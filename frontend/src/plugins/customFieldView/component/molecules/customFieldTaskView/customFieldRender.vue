@@ -54,7 +54,7 @@
     import ComputedComponentListing from '../../atom/customFieldTaskView/computedComponentListing.vue';
     import ModuleFieldListing from '../../atom/customFieldTaskView/moduleFieldListing.vue';
     import { fieldTypeUi } from '@/plugins/customFieldView/fieldTypes';
-    import { computeCustomFieldValue, recomputeCustomFields } from '@/plugins/customFieldView/formulaEngine.js';
+    import { computeCustomFieldValue, neverComputed, recomputeCustomFields } from '@/plugins/customFieldView/formulaEngine.js';
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
     import AiFieldMark from '@/components/atom/AiFieldMark/AiFieldMark.vue';
     import { isAiField } from '@/views/Projects/composables/aiFields';
@@ -228,6 +228,15 @@
             });
         }
         isInitialLoading.value = false;
+        askForMissingNumbers();
+    };
+
+    const askedFor = new Set();
+    const askForMissingNumbers = () => {
+        const taskId = props.task?._id;
+        if (!taskId || askedFor.has(taskId) || !neverComputed(props.task, filteredCustomFields.value)) return;
+        askedFor.add(taskId);
+        recomputeCustomFields({ taskIds: [taskId], projectId: props.task.ProjectID || '' });
     };
 
     const handleInputUpdate = (item, value) => {

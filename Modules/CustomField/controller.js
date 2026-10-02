@@ -318,15 +318,15 @@ const liveTasks = async (companyId, filter) => await MongoDbCrudOpration(company
 }, "find") || [];
 
 /* A rollup counts every level under its task, so a change on one row moves the rollups of each task above it.
- * The climb stops at a task the caller cannot open: nothing above it is computed or written for them. */
-const withTasksAbove = async (companyId, uid, tasks) => {
+ * `opened` keeps the tasks the caller can open, and the climb stops at one they cannot: nothing above it is computed or written for them. */
+const withTasksAbove = async (companyId, tasks, opened) => {
     const all = [...tasks];
     const known = new Set(all.map((task) => String(task._id)));
     let level = tasks;
     for (let step = 0; step < MAX_DEPTH && level.length; step += 1) {
         const wanted = [...new Set(level.map((task) => String(task.ParentTaskId || "")))].filter((id) => isObjectIdString(id) && !known.has(id));
         // eslint-disable-next-line no-await-in-loop
-        level = wanted.length ? await readable(companyId, uid, await liveTasks(companyId, { _id: { $in: wanted.map((id) => new mongoose.Types.ObjectId(id)) } })) : [];
+        level = wanted.length ? await opened(await liveTasks(companyId, { _id: { $in: wanted.map((id) => new mongoose.Types.ObjectId(id)) } })) : [];
         level.forEach((task) => { known.add(String(task._id)); all.push(task); });
     }
     return all;
@@ -345,11 +345,31 @@ const rowsBelow = async (companyId, tasks) => {
     return rows;
 };
 
-/* Works out every formula and rollup of each task from `rows`, stores it on the task and tells the open clients. */
-const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint = false }) => {
+const depthIn = (byId, task) => {
+    let depth = 0;
+    let at = task;
+    while (at && at.ParentTaskId && depth < MAX_DEPTH) {
+        at = byId.get(String(at.ParentTaskId));
+        depth += 1;
+    }
+    return depth;
+};
+
+const sameStored = (task, id, entry) => {
+    const held = ((task && task.customField) || {})[id];
+    return Boolean(held) && typeof held === "object" && held.fieldValue === entry.fieldValue && held.fieldType === entry.fieldType;
+};
+
+/* Works out every formula and rollup of each task from `rows`, stores it on the task and tells the open clients.
+ * The deepest task goes first and its new numbers are put on its row, so a rollup above reads them in the same pass.
+ * `onlyChanged` leaves a task whose stored numbers already match alone: no write and no event. */
+const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint = false, onlyChanged = false }) => {
     const out = {};
     const errors = {};
-    for (const task of tasks) {
+    const rowById = new Map(rows.map((row) => [String(row._id), row]));
+    const byId = new Map([...rows, ...tasks].map((row) => [String(row._id), row]));
+    const deepestFirst = [...tasks].sort((a, b) => depthIn(byId, b) - depthIn(byId, a));
+    for (const task of deepestFirst) {
         const definitions = definitionsOf(everyDefinition, task.ProjectID);
         const computed = definitions.filter((definition) => COMPUTED_TYPES.includes(definition.fieldType));
         if (!computed.length) continue;
@@ -358,18 +378,25 @@ const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint
             : descendantsOf(task, rows);
         const subtasks = bySprint ? kids : kids.filter((row) => String(row.ParentTaskId) === String(task._id));
         const result = computeTaskFields({ definitions, task, children: kids, subtasks });
+        out[String(task._id)] = result.values;
+        if (Object.keys(result.errors).length) errors[String(task._id)] = result.errors;
 
         const $set = {};
+        const entries = {};
         computed.forEach((definition) => {
             const id = String(definition._id);
             const value = result.values[id];
-            $set[`customField.${id}`] = {
+            entries[id] = {
                 fieldValue: value === null || value === undefined ? "" : value,
                 fieldTitle: definition.fieldTitle || "",
                 fieldType: definition.fieldType,
                 computedAt: new Date()
             };
+            if (!onlyChanged || !sameStored(task, id, entries[id])) $set[`customField.${id}`] = entries[id];
         });
+        const row = rowById.get(String(task._id));
+        if (row) row.customField = { ...(row.customField || {}), ...entries };
+        if (!Object.keys($set).length) continue;
 
         // eslint-disable-next-line no-await-in-loop
         const updated = await MongoDbCrudOpration(companyId, {
@@ -379,8 +406,6 @@ const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint
 
         // The relay places a change by the row's project, list and people, so the stored row is what is sent.
         if (updated) socketEmitter.emit("update", { type: "update", data: updated, updatedFields: $set, module: "task", companyId });
-        out[String(task._id)] = result.values;
-        if (Object.keys(result.errors).length) errors[String(task._id)] = result.errors;
     }
     return { out, errors };
 };
@@ -441,7 +466,7 @@ exports.computeFields = async (req, res) => {
         const openable = await readableTaskIds(companyId, req.uid, ids);
         const asked = openable.length ? await liveTasks(companyId, { _id: { $in: openable.map((id) => new mongoose.Types.ObjectId(id)) } }) : [];
         const bySprint = scope === "sprint";
-        const tasks = bySprint ? asked : await withTasksAbove(companyId, req.uid, asked);
+        const tasks = bySprint ? asked : await withTasksAbove(companyId, asked, (found) => readable(companyId, req.uid, found));
         const rows = bySprint
             ? await liveTasks(companyId, { sprintId: { $in: [...new Set(tasks.map((task) => task.sprintId).filter(Boolean))] } })
             : await rowsBelow(companyId, tasks);
@@ -453,6 +478,21 @@ exports.computeFields = async (req, res) => {
         console.error("Error in computeFields:", error);
         return res.send({ status: false, message: error.message || "Could not compute these fields." });
     }
+};
+
+/* A task write changed something a formula or a rollup reads (computedRefresh.js). Those tasks and every task above
+ * them are worked out again and stored. Nobody is answered, so no caller's access narrows the climb; open clients hear
+ * of it through the relay, which sends a row only to those who can open it. */
+exports.refreshComputed = async (companyId, taskIds) => {
+    const ids = [...new Set((Array.isArray(taskIds) ? taskIds : []).map(String))].filter(isObjectIdString);
+    if (!companyId || !ids.length) return 0;
+    const everyDefinition = await loadDefinitions(companyId, null);
+    if (!everyDefinition.some((definition) => COMPUTED_TYPES.includes(definition.fieldType))) return 0;
+    const asked = await liveTasks(companyId, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } });
+    if (!asked.length) return 0;
+    const tasks = await withTasksAbove(companyId, asked, (found) => found);
+    const { out } = await storeComputed({ companyId, tasks, rows: await rowsBelow(companyId, tasks), everyDefinition, onlyChanged: true });
+    return Object.keys(out).length;
 };
 
 /* A formula is refused at save when it will not parse or when it closes a cycle
