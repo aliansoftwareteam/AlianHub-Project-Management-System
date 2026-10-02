@@ -2,7 +2,7 @@ const { test, expect, asRole } = require('../support/test');
 const { createProject, createTask, listSprints, uniqueSuffix } = require('../support/fixtures');
 const { skipFirstRun } = require('../support/pages');
 const { createAgent } = require('../support/proposals');
-const { openKinds } = require('../support/proposalKinds');
+const { createToken, openKinds } = require('../support/proposalKinds');
 
 test.describe.configure({ timeout: 60000 });
 
@@ -33,17 +33,23 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
         await expectLine(row, 'Columns', 'Budget');
     }
 
+    async function cleanUp({ owner, agent, tokenId }) {
+        await owner.api.delete(`/api/v2/agents/${agent._id}`);
+        await owner.api.delete(`/api/v2/api-tokens/${tokenId}`);
+    }
+
     async function filed({ loginAs }, label) {
         const owner = await loginAs('owner');
         const suffix = uniqueSuffix();
         const project = await createProject(owner.api, { name: `KINDS ${label} ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
         const agent = await createAgent(owner.api, { project, name: `[QA kinds] ${label} ${suffix}` });
-        return { owner, suffix, project, agent, why: `Needs a decision ${label} ${suffix}` };
+        const tokenId = await createToken(owner.api, `[QA kinds] ${label} ${suffix}`);
+        return { owner, suffix, project, agent, tokenId, why: `Needs a decision ${label} ${suffix}` };
     }
 
     test('a project setup card lists its parts', async ({ page, state, loginAs }) => {
-        const { owner, project, agent, why } = await filed({ loginAs }, 'setup');
-        const id = await kinds.seedSetup({ agent, project, requestedBy: owner.uid, why });
+        const { owner, project, agent, tokenId, why } = await filed({ loginAs }, 'setup');
+        const id = await kinds.seedSetup({ agent, project, requestedBy: owner.uid, tokenId, why });
         try {
             await page.goto(`/#/${state.companyId}/inbox?tab=approval`);
             const row = rowFor(page, why);
@@ -54,14 +60,14 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
             await expectPlanLines(row);
             expect(await kinds.statusOf(id)).toBe('pending');
         } finally {
-            await owner.api.delete(`/api/v2/agents/${agent._id}`);
+            await cleanUp({ owner, agent, tokenId });
         }
     });
 
     test('a new project card names the project and says who is on it', async ({ page, state, loginAs }) => {
-        const { owner, project, agent, suffix, why } = await filed({ loginAs }, 'project');
+        const { owner, project, agent, tokenId, suffix, why } = await filed({ loginAs }, 'project');
         const name = `Kinds relaunch ${suffix}`;
-        const id = await kinds.seedProject({ agent, project, requestedBy: owner.uid, why, name, description: `Everything for ${name}.` });
+        const id = await kinds.seedProject({ agent, project, requestedBy: owner.uid, tokenId, why, name, description: `Everything for ${name}.` });
         try {
             await page.goto(`/#/${state.companyId}/inbox?tab=approval`);
             const row = rowFor(page, why);
@@ -73,14 +79,14 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
             await expectPlanLines(row);
             expect(await kinds.statusOf(id)).toBe('pending');
         } finally {
-            await owner.api.delete(`/api/v2/agents/${agent._id}`);
+            await cleanUp({ owner, agent, tokenId });
         }
     });
 
     test('an automation card shows the rule and that it starts switched off', async ({ page, state, loginAs }) => {
-        const { owner, project, agent, suffix, why } = await filed({ loginAs }, 'automation');
+        const { owner, project, agent, tokenId, suffix, why } = await filed({ loginAs }, 'automation');
         const message = `Kinds done notice ${suffix}`;
-        const id = await kinds.seedAutomation({ agent, project, requestedBy: owner.uid, why, message });
+        const id = await kinds.seedAutomation({ agent, project, requestedBy: owner.uid, tokenId, why, message });
         try {
             await page.goto(`/#/${state.companyId}/inbox?tab=approval`);
             const row = rowFor(page, why);
@@ -95,18 +101,18 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
             await expectLine(row, 'Once approved', 'switched off until you turn it on');
             expect(await kinds.statusOf(id)).toBe('pending');
         } finally {
-            await owner.api.delete(`/api/v2/agents/${agent._id}`);
+            await cleanUp({ owner, agent, tokenId });
         }
     });
 
     test('a batch card names the tasks it changes', async ({ page, state, loginAs }) => {
-        const { owner, project, agent, suffix, why } = await filed({ loginAs }, 'batch');
+        const { owner, project, agent, tokenId, suffix, why } = await filed({ loginAs }, 'batch');
         const names = [1, 2, 3].map((n) => `Kinds task ${n} ${suffix}`);
         const tasks = [];
         for (const name of names) {
             tasks.push(await createTask(owner.api, { project, name, user: state.users.owner, companyOwnerId: owner.uid, assigneeIds: [owner.uid] }));
         }
-        const id = await kinds.seedBatch({ agent, project, tasks, requestedBy: owner.uid, why, status: 'In Progress' });
+        const id = await kinds.seedBatch({ agent, project, tasks, requestedBy: owner.uid, tokenId, why, status: 'In Progress' });
         try {
             await page.goto(`/#/${state.companyId}/inbox?tab=approval`);
             const row = rowFor(page, why);
@@ -118,13 +124,13 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
             for (const name of names) await expect(row.getByRole('button', { name, exact: true })).toBeVisible();
             expect(await kinds.statusOf(id)).toBe('pending');
         } finally {
-            await owner.api.delete(`/api/v2/agents/${agent._id}`);
+            await cleanUp({ owner, agent, tokenId });
         }
     });
 
     async function approveSetup({ page, state, loginAs }, label) {
         const made = await filed({ loginAs }, label);
-        const id = await kinds.seedSetup({ agent: made.agent, project: made.project, requestedBy: made.owner.uid, why: made.why });
+        const id = await kinds.seedSetup({ agent: made.agent, project: made.project, requestedBy: made.owner.uid, tokenId: made.tokenId, why: made.why });
         await page.goto(`/#/${state.companyId}/inbox?tab=approval`);
         const row = rowFor(page, made.why);
         await expect(row).toHaveCount(1);
@@ -136,7 +142,7 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
     const reviewBoard = (page) => page.getByRole('tab', { name: /Review board/ });
 
     test('approving the project setup makes its parts in the project', async ({ page, state, loginAs }) => {
-        const { owner, project, agent } = await approveSetup({ page, state, loginAs }, 'approve setup');
+        const { owner, project, agent, tokenId } = await approveSetup({ page, state, loginAs }, 'approve setup');
         try {
             await page.goto(`/#/${state.companyId}/project/${project._id}`);
             await expect(reviewBoard(page)).toBeVisible();
@@ -145,12 +151,12 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
             const lists = await listSprints(owner.api, project._id);
             expect(lists.map((list) => list.name)).toEqual(expect.arrayContaining(['Backlog', 'This week']));
         } finally {
-            await owner.api.delete(`/api/v2/agents/${agent._id}`);
+            await cleanUp({ owner, agent, tokenId });
         }
     });
 
     test('Undo after approving the project setup takes its parts back', async ({ page, state, loginAs }) => {
-        const { owner, project, agent } = await approveSetup({ page, state, loginAs }, 'undo setup');
+        const { owner, project, agent, tokenId } = await approveSetup({ page, state, loginAs }, 'undo setup');
         try {
             await page.getByRole('status').filter({ hasText: 'Approved' }).getByRole('button', { name: 'Undo' }).click();
             await expect(page.getByText('Approval undone.')).toBeVisible();
@@ -161,7 +167,7 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
             const lists = await listSprints(owner.api, project._id);
             expect(lists.filter((list) => !Number(list.deletedStatusKey || 0)).map((list) => list.name)).not.toContain('This week');
         } finally {
-            await owner.api.delete(`/api/v2/agents/${agent._id}`);
+            await cleanUp({ owner, agent, tokenId });
         }
     });
 });
