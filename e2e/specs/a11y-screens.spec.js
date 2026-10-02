@@ -62,7 +62,7 @@ async function auditScreen(page, open) {
             found.push(...(await blockingViolations(page, `[${viewport.name} ${theme}]`)));
         }
     }
-    expect(summarise(found), `${found.length} findings`).toEqual([]);
+    if (found.length) throw new Error(`${new Set(found).size} findings\n${summarise(found).join('\n')}`);
 }
 
 async function openView(page, view) {
