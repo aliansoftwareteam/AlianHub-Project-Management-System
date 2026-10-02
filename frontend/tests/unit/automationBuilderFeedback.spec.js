@@ -113,6 +113,29 @@ describe('a sentence typed while the builder is still opening', () => {
         expect(compiles().at(-1).sentence).toBe(typed);
         expect(wrapper.findAll('.au__compiled select').some((select) => select.element.value === 'add_comment')).toBe(true);
     });
+
+    it('finds the box the person is in still empty when that answer arrives, and filled once they change a part instead', async () => {
+        const store = createStore({ modules: { settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType: 1 }) } } } });
+        apiRequest.mockImplementation((method, url) => {
+            if (url.endsWith('/registry')) return ok(MANIFEST);
+            if (url.endsWith('/compile')) return ok({ sentence: 'When a task is created, set the status to .', errors: [], issues: [], parseErrors: [], ambiguities: [], grammar: {} });
+            if (url === '/api/v1/project') return ok(PROJECTS);
+            return ok([]);
+        });
+        const wrapper = mount(AutomationsPage, { attachTo: document.body, global: { plugins: [store], mocks: { $t: echo } } });
+        await flushPromises();
+        await startNew(wrapper);
+        const sentence = wrapper.find('.au__sentence-input');
+        expect(document.activeElement).toBe(sentence.element);
+        expect(sentence.element.value).toBe('');
+
+        const scope = wrapper.find('[data-test="scope-picker"]');
+        scope.element.focus();
+        await scope.setValue('p1');
+        await flushPromises();
+        expect(sentence.element.value).toBe('When a task is created, set the status to .');
+        wrapper.unmount();
+    });
 });
 
 describe('what a rule still lacks', () => {
