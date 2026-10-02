@@ -77,8 +77,7 @@ describe('useProjects', () => {
             m.getUser.mockReturnValue(undefined);
             expect(p.getDateType(AT)).toBe('15:07');
         });
-        // The fallback value is the 12-hour pattern "hh:mm A", so a user with no preference is expected to see 12-hour time.
-        it.fails('shows 12-hour time when the user has no preference', () => {
+        it('shows 12-hour time when the user has no preference', () => {
             m.getUser.mockReturnValue({});
             expect(p.getDateType(AT)).toBe('03:07 PM');
         });
@@ -183,8 +182,7 @@ describe('useProjects', () => {
             plan({ project: 1, maxPublicProject: null }, undefined);
             expect(p.checkProjectPlan('public')).toBe(true);
         });
-        // limit - used is negative once a company is over its limit, and a negative number is truthy.
-        it.fails('refuses a new project when the company is already over its overall limit', () => {
+        it('refuses a new project when the company is already over its overall limit', () => {
             plan({ project: 5, maxPublicProject: null }, { projectCount: 7 });
             expect(p.checkProjectPlan('public')).toBe(false);
         });

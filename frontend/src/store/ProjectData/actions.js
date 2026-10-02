@@ -26,6 +26,7 @@ export const setProjects = (state, payload) => {
                 state.commit('mutateProjects', result);
             }).catch((error)=>{
                 console.error("Error while getting project",error);
+                resolve([]);
             })
         } catch (error) {
             reject(error);
@@ -327,7 +328,7 @@ export const tabSyncTaskCommit = ({state,commit},payload) => {
                 const doc = task;
 
                 if(doc.favouriteTasks && doc.favouriteTasks.length && typeof doc.favouriteTasks[0] === "string") {
-                    doc.favouriteTasks = doc.favouriteTasks.map((x) => ({...x}))
+                    doc.favouriteTasks = doc.favouriteTasks.map((x) => ({userId: x}))
                 }
                 if(doc.startDate && doc.startDate > 0) {
                     doc.startDate = new Date(doc.startDate * 1000);

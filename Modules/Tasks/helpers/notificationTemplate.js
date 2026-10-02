@@ -33,16 +33,16 @@ exports.EditProjectName = (ProjectNameobj) => {
 
 // For Create Sprint //
 exports.createSprint = (sprintObj) => {
-    return `<p>Created new <strong>Sprint</strong> named <strong>${sprintObj.sprintName}</strong> in <strong>${escapeText(sprintObj.ProjectName)}</strong> project.</p>`;
+    return `<p>Created new <strong>Sprint</strong> named <strong>${escapeText(sprintObj.sprintName)}</strong> in <strong>${escapeText(sprintObj.ProjectName)}</strong> project.</p>`;
 }
 
 exports.EditSprint = (sprintObj) => {
-    return `<p>In <strong>${escapeText(sprintObj.ProjectName)}</strong> project <strong>Sprint</strong> name is changed from <strong> ${sprintObj.previousSprint} </strong> to <strong> ${sprintObj.sprintName} </strong> </p>`;
+    return `<p>In <strong>${escapeText(sprintObj.ProjectName)}</strong> project <strong>Sprint</strong> name is changed from <strong> ${escapeText(sprintObj.previousSprint)} </strong> to <strong> ${escapeText(sprintObj.sprintName)} </strong> </p>`;
 }
 
 // For Create Folder //
 exports.createFolder = (obj) => {
-    return `<p>Created new <strong>Folder</strong> named <strong>${obj.sprintFolderName}</strong> in <strong>${escapeText(obj.ProjectName)}</strong> project.</p>`;
+    return `<p>Created new <strong>Folder</strong> named <strong>${escapeText(obj.sprintFolderName)}</strong> in <strong>${escapeText(obj.ProjectName)}</strong> project.</p>`;
 }
 
 exports.editFolder = (obj) => {
@@ -181,7 +181,7 @@ exports.projectCheckListUserRemove = (checkObj) => {
 
 // For Project MileStone //
 exports.projectMileStone = (obj) => {
-    return `<p>In Project <strong>${escapeText(obj.ProjectName)}</strong> a new Milestone named <strong>${obj.milestoneName}</strong> is Created .</p>`;
+    return `<p>In Project <strong>${escapeText(obj.ProjectName)}</strong> a new Milestone named <strong>${escapeText(obj.milestoneName)}</strong> is Created .</p>`;
 }
 
 // For projectMileStoneDelete  //
@@ -368,8 +368,7 @@ exports.taskEndDateChange = (obj) => {
 
 // For Task Description Add //
 exports.taskDescriptionAdd = (Descobj) => {
-    return `<p>In <strong>${escapeText(Descobj.ProjectName)}</strong> Project, Description of <strong>${Descobj.TaskName
-        }</strong> is added as <strong>"${Descobj.textSimple.length > 20 ? Descobj.textSimple.slice(0, 20) + '...' : Descobj.textSimple}"</strong>.</p>`;
+    return `<p>In <strong>${escapeText(Descobj.ProjectName)}</strong> Project, Description of <strong>${escapeText(Descobj.TaskName)}</strong> is added as <strong>"${Descobj.textSimple.length > 20 ? Descobj.textSimple.slice(0, 20) + '...' : Descobj.textSimple}"</strong>.</p>`;
 }
 
 // For Task Description Change //
@@ -414,7 +413,7 @@ exports.taskCheckListChecked = (checkObj) => {
 }
 // For Create Sub Task //
 exports.createSubTask = (Subobj) => {
-    return `<p>In <strong>${escapeText(Subobj.ProjectName)}</strong> Project, created a new sub task named <strong>${Subobj.newSubTaskName}</strong>.</p>`;
+    return `<p>In <strong>${escapeText(Subobj.ProjectName)}</strong> Project, created a new sub task named <strong>${escapeText(Subobj.newSubTaskName)}</strong>.</p>`;
 }
 
 // For Logged Hours //
