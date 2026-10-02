@@ -10,9 +10,7 @@ const toObjId = (id) => {
     try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; }
 };
 
-// TIME-04 — export time entries as a payroll CSV. Resolves user names from the
-// global DB and project names from the company DB so the file is self-contained
-// (User, Project, Date, Description, Billable, Hours). LogStartTime is seconds.
+/* The rows are the ones the user timesheet shows the caller. LogStartTime is in seconds. */
 exports.exportTimesheetCsv = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
@@ -29,7 +27,6 @@ exports.exportTimesheetCsv = async (req, res) => {
             data: [match, null, { sort: { LogStartTime: 1 } }],
         }, 'find') || [];
 
-        // Resolve names.
         const userIds = [...new Set(entries.map((e) => e.Loggeduser).filter(Boolean))];
         const projectIds = [...new Set(entries.map((e) => e.ProjectId).filter(Boolean))];
         const userMap = {};

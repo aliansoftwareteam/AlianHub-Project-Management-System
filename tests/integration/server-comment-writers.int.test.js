@@ -70,15 +70,28 @@ async function proposalToComment(thread, body, filedOn = thread) {
     const agentId = created.body.data._id;
     agentIds.push(agentId);
     const api = await agentClient(agentId);
+    // Filing refuses a direct message, so a row that names one is filed on an open task and then pointed at it.
+    const fileable = (place) => (place.taskId === dm.taskId ? open : place);
     const res = await api.post('/api/v2/agents/proposals', {
-        agentId, taskId: filedOn.taskId, projectId: filedOn.projectId, what: label('proposal'), why: 'integration',
-        changes: [{ action: 'task.comment', params: { taskId: thread.taskId, body }, label: 'Comment' }],
+        agentId, taskId: fileable(filedOn).taskId, projectId: fileable(filedOn).projectId, what: label('proposal'), why: 'integration',
+        changes: [{ action: 'task.comment', params: { taskId: fileable(thread).taskId, body }, label: 'Comment' }],
     });
     expect(res.body.status).toBe(true);
-    return res.body.data._id;
+    const proposalId = res.body.data._id;
+    if (thread.taskId === dm.taskId) await pointAt(proposalId, thread, filedOn);
+    return proposalId;
 }
 
 const storedProposal = (proposalId) => db.collection('agent_proposals').findOne({ _id: new ObjectId(String(proposalId)) });
+const sameKind = (was, id) => (was instanceof ObjectId ? new ObjectId(String(id)) : String(id));
+const pointAt = async (proposalId, thread, filedOn) => {
+    const stored = await storedProposal(proposalId);
+    await db.collection('agent_proposals').updateOne({ _id: stored._id }, { $set: {
+        taskId: sameKind(stored.taskId, filedOn.taskId),
+        projectId: sameKind(stored.projectId, filedOn.projectId),
+        'changes.0.params.taskId': sameKind(stored.changes[0].params.taskId, thread.taskId),
+    } });
+};
 
 const clientMessage = (session, projectId, message) => session.api.post('/api/v2/billing/client-view/message', { projectId, message });
 

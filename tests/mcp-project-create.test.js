@@ -262,6 +262,23 @@ describe('approving makes the project as the web app would, as the person who ap
         expect(socketEmitter.emit).toHaveBeenCalledWith('insert', expect.objectContaining({ module: 'project', companyId: CID, data: expect.objectContaining({ ProjectName: NAME }) }));
     });
 
+    it('makes only the parts of its plan the approver kept, and the project either way', async () => {
+        const id = await filed(as(INSIDER));
+        const out = await proposals.approve(CID, id, { decider: human(INSIDER), isPrivileged: false, ip: '', parts: { 0: { lists: [1], fields: [0] } } });
+        expect(out.error).toBeUndefined();
+        const project = made();
+        expect(project.ProjectName).toBe(NAME);
+        expect(out.applied[0].result.parts.map((part) => part.part)).toEqual(['description', 'lists', 'fields']);
+        expect(project.taskStatusData.map((status) => status.name)).toEqual(['To Do', 'In Progress', 'Done']);
+        expect(listsOf(project._id)).toEqual(['List', 'This week']);
+        expect(fieldsOf(project._id)).toEqual(['Budget']);
+        expect(project.ProjectRequiredComponent.map((view) => view.title || view.name)).toEqual(['List', 'Board']);
+
+        const refused = await proposals.approve(CID, await filed(as(INSIDER), { ...PLAN, name: 'Second site' }), { decider: human(INSIDER), isPrivileged: false, ip: '', parts: { 0: { views: [0] } } });
+        expect(refused).toMatchObject({ status: 400, error: 'The view "Review board" needs the field "Budget", which is left out. Keep both, or leave both out.' });
+        expect(projectsNamed('Second site')).toHaveLength(0);
+    });
+
     it('creates a project asked for by its name alone', async () => {
         const out = await approve(await filed(as(INSIDER), { name: 'Hiring' }));
         expect(out.applied[0]).toMatchObject({ ok: true, result: { name: 'Hiring', code: 'H', made: 0, parts: [], notMade: [] } });
@@ -378,13 +395,14 @@ describe('the preview says what will be made', () => {
             lines: [
                 { kind: 'members', only: 'approver' },
                 { kind: 'description', text: 'Everything for the new site.', more: false },
-                { kind: 'newStatuses', names: ['In Review'] },
-                { kind: 'newLists', names: ['Backlog', 'This week'] },
-                { kind: 'field', name: 'Budget', type: 'money', options: [] },
-                { kind: 'planView', name: 'Review board', layout: 'board' },
-                { kind: 'group', by: 'status', field: '' },
-                { kind: 'columns', names: ['Budget'], others: 0 },
+                { kind: 'newStatuses', names: ['In Review'], picks: ['statuses:0'] },
+                { kind: 'newLists', names: ['Backlog', 'This week'], picks: ['lists:0', 'lists:1'] },
+                { kind: 'field', name: 'Budget', type: 'money', options: [], pick: 'fields:0' },
+                { kind: 'planView', name: 'Review board', layout: 'board', pick: 'views:0' },
+                { kind: 'group', by: 'status', field: '', under: 'views:0' },
+                { kind: 'columns', names: ['Budget'], others: 0, under: 'views:0' },
             ],
+            needs: { 'views:0': ['fields:0'] },
         }]);
     });
 

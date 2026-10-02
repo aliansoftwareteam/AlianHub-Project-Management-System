@@ -13,6 +13,7 @@ const queue = require('./helpers/approvalQueue');
 const R = require('./helpers/inboxRules');
 const S = require('./helpers/inboxState');
 const { CHAT_THREAD_REPLY } = require('../Comments/helpers/chatThreads');
+const { mentionsKeptFromAgent, noticesKeptFromAgent, withoutKept } = require('../Comments/helpers/agentChatRows');
 
 // The per-user counters document behind the header's red dot. `key` selects the field:
 // 5 is notification_counts, 4 is mention_counts.
@@ -275,9 +276,10 @@ exports.list = async (req, res) => {
         const probe = window + 1;
         const waiting = tab === R.APPROVAL_TAB;
         const wantRows = !waiting && kind !== 'approval';
+        const [keptNotices, keptMentions] = await Promise.all([noticesKeptFromAgent(companyId, userId), mentionsKeptFromAgent(companyId, userId)]);
         const [notifications, mentions, approvals, proposals, applied] = await Promise.all([
-            wantRows && plan.notifications ? readNotifications(companyId, userId, { sort, limit: probe, match: R.notificationMatch(userId, scope) }) : [],
-            wantRows && plan.mentions ? readMentions(companyId, userId, { sort, limit: probe, match: R.mentionMatch(userId, scope) }) : [],
+            wantRows && plan.notifications ? readNotifications(companyId, userId, { sort, limit: probe, match: withoutKept(R.notificationMatch(userId, scope), keptNotices) }) : [],
+            wantRows && plan.mentions ? readMentions(companyId, userId, { sort, limit: probe, match: withoutKept(R.mentionMatch(userId, scope), keptMentions) }) : [],
             waiting ? readApprovals(companyId, userId) : [],
             waiting ? readProposals(companyId, userId) : [],
             waiting ? readApplied(companyId, userId) : [],
@@ -377,12 +379,15 @@ exports.counts = async (req, res) => {
             message: '$comment_message',
             at: { $dateTrunc: { date: '$createdAt', unit: 'second' } },
         };
+        const [keptNotices, keptMentions] = await Promise.all([noticesKeptFromAgent(companyId, userId), mentionsKeptFromAgent(companyId, userId)]);
+        const noticesOn = (tab) => withoutKept(R.notificationMatch(userId, { tab, now }), keptNotices);
+        const mentionsOn = (tab) => withoutKept(R.mentionMatch(userId, { tab, now }), keptMentions);
         const [notifications, mentions, other, laterNotifications, laterMentions, approvals, proposals, nextWakeAt] = await Promise.all([
-            count(SCHEMA_TYPE.NOTIFICATIONS, R.notificationMatch(userId, { tab: 'primary', now }), notificationGroup),
-            count(SCHEMA_TYPE.MENTIONS, R.mentionMatch(userId, { tab: 'primary', now }), mentionGroup),
-            count(SCHEMA_TYPE.NOTIFICATIONS, R.notificationMatch(userId, { tab: 'other', now }), notificationGroup),
-            count(SCHEMA_TYPE.NOTIFICATIONS, R.notificationMatch(userId, { tab: 'later', now }), notificationGroup),
-            count(SCHEMA_TYPE.MENTIONS, R.mentionMatch(userId, { tab: 'later', now }), mentionGroup),
+            count(SCHEMA_TYPE.NOTIFICATIONS, noticesOn('primary'), notificationGroup),
+            count(SCHEMA_TYPE.MENTIONS, mentionsOn('primary'), mentionGroup),
+            count(SCHEMA_TYPE.NOTIFICATIONS, noticesOn('other'), notificationGroup),
+            count(SCHEMA_TYPE.NOTIFICATIONS, noticesOn('later'), notificationGroup),
+            count(SCHEMA_TYPE.MENTIONS, mentionsOn('later'), mentionGroup),
             readApprovals(companyId, userId).then((rows) => rows.length),
             readProposals(companyId, userId).then(queue.waitingCount),
             S.nextWakeAt(companyId, userId, now),

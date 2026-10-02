@@ -3,11 +3,11 @@ const atRisk = require('./atRisk');
 const { agentsRefused } = require('../Agents/guard');
 const { limitCallerBody } = require('../Company/helpers/callerQueryRules');
 
-const cardsByPeople = agentsRefused('dashboard.card.add');
+const dashboardsByPeople = agentsRefused('dashboard.manage');
 
 exports.init = (app) => {
     app.get('/api/v1/dashboard/:id', ctrl.getDashboard);
-    app.post('/api/v1/dashboard', cardsByPeople, ctrl.updateDashboard);
+    app.post('/api/v1/dashboard', dashboardsByPeople, ctrl.updateDashboard);
     app.get('/api/v1/cardcomponent',ctrl.getCardComponent);
     // EmployeeWorkloadReportCard data endpoint — pure filter-driven
     // report. All thresholds (active/idle/overloaded) come from the
@@ -46,10 +46,10 @@ exports.init = (app) => {
     // visibility, not a per-user blob. Same collection as above; the legacy
     // per-user document is read as its owner's private dashboard.
     app.get('/api/v1/dashboards', ctrl.listDashboards);
-    app.post('/api/v1/dashboards', ctrl.createSharedDashboard);
+    app.post('/api/v1/dashboards', dashboardsByPeople, ctrl.createSharedDashboard);
     app.get('/api/v1/dashboards/:id', ctrl.getSharedDashboard);
-    app.put('/api/v1/dashboards/:id', ctrl.updateSharedDashboard);
-    app.put('/api/v1/dashboards/:id/cards', cardsByPeople, ctrl.updateSharedDashboardCards);
-    app.post('/api/v1/dashboards/:id/duplicate', ctrl.duplicateSharedDashboard);
+    app.put('/api/v1/dashboards/:id', dashboardsByPeople, ctrl.updateSharedDashboard);
+    app.put('/api/v1/dashboards/:id/cards', dashboardsByPeople, ctrl.updateSharedDashboardCards);
+    app.post('/api/v1/dashboards/:id/duplicate', dashboardsByPeople, ctrl.duplicateSharedDashboard);
     app.delete('/api/v1/dashboards/:id', ctrl.deleteSharedDashboard);
 }

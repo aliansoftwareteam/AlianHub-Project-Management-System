@@ -45,11 +45,11 @@ describe('New doc in the Docs hub', () => {
     it('lands in the selected project from every entry on the screen', async () => {
         await openHub('project:p1');
         const buttons = newDocButtons();
-        expect(buttons).toHaveLength(3);
+        expect(buttons).toHaveLength(4);
 
         await clickEach(buttons);
 
-        expect(created().map((body) => body.projectId)).toEqual(['p1', 'p1', 'p1']);
+        expect(created().map((body) => body.projectId)).toEqual(['p1', 'p1', 'p1', 'p1']);
     });
 
     it('puts a new wiki page in the selected project too', async () => {
@@ -103,8 +103,18 @@ describe('an empty Docs hub', () => {
         expect(empty().find('button').exists()).toBe(false);
     });
 
-    it('leaves creating to the New doc button above the list in a project', async () => {
+    it('offers New doc in a project with no docs, and the doc lands in that project', async () => {
         await openHub('project:p1');
-        expect(wrapper.find('[data-test="docs-empty-project"]').findAll('button')).toHaveLength(0);
+        const action = wrapper.find('[data-test="docs-empty-project"] .empty-state__btn');
+        expect(action.text()).toBe('Docs.new_doc');
+        await action.trigger('click');
+        await flushPromises();
+        expect(created()).toEqual([expect.objectContaining({ projectId: 'p1' })]);
+    });
+
+    it.each([['shared', 'docs-empty-shared'], ['agents', 'docs-empty-agents']])('leads from an empty %s view back to the recent docs', async (view, test) => {
+        await openHub(view);
+        await wrapper.find(`[data-test="${test}"] .empty-state__btn`).trigger('click');
+        expect(wrapper.find('select.hub__view-select').element.value).toBe('recent');
     });
 });

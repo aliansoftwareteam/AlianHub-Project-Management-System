@@ -36,12 +36,22 @@ const tasksAfter = (has) => [
     has('task.update') && 'dates with `task.update`',
 ];
 
-/* The setup steps for a connection that can send a whole plan: one call, which waits for the person in AlianHub. */
-const planThroughOneCall = (has) => [
-    'Show me the whole setup as one plan before you make anything: the statuses, the lists, the fields, the views, and the first tasks in each list. Leave out what the project already has. Say that automations are a part I have to make myself in AlianHub.',
-    'Wait for my yes. Then send the statuses, lists, fields and views together in one call of `project.setup`. Nothing is made by that call: tell me the plan is waiting for my approval in AlianHub, where I see every part of it before I approve, and wait until I say I have approved it.',
-    `Then make the rest of what I approved: ${series([listsTool(has) && `find the new lists with \`${listsTool(has)}\``, ...tasksAfter(has)])}.`,
-];
+/* The setup steps for a connection that can send a whole plan: one call, which waits for the person in AlianHub.
+ * The automations go in the plan where the connection may ask for one, and the first tasks where it may create a
+ * task with its details, which is the same connection that may assign one. */
+const planThroughOneCall = (has) => {
+    const withRules = has('automation.create');
+    const withTasks = has('task.assign');
+    const together = series(['the statuses, lists, fields and views', withRules && 'the automations', withTasks && 'the first tasks']);
+    return [
+        `Show me the whole setup as one plan before you make anything: the statuses, the lists, the fields, the views, ${withRules ? 'the automations, ' : ''}and the first tasks in each list. Leave out what the project already has. `
+            + (withRules ? 'Say that an automation starts switched off, and that only an owner or an admin can approve one.' : 'Say that automations are a part I have to make myself in AlianHub.'),
+        `Wait for my yes. Then send ${together} together in one call of \`project.setup\`. Nothing is made by that call: tell me the plan is waiting for my approval in AlianHub, where I see every part of it and can leave any part out before I approve, and wait until I say I have approved it.`,
+        withTasks
+            ? `Then tell me what was made and what was not, and why. Make whatever of the rest I still want: ${series(tasksAfter(has))}.`
+            : `Then make the rest of what I approved: ${series([listsTool(has) && `find the new lists with \`${listsTool(has)}\``, ...tasksAfter(has)])}.`,
+    ];
+};
 
 const planPartByPart = (has) => [
     'Show me the whole setup as one plan before you make anything: the lists, and the first tasks in each. Say which parts you will make and which parts I have to make myself in AlianHub, such as statuses, fields, views and automations.',
