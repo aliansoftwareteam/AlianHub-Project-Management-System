@@ -220,7 +220,9 @@ describe('the parts a person may not approve', () => {
         expect(out.error).toBeUndefined();
         expect(liveFields()).toEqual(['Cost', 'Client', 'Cost total', 'Cost with tax']);
         expect(viewTitles()).toEqual(['List']);
-        expect(paramsOf(out.left.waiting[0])).toEqual({ projectId: P_OPEN, views });
+        const madeIds = [...views[0].look.showFieldIds, idOfField('Cost total')];
+        const waitingView = { kind: views[0].kind, name: views[0].name, look: { ...views[0].look, showFieldIds: madeIds } };
+        expect(paramsOf(out.left.waiting[0])).toEqual({ projectId: P_OPEN, views: [waitingView] });
     });
 
     it('keeps a locked rollup waiting for someone whose role may make it, who then makes it once', async () => {
