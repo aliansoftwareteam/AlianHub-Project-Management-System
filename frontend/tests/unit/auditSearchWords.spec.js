@@ -43,7 +43,7 @@ describe('the keys the typed words label in the reader\'s language', () => {
 
     it('stay a short list however much matches', () => {
         const many = Object.fromEntries(Array.from({ length: 200 }, (unused, at) => [`key_${at}`, 'the same words']));
-        expect(searchKeys(() => many, 'same').qEvents.split(',')).toHaveLength(40);
+        expect(searchKeys(() => many, 'same').qEvents.split(',')).toHaveLength(25);
     });
 });
 

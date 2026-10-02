@@ -132,6 +132,23 @@ export const reasonWords = (t, te, row, personName) => {
     return plainReason(t, te, rawReason(row), personName);
 };
 
+const SEARCH_KEYS_MAX = 25;
+const SEARCHED = Object.freeze({ qEvents: ["AuditEvents"], qActions: ["AuditActions", "AgentActions"], qReasons: ["AuditReasons"] });
+
+/* The keys whose words, in the reader's language, hold what was typed. The server matches rows by them
+   (Modules/Audit/eventWords.js), since a row stores its key and not its words. `messagesOf(namespace)` answers
+   that namespace's words by key. */
+export const searchKeys = (messagesOf, typed) => {
+    const text = String(typed || "").trim().toLowerCase();
+    if (!text) return {};
+    const holding = (namespace) => Object.entries(messagesOf(namespace) || {})
+        .filter(([, words]) => typeof words === "string" && words.toLowerCase().includes(text))
+        .map(([key]) => key);
+    return Object.fromEntries(Object.entries(SEARCHED)
+        .map(([name, namespaces]) => [name, namespaces.flatMap(holding).slice(0, SEARCH_KEYS_MAX).join(",")])
+        .filter(([, keys]) => keys));
+};
+
 /* What the row holds as it was written, for whoever needs the keys and the ids. */
 export const detailLines = (t, row, shownReason) => {
     const tried = String((row.meta && row.meta.action) || "");
