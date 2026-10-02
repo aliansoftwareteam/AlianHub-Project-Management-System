@@ -12,6 +12,7 @@ jest.mock('../Modules/PersonalList/ownership', () => ({ ...jest.requireActual('.
 jest.mock('../Modules/EstimatedTime/aiTaskEstimator', () => ({ estimateAndPersist: jest.fn(), _internal: {} }));
 jest.mock('../Modules/LogTime/controllerV2/helpers', () => ({ updateRemainingTime: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
+jest.mock('../Config/projectPeople', () => ({ namedPeopleRefusal: jest.fn(async () => '') }));
 jest.mock('../Modules/EstimatedTime/helpers/planHistory', () => ({ previousPlanOf: jest.fn(async () => null), recordPlanChange: jest.fn(async () => undefined) }));
 
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');

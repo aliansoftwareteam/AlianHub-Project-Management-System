@@ -5,6 +5,8 @@ const { removeCache } = require('../../../utils/commonFunctions');
 const logger = require('../../../Config/loggerConfig');
 const { recordChecklistChange } = require('../helpers/projectItemHistory');
 const { isItemId, badRequest } = require('../../Company/helpers/callerQueryRules');
+const { namedIds } = require('../../../Config/companyMembers');
+const { namedPeopleRefusal } = require('../../../Config/projectPeople');
 
 const ITEM_KEYS = ['name', 'assigneeAdd', 'assigneeRemove'];
 const ITEM_VALUE_OF_KEY = { name: 'name', assigneeAdd: 'uid', assigneeRemove: 'uid' };
@@ -21,12 +23,24 @@ const checklistRefusal = ({ checklistItem, operation, key }) => {
     return typeof checklistItem[ITEM_VALUE_OF_KEY[key]] === 'string' ? null : `Checklist item '${ITEM_VALUE_OF_KEY[key]}' must be text.`;
 };
 
-/**
- * Helper function for build update query object based on the specific key
- * @param {*} key 
- * @param {*} item 
- * @returns 
- */
+const peopleOn = (items) => (Array.isArray(items) ? items : [items])
+    .flatMap((item) => (item && typeof item === 'object' ? namedIds(item.AssigneeUserId || []) : []));
+
+/* The people a checklist write puts on a row. Someone a row already names stays, so a row can still be ticked
+ * after its person has left. */
+const peopleAdded = async (companyId, { id, checklistItem, operation, key }) => {
+    if (operation === 'push') return peopleOn(checklistItem);
+    if (operation !== 'update') return [];
+    if (key === 'assigneeAdd') return namedIds(checklistItem.uid);
+    if (key !== 'isChecked') return [];
+    const project = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: [{ _id: new mongoose.Types.ObjectId(id) }, { checklistArray: 1 }],
+    }, 'findOne');
+    const held = new Set(peopleOn((project && project.checklistArray) || []));
+    return peopleOn(checklistItem).filter((uid) => !held.has(uid));
+};
+
 const buildQuery = (key, item) => {
     switch (key) {
         case 'name':
@@ -87,6 +101,8 @@ exports.handleChecklist = async (req, res) => {
         }
 
         const companyId = req.headers['companyid'];
+        const peopleRefusal = await namedPeopleRefusal(companyId, id, await peopleAdded(companyId, req.body));
+        if (peopleRefusal) return badRequest(res, peopleRefusal);
         const previous = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
 
         removeCache('UserProjectData:', true);

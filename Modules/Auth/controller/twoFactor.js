@@ -14,7 +14,7 @@ const { dbCollections } = require('../../../Config/collections');
 const logger = require('../../../Config/loggerConfig');
 const rules = require('../helpers/twoFactorRules');
 const loginSessionCtrl = require('./loginSession');
-const { signedInPersonOnly } = require('../helpers/accountSecurity');
+const { signedInPersonOnly, signedInPersonReads } = require('../helpers/accountSecurity');
 
 // ── DB helpers (userAuth lives in the global DB, keyed by _id) ───────────
 const findUserAuthById = (uid) => mongoC.MongoDbCrudOpration(
@@ -42,6 +42,7 @@ const findRecoveryMatch = async (code, hashes) => {
 // GET /api/v2/auth/2fa/status (authed) — is 2FA enabled for the logged-in user?
 exports.twoFaStatus = async (req, res) => {
     try {
+        if (!(await signedInPersonReads(req, res))) return undefined;
         const user = await findUserAuthById(req.uid);
         return res.status(200).json({ status: true, data: { enabled: !!(user && user.twoFactor && user.twoFactor.enabled) } });
     } catch (error) {

@@ -9,6 +9,11 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const { cleanDescription, RichTextLimitError } = require('../Tasks/helpers/cleanRichText');
 const { actingUser } = require('../Sprints/helpers/actingUser');
+const { namedPeopleRefusal } = require('../../Config/projectPeople');
+
+const ASSIGNEES_MAX = 50;
+const idList = (value) => value === undefined || value === null
+    || (Array.isArray(value) && value.length <= ASSIGNEES_MAX && value.every((id) => typeof id === 'string'));
 
 // Build a valid task `data` template from the request (mirrors the defaults in
 // taskMongo.createSubTaskWithAi so taskMongo.create accepts it).
@@ -48,6 +53,9 @@ exports.createDefinition = async (req, res) => {
         }
         const creator = await actingUser(req);
         if (!creator) return res.status(401).send({ status: false, statusText: 'A signed-in user is required.' });
+        if (!idList(b.assignees)) return res.status(400).send({ status: false, statusText: `assignees is a list of at most ${ASSIGNEES_MAX} member ids.` });
+        const refusal = await namedPeopleRefusal(companyId, b.projectData._id, b.assignees || []);
+        if (refusal) return res.status(400).send({ status: false, statusText: refusal });
         const def = {
             _id: new mongoose.Types.ObjectId(),
             name: b.name,

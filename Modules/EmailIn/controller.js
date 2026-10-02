@@ -11,6 +11,7 @@ const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { sprintIdentities, canSeeSprint } = require('../Sprints/helpers/sprintVisibility');
 const { actingUser } = require('../Sprints/helpers/actingUser');
 const { activeMemberIds } = require('../notification/activeMembers');
+const { peopleWhoOpen } = require('../../Config/projectPeople');
 
 // AUTO-01 — email-to-task. An inbox doc lives in the GLOBAL db (keyed by token)
 // so the unauthenticated inbound webhook can resolve token -> company without
@@ -125,7 +126,8 @@ exports.createInbox = async (req, res) => {
         const folderObjId = target.folderObjId || '';
 
         const creator = await actingUser(req);
-        const assignees = await activeMemberIds(companyId, (Array.isArray(b.assignees) ? b.assignees : []).filter((id) => typeof id === 'string'));
+        const members = await activeMemberIds(companyId, (Array.isArray(b.assignees) ? b.assignees : []).filter((id) => typeof id === 'string'));
+        const assignees = await peopleWhoOpen(companyId, String(projectId), members);
         const tmpl = buildTemplate(b, companyId, { assignees, creatorId });
         tmpl.ProjectID = projObj._id;
         tmpl.CompanyId = companyId;
@@ -175,7 +177,10 @@ exports.listInboxes = async (req, res) => {
         const rows = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [q, {}, { sort: { createdAt: -1 } }] }, 'find') || [];
         /* An inbox's address is the key to adding tasks, so it is shown with its project only. */
         const openable = new Set(await keepVisibleProjectIds(companyId, req.uid, rows.map((row) => String(row.ProjectID))));
-        return res.send({ status: true, data: rows.filter((row) => openable.has(String(row.ProjectID))).map(withAddress) });
+        const privileged = isPrivileged(await getRoleType(companyId, req.uid));
+        const shown = rows.filter((row) => openable.has(String(row.ProjectID)))
+            .map((row) => ({ ...withAddress(row), canManage: privileged || String(row.createdBy) === String(req.uid) }));
+        return res.send({ status: true, data: shown });
     } catch (e) { logger.error(`listInboxes: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
