@@ -3,6 +3,7 @@ textarea.previewer_sj {
     height: 100%;
 
     background-color: var(--surface-2) !important;
+    color: var(--ink);
     border: 1px solid var(--border);
     border-radius: 4px;
     font-size: 16px;

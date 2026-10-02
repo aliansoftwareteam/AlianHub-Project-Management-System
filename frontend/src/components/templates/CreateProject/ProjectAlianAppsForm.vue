@@ -25,7 +25,7 @@
                     <div class="d-flex align-items-center">
                         <img v-if="!appData.appStatus" alt="information" :src="getImageUrl(appData)">
                         <img v-if="appData.appStatus" alt="information" :src="getImageUrl(appData)">
-                        <h4 class="changesFont ml-15px" :class="{'enableapp-list-desktop': clientWidth > 767 , 'enableapp-list-mobile': clientWidth <= 767}" :style="[{'color': appData.appStatus ? '#3845B3 !important' :'' }]" >{{$t(`Apps.${appData.key}`)}}</h4> 
+                        <h4 class="changesFont ml-15px" :class="{'enableapp-list-desktop': clientWidth > 767 , 'enableapp-list-mobile': clientWidth <= 767}" :style="[{'color': appData.appStatus ? 'var(--brand) !important' :'' }]" >{{$t(`Apps.${appData.key}`)}}</h4> 
                     </div>
                     <Tooltip :isImage="true" :Image="clientWidth > 767 ? information : information_svg" :text="getTooptipText(appData.key)" width="150px" />
                 </div>
