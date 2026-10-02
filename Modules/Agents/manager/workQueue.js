@@ -341,5 +341,5 @@ const closeFinished = async (companyId, projectId, now = new Date()) => {
 };
 
 module.exports = {
-    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, connectionOf, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, heldTasks, aboutTask, handOver, pickableOn, handOverFromComment, takeBack, closeFinished,
+    CLAIM_MINUTES, QUEUE_RULES, LEFT, REFUSAL, LISTED_MAX, announce, connectionOf, liveClaim, itemsFor, itemFor, executors, inverses, claimsOf, heldTasks, aboutTask, handOver, pickableOn, handOverFromComment, takeBack, closeFinished,
 };
