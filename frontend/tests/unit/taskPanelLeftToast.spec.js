@@ -66,6 +66,7 @@ vi.mock('@/components/organisms/TaskDetailOverlay/TaskListsRow.vue', () => stub(
 
 import TaskDetailPanel from '@/components/organisms/TaskDetailOverlay/TaskDetailPanel.vue';
 import taskClass from '@/utils/TaskOperations';
+import { holdOwnBulkLeave } from '@/utils/taskUpdateMarker';
 import en from '@/locales/en.js';
 
 const i18n = config.global.plugins[0];
@@ -159,6 +160,26 @@ describe('the open task leaves its list because of an action asked for in this t
 
         expect(closed(wrapper)).toBe(1);
         expect(said()).toEqual([]);
+        wrapper.unmount();
+    });
+
+    it.each(['bulkMove', 'bulkConvertToTask', 'bulkConvertToSubTask'])('%s from the list, with this task among the chosen, stays quiet too', async (action) => {
+        const { wrapper, hears } = await openPanel();
+        const answered = holdOwnBulkLeave(action, ['task-7', 'task-1']);
+        await hears(leftItsList('moved'));
+        answered();
+
+        expect(closed(wrapper)).toBe(1);
+        expect(said()).toEqual([]);
+        wrapper.unmount();
+    });
+
+    it('a bulk action that moves nothing does not speak for a move', async () => {
+        const { wrapper, hears } = await openPanel();
+        holdOwnBulkLeave('bulkArchive', ['task-1'])();
+        await hears(leftItsList('moved'));
+
+        expect(said()).toEqual(['This task was moved to another list.']);
         wrapper.unmount();
     });
 

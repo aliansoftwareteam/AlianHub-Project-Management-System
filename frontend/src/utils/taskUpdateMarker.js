@@ -57,4 +57,11 @@ export function holdOwnLeave(taskId) {
     return () => leavesAskedHere.set(id, Date.now() + AFTER_ANSWER_MS);
 }
 
+const LEAVING_BULK_ACTIONS = new Set(["bulkMove", "bulkConvertToTask", "bulkConvertToSubTask"]);
+
+export function holdOwnBulkLeave(action, taskIds) {
+    const answered = LEAVING_BULK_ACTIONS.has(action) ? (taskIds || []).map(holdOwnLeave) : [];
+    return () => answered.forEach((done) => done());
+}
+
 export const isOwnLeave = (taskId) => (leavesAskedHere.get(String(taskId)) || 0) > Date.now();
