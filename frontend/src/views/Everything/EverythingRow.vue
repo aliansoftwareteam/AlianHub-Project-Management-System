@@ -9,7 +9,7 @@
         <div class="evr__title" :style="indent">
             <TaskTypeIcon v-if="hasTypeIcon" :taskType="taskType" class="evr__type" aria-hidden="true" />
             <button type="button" class="evr__name" :title="task.TaskName" @click.stop="$emit('open', task)">{{ task.TaskName }}</button>
-            <span v-if="task.subTasks" class="evr__subs" :title="$t('Everything.subtasks_n', { n: task.subTasks })">{{ task.subTasks }}</span>
+            <span v-if="task.subTasks" class="evr__subs" :title="$t('Everything.subtasks_n', { n: task.subTasks }, task.subTasks)">{{ task.subTasks }}</span>
             <slot name="lists"><TaskListChips :task="task" /></slot>
         </div>
 

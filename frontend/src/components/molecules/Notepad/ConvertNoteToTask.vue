@@ -40,6 +40,7 @@
 </template>
 
 <script setup>
+import { defaultStatus } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 // PACKAGES
 import { computed, defineProps, defineEmits, inject, onMounted, ref } from "vue";
 import { useStore } from "vuex";
@@ -170,7 +171,7 @@ function convert() {
         return;
     }
 
-    const status = (project.taskStatusData || []).find((x) => x.type === "default_active");
+    const status = defaultStatus(project);
     const taskType = (project.taskTypeCounts || [])[0];
     if (!status || !taskType) {
         $toast.error(t("Notepad.project_not_ready"), { position: "top-right" });

@@ -120,14 +120,20 @@
                     </div>
                 </article>
 
-                <div v-if="filter === 'agent' && !agentProposals.length && !proposalsFailed" class="tv-empty">
-                    <strong>{{ $t('Time.agent_section') }}</strong>
-                    <span>{{ $t('Time.agent_empty') }}</span>
-                </div>
-                <div v-else-if="!visibleCards.length && !loading" class="tv-empty">
-                    <strong>{{ $t('Time.queue_empty_title') }}</strong>
-                    <span>{{ $t('Time.queue_empty') }}</span>
-                </div>
+                <EmptyState
+                    v-if="filter === 'agent' && !agentProposals.length && !proposalsFailed"
+                    illustration="inbox"
+                    data-test="approvals-empty-agent"
+                    :title="$t('Time.agent_section')"
+                    :message="$t('Time.agent_empty')"
+                />
+                <EmptyState
+                    v-else-if="!visibleCards.length && !loading"
+                    illustration="inbox"
+                    data-test="approvals-empty"
+                    :title="$t('Time.queue_empty_title')"
+                    :message="$t('Time.queue_empty')"
+                />
                 <div v-else-if="loading && !visibleCards.length" class="ah-small">{{ $t('Time.loading') }}</div>
             </div>
         </template>
@@ -136,6 +142,7 @@
 </template>
 
 <script setup>
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import { ref, computed, inject, nextTick, onMounted, watch } from 'vue';
 import { useStore } from 'vuex';

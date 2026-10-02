@@ -448,7 +448,7 @@ function makeTaskList(ctx) {
 
             const tasks = await ctx.fetchTasks(this.data.projectId, this.data.statusType);
             rows.innerHTML = '';
-            count.textContent = ctx.t('Docs.task_list_count', { n: tasks.length });
+            count.textContent = ctx.t('Docs.task_list_count', { n: tasks.length }, tasks.length);
             if (!tasks.length) {
                 rows.appendChild(el('div', 'ah-small pb-tasklist__empty', ctx.t('Docs.task_list_empty')));
                 return;

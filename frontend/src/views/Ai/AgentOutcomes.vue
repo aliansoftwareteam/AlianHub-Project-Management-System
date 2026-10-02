@@ -2,7 +2,7 @@
     <section class="ah-card">
         <div class="ah-card__head">
             <span class="ah-h3">{{ $t('Parity.outcomes_title') }}</span>
-            <span class="parity-count">{{ $t('Parity.n_runs', { n: runs.length }) }}</span>
+            <span class="parity-count">{{ $t('Parity.n_runs', { n: runs.length }, runs.length) }}</span>
         </div>
 
         <div class="outcome">

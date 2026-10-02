@@ -212,7 +212,7 @@ const itemName = (item) => {
 function durationLabel(value) {
     const [n, unit] = String(value).split("_");
     const key = unit === "m" ? "Settings.minutes_before" : unit === "h" ? "Settings.hours_before" : "Settings.days_before";
-    return t(key, { n });
+    return t(key, { n }, Number(n));
 }
 
 async function updateField(section, item, field, value) {
