@@ -142,7 +142,7 @@ const mcpActor = async (p) => (p.oauthGrantId
     ? { ...(await externalClientActor({ userId: p.requestedBy, clientId: p.oauthClientId, clientName: p.agentName, grantId: p.oauthGrantId })), source: SOURCE_MCP }
     : { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP });
 
-const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding }) => {
+const create = async (companyId, { agent, runId, taskId, taskIds, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding }) => {
     if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
@@ -152,6 +152,7 @@ const create = async (companyId, { agent, runId, taskId, projectId, what, why, c
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
             agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
+            ...(Array.isArray(taskIds) && taskIds.length ? { taskIds: taskIds.map(String) } : {}),
             what: what.trim().slice(0, 300), why: String(why || '').slice(0, 2000),
             changes: prepared.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],

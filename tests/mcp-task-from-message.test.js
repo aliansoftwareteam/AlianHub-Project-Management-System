@@ -324,8 +324,19 @@ describe('the project\'s rule for agents holds it exactly as it holds a create',
     });
 
     it('runs inside a batch as one of its changes', async () => {
+        const before = taskCount();
+        const out = await rpc(ctx(OWNER), 'tasks.batch', { operations: [{ tool: TOOL, arguments: { messageId: idOf(message()) } }] });
+        expect(out).toMatchObject({ ok: true, applied: 1, notApplied: 0 });
+        expect(taskCount()).toBe(before + 1);
+    });
+
+    it('two of them in a batch are two new tasks, so the batch waits and creates nothing', async () => {
+        const before = taskCount();
         const out = await rpc(ctx(OWNER), 'tasks.batch', { operations: [{ tool: TOOL, arguments: { messageId: idOf(message()) } }, { tool: TOOL, arguments: { messageId: MISSING } }] });
-        expect(out).toMatchObject({ applied: 1, notApplied: 1 });
+        expect(out).toMatchObject({ pending: true, applied: 0, notApplied: 2, waiting: 1 });
+        expect(out.items[0]).toMatchObject({ ok: false, pending: true });
         expect(out.items[1]).toMatchObject({ ok: false, error: 'message not found' });
+        expect(taskCount()).toBe(before);
+        expect(proposals.create).toHaveBeenCalledTimes(1);
     });
 });
