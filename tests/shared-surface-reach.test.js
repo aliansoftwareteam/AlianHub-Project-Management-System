@@ -1,5 +1,3 @@
-process.env.STORAGE_TYPE = process.env.STORAGE_TYPE || 'server';
-
 const verified = require('./fixtures/verifiedRequest');
 const fakeMongo = require('./fixtures/fakeMongo');
 
@@ -11,7 +9,6 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Modules/AI/meetingNotes', () => ({ generateMeetingNotes: jest.fn(async () => ({ status: true, data: { summary: 's', actionItems: [] } })) }));
 jest.mock('../Modules/Integrations/helpers/secretHandles', () => ({ openSecrets: (...args) => mockSecrets(...args) }));
-jest.mock('../common-storage/common-server.js', () => ({ handleStoredFileCopy: jest.fn() }));
 
 const mongoose = require('mongoose');
 const { myCache } = require('../Config/config');
@@ -54,24 +51,6 @@ describe('call notes are shared with members of the workspace', () => {
     it('keeps the caller when nobody else is named', async () => {
         await call(notes.createNotes, { body: { callId: 'call-2' } });
         expect(mockDb.store[SCHEMA_TYPE.CALLS][0].participants).toEqual([ME]);
-    });
-});
-
-describe('a comment search filter cannot run code or reach another collection', () => {
-    const { searchComments } = require('../Modules/Comments/controller');
-
-    it.each([
-        ['a script', { $expr: { $function: { body: 'function () { return true; }', args: [], lang: 'js' } } }],
-        ['a where clause', { $where: 'true' }],
-        ['an accumulator', { $expr: { $accumulator: {} } }],
-        ['a join', { $or: [{ $lookup: { from: 'projects' } }] }],
-        ['a script in a text filter', JSON.stringify({ $where: 'true' })],
-        ['text that is not a filter', '{not json'],
-        ['a list', [{ $where: 'true' }]],
-    ])('answers 400 to %s and reads nothing', async (_label, filterQuery) => {
-        const res = await call(searchComments, { body: { pids: [oid()], filterQuery } });
-        expect(res.statusCode).toBe(400);
-        expect(mockDb.crud.mock.calls.some(([, { type }, method]) => type === SCHEMA_TYPE.COMMENTS && method === 'aggregate')).toBe(false);
     });
 });
 

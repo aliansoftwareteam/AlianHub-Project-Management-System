@@ -8,6 +8,7 @@ const { addSprintFun } = require("../Sprints/controller")
 const config = require("../../Config/config");
 const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
+const { announceProject } = require('../Project/helpers/projectEvents');
 const { tenantOf } = require("../../Config/tenant");
 const { fieldKeptFromNewProject, withoutStartingFields } = require("../../Config/projectAccess");
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
@@ -149,6 +150,7 @@ exports.createProjectFun = async(req, res) => {
                     removeCache("UserProjectData:", true);
                     res.send(cData);
                     if (cData && cData.status === true && cData.data) {
+                        announceProject(companyId, 'insert', cData.data);
                         recordProjectCreated({ companyId, project: cData.data, actorId: creator })
                             .catch((error) => logger.error(`project created history failed: ${(error && error.message) || error}`));
                     }

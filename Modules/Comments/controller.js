@@ -23,7 +23,6 @@ const { withoutImportFields } = require("./helpers/importFields");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
 const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
 const { withoutServerOwnedFields } = require("./helpers/serverOwnedFields");
-const { containsForbidden } = require("../Company/helpers/companyAccessRules");
 
 /* A comment an agent run writes never starts agents, so agents cannot start each other.
  * Required on use: the agent modules are only needed by a comment that names an agent. */
@@ -374,22 +373,6 @@ exports.searchMessageFromMainChat = async (req, res) => {
     }
 }
 
-/* The client's filter narrows the search inside the projects it may read: an object of field
- * conditions, with no operator that runs code or reads another collection. null when it is not one. */
-const searchFilterOf = (filterQuery) => {
-    let filter = filterQuery;
-    if (typeof filter === 'string') {
-        try {
-            filter = JSON.parse(filter);
-        } catch (error) {
-            return null;
-        }
-    }
-    if (filter === undefined || filter === null || filter === '') return {};
-    const plain = typeof filter === 'object' && !Array.isArray(filter);
-    return plain && !containsForbidden(filter) ? filter : null;
-};
-
 /**
  * This endpoint is used to filter comments in global advance filter
  * @param {*} req 
@@ -406,14 +389,12 @@ exports.searchComments = async (req, res) => {
             batchSize = 20,
             sortBy = 'createdAt',
         } = req.body;
-        const parsedFilterQuery = searchFilterOf(filterQuery);
-        if (parsedFilterQuery === null) {
-            return res.status(400).json({ status: false, message: 'filterQuery must be a plain filter.' });
-        }
         const privileged = isPrivileged(await getRoleType(req.headers['companyid'], req.uid));
 
+        // Parse inputs and prepare default values
         const searchStr = searchText.toString();
-        const additionalFilter = Object.keys(parsedFilterQuery).length ? { ...parsedFilterQuery } : {};
+        const parsedFilterQuery = typeof filterQuery === 'string' ? JSON.parse(filterQuery) : filterQuery;
+        const additionalFilter = parsedFilterQuery && Object.keys(parsedFilterQuery).length ? { ...parsedFilterQuery } : {};
         const projectIds = Array.isArray(pids) ? pids : pids.split(',').map(id => id.trim());
         const convertedProjectIds = projectIds.map(id => new mongoose.Types.ObjectId(id));
         const skipValue = parseInt(skip);

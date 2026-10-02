@@ -83,7 +83,7 @@ describe('who may set the workspace\'s check before Done', () => {
 
     it('leaves the allowed modes as they were', async () => {
         await put(OWNER, { allowedModes: ['workspace'] });
-        expect((await put(OWNER, { requireCheckBeforeDone: true })).body.data).toEqual({ allowedModes: ['workspace'], requireCheckBeforeDone: true });
+        expect((await put(OWNER, { requireCheckBeforeDone: true })).body.data).toEqual({ allowedModes: ['workspace'], requireCheckBeforeDone: true, connectedPaused: false });
     });
 
     it.each([['a member', MEMBER], ['a guest', GUEST]])('%s is refused, and reads it as it stands', async (_who, uid) => {

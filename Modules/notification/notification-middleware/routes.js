@@ -1,4 +1,5 @@
 const { sendFcmNotificationsHandler } = require("./controllerV2");
+const { agentsRefused } = require('../../Agents/guard');
 
 exports.init = (app) => {
 
@@ -94,6 +95,6 @@ exports.init = (app) => {
  *                    type: string
  */
 
-  app.post('/api/v1/send-fcm',sendFcmNotificationsHandler);
+  app.post('/api/v1/send-fcm', agentsRefused('notification.send'), sendFcmNotificationsHandler);
 
 };

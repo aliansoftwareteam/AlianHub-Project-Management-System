@@ -166,7 +166,7 @@ const TASK_WRITE_ROUTES = Object.freeze({
     'DELETE /api/v2/task-templates/:id': judgedBy('Modules/TaskTemplates/access.js canManage on the stored template'),
     'PUT /api/v2/task-templates/default': judgedBy('Modules/TaskTemplates/access.js: project.project_details in the project'),
     'POST /api/v2/task-templates/:id/apply': judgedBy('Modules/TaskTemplates/controller.js: task.task_create in the task\'s project, then each field\'s own key'),
-    'POST /api/v1/recurring-tasks/run-due': judgedBy('runs the workspace\'s stored definitions; its key is a follow-up'),
+    'POST /api/v1/recurring-tasks/run-due': judgedBy('requireCompanyAdmin on the route: an owner or an admin, for every caller'),
     'POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/accept': judgedBy('requireProjectAccess with task.task_assignee on the task\'s project; Modules/AssignmentRules/decisions.js re-checks the task and the suggested person'),
     'POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo': judgedBy('requireProjectAccess with task.task_assignee on the task\'s project'),
     'POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/dismiss': notATaskWrite('marks the suggestion dismissed; the task is not written'),

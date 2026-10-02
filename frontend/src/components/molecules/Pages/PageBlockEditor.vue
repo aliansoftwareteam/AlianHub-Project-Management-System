@@ -499,7 +499,7 @@ onBeforeUnmount(() => {
 .pbe :deep(.ce-popover-item--focused:not(.ce-popover-item--no-hover)) { background: var(--brand-tint) !important; }
 .pbe :deep(.ce-popover-item__icon) {
     width: 22px; height: 22px; border-radius: 6px;
-    background: rgba(0, 0, 0, .06); color: var(--ink);
+    background: var(--fill); color: var(--ink);
     box-shadow: none; margin-right: 0;
 }
 .pbe :deep(.ce-popover-item[data-item-name="task"] .ce-popover-item__icon),
@@ -523,7 +523,7 @@ onBeforeUnmount(() => {
 .pbe :deep(.pb-image__caption:empty::before) { content: attr(data-placeholder); opacity: .55; }
 .pbe :deep(.pb-callout__tones) { display: none; gap: 4px; align-self: flex-start; }
 .pbe :deep(.pb-callout:hover .pb-callout__tones) { display: inline-flex; }
-.pbe :deep(.pb-callout__tone) { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .15); cursor: pointer; padding: 0; }
+.pbe :deep(.pb-callout__tone) { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border); cursor: pointer; padding: 0; }
 .pbe :deep(.pb-callout__tone--info) { background: var(--brand); }
 .pbe :deep(.pb-callout__tone--warn) { background: var(--warn); }
 .pbe :deep(.pb-callout__tone--ok) { background: var(--ok); }

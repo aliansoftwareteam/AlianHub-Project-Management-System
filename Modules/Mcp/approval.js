@@ -3,13 +3,15 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { isExpired, hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const registry = require('../Agents/registry');
-const permissions = require('../Agents/permissions');
+const { holderMayInEach } = require('./propose');
 const visibility = require('./visibility');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
 const goalTokens = require('../Goals/goalTokens');
 const { ACTION: NEW_PROJECT } = require('../Agents/projectCreate');
+const { ACTION: PROJECT_COPY } = require('../Agents/projectDuplicate');
+const dashboards = require('../Agents/dashboardRequests');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
 // approval re-asks everything the original call was asked and adds the
@@ -21,9 +23,12 @@ const GATE_OWNER_ADMIN = 'owner_admin';
 
 const refused = (error, status = 403) => ({ error, status });
 
-/* A new project sits in no project yet: like a goal it is the workspace's, which a token kept to some projects is refused. */
+/* A new project sits in no project yet, and a dashboard in none at all: like a goal each is the workspace's, which a
+ * token kept to some projects is refused. So is a copy of a project, which also needs the project it is copied from to be one that can be opened. */
+const WORKSPACE_WIDE = Object.freeze([NEW_PROJECT, PROJECT_COPY, dashboards.ACTION]);
 const targetOf = (params = {}, action = '') => {
-    const target = action === NEW_PROJECT ? { ...goalTokens.WRITE_TARGET } : {};
+    const target = WORKSPACE_WIDE.includes(action) ? { ...goalTokens.WRITE_TARGET } : {};
+    if (action === PROJECT_COPY) target.projectId = String(params.sourceProjectId || '');
     if (params.taskId) target.taskId = String(params.taskId);
     if (params.relatedTaskId) target.relatedTaskId = String(params.relatedTaskId);
     if (params.projectId) target.projectId = String(params.projectId);
@@ -84,9 +89,11 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     const { tokenLists } = filer;
 
     for (const c of changes) {
+        const notTheirs = c.action === dashboards.ACTION ? dashboards.approverRefusal(decider.userId, p.requestedBy) : '';
+        if (notTheirs) return refused(notTheirs);
         const target = targetOf(c.params, c.action);
         // eslint-disable-next-line no-await-in-loop
-        const own = await permissions.holderMay(companyId, { kind: 'human', userId: decider.userId }, c.action, c.params || {});
+        const own = await holderMayInEach(companyId, { kind: 'human', userId: decider.userId }, c.action, c.params || {});
         if (!own.allowed) return refused(`The approver may not make this change: ${own.reason}`);
         // eslint-disable-next-line no-await-in-loop
         if (!(await reachable(companyId, { userId: decider.userId, projectIds: [] }, target))) return refused('The approver cannot open what this change touches.');

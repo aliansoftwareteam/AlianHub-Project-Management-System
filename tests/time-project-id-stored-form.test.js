@@ -25,7 +25,7 @@ jest.mock('../Modules/Comments/controller', () => ({ updateCommentCollection: je
 jest.mock('../Modules/serviceFunction', () => ({}));
 jest.mock('../common-storage/common-server.js', () => ({ handleFileUploadForTrackerSS: jest.fn(), handleuploadMainFileForbase64Thumbnail: jest.fn(), handleTaskAttachmentsDuplicateFunctionality: jest.fn() }));
 jest.mock('../common-storage/common-wasabi.js', () => ({ handleFileUploadForTrackerSS: jest.fn(), handleuploadMainFileForbase64Thumbnail: jest.fn(), handleTaskAttachmentsDuplicateFunctionality: jest.fn() }));
-// Which task a timer may start on has its own suite (tracker-start-and-timelog-access); these cases are about the timer row.
+// Which task a timer may start on has its own suite (tracker-start-access); these cases are about the timer row.
 jest.mock('../Modules/LogTime/controllerV2/sessionUser', () => ({ ...jest.requireActual('../Modules/LogTime/controllerV2/sessionUser'), trackedTask: jest.fn(async () => ({})) }));
 
 const { timeSheetSchema, estimatedTimeSchema } = require('../utils/mongo-handler/createSchema');

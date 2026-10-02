@@ -123,8 +123,8 @@
 .outcome__rule { font: var(--text-small); color: var(--ink-2); line-height: 1.5; margin: 0; }
 .outcome__run { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface-2); border-radius: 9px; }
 .outcome__run-body { flex: 1; min-width: 0; font: var(--text-body); line-height: 1.5; }
-.outcome__law { padding: 12px 14px; background: var(--rail); color: #fff; border-radius: 11px; font: var(--text-body); line-height: 1.6; }
-.outcome__law strong { color: #fff; }
+.outcome__law { padding: 12px 14px; background: var(--rail); color: var(--rail-ink-strong); border-radius: 11px; font: var(--text-body); line-height: 1.6; }
+.outcome__law strong { color: var(--rail-ink-strong); }
 
 /* 30b — bulk routing */
 .route__row { display: flex; align-items: center; gap: 9px; padding: 6px 0; font: var(--text-body); }

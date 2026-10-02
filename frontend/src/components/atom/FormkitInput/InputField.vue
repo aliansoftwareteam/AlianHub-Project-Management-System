@@ -11,6 +11,7 @@
             :help="props.help"
             :class="{'input-error': hasValidationError}"
             :label="props.label"
+            :aria-label="props.toopTipHover ? props.label : undefined"
             :placeholder="props.placeholder"
             :validation="props.validations"
             :validation-visibility="props.validationVisibility"

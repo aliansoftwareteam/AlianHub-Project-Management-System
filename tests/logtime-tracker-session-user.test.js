@@ -19,7 +19,7 @@ jest.mock('../Config/config', () => ({ myCache: { get: jest.fn(), set: jest.fn()
 jest.mock('../event/socketEventEmitter.js', () => ({ emit: jest.fn() }));
 jest.mock('../common-storage/common-server.js', () => ({ handleFileUploadForTrackerSS: jest.fn(), handleuploadMainFileForbase64Thumbnail: jest.fn() }));
 jest.mock('../common-storage/common-wasabi.js', () => ({ handleFileUploadForTrackerSS: jest.fn(), handleuploadMainFileForbase64Thumbnail: jest.fn() }));
-// Which task a timer may start on has its own suite (tracker-start-and-timelog-access); these cases are about the timer row.
+// Which task a timer may start on has its own suite (tracker-start-access); these cases are about the timer row.
 jest.mock('../Modules/LogTime/controllerV2/sessionUser', () => ({ ...jest.requireActual('../Modules/LogTime/controllerV2/sessionUser'), trackedTask: jest.fn(async () => ({})) }));
 
 const { timeTrackerStart, timeTrackerStart2, endTimeTracker } = require('../Modules/LogTime/controllerV2/tracker');
@@ -204,6 +204,24 @@ describe('the tracker time log lists the signed-in user\'s entries', () => {
         const r = await call(getTimelog, { companyId: C, userId });
 
         expect(r.code).toBe(403);
+        expect(r.body.status).toBe(false);
+        expect(calls('find')).toHaveLength(0);
+    });
+
+    it.each([
+        ['no collection, as the desktop tracker sends it', { companyId: C, userId: ME, startDate: 1767225600000 }],
+        ['the time log collection', { companyId: C, userId: ME, type: 'timesheets' }],
+    ])('reads the time log when the body names %s', async (_label, body) => {
+        const r = await call(getTimelog, body);
+
+        expect(r.body.status).toBe(true);
+        expect(calls('find').map(([, { type }]) => type)).toEqual(['timesheets']);
+    });
+
+    it.each(['users', 'company_users', 'apiTokens', 'tasks', { $ne: null }, ['timesheets'], ''])('answers 400 to a body that names the collection %j and reads nothing', async (type) => {
+        const r = await call(getTimelog, { companyId: C, userId: ME, type });
+
+        expect(r.code).toBe(400);
         expect(r.body.status).toBe(false);
         expect(calls('find')).toHaveLength(0);
     });

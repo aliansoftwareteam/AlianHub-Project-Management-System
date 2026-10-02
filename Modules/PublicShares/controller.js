@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { validateCreateShare, generateShareToken, isObjectIdString } = require('./helpers/shareRules');
 const { canManageShare } = require('./helpers/shareAccess');
+const { getRoleType } = require('../../Config/permissionGuard');
+const { ROLE_GUEST } = require('../../Config/roleTypes');
 const { hashPassword } = require('../Auth/helpers/passwordHash');
 
 // Parse a client-supplied expiry into a Date (null when absent / to clear).
@@ -30,6 +32,8 @@ const sanitizeShare = (doc) => {
 const refuse = (res, decision, notFoundText = 'Not found.') => (decision.statusCode === 403
     ? res.status(403).send({ status: false, statusText: 'You do not have permission to manage public links here.' })
     : res.status(404).send({ status: false, statusText: notFoundText }));
+
+const GUEST_REVIEW = 'A submission is accepted or rejected by a member of the workspace, not by a guest.';
 
 /* A form's public page never asks for a share password, so one set on a form link would promise
  * protection that does not exist; forms stay public (owner, 2026-09-27). */
@@ -248,6 +252,9 @@ exports.reviewIntake = async (req, res) => {
             : { decision: { ok: false, statusCode: 404 } };
         if (!decision.ok) {
             return refuse(res, decision, 'Intake item not found or already reviewed.');
+        }
+        if ((await getRoleType(companyId, String(req.uid || ''))) === ROLE_GUEST) {
+            return res.status(403).send({ status: false, statusText: GUEST_REVIEW });
         }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.INTAKE_ITEMS,

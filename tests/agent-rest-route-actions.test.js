@@ -1,4 +1,6 @@
 process.env.STORAGE_TYPE = 'server';
+process.env.EXTERNAL_AGENT_SESSIONS = 'on';
+jest.setTimeout(30000);
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
@@ -41,6 +43,12 @@ const world = require('./fixtures/accessWorld');
 const registry = require('../Modules/Agents/registry');
 const registryGroups = require('../Modules/Agents/registryGroups');
 const { agentPerimeter } = require('../Modules/Agents/guard');
+const { schema } = require('../utils/mongo-handler/schema');
+const { FIELD_PERMISSIONS } = require('../Config/projectAccess');
+const { runForAgentOf, agentOf } = require('../Config/agentRequest');
+const { commentThreadAccess } = require('../Modules/Comments/helpers/threadAccess');
+const { canReadTask } = require('../Modules/Tasks/helpers/taskReadAccess');
+const { companyWideMatch, readsCompanyWide } = require('../Modules/Tasks/helpers/taskQueryGuard');
 
 const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, L_OPEN, L_PRIVATE, T_OPEN, T_PRIVATE, settle } = world;
 const { seed, rows } = world.create(mockDb);
@@ -59,7 +67,12 @@ const app = { get: register('GET'), post: register('POST'), put: register('PUT')
 [
     'Tasks', 'Sprints', 'Pages', 'Importers', 'createProject', 'CustomField', 'Project', 'projectSetting', 'settings/templates', 'settings/ProjectStatusTemplate',
     'ProjectDuplicate', 'ProjectSnapshots', 'AIProjectGenerator', 'Automations', 'projectRules', 'ImportSettings', 'PublicShares', 'trackerUserPermission',
-    'settings/Members', 'settings/Roles', 'settings/securityPermissions', 'Milestone', 'Auth', 'Integrations',
+    'settings/Members', 'settings/Roles', 'settings/securityPermissions', 'Milestone', 'Auth', 'Integrations', 'ViewTemplates', 'PersonalList',
+    'Comments', 'MainChats', 'Reactions',
+    'AI', 'EstimatedTime', 'AssignmentRules', 'ProjectTemplates', 'Portfolio', 'Calls', 'TaskTemplates', 'TimeSheet', 'Company', 'ScreenshotRetention', 'Webhooks',
+    'ScheduledReports', 'EmailNotification', 'notification-count', 'notification/notification-middleware', 'notification/prepare-notification-data', 'Forms', 'EmailIn',
+    'Calendar', 'ExportJobs', 'AgentSessions', 'RecurringTasks', 'Pto', 'LogTime', 'storage/wasabi', 'UserDashboard',
+    'settings/Designation', 'settings/ProjectSkills', 'settings/commonDateFormate', 'settings/fileExtensions', 'settings/settingCurrency', 'settings/taskPriority',
 ].forEach((name) => require(`../Modules/${name}/routes`).init(app));
 
 const session = (uid) => ({ uid });
@@ -70,14 +83,14 @@ const agentRun = (uid) => ({ uid, agentRun: { _id: '6f0000000000000000000103', a
 const pathOf = (route, params = {}) => Object.entries(params).reduce((text, [name, value]) => text.replace(`:${name}`, value), route);
 
 /* Runs what stands in front of every route, then every guard of the route, and stops in front of its handler. */
-const through = (route, caller, body = {}, params = {}) => new Promise((resolve) => {
+const through = (route, caller, body = {}, params = {}, query = {}) => new Promise((resolve) => {
     const [method, url] = pathOf(route, params).split(' ');
     const res = new EventEmitter();
     res.statusCode = 200;
     res.status = (code) => { res.statusCode = code; return res; };
     res.send = (answer) => { res.emit('finish'); resolve({ code: res.statusCode, body: answer }); return res; };
     res.json = res.send;
-    const req = { ...caller, method, originalUrl: url, url, baseUrl: '', route: { path: route.split(' ')[1] }, query: {}, params, headers: { companyid: CID }, aud: CID, ip: '1.1.1.1', body };
+    const req = { ...caller, method, originalUrl: url, url, baseUrl: '', route: { path: route.split(' ')[1] }, query, params, headers: { companyid: CID }, aud: CID, ip: '1.1.1.1', body };
     const guards = [agentPerimeter, ...routes[route].slice(0, -1)];
     const step = (at) => (at === guards.length ? (res.emit('finish'), resolve(REACHED)) : Promise.resolve(guards[at](req, res, () => step(at + 1))));
     step(0);
@@ -343,6 +356,14 @@ const PROPOSED_ON_THE_WEB = {
         'creating a project from a saved one': ['POST /api/v2/projects/templates/:id/use', { name: 'From a saved one' }, { id: TEMPLATE }],
         'creating a project from a generated plan': ['POST /api/v1/ai/project/execute', { plan: {} }],
         'importing a ClickUp space as a project': [...NO_ACTION['importing a ClickUp space as a project'], {}, 'tasks.import'],
+        'opening a personal list': ['POST /api/v1/project/personal', {}],
+    },
+    'project.duplicate': {
+        'copying a project with its tasks': ['POST /api/v2/projects/:id/duplicate', { name: 'Copy', withTasks: true }, inProject, 'project.create'],
+    },
+    'dashboard.card.add': {
+        'changing the cards of the home dashboard': ['POST /api/v1/dashboard', { op: 'add', card: { key: 'DueSoonCard' } }],
+        'changing the cards of a dashboard': ['PUT /api/v1/dashboards/:id/cards', { cards: [] }, { id: TEMPLATE }],
     },
     'automation.create': {
         'adding an automation': ['POST /api/v2/automations', rule],
@@ -366,6 +387,9 @@ const NEVER_ON_THE_WEB = {
     },
     'billing.*': {
         'refunding a milestone': ['POST /api/v1/refundamount', {}],
+        'changing how a project is billed': [...projectUpdate({ ProjectType: 'Hourly' }), 'billing.project'],
+        'changing the currency of a project': [...projectUpdate({ ProjectCurrency: { code: 'EUR' } }), 'billing.project'],
+        'changing the billing period of a project': [...projectUpdate({ BillingPeriod: 'Monthly' }), 'billing.project'],
     },
     'member.remove': {
         'changing a member': ['PUT /api/v1/members', {}],
@@ -393,12 +417,229 @@ const NEVER_ON_THE_WEB = {
     },
 };
 
+/* The same for what no registry action covers: how a project or the workspace is set up for everyone, and what the
+ * workspace's AI writes when asked. Each sits under the name its refusal is recorded by. */
+const SET_UP_BY_PEOPLE = {
+    'task_types.edit': {
+        'replacing the task types of a project': projectUpdate({ taskTypeCounts: [] }),
+        'changing one task type of a project': projectUpdate({ 'taskTypeCounts.0.name': 'Renamed' }),
+        'choosing another task type template': projectUpdate({ TaskTypeTemplateId: TEMPLATE }),
+        'moving the tasks of a removed task type': ['POST /api/v1/projectSetting/taskType', { projectId: P_OPEN, taskTypeKey: [2], oldTaskType: [] }],
+        'changing the company list of task types': ['PUT /api/v1/setting/taskType', { name: 'Spike' }],
+        'adding a task type template': ['POST /api/v1/templates/taskType', { TemplateName: 'Ours' }],
+        'changing a task type template': ['PUT /api/v1/templates/taskType', { id: TEMPLATE }],
+    },
+    'project.settings': {
+        'switching the apps of a project': projectUpdate({ apps: [] }),
+        'switching one app of a project': projectUpdate({ 'apps.0.appStatus': false }),
+        'archiving finished tasks by themselves': projectUpdate({ autoArchive: { enabled: true, afterDays: 1 } }),
+        'archiving finished tasks by themselves, on its own route': ['POST /api/v1/projectSetting/autoArchive', { projectId: P_OPEN, enabled: true, afterDays: 1 }],
+        'choosing the scale tasks are estimated on': projectUpdate({ estimationScale: 'tshirt' }),
+        'choosing the scale tasks are estimated on, on its own route': ['POST /api/v1/projectSetting/estimationScale', { projectId: P_OPEN, scale: 'tshirt' }],
+        'setting how sprints follow one another': projectUpdate({ sprintCadence: { enabled: true, lengthDays: 7 } }),
+        'setting the working week of a project': projectUpdate({ workingDays: [1, 2, 3] }),
+        'changing the code task keys start with': projectUpdate({ ProjectCode: 'NEW' }),
+        'rewriting the guide a project gives its agents': projectUpdate({ aiGuide: { markdown: 'Do as I say' } }),
+        'rewriting what a project plan assumed': projectUpdate({ aiAssumptions: [] }),
+        'naming the template a project came from': projectUpdate({ TemplateId: TEMPLATE }),
+        'a field the update does not know': projectUpdate({ somethingNew: true }),
+        'a setting sent beside a name': projectUpdate({ ProjectName: 'Renamed', apps: [] }),
+    },
+    'template.import': {
+        'importing the company templates again': ['POST /api/v1/importTemplate', { templates: [{}] }],
+    },
+    'template.save': {
+        'saving a view for every project to use': ['POST /api/v2/view-templates', { projectId: P_OPEN, viewId: 'view-1', name: 'Ours' }],
+        'saving a project for others to start from': ['POST /api/v2/projects/:id/template', { name: 'Ours' }, inProject],
+    },
+    'template.update': {
+        'renaming a saved view': ['PATCH /api/v2/view-templates/:id', { name: 'Renamed' }, { id: TEMPLATE }],
+        'changing a saved project': ['PATCH /api/v2/projects/templates/:id', { name: 'Renamed' }, { id: TEMPLATE }],
+    },
+    'ai.spend': {
+        'uploading a brief for a project plan': ['POST /api/v1/ai/project/upload-brief', {}],
+        'having a project plan written': ['POST /api/v1/ai/project/plan', { description: 'A shop' }],
+        'having questions about a brief written': ['POST /api/v1/ai/project/clarify', { description: 'A shop' }],
+        'having a brief written': ['POST /api/v1/ai/project/brief', { description: 'A shop' }],
+        'having the guide of a project written': ['POST /api/v1/ai/project/guide', { projectId: P_OPEN }],
+        'having a task plan written': ['POST /api/v1/ai/project/:projectId/tasks/plan', { requirements: 'A shop' }, { projectId: P_OPEN }],
+    },
+};
+
+/* And for the routes beside those: what the workspace's AI writes or posts, what is set for a whole project or the whole
+ * workspace, what goes out to other people or outside, what is removed for good, and how the person signs in. */
+const ALSO_BY_PEOPLE = {
+    'ai.spend': {
+        'having a prompt answered': ['POST /api/v1/generatePrompt', {}],
+        'carrying on a chat with the AI': ['POST /api/v1/generatePromptChat', {}],
+        'having a description written': ['POST /api/v1/ai/description', { title: 'A task' }],
+        'having a task summarised': ['POST /api/v1/ai/task-summary', { taskId: T_OPEN }],
+        'having a task filed under a label': ['POST /api/v1/ai/task-category', { taskId: T_OPEN }],
+        'having next steps suggested': ['POST /api/v1/ai/task-next-steps', { taskId: T_OPEN }],
+        'having a selection rewritten': ['POST /api/v1/ai/selection/improve', { text: 'Some text' }],
+        'having a selection split into tasks': ['POST /api/v1/ai/selection/tasks', { text: 'Some text' }],
+        'asking the AI a question': ['POST /api/v1/ai/ask', { question: 'What is late?' }],
+        'asking the AI a question, answered as it is written': ['POST /api/v1/ai/ask/stream', { question: 'What is late?' }],
+        'asking for a dashboard card': ['POST /api/v1/ai/ask/card/:dashboardId/:cardUid', {}, { dashboardId: TEMPLATE, cardUid: 'card-1' }],
+        'having pasted text turned into what the AI remembers': ['POST /api/v1/ai/memory/import/preview', { text: 'Some text' }],
+        'having a recording written out': ['POST /api/v1/ai/transcribe', {}],
+        'having meeting notes written': ['POST /api/v1/ai/meeting-notes', { transcript: 'Some text' }],
+        'having a conversation summarised': ['POST /api/v1/ai/chat-summary', { projectId: P_OPEN, taskId: T_OPEN }],
+        'having tasks proposed from notes': ['POST /api/v1/ai/notes-to-tasks/propose', {}],
+        'asking the AI about a conversation': ['POST /api/v1/ai/chat-ask', { projectId: P_OPEN, taskId: T_OPEN }],
+        'having a field filled for a few tasks': ['POST /api/v2/custom-fields/:fieldId/ai/preview', {}, { fieldId: FIELD }],
+        'having a field filled for many tasks': ['POST /api/v2/custom-fields/:fieldId/ai/jobs', {}, { fieldId: FIELD }],
+        'having a task estimated': ['POST /api/v1/estimatedTime/ai/:tid', {}, { tid: T_OPEN }],
+        'having an estimate proposed': ['POST /api/v1/estimatedTime/ai/:tid/propose', {}, { tid: T_OPEN }],
+        'having assignment rules drafted': ['POST /api/v2/assignment-rules/project/:projectId/draft', {}, { projectId: P_OPEN }],
+        'having a project template drafted': ['POST /api/v1/project/template/custom/ai-generate', {}],
+        'having a portfolio summarised': ['POST /api/v1/portfolio/summary', {}],
+        'saving the notes of a call': ['POST /api/v2/calls/notes', {}],
+    },
+    'ai.answer.post': {
+        'posting an answer of the AI in a conversation': ['POST /api/v1/ai/ask/post', {}],
+        'posting what the AI said about a conversation': ['POST /api/v1/ai/chat-ask/post', {}],
+    },
+    'ai.memory.edit': {
+        'changing what the AI remembers of the person': ['PUT /api/v1/ai/memory', { nickname: 'Olive' }],
+        'adding to what the AI remembers of the person': ['POST /api/v1/ai/memory/import/confirm', { items: [] }],
+    },
+    'tasks.import': {
+        'creating the tasks an answer of the AI lists': ['POST /api/v1/ai/ask/create-tasks', { projectId: P_OPEN, tasks: [] }],
+        'creating the tasks proposed from notes': ['POST /api/v1/ai/notes-to-tasks', {}],
+    },
+    'task.delete': {
+        'taking back the tasks made from notes': ['POST /api/v1/ai/notes-to-tasks/undo', {}],
+    },
+    'project.settings': {
+        'setting who new tasks of a project go to': ['PUT /api/v2/assignment-rules/project/:projectId', { rules: [] }, { projectId: P_OPEN }],
+        'choosing the template new tasks of a project start from': ['PUT /api/v2/task-templates/default', { projectId: P_OPEN }],
+    },
+    'template.save': {
+        'saving a project template for the company': ['POST /api/v1/project/template/custom', { TemplateName: 'Ours' }],
+        'saving a task as a template': ['POST /api/v2/task-templates', { taskId: T_OPEN, name: 'Ours' }],
+    },
+    'template.update': {
+        'renaming a task template': ['PATCH /api/v2/task-templates/:id', { name: 'Renamed' }, { id: TEMPLATE }],
+    },
+    'template.apply': {
+        'writing a template onto a task': ['POST /api/v2/task-templates/:id/apply', { taskId: T_OPEN }, { id: TEMPLATE }],
+    },
+    'portfolio.edit': {
+        'adding a portfolio': ['POST /api/v1/portfolio', { name: 'Ours', projectIds: [P_OPEN] }],
+        'changing a portfolio': ['PUT /api/v1/portfolio/:id', { name: 'Renamed' }, { id: TEMPLATE }],
+    },
+    'billing.entries': {
+        'marking logged time as billable': ['PUT /api/v1/timesheet/entries/billable', { ids: [], billable: true }],
+    },
+    'billing.rates': {
+        'setting a billing rate': ['POST /api/v1/timesheet/rates', { scope: 'default', rate: 10 }],
+    },
+    'workload.move': {
+        'moving planned work to another day or person': ['POST /api/v1/timesheet/workload-move', { taskId: T_OPEN }],
+    },
+    'email.send': {
+        'mailing the people who have not logged time': ['POST /api/v1/timesheet/send-reminders', {}],
+        'mailing the support address': ['POST /api/v2/support-mail', { message: 'Help' }],
+    },
+    'notification.send': {
+        'pushing a message to people': ['POST /api/v1/send-fcm', { userIds: [INSIDER], message: 'Hello' }],
+        'sending people a notification': ['POST /api/v2/prepare-notification-data', { userIds: [INSIDER], message: 'Hello' }],
+    },
+    'unread.reset': {
+        'clearing the unread counts of everyone': ['POST /api/v1/unsetCommentCounts', { projectId: P_OPEN }],
+    },
+    'workspace.settings': {
+        'changing the company list of designations': ['PUT /api/v1/setting/designation/update', {}],
+        'changing the company list of skills': ['PUT /api/v1/setting/skills', {}],
+        'changing the date format of the company': ['PUT /api/v1/commonDateFormate', {}],
+        'changing which files the company takes': ['PUT /api/v1/fileExtensions', {}],
+        'changing a currency of the company': ['PUT /api/v1/currency/:cid/:id', {}, { cid: CID, id: TEMPLATE }],
+        'changing the company list of priorities': ['PUT /api/v1/taskPriority', {}],
+        'changing the details of the company': ['PUT /api/v1/company', { Cst_CompanyName: 'Renamed' }],
+        'changing the details of the company, the other way': ['PUT /api/v1/admin/company', { Cst_CompanyName: 'Renamed' }],
+        'changing how long screenshots are kept': ['PUT /api/v1/screenshot-retention', { enabled: true, maxAgeMonths: 1 }],
+        'changing who is reminded to log time': ['PUT /api/v1/timesheet/reminder-settings', { enabled: true }],
+    },
+    'workspace.create': {
+        'creating another company': ['POST /api/v2/company/create', {}],
+    },
+    'webhook.manage': {
+        'adding a webhook': ['POST /api/v2/webhooks', { url: 'https://example.com/hook', events: [] }],
+        'changing a webhook': ['PUT /api/v2/webhooks/:id', { active: true }, { id: TEMPLATE }],
+    },
+    'report.schedule': {
+        'mailing a report on a schedule': ['POST /api/v1/reports/schedules', { reportId: TEMPLATE, recipients: ['someone@example.com'] }],
+        'changing who a scheduled report goes to': ['PUT /api/v1/reports/schedules/:id', { recipients: ['someone@example.com'] }, { id: TEMPLATE }],
+        'mailing a scheduled report now': ['POST /api/v1/reports/schedules/:id/run-now', {}, { id: TEMPLATE }],
+        'mailing every scheduled report that is due': ['POST /api/v1/reports/schedules/run-due', {}],
+    },
+    'share.public': {
+        'publishing a form': ['POST /api/v2/forms/:id/publish', { published: true }, { id: TEMPLATE }],
+    },
+    'form.manage': {
+        'adding a form': ['POST /api/v2/forms', { projectId: P_OPEN, title: 'Requests' }],
+        'changing a form': ['PUT /api/v2/forms/:id', { title: 'Renamed' }, { id: TEMPLATE }],
+    },
+    'email_in.manage': {
+        'adding an address that files mail as tasks': ['POST /api/v1/email-in/inboxes', { projectId: P_OPEN, name: 'Requests' }],
+        'changing an address that files mail as tasks': ['PUT /api/v1/email-in/inboxes/:id', { enabled: true }, { id: TEMPLATE }],
+    },
+    'calendar.feed': {
+        'adding a calendar feed': ['POST /api/v1/calendar/feeds', { scope: 'mine' }],
+        'replacing the link of a calendar feed': ['POST /api/v1/calendar/feeds/:id/regenerate', {}, { id: TEMPLATE }],
+    },
+    'export.workspace': {
+        'exporting every project of the company': ['POST /api/v2/exports/workspace', {}],
+    },
+    'agent.session.endpoint': {
+        'saving where an outside agent is reached': ['PUT /api/v2/agent-sessions/endpoints', { url: 'https://example.com/agent' }],
+    },
+    'agent.session.delegate': {
+        'handing a task to an outside agent': ['POST /api/v2/agent-sessions', { taskId: T_OPEN }],
+    },
+    'recurring.manage': {
+        'adding a repeat': ['POST /api/v1/recurring-tasks', { projectId: P_OPEN, name: 'Weekly' }],
+        'making a task repeat': ['PUT /api/v1/recurring-tasks/task/:taskId', { every: 'week' }, { taskId: T_OPEN }],
+        'changing a repeat': ['PATCH /api/v1/recurring-tasks/:id', { enabled: false }, { id: TEMPLATE }],
+        'running a repeat now': ['POST /api/v1/recurring-tasks/:id/run-now', {}, { id: TEMPLATE }],
+        'running every repeat that is due': ['POST /api/v1/recurring-tasks/run-due', {}],
+    },
+    'account.security': {
+        'starting two-step sign-in': ['POST /api/v2/auth/2fa/setup', {}],
+        'switching two-step sign-in on': ['POST /api/v2/auth/2fa/verify', { code: '000000' }],
+        'switching two-step sign-in off': ['POST /api/v2/auth/2fa/disable', { code: '000000' }],
+        'changing the password': ['PATCH /api/v2/auth/:id/change-password', { oldPassword: 'a', newPassword: 'b' }, { id: OWNER }],
+    },
+    'pto.request': {
+        'filing time off': ['POST /api/v1/pto', { startDate: '2026-11-02', endDate: '2026-11-03' }],
+    },
+    'timelog.delete': {
+        'removing logged time for good': ['POST /api/v2/deleteManualLogtime', { projectId: P_OPEN, taskId: T_OPEN }],
+    },
+    'file.delete': {
+        'removing a stored file': ['POST /api/v1/wasabi/deleteFile', { companyId: CID, path: 'Project/x' }],
+    },
+};
+
 /* Changes the web app has no route for. A Slack message is sent by an approved proposal alone, and the connector's
  * own settings take no token of any kind. */
 const NO_WEB_ROUTE = ['deploy.staging', 'deploy.production', 'git.merge', 'slack.message.post'];
 
 const rowsOf = (table) => Object.entries(table).flatMap(([action, changes]) => Object.entries(changes).map(([name, [route, body, params, recordedAs]]) => [name, route, body, params, recordedAs || action]));
-const HELD_FOR_PEOPLE = [...rowsOf(PROPOSED_ON_THE_WEB), ...rowsOf(NEVER_ON_THE_WEB)];
+const HELD_FOR_PEOPLE = [...rowsOf(PROPOSED_ON_THE_WEB), ...rowsOf(NEVER_ON_THE_WEB), ...rowsOf(SET_UP_BY_PEOPLE)];
+const ALSO_HELD = rowsOf(ALSO_BY_PEOPLE);
+
+/* What the project update takes from an agent: what the project is called and says, when it is due, where the work
+ * came from, what is attached to it, and the person's own marks on it. */
+const AGENTS_MAY_CHANGE = {
+    ProjectName: 'Renamed', Description: 'Text', description: 'Text', descriptionBlock: { blocks: [] }, projectIcon: { type: 'color', data: 'blue' },
+    DueDate: '2026-11-01T00:00:00.000Z', dueDateDeadLine: [], StartDate: '2026-10-01T00:00:00.000Z', EndDate: '2026-11-01T00:00:00.000Z',
+    source: 'other', proposalId: '', skills: [], attachments: [], customField: {}, checklistArray: [], tagsArray: [],
+    favouriteTasks: { userId: OWNER }, [`watchers.${OWNER}`]: true,
+};
+const fieldOf = (path) => path.split('.')[0];
+const PROJECT_FIELDS = [...new Set([...Object.keys(schema.projects), ...Object.keys(FIELD_PERMISSIONS)])];
 const proposeOnly = () => [...registry.ACTIONS, ...registryGroups.flatMap((group) => group.entries.map((entry) => entry.action))].filter((action) => action.proposeOnly).map((action) => action.key);
 const withoutRoute = (table) => (key) => !Object.keys(table[key] || {}).length && !NO_WEB_ROUTE.includes(key);
 
@@ -422,11 +663,35 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
         expect(audits('agent.action')).toHaveLength(0);
     });
 
+    it.each(ALSO_HELD.flatMap(([name, ...row]) => [['a token created for an agent', name, agentToken, ...row], ['an agent run', name, agentRun, ...row]]))('%s is refused %s, and recorded', async (label, name, as, route, body, params, recordedAs) => {
+        const answer = await through(route, as(OWNER), body, params);
+
+        expect(answer.code).toBe(403);
+        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(audits('agent.action_refused')).toHaveLength(1);
+        expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, action: recordedAs, path: pathOf(route, params), onBehalfOf: OWNER });
+        expect(audits('agent.action')).toHaveLength(0);
+    });
+
+    it.each([
+        ['a signed-in owner', session(OWNER)],
+        ['a signed-in member', session(INSIDER)],
+        ['a signed-in guest', session(GUEST)],
+        ['a personal token of an owner', personalToken(OWNER)],
+        ['a personal token of a member', personalToken(INSIDER)],
+    ])('%s is not stopped as an agent on any of those either', async (label, caller) => {
+        for (const [, route, body, params] of ALSO_HELD) {
+            const answer = await through(route, caller, body, params);
+            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/Agents cannot/)]);
+        }
+        expect(agentAudits()).toHaveLength(0);
+    });
+
     it('refuses them the same with the proposing tools switched on, and for the agent of an admin or a member', async () => {
         process.env.MCP_TOOLS_MANAGE = 'on';
         process.env.MCP_TOOLS_WORK = 'on';
 
-        for (const [, route, body, params] of HELD_FOR_PEOPLE) {
+        for (const [, route, body, params] of [...HELD_FOR_PEOPLE, ...ALSO_HELD]) {
             for (const uid of [OWNER, ADMIN, INSIDER]) {
                 expect([route, (await through(route, agentToken(uid, { grants: ['tasks:manage'] }), body, params)).code]).toEqual([route, 403]);
             }
@@ -471,13 +736,19 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
         expect(agentAudits()).toHaveLength(0);
     });
 
-    it.each([
-        ['naming a project', { ProjectName: 'Renamed' }],
-        ['describing a project', { descriptionBlock: { blocks: [] } }],
-        ['giving a project a due date', { DueDate: '2026-11-01T00:00:00.000Z' }],
-    ])('%s is still an agent\'s to change as its person may', async (label, updateObject) => {
-        expect(await through(UPDATE, agentToken(OWNER), { updateObject }, inProject)).toBe(REACHED);
+    it.each(Object.entries(AGENTS_MAY_CHANGE))('%s of a project is still an agent\'s to change as its person may', async (path, value) => {
+        expect(await through(UPDATE, agentToken(OWNER), { updateObject: { [path]: value } }, inProject)).toBe(REACHED);
         expect(agentAudits()).toHaveLength(0);
+    });
+
+    it('takes no other field of a project from an agent', async () => {
+        const held = [];
+        for (const field of PROJECT_FIELDS) {
+            const answer = await through(UPDATE, agentToken(OWNER), { updateObject: { [field]: 1 } }, inProject);
+            if (answer !== REACHED && /^Agents cannot perform | cannot be changed\.$/.test(answer.body.statusText)) held.push(field);
+        }
+
+        expect(PROJECT_FIELDS.filter((field) => !held.includes(field)).sort()).toEqual(Object.keys(AGENTS_MAY_CHANGE).map(fieldOf).sort());
     });
 
     it.each([
@@ -489,5 +760,210 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
     ])('%s, which saves nothing, still goes through for an agent', async (label, route, body, params) => {
         expect(await through(route, agentToken(OWNER), body, params)).toBe(REACHED);
         expect(agentAudits()).toHaveLength(0);
+    });
+});
+
+const SPACE = '6f0000000000000000000ca1';
+const DM_SPACE = '6f0000000000000000000ca2';
+const CHANNEL = '6f0000000000000000000cb1';
+const DM = '6f0000000000000000000cd1';
+const DM_MESSAGE = '6f0000000000000000000ce1';
+const CHANNEL_MESSAGE = '6f0000000000000000000ce2';
+const LIST_MESSAGE = '6f0000000000000000000ce3';
+const TASK_MESSAGE = '6f0000000000000000000ce4';
+const PAGE_OF_MESSAGES = 'GET /api/v1/comments/get-paginated-messages';
+const FOUND_MESSAGES = 'GET /api/v1/comments/get-searched-messages';
+const COMMENTS = 'POST /api/v1/comments';
+const REACTIONS = 'POST /api/v2/reactions';
+const inDm = { projectId: DM_SPACE, taskId: DM };
+const inChannel = { projectId: SPACE, sprintId: CHANNEL, taskId: 'default' };
+const inListChannel = { projectId: P_OPEN, sprintId: L_OPEN, taskId: 'default' };
+const onTask = { projectId: P_OPEN, sprintId: L_OPEN, taskId: T_OPEN };
+
+/* [route, body, query]: what reaches a direct message. */
+const DIRECT_MESSAGES = {
+    'reading a direct message': [PAGE_OF_MESSAGES, {}, { ...inDm, isDefault: 'true', mainChat: 'true' }],
+    'reading a direct message as a plain thread': [PAGE_OF_MESSAGES, {}, inDm],
+    'reading the direct message space': [PAGE_OF_MESSAGES, {}, { projectId: DM_SPACE, mainChat: 'true' }],
+    'searching a direct message': [FOUND_MESSAGES, {}, { ...inDm, searchText: 'hello' }],
+    'writing a direct message': [COMMENTS, { data: { ...inDm, message: 'Hello' } }],
+    'writing a direct message, its ids sent to be converted': [COMMENTS, { data: { objId: inDm, message: 'Hello' } }],
+    'replying inside a direct message, another thread named': [COMMENTS, { data: { ...onTask, parentId: DM_MESSAGE, message: 'Hello' } }],
+    'editing a direct message': ['PUT /api/v1/comments', { id: DM_MESSAGE, data: { message: 'Edited' } }],
+    'reading the replies to a direct message': ['GET /api/v1/comments/replies', {}, { parentId: DM_MESSAGE }],
+    'reading what a direct message asks of people': ['GET /api/v1/comments/action-items', {}, inDm],
+    'assigning a direct message': ['POST /api/v1/comments/assign', { id: DM_MESSAGE, assigneeId: INSIDER }],
+    'resolving a direct message': ['POST /api/v1/comments/resolve', { id: DM_MESSAGE }],
+    'reacting to a direct message': [REACTIONS, { targetType: 'comment', targetId: DM_MESSAGE, emoji: '+1' }],
+    'reacting to the conversation itself': [REACTIONS, { targetType: 'task', targetId: DM, emoji: '+1' }],
+    'listing the direct messages of the person': ['POST /api/v1/main-chats/find', { findQuery: [{}] }],
+};
+
+/* The same for a channel. */
+const CHANNEL_MESSAGES = {
+    'reading a channel': [PAGE_OF_MESSAGES, {}, { projectId: SPACE, sprintId: CHANNEL, mainChat: 'true' }],
+    'reading the channel of a list': [PAGE_OF_MESSAGES, {}, { ...inListChannel, mainChat: 'true' }],
+    'reading the channels of every list of a project, a task named': [PAGE_OF_MESSAGES, {}, { projectId: P_OPEN, taskId: T_OPEN, mainChat: 'true' }],
+    'searching a channel': [FOUND_MESSAGES, {}, { projectId: SPACE, sprintId: CHANNEL, searchText: 'hello' }],
+    'writing in a channel': [COMMENTS, { data: { ...inChannel, message: 'Hello' } }],
+    'writing in the channel of a list': [COMMENTS, { data: { ...inListChannel, message: 'Hello' } }],
+    'replying in a channel, another thread named': [COMMENTS, { data: { ...onTask, parentId: CHANNEL_MESSAGE, message: 'Hello' } }],
+    'editing a channel message': ['PUT /api/v1/comments', { id: CHANNEL_MESSAGE, data: { message: 'Edited' } }],
+    'editing a message in the channel of a list': ['PUT /api/v1/comments', { id: LIST_MESSAGE, data: { message: 'Edited' } }],
+    'reading the replies to a channel message': ['GET /api/v1/comments/replies', {}, { parentId: CHANNEL_MESSAGE }],
+    'reacting to a channel message': [REACTIONS, { targetType: 'comment', targetId: CHANNEL_MESSAGE, emoji: '+1' }],
+    'listing the chat spaces': ['GET /api/v1/main-chats', {}],
+};
+
+/* The comments of a task and of a project, which are not chat. */
+const TASK_THREADS = {
+    'reading the comments of a task': [PAGE_OF_MESSAGES, {}, onTask],
+    'reading the comments of a project': [PAGE_OF_MESSAGES, {}, { projectId: P_OPEN }],
+    'searching the comments of a task': [FOUND_MESSAGES, {}, { ...onTask, searchText: 'hello' }],
+    'commenting on a task': [COMMENTS, { data: { ...onTask, message: 'Hello' } }],
+    'commenting on a project': [COMMENTS, { data: { projectId: P_OPEN, project: true, message: 'Hello' } }],
+    'replying to a comment on a task': [COMMENTS, { data: { parentId: TASK_MESSAGE, message: 'Hello' } }],
+    'editing a comment on a task': ['PUT /api/v1/comments', { id: TASK_MESSAGE, data: { message: 'Edited' } }],
+    'reading the replies to a comment on a task': ['GET /api/v1/comments/replies', {}, { parentId: TASK_MESSAGE }],
+    'reading what the comments of a task ask of people': ['GET /api/v1/comments/action-items', {}, onTask],
+    'assigning a comment on a task': ['POST /api/v1/comments/assign', { id: TASK_MESSAGE, assigneeId: INSIDER }],
+    'resolving a comment on a task': ['POST /api/v1/comments/resolve', { id: TASK_MESSAGE }],
+    'reading the comments assigned to the person': ['GET /api/v1/comments/assigned-to-me', {}],
+    'reacting to a comment on a task': [REACTIONS, { targetType: 'comment', targetId: TASK_MESSAGE, emoji: '+1' }],
+    'reacting to a task': [REACTIONS, { targetType: 'task', targetId: T_OPEN, emoji: '+1' }],
+};
+
+const CHAT = 'chat:read';
+const withChat = (uid) => agentToken(uid, { grants: [CHAT] });
+const on = (table) => Object.entries(table).map(([name, [route, body, query]]) => [name, route, body, query]);
+const chatRoute = (route, caller, body, query) => through(route, caller, body, {}, query);
+const seedChat = () => {
+    mockDb.seed(SCHEMA_TYPE.MAIN_CHATS, { _id: SPACE, ProjectName: 'Team', default: false });
+    mockDb.seed(SCHEMA_TYPE.MAIN_CHATS, { _id: DM_SPACE, ProjectName: 'Direct messages', default: true });
+    mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: CHANNEL, name: 'general', projectId: SPACE, deletedStatusKey: 0 });
+    mockDb.seed(SCHEMA_TYPE.TASKS, { _id: DM, TaskName: 'Olive and Ian', ProjectID: DM_SPACE, mainChat: true, AssigneeUserId: [OWNER, INSIDER], deletedStatusKey: 0 });
+    mockDb.seed(SCHEMA_TYPE.COMMENTS, { _id: DM_MESSAGE, ...inDm, userId: INSIDER, message: 'Hello' });
+    mockDb.seed(SCHEMA_TYPE.COMMENTS, { _id: CHANNEL_MESSAGE, ...inChannel, userId: INSIDER, message: 'Hello' });
+    mockDb.seed(SCHEMA_TYPE.COMMENTS, { _id: LIST_MESSAGE, ...inListChannel, userId: INSIDER, message: 'Hello' });
+    mockDb.seed(SCHEMA_TYPE.COMMENTS, { _id: TASK_MESSAGE, ...onTask, userId: INSIDER, message: 'Hello' });
+};
+
+describe('chat on the web app\'s own routes', () => {
+    beforeEach(seedChat);
+    afterEach(() => { delete process.env.MCP_TOOLS_DATA; });
+
+    it.each(on(DIRECT_MESSAGES))('%s is refused for an agent, whatever its token was given, and recorded', async (name, route, body, query) => {
+        process.env.MCP_TOOLS_DATA = 'on';
+
+        for (const caller of [agentToken(OWNER), agentToken(INSIDER), withChat(OWNER), withChat(INSIDER), agentRun(OWNER)]) {
+            const answer = await chatRoute(route, caller, body, query);
+            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'Agents cannot perform chat.direct']);
+        }
+        expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(Array(5).fill('chat.direct'));
+        expect(audits('agent.action')).toHaveLength(0);
+    });
+
+    it.each(on(CHANNEL_MESSAGES))('%s is refused for an agent whose token was not given chat, and recorded', async (name, route, body, query) => {
+        process.env.MCP_TOOLS_DATA = 'on';
+
+        for (const caller of [agentToken(OWNER), agentToken(INSIDER), agentToken(OWNER, { grants: ['tasks:manage'] }), agentRun(OWNER)]) {
+            const answer = await chatRoute(route, caller, body, query);
+            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'Agents cannot perform chat.channel']);
+        }
+        expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(Array(4).fill('chat.channel'));
+    });
+
+    it.each(on(CHANNEL_MESSAGES))('%s goes on to the rule of the person for an agent whose token was given chat', async (name, route, body, query) => {
+        process.env.MCP_TOOLS_DATA = 'on';
+
+        expect(await chatRoute(route, withChat(OWNER), body, query)).toBe(REACHED);
+        expect(await chatRoute(route, withChat(INSIDER), body, query)).toBe(REACHED);
+        expect(agentAudits()).toHaveLength(0);
+    });
+
+    it.each(on(CHANNEL_MESSAGES))('%s is refused for that token too while the read tools are off', async (name, route, body, query) => {
+        expect((await chatRoute(route, withChat(OWNER), body, query)).code).toBe(403);
+    });
+
+    it('a direct message is not an agent\'s to start through the task route either', async () => {
+        const body = { data: { TaskName: 'Olive and Mia', ProjectID: DM_SPACE, mainChat: true, AssigneeUserId: [OWNER, OUTSIDER] }, projectData: { _id: DM_SPACE, CompanyId: CID }, user: {} };
+
+        for (const caller of [agentToken(OWNER), withChat(OWNER), agentToken(INSIDER)]) {
+            expect((await chatRoute(CREATE, caller, body)).code).toBe(403);
+        }
+    });
+
+    it.each(on(TASK_THREADS))('%s stays an agent\'s as its person may', async (name, route, body, query) => {
+        expect(await chatRoute(route, agentToken(OWNER), body, query)).toBe(REACHED);
+        expect(await chatRoute(route, agentToken(INSIDER), body, query)).toBe(REACHED);
+        expect(agentAudits()).toHaveLength(0);
+    });
+
+    it.each([
+        ['a signed-in owner', session(OWNER)],
+        ['a signed-in member', session(INSIDER)],
+        ['a signed-in guest', session(GUEST)],
+        ['a personal token of an owner', personalToken(OWNER)],
+        ['a personal token of a member', personalToken(INSIDER)],
+    ])('%s reaches every one of them, and nothing is recorded as an agent\'s', async (label, caller) => {
+        for (const [, route, body, query] of [...on(DIRECT_MESSAGES), ...on(CHANNEL_MESSAGES), ...on(TASK_THREADS)]) {
+            expect([route, await chatRoute(route, caller, body, query)]).toEqual([route, REACHED]);
+        }
+        expect(agentAudits()).toHaveLength(0);
+    });
+});
+
+describe('the chat rule where a thread is judged, for what an agent\'s request reaches by another road', () => {
+    beforeEach(seedChat);
+    afterEach(() => { delete process.env.MCP_TOOLS_DATA; });
+
+    const dm = () => rows(SCHEMA_TYPE.TASKS).find((row) => String(row._id) === DM);
+    const allowed = async (uid, thread) => (await commentThreadAccess(CID, uid, thread)).allowed;
+    const asAgentOf = (uid, chat, fn) => runForAgentOf(uid, { chat }, fn);
+
+    it('leaves a person every thread they have', async () => {
+        expect(await allowed(OWNER, inDm)).toBe(true);
+        expect(await allowed(OWNER, inChannel)).toBe(true);
+        expect(await allowed(OWNER, onTask)).toBe(true);
+        expect(await canReadTask(CID, OWNER, dm())).toBe(true);
+    });
+
+    it.each([['without chat', false], ['with chat', true]])('keeps an agent\'s request %s from a direct message', async (label, chat) => {
+        expect(await asAgentOf(OWNER, chat, () => allowed(OWNER, inDm))).toBe(false);
+        expect(await asAgentOf(OWNER, chat, () => canReadTask(CID, OWNER, dm()))).toBe(false);
+        expect(asAgentOf(OWNER, chat, () => readsCompanyWide(dm(), OWNER, []))).toBe(false);
+        expect(asAgentOf(OWNER, chat, () => companyWideMatch(OWNER, []))).toEqual({ $nor: [{ mainChat: true }] });
+        expect(companyWideMatch(OWNER, [])).toEqual({ $nor: [{ mainChat: true, AssigneeUserId: { $ne: OWNER } }] });
+    });
+
+    it('keeps an agent\'s request from a channel unless its token was given chat', async () => {
+        expect(await asAgentOf(OWNER, false, () => allowed(OWNER, inChannel))).toBe(false);
+        expect(await asAgentOf(OWNER, false, () => allowed(OWNER, inListChannel))).toBe(false);
+        expect(await asAgentOf(OWNER, true, () => allowed(OWNER, inChannel))).toBe(true);
+        expect(await asAgentOf(OWNER, true, () => allowed(OWNER, inListChannel))).toBe(true);
+    });
+
+    it('leaves the agent a task\'s own thread, and leaves anyone else in that request their own rule', async () => {
+        expect(await asAgentOf(OWNER, false, () => allowed(OWNER, onTask))).toBe(true);
+        expect(await asAgentOf(OWNER, false, () => allowed(INSIDER, inDm))).toBe(true);
+        expect(await asAgentOf(OWNER, false, () => allowed(INSIDER, inChannel))).toBe(true);
+    });
+
+    it.each([
+        ['a token created for an agent', agentToken(OWNER), 'off', { uid: OWNER, chat: false }],
+        ['a token given chat', withChat(OWNER), 'on', { uid: OWNER, chat: true }],
+        ['a token given chat while the read tools are off', withChat(OWNER), 'off', { uid: OWNER, chat: false }],
+        ['an agent run', agentRun(OWNER), 'on', { uid: OWNER, chat: false }],
+        ['a personal token', personalToken(OWNER), 'on', null],
+        ['a signed-in person', session(OWNER), 'on', null],
+    ])('runs the request of %s inside its mark', async (label, caller, flag, mark) => {
+        process.env.MCP_TOOLS_DATA = flag;
+        let seen;
+        const res = { statusCode: 200, status() { return this; }, json() { return this; } };
+
+        await agentPerimeter({ ...caller, method: 'GET', originalUrl: '/api/v1/task/find', headers: { companyid: CID }, body: {} }, res, () => { seen = agentOf(OWNER); });
+
+        expect(seen).toEqual(mark);
+        expect(agentOf(OWNER)).toBeNull();
     });
 });

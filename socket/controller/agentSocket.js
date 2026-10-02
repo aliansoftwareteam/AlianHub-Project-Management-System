@@ -22,7 +22,7 @@ const runMoved = (companyId, run) => {
 
 const worthTelling = (companyId, data) => {
     if (data.kind === 'run') return runMoved(companyId, data.run);
-    if (['proposal', 'claim', 'policy', 'limits'].includes(data.kind)) return true;
+    if (['proposal', 'claim', 'policy'].includes(data.kind)) return true;
     if (data.kind === 'agent') return Boolean(data.pausedAll || data.deleted || data.paused || data.agent);
     return false;
 };

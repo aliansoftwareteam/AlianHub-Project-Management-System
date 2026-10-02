@@ -14,7 +14,7 @@ jest.mock('../Modules/Agents/memory', () => ({
 }));
 jest.mock('../Modules/Agents/actions', () => {
     const actual = jest.requireActual('../Modules/Agents/actions');
-    return { rating: actual.rating, perform: jest.fn(async () => ({ auditId: 'aud1', result: { subtaskId: 'st1' } })) };
+    return { rating: actual.rating, perform: jest.fn(async () => ({ auditId: 'aud1', result: { subtaskId: 'st1' } })), personRefusal: jest.fn(async () => '') };
 });
 jest.mock('../Modules/Agents/agentAudit', () => ({ ACTION_DONE: 'agent.action', STATE: { PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed' }, recordProposalDecision: jest.fn(async () => 'dec1'), recordRunReverted: jest.fn(async () => 'rev1'), findById: jest.fn() }));
 jest.mock('../Modules/Agents/undo', () => ({ undoAuditRow: jest.fn(async () => ({ ok: true })), REASON: {} }));

@@ -227,7 +227,7 @@ describe('approving makes the folder as the web app would, as the person who app
         expect(String(listsNamed('Inner list')[0].folderId)).toBe(String(sub._id));
         expect(folderOf(L_TWIN)).toBe(String(top._id));
         expect(partOf(result, 'moves').items).toEqual([{ sprintId: L_TWIN, folder: 'Launch', name: 'Twin list', folderId: String(top._id), previous: '', made: true }]);
-        expect(socketEmitter.emit).toHaveBeenCalledWith('insert', { type: 'insert', companyId: CID, module: 'folders' });
+        expect(socketEmitter.emit).toHaveBeenCalledWith('insert', { type: 'insert', companyId: CID, module: 'folders', data: { _id: String(top._id) } });
         expect(audits(TOOL, 'applied')[0]).toMatchObject({ entityType: 'project', entityId: P_OPEN, meta: { onBehalfOf: INSIDER, undo: { kind: 'folder', projectId: P_OPEN } } });
         expect([...new Set(mockDb.calls.slice(asked).map((call) => String(call.companyId)))].sort()).toEqual([CID, 'global'].sort());
     });

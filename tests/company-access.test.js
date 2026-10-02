@@ -14,7 +14,7 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { setMiddlewareV2, setMiddlewareWithCV2 } = require('../Config/setMiddleware');
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { signSession, startApp } = require('./fixtures/sessionApp');
-const { scopeCompanyPipeline, allowedCompanyIds, companyUpdateKind } = require('../Modules/Company/helpers/companyAccessRules');
+const { scopeCompanyPipeline, allowedCompanyIds, companyUpdateKind, memberCompanyView, COMPANY_MEMBER_FIELDS } = require('../Modules/Company/helpers/companyAccessRules');
 const ctrl = require('../Modules/Company/controller/updateCompany');
 
 const COMPANY = '6f0000000000000000000c01';
@@ -84,6 +84,18 @@ describe('companyAccessRules', () => {
         expect(allowedCompanyIds([COMPANY, OTHER_COMPANY, COMPANY], [COMPANY])).toEqual([COMPANY]);
     });
 
+    /* getCompanyDataFun keeps hydrated company documents in node-cache, which clones them on the way in and out. */
+    it('reads the member fields off a cached company document', () => {
+        const NodeCache = require('node-cache');
+        const { companies } = require('../utils/mongo-handler/createSchema');
+        const Company = mongoose.models.CompanyAccessProbe || mongoose.model('CompanyAccessProbe', companies);
+        const cache = new NodeCache();
+        cache.set('company', Company.hydrate({ _id: new mongoose.Types.ObjectId(COMPANY), Cst_CompanyName: 'Acme', planFeature: { ai: true }, billingDetails: { card: 'x' }, SubcriptionId: 'sub_1' }));
+        const view = JSON.parse(JSON.stringify(memberCompanyView(cache.get('company'))));
+        expect(view).toEqual(expect.objectContaining({ _id: COMPANY, Cst_CompanyName: 'Acme', planFeature: { ai: true } }));
+        expect(Object.keys(view).filter((field) => !COMPANY_MEMBER_FIELDS.includes(field))).toEqual([]);
+    });
+
     it.each([
         [[{ $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'u' } }]],
         [[{ $unionWith: 'users' }]],
@@ -113,6 +125,26 @@ describe('ACC-06 POST /api/v1/admin/company', () => {
         expect(res.body.map((company) => company._id)).toEqual([COMPANY]);
     });
 
+    describe('the fields of a company row', () => {
+        const ROW = { _id: COMPANY, Cst_CompanyName: 'Acme', planFeature: { ai: true }, workingDays: [1, 2, 3, 4, 5], billingDetails: { card: 'x' },
+            aiProviderKeys: { openai: 'sec_1' }, SubcriptionId: 'sub_1', customerId: 'cus_1', agentMonthlyBudgetUsd: 50 };
+        const readAs = async (uid) => {
+            const answer = MongoDbCrudOpration.getMockImplementation();
+            MongoDbCrudOpration.mockImplementation(async (db, obj, method) => (obj.type === SCHEMA_TYPE.COMPANIES && method === 'find' ? [ROW] : answer(db, obj, method)));
+            const res = await app.call('POST', '/api/v1/admin/company', { token: signSession(uid, [COMPANY]), body: { companyIds: [COMPANY] } });
+            expect(res.status).toBe(200);
+            return res.body[0];
+        };
+
+        it.each([['a guest', GUEST], ['a member', MEMBER]])('are, for %s, the ones the web app reads', async (label, uid) => {
+            expect(await readAs(uid)).toEqual({ _id: COMPANY, Cst_CompanyName: 'Acme', planFeature: { ai: true }, workingDays: [1, 2, 3, 4, 5] });
+        });
+
+        it('are all of them for a company admin', async () => {
+            expect(await readAs(ADMIN)).toEqual(ROW);
+        });
+    });
+
     it('returns nothing for a company whose seat is gone while the account still lists it', async () => {
         seats[COMPANY] = seats[COMPANY].filter((seat) => seat.userId !== GUEST);
         const res = await app.call('POST', '/api/v1/admin/company', { token: signSession(GUEST, []), body: { companyIds: [COMPANY] } });
@@ -134,7 +166,42 @@ describe('ACC-06 POST /api/v1/admin/company/find', () => {
         expect(res.status).toBe(200);
         const pipeline = callsOf('aggregate')[0][1].data[0];
         expect(pipeline[0]).toEqual({ $match: { _id: { $in: [new mongoose.Types.ObjectId(COMPANY)] } } });
-        expect(pipeline).toHaveLength(2);
+        expect(pipeline).toHaveLength(3);
+    });
+
+    it.each([['a guest', GUEST], ['a member', MEMBER]])('starts %s from the member fields of the company, whatever the pipeline projects', async (label, uid) => {
+        const findQuery = [{ $match: {} }, { $project: { billingDetails: 1, aiProviderKeys: 1, SubcriptionId: 1 } }];
+        const res = await app.call('POST', '/api/v1/admin/company/find', { token: signSession(uid, [COMPANY]), body: { findQuery } });
+        expect(res.status).toBe(200);
+        const pipeline = callsOf('aggregate')[0][1].data[0];
+        const [limitedTo, memberRow, otherwise] = pipeline[1].$replaceWith.$cond;
+        expect(limitedTo).toEqual({ $in: ['$_id', [new mongoose.Types.ObjectId(COMPANY)]] });
+        expect(Object.keys(memberRow)).toEqual([...COMPANY_MEMBER_FIELDS]);
+        expect(Object.keys(memberRow)).not.toEqual(expect.arrayContaining(['billingDetails']));
+        expect(otherwise).toBe('$$ROOT');
+        expect(pipeline.slice(2)).toEqual(findQuery);
+    });
+
+    it('gives a company admin the whole row of their company', async () => {
+        const findQuery = [{ $match: {} }];
+        const res = await app.call('POST', '/api/v1/admin/company/find', { token: signSession(ADMIN, [COMPANY]), body: { findQuery } });
+        expect(res.status).toBe(200);
+        expect(callsOf('aggregate')[0][1].data[0]).toEqual([{ $match: { _id: { $in: [new mongoose.Types.ObjectId(COMPANY)] } } }, ...findQuery]);
+    });
+
+    it.each([
+        ['$graphLookup', [{ $graphLookup: { from: 'users', startWith: '$userId', connectFromField: '_id', connectToField: '_id', as: 'u' } }]],
+        ['$out', [{ $match: {} }, { $out: 'copy' }]],
+        ['$merge', [{ $merge: { into: 'copy' } }]],
+        ['$unionWith', [{ $unionWith: 'users' }]],
+        ['a $where inside $and', [{ $match: { $and: [{ $where: 'true' }] } }]],
+        ['a $function inside $expr', [{ $match: { $expr: { $function: { body: 'function(){return true}', args: [], lang: 'js' } } } }]],
+        ['an $accumulator inside $addFields', [{ $addFields: { x: [{ $accumulator: {} }] } }]],
+        ['$facet', [{ $facet: { a: [{ $lookup: { from: 'users', pipeline: [], as: 'u' } }] } }]],
+    ])('refuses a member %s', async (label, findQuery) => {
+        const res = await app.call('POST', '/api/v1/admin/company/find', { token: signSession(MEMBER, [COMPANY]), body: { findQuery } });
+        expect(res.status).toBe(403);
+        expect(callsOf('aggregate')).toHaveLength(0);
     });
 
     it('pins the pipeline to no company once the member\'s seat is gone', async () => {

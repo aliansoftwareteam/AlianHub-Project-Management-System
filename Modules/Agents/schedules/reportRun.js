@@ -29,6 +29,9 @@ const SUMMARY_SKILL = Object.freeze({
 
 const slotKey = (agent, schedule, slot) => `${agent._id}:schedule:${schedule._id}:${new Date(slot).toISOString()}`;
 
+/* The projects a report names outright: the ones its agent is kept to, and the one its page is filed in. */
+const namedProjects = (agent, schedule) => [...((agent && agent.projectIds) || []), (schedule.deliver || {}).pageProjectId].filter(Boolean).map(String);
+
 const summarise = async (companyId, { run, agent, report }) => {
     const guard = spendGuard.forRun({ companyId, run });
     const spend = { feature: FEATURES.AGENT_RUN, companyId, runId: String(run._id), userId: run.startedBy || null, account: run.viaAccount || 'workspace', agentId: String(agent._id), agentRevision: run.agentRevision, skillRevision: run.skillRevision };
@@ -43,7 +46,7 @@ const runReport = async (companyId, { agent, schedule, slot, now = new Date() })
     const ownerId = String(schedule.ownerId);
     const owner = await ownerMayRun(companyId, agent, ownerId);
     if (!owner.ok) return { status: 'skipped', reason: owner.reason, code: 'owner_not_allowed' };
-    const check = await runs.canStart(agent, { trigger: TRIGGER, companyId, depth: 0 });
+    const check = await runs.canStart(agent, { trigger: TRIGGER, companyId, depth: 0, projectIds: namedProjects(agent, schedule) });
     if (!check.ok) return { status: 'skipped', reason: check.reason, ...(check.code ? { code: check.code } : {}) };
 
     const { run, deduplicated } = await runs.start(companyId, {

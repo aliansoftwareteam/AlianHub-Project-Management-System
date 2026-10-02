@@ -26,6 +26,9 @@ exports.getTimelog = async (req, res) => {
     if (!companyId) return;
     const actor = await trackerUser(req, res);
     if (!actor) return;
+    if (req.body && req.body.type !== undefined && req.body.type !== SCHEMA_TYPE.TIMESHEET) {
+        return res.status(400).json({ status: false, statusText: 'This route reads logged time only.' });
+    }
     var startDate = new Date();
     startDate.setHours(0);
     startDate.setMinutes(0);

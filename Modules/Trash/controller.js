@@ -3,7 +3,7 @@ const logger = require('../../Config/loggerConfig');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { updateProjectInternal } = require('../Project/controller/updateProject');
-const { updateSprintFun, updateFolderFun, announceFolders } = require('../Sprints/controller');
+const { updateSprintFun, updateFolderFun } = require('../Sprints/controller');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const { leaveLists } = require('../Tasks/helpers/taskListsLeft');
 const pages = require('../Pages/controller');
@@ -14,6 +14,7 @@ const { visibleTrash } = require('./listAccess');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
 const { announce } = require('../Goals/goalStore');
 const { removeCache } = require('../../utils/commonFunctions');
+const { announceProject } = require('../Project/helpers/projectEvents');
 
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -54,6 +55,7 @@ const restoreChildren = (companyId, kind, id) => {
 const restoreProject = async (companyId, id) => {
     await updateProjectInternal(companyId, id, { deletedStatusKey: 0 });
     await restoreChildren(companyId, 'projects', id);
+    announceProject(companyId, 'update', { _id: id }, { deletedStatusKey: 0 });
 };
 
 const restoreList = async (companyId, id, userData) => {
@@ -172,12 +174,12 @@ exports.removeSampleData = async (req, res) => {
             }
             await leaveLists({ companyId, sprintIds: lists, exceptProjectId: id });
             removed.fields += await switchOffSampleFields(companyId, id);
+            announceProject(companyId, 'update', { _id: id }, { deletedStatusKey: rules.TRASHED });
         }
         // A sample project already in the trash still counts, so its goal does not outlive it.
         const seeded = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ ProjectCode: rules.SAMPLE_PROJECT_CODE }, '_id'] }, 'find') || [];
         removed.goals = await trashWhere(companyId, SCHEMA_TYPE.GOALS, { sample: true, sampleProjectId: { $in: seeded.map((project) => String(project._id)) } });
         if (removed.goals) announce('update', companyId);
-        if (removed.folders) announceFolders('update', companyId);
         // updateProjectInternal cleared this before the lists and folders were written.
         if (removed.projects) removeCache('UserProjectData:', true);
         return res.send({ status: true, statusText: 'Sample data removed.', data: removed });

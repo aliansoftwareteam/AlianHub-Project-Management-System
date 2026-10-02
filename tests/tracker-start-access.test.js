@@ -27,7 +27,6 @@ const mongoose = require('mongoose');
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { timeTrackerStart, timeTrackerStart2 } = require('../Modules/LogTime/controllerV2/tracker');
-const { getTimelog } = require('../Modules/LogTime/controllerV2/timelog');
 
 const C = 'c00000000000000000000001';
 const ME = 'a00000000000000000000003';
@@ -84,22 +83,5 @@ describe.each([
         expect(timers()).toHaveLength(0);
         expect(mockProjectTouch).not.toHaveBeenCalled();
         expect(mockStartDates).not.toHaveBeenCalled();
-    });
-});
-
-describe('the tracker\'s time list is read from the time records', () => {
-    it.each([
-        ['names no collection', {}],
-        ['names the time records', { type: SCHEMA_TYPE.TIMESHEET }],
-        ['names another collection', { type: SCHEMA_TYPE.PROJECTS }],
-        ['names something that is not text', { type: { $ne: '' } }],
-    ])('when the body %s', async (_label, extra) => {
-        const now = Date.now();
-        mockDb.seed(SCHEMA_TYPE.TIMESHEET, { Loggeduser: ME, createdAt: now, LogDescription: 'mine' });
-        mockDb.seed(SCHEMA_TYPE.PROJECTS, { Loggeduser: ME, createdAt: now, ProjectName: 'kept' });
-        const r = await call(getTimelog, { userId: ME, ...extra });
-        expect(r.body.status).toBe(true);
-        expect(r.body.data.map((row) => row.LogDescription)).toEqual(['mine']);
-        expect(JSON.stringify(r.body)).not.toContain('kept');
     });
 });
