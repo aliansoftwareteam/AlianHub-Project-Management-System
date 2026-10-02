@@ -137,6 +137,12 @@ describe('the rail in a short window', () => {
         expect(ruleBody(css, '.ah-rail__mark')).toMatch(/flex:\s*none/);
     });
 
+    it('keeps the whole More menu on screen above the profile picture', () => {
+        const more = ruleBody(css, '.ah-rail__pop--more');
+        expect(more).toMatch(/box-sizing:\s*border-box/);
+        expect(more).toMatch(/max-height:\s*calc\(100dvh - 72px\)/);
+    });
+
     it('sits in a shell that cannot be scrolled, even by focus', () => {
         expect(ruleBody(read('assets/css/tokens.css'), '.ah-app')).toMatch(/overflow:\s*hidden;\s*overflow:\s*clip/);
     });

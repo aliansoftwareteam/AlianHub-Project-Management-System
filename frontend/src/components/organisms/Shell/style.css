@@ -71,7 +71,8 @@
 .ah-rail__pop {
     position: absolute; left: calc(100% + 6px); bottom: 0; z-index: 40; text-align: left; color: var(--ink);
 }
-.ah-rail__pop--more { min-width: 224px; max-height: calc(100dvh - 40px); overflow: auto; }
+/* The menu hangs up from the More button, whose foot sits 56px above the window's end with the profile picture under it. */
+.ah-rail__pop--more { min-width: 224px; box-sizing: border-box; max-height: calc(100dvh - 72px); overflow: auto; }
 .ah-rail__pop--profile { min-width: 240px; }
 .ah-rail__me { display: flex; align-items: center; gap: 10px; padding: 8px 10px 6px; }
 .ah-rail__me-text { display: flex; flex-direction: column; min-width: 0; }
