@@ -93,7 +93,7 @@ exports.getOrCreatePersonalProject = async (req, res) => {
             project = result && result.data;
             created = true;
             removeCache("UserProjectData:", true);
-            socketEmitter.emit("insert", { type: "insert", data: project, module: "project" });
+            socketEmitter.emit("insert", { type: "insert", companyId: String(companyId), data: project, module: "project" });
         }
 
         const sprint = await findListSprint(companyId, String(project._id));

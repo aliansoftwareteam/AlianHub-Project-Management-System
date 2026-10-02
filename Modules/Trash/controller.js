@@ -14,6 +14,7 @@ const { visibleTrash } = require('./listAccess');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
 const { announce } = require('../Goals/goalStore');
 const { removeCache } = require('../../utils/commonFunctions');
+const { announceProject } = require('../Project/helpers/projectEvents');
 
 const ObjectId = mongoose.Types.ObjectId;
 
@@ -54,6 +55,7 @@ const restoreChildren = (companyId, kind, id) => {
 const restoreProject = async (companyId, id) => {
     await updateProjectInternal(companyId, id, { deletedStatusKey: 0 });
     await restoreChildren(companyId, 'projects', id);
+    announceProject(companyId, 'update', { _id: id }, { deletedStatusKey: 0 });
 };
 
 const restoreList = async (companyId, id, userData) => {
@@ -172,6 +174,7 @@ exports.removeSampleData = async (req, res) => {
             }
             await leaveLists({ companyId, sprintIds: lists, exceptProjectId: id });
             removed.fields += await switchOffSampleFields(companyId, id);
+            announceProject(companyId, 'update', { _id: id }, { deletedStatusKey: rules.TRASHED });
         }
         // A sample project already in the trash still counts, so its goal does not outlive it.
         const seeded = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ ProjectCode: rules.SAMPLE_PROJECT_CODE }, '_id'] }, 'find') || [];
