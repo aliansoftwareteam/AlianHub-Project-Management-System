@@ -1,30 +1,23 @@
 :root {
-    --home-soft: rgba(0, 0, 0, .06);
-    --home-soft-2: rgba(0, 0, 0, .04);
+    --home-soft: var(--fill);
+    --home-soft-2: var(--surface-hover);
     --home-check: rgba(0, 0, 0, .25);
     --home-label: rgba(0, 0, 0, .42);
-    --home-accent-tint: rgba(47, 57, 144, .08);
-    --home-accent-dash: rgba(47, 57, 144, .4);
-    --home-warn-tint: rgba(217, 131, 36, .12);
+    --home-accent-tint: var(--brand-tint);
+    --home-accent-dash: var(--brand-border);
+    --home-warn-tint: var(--warn-bg);
     --home-agent-border: rgba(107, 92, 231, .35);
-    --home-timer-btn: rgba(255, 255, 255, .12);
+    --home-timer-btn: var(--rail-active);
     --home-timer-btn-hover: rgba(255, 255, 255, .2);
-    --home-block-neutral: rgba(0, 0, 0, .05);
+    --home-block-neutral: var(--fill);
     --home-block-neutral-edge: rgba(0, 0, 0, .3);
-    --home-grid-line: rgba(0, 0, 0, .05);
+    --home-grid-line: var(--hairline);
 }
 :root[data-theme="dark"] {
-    --home-soft: rgba(255, 255, 255, .1);
-    --home-soft-2: rgba(255, 255, 255, .06);
     --home-check: rgba(255, 255, 255, .3);
     --home-label: rgba(255, 255, 255, .42);
-    --home-accent-tint: rgba(168, 146, 255, .14);
-    --home-accent-dash: rgba(168, 146, 255, .5);
-    --home-warn-tint: rgba(217, 131, 36, .16);
     --home-agent-border: rgba(168, 146, 255, .35);
-    --home-block-neutral: rgba(255, 255, 255, .07);
     --home-block-neutral-edge: rgba(255, 255, 255, .35);
-    --home-grid-line: rgba(255, 255, 255, .06);
 }
 
 /* ---------- page frame ---------- */

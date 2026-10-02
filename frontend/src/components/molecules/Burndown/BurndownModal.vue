@@ -117,36 +117,36 @@ const chartOptions = computed(() => ({
 .burndown__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .burndown__card {
-    background: #fff;
+    background: var(--surface);
     border-radius: 10px;
     width: min(720px, 92vw);
     padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-pop);
 }
 .burndown__head {
     margin-bottom: 12px;
 }
 .burndown__close {
-    color: #9a9a9a;
+    color: var(--ink-2);
 }
 .burndown__close:hover {
-    color: #e84a4a;
+    color: var(--danger);
 }
 .burndown__controls {
     margin-bottom: 10px;
 }
 .burndown__select {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 6px 8px;
-    background: #fff;
+    background: var(--surface);
     min-width: 220px;
 }
 .burndown__empty {

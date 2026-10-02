@@ -56,7 +56,7 @@
     background-size: cover;
     background-position: center center;
     border-radius: 15px;
-    border: 2px solid #102a83;
+    border: 2px solid var(--brand);
 }
 .settingProfileWrapper .noimg-uploadImage {
     width: 121px;
@@ -70,7 +70,7 @@
     justify-content: center;
     border-color: var(--brand);
     font-size: 50px;
-    border: 2px solid #102a83;
+    border: 2px solid var(--brand);
 }
 .settingProfileWrapper {
     max-width: 121px;

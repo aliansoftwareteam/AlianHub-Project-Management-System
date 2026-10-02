@@ -170,17 +170,17 @@ function startImport() {
 </script>
 
 <style scoped>
-.timport__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.timport__card { background: #fff; border-radius: 10px; width: min(520px, 92vw); padding: 16px 20px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18); }
+.timport__overlay { position: fixed; inset: 0; background: var(--scrim); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.timport__card { background: var(--surface); border-radius: 10px; width: min(520px, 92vw); padding: 16px 20px; box-shadow: var(--shadow-pop); }
 .timport__head { margin-bottom: 8px; }
-.timport__close { color: #9a9a9a; }
-.timport__close:hover { color: #e84a4a; }
+.timport__close { color: var(--ink-2); }
+.timport__close:hover { color: var(--danger); }
 .timport__hint { margin-bottom: 12px; }
-.timport__sample { display: inline-block; margin-bottom: 12px; color: #2f3990; text-decoration: underline; cursor: pointer; }
+.timport__sample { display: inline-block; margin-bottom: 12px; color: var(--brand); text-decoration: underline; cursor: pointer; }
 .timport__sample:hover { opacity: 0.8; }
 .timport__file { margin-bottom: 12px; }
 .timport__preview { margin-bottom: 10px; }
 .timport__controls { margin-top: 4px; }
-.timport__select { border: 1px solid #e0e0e0; border-radius: 6px; padding: 6px 8px; background: #fff; min-width: 200px; }
-.timport__result { margin-top: 12px; padding: 8px 10px; background: #f7f9fc; border-radius: 6px; }
+.timport__select { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; background: var(--surface); min-width: 200px; }
+.timport__result { margin-top: 12px; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; }
 </style>

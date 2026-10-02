@@ -27,7 +27,7 @@
 .custom-form .custom-field .custom-field-input:focus {
     outline: none;
     border-color: var(--brand);
-    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    box-shadow: 0 0 0 1px var(--brand-ring);
 }
 
 .custom-dropdown {
@@ -151,7 +151,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
+    background-color: var(--track);
     border-radius: 34px;
     transition: .4s;
 }
@@ -335,13 +335,13 @@ button {
     height: 14px;
     width: 14px;
     background-color: var(--fill);
-    border: 2px solid #333;
+    border: 2px solid var(--ink);
     border-radius: 4px;
     transition: all 0.2s ease;
   }
   
   .project-custom-checkbox:hover .project-checkbox-mark {
-    background-color: #ccc;
+    background-color: var(--border);
   }
   
   .project-custom-checkbox input:checked ~ .project-checkbox-mark {

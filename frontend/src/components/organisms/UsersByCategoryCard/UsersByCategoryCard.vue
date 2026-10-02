@@ -323,13 +323,13 @@ watch(() => globalRange && globalRange.value, () => { if (timerange.value === 0)
 .ubc-td-user { display: flex; align-items: center; gap: 8px; max-width: 220px; }
 .ubc-user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .ubc-td-num { text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ubc-zero { color: #cbd0dd; }
+.ubc-zero { color: var(--ink-2); }
 .ubc-total-row td { position: sticky; bottom: 0; z-index: 2; background: var(--surface-2); border-top: 1px solid var(--hairline); box-shadow: inset 0 1px 0 var(--hairline); font-weight: 600; padding: 9px 10px; }
 .ubc-total-label { color: var(--ink-label); }
 
 /* Skeleton */
-.ubc-skel-bar { height: 12px; border-radius: 6px; margin-bottom: 12px; background: linear-gradient(90deg, #eef0f6 25%, #e3e7f1 37%, #eef0f6 63%); background-size: 400% 100%; animation: ubc-shim 1.4s ease infinite; }
+.ubc-skel-bar { height: 12px; border-radius: 6px; margin-bottom: 12px; background: linear-gradient(90deg, var(--fill) 25%, var(--border) 37%, var(--fill) 63%); background-size: 400% 100%; animation: ubc-shim 1.4s ease infinite; }
 .ubc-skel-row { padding: 6px 4px; }
-.ubc-skel { height: 16px; border-radius: 4px; background: linear-gradient(90deg, #eef0f6 25%, #e3e7f1 37%, #eef0f6 63%); background-size: 400% 100%; animation: ubc-shim 1.4s ease infinite; }
+.ubc-skel { height: 16px; border-radius: 4px; background: linear-gradient(90deg, var(--fill) 25%, var(--border) 37%, var(--fill) 63%); background-size: 400% 100%; animation: ubc-shim 1.4s ease infinite; }
 @keyframes ubc-shim { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
 </style>

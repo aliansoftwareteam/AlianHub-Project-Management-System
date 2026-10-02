@@ -19,7 +19,7 @@
 .con-vs-dropdown--menu.vs-dropdown-menu.tagpopup-list {
     min-width: 241px!important;
     max-width: 241px;
-    background-color: white;
+    background-color: var(--surface);
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.15);
     border-radius: 12px;
     padding-top: 0px!important;
@@ -55,7 +55,7 @@
     justify-content: space-between;
 }
 .mainDiv:hover{
-    background: #F4F5F7;
+    background: var(--surface-2);
 }
 .mainDiv:hover span{
     cursor: pointer;
@@ -83,7 +83,7 @@ span.tag_name {
 .tag-task-list{
     position: absolute;
     z-index: 9999;
-    background-color: #fff;
+    background-color: var(--surface);
     padding: 10px;
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.15);
     border-radius: 8px;
@@ -97,7 +97,7 @@ span.tag_name {
     position: absolute;
     right: 12px;
     z-index: 9999;
-    background-color: #fff;
+    background-color: var(--surface);
     top: 4px;
     padding: 12px;
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.15);
@@ -150,7 +150,7 @@ span.tag_name {
     font-weight: 400;
     font-size: 12px;
     line-height: 14px;
-    color: #959595;
+    color: var(--ink-2);
     display: flex;
     justify-content: center;
     padding-bottom: 10px;
@@ -203,8 +203,8 @@ img.tagHover__icon-close {
     display: flex;
 }
 .tagcount{
-    background-color:#818181;
-    color:#FFFFFF;
+    background-color: var(--ink-2);
+    color: var(--surface);
     border-radius: 3px;
     margin-right: 5px;
     padding: 1px 5px;

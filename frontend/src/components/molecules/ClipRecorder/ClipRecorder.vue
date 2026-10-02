@@ -478,7 +478,7 @@ onBeforeUnmount(() => {
     border-radius: 10px;
     width: min(460px, 92vw);
     padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-pop);
     /* Mounted at the app shell (navy Header) — set an explicit dark text colour so
        labels/title don't inherit the header's white text and vanish on the card. */
     color: var(--ink);
@@ -493,7 +493,7 @@ onBeforeUnmount(() => {
     color: var(--ink-2);
 }
 .clip__close:hover {
-    color: #e84a4a;
+    color: var(--danger);
 }
 /* Idle step: the three modes and Start sit on one line, separated from the
    header by a divider, so choosing and starting is a single row. */
@@ -556,7 +556,7 @@ onBeforeUnmount(() => {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #e84a4a;
+    background: var(--danger);
     animation: clip-pulse 1s infinite;
     flex: 0 0 auto;
 }
@@ -567,7 +567,7 @@ onBeforeUnmount(() => {
     width: 100%;
     max-height: 320px;
     border-radius: 8px;
-    background: #000;
+    background: var(--rail);
 }
 .clip__title-row {
     display: flex;
@@ -621,19 +621,19 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: #1b1b38;
-    color: #fff;
+    background: var(--rail);
+    color: var(--rail-ink-strong);
     padding: 8px 12px;
     border-radius: 30px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-pop);
 }
 .clip__mini-timer {
     font-variant-numeric: tabular-nums;
     min-width: 42px;
 }
 .clip__mini-stop {
-    background: #e84a4a;
-    color: #fff;
+    background: var(--danger);
+    color: var(--on-danger);
     border: 0;
     border-radius: 16px;
     padding: 4px 12px;

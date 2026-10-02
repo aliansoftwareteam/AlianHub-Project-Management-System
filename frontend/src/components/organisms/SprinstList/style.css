@@ -196,14 +196,12 @@ span.duedate-new .due-date span, span.key-new {
 {
     font-size: 13px;
     font-weight: 400;
-    color: #FF9128;
     background-color: var(--warn-bg);
     border-radius: 7px;
     width: auto;
     height: 24px;
     padding: 0 10px;
-    background-color: rgba(255, 150, 0, 0.208);
-    color: rgb(255, 150, 0);
+    color: var(--warn-ink);
     line-height: 24px;
 }
 .sprintWrapper {
@@ -217,13 +215,13 @@ span.duedate-new .due-date span, span.key-new {
     margin-right: 5px;
 }
 .item_wrapper::-webkit-scrollbar-thumb{
-    background-color: #888888;
+    background-color: var(--ink-3);
     border-radius: 6px;
 }
 .item_wrapper::-webkit-scrollbar{
     width: 1px;
     height: 2px;
-    background-color: #e0dede;
+    background-color: var(--fill);
     border-radius: 6px;
 }
 
@@ -253,7 +251,7 @@ span.duedate-new .due-date span, span.key-new {
 .sub-task-countdata span.subTaskChatCount {
     background-color: var(--danger);
     height: 11px;
-    color: white;
+    color: var(--on-danger);
     border-radius: 41px;
     text-align: center;
     font-size: 9px;
@@ -705,7 +703,7 @@ span.duedate-new .due-date span, span.key-new {
 .sprint-watcher-count {
     position: absolute;
     bottom: 0px;
-    background-color: #DFE1E6;
+    background-color: var(--border);
     border-radius: 20px;
     display: block;
     font-family: var(--font-ui);
@@ -746,7 +744,6 @@ span.duedate-new .due-date span, span.key-new {
 .spr__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spr__window { color: var(--ink-2); white-space: nowrap; }
 .spr__bar { height: 5px; max-width: 200px; border-radius: 99px; background: var(--fill); overflow: hidden; }
-:root[data-theme="dark"] .spr__bar { background: rgba(255, 255, 255, .12); }
 .spr__bar-fill { height: 100%; border-radius: 99px; background: var(--brand); transition: width var(--t-state) var(--ease); }
 
 .spr__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

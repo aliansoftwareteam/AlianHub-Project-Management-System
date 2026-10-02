@@ -8,16 +8,16 @@
     border: 1px solid var(--hairline);
 }
 .border-thick-white {
-    border: 8px solid white;
+    border: 8px solid var(--surface);
 }
 .bordergray{
-    border: 1px solid #CFCFCF;
+    border: 1px solid var(--border);
 }
 .bordergray-dashed{
-    border: 1px dashed #CFCFCF;
+    border: 1px dashed var(--border);
 }
 .border-gray-bold-dashed{
-    border: 2px dashed #ccc;
+    border: 2px dashed var(--border);
 }
 .border-2 {
     border: 2px solid var(--hairline);
@@ -26,7 +26,7 @@
     border: 1px solid var(--border) !important;
 }
 .border-groupBy{
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
 }
 .border-primary {
     border: 1px solid var(--brand) !important;
@@ -35,7 +35,7 @@
     border: 1px solid #818181;
 }
 .border-gray-blue {
-    border: 1px solid #c6d1dd;
+    border: 1px solid var(--border);
 }
 
 .border-top {
@@ -48,10 +48,10 @@
     border-bottom: 1px solid var(--border) !important;
 }
 .border-bottom-black{
-    border-bottom: 1px solid black !important;
+    border-bottom: 1px solid var(--ink) !important;
 }
 .border-bottom-serach{
-    border-bottom: 1px solid #CFCFCF;
+    border-bottom: 1px solid var(--border);
 }
 .border-left {
     border-left: 1px solid var(--hairline);
@@ -63,10 +63,10 @@
     border-right: 0;
 }
 .border-top-lightwhite{
-    border-top: 1px solid #f2f2f2;
+    border-top: 1px solid var(--hairline);
 }
 .border-top-white {
-    border-top: 1px solid white !important;
+    border-top: 1px solid var(--surface) !important;
 }
 .border-x {
     border-left: 1px solid var(--hairline);
@@ -80,7 +80,7 @@
     border-bottom: 1px solid var(--danger)!important;
 }
 .border-right-grey {
-    border-right: 1px solid #ccc!important;
+    border-right: 1px solid var(--border)!important;
 }
 .border-red {
     border: 1px solid var(--danger)!important;
@@ -90,13 +90,13 @@
     border: 2px solid var(--brand) !important;
 }
 .borderdarkgray{
-    border: 1px solid #cdcdcd;
+    border: 1px solid var(--border);
 }
 .border-left-0{
     border-left: 0 !important;
 }
 .border-bottom-lightgray{
-    border-bottom: 1px solid #C7C7C7;
+    border-bottom: 1px solid var(--border);
 }
 .ai-border-bottom {
     border-bottom: 1px solid;

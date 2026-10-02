@@ -290,11 +290,11 @@ const clearDropdown = () => {
 
 <style scoped>
 .top-bottom-white-border {
-    border-top: 1px solid white !important;
-    border-bottom: 1px solid white !important;
+    border-top: 1px solid var(--surface) !important;
+    border-bottom: 1px solid var(--surface) !important;
 }
 .left-white-border {
-    border-left: 1px solid white !important;
+    border-left: 1px solid var(--surface) !important;
 }
 .arrow::before {
     position: absolute;
@@ -304,7 +304,7 @@ const clearDropdown = () => {
     content: "";
     width: 48px;
     height: 48px;
-    background-color: #ffffff;
+    background-color: var(--surface);
     z-index: 9;
 }
 
@@ -312,10 +312,10 @@ const clearDropdown = () => {
     content: "";
     width: 50px;
     height: 48px;
-    border-color: #c6d1dd #c6d1dd transparent transparent;  
+    border-color: var(--border) var(--border) transparent transparent;  
     transform: rotate(45deg) translate(-6px, 10px);
     border-width: 1px;
-    background: #DFE1E6;
+    background: var(--fill);
     display: block;
     z-index: 10;
     position: absolute;

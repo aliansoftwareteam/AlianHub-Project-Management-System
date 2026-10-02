@@ -19,7 +19,7 @@
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: 12px;
-    box-shadow: 0 16px 44px rgba(23, 24, 36, 0.2);
+    box-shadow: var(--shadow-pop);
     overflow: hidden;
 }
 
@@ -102,7 +102,7 @@
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(23, 24, 36, 0.16);
+    box-shadow: var(--shadow-pop);
 }
 .np__hmitem {
     box-sizing: border-box;
@@ -351,7 +351,7 @@
     padding: 20px;
     background: var(--surface);
     border-radius: 12px;
-    box-shadow: 0 18px 50px rgba(23, 24, 36, 0.28);
+    box-shadow: var(--shadow-modal);
 }
 .np__cicon {
     display: inline-flex;

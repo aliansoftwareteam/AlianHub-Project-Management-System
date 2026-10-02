@@ -33,7 +33,7 @@
                 <div v-for="epic in epics" :key="'epic-'+epic._id" class="epics__row">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="d-flex align-items-center epics__row-main">
-                            <span class="epics__dot" :style="{background: epic.color || '#7b68ee'}"></span>
+                            <span class="epics__dot" :style="{background: epic.color || 'var(--brand)'}"></span>
                             <span class="font-size-13 font-weight-600 epics__name">{{ epic.name }}</span>
                             <span v-if="epic.priority" class="epics__badge font-size-10" :class="'epics__badge--'+epic.priority">{{ priorityLabel(epic.priority) }}</span>
                         </div>
@@ -53,7 +53,7 @@
                         </div>
                     </div>
                     <div class="epics__bar">
-                        <div class="epics__bar-fill" :style="{width: progressOf(epic) + '%', background: epic.color || '#7b68ee'}"></div>
+                        <div class="epics__bar-fill" :style="{width: progressOf(epic) + '%', background: epic.color || 'var(--brand)'}"></div>
                     </div>
                     <div class="d-flex align-items-center flex-wrap epics__meta font-size-11 gray81">
                         <span class="epics__meta-item">{{ $t('Projects.epic_owner') }}: {{ ownerName(epic) }}</span>
@@ -202,7 +202,7 @@ function deleteEpic(epic) {
     max-height: 74vh;
     overflow-y: auto;
     padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-pop);
 }
 .epics__head { margin-bottom: 12px; }
 .epics__close { color: var(--ink-2); }
@@ -242,7 +242,7 @@ function deleteEpic(epic) {
     white-space: nowrap;
 }
 .epics__badge--low { background: var(--fill); color: var(--ink-label); }
-.epics__badge--medium { background: #e7f0fb; color: #1565c0; }
+.epics__badge--medium { background: var(--brand-tint); color: var(--brand); }
 .epics__badge--high { background: var(--danger-bg); color: var(--danger); }
 .epics__status-select {
     border: 1px solid var(--hairline);
@@ -252,10 +252,10 @@ function deleteEpic(epic) {
     cursor: pointer;
 }
 .epics__status-select--open { color: var(--ink-label); }
-.epics__status-select--in_progress { color: #b06a00; border-color: #f0d8a8; background: var(--warn-bg); }
+.epics__status-select--in_progress { color: var(--warn-ink); border-color: #f0d8a8; background: var(--warn-bg); }
 .epics__status-select--done { color: var(--ok-ink); border-color: #bfe3c4; background: var(--ok-bg); }
 .epics__count { white-space: nowrap; }
-.epics__delete { color: #c9c9c9; padding: 0 4px; }
+.epics__delete { color: var(--ink-2); padding: 0 4px; }
 .epics__delete:hover { color: var(--danger); }
 .epics__bar {
     height: 6px;

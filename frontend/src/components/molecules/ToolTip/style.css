@@ -8,8 +8,8 @@
 .tooltip-container {
     position: fixed;
     z-index: 9999;
-    background-color: #FFF;
-    color: #000;
+    background-color: var(--surface);
+    color: var(--ink);
     font-size: 13px;
     text-align: center;
     border-radius: 5px;
@@ -34,14 +34,14 @@
 .tooltip-above .tooltip-arrow {
     bottom: -8px;
     border-width: 8px 8px 0 8px;
-    border-color: #FFF transparent transparent transparent;
+    border-color: var(--surface) transparent transparent transparent;
 }
 
 /* Arrow pointing up (tooltip is below trigger) */
 .tooltip-below .tooltip-arrow {
     top: -8px;
     border-width: 0 8px 8px 8px;
-    border-color: transparent transparent #FFF transparent;
+    border-color: transparent transparent var(--surface) transparent;
 }
 
 .tooltip-content {
@@ -61,7 +61,7 @@
 .read-more-btn {
     background: none;
     border: none;
-    color: #64b5f6;
+    color: var(--brand);
     cursor: pointer;
     font-size: 13px;
     padding: 4px 0 0 0;
@@ -75,11 +75,11 @@
 }
 
 .read-more-btn:hover {
-    color: #90caf9;
+    color: var(--brand-deep);
 }
 
 .read-more-btn:active {
-    color: #42a5f5;
+    color: var(--brand-deep);
 }
 
 .tooltip-fade-enter-active,
@@ -104,7 +104,7 @@
 }
 
 .tooltip-desc {
-    color: #000;
+    color: var(--ink);
     font-size: 13px;
     text-align: center;
     border-radius: 5px;

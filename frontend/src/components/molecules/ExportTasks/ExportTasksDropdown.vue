@@ -127,21 +127,21 @@ function downloadJob(job) {
 .export-tasks__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .export-tasks__card {
-    background: #fff;
+    background: var(--surface);
     border-radius: 10px;
     width: min(360px, 92vw);
     padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-pop);
 }
 .export-tasks__head { margin-bottom: 8px; }
-.export-tasks__close { color: #9a9a9a; }
-.export-tasks__close:hover { color: #e84a4a; }
+.export-tasks__close { color: var(--ink-2); }
+.export-tasks__close:hover { color: var(--danger); }
 .export-tasks__hint { margin-bottom: 14px; }
 </style>
