@@ -1,5 +1,5 @@
-const { AsyncResource } = require('async_hooks');
 const { findRoomsByPrefixes } = require('../helper');
+const { forTheViewer } = require('../roomAccess');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { verifyCompanyMembership } = require('../../Config/jwt');
 const logger = require('../../Config/loggerConfig');
@@ -14,10 +14,6 @@ const cached = (key, now) => {
     decisions.delete(key);
     return undefined;
 };
-
-/* Whether the person looking may open the task is not the business of the request that changed the session: bound
- * here, where no request is running, it is read under no token's project list and no agent's mark. */
-const forTheViewer = AsyncResource.bind((decide) => decide());
 
 /* joinTaskDetail admits any live session to any task's room, so the relay decides per socket: the user the socket's
  * verified token names must belong to the workspace and be able to open the task. */

@@ -1,3 +1,4 @@
+const { AsyncResource } = require('async_hooks');
 const logger = require('../../../Config/loggerConfig');
 const domainEventBus = require('../../../event/domainEventBus');
 const matcher = require('./matcher');
@@ -111,7 +112,9 @@ async function start() {
         return;
     }
     driver = selectDriver();
-    driver.define(JOB_NAME, async (job) => {
+    // A queue runs a job in whichever chain picks it up: the one that saved it, its own timer, or another request's.
+    // Bound here, at start, a run is under no bystander's project list, agent rule, mark or request.
+    driver.define(JOB_NAME, AsyncResource.bind(async (job) => {
         const { companyId, runId, ruleId, workflowRunId } = job.attrs.data || {};
         const keepAlive = typeof job.touch === 'function' ? () => job.touch() : null;
         await providerContext.run({ companyId }, async () => {
@@ -121,7 +124,7 @@ async function start() {
             }
             await runner.execute({ companyId, runId, ruleId, enqueue: enqueueRun, keepAlive });
         });
-    });
+    }));
     await driver.start();
     domainEventBus.bus.on('domain.event', dispatch);
     domainEventBus.bus.on('domain.event', subtaskTrigger.onEnvelope);

@@ -18,6 +18,6 @@ const agentOf = (uid) => {
  * yes or no for a check; nothing the agent is kept from is read for it this way. */
 const asThePerson = (fn) => storage.exit(fn);
 
-const outside = (fn) => storage.exit(fn);
+const outside = asThePerson;
 
 module.exports = { runForAgentOf, agentOf, asThePerson, outside };
