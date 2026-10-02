@@ -60,6 +60,7 @@
     transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
 }
 .dash__tile:hover { border-color: var(--border); box-shadow: var(--shadow-card); }
+.dash__empty { grid-column: 1 / -1; }
 .dash__tile:focus-visible { outline: none; box-shadow: var(--focus); }
 .dash__tile-head { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .dash__tile-title { font: var(--text-h3); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

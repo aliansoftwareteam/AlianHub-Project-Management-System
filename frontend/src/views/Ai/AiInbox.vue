@@ -30,7 +30,7 @@
                         <EmptyState v-if="approvalsEngineOff" data-test="approvals-engine-off" :title="$t('Workflows.engine_off_title')" :message="$t('Workflows.engine_off_body')" />
                         <div v-else-if="!approvalsLoaded" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
                         <EmptyState v-else-if="approvalsError" :title="$t('Ai.load_failed')" :message="approvalsError" :action-label="$t('Ai.retry')" @action="loadApprovals" />
-                        <EmptyState v-else-if="!approvals.length" data-test="approvals-empty" :title="$t('Workflows.approvals_empty_title')" :message="$t('Workflows.approvals_empty_body')" />
+                        <EmptyState v-else-if="!approvals.length" data-test="approvals-empty" :title="$t('Workflows.approvals_empty_title')" :message="$t('Workflows.approvals_empty_body')" :action-label="$t('Ai.back_to_waiting')" @action="switchView('pending')" />
                         <WorkflowApprovalRow
                             v-for="approval in approvals"
                             v-else
@@ -44,7 +44,7 @@
                     <template v-else-if="view === 'reports'">
                         <div v-if="!reportsLoaded" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
                         <EmptyState v-else-if="reportsError" :title="$t('Ai.load_failed')" :message="reportsError" :action-label="$t('Ai.retry')" @action="loadReports" />
-                        <EmptyState v-else-if="!reports.length" data-test="reports-empty" :title="$t('Ai.reports_empty_title')" :message="$t('Ai.reports_empty_body')" />
+                        <EmptyState v-else-if="!reports.length" data-test="reports-empty" :title="$t('Ai.reports_empty_title')" :message="$t('Ai.reports_empty_body')" :action-label="$t('Ai.reports_empty_action')" @action="$router.push({ name: 'AgentTeammates', params: { cid: companyId } })" />
                         <button
                             v-for="r in reports"
                             v-else
@@ -91,7 +91,7 @@
                             <span class="ai-item__time ah-mono">{{ shortTime(p.createdAt) }}</span>
                         </div>
                         <div class="ai-item__what">{{ titleOf(p) }}</div>
-                        <div class="ai-item__why">{{ p.why }}</div>
+                        <div class="ai-item__why">{{ whyOf(p) }}</div>
                     </button>
                 </div>
 
@@ -133,7 +133,7 @@
                     <h2 class="ai-detail__what">{{ titleOf(selected) }}</h2>
 
                     <div class="ah-label">{{ $t('Ai.why') }}</div>
-                    <p class="ai-detail__why">{{ selected.why }}</p>
+                    <p class="ai-detail__why">{{ whyOf(selected) }}</p>
 
                     <div class="ah-label">{{ changesLabel }}</div>
                     <div v-if="selected.batch" class="ai-batch">
@@ -152,7 +152,12 @@
 
                     <div v-if="selected.gate" class="auth__banner auth__banner--warn" style="margin-top:14px">
                         <ShellIcon name="shield" :size="15" />
-                        <span>{{ canDecide ? $t('Ai.gate_note') : $t('Ai.gate_locked') }}</span>
+                        <span>{{ canDecide || lockedByRights ? $t('Ai.gate_note') : $t('Ai.gate_locked') }}</span>
+                    </div>
+
+                    <div v-if="lockedByRights" class="auth__banner auth__banner--warn ai-locked" data-test="rights-locked">
+                        <ShellIcon name="shield" :size="15" />
+                        <span>{{ $t('Ai.rights_locked') }}</span>
                     </div>
 
                     <div v-if="selected.taint" class="auth__banner auth__banner--warn" style="margin-top:14px" data-test="taint-reason">
@@ -169,7 +174,10 @@
                         </button>
                         <button type="button" class="ah-btn ah-btn--ghost" :disabled="busy" data-test="decline" @click="openDecline">{{ $t('Ai.decline') }}</button>
                     </div>
-                    <div v-else-if="selected.status === 'pending' && canDecide" class="ai-decline" data-test="decline-reason">
+                    <div v-else-if="selected.status === 'pending' && canDecline && !declining" class="ai-actions">
+                        <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" data-test="decline" @click="openDecline">{{ $t('Ai.decline') }}</button>
+                    </div>
+                    <div v-else-if="selected.status === 'pending' && canDecline" class="ai-decline" data-test="decline-reason">
                         <div class="ah-label">{{ $t('Ai.decline_reason_title') }}</div>
                         <p class="ah-small ai-decline__lead">{{ $t('Ai.decline_reason_lead') }}</p>
                         <div class="ai-decline__chips" role="group" :aria-label="$t('Ai.decline_reason_title')">
@@ -222,10 +230,12 @@ import { skillSourceLabel } from "./skillSourceText";
 import { proposalTitle, sortProposals, waitingDaysOf } from "./plainLabels";
 import { useAgentAccess } from "./agentAccess";
 import { changeLabel } from "./agentActionLabels";
+import { plainReason } from "./auditWords";
 
 defineOptions({ name: "AiInboxPage" });
 
 const GATE_OWNER_ADMIN = "owner_admin";
+const LOCKED_BY_RIGHTS = "own_rights";
 
 const { t, te } = useI18n();
 const store = useStore();
@@ -233,6 +243,8 @@ const companyId = inject("$companyId", null);
 const { canManage, userId, mayUndo } = useAgentAccess();
 const $toast = useToast();
 const { proposals, counts, loadProposals, loadSummary, decide } = useAgents();
+const plain = (reason) => plainReason(t, te, reason);
+const whyOf = (proposal) => plain(proposal.why);
 const {
     approvals,
     count: approvalCount,
@@ -272,7 +284,14 @@ const pickReason = (key) => {
 };
 const declineReasonValue = computed(() => declineReason.value || declineNote.value.slice(0, 200));
 
-const canDecide = computed(() => !selected.value || selected.value.gate !== GATE_OWNER_ADMIN || canManage.value);
+/* The server says whether a waiting proposal is the reader's to approve; a row without its word falls back to the owner-or-admin rule. */
+const canDecide = computed(() => {
+    const p = selected.value;
+    if (!p) return true;
+    return typeof p.locked === "boolean" ? !p.locked : p.gate !== GATE_OWNER_ADMIN || canManage.value;
+});
+const canDecline = computed(() => canDecide.value || selected.value?.mayDecline === true);
+const lockedByRights = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_BY_RIGHTS);
 const taintLine = (marker) => taintSourcesLine(t, taintSourcesOf(marker));
 const selectedSkillSource = computed(() => skillSourceLabel(t, selected.value?.skillSource));
 const sortedProposals = computed(() => sortProposals(proposals.value, sortOrder.value));
@@ -386,7 +405,7 @@ const onApprove = async () => {
         const unapplied = (out?.applied || []).filter((a) => !a.ok);
         showProjects(store, madeProjectIds(out));
         const id = await afterDecision(unapplied.length ? "" : t("Ai.applied"));
-        if (unapplied.length) $toast.error(t("Ai.applied_with_failures", { n: unapplied.length, error: unapplied[0].error || "" }), { position: "top-right" });
+        if (unapplied.length) $toast.error(t("Ai.applied_with_failures", { n: unapplied.length, error: plain(unapplied[0].error) }), { position: "top-right" });
         if (out?.undoUntil && mayUndo({ decidedBy: out.decidedBy || userId.value })) {
             undo.value = { id, until: new Date(out.undoUntil).getTime() };
             setTimeout(() => { if (undo.value && undo.value.id === id) undo.value = null; }, Math.max(0, new Date(out.undoUntil).getTime() - Date.now()));
@@ -459,6 +478,7 @@ onMounted(() => Promise.all([reload(), loadApprovals(), route?.query?.report ? o
 .ai-decline__actions { margin-top: 4px; align-items: center; }
 .ai-decline__skip { border: 0; background: transparent; color: var(--ink-2); font: var(--text-small); cursor: pointer; text-decoration: underline; padding: 0 4px; }
 .ai-detail__feedback { margin-top: 12px; }
+.ai-locked { margin-top: 14px; }
 .ai-batch { display: flex; flex-direction: column; gap: 6px; margin-bottom: 7px; min-width: 0; }
 .ai-batch__mark { align-self: flex-start; }
 </style>

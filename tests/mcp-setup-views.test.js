@@ -309,6 +309,6 @@ describe('undo removes exactly the view that was added', () => {
         expect(out.results[0]).toMatchObject({ ok: true, result: { projectId: P_OPEN, removed: true } });
         expect(viewsOf(P_OPEN).map((entry) => entry.title)).toEqual(['List', 'Board']);
         expect(JSON.stringify(viewsOf(P_OPEN))).toBe(before);
-        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', updatedFields: { ProjectRequiredComponent: 'remove' } }));
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', companyId: CID, updatedFields: { ProjectRequiredComponent: 'remove' } }));
     });
 });

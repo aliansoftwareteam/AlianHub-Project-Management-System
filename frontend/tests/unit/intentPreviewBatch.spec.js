@@ -98,6 +98,59 @@ describe('the card for a batch that names several tasks', () => {
     });
 });
 
+describe('the lines that say what each change of a batch sets', () => {
+    it('names the people, the place, the value and the text, each with the task it is set on', () => {
+        mountCard(batch({ lines: [
+            { kind: 'batchItem', what: 'assignees', task: 'Bulk 1', mode: 'add', names: ['Mia', 'Priya'], others: 1 },
+            { kind: 'batchItem', what: 'assignees', task: 'Bulk 2', mode: 'set', names: [], others: 0 },
+            { kind: 'batchItem', what: 'assignees', task: 'Bulk 3', mode: 'remove', names: ['Mia'], others: 0 },
+            { kind: 'batchItem', what: 'move', task: 'Bulk 4', project: 'Web', list: 'Sprint 5' },
+            { kind: 'batchItem', what: 'list_add', task: 'Bulk 4', project: 'Web', list: '' },
+            { kind: 'fieldValue', field: 'Budget', task: 'Bulk 5', value: '12', others: 0 },
+            { kind: 'batchItem', what: 'comment', task: 'Bulk 6', value: 'Ready for review', more: false },
+            { kind: 'batchItem', what: 'description', task: 'Bulk 6', value: 'The new plan', more: true },
+            { kind: 'batchItem', what: 'title', task: 'Bulk 7', value: 'Renamed' },
+            { kind: 'batchItem', what: 'due', task: 'Bulk 7', value: '2026-10-09' },
+            { kind: 'batchItem', what: 'relation_add', task: 'Bulk 8', value: 'Bulk 1' },
+            { kind: 'batchItem', what: 'relation_remove', task: 'Bulk 8', value: '' },
+            { kind: 'batchItem', what: 'archive', task: 'Bulk 9' },
+            { kind: 'batchItem', what: 'task', task: '', value: 'A new one' },
+            { kind: 'batchItem', what: 'something.new', task: '', value: '' },
+        ] }));
+        expect(lines()).toEqual([
+            ['Assignees', 'Add Mia, Priya and 1 more, on “Bulk 1”'],
+            ['Assignees', 'Nobody, on “Bulk 2”'],
+            ['Assignees', 'Remove Mia, on “Bulk 3”'],
+            ['Moved', 'Sprint 5, in Web, on “Bulk 4”'],
+            ['Added to list', 'Web, on “Bulk 4”'],
+            ['Value', 'Budget on “Bulk 5”: 12'],
+            ['Comment', 'Ready for review, on “Bulk 6”'],
+            ['Description', 'The new plan…, on “Bulk 6”'],
+            ['Title', 'Renamed, on “Bulk 7”'],
+            ['Due', 'Oct 9, 2026, on “Bulk 7”'],
+            ['Linked to', 'Bulk 1, on “Bulk 8”'],
+            ['Link removed', 'Bulk 8'],
+            ['Archived', 'Bulk 9'],
+            ['New task', 'A new one'],
+        ]);
+    });
+
+    it('shows a text that holds markup as the text it is', () => {
+        const attack = '<img src=x onerror="window.__hit = 1">';
+        mountCard(batch({ lines: [{ kind: 'batchItem', what: 'comment', task: attack, value: attack, more: false }] }));
+        expect(lines()).toEqual([['Comment', `${attack}, on “${attack}”`]]);
+        expect(wrapper.find('img').exists()).toBe(false);
+        expect(window.__hit).toBeUndefined();
+    });
+
+    it('heads the card of one change that waits on its own as one change', () => {
+        mountCard(batch({ tasks: 1, changes: 1, lines: [{ kind: 'batchChange', what: 'move', count: 1, value: '', mixed: false }, { kind: 'batchItem', what: 'move', task: 'Bulk 1', project: 'Web', list: 'Sprint 5' }] }));
+        expect(wrapper.find('[data-test="intent-kind"]').text()).toBe('One change');
+        expect(wrapper.find('[data-test="intent-title"]').text()).toBe('1 task');
+        expect(lines()).toEqual([['Moved', '1 task'], ['Moved', 'Sprint 5, in Web, on “Bulk 1”']]);
+    });
+});
+
 describe('a batch in the Inbox approval queue', () => {
     it('is one card with one Approve, not a line for each change, and no "Always do this"', () => {
         mountQueue([row()]);

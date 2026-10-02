@@ -14,6 +14,8 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 // What an MCP caller may read or act on: exactly what the person behind the token
 // could open in the web app (Modules/Tasks/helpers/taskQueryGuard visibilityStage),
 // narrowed further by the token's own project list. It never widens either.
+// A conversation is stored as a task row marked mainChat. It is chat, not a task: no caller's filter lets one
+// through, its own people included, so every task read and write answers for it as for a task that is not there.
 
 /* What a task read must carry for allowsTask to judge it. */
 const TASK_ACCESS_FIELDS = Object.freeze({ ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 });
@@ -42,7 +44,7 @@ const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarr
     const allowsProject = (id) => isId(id) && !excluded.has(String(id)) && (projectSet === null || projectSet.has(String(id)));
     const listsTasksIn = (id) => allowsProject(id) && (taskProjectSet === null || taskProjectSet.has(String(id)));
     const allowsSprint = (id) => !id || !hiddenSet.has(String(id));
-    const allowsTask = (task) => Boolean(task) && listsTasksIn(task.ProjectID) && allowsSprint(task.sprintId)
+    const allowsTask = (task) => Boolean(task) && task.mainChat !== true && listsTasksIn(task.ProjectID) && allowsSprint(task.sprintId)
         && readsCompanyWide(task, uid, [...excluded]);
     // A page outside every project is company-wide; a project-restricted token was never granted those.
     const allowsPage = (page) => pageReachedBy(page, {
@@ -55,6 +57,7 @@ const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarr
         let ids = taskProjectIds;
         if (isId(narrowTo)) ids = listsTasksIn(narrowTo) ? [String(narrowTo)] : [];
         return {
+            mainChat: { $ne: true },
             ...(ids === null ? {} : { ProjectID: { $in: ids.map(toOid) } }),
             ...(hiddenSet.size ? { sprintId: { $nin: [...hiddenSet].map(toOid) } } : {}),
             ...(companyWide ? companyWideMatch(uid, [...excluded]) : {}),

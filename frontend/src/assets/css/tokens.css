@@ -487,7 +487,9 @@ html, body, #app {
     display: flex;
     height: 100dvh;
     width: 100vw;
+    /* `hidden` still lets focus scroll the shell, and nothing on screen scrolls it back; `clip` cannot be scrolled at all. */
     overflow: hidden;
+    overflow: clip;
     background: var(--canvas);
 }
 .ah-app__main {
@@ -749,7 +751,7 @@ html, body, #app {
 .ah-tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r-input); background: var(--track, rgba(0, 0, 0, .05)); }
 .ah-tab {
     height: var(--control-h, 26px); padding: 0 var(--sp-4); border-radius: var(--r-chip); border: 0; background: transparent;
-    font: var(--fw-strong, 600) var(--fs-sm, 12px)/1 var(--font-ui); color: var(--ink-2); cursor: pointer;
+    font: var(--fw-strong, 600) var(--fs-sm, 12px)/1 var(--font-ui); color: var(--ink-label); cursor: pointer;
     transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
 .ah-tab.is-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }

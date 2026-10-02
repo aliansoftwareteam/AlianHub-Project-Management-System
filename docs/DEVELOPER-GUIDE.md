@@ -34,7 +34,7 @@ The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run b
 | `npm run api:doc:check` | `docs/API.md` and `docs/api/openapi.json` match the routes and `scripts/api-doc.meta.json`. Not run in CI: run `npm run api:doc` and commit both files in the docs pull request that follows merges to `beta` |
 | `npm run visual` | the screenshot check of the core screens; CI only, see [Screenshot check](#screenshot-check) |
 
-`.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. A pull request that only changes files under `Tasks/` or Markdown under `.claude/` skips the suites: nothing they test can have changed. A draft pull request skips them too: a draft cannot be merged, and marking it ready for review runs them. Work that goes in through a combined pull request can therefore stay a draft, and the suites run once, on the combined one. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
+`.github/workflows/ci.yml` runs all of that on every pull request to `beta`, `staging` and `main`, except the screenshot check, which has a workflow of its own. A pull request that only changes files under `Tasks/` or Markdown under `.claude/` skips the suites: nothing they test can have changed. A draft pull request skips them too: a draft cannot be merged, and marking it ready for review runs them. Work that goes in through a combined pull request can therefore stay a draft, and the suites run once, on the combined one. The frontend is built once for the browser tests (`npm run e2e`, three shards) and the API tests (`npm run test:integration`, two shards); every shard has its own database and server. The check named `e2e` passes only when all of them did, and a failing shard keeps its report as the artifact `e2e-report-shard-<n>` or `integration-logs-shard-<n>`. The conventions project is the place for a rule that must hold everywhere: it reads the tree and fails with the offending file, so a new rule needs no per-module wiring.
 
 The `Clock` workflow (`.github/workflows/clock.yml`) runs weekly and on demand, never on pull requests: it runs the backend unit suite (two shards) and the frontend suite with the clock moved forward by 3, 40 and 400 days, which catches code that reads the real clock against test data written with fixed dates, something no test file's text can reveal. `tests/support/shift-clock.js` moves `new Date()` and `Date.now()` by `CLOCK_SHIFT_DAYS` days and leaves explicit dates and timers alone; a failing job names each failing test and its offset in the job summary. To run one offset locally, set the variable: `CLOCK_SHIFT_DAYS=40 npx jest --selectProjects unit tests/some.test.js` or `cd frontend && CLOCK_SHIFT_DAYS=40 npx vitest run tests/some.spec.js`. A test that fails only because a TLS certificate looks expired goes in `tests/support/clock-skip.js` with its reason; any other failure means the test or the code under test should own its clock (pin both the data and the clock, or use the file's fake-timer helper).
 
@@ -50,6 +50,16 @@ The conventions in place:
 - `naming-conventions` — module folder and file naming.
 
 Writing a frontend spec: mount with `@vue/test-utils`; `frontend/tests/setup.js` installs i18n, `$t`, and the shell provides (`$userId`, `$companyId`, `$clientWidth`, `$socket`). Mock `@/services` and heavy children with `vi.mock`; keep shared mocks in `vi.hoisted`. `frontend/tests/TaskDetailPanel.spec.js` is the template for a large component, `useProjectTree.spec.js` for a composable.
+
+### Tests that pass by chance
+
+A test that fails one run in ten is wrong, not unlucky. What causes it here, and what to do:
+
+- A spec mocks a module that `frontend/tests/setup.js` also mocks with an async factory (`@formkit/vue` against `@/plugins/customFieldView/lazyFormKit`). Which factory wins depends on load, and the real FormKit then fails with `E600`. Mock the module the component imports, in the spec itself, so the spec owns it.
+- A real timer, an unawaited promise, or an assertion made before the next tick. Use fake timers and `await flushPromises()`.
+- State shared between tests: a module-level variable, `document.body`, a mock that is not reset. Reset it in `beforeEach`.
+- A fixed date near today, or a count or list another test changes (the shared e2e workspace). Make the test create its own project, task or member with `uniqueSuffix()` and assert on that.
+- Never fix it with a longer timeout, a retry, or a looser assertion. Show it steady: run it 20 times with `npx vitest run --no-file-parallelism <file>` and with `--maxWorkers=4`, and under CPU load (a few `while :; do :; done` loops) while you do.
 
 ### Screenshot atlas
 
@@ -162,6 +172,12 @@ Read them once at module load (`process.env.NAME || default`), describe the key 
 ### Locale keys
 
 `t('Namespace.key')` with a literal key; when the key is built at run time, end the literal with `_` or `.` (`t('Inbox.tab_' + kind)`) so the audit can resolve the prefix. `node scripts/i18n-rename-namespace.js <From> <To>` moves a namespace and rewrites every reference.
+
+Keys waiting for a translator, per locale, on 2026-10-02 (`npm run i18n:backfill -- --dry-run` prints today's count as "pending review"): `ar` 12,660 · `ge` 10,798 · `fr` 10,786 · `gr` 10,779 · `hi` 10,778 · `ch`, `gu`, `it` 10,777 each · `ru`, `spa` 10,776 each. `ja`, `ko` and `ptBr` show English as it is and have no list. A translator clears a key in three steps:
+
+1. Open `frontend/src/locales/<locale>.pending.json`: every key in it is listed with its English text, and is still English (or a machine translation) in `<locale>.js`.
+2. Write the translation at that key in `frontend/src/locales/<locale>.js`, keeping every `{placeholder}` as it is, then delete the key's line from `<locale>.pending.json`; nothing removes it for you.
+3. Run `npm run i18n:backfill` (it puts the file back in order) and `npm run i18n:check`, and commit both files together.
 
 ### Colours and style classes
 

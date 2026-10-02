@@ -30,7 +30,7 @@
 @media (max-width: 767px) {
     .project__detail-component .sticky_item-wrapper { background-color: var(--surface); }
     /* The page drops its own padding at this width, for the blocks that run edge to edge. The bordered cards are not such blocks. */
-    .project__detail-component.showProjectDetailRight > :is(.pm, .pdt, .arc) {
+    .project__detail-component.showProjectDetailRight > :is(.pm, .pdt, .pap, .plim, .psa, .pmc, .arc) {
         margin-left: var(--page-pad-x, 16px);
         margin-right: var(--page-pad-x, 16px);
     }

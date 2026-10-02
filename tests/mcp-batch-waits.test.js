@@ -159,14 +159,18 @@ describe('a batch that names more than one task, in a project left at its defaul
         ]);
         expect(out).toMatchObject({ pending: true, waiting: 2, applied: 0 });
         expect(rows(SCHEMA_TYPE.TASKS).map((task) => task.TaskName)).not.toEqual(expect.arrayContaining(['First']));
-        expect((await rowFor(MEMBER, out.proposalId)).batch).toMatchObject({ tasks: 0, changes: 2, lines: [{ kind: 'batchChange', what: 'task', count: 2, value: '', mixed: false }] });
+        expect((await rowFor(MEMBER, out.proposalId)).batch).toMatchObject({ tasks: 0, changes: 2, lines: [
+            { kind: 'batchChange', what: 'task', count: 2, value: '', mixed: false },
+            { kind: 'batchItem', what: 'task', task: '', value: 'First' },
+            { kind: 'batchItem', what: 'task', task: '', value: 'Second' },
+        ] });
     });
 });
 
 describe('a batch on one task', () => {
     it('runs at once as before: each operation on its own, and the ones that applied recorded as one group', async () => {
         const [task] = twenty;
-        const out = await batch(ctx(OWNER), [setStatus(task, 'To Do'), rename(task, 'Renamed'), { tool: 'subtask.create', arguments: { taskId: String(task._id), title: 'Follow up' } }]);
+        const out = await batch(ctx(OWNER), [setStatus(task, 'To Do'), rename(task, 'Renamed'), { tool: 'task.comment', arguments: { taskId: String(task._id), body: 'Follow up' } }]);
         expect(out).toMatchObject({ ok: true, applied: 3, notApplied: 0, undoable: true });
         expect(out.pending).toBeUndefined();
         expect(stored(task._id)).toMatchObject({ TaskName: 'Renamed', status: expect.objectContaining({ text: 'To Do' }) });

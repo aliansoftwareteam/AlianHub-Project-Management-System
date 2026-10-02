@@ -48,4 +48,20 @@ const requireChatAccess = ({ containers, permission }) => async (req, res, next)
     }
 };
 
-module.exports = { CHAT_CHANNEL, CHAT_CATEGORY, isChatSpace, requireChatAccess };
+/* Whether a list or folder write lands in a chat space is read from where its container is stored,
+ * and a seeding write is made by server code alone: neither is taken from the request. */
+const serverListFlags = (containers) => async (req, res, next) => {
+    try {
+        if (!req.body || typeof req.body !== 'object') req.body = {};
+        const ids = idsIn(await containers(req));
+        const spaces = await chatSpaces(req.headers['companyid'], ids);
+        req.body.mainChat = ids.length > 0 && spaces.length === ids.length;
+        delete req.body.isPreCompany;
+        return next();
+    } catch (error) {
+        logger.error(`serverListFlags error: ${error.message || error}`);
+        return res.status(403).json({ status: false, statusText: 'Permission check failed.', error: 'Forbidden' });
+    }
+};
+
+module.exports = { CHAT_CHANNEL, CHAT_CATEGORY, isChatSpace, requireChatAccess, serverListFlags };

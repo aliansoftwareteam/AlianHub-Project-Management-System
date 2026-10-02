@@ -54,6 +54,8 @@ const run = (handlers) => (route, caller, body = {}, params = {}) => new Promise
 const send = run((handlers) => handlers);
 const through = run((handlers) => handlers.slice(0, -1));
 
+const REVIEW = 'PUT /api/v2/pages/:id/review';
+
 /* [route, body, params]: the doc writes no registry action covers on a route. */
 const NO_ACTION = {
     'changing a doc': ['PUT /api/v2/pages/:id', { title: 'Renamed' }, { id: PAGE }],
@@ -61,7 +63,7 @@ const NO_ACTION = {
     'keeping a version of a doc': ['POST /api/v2/pages/:id/versions', {}, { id: PAGE }],
     'putting a version of a doc back': ['POST /api/v2/pages/:id/versions/:versionId/restore', {}, { id: PAGE, versionId: VERSION }],
     'naming a version of a doc': ['PUT /api/v2/pages/:id/versions/:versionId', { name: 'First' }, { id: PAGE, versionId: VERSION }],
-    'marking a doc reviewed': ['PUT /api/v2/pages/:id/review', {}, { id: PAGE }],
+    'marking a doc reviewed': [REVIEW, {}, { id: PAGE }],
     'taking a doc out of the trash': ['PUT /api/v2/pages/:id/restore', {}, { id: PAGE }],
     'adding an image to a doc': ['POST /api/v2/pages/:id/images', {}, { id: PAGE }],
     'composing a doc with the assistant': [COMPOSE, { action: 'draft', title: 'Plan' }, {}],
@@ -305,6 +307,25 @@ describe('the draft mark of a doc', () => {
     });
 });
 
+describe('the review mark of a doc', () => {
+    it('is set by a person signed in', async () => {
+        expect((await send(REVIEW, session(OWNER), {}, { id: PAGE })).body.status).toBe(true);
+
+        expect(stored(PAGE)).toMatchObject({ reviewedBy: OWNER });
+    });
+
+    it.each([
+        ['a personal token of an owner', personalToken(OWNER)],
+        ['a personal token of a member', personalToken(INSIDER)],
+        ['an agent\'s token', agentToken(OWNER)],
+        ['a connected app\'s token', { uid: OWNER, mcp: true }],
+    ])('is not set by %s', async (label, caller) => {
+        expect(await send(REVIEW, caller, {}, { id: PAGE })).toMatchObject({ code: 403, body: { status: false } });
+
+        expect(stored(PAGE).reviewedBy).toBeUndefined();
+    });
+});
+
 describe('everyone else on the doc routes', () => {
     it.each([
         ['a signed-in owner', session(OWNER)],
@@ -313,7 +334,7 @@ describe('everyone else on the doc routes', () => {
         ['a personal token of an owner', personalToken(OWNER)],
         ['a personal token of a member', personalToken(INSIDER)],
     ])('%s reaches every one of them, and nothing is recorded as an agent\'s', async (label, caller) => {
-        for (const [route, body, params] of Object.values(NO_ACTION)) {
+        for (const [route, body, params] of Object.values(NO_ACTION).filter(([path]) => !(caller.apiToken && path === REVIEW))) {
             expect([route, await through(route, caller, body, params)]).toEqual([route, REACHED]);
         }
         for (const body of [...Object.values(BEYOND_A_DRAFT), ...Object.values(DRAFTED)]) {

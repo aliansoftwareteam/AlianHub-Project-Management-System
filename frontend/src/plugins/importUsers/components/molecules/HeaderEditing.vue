@@ -1,28 +1,28 @@
 <template>
-    <div class="d-flex flex-row justify-content-between w-100 p-10px align-items-center bg-light-gray">
+    <div class="d-flex flex-row justify-content-between w-100 p-10px align-items-center header-editing-bg-light-gray">
         <!-- Left side of the container with the table -->
         <div class="w-50">
             <div class="">
                 <!-- Table for displaying system headers and matching user header -->
-                <table class="w-100 text-left bg-white">
+                <table class="w-100 text-left header-editing-bg-white">
                     <thead>
-                        <tr class="border-gray">
+                        <tr class="header-editing-border-gray">
                             <!-- Column for displaying index (A, B, C, etc.) -->
-                            <th class="mw-40px w-40px bg-colorlightgray p8px-12px font-size-14 text-left dark-gray">
+                            <th class="mw-40px w-40px header-editing-bg-colorlightgray p8px-12px header-editing-font-size-14 text-left header-editing-dark-gray">
                                 {{ String.fromCharCode(65 + index) }}
                             </th>
                             <!-- Column for displaying user header -->
                             <th
-                                class="w-250px bg-colorlightgray p8px-12px font-size-14 text-left m-gray dark-gray position-re overflow-hidden left-white-border arrow">
+                                class="w-250px header-editing-bg-colorlightgray p8px-12px header-editing-font-size-14 text-left m-gray header-editing-dark-gray position-re overflow-hidden left-white-border arrow">
                                 {{ header?.userHeader }}
                             </th>
                             <!-- Dropdown for selecting system header -->
-                            <th class="p8px-12px font-size-14 text-left dark-gray border-left-0">
+                            <th class="p8px-12px header-editing-font-size-14 text-left header-editing-dark-gray border-left-0">
                                 <DropDown mode="listbox" z-index="9" :bodyClassHeader="{'d-flex': true, 'flex-row': true, 'justify-content-between': true, 'align-items-center': true}">
                                     <template #button="{ triggerAttrs }">
                                         <button
                                             type="button"
-                                            class="text-nowrap btn-white border-0 cursor-pointer font-size-14 dark-gray"
+                                            class="text-nowrap header-editing-btn-white border-0 cursor-pointer header-editing-font-size-14 header-editing-dark-gray"
                                             v-bind="triggerAttrs"
                                             ref="expand_collapse">
                                             {{ header?.systemHeader }} ▼
@@ -35,9 +35,9 @@
                                         </div>
                                     </template>
                                     <template #options>
-                                        <div class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px border-radius-4-px">
+                                        <div class="d-flex align-items-center header-editing-hover-bg-lighter-gray-dropdown header-editing-hover-purple cursor-pointer text-nowrap drop-down-item header-editing-gray81 p-7px border-radius-4-px">
                                             <input type="text" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search[index]"
-                                                class="p6px-8px border-gray border-radius-4-px font-size-14" />
+                                                class="p6px-8px header-editing-border-gray border-radius-4-px header-editing-font-size-14" />
                                         </div>
                                         <DropDownOption
                                             v-for="(systemHeader, systemHeaderIndex) in filteredSystemHeaders(index)"
@@ -52,11 +52,11 @@
                     </thead>
                     <!-- Body of the table displaying data rows -->
                     <tbody>
-                        <tr class="hover-bg-light-blue" v-for="(row, rowIndex) in props.tableData?.slice(0, 3)"
+                        <tr class="header-editing-hover-bg-light-blue" v-for="(row, rowIndex) in props.tableData?.slice(0, 3)"
                             :key="rowIndex">
-                            <td class="bg-colorlightgray p8px-12px font-size-14 border-gray top-bottom-white-border">{{ rowIndex + 1 }}
+                            <td class="header-editing-bg-colorlightgray p8px-12px header-editing-font-size-14 header-editing-border-gray top-bottom-white-border">{{ rowIndex + 1 }}
                             </td>
-                            <td class="p8px-12px font-size-14 border-gray" colspan="2">{{ row[index] || 'N/A' }}
+                            <td class="p8px-12px header-editing-font-size-14 header-editing-border-gray" colspan="2">{{ row[index] || 'N/A' }}
                             </td>
                         </tr>
                     </tbody>
@@ -64,22 +64,22 @@
             </div>
         </div>
         <!-- Right side of the container for displaying match status -->
-        <div class="w-50 p-10px text-center font-size-14 dark-gray border-left-gray-blue d-flex flex-column">
+        <div class="w-50 p-10px text-center header-editing-font-size-14 header-editing-dark-gray border-left-gray-blue d-flex flex-column">
             <div v-if="header?.systemHeader === $t('headerMapping.no_match_title')"
                 class="d-flex flex-column align-items-left">
                 <!-- Message for no match found -->
                 <div class="d-flex flex-row">
                     <img :src="warning_svg" alt="warning" class="w-20 mr-5px">
-                    <p class="font-size-14 dark-gray m-0">{{ $t('headerMapping.no_match') }}</p>
+                    <p class="header-editing-font-size-14 header-editing-dark-gray m-0">{{ $t('headerMapping.no_match') }}</p>
                 </div>
-                <div class="text-left font-size-12 text-gray ml-25px">
+                <div class="text-left header-editing-font-size-12 text-gray ml-25px">
                     <p class="m-0">
                         {{ $t('headerMapping.no_match_description') }}
                     </p>
                 </div>
                 <!-- Actions for "No Match" -->
                 <div class="d-flex flex-row ml-25px mt-20px">
-                    <button class="outline-primary" @click="emit('ignore-field', index)">
+                    <button class="header-editing-outline-primary" @click="emit('ignore-field', index)">
                         {{ $t('headerMapping.ignore_field_button') }}
                     </button>
                 </div>
@@ -88,12 +88,12 @@
             <div v-else class="align-items-left">
                 <div class="d-flex flex-row">
                     <img :src="tick_true_svg" alt="tick_true" class="w-20 mr-5px">
-                    <p class="font-size-14 dark-gray m-0">{{ $t('headerMapping.matched_to_field') }} <strong> {{
+                    <p class="header-editing-font-size-14 header-editing-dark-gray m-0">{{ $t('headerMapping.matched_to_field') }} <strong> {{
                         header?.systemHeader }}
                         </strong>
                     </p>
                 </div>
-                <div class="text-left font-size-12 text-gray ml-25px">
+                <div class="text-left header-editing-font-size-12 text-gray ml-25px">
                     <p class="m-0">
                         {{ props?.description }}
                     </p>
@@ -101,7 +101,7 @@
                     <div v-if="isDuplicateField(header?.userHeader)"
                         class="d-flex align-items-center align-items-center mt-10px">
                         <img :src=red_warning alt="warning" class="w-20">
-                        <p class="text-danger m-0 font-size-15">
+                        <p class="text-danger m-0 header-editing-font-size-15">
                             {{ $t('headerMapping.duplication_warning') }}
                         </p>
                     </div>
@@ -109,16 +109,16 @@
                 <!-- Actions for "Matched" -->
                 <div class="d-flex flex-row ml-25px mt-20px">
                     <!-- Confirm Mapping button, disabled if duplicate -->
-                    <button class="btn-primary mr-20px" :disabled="isDuplicateField(header?.userHeader)"
+                    <button class="header-editing-btn-primary mr-20px" :disabled="isDuplicateField(header?.userHeader)"
                         :class="{ 'disabled': isDuplicateField(header?.userHeader) }"
                         @click="emit('confirm-field', index)">
                         {{ $t('headerMapping.confirm_map_button') }}
                     </button>
-                    <button class="outline-primary" @click="emit('ignore-field', index)">
+                    <button class="header-editing-outline-primary" @click="emit('ignore-field', index)">
                         {{ $t('headerMapping.ignore_field_button') }}
                     </button>
                     <!-- Include as Custom Field button, shown for duplicates -->
-                    <button v-if="isDuplicateField(header?.userHeader)" class="outline-primary ml-20px"
+                    <button v-if="isDuplicateField(header?.userHeader)" class="header-editing-outline-primary ml-20px"
                         @click="emit('custom-field', header?.userHeader)">
                         {{ $t('headerMapping.custom_field_button') }}
                     </button>
@@ -222,6 +222,71 @@ const clearDropdown = () => {
 };
 </script>
 
+
+<style scoped>
+.header-editing-font-size-12 {
+    font-size: 12px;
+}
+.header-editing-font-size-14 {
+    font-size: 14px;
+}
+.header-editing-font-size-15 {
+    font-size: 15px;
+}
+.header-editing-bg-white {
+    background-color: var(--surface);
+}
+.header-editing-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.header-editing-bg-colorlightgray {
+    background-color: var(--fill);
+}
+.header-editing-gray81 {
+    color: var(--ink-2);
+}
+.header-editing-dark-gray {
+    color: var(--ink);
+}
+.header-editing-hover-purple:hover {
+    color: var(--brand) !important;
+}
+.header-editing-hover-bg-lighter-gray-dropdown:hover {
+    background-color: var(--surface-hover) !important;
+}
+.header-editing-hover-bg-light-blue:hover {
+    background-color: var(--surface-hover) !important;
+}
+.header-editing-border-gray {
+    border: 1px solid var(--hairline) !important;
+}
+.header-editing-btn-primary {
+    cursor: pointer;
+    background: var(--brand);
+    border-radius: 4px;
+    color: var(--on-brand);
+    border: none;
+    height: 30px;
+    font-family: var(--font-ui);
+}
+.header-editing-btn-white {
+    height: 30px;
+    color: var(--ink);
+    background: var(--surface);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: var(--font-ui);
+}
+.header-editing-outline-primary {
+    height: 30px;
+    background: var(--surface);
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    color: var(--brand);
+    cursor: pointer;
+    font-family: var(--font-ui);
+}
+</style>
 
 <style scoped>
 .top-bottom-white-border {

@@ -30,14 +30,14 @@
             <div v-else-if="busy && !rows.length" class="ah-empty">{{ $t('Audit.loading') }}</div>
             <EmptyState
                 v-else-if="!rows.length"
-                :illustration="search ? 'search' : 'generic'"
+                :illustration="narrowed ? 'search' : 'generic'"
                 data-test="audit-empty"
                 :heading-level="2"
-                :title="search ? $t('Audit.none_match') : $t('Audit.none')"
-                :message="search ? '' : $t('Audit.none_msg')"
-                :action-label="$t('Audit.clear_search')"
-                :action-allowed="Boolean(search)"
-                @action="clearSearch"
+                :title="$t(filtered ? 'Audit.none_filtered' : search ? 'Audit.none_match' : 'Audit.none')"
+                :message="narrowed ? '' : $t('Audit.none_msg')"
+                :action-label="$t(filtered ? 'Audit.clear_filters' : 'Audit.clear_search')"
+                :action-allowed="narrowed"
+                @action="clearFilters"
             />
 
             <table v-else class="al__table">
@@ -72,16 +72,23 @@
                         <td>
                             <div class="al__event">
                                 <span v-if="isRefusal(row)" class="al__blocked">{{ $t('Audit.blocked_by_policy') }}</span>
-                                <span class="al__action" :class="{ 'ah-mono': !plainAction(row) }" :title="plainAction(row) ? eventAction(row) : null">{{ plainAction(row) || eventAction(row) }}</span>
-                                <span v-if="row.entityName || row.entityId" class="al__entity">{{ row.entityName || row.entityId }}</span>
+                                <span class="al__action" :title="eventKey(row)">{{ eventWords(t, row) }}</span>
+                                <span v-if="entityOf(row)" class="al__entity" :title="entityOf(row) === entityKey(row) ? null : entityKey(row)">{{ entityOf(row) }}</span>
                             </div>
-                            <div v-if="showsHashedIds(row) && row.entityId && row.entityName && row.entityName !== row.entityId" class="ah-mono ah-small al__id" data-test="entity-id" :title="$t('Audit.names_not_checked')">{{ row.entityId }}</div>
+                            <div v-if="showsHashedIds(row) && row.entityId && entityOf(row) && ![entityOf(row), row.entityName].includes(row.entityId)" class="ah-mono ah-small al__id" data-test="entity-id" :title="$t('Audit.names_not_checked')">{{ row.entityId }}</div>
                             <div v-if="row.meta && row.meta.cost && (row.meta.cost.tokens || row.meta.cost.usd)" class="al__cost ah-mono">
                                 {{ $t('Audit.cost', { tokens: row.meta.cost.tokens || 0, usd: Number(row.meta.cost.usd || 0).toFixed(2) }) }}
                             </div>
+                            <details class="al__details ah-small" data-test="row-details">
+                                <summary class="al__details-open">{{ $t('Audit.details') }}</summary>
+                                <div v-for="line in detailLines(t, row, reasonOf(row))" :key="line.label" class="al__detail">
+                                    <span class="al__detail-label">{{ line.label }}</span>
+                                    <span class="ah-mono al__detail-value">{{ line.value }}</span>
+                                </div>
+                            </details>
                         </td>
                         <td>
-                            <div class="al__reason">{{ (row.meta && row.meta.reason) || '—' }}</div>
+                            <div class="al__reason">{{ reasonOf(row) || '—' }}</div>
                             <div class="al__meta">
                                 <span v-if="row.meta && row.meta.runId" class="ah-mono al__run">{{ $t('Audit.run_n', { n: String(row.meta.runId).slice(-4) }) }}</span>
                                 <span v-if="row.meta && row.meta.tainted" class="ah-chip ah-chip--warn" :title="taintTitle(row)" data-test="tainted">{{ $t('Audit.tainted') }}</span>
@@ -126,11 +133,11 @@ import { apiRequest } from "@/services";
 import { useGetterFunctions } from "@/composable";
 import * as env from "@/config/env";
 import { taintSourcesLine, taintSourcesOf } from "@/views/Ai/taintText";
-import { agentActionLabel } from "@/views/Ai/agentActionLabels";
+import { detailLines, entityWords, eventKey, eventWords, reasonWords, searchKeys } from "@/views/Ai/auditWords";
 
 defineOptions({ name: "AuditLogPage" });
 
-const { t } = useI18n();
+const { t, te, tm, rt } = useI18n();
 const $toast = useToast();
 const route = useRoute();
 const { getUser } = useGetterFunctions();
@@ -157,6 +164,9 @@ const tabs = [
 ];
 const scope = ref(tabs.some((tab) => tab.key === route.query.scope) ? route.query.scope : "all");
 
+const filtered = computed(() => scope.value !== "all" || Boolean(projectFilter.value));
+const narrowed = computed(() => filtered.value || Boolean(search.value));
+
 const REFUSALS = ["agent.action_refused", "permission.refused"];
 const INTEGRITY_CHIPS = { verified: "ah-chip--ok", broken: "ah-chip--danger", unverified: "ah-chip--warn", unchained: "" };
 
@@ -177,8 +187,10 @@ const actorName = (row) => {
     return row.actorName || getUser(row.actorId)?.Employee_Name || t("Audit.someone");
 };
 const initial = (row) => actorName(row).charAt(0).toUpperCase();
-const eventAction = (row) => (row.meta && row.meta.action) || row.action;
-const plainAction = (row) => (isAgent(row) && row.meta.action ? agentActionLabel(t, row.meta.action) : "");
+const personName = (id) => getUser(id)?.Employee_Name || "";
+const entityOf = (row) => entityWords(t, te, row, personName);
+const entityKey = (row) => (row.entityType === "permission" ? row.entityName || row.entityId : null);
+const reasonOf = (row) => reasonWords(t, te, row, personName);
 const isRefusal = (row) => REFUSALS.includes(row.action);
 const taintTitle = (row) => taintSourcesLine(t, taintSourcesOf(row.meta));
 const showsIntegrity = (row) => Boolean(chainOn.value && row.integrity && row.integrity.state in INTEGRITY_CHIPS);
@@ -189,6 +201,8 @@ const integrityHint = (row) => t(integrityKey(row) + "_hint", { seq: row.integri
 const time = (at) => (at ? moment(at).format(moment(at).isSame(moment(), "day") ? "HH:mm" : "D MMM HH:mm") : "");
 const deadline = (at) => (at ? moment(at).format("D MMM HH:mm") : "");
 
+const wordsOf = (namespace) => Object.fromEntries(Object.entries(tm(namespace) || {}).map(([key, message]) => [key, rt(message)]));
+
 const query = (extra = {}) => {
     const q = { page: page.value, limit: 25, ...extra };
     if (scope.value === "agent") q.actorType = "agent";
@@ -196,7 +210,7 @@ const query = (extra = {}) => {
     if (scope.value === "gated") q.gated = "true";
     if (scope.value === "undone") q.undone = "true";
     if (scope.value === "refused") q.refused = "true";
-    if (search.value) q.q = search.value;
+    if (search.value) Object.assign(q, { q: search.value }, searchKeys(wordsOf, search.value));
     if (projectFilter.value) q.projectId = projectFilter.value.id;
     return Object.entries(q).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
 };
@@ -226,7 +240,12 @@ const load = async ({ append = false } = {}) => {
 const reload = () => { page.value = 1; load(); };
 const setScope = (key) => { scope.value = key; reload(); };
 const clearProject = () => { projectFilter.value = null; reload(); };
-const clearSearch = () => { search.value = ""; reload(); };
+const clearFilters = () => {
+    search.value = "";
+    scope.value = "all";
+    projectFilter.value = null;
+    reload();
+};
 const loadMore = () => { page.value += 1; load({ append: true }); };
 
 const undo = async (row) => {
@@ -288,6 +307,11 @@ onMounted(load);
 .al__action { color: var(--ink); }
 .al__entity { color: var(--ink-2); }
 .al__id { color: var(--ink-2); margin-top: 3px; }
+.al__details { color: var(--ink-2); margin-top: 3px; }
+.al__details-open { cursor: pointer; width: fit-content; border-radius: var(--r-input); }
+.al__details-open:focus-visible { outline: none; box-shadow: var(--focus); }
+.al__detail { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.al__detail-value { overflow-wrap: anywhere; }
 .al__blocked { color: var(--danger-ink); font-weight: 600; }
 .al__cost { color: var(--ink-2); margin-top: 3px; }
 .al__reason { color: var(--ink-2); }

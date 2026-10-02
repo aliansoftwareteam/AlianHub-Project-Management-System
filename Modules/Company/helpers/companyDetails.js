@@ -5,6 +5,9 @@ const PHONE_PATTERN = /^[0-9]{4,15}$/;
 // Companies set up before phone became optional hold this in Cst_Phone, and the form sends it back unchanged.
 const SETUP_PLACEHOLDER_PHONE = 'N/A';
 
+// The company schema requires a country, and neither sign-up nor the setup wizard asks for one. An empty one fails the save.
+const COUNTRY_NOT_ASKED = 'N/A';
+
 const checkPhone = (updateObject) => {
     if (!('Cst_Phone' in updateObject)) return { ok: true, updateObject };
     const phone = updateObject.Cst_Phone === SETUP_PLACEHOLDER_PHONE ? '' : updateObject.Cst_Phone;
@@ -26,4 +29,4 @@ const checkCompanyDetails = (updateObject) => {
     return phone.ok ? checkWeek(phone.updateObject) : phone;
 };
 
-module.exports = { checkCompanyDetails };
+module.exports = { checkCompanyDetails, COUNTRY_NOT_ASKED };

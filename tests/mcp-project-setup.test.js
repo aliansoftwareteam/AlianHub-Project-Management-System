@@ -262,7 +262,7 @@ describe('approving carries out each part as the web app would', () => {
         expect(made.settings.filters[0]).toMatchObject({ values: [4] });
         expect(partOf(result, 'views').items).toEqual([{ name: 'Review board', kind: 'board', made: true, viewId: String(made._id), leftOut: [] }]);
 
-        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', updatedFields: expect.objectContaining({ taskStatusData: expect.any(Array) }) }));
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', companyId: CID, updatedFields: expect.objectContaining({ taskStatusData: expect.any(Array) }) }));
         expect(audits(TOOL, 'applied')[0]).toMatchObject({ entityType: 'project', entityId: P_OPEN, meta: { onBehalfOf: INSIDER, undo: { kind: 'setup', projectId: P_OPEN, statusKeys: [4] } } });
     });
 
@@ -381,15 +381,16 @@ describe('the preview lists every part', () => {
             title: 'Open',
             lines: [
                 { kind: 'place', project: 'Open', list: '' },
-                { kind: 'newStatuses', names: ['In Review', 'in progress'] },
-                { kind: 'newLists', names: ['Backlog', 'This week'] },
-                { kind: 'field', name: 'Budget', type: 'money', options: [] },
-                { kind: 'field', name: 'Region', type: 'dropdown', options: ['North', 'South'] },
-                { kind: 'planView', name: 'Review board', layout: 'board' },
-                { kind: 'group', by: 'status', field: '' },
-                { kind: 'statuses', names: ['In Review'] },
-                { kind: 'columns', names: ['Budget'], others: 0 },
+                { kind: 'newStatuses', names: ['In Review', 'in progress'], picks: ['statuses:0', 'statuses:1'] },
+                { kind: 'newLists', names: ['Backlog', 'This week'], picks: ['lists:0', 'lists:1'] },
+                { kind: 'field', name: 'Budget', type: 'money', options: [], pick: 'fields:0' },
+                { kind: 'field', name: 'Region', type: 'dropdown', options: ['North', 'South'], pick: 'fields:1' },
+                { kind: 'planView', name: 'Review board', layout: 'board', pick: 'views:0' },
+                { kind: 'group', by: 'status', field: '', under: 'views:0' },
+                { kind: 'statuses', names: ['In Review'], under: 'views:0' },
+                { kind: 'columns', names: ['Budget'], others: 0, under: 'views:0' },
             ],
+            needs: { 'views:0': ['fields:0'] },
         }]);
     });
 

@@ -77,8 +77,8 @@ describe('POST /api/v1/estimatedTime/ai/:tid/propose', () => {
         routes.init(app);
         const paths = app.post.mock.calls.map(([path]) => path);
         expect(paths).toEqual(expect.arrayContaining(['/api/v1/estimatedTime/ai/:tid', '/api/v1/estimatedTime/ai/:tid/propose']));
-        const [, handler] = app.post.mock.calls.find(([path]) => path === '/api/v1/estimatedTime/ai/:tid/propose');
-        expect(handler).toBe(estimates.proposeAiEstimate);
+        const handlers = app.post.mock.calls.find(([path]) => path === '/api/v1/estimatedTime/ai/:tid/propose');
+        expect(handlers[handlers.length - 1]).toBe(estimates.proposeAiEstimate);
     });
 
     it('returns the suggested minutes and reasoning without writing anything', async () => {

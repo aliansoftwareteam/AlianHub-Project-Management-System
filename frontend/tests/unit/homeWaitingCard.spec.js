@@ -77,6 +77,19 @@ describe('Waiting on you (Home card)', () => {
         expect(link.text()).toBe('Inbox.open_ai_inbox');
     });
 
+    /* [what the server says of the proposal, the reader's role, whether the card counts it] */
+    it.each([
+        ['it is the reader\'s to approve', { locked: false }, 3, true],
+        ['it is not the reader\'s to approve', { locked: true, lockedWhy: 'own_rights' }, 3, false],
+        ['it is not an owner\'s to approve either', { locked: true, lockedWhy: 'own_rights' }, 1, false],
+        ['it needs an owner or admin, and the server calls it open for this reader', { gate: 'owner_admin', locked: false }, 1, true],
+    ])('counts a proposal only when it is the reader\'s to decide: %s', async (_what, fields, roleType, counted) => {
+        serverProposals = [proposal('p1', fields), proposal('p2', { locked: false })];
+        const { wrapper } = await open({ roleType });
+        expect(wrapper.find('[data-test="waiting-count"]').text()).toBe(counted ? '2' : '1');
+        expect(wrapper.emitted('count').at(-1)).toEqual([counted ? 2 : 1]);
+    });
+
     it('approves a proposal through the agent API and drops the row', async () => {
         serverProposals = [proposal('p1'), proposal('p2')];
         const { wrapper } = await open();

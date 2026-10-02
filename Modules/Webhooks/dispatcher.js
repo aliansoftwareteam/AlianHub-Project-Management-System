@@ -8,6 +8,7 @@ const { createSnapshotStore } = require('../../utils/entityEvents');
 const { safeFetch } = require('../Agents/engine/safeFetch');
 const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
 const { signingSecretOf, NEEDS_ATTENTION } = require('./helpers/signingSecret');
+const { hooksThatMayCarry } = require('./helpers/hookAudience');
 const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFields, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
 
 // Webhook dispatcher. Piggybacks on the namespaced socketEmitter events that
@@ -163,8 +164,8 @@ async function resolveUserNames(companyId, ids) {
 
 async function flush(companyId, event, doc, changedKeys) {
     const hooks = await getCompanyWebhooks(companyId);
-    const targets = hooks.filter((hook) => subscribesTo(hook, event));
-    if (!targets.length) return;
+    const subscribed = hooks.filter((hook) => subscribesTo(hook, event));
+    if (!subscribed.length) return;
 
     // Task socket payloads can be partial (only the changed fields), which would
     // deliver a payload missing the key/name/priority and a status with no
@@ -192,6 +193,9 @@ async function flush(companyId, event, doc, changedKeys) {
 
     if (!shouldDeliverTask(fullDoc, readErrored)) return;
     if (!fullDoc) fullDoc = doc; // transient read error → best-effort with the socket payload
+
+    const targets = await hooksThatMayCarry(companyId, subscribed, fullDoc);
+    if (!targets.length) return;
 
     const data = trimTaskForDelivery(fullDoc);
 

@@ -1,0 +1,80 @@
+const mongoose = require('mongoose');
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { canReadProject } = require('../../Config/projectAccess');
+const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
+const { canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
+const { pageReachedBy } = require('../Pages/helpers/pageRules');
+const access = require('./access');
+const projectPolicy = require('./projectPolicy');
+
+// What the proposal route asks of a proposal beside who files it. Once approved its changes run on the approver's
+// rights, so it names nothing the person behind the filing token could not open themselves.
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const TASKS = ['taskId', 'relatedTaskId'];
+const PROJECTS = ['projectId', 'listProjectId'];
+const LISTS = ['sprintId'];
+const PAGES = ['pageId', 'parentPageId'];
+
+const plain = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
+const changesOf = (body) => (Array.isArray(body.changes) ? body.changes : []).map((change) => ({ action: change && change.action, params: plain(change && change.params) }));
+const stored = (companyId, type, id, fields) => MongoDbCrudOpration(companyId, { type, data: [{ _id: new mongoose.Types.ObjectId(id) }, fields] }, 'findOne');
+
+const namedUnder = (body, keys) => [...new Set([body, ...changesOf(body).map((change) => change.params)]
+    .flatMap((params) => keys.map((key) => params[key]))
+    .filter((value) => value !== undefined && value !== null && value !== '')
+    .map((value) => String(value).toLowerCase()))];
+
+/* A list is open where its project is and, short of an owner or admin, where the person is on it when it is private. */
+const opensList = async (companyId, caller, listId) => {
+    const list = await stored(companyId, SCHEMA_TYPE.SPRINTS, listId, { projectId: 1 });
+    if (!list || !(await canReadProject(companyId, caller.actor.userId, String(list.projectId))).allowed) return false;
+    return caller.privileged || canSeeSprintById(companyId, caller.actor.userId, listId);
+};
+
+const opensPage = async (companyId, uid, pageId) => {
+    const page = await stored(companyId, SCHEMA_TYPE.PAGES, pageId, { ProjectID: 1, visibility: 1, createdBy: 1, sharedWith: 1 });
+    if (!page) return false;
+    const inProject = page.ProjectID ? (await canReadProject(companyId, uid, String(page.ProjectID))).allowed : false;
+    return pageReachedBy(page, { uid, inProject: () => inProject });
+};
+
+const every = async (ids, opens) => {
+    for (const id of ids) {
+        if (!OBJECT_ID.test(id) || !(await opens(id))) return false;
+    }
+    return true;
+};
+
+/* Whether the person can open every task, project, list and doc the proposal names. A missing one and a hidden one answer alike. */
+const namesOnlyOpenThings = async (companyId, uid, body) => {
+    const tasks = namedUnder(body, TASKS);
+    if (!tasks.every((id) => OBJECT_ID.test(id)) || (await readableTaskIds(companyId, uid, tasks)).length !== tasks.length) return false;
+    const caller = await access.personOf(companyId, uid);
+    return await every(namedUnder(body, PROJECTS), async (id) => (await canReadProject(companyId, uid, id)).allowed)
+        && await every(namedUnder(body, LISTS), (id) => opensList(companyId, caller, id))
+        && every(namedUnder(body, PAGES), (id) => opensPage(companyId, uid, id));
+};
+
+/* The run a proposal is filed from is the filing agent's own, and one its person can open. */
+const ownRun = async (companyId, uid, agentId, runId) => {
+    if (!OBJECT_ID.test(String(runId || ''))) return false;
+    const run = await stored(companyId, SCHEMA_TYPE.AGENT_RUNS, String(runId), {});
+    if (!run || String(run.agentId) !== String(agentId)) return false;
+    return access.canSeeRun(companyId, await access.personOf(companyId, uid), run);
+};
+
+/* The first change a project refuses outright, a paused project's for one, with the reason; null when every change may wait for a person. */
+const refusedChange = async (companyId, actor, body) => {
+    for (const { action, params } of changesOf(body)) {
+        const rule = await projectPolicy.ask({ companyId, actor, action, params });
+        if (rule.decision === projectPolicy.DECISION.REFUSE) return { action, params, reason: rule.reason };
+    }
+    return null;
+};
+
+/* A gate is what the changes carry; the filer may ask for the stricter one, never for a lighter one. */
+const gateAsked = (gate) => (gate === access.GATE_OWNER_ADMIN ? gate : undefined);
+
+module.exports = { namesOnlyOpenThings, ownRun, refusedChange, gateAsked };

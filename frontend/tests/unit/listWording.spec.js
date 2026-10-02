@@ -43,8 +43,6 @@ const LIST_KEYS = [
     ['TaskPanel', 'sprint', 'Sprint'],
     ['Views', 'sprint_fallback', 'Sprint'],
     ['Views', 'map_empty', 'No tasks in this sprint yet.'],
-    ['Fields', 'rollup_scope_sprint', 'Sprint'],
-    ['Fields', 'hint_rollup', 'sums up subtasks or a sprint'],
     ['Projects', 'sprint', 'Sprint'],
     ['Projects', 'create_new_list', 'Create New Sprint'],
     ['Projects', 'sprint_planned_hint', 'Hours planned across every task in this sprint, subtasks included'],

@@ -117,31 +117,38 @@ const catalogueForAgents = () => {
     };
 };
 
-/* The statuses and people of one project that `uid` may name in a rule; null when they cannot open the project. */
-const refsFor = async (companyId, uid, projectId) => {
+/* The statuses and people of one project that `uid` may name in a rule; null when they cannot open the project.
+ * `planned` are statuses the same plan adds first (./planWork.js): a rule may name one before it is there, and only
+ * to be checked and read. A rule is saved from the project as it is once they are made. */
+const refsFor = async (companyId, uid, projectId, planned = []) => {
     const refs = await require('../Automations/aiDraft').loadRefs(companyId, String(uid));
     const project = refs.projects.find((entry) => entry.id === projectId);
     if (!project) return null;
     const onProject = new Set([...project.members, String(uid)]);
+    const held = listOf(project.statuses).map((name) => String(name).trim().toLowerCase());
+    const coming = [...new Set(listOf(planned).filter((name) => typeof name === 'string' && name.trim()).map((name) => name.trim()))].filter((name) => !held.includes(name.toLowerCase()));
     return {
         ...refs,
-        projects: [project],
+        projects: [{ ...project, statuses: [...listOf(project.statuses), ...coming] }],
         people: refs.people.filter((person) => onProject.has(person.id)),
-        statusCatalogue: listOf(refs.statusCatalogue).filter((status) => status.projectId === projectId),
+        statusCatalogue: [
+            ...listOf(refs.statusCatalogue).filter((status) => status.projectId === projectId),
+            ...coming.map((name, at) => ({ projectId, key: `planned-${at}`, name, type: 'active' })),
+        ],
     };
 };
 
 /* { rule, people } for `uid`, or { rule: null, rejected } with why the draft is not a rule that person could save. */
-const ruleFor = async ({ companyId, uid, draft }) => {
-    const refs = OBJECT_ID.test(draft.projectId) ? await refsFor(companyId, uid, draft.projectId) : null;
+const ruleFor = async ({ companyId, uid, draft, planned }) => {
+    const refs = OBJECT_ID.test(draft.projectId) ? await refsFor(companyId, uid, draft.projectId, planned) : null;
     if (!refs) return { rule: null, people: [], rejected: [REFUSED.project] };
     const out = require('../Automations/helpers/aiDraftCheck').checkDraft({ trigger: draft.trigger, project: draft.projectId, conditions: draft.conditions, actions: draft.actions }, refs);
     return { rule: out.rule, people: refs.people, rejected: out.rejected };
 };
 
 /* '' when `uid` could save this draft as a rule by hand; otherwise why not. */
-const proposalProblem = async ({ companyId, uid, draft }) => {
-    const built = await ruleFor({ companyId, uid, draft });
+const proposalProblem = async ({ companyId, uid, draft, planned }) => {
+    const built = await ruleFor({ companyId, uid, draft, planned });
     return built.rule ? '' : built.rejected.join(' ');
 };
 

@@ -1,17 +1,17 @@
 <template>
     <div class="w-100 h-100 overflow-y-auto"
         v-if="checkPermission('project') !== null && checkPermission('project.project_list') !== null && checkPermission('task.task_list') !== null">
-        <div class="bg-white px-1 d-flex white align-items-center justify-content-between p-15px border-gray">
+        <div class="home-bg-white px-1 d-flex home-white align-items-center justify-content-between p-15px home-border-gray">
             <div>
-                <h3 class="m-0 font-size-18 font-weight-700 blue">{{ $t('Home.Home') }}</h3>
+                <h3 class="m-0 home-font-size-18 home-font-weight-700 home-blue">{{ $t('Home.Home') }}</h3>
             </div>
             <div class="dashboard__calendar-wrapper">
-                <button class="text-capitalize outline-primary mr-10-px d-flex align-items-center" @click="toggleDashboardLock()">
+                <button class="text-capitalize home-outline-primary mr-10-px d-flex align-items-center" @click="toggleDashboardLock()">
                     <img :src="companyUser.dashboardLocked ? unlockImage : lockImage" alt="lock" class="mr-5px" />{{ companyUser.dashboardLocked ? $t('Home.unlock') : $t('Home.lock') }}
                 </button>
-                <button class="text-capitalize outline-primary mr-10-px" @click="addItem">{{ $t(`dashboardCard.add_card`) }}</button>
+                <button class="text-capitalize home-outline-primary mr-10-px" @click="addItem">{{ $t(`dashboardCard.add_card`) }}</button>
                 <div class="position-re dashboard__settings">
-                    <button class="outline-primary dashboard__settings-btn" :title="$t('dashboardCard.dashboard_settings')" @click.stop="dashMenuOpen = !dashMenuOpen">
+                    <button class="home-outline-primary dashboard__settings-btn" :title="$t('dashboardCard.dashboard_settings')" @click.stop="dashMenuOpen = !dashMenuOpen">
                         <img :src="settingIcon" alt="settings" />
                     </button>
                     <template v-if="dashMenuOpen">
@@ -327,6 +327,36 @@ provide('isSupport', ref(false));
 provide('showLoader', ref(false));
 provide('progress', ref(0));
 </script>
+<style scoped>
+.home-font-size-18 {
+    font-size: 18px !important;
+}
+.home-font-weight-700 {
+    font-weight: 700 !important;
+}
+.home-bg-white {
+    background-color: var(--surface);
+}
+.home-blue {
+    color: var(--brand) !important;
+}
+.home-white {
+    color: var(--on-brand) !important;
+}
+.home-border-gray {
+    border: 1px solid var(--hairline) !important;
+}
+.home-outline-primary {
+    height: 30px;
+    background: var(--surface);
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    color: var(--brand);
+    cursor: pointer;
+    font-family: var(--font-ui);
+}
+</style>
+
 <style scoped src="../css/style.css">
 </style>
 <style scoped>
@@ -340,8 +370,8 @@ provide('progress', ref(0));
     top: calc(100% + 6px);
     z-index: 21;
     min-width: 180px;
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
     padding: 4px;
@@ -350,10 +380,10 @@ provide('progress', ref(0));
 .dashboard__settings-item {
     padding: 8px 12px;
     font-size: 13px;
-    color: #3a3f52;
+    color: var(--ink);
     border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
 }
-.dashboard__settings-item:hover { background: #f5f7fb; color: #2F3990; }
+.dashboard__settings-item:hover { background: var(--surface-hover); color: var(--brand); }
 </style>

@@ -11,10 +11,12 @@ const findingMemory = require('./engine/findingMemory');
 const persistence = require('../AICore/persistence');
 const logger = require('../../Config/loggerConfig');
 const access = require('./access');
+const approverRights = require('./approverRights');
 const taint = require('./taint');
 const { externalClientActor } = require('./actor');
 const aiFeedback = require('../AI/feedback');
 const slackPost = require('./connectors/slackPost');
+const proposalText = require('./proposalText');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -143,7 +145,6 @@ const mcpActor = async (p) => (p.oauthGrantId
     : { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP });
 
 const create = async (companyId, { agent, runId, taskId, taskIds, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding }) => {
-    if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
     const prepared = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
@@ -151,10 +152,10 @@ const create = async (companyId, { agent, runId, taskId, taskIds, projectId, wha
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
-            agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
+            agentId: String(agent._id), agentName: proposalText.nameOf(agent.name), runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
             ...(Array.isArray(taskIds) && taskIds.length ? { taskIds: taskIds.map(String) } : {}),
-            what: what.trim().slice(0, 300), why: String(why || '').slice(0, 2000),
-            changes: prepared.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
+            what: proposalText.titleOf(what, prepared), why: proposalText.reasonOf(why),
+            changes: prepared.map((c) => ({ action: c.action, params: c.params || {}, label: proposalText.labelOf(c), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
             ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
@@ -178,34 +179,74 @@ const skillSourcesOfRuns = async (companyId, rows) => {
     return new Map((found || []).filter((r) => r.skillSource).map((r) => [String(r._id), r.skillSource]));
 };
 
+const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
+
+/* How many proposals each status holds inside the scope. A change that reaches into a project outside it is left out, as the list leaves it out. */
+const countsByStatus = async (companyId, scoped, projectIds) => {
+    const grouped = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [[{ $match: scoped }, { $group: { _id: '$status', n: { $sum: 1 } } }]],
+    }, 'aggregate').catch(() => []);
+    const byStatus = {};
+    (grouped || []).forEach((c) => { byStatus[c._id] = c.n; });
+    if (!Array.isArray(projectIds)) return byStatus;
+    const reaching = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ ...scoped, ...access.reachesOutsideClause(projectIds) }, { status: 1, changes: 1 }],
+    }, 'find').catch(() => []);
+    const inside = access.staysInside(projectIds);
+    (reaching || []).map(plain).filter((row) => !inside(row)).forEach((row) => { byStatus[row.status] = Math.max(0, (byStatus[row.status] || 0) - 1); });
+    return byStatus;
+};
+
+const WAITING_READ_LIMIT = 500;
+
+/* Every waiting proposal in the scope with what `viewer` may do with it; with no viewer each is taken as theirs to decide. */
+const waitingFor = async (companyId, scoped, projectIds, viewer) => {
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ ...scoped, status: STATUS.PENDING }, {}, { sort: { createdAt: -1 }, limit: WAITING_READ_LIMIT }],
+    }, 'find').catch(() => []);
+    const seen = (rows || []).map(plain).filter(access.staysInside(projectIds));
+    const standings = viewer ? await approverRights.standingsOf(companyId, viewer, seen) : seen.map(() => approverRights.OPEN);
+    return new Map(seen.map((p, at) => [String(p._id), { ...standings[at], bucket: bucketOf(p) }]));
+};
+
 /* projectIds, when given, is the caller's visible set, hiddenTaskIds the tasks in it they cannot read,
- * and privateWork what is someone else's alone; the counts follow the same scope. */
-const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork, askedBy } = {}) => {
+ * and privateWork what is someone else's alone; the counts follow the same scope. `viewer` is the person reading:
+ * each waiting row says whether it is theirs to approve, and only those are counted as waiting. */
+const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork, askedBy, viewer } = {}) => {
     const scoped = access.proposalScopeClause({ projectIds, hiddenTaskIds, privateWork, askedBy });
     const match = { ...scoped };
     if (status) match.status = String(status);
     if (agentId) match.agentId = String(agentId);
-    const rows = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [match, {}, { sort: { createdAt: -1 }, limit: Math.min(500, Number(limit) || 100) }],
-    }, 'find');
-    const sources = await skillSourcesOfRuns(companyId, rows || []);
-    const shaped = (rows || []).map((p) => {
-        const o = typeof p.toObject === 'function' ? p.toObject() : p;
+    const [rows, byStatus, waiting] = await Promise.all([
+        MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [match, {}, { sort: { createdAt: -1 }, limit: Math.min(500, Number(limit) || 100) }],
+        }, 'find'),
+        countsByStatus(companyId, scoped, projectIds),
+        waitingFor(companyId, scoped, projectIds, viewer),
+    ]);
+    const listed = (rows || []).map(plain).filter(access.staysInside(projectIds));
+    const sources = await skillSourcesOfRuns(companyId, listed);
+    const shaped = listed.map((o) => {
         const skillSource = o.runId ? sources.get(String(o.runId)) : undefined;
-        return { ...o, bucket: bucketOf(o), undoAvailable: o.undoUntil ? new Date(o.undoUntil).getTime() > Date.now() : false, ...(skillSource ? { skillSource } : {}) };
+        const standing = viewer && o.status === STATUS.PENDING ? waiting.get(String(o._id)) : null;
+        return {
+            ...o, ...proposalText.shown(o), bucket: bucketOf(o), undoAvailable: o.undoUntil ? new Date(o.undoUntil).getTime() > Date.now() : false,
+            ...(skillSource ? { skillSource } : {}),
+            ...(standing ? { locked: standing.locked, lockedWhy: standing.lockedWhy, mayDecline: standing.mayDecline } : {}),
+        };
     });
     const filtered = bucket ? shaped.filter((p) => p.bucket === bucket) : shaped;
-    const counts = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [[{ $match: scoped }, { $group: { _id: '$status', n: { $sum: 1 } } }]],
-    }, 'aggregate').catch(() => []);
-    const byStatus = {};
-    (counts || []).forEach((c) => { byStatus[c._id] = c.n; });
+    const mine = [...waiting.values()].filter((standing) => !standing.locked);
     return {
         proposals: filtered,
-        counts: { waiting: byStatus.pending || 0, doneByAi: (byStatus.approved || 0) + (byStatus.edited || 0), declined: byStatus.declined || 0, undone: byStatus.undone || 0, failed: byStatus.failed || 0,
-                  primary: shaped.filter((p) => p.bucket === 'primary').length, later: shaped.filter((p) => p.bucket === 'later').length },
+        counts: { waiting: mine.length, doneByAi: (byStatus.approved || 0) + (byStatus.edited || 0), declined: byStatus.declined || 0, undone: byStatus.undone || 0, failed: byStatus.failed || 0,
+                  primary: mine.filter((standing) => standing.bucket === 'primary').length, later: mine.filter((standing) => standing.bucket === 'later').length },
     };
 };
+
+/* The audit rows of the parts a change made as actions of their own (./planWork.js), in the order they were made, so undoing the proposal undoes them too. */
+const partAudits = (result) => (Array.isArray(result && result.parts) ? result.parts : [])
+    .flatMap((part) => (Array.isArray(part && part.items) ? part.items : []).map((item) => item && item.auditId).filter(Boolean).map(String));
 
 const get = (companyId, id) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: oid(id) }] }, 'findOne');
 
@@ -224,30 +265,43 @@ const alreadyDecided = async (companyId, id) => {
     return { error: `Proposal is ${state}.`, status: 409 };
 };
 
-/* Approve (optionally with edited changes). `decider` is the human actor;
- * the changes execute AS the agent, on the human's decision, inside the
- * agent's allowedActions. */
-const approve = async (companyId, id, { decider, isPrivileged, changes: edited, ip }) => {
+/* Approve (optionally with edited changes, or with the parts of a plan to keep, ./planChoice.js). `decider` is the
+ * human actor; the changes execute AS the agent, on the human's decision, inside the agent's allowedActions. */
+const approve = async (companyId, id, { decider, isPrivileged, changes: edited, parts, ip }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (p.status !== STATUS.PENDING) return alreadyDecided(companyId, id);
+    const planChoice = require('./planChoice');
+    const chosen = planChoice.given(parts);
+    const editing = Array.isArray(edited) && edited.length > 0;
+    if (chosen && editing) return { error: planChoice.REFUSED.both, status: 400 };
+    const kept = chosen ? planChoice.narrow(p.changes, parts) : null;
+    if (kept && kept.error) return { error: kept.error, status: 400 };
     const fromMcp = p.source === SOURCE_MCP;
     if (fromMcp) {
-        const refusal = await require('../Mcp/approval').refusalFor(companyId, p, { decider, isPrivileged, edited });
+        const refusal = await require('../Mcp/approval').refusalFor(companyId, p, { decider, isPrivileged, edited, ...(kept ? { changes: kept.changes } : {}) });
         if (refusal) return refusal;
     }
-    if (p.gate === GATE_OWNER_ADMIN && !isPrivileged) return { error: 'This proposal needs an Owner or Admin.', status: 403 };
+    const needsAdmin = { error: 'This proposal needs an Owner or Admin.', status: 403 };
+    if (p.gate === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
 
-    let changes = p.changes;
-    let status = STATUS.APPROVED;
-    if (Array.isArray(edited) && edited.length) {
+    let changes = kept ? kept.changes : p.changes;
+    let status = kept ? STATUS.EDITED : STATUS.APPROVED;
+    if (editing) {
         const check = validateChanges(edited);
         if (!check.valid) return { error: check.reason, status: 400 };
+        // The gate kept at filing was read from the changes as filed; an edit is held to what it would run.
+        if (gateOf(edited, p.gate) === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
         changes = edited.map((c) => ({ action: c.action, params: c.params || {}, label: c.label || c.action }));
         if (slackPost.hasSlackChange(changes)) {
             try { changes = await slackPost.prepareChanges(companyId, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
         }
         status = STATUS.EDITED;
+    }
+    // A connected agent's change was asked of the approver above; these run on the approver's own rights.
+    if (!fromMcp) {
+        const lacking = await approverRights.approveRefusal(companyId, { userId: decider.userId, privileged: Boolean(isPrivileged) }, p, changes);
+        if (lacking) return lacking;
     }
 
     const runs = require('./runs');
@@ -275,7 +329,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         try {
             // eslint-disable-next-line no-await-in-loop
             const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, ...(marker ? { taint: marker } : {}) });
-            if (out.auditId) auditIds.push(out.auditId);
+            if (out.auditId) auditIds.push(out.auditId, ...partAudits(out.result));
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
             applied.push({ action: c.action, ok: false, error: e.message });
@@ -323,12 +377,12 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
 const fileApplied = async (companyId, { rule, action, params, auditId, why }) => {
     const asAsked = { ...params };
     delete asAsked.__proposal;
-    const label = String((registry.get(action) && registry.get(action).label) || action).slice(0, 300);
+    const label = proposalText.titleOf('', [{ action }]);
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
-            agentId: String(rule.agentId || ''), agentName: rule.agentName, runId: null, taskId: asAsked.taskId ? String(asAsked.taskId) : null, projectId: rule.projectId,
-            what: label, why: String(why || '').slice(0, 2000), changes: [{ action, params: asAsked, label, reversible: true, rating: actions.rating(action) }],
+            agentId: String(rule.agentId || ''), agentName: proposalText.nameOf(rule.agentName), runId: null, taskId: asAsked.taskId ? String(asAsked.taskId) : null, projectId: rule.projectId,
+            what: label, why: proposalText.reasonOf(why), changes: [{ action, params: asAsked, label, reversible: true, rating: actions.rating(action) }],
             status: STATUS.APPROVED, gate: null, priority: 'normal', decidedBy: String(rule.madeBy), decidedAt: new Date(), undoUntil: new Date(Date.now() + UNDO_WINDOW_MS),
             auditIds: [String(auditId)], source: SOURCE_MCP, requestedBy: String(rule.requestedBy), standingApprovalId: String(rule._id),
             ...(rule.oauthGrantId ? { oauthClientId: rule.oauthClientId, oauthGrantId: rule.oauthGrantId } : { tokenId: rule.tokenId }),

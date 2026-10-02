@@ -12,10 +12,10 @@ const { mayAttachKey, taskAttachmentKey, formUploadKey, clipKey } = require('../
 const { REPORT, scopeMode, countReported } = require('../../../common-storage/storedFileScope');
 const { tenantOf, TenantError } = require('../../../Config/tenant');
 const { canReadTask } = require('./taskReadAccess');
-const { loadSubtree } = require('./taskTree');
+const { loadSubtree, REFUSALS } = require('./taskTree');
 const { RichTextLimitError } = require('./cleanRichText');
 const { CANNOT_OPEN_PROJECT, peopleWhoOpen, cannotOpen } = require('../../../Config/projectPeople');
-const { openProject, isChatSpace, listOf, listRef, readableTaskIds, flatStatus, coveredByMapping, moveMappingInto } = require('./taskWritePlacement');
+const { openProject, isChatSpace, startsOwnConversation, listOf, listRef, listLeftBy, readableTaskIds, flatStatus, coveredByMapping, moveMappingInto, conversionRules } = require('./taskWritePlacement');
 
 const { IMPORT_MARK_FIELDS } = require('./importMark');
 
@@ -152,15 +152,20 @@ const holdsTaskType = (payload, stored) => {
  * ones. `destination` names the project a create, move or copy writes into, which the caller must be able to open;
  * `chat` is the flag that marks a conversation, whose container is a chat space instead. `list.id` is the list of that
  * project the write names, which must be one of its lists the caller may see, and `list.ref` the object the handler
- * stores on the task, rewritten from the stored list. `mapping` is the status and task type mapping of a move into
- * another project. `people` returns the user ids the write newly names, each of whom must hold a live seat in the
- * company and be able to open the project; `carries` are the lists of people a move or copy takes along. `landing`
+ * stores on the task, rewritten from the stored list. `parent` is the task a new row goes under, which the caller
+ * must be able to read. `mapping` is the status and task type mapping of a move into another project. `people`
+ * returns the user ids the write newly names, each of whom must hold a live seat in the company and be able to open
+ * the project; `carries` are the lists of people a move or copy takes along. `landing`
  * returns the user ids stored on a task the write creates in the destination, each of whom must be able to open that
- * project. `actor` are the params that receive the signed-in user. `strict` refuses a body key the action does not
- * take, for an action no existing client sends extra fields to.
+ * project. `lands` names, among `others`, the task whose project the written task ends up in when the action names
+ * no destination; that project is written to `projectData`. `rules` is the object that says what each status and
+ * task type becomes in the project the task ends up in: it is rebuilt from the two stored projects, and the body
+ * only chooses among what that project has. `leaves` are the objects that name the list the task leaves, rewritten
+ * from the stored task. `actor` are the params that receive the signed-in user. `strict` refuses a body key the
+ * action does not take, for an action no existing client sends extra fields to.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, status = null, held = null, destination = null, chat = null, list = null, mapping = null, attachments = null, people = null, carries = [], landing = null, strict = false, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, status, held, destination, chat, list, mapping, attachments, people, carries, landing, strict,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, status = null, held = null, destination = null, chat = null, list = null, parent = null, mapping = null, attachments = null, people = null, carries = [], landing = null, lands = null, rules = null, leaves = [], strict = false, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, status, held, destination, chat, list, parent, mapping, attachments, people, carries, landing, lands, rules, leaves, strict,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -185,6 +190,8 @@ const DESTINATION = ['projectData', 'id'];
 const DESTINATION_LIST = Object.freeze({ id: ['sprintObj', 'id'], ref: ['sprintObj'] });
 const LISTED_TASKS = Object.freeze({ path: ['taskIds'] });
 const CARRIED = Object.freeze(['assignee', 'watcher']);
+const RULES = ['oldProject'];
+const LIST_LEFT = [['oldSprintObj']];
 
 const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy', 'extraLists', ...IMPORT_MARK_FIELDS].includes(field)));
 
@@ -202,12 +209,13 @@ const CREATE = spec({
     destination: ['data', 'ProjectID'],
     chat: ['data', 'mainChat'],
     list: { id: ['data', 'sprintId'], ref: null },
+    parent: ['data', 'ParentTaskId'],
 });
 
 const TASK_ACTION_FIELDS = Object.freeze({
     create: CREATE,
     createSubTaskWithAi: spec({ params: ['companyId', 'userId', 'subTitles', 'sprintObj', 'projectData', 'userData', 'parentTask', 'type'], owns: PLACEMENT_FIELDS, company: [...companyId, ...projectCompany], ids: [['parentTask', 'id'], ['parentTask', 'ProjectID']], others: [['parentTask', 'id']], destination: ['parentTask', 'ProjectID'], list: { id: ['sprintObj', 'id'], ref: null } }),
-    createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']], attachments: 'imported', people: PEOPLE.createMultipleTasks }),
+    createMultipleTasks: spec({ params: ['tasks', 'userData', 'projectData', 'indexObj', 'statusArray', 'sprint', 'eventId'], owns: PLACEMENT_FIELDS, company: projectCompany, fieldNames: [['indexObj', 'indexName']], ids: PROJECT_DATA, objects: [['indexObj']], attachments: 'imported', people: PEOPLE.createMultipleTasks, destination: PROJECT_DATA[0], list: { id: ['sprint', 'id'], ref: ['sprint'] } }),
 
     updateStatus: spec({ params: ['newStatus', 'prevStatus', 'projectData', 'task', 'isUpdateTask', ...HISTORY_USER], writes: { newStatus: STATUS_FIELDS }, status: ['newStatus'], company: projectCompany, ids: [...TASK, ['prevStatus', 'taskId']], task: TASK[0], project: PROJECT_DATA, taskIds: [...TASK, ['prevStatus', 'taskId']], taskNames: [['prevStatus', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['newStatus', 'statusKey'], 'statusKey') }),
     updatePriority: spec({ params: ['firebaseObj', 'projectData', 'taskData', 'priorityObj', 'isUpdateTask', ...HISTORY_USER], writes: { firebaseObj: ['Task_Priority', 'Updated_At'] }, company: projectCompany, ids: [...TASK_DATA, ['priorityObj', 'taskId']], task: TASK_DATA[0], project: PROJECT_DATA, taskIds: [...TASK_DATA, ['priorityObj', 'taskId']], taskNames: [['priorityObj', 'taskName']], projectNames: PROJECT_DATA_NAME, held: holdsField(['firebaseObj', 'Task_Priority'], 'Task_Priority') }),
@@ -234,12 +242,12 @@ const TASK_ACTION_FIELDS = Object.freeze({
     updateQueueList: spec({ params: ['CompanyId', 'projectId', 'sprintId', 'taskId', 'userId', 'actionType', 'taskName', ...HISTORY_USER], company: [['CompanyId']], ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateQueueList }),
     updateArchiveDelete: spec({ params: ['companyId', 'projectData', 'sprintId', 'task', 'deletedStatusKey', ...HISTORY_USER], company: companyId, ids: [...TASK, ['task', 'ParentTaskId']], task: TASK[0], project: PROJECT_DATA }),
 
-    convertToSubTask: spec({ params: ['companyId', 'projectData', 'sprintId', 'selectedTaskId', 'taskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], ...TASK_ID], task: ['selectedTaskId'], others: TASK_ID }),
-    convertToTask: spec({ params: ['companyId', 'projectData', 'taskId', 'sprintObj', 'parentTaskId', 'oldSprintObj', 'oldProject'], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['parentTaskId'], DESTINATION], task: TASK_ID[0], destination: DESTINATION, list: DESTINATION_LIST }),
+    convertToSubTask: spec({ params: ['companyId', 'projectData', 'sprintId', 'selectedTaskId', 'taskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], ...TASK_ID], task: ['selectedTaskId'], others: TASK_ID, lands: TASK_ID[0], rules: RULES }),
+    convertToTask: spec({ params: ['companyId', 'projectData', 'taskId', 'sprintObj', 'parentTaskId', 'oldSprintObj', 'oldProject'], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['parentTaskId'], DESTINATION], task: TASK_ID[0], destination: DESTINATION, list: DESTINATION_LIST, rules: RULES, leaves: LIST_LEFT }),
     convertToList: spec({ params: ['companyId', 'projectData', 'taskId', 'folderData', 'sprintObj', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, DESTINATION], task: TASK_ID[0], destination: DESTINATION }),
-    moveTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'moveTaskId', 'oldSprintObj', 'oldProject', 'isSubTask', 'assignee', 'watcher', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['moveTaskId'], DESTINATION], task: ['moveTaskId'], destination: DESTINATION, list: DESTINATION_LIST, mapping: ['oldProject'], people: PEOPLE.carried, carries: CARRIED }),
-    mergeTask: spec({ params: ['companyId', 'projectData', 'taskId', 'mergeTaskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['mergeTaskId']], task: TASK_ID[0], others: [['mergeTaskId']] }),
-    duplicateTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'selectedTaskId', 'oldProject', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], DESTINATION], task: ['selectedTaskId'], destination: DESTINATION, list: DESTINATION_LIST, people: PEOPLE.carried, carries: CARRIED, landing: peopleOnCopy }),
+    moveTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'moveTaskId', 'oldSprintObj', 'oldProject', 'isSubTask', 'assignee', 'watcher', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['moveTaskId'], DESTINATION], task: ['moveTaskId'], destination: DESTINATION, list: DESTINATION_LIST, mapping: RULES, leaves: LIST_LEFT, people: PEOPLE.carried, carries: CARRIED }),
+    mergeTask: spec({ params: ['companyId', 'projectData', 'taskId', 'mergeTaskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['mergeTaskId']], task: TASK_ID[0], others: [['mergeTaskId']], lands: ['mergeTaskId'], rules: RULES }),
+    duplicateTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'selectedTaskId', 'oldProject', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], DESTINATION], task: ['selectedTaskId'], destination: DESTINATION, list: DESTINATION_LIST, rules: RULES, leaves: LIST_LEFT, people: PEOPLE.carried, carries: CARRIED, landing: peopleOnCopy }),
 
     addTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', 'type', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0], others: [['relatedTaskId']] }),
     removeTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0] }),
@@ -584,6 +592,14 @@ const statusAsStored = async (company, task, sent) => {
 };
 
 const projectNotFound = () => new TaskWriteRefusal(404, 'Project not found');
+const listNotFound = () => new TaskWriteRefusal(404, 'List not found');
+
+/* A conversation sits in a list of its chat space that the person starting it may see, under no parent, and that person is in it. */
+const checkConversation = async (req, company, taskSpec, payload, spaceId) => {
+    if (!taskSpec.list || !(await listOf(company, req.uid, spaceId, valueAt(payload, taskSpec.list.id)))) throw listNotFound();
+    if (taskSpec.parent && !isNone(valueAt(payload, taskSpec.parent))) refuse(400, 'A conversation is not a subtask.');
+    if (!startsOwnConversation(req.uid, valueAt(payload, taskSpec.chat.slice(0, -1)))) refuse(400, 'A conversation is started by one of the people in it.');
+};
 
 /* Where a create, move or copy lands: a project the caller can open and, when the action names one, a list
  * of that project they may see. A conversation lands in a chat space, which has neither. */
@@ -592,12 +608,15 @@ const destinationOf = async (req, company, taskSpec, payload) => {
     if (typeof projectId !== 'string' || !projectId) refuse(400, `${nameOf(taskSpec.destination)} is required.`);
     const project = await openProject(company, req.uid, projectId);
     if (!project) {
-        if (taskSpec.chat && valueAt(payload, taskSpec.chat) === true && await isChatSpace(company, projectId)) return null;
+        if (taskSpec.chat && valueAt(payload, taskSpec.chat) === true && await isChatSpace(company, projectId)) {
+            await checkConversation(req, company, taskSpec, payload, projectId);
+            return null;
+        }
         throw projectNotFound();
     }
     if (taskSpec.list) {
         const list = await listOf(company, req.uid, projectId, valueAt(payload, taskSpec.list.id));
-        if (!list) throw new TaskWriteRefusal(404, 'List not found');
+        if (!list) throw listNotFound();
         if (taskSpec.list.ref) setAt(payload, taskSpec.list.ref, await listRef(company, list));
     }
     if (isPlainObject(payload.projectData)) {
@@ -611,7 +630,16 @@ const destinationOf = async (req, company, taskSpec, payload) => {
     return project;
 };
 
+/* A parent the caller cannot read answers as one that does not exist. */
+const checkParent = async (req, company, taskSpec, payload) => {
+    const parentId = valueAt(payload, taskSpec.parent);
+    if (typeof parentId !== 'string' || !parentId) return;
+    if (!(await canReadTask(company, req.uid, await storedTaskOf(company, parentId)))) throw new TaskWriteRefusal(404, REFUSALS.PARENT_NOT_FOUND, 'PARENT_NOT_FOUND');
+};
+
 const MAPPING_REFUSED = 'A status or task type of this task has no place in the project it moves to.';
+
+const liveRowsUnder = async (company, task) => [task, ...await loadSubtree(company, task._id, { filter: { deletedStatusKey: { $nin: [1] } } })];
 
 /* A move into another project carries its status and type mapping; a move within a project carries none. */
 const checkMoveMapping = async (company, taskSpec, payload, { task, destination }) => {
@@ -623,9 +651,25 @@ const checkMoveMapping = async (company, taskSpec, payload, { task, destination 
         return;
     }
     const mapping = moveMappingInto(sent, destination);
-    const rows = [task, ...await loadSubtree(company, task._id, { filter: { deletedStatusKey: { $nin: [1] } } })];
-    if (!mapping || !coveredByMapping(rows, mapping)) refuse(400, MAPPING_REFUSED);
+    if (!mapping || !coveredByMapping(await liveRowsUnder(company, task), mapping)) refuse(400, MAPPING_REFUSED);
     setAt(payload, taskSpec.mapping, { ...names, ...mapping });
+};
+
+const NO_PLACE_IN_PROJECT = 'The project this task goes to has no status or no task type to give it.';
+
+/* The project a task ends up in when the action names another task instead of a destination. */
+const projectOfTask = async (company, payload, row) => {
+    const project = await storedProjectOf(company, String(row.ProjectID));
+    if (!project) throw projectNotFound();
+    payload.projectData = { ...(isPlainObject(payload.projectData) ? payload.projectData : {}), id: String(project._id), ProjectName: project.ProjectName || '', ProjectCode: project.ProjectCode || '' };
+    return project;
+};
+
+const storeConversionRules = async (company, taskSpec, payload, task, into) => {
+    const source = await storedProjectOf(company, String(task.ProjectID));
+    const rules = conversionRules(source, into, valueAt(payload, taskSpec.rules), await liveRowsUnder(company, task));
+    if (!rules) refuse(400, NO_PLACE_IN_PROJECT);
+    setAt(payload, taskSpec.rules, { ...rules, id: String(task.ProjectID) });
 };
 
 /* A new or imported task has no id yet and its body's origin is the client's word, so only its placement counts. */
@@ -713,25 +757,34 @@ const prepareTaskRequest = async (req, taskSpec, label) => {
             taskSpec.projectNames.forEach((path) => setAt(payload, path, (project && project.ProjectName) || ''));
         }
         if (taskSpec.stored) payload.storedTask = stored;
+        taskSpec.leaves.forEach((path) => setAt(payload, path, listLeftBy(stored)));
         if (payload.isUpdateTask === false && !(taskSpec.held && taskSpec.held(payload, stored))) refuse(409, 'The task does not hold the change this request records.');
         if (taskSpec.status) setAt(payload, taskSpec.status, await statusAsStored(company, stored, valueAt(payload, taskSpec.status)));
     }
+    const others = new Map();
     for (const path of taskSpec.others) {
         const otherId = valueAt(payload, path);
-        if (typeof otherId === 'string' && otherId) await visibleTaskOf(req, company, otherId);
+        if (typeof otherId === 'string' && otherId) others.set(nameOf(path), await visibleTaskOf(req, company, otherId));
     }
+    const landsBy = taskSpec.lands ? others.get(nameOf(taskSpec.lands)) : null;
+    const landsIn = landsBy ? await projectOfTask(company, payload, landsBy) : null;
     if (taskSpec.listed) prepared.listed = await keepListed(req, company, payload, taskSpec.listed);
     if (taskSpec.destination) {
         prepared.destination = await destinationOf(req, company, taskSpec, payload);
         if (taskSpec.landing && prepared.destination && await cannotOpen(company, String(prepared.destination._id), taskSpec.landing(payload))) refuse(400, CANNOT_OPEN_DESTINATION);
         if (prepared.destination && taskSpec.mapping && prepared.task) await checkMoveMapping(company, taskSpec, payload, prepared);
+        /* A conversation in a chat space has no project, and what it names as its parent is not a task. */
+        if (prepared.destination && taskSpec.parent) await checkParent(req, company, taskSpec, payload);
     }
+    const endsIn = prepared.destination || landsIn;
+    if (taskSpec.rules && prepared.task && endsIn) await storeConversionRules(company, taskSpec, payload, prepared.task, endsIn);
     if (taskSpec.people) await checkPeople(company, taskSpec, prepared);
     await checkAttachmentKeys(taskSpec, prepared);
     return prepared;
 };
 
 const sendRefusal = (res, error) => res.status(error.statusCode).send({ status: false, statusText: error.message, ...(error.code ? { code: error.code } : {}) });
+const COULD_NOT_BE_PROCESSED = 'The request could not be processed.';
 
 const prepareOrRefuse = async (req, res, taskSpec, label) => {
     try {
@@ -741,16 +794,19 @@ const prepareOrRefuse = async (req, res, taskSpec, label) => {
             sendRefusal(res, error);
         } else {
             logger.error(`task write ${printable(label)} could not be prepared: ${error && error.message}`);
-            res.status(500).send({ status: false, statusText: 'The request could not be processed.' });
+            res.status(500).send({ status: false, statusText: COULD_NOT_BE_PROCESSED });
         }
         return null;
     }
 };
 
+/* The handlers reject with an error, a sentence, or the answer of a helper they called. */
+const failureText = (error) => [error && error.message, error, error && error.statusText].find((text) => typeof text === 'string' && text) || COULD_NOT_BE_PROCESSED;
+
 const sendFailure = (res, error) => {
     if (error instanceof TaskWriteRefusal) return sendRefusal(res, error);
     if (error instanceof RichTextLimitError) return res.status(error.statusCode).send({ status: false, statusText: error.message });
-    return res.send({ status: false, statusText: error && error.message });
+    return res.send({ status: false, statusText: failureText(error) });
 };
 
 module.exports = {
@@ -777,5 +833,6 @@ module.exports = {
     prepareOrRefuse,
     sessionActor,
     employeeNameOf,
+    failureText,
     sendFailure,
 };

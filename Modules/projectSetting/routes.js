@@ -4,8 +4,12 @@ const autoArchive = require('./autoArchive');
 const estimationScale = require('./estimationScale');
 const wipLimit = require('./wipLimit');
 const { READ, requireProjectAccess, DETAILS } = require('../../Config/projectAccess');
+const { agentsRefused } = require('../Agents/guard');
 
 const editsProjectSettings = requireProjectAccess({ projectIds: (req) => req.body && req.body.projectId, permissions: () => [DETAILS] });
+const statusesByPeople = agentsRefused('project.setup');
+const taskTypesByPeople = agentsRefused('task_types.edit');
+const settingsByPeople = agentsRefused('project.settings');
 
 exports.init = (app) => {
      /**
@@ -53,7 +57,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v1/projectSetting/taskType', editsProjectSettings, ctrl.changeTaskType);
+    app.post('/api/v1/projectSetting/taskType', taskTypesByPeople, editsProjectSettings, ctrl.changeTaskType);
 
     /**
      * @swagger
@@ -100,18 +104,18 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v1/projectSetting/taskStatus', editsProjectSettings, ctrl.changeTaskStatus);
+    app.post('/api/v1/projectSetting/taskStatus', statusesByPeople, editsProjectSettings, ctrl.changeTaskStatus);
     // Under the /taskStatus prefix on purpose: setMiddleware guards that prefix,
     // so this write is behind the same JWT + company audience check as every
     // other task-status change rather than needing a new entry in that list.
-    app.post('/api/v1/projectSetting/taskStatus/wipLimit', editsProjectSettings, wipLimit.setWipLimit);
+    app.post('/api/v1/projectSetting/taskStatus/wipLimit', statusesByPeople, editsProjectSettings, wipLimit.setWipLimit);
     app.post('/api/v1/projectSetting/migrateSprintsFun', requireInstanceAdmin, ctrl.migrateSprintsFun);
 
     // Per-project auto-archive rule (completed tasks archive after N days —
     // applied by the nightly cron in cron.js).
     app.get('/api/v1/projectSetting/autoArchive/:pid', requireProjectAccess({ mode: READ, projectIds: (req) => req.params.pid }), autoArchive.getAutoArchive);
-    app.post('/api/v1/projectSetting/autoArchive', editsProjectSettings, autoArchive.setAutoArchive);
+    app.post('/api/v1/projectSetting/autoArchive', settingsByPeople, editsProjectSettings, autoArchive.setAutoArchive);
 
     // Per-project story-point estimation scale (drives the points picker).
-    app.post('/api/v1/projectSetting/estimationScale', editsProjectSettings, estimationScale.setEstimationScale);
+    app.post('/api/v1/projectSetting/estimationScale', settingsByPeople, editsProjectSettings, estimationScale.setEstimationScale);
 }

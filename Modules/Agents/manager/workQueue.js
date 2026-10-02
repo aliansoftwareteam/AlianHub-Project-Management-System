@@ -11,6 +11,7 @@ const { DeterministicError } = require('../../Automations/engine/tools');
 const { toolNameOf, byline } = require('../actingAgent');
 const { userAgentAccount } = require('../actor');
 const connectedAgents = require('../connectedAgents');
+const accounts = require('../accounts');
 const { connectionOf } = require('../workMarks');
 const places = require('./places');
 const { parseOwnAiMentionIds } = require('../../Comments/helpers/parseMentions');
@@ -111,9 +112,10 @@ const heldBy = async (companyId, row, now) => {
 
 const byUrgency = (a, b) => QUEUE_RULES.indexOf(a.row.rule) - QUEUE_RULES.indexOf(b.row.rule) || new Date(a.row.openedAt) - new Date(b.row.openedAt);
 
-/* What a connection may take or already holds, the most urgent first. Nothing is counted beside the list, and a
- * project where agents are paused hands out nothing. */
+/* What a connection may take or already holds, the most urgent first. Nothing is counted beside the list. A
+ * project where agents are paused hands out nothing, and neither does a workspace whose connected agents are paused. */
 const itemsFor = async ({ companyId, uid, connection, projectId, allowsProject = () => true, allowsTask, limit, now = new Date() }) => {
+    if (await accounts.connectedPaused(companyId)) return [];
     const projects = (await projectsOn(companyId, projectId ? [projectId] : null, NOT_PAUSED)).filter((project) => allowsProject(String(project._id)));
     if (!projects.length) return [];
     const names = new Map(projects.map((project) => [String(project._id), project.ProjectName || '']));
@@ -356,10 +358,11 @@ const closeFinished = async (companyId, projectId, now = new Date()) => {
     await Promise.all(rows.filter((row) => open.has(String(row.taskId))).map((row) => standing(companyId, row, now)));
 };
 
-/* Pausing a project takes every item there out of the agents' hands at once, so no task still reads as being worked on. */
-const dropClaimsIn = async (companyId, projectId) => {
+/* A pause takes every item out of the agents' hands at once, so no task still reads as being worked on: the items of
+ * one project, or with no project named those of the whole workspace. */
+const dropClaimsIn = async (companyId, projectId = null) => {
     const dropped = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.PROJECT_FINDINGS, data: [{ projectId: { $in: idForms([String(projectId)]) }, claim: { $ne: null } }, { $unset: { claim: '' } }],
+        type: SCHEMA_TYPE.PROJECT_FINDINGS, data: [{ ...(projectId ? { projectId: { $in: idForms([String(projectId)]) } } : {}), claim: { $ne: null } }, { $unset: { claim: '' } }],
     }, 'updateMany');
     announce(companyId);
     return Number((dropped && dropped.modifiedCount) || 0);

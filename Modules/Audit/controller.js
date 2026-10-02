@@ -7,12 +7,14 @@ const { csvRow } = require('../../utils/csv');
 const chain = require('./chain');
 const { AMENDED_ACTION } = require('./helpers/chainRules');
 const outsideActors = require('./outsideActors');
+const entityNames = require('./entityNames');
+const { labelOf, keysFor, rowHolds, clausesFor } = require('./eventWords');
 const { VIA_EXTERNAL } = require('../Agents/actor');
 const { pinSessionTenant } = require('../../Config/tenant');
 
 const AUDIT_EXPORT_HARD_CAP = 100000;
 const AUDIT_EXPORT_PAGE_SIZE = 1000;
-const AUDIT_CSV_HEADER = ['time', 'actorType', 'actor', 'agent', 'run', 'event', 'entity', 'reason', 'cost_usd', 'undone_at'];
+const AUDIT_CSV_HEADER = ['time', 'actorType', 'actor', 'agent', 'run', 'event', 'event_label', 'entity', 'reason', 'cost_usd', 'undone_at'];
 const PERMISSION_REFUSED = 'permission.refused';
 
 /* Each agent action row carries the deadline the undo route will enforce, so the
@@ -90,6 +92,7 @@ const auditMatch = (q) => {
             { actorName: { $regex: term, $options: 'i' } },
             { 'meta.action': { $regex: term, $options: 'i' } },
             { 'meta.reason': { $regex: term, $options: 'i' } },
+            ...clausesFor(keysFor(q.q, q)),
         ] }];
     }
     if (q.from || q.to) {
@@ -111,7 +114,8 @@ const matchesFolded = (row, q) => {
     if (q.undone === 'true' && meta.undoneAt == null) return false;
     if (q.q) {
         const pattern = new RegExp(searchTerm(q.q), 'i');
-        if (![row.entityName, row.actorName, meta.action, meta.reason].some((v) => typeof v === 'string' && pattern.test(v))) return false;
+        const stored = [row.entityName, row.actorName, meta.action, meta.reason].some((v) => typeof v === 'string' && pattern.test(v));
+        if (!stored && !rowHolds(row, keysFor(q.q, q))) return false;
     }
     return true;
 };
@@ -187,7 +191,7 @@ exports.listAuditLogs = async (req, res) => {
         // The total counts candidates, so once a page drops one the total may count rows that do not match.
         const approximate = listed.length !== read.length;
         const total = (rows && rows[0] && rows[0].meta && rows[0].meta[0] && rows[0].meta[0].total) || 0;
-        const data = await outsideActors.nameRows(companyId, await withUndoState(companyId, req.uid, listed));
+        const data = await entityNames.nameRows(companyId, req.uid, await outsideActors.nameRows(companyId, await withUndoState(companyId, req.uid, listed)));
         const metadata = { total, page, totalPages: Math.ceil(total / limit), ...(approximate ? { approximate: true } : {}), ...(chain.isOn() ? { chain: { on: true } } : {}) };
         return res.send({ status: true, data, metadata });
     } catch (error) {
@@ -213,7 +217,7 @@ const auditCsvLine = (r, withIntegrity) => {
     return csvRow([
         r.createdAt ? new Date(r.createdAt).toISOString() : '', m.actorType || 'human',
         outside ? outsideActors.csvLabel(outside) : r.actorName || '', outside ? outside.clientName || outside.clientId : m.agentName || '', m.runId || '',
-        m.action || r.action, r.entityName || r.entityId || '', m.reason || '', (m.cost && m.cost.usd) || '', m.undoneAt ? new Date(m.undoneAt).toISOString() : '',
+        m.action || r.action, labelOf(r), r.entityName || r.entityId || '', m.reason || '', (m.cost && m.cost.usd) || '', m.undoneAt ? new Date(m.undoneAt).toISOString() : '',
         ...(withIntegrity ? [integrityCell(r.integrity)] : []),
     ]);
 };
@@ -258,7 +262,7 @@ exports.exportAuditCsv = async (req, res) => {
         }
         await flush();
         if (truncated) {
-            const note = ['', '', '', '', '', 'export.truncated', `Export truncated at ${cap} rows. Narrow the filter to export the rest.`, '', '', ''];
+            const note = ['', '', '', '', '', 'export.truncated', `Export truncated at ${cap} rows. Narrow the filter to export the rest.`, '', '', '', ''];
             res.write(`\n${csvRow([...note, ...(withIntegrity ? [''] : [])])}`);
         }
         return res.end();

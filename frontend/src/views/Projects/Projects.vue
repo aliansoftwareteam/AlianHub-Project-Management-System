@@ -68,7 +68,7 @@
                                                         :ref="projectView"
                                                     >
                                                         <img :src="publicIcon" v-if="!projectData.isPrivateSpace" class="pr-10px vertical-middle" alt="public-folder"/>
-                                                        <span class="font-size-14 text-ellipsis d-inline-block gray81 project__requirement">
+                                                        <span class="font-size-14 text-ellipsis d-inline-block project__requirement">
                                                             <span v-if="activeTab !== 'EmbedView' && projectComponentsIcons(activeTab)?.icon" class="ah-mask-icon phone-view__icon mr-5px" :style="maskOf(projectComponentsIcons(activeTab).icon)" aria-hidden="true"></span>
                                                             <img v-else-if="activeTab === 'EmbedView' && icons[selectedEmbedView?.type]" :src="icons[selectedEmbedView.type]" alt="" class="mr-5px">
                                                             {{activeTab !== 'EmbedView' ? (shownView?.title || viewLabel(shownView?.name)) : embedViewName || "N/A"}}
@@ -506,7 +506,7 @@ import ProjectEmptyState from './components/ProjectEmptyState.vue';
 import FolderEmptyState from './components/FolderEmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { folderSprintList, folderWithoutLists, headerLocation, projectSprintList } from './folderSprints';
+import { folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
 import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
@@ -1122,6 +1122,12 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
 
     if (!project) return;
 
+    const moved = movedListRoute({ route, project });
+    if (moved) {
+        router.replace(moved);
+        return;
+    }
+
     try {
         if (route.name === 'Projects' || route.name === 'Project') {
             tmp = projectSprintList({ project, showArchived: showArchived.value, includeSprint: checkSprint });
@@ -1382,6 +1388,7 @@ function closeModal() {
     height: 28px;
 }
 .project__requirement{
+    color: var(--ink-2);
     padding: 0px 10px 0 2px;
 }
 .project__requirement img{

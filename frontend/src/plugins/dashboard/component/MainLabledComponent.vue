@@ -5,19 +5,19 @@
             <div class="is__expanded-droparrow"  @click="isExpanded = !isExpanded">
                 <img :src="dropdownArrow" alt="" class="cursor-pointer drop__down-arrow" :style="`transform: rotateZ(${isExpanded ? 90 : 0}deg);`">
             </div>
-            <h3 class="font-size-14 font-weight-500 m-0 pl-20px dark-gray">{{lable}} <span class="font-size-13 font-weight-400 GunPowder" v-if="taskCount !== 0">({{ taskCount }})</span></h3>
+            <h3 class="main-labled-component-font-size-14 main-labled-component-font-weight-500 m-0 pl-20px main-labled-component-dark-gray">{{lable}} <span class="main-labled-component-font-size-13 main-labled-component-font-weight-400 main-labled-component-GunPowder" v-if="taskCount !== 0">({{ taskCount }})</span></h3>
         </div>
         <div class="d-flex" v-if="lable.toLowerCase() == 'overdue' || lable.toLowerCase() == 'next' || lable.toLowerCase() == 'done'"> 
-            <button class="btn__task ml-10px border-radius-4-px black font-weight-400 border-0 font-size-12 cursor-pointer bg-colorlightgray mr-2px vertical-middle"  @click="sortArray(sortingVal)">
+            <button class="btn__task ml-10px border-radius-4-px main-labled-component-black main-labled-component-font-weight-400 border-0 main-labled-component-font-size-12 cursor-pointer main-labled-component-bg-colorlightgray mr-2px vertical-middle"  @click="sortArray(sortingVal)">
                 <img :src="dueDateArrow" :style="`transform: rotateZ(${sortingVal == -1 ? 180 : 0}deg);`" alt="" class="cursor-pointer pr-3px" /> {{$t('Home.Due_Date')}} </button>
         </div>
         </div>
         <div v-else class="d-flex flex-row justify-content-start">
-            <h3 class="font-size-14 font-weight-500 m-0 pb-10px">{{lable}}</h3>
+            <h3 class="main-labled-component-font-size-14 main-labled-component-font-weight-500 m-0 pb-10px">{{lable}}</h3>
         </div>
         <template v-if="isFetching && isExpanded == true">
             <div class="overflow-y-auto overflow-x-hidden overflow-scroll border-radius-3-px mywork__taskstatus-wrapper">
-                <Skelaton v-for="i in (currentCountValue >= 5 ? 5 : currentCountValue !== 0 ? currentCountValue : 1)" :key="i" :class="'d-flex align-items-center justify-content-between bg-white display__componet-wrapper border-bottom-mobiledrop flex-wrap cursor-pointer ml-15px p10px-p15px h-50-px'"/>
+                <Skelaton v-for="i in (currentCountValue >= 5 ? 5 : currentCountValue !== 0 ? currentCountValue : 1)" :key="i" :class="'d-flex align-items-center justify-content-between main-labled-component-bg-white display__componet-wrapper main-labled-component-border-bottom-mobiledrop flex-wrap cursor-pointer ml-15px p10px-p15px h-50-px'"/>
             </div>
         </template>
         <template v-else>
@@ -50,7 +50,7 @@
                             </div>
                         </template>
                     </draggable>
-                    <div :key="`no-task-message-${lable}`" v-if="(!taskArrayValue || (taskArrayValue && taskArrayValue.length == 0)) && !isLoading" class="d-flex justify-content-between font-weight-400 justify-content-center align-items-center bg-white p-10px gray81 font-ui font-size-12 ml-15px no__task-msg">
+                    <div :key="`no-task-message-${lable}`" v-if="(!taskArrayValue || (taskArrayValue && taskArrayValue.length == 0)) && !isLoading" class="d-flex justify-content-between main-labled-component-font-weight-400 justify-content-center align-items-center main-labled-component-bg-white p-10px main-labled-component-gray81 font-ui main-labled-component-font-size-12 ml-15px no__task-msg">
                      {{$t('Home.no')}} {{ `${lable.toLowerCase()}`}} {{  $t('Home.task_assign_to_you')   }}
                     </div>
                 </TransitionGroup>
@@ -261,6 +261,45 @@ function sidebarDataMange(taskObj) {
     emit('openTaskDetail',taskObj);
 }
 </script>
+<style scoped>
+.main-labled-component-font-size-12 {
+    font-size: 12px;
+}
+.main-labled-component-font-size-13 {
+    font-size: 13px;
+}
+.main-labled-component-font-size-14 {
+    font-size: 14px;
+}
+.main-labled-component-font-weight-400 {
+    font-weight: 400 !important;
+}
+.main-labled-component-font-weight-500 {
+    font-weight: 500 !important;
+}
+.main-labled-component-bg-white {
+    background-color: var(--surface);
+}
+.main-labled-component-bg-colorlightgray {
+    background-color: var(--fill);
+}
+.main-labled-component-gray81 {
+    color: var(--ink-2);
+}
+.main-labled-component-GunPowder {
+    color: var(--ink-2);
+}
+.main-labled-component-black {
+    color: var(--ink);
+}
+.main-labled-component-dark-gray {
+    color: var(--ink);
+}
+.main-labled-component-border-bottom-mobiledrop {
+    border-bottom: 1px solid var(--hairline) !important;
+}
+</style>
+
 <style>
 .listlablemain-move,
 .listlablemain-enter-active,

@@ -71,7 +71,7 @@ describe('mail routes', () => {
     it('puts the support mail route behind a session, a company and a rate limit', () => {
         const route = mailRoutes().find((r) => r.method === 'post' && r.path === '/api/v2/support-mail');
         expect(route).toBeDefined();
-        expect(route.handlers.length).toBe(2);
+        expect(route.handlers.length).toBe(3);
         const guards = fs.readFileSync(path.join(__dirname, '..', 'Config', 'setMiddleware.js'), 'utf8');
         expect(guards).toContain('"/api/v2/support-mail"');
     });
