@@ -1,4 +1,5 @@
 const logger = require('../../Config/loggerConfig');
+const telemetry = require('../../Config/telemetry');
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const { getRoleType } = require('../../Config/permissionGuard');
 const { nonMembersOf, guestsOf, NOT_A_MEMBER, NOT_A_GUEST } = require('../../Config/companyMembers');
@@ -240,6 +241,7 @@ exports.startRun = async (req, res) => {
             source: 'api',
             dedupeKey,
             startedBy: ctx.caller.actor.userId,
+            traceId: telemetry.traceIdNow() || telemetry.newTraceId(),
             agentId: body.agentId ? String(body.agentId) : null,
             taskId: body.taskId ? String(body.taskId) : null,
             projectId: body.projectId ? String(body.projectId) : null,

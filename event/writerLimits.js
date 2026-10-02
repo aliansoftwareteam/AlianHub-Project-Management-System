@@ -39,6 +39,24 @@ const underNoRequest = (step) => tokenNarrowing.outside(() => agentRequest.outsi
 const underTheWritersLimits = (limits, step) => underNoRequest(() => tokenNarrowing.runNarrowed({ userId: limits.userId, projectIds: limits.projectIds },
     () => (typeof limits.chat === 'boolean' ? agentRequest.runForAgentOf(limits.userId, { chat: limits.chat }, step) : step())));
 
+/* A run is held, for as long as it runs, to what the request that started it was held to. It is read once, where
+ * the run starts, and kept on the run: wherever the run's skill is picked up, that is entered and nothing else.
+ * A call held to some projects is an agent's, with the chat it was given. */
+const ofStarter = (uid) => {
+    const agent = agentRequest.agentOf(uid);
+    const held = ofThisRequest();
+    const mine = held && String(held.userId) === String(uid || '') ? held : null;
+    const chat = agent ? agent.chat : (mine ? mine.chat : null);
+    return { agent: typeof chat === 'boolean', chat: chat === true, projectIds: mine ? mine.projectIds.map(String) : [] };
+};
+
+const underItsStartersLimits = (run, step) => underNoRequest(() => {
+    const kept = (run && run.startedUnder) || {};
+    const uid = String((run && run.startedBy) || '');
+    const asStarter = () => (kept.agent === true ? agentRequest.runForAgentOf(uid, { chat: kept.chat === true }, step) : step());
+    return tokenNarrowing.runNarrowed({ userId: uid, projectIds: [...(kept.projectIds || [])].map(String) }, asStarter);
+});
+
 const UNREADABLE = 'The change this follows names limits that cannot be read, so nothing was done.';
 
 /* A choice left to the owner. A rule's step that is judged for the rule's maker is judged with the maker's rights;
@@ -52,4 +70,4 @@ const judgedAfter = (envelope, step) => {
     return underTheWritersLimits(limits, step);
 };
 
-module.exports = { ofThisRequest, handedOrHere, duringCall, judgedAfter, underNoRequest };
+module.exports = { ofThisRequest, handedOrHere, duringCall, judgedAfter, underNoRequest, ofStarter, underItsStartersLimits };

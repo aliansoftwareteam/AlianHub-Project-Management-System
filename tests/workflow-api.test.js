@@ -206,6 +206,7 @@ describe('starting a run', () => {
         expect(created.steps).toEqual([expect.objectContaining({ id: 'sAgent', type: stepTypes.AGENT_RUN })]);
         expect(created.steps[0].config).toMatchObject({ agentId: AGENT_ID, taskId: TASK_ID, note: 'please review' });
         expect(created.startedBy).toBe(OWNER);
+        expect(created.traceId).toMatch(/^[0-9a-f]{32}$/);
         expect(queue.dispatch).toHaveBeenCalledWith(COMPANY, RUN_ID);
     });
 
