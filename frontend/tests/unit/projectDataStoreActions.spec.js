@@ -6,7 +6,6 @@ vi.mock('../../src/services/index', () => ({ apiRequest }));
 vi.mock('@/composable/index.js', () => ({ useCustomComposable: () => ({ checkPermission: () => 0 }) }));
 vi.mock('@/views/Projects/composables/customFieldQuery', () => ({ tableSortStages }));
 
-import * as env from '@/config/env';
 import projectData from '@/store/ProjectData';
 
 const initialState = () => structuredClone({
@@ -35,7 +34,6 @@ const build = (socketInstance = null, getters = {}) => createStore({
     }
 });
 
-const FIND = `${env.TASK}/find`;
 const ok = (data) => Promise.resolve({ status: 200, data });
 const page = (result, count) => ok([{ result, ...(count === undefined ? {} : { count: [{ count }] }) }]);
 const parentTask = (id, extra = {}) => ({ _id: id, isParentTask: true, sprintId: 's1', ProjectID: 'p1', statusKey: 'st1', ...extra });
