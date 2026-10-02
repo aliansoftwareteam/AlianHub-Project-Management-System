@@ -1,7 +1,7 @@
 .iw__scrim {
     position: fixed;
     inset: 0;
-    background: rgba(23, 22, 28, .4);
+    background: var(--scrim);
     display: grid;
     place-items: center;
     padding: 24px;

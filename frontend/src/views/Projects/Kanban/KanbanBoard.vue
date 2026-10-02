@@ -30,6 +30,7 @@
                         <p class="ah-small wip-pop__note">{{ wipError || $t('Gaps.wip_note') }}</p>
                     </div>
                     <button
+                        v-if="!column.agentWork"
                         type="button"
                         class="add-task-btn"
                         :title="$t('Projects.add_task_to_column', { name: column.name })"
@@ -52,7 +53,7 @@
                         @change="updateEvent($event, column)"
                         @scroll="checkScroll($event, column)"
                         :style="`max-height: ${columnMaxHeight(column.key)};`"
-                        :disabled="isDisabled"
+                        :disabled="isDisabled || column.agentWork"
                         :delay="clientWidth <= 767 ? 250 : 0"
                         :delayOnTouchOnly="true"
                         :emptyInsertThreshold="24"

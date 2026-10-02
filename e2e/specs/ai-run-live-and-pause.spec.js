@@ -1,8 +1,9 @@
 const { MongoClient, ObjectId } = require('mongodb');
 const { test, expect, asRole, storageStatePath } = require('../support/test');
-const { createFolder, createList, createProject, createTask, uniqueSuffix } = require('../support/fixtures');
+const { createApiClient } = require('../support/api');
+const { PASSWORD, assertOk, createFolder, createList, createProject, createTask, createWorkspace, emailFor, inviteMember, login, readState, registerVerifiedAccount, uniqueSuffix } = require('../support/fixtures');
 const { resolveMongoUrl } = require('../support/env');
-const { skipFirstRun } = require('../support/pages');
+const { signInThroughForm, skipFirstRun } = require('../support/pages');
 
 test.describe.configure({ timeout: 90000 });
 
@@ -10,6 +11,7 @@ const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$
 const named = (name) => new RegExp(escapeRegex(name));
 const LIMITS = '/api/v2/agents/project-limits';
 const POLICY = '/api/v2/agents/policy';
+const NAV_PREFERENCES = '/api/v2/users/nav-preferences';
 const WIDE = { width: 1440, height: 900 };
 const RAW_KEY = /^[a-z_]+(\.[a-z_]+)+$/;
 
@@ -132,23 +134,52 @@ test.describe('lists and projects follow live', () => {
     });
 });
 
+/* The pause holds every connected agent of a workspace, and other spec files work with agents in the suite's
+ * workspace while this one runs: the pause is made in a workspace no other spec opens. */
+async function workspaceOfItsOwn(state) {
+    const suffix = uniqueSuffix();
+    const ownerEmail = emailFor('owner', `pause${suffix}`);
+    await registerVerifiedAccount(state.baseURL, { firstName: 'Opal', lastName: `Owner${suffix}`, email: ownerEmail });
+    const companyId = await createWorkspace(state.baseURL, { email: ownerEmail, name: `Pause ${suffix}` });
+    const session = await login(state.baseURL, ownerEmail);
+    const api = createApiClient({ baseURL: state.baseURL, accessToken: session.accessToken, companyId });
+    assertOk(await api.put(NAV_PREFERENCES, { mode: 'full' }), `full rail for ${ownerEmail}`);
+    const memberEmail = emailFor('member', `pause${suffix}`);
+    await inviteMember({ baseURL: state.baseURL, ownerApi: api, companyId, role: 'member', email: memberEmail, firstName: 'Milo', lastName: `Member${suffix}` });
+    return { companyId, api, ownerEmail, memberEmail };
+}
+
 test.describe('AI > Accounts: the pause for connected agents', () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'serial', timeout: 150000 });
     // At 1280 px and under the AI sidebar is an icon rail without its usage block, where the paused line and Resume are.
-    test.use({ ...asRole('owner'), viewport: WIDE });
+    test.use({ viewport: WIDE });
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
-    test('the owner pauses connected agents, a member sees the paused line without Resume, and the owner resumes', async ({ page, browser, state, loginAs }) => {
-        const owner = await loginAs('owner');
-        const url = `/#/${state.companyId}/ai/accounts`;
+    let workspace;
+
+    test.beforeAll(async () => {
+        workspace = await workspaceOfItsOwn(readState());
+    });
+
+    test.afterAll(async () => {
+        if (workspace) assertOk(await workspace.api.put(POLICY, { connectedPaused: false }), 'connected agents resumed');
+    });
+
+    test('the owner pauses connected agents, a member sees the paused line without Resume, and the owner resumes', async ({ page, browser, state }) => {
+        const url = `/#/${workspace.companyId}/ai/accounts`;
         const pause = page.locator('[data-test="connected-pause-switch"]');
         const sidebar = page.locator('.ai-side__usage');
         const pausedLine = (target) => target.locator('.ai-side__usage').getByText('Connected agents are paused', { exact: true });
         const resume = (target) => target.getByRole('button', { name: 'Resume connected agents', exact: true });
         const policyRead = (target) => target.waitForResponse((res) => res.url().includes(POLICY) && res.request().method() === 'GET' && res.ok());
-        const seen = await memberPage(browser, state, { viewport: WIDE });
+        const seenContext = await browser.newContext({ baseURL: state.baseURL, viewport: WIDE });
+        const seen = { context: seenContext, page: await seenContext.newPage() };
 
         try {
+            await skipFirstRun(seen.page);
+            await signInThroughForm(seen.page, { email: workspace.memberEmail, password: PASSWORD, companyId: workspace.companyId });
+            await signInThroughForm(page, { email: workspace.ownerEmail, password: PASSWORD, companyId: workspace.companyId });
+
             const read = policyRead(page);
             await page.goto(url);
             await read;
@@ -182,7 +213,6 @@ test.describe('AI > Accounts: the pause for connected agents', () => {
             await expect(pausedLine(seen.page)).toHaveCount(0);
         } finally {
             await seen.context.close();
-            await owner.api.put(POLICY, { connectedPaused: false });
         }
     });
 });

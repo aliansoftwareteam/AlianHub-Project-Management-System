@@ -14,6 +14,9 @@ import { assigneeCondition, assigneeGroups, dueDateBuckets, dueDateCondition, re
 import { customFieldGroups, customFieldIdOf, customGroupUpdate, needsProjectRange, numberRangeStages, rangeFromRows } from "./composables/customFieldQuery";
 import { activeMemberIds } from "@/plugins/customFieldView/fieldTypes/people";
 import { flatTasks } from "./composables/projectCustomFields";
+import { AGENT_WORK_GROUP } from "@viewSettings";
+import { agentWorkIn } from "./composables/agentWork";
+import { agentWorkGroups } from "./composables/agentWorkQuery";
 
 /* The bands of a number group are cut from the project's own values; if the range cannot be read, the loaded tasks stand in. */
 const projectNumberRange = (def, projectId) => apiRequest("post", `${env.TASK}/find`, { findQuery: numberRangeStages(def, projectId) })
@@ -977,6 +980,14 @@ export function taskListHelper() {
                     sprint.isExpanded = false;
                     sprint.items = arr.map((x, arrIndex) => ({ ...x, key: `${index}_${arrIndex}_${x.searchValue}`, tasksArray: tasks }));
                 })
+            } else if(type === AGENT_WORK_GROUP) {
+                indexKey.value = "groupByStatusIndex";
+                arr = agentWorkGroups(agentWorkIn(project._id), t("AgentWork.group_none"));
+
+                sprints.forEach((sprint, index) => {
+                    sprint.isExpanded = false;
+                    sprint.items = arr.map((x) => ({ ...x, key: `${index}_${x.searchKey}_${x.searchValue}`, tasksArray: tasks }));
+                })
             } else if(type === 3) {
                 // DUE DATE
                 indexKey.value = "dueDateIndex";
@@ -1000,6 +1011,11 @@ export function taskListHelper() {
             if (!isBoard) {
                 restoreGroupState(sprints, groupedTasks.value, indexKey.value);
             }
+
+            dispatch("projectData/keepRequestsOfGroups", {
+                pid: project._id,
+                groups: Object.fromEntries(sprints.filter((sprint) => Array.isArray(sprint.items)).map((sprint) => [String(sprint.id || sprint._id), sprint.items.map((item) => item.key)]))
+            });
 
             if(sprints && sprints.length) {
                 const openSprint = sprintToLoad(sprints, fetchTask === true);

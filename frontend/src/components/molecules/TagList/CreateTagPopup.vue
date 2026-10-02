@@ -348,7 +348,7 @@ const HandleColors = (key,i,item) =>{
     height:26px !important;
 }
 .chipDiv-hr{
-    border-bottom: 1px solid #CFCFCF;
+    border-bottom: 1px solid var(--border);
     margin: 6px 0;
 }
 </style>

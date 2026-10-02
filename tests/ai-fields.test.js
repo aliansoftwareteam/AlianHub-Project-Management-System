@@ -62,6 +62,7 @@ const config = require('../Modules/CustomField/aiFields/config');
 const fill = require('../Modules/CustomField/aiFields/fill');
 const jobs = require('../Modules/CustomField/aiFields/jobs');
 const autoRefill = require('../Modules/CustomField/aiFields/autoRefill');
+const actingAgent = require('../Modules/Agents/actingAgent');
 const controller = require('../Modules/CustomField/aiFields/controller');
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
@@ -435,6 +436,44 @@ describe('auto-refill', () => {
         expect(mockChat.mock.calls[0][0].spend.userId).toBe(ALICE);
         expect(storedTask(task._id).customField[String(field._id)].fieldValue).toBe('Second');
         expect(storedTask(task._id).aiFieldFills[String(field._id)].trigger).toBe('auto');
+    });
+
+    describe('the event of the refill', () => {
+        const helper = (depth) => ({ userId: BOB, agentId: 'agent-1', agentName: 'Helper', depth });
+        const renamed = async (task, TaskName) => ({ type: 'update', module: 'task', data: await rename(task, TaskName), updatedFields: { TaskName } });
+        const origins = () => mockUpdateTaskCustomField.mock.calls.map(([sent]) => sent.eventOrigin);
+
+        it('names the agent whose edit it follows, at that edit\'s depth, and is still the last filler\'s fill', async () => {
+            const { field, task } = await filledTask();
+            const change = await renamed(task, 'Ship the signup page');
+            actingAgent.runAs(helper(2), () => socketEmitter.emit('update', change));
+            await autoRefill.flush();
+
+            expect(origins()).toEqual([{ actor: { userId: BOB, kind: 'agent' }, depth: 3 }]);
+            expect(mockChat.mock.calls[0][0].spend.userId).toBe(ALICE);
+            expect(storedTask(task._id).aiFieldFills[String(field._id)].by).toBe(ALICE);
+        });
+
+        it('names nobody after a person\'s edit', async () => {
+            const { task } = await filledTask();
+            socketEmitter.emit('update', await renamed(task, 'Ship the signup page'));
+            await autoRefill.flush();
+
+            expect(origins()).toEqual([null]);
+        });
+
+        it('names the deepest agent edit of the edits it waited for', async () => {
+            const { task } = await filledTask();
+            autoRefill.stop();
+            autoRefill.start({ debounceMs: 60 * 1000 });
+            actingAgent.runAs(helper(0), () => socketEmitter.emit('update', { type: 'update', module: 'task', data: storedTask(task._id), updatedFields: { TaskName: 'One' } }));
+            const change = await renamed(task, 'Ship the signup page');
+            actingAgent.runAs(helper(2), () => socketEmitter.emit('update', change));
+            socketEmitter.emit('update', { ...change });
+            await autoRefill.flush();
+
+            expect(origins()).toEqual([{ actor: { userId: BOB, kind: 'agent' }, depth: 3 }]);
+        });
     });
 
     it('ignores a change to a part the field does not read', async () => {

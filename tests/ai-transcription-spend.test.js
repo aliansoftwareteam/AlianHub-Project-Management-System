@@ -60,7 +60,9 @@ const wav = (seconds) => {
     data.writeUInt32LE(seconds * 32000, 4);
     return Buffer.concat([Buffer.from('RIFF\0\0\0\0WAVE', 'latin1'), fmt, data]);
 };
-const unknownContainer = (minutes) => Buffer.alloc(minutes * ESTIMATED_BYTES_PER_MINUTE, 1);
+const startingWith = (head, bytes = 64) => { const file = Buffer.alloc(bytes, 1); Buffer.from(head).copy(file); return file; };
+/* Ogg is audio whose length is not read. */
+const unknownContainer = (minutes) => startingWith('OggS', minutes * ESTIMATED_BYTES_PER_MINUTE);
 
 const ledger = () => mockDb.store[SCHEMA_TYPE.AI_USAGE] || [];
 const holds = () => mockDb.store[SCHEMA_TYPE.AI_RESERVATIONS] || [];
@@ -195,6 +197,43 @@ describe('a call the vendor did not answer books nothing', () => {
 
         expect(res).toMatchObject({ statusCode: 502, body: { status: false, statusText: 'Transcription failed (500).' } });
         expect(ledger()).toHaveLength(0);
+    });
+});
+
+describe('what Talk to Text takes', () => {
+    it.each([
+        ['a browser recording', recording(5)],
+        ['an MP4 or M4A file', mp4(5)],
+        ['a WAV file', wav(1)],
+        ['an Ogg file', startingWith('OggS')],
+        ['a FLAC file', startingWith('fLaC')],
+        ['an MP3 file with a tag', startingWith('ID3')],
+        ['an MP3 file with no tag', startingWith([0xff, 0xfb])],
+        ['an AAC file', startingWith([0xff, 0xf1])],
+    ])('%s is written out', async (_name, buffer) => {
+        const res = await talk(buffer);
+
+        expect(res).toMatchObject({ statusCode: 200, body: { status: true, data: { text: 'Ship it on Friday.' } } });
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+        ['a PDF', startingWith('%PDF-1.7')],
+        ['a zip archive', startingWith([0x50, 0x4b, 0x03, 0x04])],
+        ['a picture', startingWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])],
+        ['a program', startingWith('MZ')],
+        ['a web page', startingWith('<!doctype html>')],
+        ['plain text', startingWith('Ship it on Friday.')],
+        ['UTF-16 text', startingWith([0xff, 0xfe, 0x53, 0x00])],
+        ['a single byte', Buffer.from([0xff])],
+    ])('%s is answered 400 under an audio name and type, and is neither sent nor booked', async (_name, buffer) => {
+        const res = await talk(buffer);
+
+        expect(res).toMatchObject({ statusCode: 400, body: { status: false, statusText: expect.stringMatching(/^That file is not audio\./) } });
+        expect(Object.keys(res.body).sort()).toEqual(['status', 'statusText']);
+        expect(global.fetch).not.toHaveBeenCalled();
+        expect(ledger()).toHaveLength(0);
+        expect(holds()).toHaveLength(0);
     });
 });
 

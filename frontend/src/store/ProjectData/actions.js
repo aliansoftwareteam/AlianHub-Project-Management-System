@@ -302,6 +302,7 @@ export const refreshGroupCounts = ({state, commit}, payload) => {
     });
 }
 
+export const keepRequestsOfGroups = ({commit}, payload) => commit('keepRequestsOfGroups', payload);
 
 export const tabSyncTaskCommit = ({state,commit},payload) => {
     try {

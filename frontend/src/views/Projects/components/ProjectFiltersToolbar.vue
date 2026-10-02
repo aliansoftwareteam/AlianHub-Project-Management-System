@@ -97,6 +97,7 @@
                             <DropDownOption v-for="item in groupByOptions" :key="item.id" :selected="item.id === groupBy" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click()">
                                 <div class="pft__group-option">
                                     <span v-if="item.image" class="ah-mask-icon pft__group-icon" :style="maskOf(item.image)" aria-hidden="true"></span>
+                                    <ShellIcon v-else-if="item.icon" :name="item.icon" :size="12" />
                                     <span>{{ groupLabel(item) }}</span>
                                 </div>
                             </DropDownOption>

@@ -44,8 +44,8 @@ const isAuthWithGitlab = computed(() => (publicConfig.auth.gitlab.enabled ? "tru
 .oauth-spinner {
     width: 20px;
     height: 20px;
-    border: 2px solid #ccc;
-    border-top: 2px solid #333;
+    border: 2px solid var(--border);
+    border-top: 2px solid var(--ink);
     border-radius: 50%;
     animation: spin 0.6s linear infinite;
 }

@@ -1,10 +1,12 @@
 const { performance } = require('perf_hooks');
 const { summarise } = require('./stats');
 const { goalProbes } = require('./goalProbes');
+const { noAgentWorkMatch } = require('../../../frontend/src/views/Projects/composables/agentWorkQuery');
 
 const PAGE_SIZE = 35;
 const WARM_UP_RUNS = 2;
 const SEARCH_TEXT = 'login';
+const HELD_TASKS = 5;
 
 const client = ({ base, token, companyId }) => async (method, path, body) => {
     const started = performance.now();
@@ -23,6 +25,13 @@ const client = ({ base, token, companyId }) => async (method, path, body) => {
  * getPaginatedTasks for a status group, searchTask for a filter or a search, and the List's subtask progress. */
 const groupPage = ({ projectId, sprintId, statusKey }) => [
     { $match: { objId: { sprintId, ProjectID: projectId }, deletedStatusKey: 0, isParentTask: true, statusKey: { $eq: statusKey } } },
+    { $sort: { groupByStatusIndex: 1, createdAt: 1, _id: 1 } },
+    { $facet: { result: [{ $skip: 0 }, { $limit: PAGE_SIZE }], count: [{ $count: 'count' }] } },
+];
+
+/* Grouped by who is working, nearly every row sits in the group of the tasks no agent holds, so that page is the one measured. */
+const agentWorkGroupPage = ({ projectId, sprintId, heldIds }) => [
+    { $match: { objId: { sprintId, ProjectID: projectId }, deletedStatusKey: 0, isParentTask: true, ...noAgentWorkMatch(heldIds) } },
     { $sort: { groupByStatusIndex: 1, createdAt: 1, _id: 1 } },
     { $facet: { result: [{ $skip: 0 }, { $limit: PAGE_SIZE }], count: [{ $count: 'count' }] } },
 ];
@@ -77,6 +86,11 @@ async function measureApi({ base, session, runs, room, log = () => {} }) {
                 return { ms: performance.now() - started, bytes: answers.reduce((sum, answer) => sum + answer.bytes, 0), rows: answers.reduce((sum, answer) => sum + rowsOf(answer.json), 0) };
             },
         },
+        {
+            key: 'api.listByAgentWork',
+            label: `API: List grouped by who is working (the tasks no agent holds, ${PAGE_SIZE} rows, with ${HELD_TASKS} tasks held)`,
+            run: () => find(agentWorkGroupPage({ projectId, sprintId: list._id, heldIds: parentIds.slice(0, HELD_TASKS) })),
+        },
         { key: 'api.filterAssignee', label: 'API: Filter by one assignee (whole project, not paged)', run: () => find(wholeProject(projectId, { AssigneeUserId: { $in: [assignee] } })) },
         { key: 'api.filterPriority', label: 'API: Filter by priority High (whole project, not paged)', run: () => find(wholeProject(projectId, { $and: [{ Task_Priority: { $in: ['HIGH'] } }] })) },
         { key: 'api.searchInProject', label: `API: Search task names in the project for "${SEARCH_TEXT}" (not paged)`, run: () => find(wholeProject(projectId, { $or: [{ TaskName: { $regex: SEARCH_TEXT, $options: 'i' } }] })) },
@@ -109,4 +123,4 @@ async function measureApi({ base, session, runs, room, log = () => {} }) {
     return { metrics, size: { tasks: countOf(true), subtasks: countOf(false), list: { id: list._id, name: list.name, tasks: list.tasks } } };
 }
 
-module.exports = { client, measureApi, groupPage, wholeProject, subtaskProgress };
+module.exports = { client, measureApi, groupPage, agentWorkGroupPage, wholeProject, subtaskProgress };

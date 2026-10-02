@@ -1,5 +1,5 @@
 /* Task 047, T-4: the tasks a connected agent holds, as a list of rows shows them. Who is told, what the filter
-   "an agent is working on it" brings each person, and what one page of rows costs. */
+   "an agent is working on it" and the grouping "who is working" bring each person, and what one page of rows costs. */
 process.env.STORAGE_TYPE = 'server';
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -44,7 +44,12 @@ const controller = require('../Modules/Agents/manager/controller');
 const server = require('../Modules/Mcp/server');
 const { relay, EVENT } = require('../socket/controller/agentSocket');
 const { getTaskByQyery } = require('../Modules/Tasks/helpers/getTasksData');
-const { agentWorkMatch } = require('../frontend/src/views/Projects/composables/agentWorkQuery');
+const { getTabSyncTasks } = require('../Modules/Tasks/controller/getTabSyncTasks');
+const { agentWorkMatch, agentWorkGroups } = require('../frontend/src/views/Projects/composables/agentWorkQuery');
+const { cleanViewSettings, AGENT_WORK_GROUP } = require('../Modules/Project/helpers/viewSettings');
+const { validatePipeline } = require('../Modules/Tasks/helpers/taskQueryGuard');
+const { agentWorkGroupPage } = require('../scripts/scale/lib/apiProbes');
+const { budgetOf } = require('../scripts/scale/lib/report');
 const { projectFindingsSchema } = require('../utils/mongo-handler/createSchema');
 
 const { CID, OWNER, MEMBER, OTHER, OUTSIDER, TOKEN, P_OPEN, P_DEST, S_OPEN, S_SECRET, TASKS_GRANT, settle } = world;
@@ -103,11 +108,17 @@ const held = async (uid) => (await through(controller.getHeldTasks, { uid, metho
 const heldIds = async (uid) => (await held(uid)).map((entry) => entry.taskId).sort();
 
 /* The List's search, as the web app sends it with the filter on. */
-const filtered = async (uid, ids) => {
-    const findQuery = [{ $match: { $and: [{ $and: [{ ProjectID: { objId: { $in: [P_OPEN] } } }, { deletedStatusKey: { $in: [0] } }] }, agentWorkMatch(ids)] } }];
+const narrowed = async (uid, condition) => {
+    const findQuery = [{ $match: { $and: [{ $and: [{ ProjectID: { objId: { $in: [P_OPEN] } } }, { deletedStatusKey: { $in: [0] } }] }, condition] } }];
     const found = await through(getTaskByQyery, { uid, aud: CID, headers: { companyid: CID }, body: { findQuery } });
     return (found.body || []).map((row) => String(row._id)).sort();
 };
+const filtered = (uid, ids) => narrowed(uid, agentWorkMatch(ids));
+
+/* The groups a view builds from what the marks read brought this person, and the rows each group asks for. */
+const NO_AGENT = 'No agent';
+const groupsFor = async (uid) => agentWorkGroups((await held(uid)).filter((entry) => entry.projectId === P_OPEN), NO_AGENT);
+const rowsIn = (uid, group) => narrowed(uid, group.conditions[0]);
 
 const reads = (type) => mockDb.crud.mock.calls.filter(([, q, method]) => q.type === type && method === 'find').length;
 
@@ -209,6 +220,96 @@ describe('the filter "an agent is working on it"', () => {
     it('brings nothing when no agent is working', async () => {
         task();
         expect(await filtered(OWNER, [])).toEqual([]);
+    });
+});
+
+describe('the grouping "who is working"', () => {
+    it('puts the held tasks under the agent the mark names, and every other task under the last group', async () => {
+        const [open, secret] = await heldTasks({}, inSecret);
+        const free = String(task()._id);
+        const [agent, nobody, ...rest] = await groupsFor(OWNER);
+
+        expect(rest).toEqual([]);
+        expect(agent.name).toBe(PRIYAS_CLAUDE);
+        expect(nobody.name).toBe(NO_AGENT);
+        expect(await rowsIn(OWNER, agent)).toEqual([open.id, secret.id].sort());
+        const others = await rowsIn(OWNER, nobody);
+        expect(others).toContain(free);
+        expect(others).not.toContain(open.id);
+        expect(others).not.toContain(secret.id);
+        expect([...await rowsIn(OWNER, agent), ...others].sort()).toEqual(await narrowed(OWNER, {}));
+    });
+
+    it('shows each person the same tasks as their marks, whatever ids the groups are sent with', async () => {
+        const [open, secret] = await heldTasks({}, inSecret);
+        const [agent, nobody] = await groupsFor(MEMBER);
+        expect(await rowsIn(MEMBER, agent)).toEqual([open.id]);
+        expect(await rowsIn(MEMBER, nobody)).not.toContain(secret.id);
+
+        const [ownersAgent, ownersNobody] = await groupsFor(OWNER);
+        expect(await rowsIn(MEMBER, ownersAgent)).toEqual([open.id]);
+        expect(await rowsIn(MEMBER, ownersNobody)).not.toContain(secret.id);
+        expect(await rowsIn(GUEST, ownersAgent)).toEqual([]);
+        expect(await rowsIn(GUEST, ownersNobody)).toEqual([]);
+    });
+
+    it('is one group holding every task while no agent is working', async () => {
+        task();
+        const groups = await groupsFor(OWNER);
+        expect(groups.map((group) => group.name)).toEqual([NO_AGENT]);
+        expect(await rowsIn(OWNER, groups[0])).toEqual(await narrowed(OWNER, {}));
+    });
+
+    it('is kept on a saved view', () => {
+        expect(cleanViewSettings({ groupBy: AGENT_WORK_GROUP }).groupBy).toBe(AGENT_WORK_GROUP);
+        expect(cleanViewSettings({ groupBy: `${AGENT_WORK_GROUP}.x` }).groupBy).toBe(0);
+    });
+
+    it('has a page the speed check measures against the budget of a List page', () => {
+        const page = agentWorkGroupPage({ projectId: P_OPEN, sprintId: S_OPEN, heldIds: [P_DEST] });
+        expect(() => validatePipeline(page)).not.toThrow();
+        expect(page[0].$match._id).toEqual({ objId: { $nin: [P_DEST] } });
+        expect(budgetOf('api.listByAgentWork')).toEqual(budgetOf('api.listFirstPage'));
+    });
+});
+
+describe('a list grouped by who is working, read again when its tab comes back', () => {
+    /* The stored page request of one group, as the web app sends it again: JSON, so every id is text. */
+    const tabReturn = async (uid, group) => {
+        mockDb.calls.length = 0;
+        const body = { pid: P_OPEN, sprintId: S_OPEN, istableTask: false, tabLeaveTime: 0, userId: uid, showAllTasks: true, item: JSON.parse(JSON.stringify(group)) };
+        const answer = await through(getTabSyncTasks, { uid, headers: { companyid: CID }, body });
+        const [pipeline] = mockDb.calls.find((call) => call.type === SCHEMA_TYPE.TASKS && call.method === 'aggregate').data;
+        const counted = pipeline.find((stage) => stage.$facet).$facet.count[0].$match;
+        const [operator, ids] = Object.entries(counted.$and[1]._id)[0];
+        return { code: answer.code, operator, ids, rows: answer.body[0].result.map((row) => String(row._id)).sort(), count: answer.body[0].count[0]?.count || 0 };
+    };
+    const isObjectId = (id) => id && id._bsontype === 'ObjectId';
+
+    it('asks the database for the ids of each group as ids, and counts the rows the group holds', async () => {
+        const [open] = await heldTasks({});
+        const free = String(task()._id);
+        const [agent, nobody] = await groupsFor(OWNER);
+
+        const held = await tabReturn(OWNER, agent);
+        expect(held).toMatchObject({ code: 200, operator: '$in', rows: [open.id], count: 1 });
+        expect(held.ids.map(String)).toEqual([open.id]);
+        expect(held.ids.every(isObjectId)).toBe(true);
+
+        const rest = await tabReturn(OWNER, nobody);
+        expect(rest).toMatchObject({ code: 200, operator: '$nin' });
+        expect(rest.ids.every(isObjectId)).toBe(true);
+        expect(rest.rows).toContain(free);
+        expect(rest.rows).not.toContain(open.id);
+        expect(rest.count).toBe(rest.rows.length);
+    });
+
+    it('still refuses a group whose condition the task query would refuse', async () => {
+        const answer = await through(getTabSyncTasks, {
+            uid: OWNER, headers: { companyid: CID },
+            body: { pid: P_OPEN, sprintId: S_OPEN, istableTask: false, tabLeaveTime: 0, userId: OWNER, item: { indexName: 'groupByStatusIndex', conditions: [{ $where: 'true' }] } },
+        });
+        expect(answer.code).toBe(400);
     });
 });
 

@@ -301,6 +301,19 @@ describe('what a refresh tells', () => {
         expect(refreshes().length).toBeGreaterThan(0);
     });
 
+    it('is one step deeper than what an agent answered, and is no edit for a rule or a webhook to hear', async () => {
+        const made = mockDb.seed(SCHEMA_TYPE.TASKS, row(FIRST, PARENT, 4));
+        const helper = { userId: '6f00000000000000000000a9', agentId: 'agent-1', agentName: 'Helper', depth: 2 };
+        require('../Modules/Agents/actingAgent').runAs(helper, () => socketEmitter.emit('insert', { type: 'insert', data: { ...made }, module: 'task', companyId: CID }));
+        countUnder(PARENT, 1);
+        await computedRefresh.flush();
+        expect(refreshes().length).toBeGreaterThan(0);
+        refreshes().forEach((payload) => {
+            expect(payload).toMatchObject({ depth: 3, actor: { kind: 'system', userId: null } });
+            expect(require('../utils/entityEvents').isNotAnEdit(payload)).toBe(true);
+        });
+    });
+
     it('starts at no depth after a person\'s own write', async () => {
         add(FIRST, PARENT, 4);
         await computedRefresh.flush();

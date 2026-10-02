@@ -30,4 +30,9 @@ export const agentWorkFor = (taskId) => byTask.value.get(String(taskId)) || null
 
 export const agentWorkCountIn = (projectId) => (projectId ? (tasksByProject.value.get(String(projectId)) || new Set()).size : 0);
 
+/* The marked tasks of one project with the name each mark shows, in a fixed order, so the same work reads the same twice. */
+export const agentWorkIn = (projectId) => [...(tasksByProject.value.get(String(projectId || "")) || [])]
+    .sort()
+    .map((taskId) => ({ taskId, name: byTask.value.get(taskId)?.name || "" }));
+
 export const agentTaskIds = computed(() => [...byTask.value.keys()]);
