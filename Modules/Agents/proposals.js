@@ -236,13 +236,16 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         const refusal = await require('../Mcp/approval').refusalFor(companyId, p, { decider, isPrivileged, edited });
         if (refusal) return refusal;
     }
-    if (p.gate === GATE_OWNER_ADMIN && !isPrivileged) return { error: 'This proposal needs an Owner or Admin.', status: 403 };
+    const needsAdmin = { error: 'This proposal needs an Owner or Admin.', status: 403 };
+    if (p.gate === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
 
     let changes = p.changes;
     let status = STATUS.APPROVED;
     if (Array.isArray(edited) && edited.length) {
         const check = validateChanges(edited);
         if (!check.valid) return { error: check.reason, status: 400 };
+        // The gate kept at filing was read from the changes as filed; an edit is held to what it would run.
+        if (gateOf(edited, p.gate) === GATE_OWNER_ADMIN && !isPrivileged) return needsAdmin;
         changes = edited.map((c) => ({ action: c.action, params: c.params || {}, label: c.label || c.action }));
         if (slackPost.hasSlackChange(changes)) {
             try { changes = await slackPost.prepareChanges(companyId, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }

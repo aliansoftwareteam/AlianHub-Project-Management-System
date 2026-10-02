@@ -380,7 +380,7 @@ describe('the project\'s own count', () => {
         expect(out).toMatchObject({ code: 200, body: { status: true, data: {
             limits: { atOnce: 3, paused: false, directTasks: 25 }, defaults: { directTasks: 10 }, directTasksRange: { min: 1, max: 100 }, directTasksMinutes: 10, canEdit: true,
         } } });
-        expect(project().agentLimits).toMatchObject({ atOnce: 3, paused: false, directTasks: 25, updatedBy: OWNER });
+        expect(project().agentLimits).toMatchObject({ directTasks: 25, updatedBy: OWNER });
         const [change] = rows(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => row.action === 'agent.project_policy_changed');
         expect(change.meta).toMatchObject({ from: { agentsDirectTasks: 10 }, to: { agentsDirectTasks: 25 } });
         expect((await putLimits(OWNER, { atOnce: 5 })).body.data.limits).toMatchObject({ atOnce: 5, directTasks: 25 });

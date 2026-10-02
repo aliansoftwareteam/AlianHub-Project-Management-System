@@ -262,7 +262,7 @@ describe('approving carries out each part as the web app would', () => {
         expect(made.settings.filters[0]).toMatchObject({ values: [4] });
         expect(partOf(result, 'views').items).toEqual([{ name: 'Review board', kind: 'board', made: true, viewId: String(made._id), leftOut: [] }]);
 
-        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', updatedFields: expect.objectContaining({ taskStatusData: expect.any(Array) }) }));
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', companyId: CID, updatedFields: expect.objectContaining({ taskStatusData: expect.any(Array) }) }));
         expect(audits(TOOL, 'applied')[0]).toMatchObject({ entityType: 'project', entityId: P_OPEN, meta: { onBehalfOf: INSIDER, undo: { kind: 'setup', projectId: P_OPEN, statusKeys: [4] } } });
     });
 

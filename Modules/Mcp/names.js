@@ -10,8 +10,9 @@ const { canSeeSprint, sprintIdentities } = require('../Sprints/helpers/sprintVis
 // Names sit next to ids so an MCP client can talk about a record without a
 // second lookup. Everything named under a project (the project itself, its
 // sprints, its people and task types) is resolved only when the caller may open
-// that project and the token is not narrowed away from it; a private sprint's
-// name also needs the caller on the sprint, as it does in the web app.
+// that project and the token is not narrowed away from it; a sprint is named
+// only under the project it belongs to, and a private sprint's name also needs
+// the caller on the sprint, as it does in the web app.
 
 const PRIORITY_NAMES = Object.freeze({ URGENT: 'Urgent', HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low' });
 
@@ -36,7 +37,7 @@ const resolver = async (ctx, { projectIds = [], sprintIds = [], userIds = [] }) 
     const userList = unique(userIds);
     const [projects, sprints, members, identities, role] = await Promise.all([
         openIds.length ? find(ctx.companyId, SCHEMA_TYPE.PROJECTS, { _id: { $in: oids(openIds) } }, { ProjectName: 1, taskTypeCounts: 1 }) : [],
-        sprintList.length ? find(ctx.companyId, SCHEMA_TYPE.SPRINTS, { _id: { $in: oids(sprintList) } }, { name: 1, sprintName: 1, private: 1, AssigneeUserId: 1 }) : [],
+        sprintList.length ? find(ctx.companyId, SCHEMA_TYPE.SPRINTS, { _id: { $in: oids(sprintList) } }, { name: 1, sprintName: 1, private: 1, AssigneeUserId: 1, projectId: 1 }) : [],
         userList.length ? find(ctx.companyId, SCHEMA_TYPE.COMPANY_USERS, { userId: { $in: userList }, ...ACTIVE_SEAT }, { userId: 1 }) : [],
         sprintList.length ? sprintIdentities(ctx.companyId, String(ctx.userId)) : [],
         sprintList.length ? getRoleType(ctx.companyId, String(ctx.userId)) : null,
@@ -54,7 +55,7 @@ const resolver = async (ctx, { projectIds = [], sprintIds = [], userIds = [] }) 
     const project = (id) => ({ id, name: opens(id) && projectById.has(id) ? projectById.get(id).ProjectName || null : null });
     const sprint = (id, projectId) => {
         const row = sprintById.get(id);
-        const named = row && opens(projectId) && (seesPrivate || canSeeSprint(row, identities));
+        const named = row && idOf(row.projectId) === projectId && opens(projectId) && (seesPrivate || canSeeSprint(row, identities));
         return { id, name: named ? row.sprintName || row.name || null : null };
     };
     const person = (id, projectId) => ({ id, name: opens(projectId) ? personById.get(id) || null : null });

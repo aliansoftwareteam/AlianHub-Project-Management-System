@@ -35,6 +35,10 @@ const alwaysOf = (caller, proposal) => {
     return offered ? { always: true, alwaysKind: standingApprovals.labelOf(proposal.changes[0].action) } : { always: false };
 };
 
+const withoutParams = ({ params, ...change }) => change;
+
+/* A change is shown through its card, which is built for the viewer. The change as filed goes only with a proposal
+ * a person can edit, to a person who may decide it: approving an edit sends the kept changes back. */
 const toRow = (caller, previews, batches = new Map()) => (proposal) => ({
     sourceType: 'proposal',
     sourceId: String(proposal._id),
@@ -49,7 +53,8 @@ const toRow = (caller, previews, batches = new Map()) => (proposal) => ({
     why: proposal.why || '',
     changes: (Array.isArray(proposal.changes) ? proposal.changes : []).map((change, at) => {
         const preview = (previews.get(String(proposal._id)) || [])[at];
-        return { action: change.action, params: change.params || {}, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}) };
+        const asFiled = proposal.source !== SOURCE_MCP && access.mayDecideProposal(caller, proposal) ? { params: change.params || {} } : {};
+        return { action: change.action, ...asFiled, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}) };
     }),
     ...(batches.has(String(proposal._id)) ? { batch: batches.get(String(proposal._id)) } : {}),
     cost: proposal.cost || null,
@@ -69,7 +74,7 @@ const toRow = (caller, previews, batches = new Map()) => (proposal) => ({
 const heldToOwnRights = (companyId, userId) => async (row) => {
     if (row.source !== SOURCE_SYSTEM || row.locked) return row;
     const answers = await Promise.all(row.changes.map((change) => permissions.holderMay(companyId, { userId: String(userId) }, change.action, change.params)));
-    return answers.every((answer) => answer.allowed) ? row : { ...row, locked: true };
+    return answers.every((answer) => answer.allowed) ? row : { ...row, locked: true, changes: row.changes.map(withoutParams) };
 };
 
 const readQueue = async (companyId, userId) => {

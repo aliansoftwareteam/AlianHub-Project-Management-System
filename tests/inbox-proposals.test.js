@@ -93,14 +93,17 @@ describe('the approval queue in the Inbox', () => {
         expect((await call(ctrl.counts, uid)).approval).toBe(0);
     });
 
-    it('a row says who proposes, what, why and exactly what changes', async () => {
+    it('a row says who proposes, what and why, and carries the change as filed only where the person may edit it', async () => {
+        const { params, ...shown } = comment(T_OPEN);
         const row = (await queueOf(OWNER)).find((r) => r.what === 'from a connected agent');
         expect(row).toMatchObject({
             kind: 'proposal', sourceType: 'proposal', proposalId: row.sourceId, agentName: 'Claude', source: 'mcp', requestedBy: MEMBER,
             why: 'because from a connected agent', editable: false, locked: false, unread: true,
         });
-        expect(row.changes).toEqual([comment(T_OPEN)]);
-        expect((await queueOf(OWNER)).find((r) => r.what === 'plain').editable).toBe(true);
+        expect(row.changes).toEqual([shown]);
+        expect((await queueOf(OWNER)).find((r) => r.what === 'plain')).toMatchObject({ editable: true, changes: [{ ...shown, params }] });
+        expect((await queueOf(MEMBER)).find((r) => r.what === 'gated')).toMatchObject({ editable: true, locked: true, changes: [shown] });
+        expect((await queueOf(MEMBER)).find((r) => r.what === 'gated').changes[0].params).toBeUndefined();
     });
 
     it.each([['an owner', OWNER], ['a member', MEMBER]])('for %s the count on the tab is the rows that wait for them', async (_who, uid) => {

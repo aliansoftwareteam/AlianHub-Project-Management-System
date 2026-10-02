@@ -19,17 +19,32 @@ const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } ca
 const getPolicy = async (companyId) => {
     const company = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, 'agentPolicy'] }, 'findOne').catch(() => null);
     const p = (company && company.agentPolicy) || {};
-    return { allowedModes: Array.isArray(p.allowedModes) && p.allowedModes.length ? p.allowedModes.filter((m) => MODES.includes(m)) : [...MODES], requireCheckBeforeDone: Boolean(p.requireCheckBeforeDone) };
+    return {
+        allowedModes: Array.isArray(p.allowedModes) && p.allowedModes.length ? p.allowedModes.filter((m) => MODES.includes(m)) : [...MODES],
+        requireCheckBeforeDone: Boolean(p.requireCheckBeforeDone),
+        connectedPaused: p.connectedPaused === true,
+    };
 };
 
-const setPolicy = async (companyId, { allowedModes, requireCheckBeforeDone }) => {
+/* Whether the workspace has its connected agents paused. A read that fails is thrown, so a pause never reads as off. */
+const connectedPaused = async (companyId) => {
+    const company = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, 'agentPolicy'] }, 'findOne');
+    return Boolean(company && company.agentPolicy && company.agentPolicy.connectedPaused === true);
+};
+
+/* `connectedPaused` holds every connected agent of the workspace (./projectPolicy.js) until a person sets it back.
+ * Turning it on takes every queue item out of the agents' hands, so no task still reads as being worked on. */
+const setPolicy = async (companyId, { allowedModes, requireCheckBeforeDone, connectedPaused: pause }, pausedBy = '') => {
     const modes = Array.isArray(allowedModes) ? allowedModes.filter((m) => MODES.includes(m)) : null;
     if (allowedModes !== undefined && (!modes || !modes.length)) return { error: `allowedModes must be drawn from ${MODES.join(', ')}.` };
+    if (pause !== undefined && typeof pause !== 'boolean') return { error: 'connectedPaused must be true or false.' };
     const set = {};
     if (modes) set['agentPolicy.allowedModes'] = modes;
     if (requireCheckBeforeDone !== undefined) set['agentPolicy.requireCheckBeforeDone'] = Boolean(requireCheckBeforeDone);
+    if (pause !== undefined) Object.assign(set, { 'agentPolicy.connectedPaused': pause, 'agentPolicy.connectedPausedBy': String(pausedBy || ''), 'agentPolicy.connectedPausedAt': new Date() });
     const from = await getPolicy(companyId);
     await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, { $set: set }] }, 'updateOne');
+    if (pause === true) await require('./manager/workQueue').dropClaimsIn(companyId);
     return { from, policy: await getPolicy(companyId) };
 };
 
@@ -82,4 +97,4 @@ const monthlySummary = async (companyId, userId, month) => {
     return { month: key, tasksWorked: tasks.size, agentHours: Math.round((minutes / 60) * 10) / 10, prsOpened: prs, usdToCompany: 0, personalUsdEstimate: Math.round(personalUsd * 100) / 100 };
 };
 
-module.exports = { MODES, PROVIDERS, getPolicy, setPolicy, getAccount, link, unlink, monthlySummary };
+module.exports = { MODES, PROVIDERS, getPolicy, connectedPaused, setPolicy, getAccount, link, unlink, monthlySummary };

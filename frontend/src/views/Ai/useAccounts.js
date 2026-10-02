@@ -11,7 +11,7 @@ export const MODES = ["workspace", "personal", "local"];
 export const PROVIDERS = ["claude-code", "cursor", "codex", "antigravity", "ollama", "vllm", "other"];
 
 const account = ref(null);
-const policy = ref({ allowedModes: [...MODES], requireCheckBeforeDone: false });
+const policy = ref({ allowedModes: [...MODES], requireCheckBeforeDone: false, connectedPaused: false });
 const summary = ref({});
 const tokens = ref([]);
 const tokenPolicy = ref({ ...DEFAULT_TOKEN_POLICY });
@@ -126,6 +126,7 @@ export function useAccounts() {
 
     const savePolicy = (allowedModes) => putPolicy({ allowedModes });
     const saveCheckBeforeDone = (on) => putPolicy({ requireCheckBeforeDone: Boolean(on) });
+    const saveConnectedPaused = (on) => putPolicy({ connectedPaused: Boolean(on) });
 
     const linkAccount = async (body) => {
         try {
@@ -194,6 +195,6 @@ export function useAccounts() {
         account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, stepCredentials, stepCredentialPolicy, manifest, runs, peopleHours,
         mode, allowed, isAllowed,
         loadAccount, loadPolicy, loadTokens, loadTokensNeedingExpiry, loadStepCredentials, loadManifest, loadRuns, loadPeopleHours,
-        savePolicy, saveCheckBeforeDone, linkAccount, unlinkAccount, mintToken, revokeToken, renewToken
+        savePolicy, saveCheckBeforeDone, saveConnectedPaused, linkAccount, unlinkAccount, mintToken, revokeToken, renewToken
     };
 }

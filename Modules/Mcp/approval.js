@@ -3,7 +3,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { isExpired, hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const registry = require('../Agents/registry');
-const permissions = require('../Agents/permissions');
+const { holderMayInEach } = require('./propose');
 const visibility = require('./visibility');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
@@ -86,7 +86,7 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     for (const c of changes) {
         const target = targetOf(c.params, c.action);
         // eslint-disable-next-line no-await-in-loop
-        const own = await permissions.holderMay(companyId, { kind: 'human', userId: decider.userId }, c.action, c.params || {});
+        const own = await holderMayInEach(companyId, { kind: 'human', userId: decider.userId }, c.action, c.params || {});
         if (!own.allowed) return refused(`The approver may not make this change: ${own.reason}`);
         // eslint-disable-next-line no-await-in-loop
         if (!(await reachable(companyId, { userId: decider.userId, projectIds: [] }, target))) return refused('The approver cannot open what this change touches.');

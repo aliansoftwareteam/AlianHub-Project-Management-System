@@ -161,7 +161,7 @@ const addToCompany = async ({ companyId, who, approvedBy, name, at }) => {
 const saveStatuses = async ({ companyId, who, projectId, next }) => {
     const answer = await setup.answerOf('projectUpdate', { companyId, who, params: { id: projectId }, body: { updateObject: { taskStatusData: next } } });
     if (answer.code !== 200) return setup.reasonOf(answer, 'the statuses were not saved');
-    socketEmitter.emit('update', { type: 'update', data: await storedProject(companyId, projectId), updatedFields: { taskStatusData: next }, module: 'project' });
+    socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: await storedProject(companyId, projectId), updatedFields: { taskStatusData: next }, module: 'project' });
     return '';
 };
 
