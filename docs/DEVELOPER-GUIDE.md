@@ -48,6 +48,16 @@ The conventions in place:
 
 Writing a frontend spec: mount with `@vue/test-utils`; `frontend/tests/setup.js` installs i18n, `$t`, and the shell provides (`$userId`, `$companyId`, `$clientWidth`, `$socket`). Mock `@/services` and heavy children with `vi.mock`; keep shared mocks in `vi.hoisted`. `frontend/tests/TaskDetailPanel.spec.js` is the template for a large component, `useProjectTree.spec.js` for a composable.
 
+### Tests that pass by chance
+
+A test that fails one run in ten is wrong, not unlucky. What causes it here, and what to do:
+
+- A spec mocks a module that `frontend/tests/setup.js` also mocks with an async factory (`@formkit/vue` against `@/plugins/customFieldView/lazyFormKit`). Which factory wins depends on load, and the real FormKit then fails with `E600`. Mock the module the component imports, in the spec itself, so the spec owns it.
+- A real timer, an unawaited promise, or an assertion made before the next tick. Use fake timers and `await flushPromises()`.
+- State shared between tests: a module-level variable, `document.body`, a mock that is not reset. Reset it in `beforeEach`.
+- A fixed date near today, or a count or list another test changes (the shared e2e workspace). Make the test create its own project, task or member with `uniqueSuffix()` and assert on that.
+- Never fix it with a longer timeout, a retry, or a looser assertion. Show it steady: run it 20 times with `npx vitest run --no-file-parallelism <file>` and with `--maxWorkers=4`, and under CPU load (a few `while :; do :; done` loops) while you do.
+
 ### Screenshot atlas
 
 Unit specs cannot show what a visual change did. `npm run atlas` opens every screen in `scripts/atlas-manifest.js` in a headless Chromium and saves one PNG per screen, theme and size, plus an `index.html` gallery that opens from disk. `npm run atlas:compare` puts two atlases side by side.
