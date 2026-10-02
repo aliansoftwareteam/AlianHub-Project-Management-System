@@ -9,6 +9,7 @@ const { apiRequestWithoutCompnay, getAuth, push } = vi.hoisted(() => ({
 }));
 
 const t = (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key);
+const te = (key) => typeof key.split('.').reduce((node, part) => node?.[part], en) === 'string';
 
 vi.mock('@/services', () => ({ apiRequestWithoutCompnay, getAuth, useAuth: () => ({ logOut: vi.fn() }) }));
 vi.mock('@/composable', () => ({
@@ -17,7 +18,7 @@ vi.mock('@/composable', () => ({
 }));
 vi.mock('vue-router', () => ({ useRouter: () => ({ push, replace: vi.fn(() => Promise.resolve()) }) }));
 vi.mock('vuex', () => ({ useStore: () => ({ getters: { 'settings/companies': [] }, commit: vi.fn() }) }));
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t }) }));
+vi.mock('vue-i18n', () => ({ useI18n: () => ({ t, te }) }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 vi.mock('@/components/templates/AuthShell/AuthShell.vue', () => ({ default: { name: 'AuthShell', template: '<div><slot name="top-right" /><slot /></div>' } }));
 
@@ -190,6 +191,33 @@ describe('the last sign-up step when the workspace is not made', () => {
         expect(banner(wrapper).text()).toBe(t('Auth.workspace_failed_reason', { reason: 'The server could not set up the workspace.' }));
     });
 
+    it('says the reason in the reader\'s language when the server names it by a code', async () => {
+        reply = () => Promise.resolve({ data: { status: false, code: 'not_finished', statusText: 'An English sentence.' } });
+        const wrapper = await openLastStep();
+        await skip(wrapper);
+        await flushPromises();
+
+        expect(banner(wrapper).text()).toBe(t('Auth.workspace_failed_reason', { reason: 'Auth.workspace_reason_not_finished' }));
+    });
+
+    it('translates the reason that came on the progress stream the same way', async () => {
+        const wrapper = await openLastStep();
+        await skip(wrapper);
+        streams[0].say({ step: 100, error: 'An English sentence.', code: 'not_prepared' });
+        await flushPromises();
+
+        expect(banner(wrapper).text()).toBe(t('Auth.workspace_failed_reason', { reason: 'Auth.workspace_reason_not_prepared' }));
+    });
+
+    it('falls back to the server\'s sentence for a code it does not know', async () => {
+        reply = () => Promise.resolve({ data: { status: false, code: 'made_up_tomorrow', statusText: 'A reason added after this page was built.' } });
+        const wrapper = await openLastStep();
+        await skip(wrapper);
+        await flushPromises();
+
+        expect(banner(wrapper).text()).toBe(t('Auth.workspace_failed_reason', { reason: 'A reason added after this page was built.' }));
+    });
+
     it('says the free workspace is already used, in the page\'s own words', async () => {
         reply = () => Promise.resolve({ data: { status: false, statusText: 'limit', freeCompanyLimitReached: true } });
         const wrapper = await openLastStep();
@@ -229,5 +257,9 @@ describe('the last sign-up step when the workspace is not made', () => {
 
     it('has the sentence that carries the server\'s reason', () => {
         expect(en.Auth.workspace_failed_reason).toContain('{reason}');
+    });
+
+    it.each(['not_prepared', 'not_finished', 'invalid_details', 'server_error'])('has a sentence for the reason "%s"', (code) => {
+        expect(en.Auth[`workspace_reason_${code}`]).toEqual(expect.any(String));
     });
 });

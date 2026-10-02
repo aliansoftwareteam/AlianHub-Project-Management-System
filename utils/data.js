@@ -1359,19 +1359,9 @@ exports.importCompanyRules = async(companyName,type,projectId) => {
     });
 }
 
-// IMPORT COMPANY OWNER
-exports.importCompanyUserOwner = (companyName, obj) => {
-    return new Promise((resolve, reject) => {
-        try {
-            MongoDbCrudOpration(companyName, obj, "findOneAndUpdate")
-            .then(() => {
-                resolve();
-            })
-        } catch (error) {
-            reject(error);
-        }
-    });
-}
+exports.importCompanyUserOwner = async (companyName, obj) => {
+    await MongoDbCrudOpration(companyName, obj, "findOneAndUpdate");
+};
 
 // IMPORT COMPANY ROLES
 exports.importCompanyRoles = (companyName) => {
