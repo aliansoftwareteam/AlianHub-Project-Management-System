@@ -250,14 +250,22 @@ const pageCreateGuard = (req, res, next) => pageCreateChecked(req, res, () => {
 /* For a write route the registry has no action for, or only one behind a flag: `action` names it in the refusal and its audit row. */
 const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
 
-/* What the project update moves a project with: the trash, the archive and the way back, and its open or closed state. */
-const PROJECT_MOVES = { deletedStatusKey: 'project.delete', status: 'project.status.set', statusType: 'project.status.set' };
-const projectMoveRefused = Object.fromEntries([...new Set(Object.values(PROJECT_MOVES))].map((action) => [action, agentsRefused(action)]));
+/* The fields of the project update that are a person's to change: where the project sits (the trash, the archive and
+ * the way back, its open or closed state), who is on it and which rules it follows, and the statuses and saved views
+ * an agent proposes through its MCP tools. */
+const PROJECT_FIELD_ACTIONS = {
+    deletedStatusKey: 'project.delete', status: 'project.status.set', statusType: 'project.status.set',
+    AssigneeUserId: 'member.remove', LeadUserId: 'member.remove',
+    isPrivateSpace: 'permissions.edit', isGlobalPermission: 'permissions.edit',
+    taskStatusData: 'project.setup', TemplateTaskStatusId: 'project.setup', projectStatusData: 'project.setup', projectStatusTemplateId: 'project.setup',
+    ProjectRequiredComponent: 'view.create', ProjectRequiredDefaultComponent: 'view.create', viewColumn: 'view.create',
+};
+const projectFieldRefused = Object.fromEntries([...new Set(Object.values(PROJECT_FIELD_ACTIONS))].map((action) => [action, agentsRefused(action)]));
 
-/* An agent changes a project's other details as its person may; where the project sits is a person's to change. */
+/* An agent changes a project's other details as its person may. */
 const projectUpdateGuard = (req, res, next) => {
-    const move = fieldsOf(req.body && req.body.updateObject).map((field) => PROJECT_MOVES[field]).find(Boolean);
-    return move ? projectMoveRefused[move](req, res, next) : next();
+    const held = fieldsOf(req.body && req.body.updateObject).find((field) => Object.hasOwn(PROJECT_FIELD_ACTIONS, field));
+    return held ? projectFieldRefused[PROJECT_FIELD_ACTIONS[held]](req, res, next) : next();
 };
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
