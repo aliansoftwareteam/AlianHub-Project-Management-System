@@ -216,6 +216,19 @@ describe('where a new task lands', () => {
 
         expect(payload.data.ProjectID).toBe(CHAT_SPACE);
     });
+
+    it('is not a project for a conversation, which is started in a chat space', async () => {
+        expect((await create(MEMBER, { ProjectID: OPEN, sprintId: L_OPEN, mainChat: true, AssigneeUserId: [MEMBER, INSIDER] })).refused).toBe(400);
+        expect((await create(OWNER, { ProjectID: PRIVATE, sprintId: L_PRIVATE, mainChat: true, AssigneeUserId: [OWNER] })).refused).toBe(400);
+    });
+
+    it.each(['true', 1, 'yes'])('is not a project for a row marked a conversation by %p either, which is stored as one', async (mark) => {
+        expect((await create(MEMBER, { ProjectID: OPEN, sprintId: L_OPEN, mainChat: mark })).refused).toBe(400);
+    });
+
+    it('is a project for a task that says it is no conversation', async () => {
+        expect((await create(MEMBER, { ProjectID: OPEN, sprintId: L_OPEN, mainChat: false })).payload.data.ProjectID).toBe(OPEN);
+    });
 });
 
 describe('the people a task write names', () => {

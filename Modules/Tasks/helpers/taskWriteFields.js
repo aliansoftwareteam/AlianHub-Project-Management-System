@@ -585,16 +585,22 @@ const statusAsStored = async (company, task, sent) => {
 
 const projectNotFound = () => new TaskWriteRefusal(404, 'Project not found');
 
+const CONVERSATION_IN_PROJECT = 'A conversation is started in a chat space, not in a project.';
+
 /* Where a create, move or copy lands: a project the caller can open and, when the action names one, a list
- * of that project they may see. A conversation lands in a chat space, which has neither. */
+ * of that project they may see. A conversation lands in a chat space, which has neither, and nowhere else:
+ * kept among a project's tasks it would be a row of that project only the people in it could see. */
 const destinationOf = async (req, company, taskSpec, payload) => {
     const projectId = valueAt(payload, taskSpec.destination);
     if (typeof projectId !== 'string' || !projectId) refuse(400, `${nameOf(taskSpec.destination)} is required.`);
+    const marked = taskSpec.chat ? valueAt(payload, taskSpec.chat) : false;
     const project = await openProject(company, req.uid, projectId);
     if (!project) {
-        if (taskSpec.chat && valueAt(payload, taskSpec.chat) === true && await isChatSpace(company, projectId)) return null;
+        if (marked === true && await isChatSpace(company, projectId)) return null;
         throw projectNotFound();
     }
+    /* Any value the schema would store as true, not `true` alone. */
+    if (marked) refuse(400, CONVERSATION_IN_PROJECT);
     if (taskSpec.list) {
         const list = await listOf(company, req.uid, projectId, valueAt(payload, taskSpec.list.id));
         if (!list) throw new TaskWriteRefusal(404, 'List not found');

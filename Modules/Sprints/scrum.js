@@ -37,7 +37,7 @@ const BACKLOG_NAME = 'Backlog';
 
 // Sprint scope, defined exactly as Modules/Sprints/burndown.js defines it, so
 // the commitment snapshot and the chart can never disagree about what was in.
-const SCOPE_FILTER = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true };
+const SCOPE_FILTER = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true, mainChat: { $ne: true } };
 const SCOPE_FIELDS = '_id TaskKey TaskName statusType points totalEstimatedTime ProjectID sprintId folderObjId';
 
 const fail = (res, statusText) => res.send({ status: false, statusText });
@@ -305,6 +305,7 @@ async function planCompletion(companyId, sprint) {
                 ancestors: { $in: doneParentIds.map(String) },
                 statusType: { $ne: rules.DONE_STATUS_TYPE },
                 deletedStatusKey: { $in: [0, 2, undefined] },
+                mainChat: { $ne: true },
             }, `${SCOPE_FIELDS} ParentTaskId`],
         }, 'find').catch(() => []);
     }
@@ -403,7 +404,7 @@ exports.sprintReport = async (req, res) => {
                 .map((id) => new mongoose.Types.ObjectId(id));
             committedTasks = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
-                data: [{ _id: { $in: objectIds }, deletedStatusKey: { $in: [0, 2, undefined] } }, SCOPE_FIELDS],
+                data: [{ _id: { $in: objectIds }, deletedStatusKey: { $in: [0, 2, undefined] }, mainChat: { $ne: true } }, SCOPE_FIELDS],
             }, 'find').catch(() => []);
         } else {
             // Never started, or started before the snapshot existed. The best

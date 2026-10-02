@@ -4,6 +4,19 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { taskIdMatch } = require("../Comments/helpers/taskIdMatch");
+const { commentThreadAccess } = require("../Comments/helpers/threadAccess");
+
+const THREAD_KINDS = ['task', 'project', 'chat'];
+
+/* The files of a thread are read by whoever reads that thread on the comment routes; anyone else is answered as
+ * for a thread that holds none. `match` leaves out the private lists the caller is not on. */
+const threadFilesAccess = async (req, kind, selected) => {
+    if (!THREAD_KINDS.includes(kind) || !selected || typeof selected !== 'object') return { allowed: false };
+    const thread = kind === 'project'
+        ? { projectId: selected._id }
+        : { projectId: selected.ProjectID, sprintId: selected.sprintId, taskId: selected._id };
+    return commentThreadAccess(req.headers['companyid'], req.uid, thread);
+};
 
 exports.getPaginateMediaFiles = async (req, res) => {
     try {
@@ -36,7 +49,10 @@ exports.getPaginateMediaFiles = async (req, res) => {
             return res.status(400).json({ error: 'Invalid selectedData or parsedMediaTypes format' });
         }
 
-        let matchConditions = [];
+        const access = await threadFilesAccess(req, handleType, parsedSelectedData);
+        if (!access.allowed) return res.status(200).json([]);
+
+        let matchConditions = [access.match];
 
         if (excludeMediaTypes) {
             matchConditions.push({
@@ -136,6 +152,9 @@ exports.getMediaFileUsers = async (req, res) => {
             return res.status(400).json({ error: 'Invalid selectedData format' });
         }
 
+        const access = await threadFilesAccess(req, fromWhich, parsedSelectedData);
+        if (THREAD_KINDS.includes(fromWhich) && !access.allowed) return res.status(200).json([]);
+
         let matchConditions = [];
 
         if (fromWhich === 'task') {
@@ -167,6 +186,8 @@ exports.getMediaFileUsers = async (req, res) => {
             logger.error('Invalid fromWhich parameter');
             return res.status(400).json({ error: 'Invalid fromWhich parameter' });
         }
+
+        matchConditions.push(access.match);
 
         if (searchValue) {
             matchConditions.push({

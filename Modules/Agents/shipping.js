@@ -26,7 +26,7 @@ const gatedKeys = () => gatedActions().map((a) => a.key);
 const findTasks = (companyId, taskIds, visible, sprints) => (taskIds.length
     ? MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ ...sprints, _id: { $in: taskIds.map(oid).filter(Boolean) }, ProjectID: { $in: visible }, deletedStatusKey: { $ne: 1 } }, TASK_FIELDS],
+        data: [{ ...sprints, _id: { $in: taskIds.map(oid).filter(Boolean) }, ProjectID: { $in: visible }, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }, TASK_FIELDS],
     }, 'find').catch(() => [])
     : Promise.resolve([]));
 
@@ -127,7 +127,7 @@ const releaseCandidate = async (companyId, uid, { since } = {}) => {
     const doneTasks = visible.length
         ? await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ ...sprints, deletedStatusKey: { $ne: 1 }, ProjectID: { $in: visible }, statusType: { $in: [...registry.DONE_STATUS_TYPES] }, updatedAt: { $gte: from } },
+            data: [{ ...sprints, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, ProjectID: { $in: visible }, statusType: { $in: [...registry.DONE_STATUS_TYPES] }, updatedAt: { $gte: from } },
                    TASK_FIELDS, { sort: { updatedAt: -1 }, limit: 200 }],
         }, 'find').catch(() => [])
         : [];

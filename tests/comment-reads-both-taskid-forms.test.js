@@ -12,6 +12,8 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/config', () => ({ myCache: { get: jest.fn(), set: jest.fn(), del: jest.fn() } }));
 jest.mock('../Modules/AI/taskAccess', () => ({ visibleTask: jest.fn(async () => ({ _id: 'task', TaskName: 'Task' })), TASK_NOT_FOUND: 'task not found' }));
 jest.mock('../Modules/AICore/llmProvider', () => ({ isAnyProviderConfigured: () => true, getProvider: jest.fn() }));
+/* Who reads a thread is asked in tests/media-files-access.test.js; here every thread is open, so the filters are what is read. */
+jest.mock('../Modules/Comments/helpers/threadAccess', () => ({ commentThreadAccess: jest.fn(async () => ({ allowed: true, match: {} })), refuseThread: jest.fn() }));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { addCommentCollection } = require('../Modules/Comments/controller');

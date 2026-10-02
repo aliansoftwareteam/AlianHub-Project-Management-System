@@ -117,7 +117,7 @@ const loadMilestones = (companyId, projectId) => MongoDbCrudOpration(companyId, 
 const loadProjectTasks = (companyId, projectId) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.TASKS,
     data: [
-        { ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: 0 },
+        { ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: 0, mainChat: { $ne: true } },
         '_id TaskKey TaskName status statusType DueDate startDate AssigneeUserId',
     ],
 }, 'find');

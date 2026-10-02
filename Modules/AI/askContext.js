@@ -87,7 +87,7 @@ const pinnedSources = async (companyId, uid, { context, projects = [] } = {}) =>
     const read = async ({ kind, id }) => {
         if (kind === 'task') {
             const task = await findOne(companyId, SCHEMA_TYPE.TASKS,
-                { _id: oid(id), deletedStatusKey: { $ne: 1 }, ProjectID: { $in: visibleIds }, ...sprintClause },
+                { _id: oid(id), deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, ProjectID: { $in: visibleIds }, ...sprintClause },
                 'TaskName TaskKey status statusType Task_Priority ProjectID rawDescription updatedAt');
             return task ? taskSource(task, nameById) : null;
         }

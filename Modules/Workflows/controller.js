@@ -641,7 +641,7 @@ exports.decideApproval = async (req, res) => {
 const inputFor = async (companyId, body) => {
     if (OBJECT_ID.test(String(body.taskId || ''))) {
         const task = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS, data: [{ _id: String(body.taskId) }, { TaskName: 1, ProjectID: 1 }],
+            type: SCHEMA_TYPE.TASKS, data: [{ _id: String(body.taskId), mainChat: { $ne: true } }, { TaskName: 1, ProjectID: 1 }],
         }, 'findOne');
         if (!task) return { kind: 'task', id: String(body.taskId), found: false };
         return { kind: 'task', id: String(task._id), name: task.TaskName || '', projectId: task.ProjectID ? String(task.ProjectID) : null, found: true };

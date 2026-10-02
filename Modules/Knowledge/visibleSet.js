@@ -132,7 +132,7 @@ const callProjects = (set, ids) => {
 const clausesFor = (set) => {
     const projects = objectIds(set.projectIds);
     const sprintClause = set.hiddenSprintIds.length ? { sprintId: { $nin: objectIds(set.hiddenSprintIds) } } : {};
-    const task = { ProjectID: { $in: projects }, deletedStatusKey: { $ne: 1 }, ...sprintClause };
+    const task = { ProjectID: { $in: projects }, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, ...sprintClause };
     return {
         task,
         guide: { deletedStatusKey: { $ne: 1 } },

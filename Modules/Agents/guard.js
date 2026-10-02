@@ -255,6 +255,17 @@ const pageCreateGuard = (req, res, next) => pageCreateChecked(req, res, () => {
 /* For a write route the registry has no action for, or only one behind a flag: `action` names it in the refusal and its audit row. */
 const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
 
+/* The reminder an agent sets is the registry's: on a task its person can open, in that task's project. Any other,
+ * one with no task or with a task that is hidden or missing alike, is a person's to set. */
+const reminderChecks = async (req, body, companyId) => {
+    const taskId = idText(body.taskId);
+    const home = taskId ? await projectOfTask(companyId, req.uid, taskId) : '';
+    const inItsProject = body.projectId === undefined || idText(body.projectId) === home;
+    return home && inItsProject ? { action: 'reminder.create', params: { taskId } } : { action: 'reminder.manage', params: {} };
+};
+
+const reminderCreateGuard = routeGuard(reminderChecks);
+
 /* What the project update takes from an agent, as its person may: what the project is called and says, when it is
  * due, where the work came from, what is attached to it, and the person's own marks on it. */
 const AGENT_PROJECT_FIELDS = new Set([
@@ -366,4 +377,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, reminderCreateGuard, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };

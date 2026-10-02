@@ -158,7 +158,7 @@ const buildRollup = async (companyId, portfolioId, uid) => {
         if (!proj) return null;
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ ProjectID: String(pid), deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true, ...hiddenSprints }, '_id statusType DueDate'],
+            data: [{ ProjectID: String(pid), deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true, mainChat: { $ne: true }, ...hiddenSprints }, '_id statusType DueDate'],
         }, 'find');
         let milestones = [];
         try {
