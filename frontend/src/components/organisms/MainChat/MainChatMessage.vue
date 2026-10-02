@@ -70,7 +70,6 @@
             <MainChatThreadFooter
                 v-if="hasThread"
                 :message="message"
-                :hour12="hour12"
                 @open="$emit('thread', message)"
             />
 
@@ -140,7 +139,7 @@
  */
 import { computed, defineProps, defineEmits, inject, onBeforeUnmount, ref, unref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import moment from 'moment';
+import { clockText } from '@/utils/clockText';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import ReactionBar from '@/components/atom/ReactionBar/ReactionBar.vue';
@@ -160,7 +159,6 @@ const props = defineProps({
     senderName: { type: String, default: '' },
     senderSrc: { type: String, default: '' },
     askerName: { type: String, default: '' },
-    hour12: { type: Boolean, default: true },
     // Shown in a thread panel: no thread of its own, and an id that cannot clash with the same message in the conversation.
     inThread: { type: Boolean, default: false },
 });
@@ -240,11 +238,5 @@ const isEdited = computed(() => {
     return new Date(createdAt).getTime() !== new Date(updatedAt).getTime();
 });
 
-const shortTime = computed(() => {
-    const raw = props.message.createdAt;
-    if (!raw) return '';
-    const date = moment(raw.seconds ? raw.seconds * 1000 : raw);
-    if (!date.isValid()) return '';
-    return date.format(props.hour12 ? 'h:mm A' : 'HH:mm');
-});
+const shortTime = computed(() => clockText(props.message.createdAt));
 </script>

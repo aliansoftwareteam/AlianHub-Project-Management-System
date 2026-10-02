@@ -183,7 +183,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
-import moment from "moment";
+import { clockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentRunDetail from "./AgentRunDetail.vue";
@@ -247,7 +247,7 @@ const allowedKeys = computed(() => {
 });
 const preview = computed(() => splitPreview(allowedKeys.value, registryManifest.value.actions));
 
-const time = (at) => (at ? moment(at).format("HH:mm") : "");
+const time = clockText;
 const runStatus = (run) => (te(`Ai.run_status_${run.status}`) ? t(`Ai.run_status_${run.status}`) : run.status);
 const runChip = (run) => (run.status === "failed" ? "ah-chip--danger" : run.status === "running" ? "ah-chip--brand" : run.status === "skipped" ? "ah-chip--warn" : "ah-chip--ok");
 const toggleRun = (id) => { expandedRun.value = expandedRun.value === id ? "" : id; };

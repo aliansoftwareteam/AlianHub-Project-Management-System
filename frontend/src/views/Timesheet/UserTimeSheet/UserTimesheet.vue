@@ -113,7 +113,7 @@
         </div>
         <div v-if="reopening" class="tv-card" data-test="reopen-note">
             <span class="ah-dot ah-dot--warn"></span>
-            <span>{{ $t('Time.reopened_by', { name: reopening.byName || $t('Time.someone'), date: moment(reopening.at).format('MMM D, HH:mm') }) }}</span>
+            <span>{{ $t('Time.reopened_by', { name: reopening.byName || $t('Time.someone'), date: dayClockText(reopening.at) }) }}</span>
         </div>
         <div v-if="underHint" class="tv-card">
             <ShellIcon name="info" :size="13" class="tv-spark" />
@@ -138,6 +138,7 @@ import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import moment from 'moment';
+import { dayClockText } from '@/utils/clockText';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';

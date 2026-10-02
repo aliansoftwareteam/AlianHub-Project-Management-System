@@ -109,7 +109,7 @@ import { computed, inject, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
-import moment from "moment";
+import { weekdayClockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
@@ -161,7 +161,7 @@ function nameOf(id) {
 }
 
 function dayOf(seconds) {
-    return moment((Number(seconds) || 0) * 1000).format("ddd D MMM, HH:mm");
+    return weekdayClockText((Number(seconds) || 0) * 1000);
 }
 
 function context() {

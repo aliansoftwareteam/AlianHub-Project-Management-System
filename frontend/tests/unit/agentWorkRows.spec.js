@@ -23,6 +23,7 @@ vi.mock('@/views/Projects/TableView/useTaskCategories.js', () => ({
 import ListRow from '@/views/Projects/ListView/ListRow.vue';
 import TableRow from '@/views/Projects/TableView/TableRow.vue';
 import TaskAgentMark from '@/views/Projects/components/TaskAgentMark.vue';
+import { followClockPrefs } from '@/utils/clockText';
 import { heldTasks, openRuns } from '@/views/Ai/agentFeed';
 import { agentTaskIds, agentWorkFor } from '@/views/Projects/composables/agentWork';
 import { agentWorkMatch } from '@/views/Projects/composables/agentWorkQuery';
@@ -120,13 +121,23 @@ describe.each([
 describe('the mark', () => {
     const shownFor = () => mount(TaskAgentMark, { props: { taskId: 't1' } });
 
+    const sinceShown = (since) => {
+        heldTasks.value = [{ ...CLAIM, since }];
+        return shownFor().find('.tam__since').text();
+    };
+
     it('says the time alone for today and the day with it otherwise', () => {
-        const today = new Date();
-        today.setHours(9, 5, 0, 0);
-        heldTasks.value = [{ ...CLAIM, since: today.toISOString() }];
-        expect(shownFor().find('.tam__since').text()).toBe('09:05');
-        heldTasks.value = [{ ...CLAIM, since: '2026-03-04T09:05:00' }];
-        expect(shownFor().find('.tam__since').text()).toBe('4 Mar, 09:05');
+        vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 2, 12, 0) });
+        try {
+            followClockPrefs({ timeFormat: '24' });
+            expect(sinceShown(new Date(2026, 9, 2, 9, 5).toISOString())).toBe('09:05');
+            expect(sinceShown('2026-03-04T09:05:00')).toBe('4 Mar, 09:05');
+            followClockPrefs({ timeFormat: '12' });
+            expect(sinceShown(new Date(2026, 9, 2, 9, 5).toISOString())).toBe('9:05 AM');
+            expect(sinceShown('2026-03-04T14:05:00')).toBe('4 Mar, 2:05 PM');
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('still names the agent when the start is unknown', () => {
