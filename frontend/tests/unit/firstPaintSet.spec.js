@@ -77,7 +77,7 @@ describe('what the first paint downloads', () => {
         const SCREEN_ONLY = [
             'apexcharts', 'vue3-apexcharts', 'xlsx', 'jszip', 'grid-layout-plus', 'v-calendar', '@vuepic/vue-datepicker',
             '@formkit/vue', '@formkit/pro', '@formkit/core', 'mic-recorder-to-mp3', 'detectrtc', 'markdown-it', 'vuedraggable',
-            'vue3-timepicker', 'country-state-city', 'dompurify'
+            'vue3-timepicker', 'country-state-city', 'dompurify', 'sweetalert2'
         ];
         const reached = graph.packages.filter((name) => SCREEN_ONLY.includes(name) || name.startsWith('@editorjs/'));
         expect(reached).toEqual([]);
@@ -96,7 +96,15 @@ describe('what the first paint downloads', () => {
             'plugins/importTasks/components/templates/ImportTaskButton.vue',
             'plugins/importUsers/components/templates/ImportUsers.vue',
             'components/atom/FormkitInput/InputField.vue',
-            'components/molecules/PhoneComponent/allCountry.js'
+            'components/molecules/PhoneComponent/allCountry.js',
+            'components/molecules/AdvanceSearch/CommandPalette.vue',
+            'components/organisms/QuickCreateTask/QuickCreateTask.vue',
+            'components/molecules/TaskTemplates/TaskTemplateDialogHost.vue',
+            'components/molecules/AiFieldFill/AiFieldFillDialog.vue',
+            'components/molecules/Notepad/NotepadPanel.vue',
+            'components/molecules/Clips/ClipsPanel.vue',
+            'components/molecules/ClipRecorder/ClipRecorder.vue',
+            'components/molecules/TalkToText/TalkToTextPopover.vue'
         ];
         LAZY.forEach((file) => expect(fs.existsSync(path.join(SRC, file)), file).toBe(true));
         expect(graph.files.filter((file) => LAZY.includes(file))).toEqual([]);

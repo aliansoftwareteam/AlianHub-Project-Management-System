@@ -264,7 +264,7 @@ A first visit: scripts ready at 0.29 s, the task query sent at 0.41 s and answer
 
 What a browser must download before it can draw anything: the files `index.html` names, which are the entry script (`js/app.*.js`), the initial vendor script (`js/chunk-vendors.*.js`) and their two stylesheets. Everything else is a chunk fetched when a screen asks for it.
 
-**Budget: 2,575,000 bytes**, uncompressed, for those four files together. The number lives in `frontend/firstPaintBudget.js` and nowhere else; `frontend/vue.config.js` hands it to webpack (`performance.maxEntrypointSize`, `hints: 'error'`), so a production build that goes over fails and names the files. It is the measured size plus ten percent. Chunks fetched later are not budgeted.
+**Budget: 2,270,000 bytes**, uncompressed, for those four files together. The number lives in `frontend/firstPaintBudget.js` and nowhere else; `frontend/vue.config.js` hands it to webpack (`performance.maxEntrypointSize`, `hints: 'error'`), so a production build that goes over fails and names the files. It is the measured size plus ten percent. Chunks fetched later are not budgeted.
 
 Measured on 2026-10-01 with one production build before and one after the change, in bytes:
 
@@ -304,8 +304,10 @@ The chunks that took the rest, fetched when a screen needs them:
 | The spreadsheet reader is fetched when a file is picked | `src/utils/loadXlsx.js` |
 | moment ships without its locale files; the app never switches moment's locale | `vue.config.js` |
 | Every route is a dynamic import | `src/router/` |
+| The shell's command palette, quick create, task-template and AI-field dialogs and the notepad, clips, recorder and talk-to-text panels are chunks that draw nothing until opened; a failed fetch shows the general error toast | `src/config/shellParts.js`, `src/config/lazyShell.js` |
+| `sweetalert2` is fetched the first time a confirmation is asked for | `src/utils/lazySwal.js` |
 
-The task panel, the field components and FormKit are needed within the first minute of nearly every session, so `src/config/warmChunks.js` fetches them once the shell is up and the browser is idle. They no longer hold up the first paint, and opening a task does not wait on the network.
+The task panel, the field components, FormKit and the shell parts above are needed within the first minute of nearly every session, so `src/config/warmChunks.js` fetches them once the shell is up and the browser is idle. They no longer hold up the first paint, and opening a task does not wait on the network.
 
 `tests/unit/firstPaintSet.spec.js` walks the plain imports from `src/main.js` and fails when one of those libraries, the task panel, a plugin screen or a second language is reachable again without a dynamic import. That catches the cause without a build; the budget catches the size.
 
@@ -314,9 +316,9 @@ The task panel, the field components and FormKit are needed within the first min
 | What | Why |
 | --- | --- |
 | `locales/en.js` | the fallback language; every missing key reads from it |
-| The shell: rail, panels, command palette, quick create, call overlay | drawn or listening on every signed-in screen |
+| The shell: rail, reminders panel, call overlay | drawn or listening on every signed-in screen |
 | The tour (`driver.js`) | the shell provides it as a ref that screens call without waiting |
-| `sweetalert2`, `moment`, `axios`, `socket.io-client`, `lodash/isEqual` | used by the store, the request layer or the shell itself |
+| `moment`, `axios`, `socket.io-client`, `lodash/isEqual` | used by the store, the request layer or the shell itself |
 | Images under 8 kB stay inlined as data URLs | `WasabiIamgeCompp`, `wasabVideo`, `wasabAudio` and `MainChatAvatar` tell a bundled image from a stored path by its `data:` prefix. The default avatar, the priority icons and the default status icon are drawn only because they are inlined; lowering the limit would turn them into storage lookups |
 
 ### Moving a component out of the first load changes where its styles sit
