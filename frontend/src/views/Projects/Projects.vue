@@ -12,6 +12,9 @@
                             :sprint="headerSprint"
                             :folders="headerFolders"
                             :agentSummary="agentSummary"
+                            :agentsAtWork="agentWorkCountIn(projectData?._id)"
+                            :agentsPaused="projectData?.agentLimits?.paused === true"
+                            @show-agent-work="setAgentWorking(true)"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
                             @select-project="selectProject({ _id: $event }, true)"
@@ -493,6 +496,7 @@ import ProjectTreePanel from './components/ProjectTreePanel.vue';
 import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
 import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
+import { agentWorkCountIn } from './composables/agentWork';
 import SavedViewBar from './components/SavedViewBar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';

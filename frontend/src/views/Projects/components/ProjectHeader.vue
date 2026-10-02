@@ -51,11 +51,12 @@
             <span v-if="rangeLabel" class="ph2__range">{{ rangeLabel }}</span>
 
             <div class="ph2__actions">
-                <div v-if="agentChip" class="ph2__agents" :title="$t('Projects.agents_chip_title')">
+                <span v-if="agentsPaused" class="ph2__agents ph2__agents--paused" data-test="agents-paused">{{ $t('AgentWork.paused') }}</span>
+                <button v-else-if="agentsAtWork > 0" type="button" class="ph2__agents" data-test="agents-at-work" :title="$t('AgentWork.at_work_open')" @click="$emit('show-agent-work')">
                     <span class="ph2__agents-dot"></span>
-                    <span class="ph2__agents-label">{{ t('Projects.agents_working', { n: agentChip.agents }, agentChip.agents) }}</span>
-                    <span class="ph2__agents-meta">{{ agentChip.meta }}</span>
-                </div>
+                    <span class="ph2__agents-label">{{ t('AgentWork.at_work', { n: agentsAtWork }, agentsAtWork) }}</span>
+                    <span v-if="runMeta" class="ph2__agents-meta">{{ runMeta }}</span>
+                </button>
                 <slot name="actions"></slot>
                 <button v-if="showAiAssist" type="button" class="ah-btn ah-btn--sm ph2__ai" @click="$emit('ai-assist')">
                     <span aria-hidden="true">✦</span>{{ $t('Projects.ai_assist') }}
@@ -111,11 +112,13 @@ const props = defineProps({
     sprint: { type: Object, default: null },
     folders: { type: Array, default: () => [] },
     agentSummary: { type: Object, default: null },
+    agentsAtWork: { type: Number, default: 0 },
+    agentsPaused: { type: Boolean, default: false },
     showAiAssist: { type: Boolean, default: false },
     showAddTask: { type: Boolean, default: true }
 });
 
-defineEmits(['ai-assist', 'add-task', 'select-project']);
+defineEmits(['ai-assist', 'add-task', 'select-project', 'show-agent-work']);
 
 const companyId = inject('$companyId', null);
 const clientWidthRef = inject('$clientWidth', null);
@@ -156,12 +159,11 @@ const rangeLabel = computed(() => {
     return `${head} · ${t('Projects.days_left_short', { n: daysLeft })}`;
 });
 
-const agentChip = computed(() => {
+const runMeta = computed(() => {
     const s = props.agentSummary;
-    if (!s || !Number(s.agents)) return null;
+    if (!s || !Number(s.agents)) return '';
     const minutes = Math.max(0, Math.round(Number(s.elapsedMs || 0) / 60000));
-    const spend = Number(s.spendUsd || 0);
-    return { agents: Number(s.agents), meta: `${minutes}m · $${spend.toFixed(2)}` };
+    return `${minutes}m · $${Number(s.spendUsd || 0).toFixed(2)}`;
 });
 
 const TAB_KEYS = ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '];
