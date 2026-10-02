@@ -325,7 +325,7 @@ function onKey(e) {
 
 <style scoped>
 .ttd-layer { position: fixed; inset: 0; z-index: 1000; }
-.ttd-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .36); }
+.ttd-backdrop { position: absolute; inset: 0; background: var(--scrim); }
 .ttd {
     position: absolute; top: 10vh; left: 50%; transform: translateX(-50%);
     box-sizing: border-box; width: 520px; max-width: calc(100vw - 32px); max-height: 80dvh; overflow: auto;

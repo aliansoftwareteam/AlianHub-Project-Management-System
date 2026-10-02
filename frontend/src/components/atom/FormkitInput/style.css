@@ -12,7 +12,7 @@
     opacity: 1;
 }
 .formkit-label__font {
-    color: #3E3E3E;
+    color: var(--ink-label);
     font-family: var(--font-ui);
     font-weight: 400;
     line-height: 17.919px; 
@@ -34,12 +34,12 @@
     height: 15px;
 }
 .custom_field_label [data-invalid] .formkit-inner, .custom_field_label .validationError {
-    border-color: red !important;
-    box-shadow: 0 0 0 1px red !important;
+    border-color: var(--danger) !important;
+    box-shadow: 0 0 0 1px var(--danger) !important;
     margin-top: 3px;
 }
 .custom_field_label .formkit-inner:focus-within {
-    box-shadow: 0 0 0 1px #0275ff !important;
+    box-shadow: 0 0 0 1px var(--brand) !important;
 }
 @media(max-width:767px){
     .formkit-label__image {
