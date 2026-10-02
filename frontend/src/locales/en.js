@@ -769,6 +769,8 @@ export default {
         back: "Back",
         next: "Next",
         run: "Import {count} task(s)",
+        run_update: "Update {count} task(s)",
+        run_and_update: "Import {created} and update {updated} task(s)",
         finish: "Done"
     },
     ImportExport: {
