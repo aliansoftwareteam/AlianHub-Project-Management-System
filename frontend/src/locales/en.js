@@ -2488,6 +2488,16 @@ export default {
         undo_hint: "Undo (Ctrl+Z or ⌘Z)",
         dismiss: "Dismiss",
     },
+    AgentChange: {
+        one: "{agent} changed {task}: {what}",
+        one_unnamed: "{agent} made a change: {what}",
+        many: "{agent} made {n} change | {agent} made {n} changes",
+        many_mixed: "Your AI made {n} change | Your AI made {n} changes",
+        show: "Show",
+        undone: "Undone.",
+        undone_some: "{done} of {n} changes were undone.",
+        undo_failed: "That could not be undone.",
+    },
     TaskPanel: {
         dialog_label: "Task detail",
         action_items: "Action items ({n})",

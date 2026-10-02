@@ -140,7 +140,6 @@ const totalPages = ref(1);
 const total = ref(0);
 const busy = ref(false);
 const error = ref("");
-const scope = ref("all");
 const search = ref("");
 const undoingId = ref("");
 const chainOn = ref(false);
@@ -155,6 +154,7 @@ const tabs = [
     { key: "undone", label: "Audit.tab_undone" },
     { key: "refused", label: "Audit.tab_refusals" }
 ];
+const scope = ref(tabs.some((tab) => tab.key === route.query.scope) ? route.query.scope : "all");
 
 const REFUSALS = ["agent.action_refused", "permission.refused"];
 const INTEGRITY_CHIPS = { verified: "ah-chip--ok", broken: "ah-chip--danger", unverified: "ah-chip--warn", unchained: "" };

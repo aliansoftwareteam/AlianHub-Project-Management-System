@@ -97,6 +97,7 @@ import { applyStoredLocale } from '@/locales/main';
 import { warmWorkspaceChunks } from '@/config/warmChunks';
 import {socketHelper} from './composable/socketHelper';
 import { useFieldDefinitionsSync } from '@/plugins/customFieldView/fieldDefinitionsSync';
+import { useAgentChangeNotice } from '@/views/Ai/agentChangeNotice';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
@@ -707,6 +708,7 @@ provide("$currentLoggedInUserDetails", '');
 provide("$mainTour", mainTour);
 provide("$socket",socket);
 useFieldDefinitionsSync(socket);
+useAgentChangeNotice(socket, companyId);
 
 </script>
 
