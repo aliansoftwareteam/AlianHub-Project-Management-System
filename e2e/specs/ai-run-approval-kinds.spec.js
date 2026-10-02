@@ -134,19 +134,22 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
         await page.goto(`/#/${state.companyId}/inbox?tab=approval`);
         const row = rowFor(page, made.why);
         await expect(row).toHaveCount(1);
+        const decided = page.waitForResponse((res) => res.url().endsWith(`/${id}/approve`));
         await row.getByRole('button', { name: /^Approve:/ }).click();
+        const answer = await (await decided).json();
+        expect(JSON.stringify(answer), 'the approval answer').toContain('"ok":true');
         await expect(row).toHaveCount(0);
         await expect.poll(() => kinds.statusOf(id)).toBe('approved');
-        return made;
+        return { ...made, answer };
     }
     const views = (page) => page.getByRole('group', { name: 'Project views' });
     const reviewBoard = (page) => views(page).getByRole('button', { name: /Review board/ });
 
     test('approving the project setup makes its parts in the project', async ({ page, state, loginAs }) => {
-        const { owner, project, agent, tokenId } = await approveSetup({ page, state, loginAs }, 'approve setup');
+        const { owner, project, agent, tokenId, answer } = await approveSetup({ page, state, loginAs }, 'approve setup');
         try {
             await page.goto(`/#/${state.companyId}/project/${project._id}`);
-            await expect(reviewBoard(page)).toBeVisible();
+            await expect(reviewBoard(page), JSON.stringify(answer)).toBeVisible();
             await reviewBoard(page).click();
             await expect(page.getByText('In Review', { exact: true }).first()).toBeVisible();
             const lists = await listSprints(owner.api, project._id);
