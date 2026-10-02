@@ -1,3 +1,5 @@
+import { madeProjectIds, trashedProjectIds } from '@/composable/approvedProjectIds';
+
 const refusalOf = (source, fallback) => source?.response?.data?.statusText || source?.data?.statusText || source?.message || fallback;
 
 /* A change that was carried out in part (a project setup) names what it could not make; each counts as one thing not done. */
@@ -17,7 +19,7 @@ export const decideOne = async (send, id, verb, body, fallback) => {
         const res = await send(id, verb, body);
         if (!res?.data?.status) return { id, ok: false, error: refusalOf(res, fallback) };
         const data = res.data.data || {};
-        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data), left: leftOf(data), standing: data.standing || null };
+        return { id, ok: true, undo: Boolean(data.undoUntil), unapplied: unappliedOf(data), left: leftOf(data), standing: data.standing || null, madeProjects: madeProjectIds(data), trashedProjects: trashedProjectIds(data) };
     } catch (error) {
         return { id, ok: false, error: refusalOf(error, fallback) };
     }
