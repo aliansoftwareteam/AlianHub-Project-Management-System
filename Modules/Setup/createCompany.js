@@ -23,6 +23,8 @@ const importSettings = (payload) => new Promise((resolve, reject) => {
         : reject(new Error(result?.statusText || 'Settings import failed'))));
 });
 
+const reasonOf = (failure) => failure?.message || failure?.statusText || String(failure?.error || failure);
+
 async function createOwner({ firstName, lastName, email, password }) {
     const created = await createUserRef.addUserMongodbV2({ firstName, lastName, email, password, isInvitation: false });
     const ownerId = String(created.statusText._id);
@@ -69,14 +71,29 @@ async function createFirstCompany({ userId, email, companyName, teamFocus = '', 
     await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: company }, 'save');
 
     onStep('settings');
-    const side = await Promise.allSettled([
-        handleCreateCompanyDataStorageFun({ companyName }, companyId),
-        addAndRemoveUserInMongodbNotificationCount(companyId, userId, 'Add'),
-        importSettings({ companyId, uid: userId, email }),
-        ensureNotificationDefaults(companyId, userId),
-    ]);
-    side.filter((r) => r.status === 'rejected').forEach((r) => logger.error(`setup: company side step failed: ${r.reason?.message || r.reason}`));
-    // The settings import stops at its first failed batch, which can leave the view catalogue unseeded.
+    const steps = [
+        { name: 'its storage', needed: true, run: () => handleCreateCompanyDataStorageFun({ companyName }, companyId) },
+        { name: 'the unread counter row', needed: false, run: () => addAndRemoveUserInMongodbNotificationCount(companyId, userId, 'Add') },
+        { name: "the owner's seat and starting settings", needed: true, run: () => importSettings({ companyId, uid: userId, email }) },
+        { name: 'the notification defaults', needed: false, run: () => ensureNotificationDefaults(companyId, userId) },
+    ];
+    const settled = await Promise.allSettled(steps.map((step) => step.run()));
+    const failed = steps.filter((step, index) => settled[index].status === 'rejected');
+    failed.forEach((step) => logger.error(`setup: ${step.name} failed: ${reasonOf(settled[steps.indexOf(step)].reason)}`));
+    const missing = failed.filter((step) => step.needed).map((step) => step.name);
+    if (missing.length) {
+        // Left in place, the row would be a company nobody can open, and it would count against the owner's free ones.
+        try {
+            await updateCompanyFun(SCHEMA_TYPE.GOLBAL, {
+                type: dbCollections.COMPANIES,
+                data: [{ _id: companyMongoId, userId }],
+            }, 'deleteOne', companyId);
+        } catch (error) {
+            logger.error(`setup: the company row could not be taken back: ${reasonOf(error)}`);
+        }
+        throw new Error(`The company could not be set up: ${missing.join(' and ')} could not be made.`);
+    }
+    // The sample project picks its views from the catalogue, so it is completed whatever the import stored of it.
     await ensureViewCatalogue(companyId).catch((error) => logger.error(`setup: project view catalogue failed: ${error.message}`));
     vectorStore.prepareCompany(companyId);
 

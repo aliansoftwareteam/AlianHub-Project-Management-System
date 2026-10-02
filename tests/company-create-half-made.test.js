@@ -302,3 +302,43 @@ describe('the reasons a workspace is not made', () => {
         expect(res.body).toEqual({ status: false, code: 'invalid_details', statusText: 'teamSize is invalid' });
     });
 });
+
+describe('POST /api/v2/company/create, details the company row requires', () => {
+    const readyCompanies = () => rowsOf(GLOBAL, SCHEMA_TYPE.PRECOMPANIES).filter((row) => row.isAvailable === true);
+
+    it.each([
+        ['only spaces', '   '],
+        ['not text', { $ne: '' }],
+        ['a list', ['Fresh Co']],
+    ])('refuses a workspace name that is %s, and takes no prepared company for it', async (label, companyName) => {
+        const res = await create$({ companyName });
+
+        expect(res.body).toEqual({ status: false, code: 'invalid_details', statusText: 'companyName is required' });
+        expect(companyRows()).toEqual([]);
+        expect(readyCompanies()).toHaveLength(2);
+    });
+
+    it('stores the workspace name without the spaces around it', async () => {
+        await create$({ companyName: '  Fresh Co ' });
+
+        expect(companyRows()[0].Cst_CompanyName).toBe('Fresh Co');
+    });
+
+    it.each([
+        ['a word', 'none'],
+        ['a number', 91],
+    ])('opens the workspace when the dial code sent is %s: the page asks for none', async (label, countryCodeObj) => {
+        const res = await create$({ countryCodeObj });
+
+        expect(res.body).toMatchObject({ status: true, companyId: READY });
+        expect(companyRows()[0].Cst_DialCode).toEqual({});
+    });
+
+    it('keeps a dial code that is one', async () => {
+        const dial = { name: 'India', dialCode: '+91', code: 'IN' };
+
+        await create$({ countryCodeObj: dial });
+
+        expect(companyRows()[0].Cst_DialCode).toEqual(dial);
+    });
+});

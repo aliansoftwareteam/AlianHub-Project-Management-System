@@ -101,7 +101,6 @@ const SAFE_EMBED_SRC = new RegExp(
     + ')[\\w\\-/?=&.%]*$',
     'i',
 );
-exports.SAFE_EMBED_SRC = SAFE_EMBED_SRC;
 // Inline styles carry the editor's colours and alignment. Layout and anything
 // that can fetch or execute is not on the list.
 const ALLOWED_STYLE_PROPS = new Set([
@@ -185,6 +184,7 @@ const cleanAttrs = (tag, raw) => {
     const kept = [];
     let hasHref = false;
     let hasEmbedSrc = false;
+    let hasFullscreen = tag === 'iframe' && /(?:^|\s)allowfullscreen(?=[\s/]|$)/i.test(raw.replace(/"[^"]*"|'[^']*'/g, ''));
     const ATTR = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
     let match;
     while ((match = ATTR.exec(raw))) {
@@ -210,7 +210,7 @@ const cleanAttrs = (tag, raw) => {
                 hasEmbedSrc = true;
             }
         } else if (name === 'allowfullscreen' && tag === 'iframe') {
-            kept.push('allowfullscreen');
+            hasFullscreen = true;
         } else if (name === 'data-checked' && tag === 'ul' && (value === 'true' || value === 'false')) {
             // The editor stores a checklist as <ul data-checked="true|false">.
             // Dropping it left plain bullets, losing the ticks entirely.
@@ -228,6 +228,7 @@ const cleanAttrs = (tag, raw) => {
     // the element rather than emit a bare <iframe> pointing nowhere.
     if (tag === 'iframe') {
         if (!hasEmbedSrc) return null;
+        if (hasFullscreen) kept.push('allowfullscreen');
         kept.push('loading="lazy"', 'referrerpolicy="strict-origin-when-cross-origin"');
     }
     return kept.length ? ` ${kept.join(' ')}` : '';
@@ -286,4 +287,5 @@ module.exports = {
     validateIntakeSubmission,
     escapeHtml,
     sanitizeDocHtml,
+    SAFE_EMBED_SRC,
 };

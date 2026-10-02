@@ -86,6 +86,30 @@ describe('signing in on the way to an invitation', () => {
         expect(reload).toHaveBeenCalled();
     });
 
+    describe('with an account that has no workspace yet', () => {
+        beforeEach(() => {
+            mocks.apiRequestWithoutCompnay.mockImplementation(async (type, url) => (url === env.USER_AND_COMAPNY_CHECK
+                ? { data: { status: true, data: { userData: { _id: USER_ID, isEmailVerified: true, AssignCompany: [] }, companyId: '', isCompanyFind: false } } }
+                : { status: 200, data: {} }));
+        });
+
+        it('goes back to the invitation, not to naming a workspace', async () => {
+            await signInWith(INVITATION_PATH);
+
+            expect(mocks.push).not.toHaveBeenCalled();
+            expect(mocks.replace).toHaveBeenCalledWith(INVITATION_PATH);
+            expect(localStorage.getItem('isLogging')).toBe('true');
+            expect(reload).toHaveBeenCalled();
+        });
+
+        it('is asked to name a workspace when signing in anywhere else', async () => {
+            await signInWith('/');
+
+            expect(mocks.push).toHaveBeenCalledWith({ name: 'Create_Company' });
+            expect(mocks.replace).not.toHaveBeenCalled();
+        });
+    });
+
     it('still sends any other redirect outside the account\'s workspaces home', async () => {
         localStorage.setItem('selectedCompany', HOME_COMPANY);
         await signInWith('/6f0000000000000000000c09/project');

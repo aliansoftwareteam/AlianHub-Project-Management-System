@@ -82,6 +82,13 @@ const acceptable = (invitation, linkId, account) => Boolean(invitation)
     && linkTokenAccepted(invitation.linkId, linkId)
     && exports.invitationBindsAccount(invitation, account);
 
+/* The seat alone is not a joined workspace: no session names a company the account does not list, and an owner
+ * invitation hands the company over on its own row. When either write fails the seat is given back, so the person
+ * is told it failed and the same link works on the next try. */
+class NotJoined extends Error {}
+
+const notJoined = (res) => res.status(500).json({ status: false, statusText: 'The invitation could not be accepted just now. Try again.' });
+
 /* Recorded as one conditional update, so a withdrawal or a second accept racing this one wins or loses whole. */
 const claimInvitation = async (companyId, invitation, account) => {
     const userId = String(account._id);
@@ -92,17 +99,28 @@ const claimInvitation = async (companyId, invitation, account) => {
     ], 'findOneAndUpdate');
     if (!claimed.data || !claimed.data._id) return false;
 
-    await Promise.all([
-        recordInvitedOwner({ companyId, invitation, userId }).catch((error) => {
-            logger.error(`ERROR in record invited owner: ${error.message}`);
-        }),
-        updateUserFun(SCHEMA_TYPE.GOLBAL, {
-            type: dbCollections.USERS,
-            data: [{ _id: new mongoose.Types.ObjectId(userId) }, { $addToSet: { AssignCompany: companyId } }]
-        }, 'updateOne', companyId, userId).catch((error) => {
-            logger.error(`ERROR in update user: ${error.message}`);
-        }),
-    ]);
+    const onAccount = (change) => updateUserFun(SCHEMA_TYPE.GOLBAL, {
+        type: dbCollections.USERS,
+        data: [{ _id: new mongoose.Types.ObjectId(userId) }, { [change]: { AssignCompany: companyId } }]
+    }, 'updateOne', companyId, userId);
+    let putOnAccount = false;
+    try {
+        const listed = await onAccount('$addToSet');
+        if (listed?.data?.matchedCount === 0) throw new Error('the account was not found');
+        putOnAccount = listed?.data?.modifiedCount === 1;
+        await recordInvitedOwner({ companyId, invitation, userId });
+    } catch (error) {
+        logger.error(`accept invitation ${invitation._id}: not joined, so the invitation waits again: ${error?.message || error}`);
+        const givenBack = await Promise.allSettled([
+            putOnAccount ? onAccount('$pull') : null,
+            updateMemberFunction(companyId, [
+                { _id: invitation._id, status: ACCEPTED, userId },
+                { $set: { status: PENDING, linkId: invitation.linkId, userId: invitation.userId || '' } }
+            ], 'findOneAndUpdate'),
+        ]);
+        givenBack.filter((step) => step.status === 'rejected').forEach((step) => logger.error(`accept invitation ${invitation._id}: could not be given back: ${step.reason?.message || step.reason}`));
+        throw new NotJoined();
+    }
     importUserNotifications(companyId, userId).catch((error) => {
         logger.error(`ERROR in import notification settings: ${error}`);
     });
@@ -126,6 +144,7 @@ exports.checkPermission = async (req, res) => {
         if (!(await claimInvitation(invite.companyId, invitation, account))) return refuse(res);
         res.json({ status: true, key: 5, companyId: invite.companyId });
     } catch (error) {
+        if (error instanceof NotJoined) return notJoined(res);
         logger.error(`Check Permission Error: ${error}`);
         if (!res.headersSent) refuse(res);
     }
@@ -147,6 +166,7 @@ exports.acceptSignedIn = async (req, res) => {
         if (!(await claimInvitation(companyId, invitation, account))) return refuseSignedIn(res);
         return res.json({ status: true, statusText: 'Invitation accepted.', companyId });
     } catch (error) {
+        if (error instanceof NotJoined) return notJoined(res);
         logger.error(`accept invitation signed in: ${error?.message || error}`);
         if (!res.headersSent) refuseSignedIn(res);
     }
