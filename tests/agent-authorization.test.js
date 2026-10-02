@@ -7,6 +7,7 @@ jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async (c, uid) => ({ owner1: 1, admin1: 2, member1: 3, member2: 3, guest1: 0 })[uid]), isPrivileged: (r) => r === 1 || r === 2 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['p1']) }));
 jest.mock('../Modules/Agents/actions', () => ({ ...jest.requireActual('../Modules/Agents/actions'), personRefusal: jest.fn(async () => '') }));
+jest.mock('../Modules/Tasks/helpers/taskWritePlacement', () => ({ readableTaskIds: jest.fn(async (companyId, uid, ids) => ids) }));
 jest.mock('../Modules/Agents/actor', () => {
     const isAgent = (a) => Boolean(a && a.kind === 'agent');
     return {

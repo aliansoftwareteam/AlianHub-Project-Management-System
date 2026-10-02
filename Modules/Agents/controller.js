@@ -34,7 +34,9 @@ const confidence = require('./engine/confidence');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const triggers = require('./triggers');
 const { agentsRefused } = require('./guard');
-const { personDecides } = require('./personDecides');
+const { personDecides, refuse } = require('./personDecides');
+const runStart = require('./runStart');
+const proposalFiling = require('./proposalFiling');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
 const companyOf = (req) => String(req.headers['companyid'] || '');
@@ -480,7 +482,8 @@ exports.startRun = async (req, res) => {
         if (taskId) {
             task = await tools.getTask(companyId, taskId).catch(() => null);
             if (!task) return fail(res, 'Task not found.', 404);
-            if (human && !(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
+            if (!human && !triggers.isWorkTask(task)) return fail(res, 'Task not found.', 404);
+            if (!(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
             if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) return fail(res, 'This agent is not scoped to that project.', 403);
         }
         if (!task) {
@@ -490,6 +493,8 @@ exports.startRun = async (req, res) => {
         }
         const paused = await runs.pausedIn(companyId, task.ProjectID);
         if (paused) return fail(res, paused, 409);
+        const held = human ? '' : await runStart.heldBy(companyId, actor, task);
+        if (held) return refuse(req, res, actor, { action: runStart.START, reason: held, params: { taskId: String(task._id) }, entityId: String(task._id) });
         const { run, deduplicated } = await runs.start(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note, spendCapUsd, notifyMe: Boolean(notifyMe), idempotencyKey });
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
         if (deduplicated) return res.send({ status: true, statusText: 'Run already started.', data: { ...plain, deduplicated: true } });
@@ -616,7 +621,9 @@ exports.listProposals = async (req, res) => {
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
 
-/* POST /api/v2/agents/proposals — only an agent files one, and only in its own name */
+const NAMED_NOT_FOUND = 'A task, project, list, doc or run this proposal names was not found.';
+
+/* POST /api/v2/agents/proposals — only an agent files one, only in its own name, and only about what its person can open */
 exports.createProposal = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -630,7 +637,12 @@ exports.createProposal = async (req, res) => {
         const agent = await runs.getAgent(companyId, agentId);
         if (!agent) return fail(res, 'Agent not found.', 404);
         if (actor.tokenId && require('./connectors/slackPost').hasSlackChange(b.changes)) return fail(res, 'A Slack message is proposed only by a workspace agent\'s own run, not through a token.', 403);
-        const saved = await proposals.create(companyId, { agent, runId: b.runId || actor.runId, taskId: b.taskId, projectId: b.projectId, what: b.what, why: b.why, changes: b.changes, gate: b.gate, priority: b.priority, cost: b.cost });
+        const runId = b.runId || actor.runId;
+        const open = await proposalFiling.namesOnlyOpenThings(companyId, actor.userId, b) && (!runId || await proposalFiling.ownRun(companyId, actor.userId, agentId, runId));
+        if (!open) return fail(res, NAMED_NOT_FOUND, 404);
+        const refused = await proposalFiling.refusedChange(companyId, actor, b);
+        if (refused) return refuse(req, res, actor, { ...refused, entityId: refused.params.taskId });
+        const saved = await proposals.create(companyId, { agent, runId, taskId: b.taskId, projectId: b.projectId, what: b.what, why: b.why, changes: b.changes, gate: proposalFiling.gateAsked(b.gate), priority: b.priority, cost: b.cost });
         return res.send({ status: true, statusText: 'Proposal filed.', data: saved });
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
