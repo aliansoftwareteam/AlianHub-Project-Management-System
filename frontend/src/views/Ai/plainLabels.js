@@ -1,3 +1,5 @@
+import { changeLabel, labelSlug } from "./agentActionLabels";
+
 // Built-in skills carry persona names ("Reviewer") in their records, which say
 // who rather than what; these keys are named from the i18n map instead.
 const BUILT_IN_SKILLS = Object.freeze(["brief.parse", "project.plan", "pr.summary", "risk.flags", "digest.ceo", "risk.today", "project.guide", "qa-review", "fields.fill", "prd.draft", "wiki.upkeep", "slack.summary"]);
@@ -9,7 +11,7 @@ const AUTONOMY_LEVELS = Object.freeze([0, 1, 2, 3]);
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const WAITING_MARK_DAYS = 3;
 
-export const labelSlug = (key) => String(key || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+export { labelSlug };
 
 export const humaniseKey = (key) => {
     const words = String(key || "").replace(/[^A-Za-z0-9]+/g, " ").trim().toLowerCase();
@@ -69,7 +71,7 @@ const wordsOf = (value) => {
 
 const titleFromChanges = (t, proposal) => {
     const changes = Array.isArray(proposal && proposal.changes) ? proposal.changes : [];
-    const first = wordsOf(changes[0] && changes[0].label);
+    const first = wordsOf(changeLabel(t, changes[0]));
     if (!first) return t("Ai.proposal_untitled");
     const more = changes.length - 1;
     return more ? t("Ai.proposal_first_and_more", { label: first, n: more }, more) : first;

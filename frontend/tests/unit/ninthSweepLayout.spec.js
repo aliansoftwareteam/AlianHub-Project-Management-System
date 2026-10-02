@@ -253,6 +253,10 @@ describe('a proposal filed with no title', () => {
         expect(proposalTitle(t, { changes: [change('Post the summary'), change('Set the due date'), change('Assign it')] })).toBe('Post the summary and 2 more changes');
     });
 
+    it('reads a change filed with the stock label in the words the page has for it', () => {
+        expect(proposalTitle(t, { what: 'undefined', changes: [{ action: 'task.comment', label: 'Comment', stockLabel: true }] })).toBe(en.AgentActions.task_comment);
+    });
+
     it('never shows the word undefined, even with nothing to name it by', () => {
         expect(proposalTitle(t, { what: 'undefined' })).toBe(en.Ai.proposal_untitled);
         expect(proposalTitle(t, { what: 'null', changes: [change('undefined')] })).toBe(en.Ai.proposal_untitled);
