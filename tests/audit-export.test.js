@@ -48,7 +48,7 @@ describe('INS-08 audit CSV export', () => {
         const out = await exportCsv({ entityId: ENTITY });
         expect(out.headers['Content-Type']).toContain('text/csv');
         expect(out.text.split('\n')).toHaveLength(102);
-        expect(out.text.split('\n')[0]).toBe('time,actorType,actor,agent,run,event,entity,reason,cost_usd,undone_at');
+        expect(out.text.split('\n')[0]).toBe('time,actorType,actor,agent,run,event,event_label,entity,reason,cost_usd,undone_at');
     });
 
     it('pages past a thousand rows', async () => {

@@ -231,6 +231,7 @@ import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
 import { agentActionLabel, changeLabel } from '@/views/Ai/agentActionLabels';
 import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
+import { plainReason } from '@/views/Ai/auditWords';
 import { decideEach, decideOne } from './approvalQueue';
 
 defineOptions({ name: 'ApprovalQueue' });
@@ -250,7 +251,7 @@ const STANDING_DAYS = 90;
 const REVIEW_TITLE_ID = 'aq-review-title';
 const SELECT_ALL_ID = 'aq-select-all';
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const { getUser } = useGetterFunctions();
 
 const busy = ref(false);
@@ -274,7 +275,7 @@ const holdAlwaysPanel = (el) => { alwaysPanel = el; };
 const onlyPreview = (p) => (p.source === SOURCE_MCP && (p.changes || []).length === 1 ? p.changes[0].preview : null);
 /* A change the project's rules filed is worded here from the facts it carries; its stored text is the fallback. */
 const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || intentTitle(t, p.batch || onlyPreview(p)) || proposalTitle(t, p);
-const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || p.why;
+const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || plainReason(t, te, p.why);
 const changeText = (change) => intentSummary(t, change.preview) || changeLabel(t, change);
 const alwaysKindOf = (p) => agentActionLabel(t, p.changes?.[0]?.action, p.alwaysKind);
 // The preview is the server's reading of a change for this viewer, never part of the change sent back.

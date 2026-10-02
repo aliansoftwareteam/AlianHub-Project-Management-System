@@ -65,7 +65,7 @@
             <div class="ah-toolbar">
                 <span class="ah-toolbar__title">
                     {{ $t('Docs.docs') }}
-                    <span class="ah-label hub__stats">{{ $t('Docs.pages_count', { n: pages.length }) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
+                    <span class="ah-label hub__stats">{{ $t('Docs.pages_count', { n: pages.length }, pages.length) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
                 </span>
                 <select v-model="view" class="hub__view-select">
                     <option value="recent">{{ $t('Docs.recent') }}</option>
@@ -151,7 +151,7 @@
 
                 <template v-else-if="view === 'wiki'">
                     <div class="hub__section-head">
-                        <span class="ah-label">{{ $t('Docs.pages_count', { n: wikiPages.length }) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
+                        <span class="ah-label">{{ $t('Docs.pages_count', { n: wikiPages.length }, wikiPages.length) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
                         <button type="button" class="ah-btn ah-btn--sm" :class="onlyDue ? 'ah-btn--outline' : 'ah-btn--secondary'" @click="onlyDue = !onlyDue">{{ $t('Docs.needs_review') }}</button>
                     </div>
                     <EmptyState
