@@ -1,21 +1,21 @@
 .custom-field__table-wrapper {
     padding: 20px;
-    border: 1px solid #E8E8E8;
+    border: 1px solid var(--hairline);
     border-radius: 8px;
-    background: #fff;
+    background: var(--surface);
 }
 .custome-field-table {
     max-height: calc(100vh - 205px);
     overflow: auto;
 }
 .custome-field-table tbody tr td span {
-    color: #6B6B6B;
+    color: var(--ink-2);
     font-size: 13px;
     font-weight: 400;
     line-height: 19.24px;
 }
 .custome-field-table tbody tr td .project_bg{
-    color: #535358;
+    color: var(--ink-label);
 }
 .custome-field-table tbody tr .edit__item{
     opacity: 0;
@@ -25,12 +25,12 @@
 }
 
     table{
-        background:#fff;
+        background:var(--surface);
         border:0px;
     }
     table thead {
     border-radius: 6px 6px 0px 0px;
-    background: #F4F5F7;
+    background: var(--fill);
     position: sticky;
     top: -20px;
     z-index:1;
@@ -47,7 +47,7 @@
         font-size: 12px;
         font-style: normal;
         font-weight: 500;
-        color: #3a3a3a
+        color: var(--ink)
     }
     table td{
         padding:3px 10px;
@@ -93,7 +93,7 @@ table thead tr th:last-child {
     .type svg{margin-right:3px;}
     .project_bg {
     border-radius: 6px;
-    background: #ECEEF1;
+    background: var(--fill);
     padding: 4.5px 10px;
     width: fit-content;
 }

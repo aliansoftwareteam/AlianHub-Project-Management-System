@@ -41,6 +41,7 @@ mongoHelper.getTotalSprintCount = async () => true;
 
 const SPRINT = '6f0000000000000000000e01';
 const OTHER_SPRINT = '6f0000000000000000000e02';
+const NEW_SPRINT = '6f0000000000000000000e03';
 const FIELD = '6f0000000000000000000e0f';
 const FOLDER = '6f0000000000000000000f01';
 const OTHER_TASK = '6f0000000000000000000b09';
@@ -128,6 +129,7 @@ const reset = () => {
     mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: FIELD, fieldTitle: 'Customer', fieldType: 'text', type: 'task', global: true, isDelete: true });
     mockDb.seed('tasks', taskDoc(OPEN_TASK));
     mockDb.seed('tasks', taskDoc(OPEN_TASK_2, { extraLists: [{ projectId: OPEN_PROJECT, sprintId: OTHER_SPRINT, addedBy: OWNER }] }));
+    require('../Modules/Sprints/controller').addSprintFun.mockResolvedValue({ status: true, data: { _id: NEW_SPRINT, name: 'Parity task' } });
 };
 
 beforeEach(reset);
@@ -521,7 +523,8 @@ const linkTasks = () => {
     link(OPEN_TASK_2, OPEN_TASK, 'blocked_by');
 };
 
-/* The list a move names is stored as the server holds it, so a move into a folder list needs the list to sit in that folder. */
+/* The list a move names is stored as the server holds it, so a move into a folder list needs the list to sit in that folder;
+ * a task made a list in a folder needs the folder to be one of its project. */
 const listInFolder = () => {
     const { folderId, name } = WEB_APP_BODIES.PLACEMENT.PICKED_FOLDER;
     mockDb.store.sprints.find((sprint) => String(sprint._id) === OTHER_SPRINT).folderId = folderId;
@@ -530,7 +533,7 @@ const listInFolder = () => {
 
 describe('every web-app body is served as before', () => {
     const rows = WEB_APP_BODIES.map((row) => [`${row.route}${row.action ? ` ${row.action}` : ''} (${row.source})`, row]);
-    const SEEDS = { remove: linkTasks, 'ConvertToSubTaskSidebar.vue move into a folder list': listInFolder };
+    const SEEDS = { remove: linkTasks, 'ConvertToSubTaskSidebar.vue move into a folder list': listInFolder, 'ConvertToList.vue into a picked folder': listInFolder };
 
     test.each(rows)('%s', async (_, row) => {
         const ids = { taskId: OPEN_TASK, otherTaskId: OPEN_TASK_2, projectId: OPEN_PROJECT, destinationProjectId: OPEN_PROJECT };
@@ -587,5 +590,38 @@ describe('a move keeps on the task the few values that name its new list', () =>
     test('a list made from a task names its folder by id and name', () => {
         expect(convertedToListIn(PICKED_FOLDER)(ids).folderData).toEqual({ folderId: PICKED_FOLDER.folderId, name: 'Design' });
         expect(convertedToListIn({})(ids).folderData).toBeNull();
+    });
+});
+
+describe('every action answers, whatever its queries do', () => {
+    /* What a handler's queries answer once the request is prepared: a row that is gone, or a database that is away. */
+    const NOTHING = { find: [], findOne: null, aggregate: [], countDocuments: 0 };
+    const QUERIES = {
+        'find no task': (method, type) => (type === 'tasks' && READS.includes(method) ? { value: NOTHING[method] } : null),
+        'find nothing': (method) => (READS.includes(method) ? { value: NOTHING[method] } : null),
+        'write to no row': (method) => (['findOneAndUpdate', 'updateOne'].includes(method) ? { value: null } : null),
+        fail: () => ({ error: new Error('The database is away.') }),
+    };
+    const cases = Object.keys(TASK_ACTION_FIELDS).flatMap((action) => Object.keys(QUERIES).map((how) => [action, how]));
+
+    test.each(cases)('%s when its queries %s', async (action, how) => {
+        const route = action.startsWith('bulk') ? BULK : PATCH;
+        const handler = taskMongo[action];
+        const stored = mockDb.crud.getMockImplementation();
+        let handling = false;
+        const spy = jest.spyOn(taskMongo, action).mockImplementation(function handled(payload) { handling = true; return handler.call(this, payload); });
+        mockDb.crud.mockImplementation(async (companyId, query, method) => {
+            const outcome = handling ? QUERIES[how](method, query.type) : null;
+            if (outcome && outcome.error) throw outcome.error;
+            return outcome ? outcome.value : stored(companyId, query, method);
+        });
+
+        const result = await call(route, bodyFor(route, action));
+        handling = false;
+        mockDb.crud.mockImplementation(stored);
+        spy.mockRestore();
+
+        expect([action, result.code]).not.toEqual([action, 'no answer']);
+        expect(result.body).toEqual(expect.objectContaining({ status: expect.any(Boolean) }));
     });
 });

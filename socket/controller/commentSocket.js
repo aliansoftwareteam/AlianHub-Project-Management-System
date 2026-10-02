@@ -41,7 +41,7 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
      */
     socket.on('commentTyping', (data) => {
         const { identity } = socket;
-        if (!identity || !data || !data.roomPrefix || !socket.rooms.has(roomFor(socket, data.roomPrefix))) return;
+        if (!identity || !data || typeof data.roomPrefix !== 'string' || !data.roomPrefix || !socket.rooms.has(roomFor(socket, data.roomPrefix))) return;
 
         const payload = {
             roomPrefix: data.roomPrefix,
@@ -53,6 +53,8 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
         const others = findRoomsByPrefix(data.roomPrefix).filter((entry) => entry.socket && entry.socket !== socket);
         if (!others.length) return;
         inOrder(async () => {
+            // The sender's room outlives their access too, so they are asked the same question as each receiver.
+            if (!(await mayReceiveComments(identity, identity, data.roomPrefix))) return;
             for (const entry of others) {
                 // eslint-disable-next-line no-await-in-loop
                 if (!(await mayReceiveComments(entry.socket.identity, identity, data.roomPrefix))) continue;

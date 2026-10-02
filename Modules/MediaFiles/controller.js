@@ -4,18 +4,42 @@ const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { taskIdMatch } = require("../Comments/helpers/taskIdMatch");
-const { commentThreadAccess } = require("../Comments/helpers/threadAccess");
+const { commentThreadAccess, refuseThread } = require("../Comments/helpers/threadAccess");
+const { CHANNEL_THREAD } = require("../Comments/helpers/conversation");
 
-const THREAD_KINDS = ['task', 'project', 'chat'];
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const isId = (value) => typeof value === 'string' && OBJECT_ID.test(value);
+const oid = (id) => new mongoose.Types.ObjectId(id);
 
-/* The files of a thread are read by whoever reads that thread on the comment routes; anyone else is answered as
- * for a thread that holds none. `match` leaves out the private lists the caller is not on. */
-const threadFilesAccess = async (req, kind, selected) => {
-    if (!THREAD_KINDS.includes(kind) || !selected || typeof selected !== 'object') return { allowed: false };
-    const thread = kind === 'project'
-        ? { projectId: selected._id }
-        : { projectId: selected.ProjectID, sprintId: selected.sprintId, taskId: selected._id };
-    return commentThreadAccess(req.headers['companyid'], req.uid, thread);
+/* The comment thread a media read names: a project's own comments, or those of one task or conversation in a
+ * list. Null when an id is not an id, so nothing the request sends reaches the query as an operator. */
+const threadOf = (kind, selected) => {
+    if (!selected || typeof selected !== 'object') return null;
+    if (kind === 'project') return isId(selected._id) ? { projectId: selected._id } : null;
+    if (kind !== 'task' && kind !== 'chat') return null;
+    const { ProjectID: projectId, sprintId, _id: taskId } = selected;
+    if (!isId(projectId) || !isId(sprintId) || !(isId(taskId) || taskId === CHANNEL_THREAD)) return null;
+    return { projectId, sprintId, taskId };
+};
+
+const threadConditions = ({ projectId, sprintId, taskId }) => (taskId === undefined
+    ? [{ projectId: oid(projectId) }, { project: true }]
+    : [{ projectId: oid(projectId) }, { project: false }, { sprintId: oid(sprintId) }, { taskId: taskIdMatch(taskId) }]);
+
+/* The conditions that hold a media read to one thread the caller can open, as the comment routes decide it;
+ * or null once the refusal is sent. */
+const openThreadConditions = async (req, res, kind, selected) => {
+    const thread = threadOf(kind, selected);
+    if (!thread) {
+        res.status(400).json({ error: 'Invalid selectedData' });
+        return null;
+    }
+    const access = await commentThreadAccess(req.headers['companyid'], req.uid, thread);
+    if (!access.allowed) {
+        refuseThread(res, access);
+        return null;
+    }
+    return [...threadConditions(thread), access.match];
 };
 
 exports.getPaginateMediaFiles = async (req, res) => {
@@ -26,8 +50,6 @@ exports.getPaginateMediaFiles = async (req, res) => {
             searchValue,
             searchByUserId,
             selectedOrder,
-            nPerPage,
-            startValue,
             skip,
             batchSize,
             mediaTypes,
@@ -48,11 +70,11 @@ exports.getPaginateMediaFiles = async (req, res) => {
             logger.error(`Invalid parsedSelectedData or parsedMediaTypes format`);
             return res.status(400).json({ error: 'Invalid selectedData or parsedMediaTypes format' });
         }
+        if (!Array.isArray(parsedMediaTypes) || !parsedMediaTypes.every((type) => typeof type === 'string')) {
+            return res.status(400).json({ error: 'Invalid selectedData or parsedMediaTypes format' });
+        }
 
-        const access = await threadFilesAccess(req, handleType, parsedSelectedData);
-        if (!access.allowed) return res.status(200).json([]);
-
-        let matchConditions = [access.match];
+        let matchConditions = [];
 
         if (excludeMediaTypes) {
             matchConditions.push({
@@ -73,60 +95,28 @@ exports.getPaginateMediaFiles = async (req, res) => {
         }
 
         if (searchByUserId) {
-            const userIds = JSON.parse(searchByUserId);
-            if (Array.isArray(userIds)) {
-                matchConditions.push({
-                    userId: { $in: userIds },
-                });
+            let userIds;
+            try {
+                userIds = JSON.parse(searchByUserId);
+            } catch (error) {
+                userIds = null;
             }
+            if (!Array.isArray(userIds) || !userIds.every(isId)) return res.status(400).json({ error: 'Invalid searchByUserId format' });
+            matchConditions.push({ userId: { $in: userIds } });
         }
 
-        if (handleType === 'task') {
-            matchConditions.unshift(
-                { projectId: new mongoose.Types.ObjectId(parsedSelectedData.ProjectID) },
-                { project: false },
-                { sprintId: new mongoose.Types.ObjectId(parsedSelectedData.sprintId) },
-                { taskId: taskIdMatch(parsedSelectedData._id) }
-            );
-        } else if (handleType === 'project') {
-            matchConditions.unshift(
-                { projectId: new mongoose.Types.ObjectId(parsedSelectedData._id) },
-                { project: true }
-            );
-        } else if (handleType === 'chat') {
-            matchConditions.unshift(
-                { projectId: new mongoose.Types.ObjectId(parsedSelectedData.ProjectID) },
-                { project: false },
-                { sprintId: new mongoose.Types.ObjectId(parsedSelectedData.sprintId) },
-                { taskId: taskIdMatch(parsedSelectedData._id) }
-            );
-        }
+        const threadMatch = await openThreadConditions(req, res, handleType, parsedSelectedData);
+        if (!threadMatch) return undefined;
+        matchConditions.unshift(...threadMatch);
 
-        let finalQuery = [
+        const pipeline = [
             { $match: { $and: matchConditions } },
-            {
-                $sort: {
-                    mediaName: selectedOrder === '0' ? 1 : -1,
-                    _id: 1,
-                },
-            },
+            { $sort: { mediaName: selectedOrder === '0' ? 1 : -1, _id: 1 } },
             { $skip: parseInt(skip, 10) || 0 },
-            { $limit: parseInt(batchSize, 10) }
-    
-        ];
-       
-        const queryfinalQuery = [
-            finalQuery,
+            { $limit: parseInt(batchSize, 10) },
         ];
 
-        const results = await MongoDbCrudOpration(
-            req.headers['companyid'],
-            {
-                type: SCHEMA_TYPE.COMMENTS,
-                data: [queryfinalQuery],
-            },
-            'aggregate'
-        );
+        const results = await MongoDbCrudOpration(req.headers['companyid'], { type: SCHEMA_TYPE.COMMENTS, data: [pipeline] }, 'aggregate');
 
         res.status(200).json(results);
     } catch (error) {
@@ -152,42 +142,9 @@ exports.getMediaFileUsers = async (req, res) => {
             return res.status(400).json({ error: 'Invalid selectedData format' });
         }
 
-        const access = await threadFilesAccess(req, fromWhich, parsedSelectedData);
-        if (THREAD_KINDS.includes(fromWhich) && !access.allowed) return res.status(200).json([]);
-
-        let matchConditions = [];
-
-        if (fromWhich === 'task') {
-            matchConditions = [
-                { projectId: new mongoose.Types.ObjectId(parsedSelectedData.ProjectID) },
-                { project: false },
-                { sprintId: new mongoose.Types.ObjectId(parsedSelectedData.sprintId) },
-                { taskId: taskIdMatch(parsedSelectedData._id) },
-                { type: { $in: ['audio'] } },
-                { isDeleted: false },
-            ];
-        } else if (fromWhich === 'project') {
-            matchConditions = [
-                { projectId: new mongoose.Types.ObjectId(parsedSelectedData._id) },
-                { project: true },
-                { type: { $in: ['audio'] } },
-                { isDeleted: false },
-            ];
-        } else if (fromWhich === 'chat') {
-            matchConditions = [
-                { projectId: new mongoose.Types.ObjectId(parsedSelectedData.ProjectID) },
-                { project: false },
-                { sprintId: new mongoose.Types.ObjectId(parsedSelectedData.sprintId) },
-                { taskId: taskIdMatch(parsedSelectedData._id) },
-                { type: { $in: ['audio'] } },
-                { isDeleted: false },
-            ];
-        } else {
-            logger.error('Invalid fromWhich parameter');
-            return res.status(400).json({ error: 'Invalid fromWhich parameter' });
-        }
-
-        matchConditions.push(access.match);
+        const threadMatch = await openThreadConditions(req, res, fromWhich, parsedSelectedData);
+        if (!threadMatch) return undefined;
+        const matchConditions = [...threadMatch, { type: { $in: ['audio'] } }, { isDeleted: false }];
 
         if (searchValue) {
             matchConditions.push({

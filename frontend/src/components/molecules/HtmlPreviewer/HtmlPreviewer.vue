@@ -81,8 +81,8 @@ import { apiRequest } from '@/services';
 
 <style scoped>
   .preview-container {
-    border: 1px solid #ccc;
-    background: #fff;
+    border: 1px solid var(--border);
+    background: var(--surface);
     padding: 5px 12px 12px 12px;
     max-width: 100%;
     width: 100%;
@@ -116,7 +116,7 @@ import { apiRequest } from '@/services';
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
+    background-color: var(--border);
     transition: 0.4s;
     border-radius: 34px;
     overflow: hidden;
@@ -129,7 +129,7 @@ import { apiRequest } from '@/services';
     width: 20px;
     left: 6px;
     bottom: 2px;
-    background-color: white;
+    background-color: var(--surface);
     transition: 0.4s;
     border-radius: 50%;
     display: flex;
@@ -165,7 +165,7 @@ import { apiRequest } from '@/services';
   }
 
   input:checked+.switch-slider {
-    background-color: #2196F3;
+    background-color: var(--brand);
   }
 
   input:checked+.switch-slider:before {
@@ -178,7 +178,7 @@ import { apiRequest } from '@/services';
 
   input:checked+.switch-slider .slider-icon img,
   input:checked+.switch-slider .slider-icon span {
-    color: white;
+    color: var(--on-brand);
     filter: brightness(1) invert(1);
   }
 
@@ -189,7 +189,7 @@ import { apiRequest } from '@/services';
     min-height: 300px;
     overflow: auto;
     padding: 10px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border);
     height: calc(100% - 52px);
   }
 
@@ -197,7 +197,7 @@ import { apiRequest } from '@/services';
     width: 100%;
     height: calc(100% - 52px);
     min-height: 300px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border);
     font-family: monospace;
     padding: 10px;
   }

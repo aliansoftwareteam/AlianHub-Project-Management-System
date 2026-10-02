@@ -153,3 +153,27 @@ describe('Invitation page for an invitee who may already have an account', () =>
         expect(localStorage.getItem('selectedCompany')).toBeNull();
     });
 });
+
+describe('the sign-up form on the invitation page', () => {
+    beforeEach(() => {
+        Object.values(mocks).forEach((mock) => mock.mockReset());
+        localStorage.clear();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    });
+
+    afterEach(() => vi.useRealTimers());
+
+    it('starts in the name box as it is drawn, and leaves the person in the box they moved to', async () => {
+        const wrapper = mount(Invitation, {
+            attachTo: document.body,
+            global: { provide: { $axios: previewSays(), addSubscription: vi.fn() }, stubs: { 'router-link': true } },
+        });
+        await flushPromises();
+        expect(document.activeElement).toBe(wrapper.find('#inv-name').element);
+
+        wrapper.find('#inv-password').element.focus();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(document.activeElement).toBe(wrapper.find('#inv-password').element);
+        wrapper.unmount();
+    });
+});

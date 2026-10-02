@@ -72,6 +72,8 @@ exports.createPto = async (req, res) => {
         const privileged = isPrivileged(roleType);
         const body = req.body || {};
         const targetUser = privileged && body.userId ? String(body.userId) : String(req.uid);
+        const decidesForSomeone = privileged && (targetUser !== String(req.uid) || (body.status && body.status !== 'pending'));
+        if (decidesForSomeone && !(await personDecides(req, res, 'pto.decide'))) return undefined;
         if (targetUser !== String(req.uid) && (await nonMembersOf(companyId, [targetUser])).length) {
             return res.status(400).json({ status: false, statusText: NOT_A_MEMBER });
         }

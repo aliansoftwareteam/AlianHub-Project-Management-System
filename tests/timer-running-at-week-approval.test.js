@@ -27,6 +27,8 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../event/socketEventEmitter.js', () => ({ emit: jest.fn() }));
 jest.mock('../common-storage/common-server.js', () => ({ handleFileUploadForTrackerSS: jest.fn(), handleuploadMainFileForbase64Thumbnail: jest.fn() }));
 jest.mock('../common-storage/common-wasabi.js', () => ({ handleFileUploadForTrackerSS: jest.fn(), handleuploadMainFileForbase64Thumbnail: jest.fn() }));
+// Which task a timer may start on has its own suite (tracker-start-access); these cases are about the timer row.
+jest.mock('../Modules/LogTime/controllerV2/sessionUser', () => ({ ...jest.requireActual('../Modules/LogTime/controllerV2/sessionUser'), trackedTask: jest.fn(async () => ({})) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const approval = require('../Modules/TimesheetApproval/controller');

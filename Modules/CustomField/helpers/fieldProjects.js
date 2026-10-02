@@ -44,6 +44,7 @@ const applyLinks = async (companyId, field, { add, remove }) => {
  * socket/controller/customFieldSocket.js. */
 const announceFields = (companyId, type = 'update') => {
     removeCache(`customField:${companyId}`);
+    removeCache(`computedFields:${companyId}`);
     socketEmitter.emit(type, { type, companyId: String(companyId), module: 'customFields' });
 };
 

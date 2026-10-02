@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue";
+import { nextTick, onMounted, reactive, ref } from "vue";
 
 defineOptions({ name: "NewPasswordCard" });
 import { useRoute, useRouter } from "vue-router";
@@ -101,7 +101,8 @@ onMounted(async () => {
         const result = await apiRequestWithoutSecure("post", env.TOKEN_VERIFY_FORGOTPASSWORD, { token: route.params.token });
         userId.value = result.data.data._id;
         stage.value = "form";
-        setTimeout(() => passwordInput.value?.focus(), 50);
+        await nextTick();
+        passwordInput.value?.focus();
     } catch {
         stage.value = "expired";
     }

@@ -314,12 +314,22 @@
                             />
                             <!-- AI Assist (AHE-3777): project-level AI task generation, opened from the toolbar. -->
                             <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" :sprints="aiSprints" :activeSprintId="aiActiveSprintId" @done="onAiTasksCreated" />
+                            <ArchivedLists v-if="showArchived && archivedLists.length" :project="projectData" :lists="archivedLists" />
+                            <FolderGoneState v-if="folderGone" :project="projectData" @open="openProjectOfGoneFolder" />
                             <FolderEmptyState
-                                v-if="folderWithNoLists"
+                                v-else-if="folderWithNoLists"
                                 :project="projectData"
                                 :folders="projectData.sprintsfolders"
                                 :folder="folderWithNoLists"
                                 @create="newInProject?.start('sprint')"
+                            />
+                            <EmptyState
+                                v-else-if="searchFailed"
+                                role="alert"
+                                :title="$t('Projects.search_failed_title')"
+                                :message="$t('Projects.search_failed_msg')"
+                                :actionLabel="$t('Projects.search_try_again')"
+                                @action="searchMongoDB"
                             />
                             <component
                                 v-else-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
@@ -504,9 +514,12 @@ import ProjectSidebars from './components/ProjectSidebars.vue';
 import ProjectBottomModals from './components/ProjectBottomModals.vue';
 import ProjectEmptyState from './components/ProjectEmptyState.vue';
 import FolderEmptyState from './components/FolderEmptyState.vue';
+import ArchivedLists from './components/ArchivedLists.vue';
+import FolderGoneState from './components/FolderGoneState.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
+import { archivedListsOf, folderIsGone, folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
 import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
@@ -708,7 +721,7 @@ const { changeAssignee } = useProjectAssignee(projectData);
 const { archive, showSidebar, showSpinner, updateProject } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
 const projectSearch = useProjectSearch(projectData, showArchived, { buildFilterQuery });
-const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy, agentWorking, setAgentWorking } = projectSearch;
+const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, searchFailed, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy, agentWorking, setAgentWorking } = projectSearch;
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));
@@ -1090,6 +1103,10 @@ const headerFolders = computed(() => headerPlace.value.folders);
 /* The task views can only say that no task shows; on the page of a folder that holds no list, the missing thing is a list. */
 const TASK_VIEWS = ['ProjectListView', 'ProjectKanban', 'TableView'];
 const newInProject = ref(null);
+const archivedLists = computed(() => archivedListsOf(projectData.value)
+    .filter((list) => isOwnerOrAdmin(companyUserDetail.value?.roleType) || !list.private || list.AssigneeUserId?.includes(userId.value)));
+const folderGone = computed(() => !sprintLoading.value && folderIsGone(getters['projectData/folders']?.[projectData.value?._id], route.params?.folderId));
+const openProjectOfGoneFolder = () => router.replace({ name: 'Project', params: { cid: route.params?.cid, id: projectData.value?._id }, query: { tab: route.query?.tab } });
 const folderWithNoLists = computed(() => (route.params?.folderId && !route.params?.sprintId && !showArchived.value && !sprintLoading.value && TASK_VIEWS.includes(activeTab.value)
     ? folderWithoutLists(projectData.value?.sprintsfolders, route.params.folderId)
     : null));

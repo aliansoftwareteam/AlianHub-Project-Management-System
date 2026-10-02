@@ -66,7 +66,7 @@ const listed = listedThrough(server);
 
 const TOOL = 'project.duplicate';
 const NAME = 'Open, second round';
-const NO_PROJECT = 'not_visible: the project is not one the person behind this token can open';
+const NO_PROJECT = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
 const PEOPLE = [OWNER, INSIDER, OUTSIDER, GUEST];
 const MEMBER_KEYS = ['project_create', 'project_delete', 'project_close'];
 const ASK = { projectId: P_OPEN, name: `  ${NAME}\u0007 `, reason: 'The next round starts from the same setup' };
@@ -159,7 +159,7 @@ describe('a copy is never made before a person has seen it', () => {
         const params = { sourceProjectId: P_OPEN, name: NAME };
         expect(await projectPolicy.ask({ companyId: CID, actor: as(INSIDER).actor, action: TOOL, params })).toMatchObject({ decision: 'propose' });
         const call = (given) => actions.perform({ companyId: CID, actor: as(OWNER).actor, action: TOOL, params: given, reason: 'direct' });
-        await expect(call(params)).rejects.toThrow(/must be proposed/);
+        await expect(call(params)).rejects.toThrow(/has to be sent as a proposal/);
         await expect(call({ ...params, __proposal: true })).rejects.toThrow(/waits for a person's approval/);
         expect(projectsNamed()).toHaveLength(0);
     });
@@ -178,7 +178,7 @@ describe('who may ask for a copy', () => {
         const before = everythingNow();
         const out = await rpc(as(OUTSIDER), TOOL, ASK);
         expect(out).toMatchObject({ refused: true });
-        expect(out.reason).toMatch(/^permission_denied: the person behind this token may not create a project by hand \(project\.project_create is not granted\)$/);
+        expect(out.reason).toMatch(/^permission_denied: the person you act for is not allowed to create a project themselves\. Ask someone who can\. \(The permission project\.project_create is missing\.\)$/);
         expect(audits(TOOL).map((row) => row.meta.ran)).toEqual([false]);
         expect(everythingNow()).toBe(before);
         expect(waiting()).toHaveLength(0);
@@ -200,8 +200,8 @@ describe('who may ask for a copy', () => {
 
     it('refuses a token kept to some projects, even to the project it names, and a token that only reads', async () => {
         const kept = { ...as(INSIDER), projectIds: narrowed(INSIDER, [P_OPEN]).projectIds };
-        expect(await rpc(kept, TOOL, ASK)).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible: .*kept to some projects/) });
-        expect(await rpc(readOnly(OWNER), TOOL, ASK)).toMatchObject({ isError: true, error: 'This token is read-only.' });
+        expect(await rpc(kept, TOOL, ASK)).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible: .*limited to some projects/) });
+        expect(await rpc(readOnly(OWNER), TOOL, ASK)).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
         expect(waiting()).toHaveLength(0);
     });
 
@@ -367,7 +367,7 @@ describe('approving makes the copy as the web app would, private to the person w
     it('moves the copy to the trash, and says so, if it ever came out open to anyone but the approver', async () => {
         jest.spyOn(copyRules, 'forCallerAlone').mockImplementation((bundle) => bundle);
         const out = await approve(await filed(as(INSIDER)));
-        expect(out.applied[0]).toMatchObject({ ok: false, error: expect.stringMatching(/not private to the approver.*moved to the trash/) });
+        expect(out.applied[0]).toMatchObject({ ok: false, error: expect.stringMatching(/not private to the person approving, so it was moved to the trash/) });
         expect(Number(made().deletedStatusKey)).toBe(1);
     });
 });
@@ -400,14 +400,14 @@ describe('undo moves the copy to the trash', () => {
         const first = await filed(as(INSIDER), WITH_TASKS);
         await approve(first);
         mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Draft the brief', ProjectID: String(made()._id), CompanyId: CID, statusKey: 1, deletedStatusKey: 0 });
-        expect((await undo(first)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/"Open, second round" holds a task that was not part of the copy, so it stays/) });
+        expect((await undo(first)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/The project "Open, second round" has a task that was not part of the copy, so it was kept/) });
         expect(live(made())).toBe(true);
         expect(audits(TOOL, 'applied')[0].meta.undoneAt).toBeFalsy();
 
         const second = await filed(as(INSIDER), { ...ASK, name: 'Third round' });
         await approve(second);
         mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Round notes', ProjectID: String(made('Third round')._id), createdBy: INSIDER, deletedStatusKey: 0 });
-        expect((await undo(second)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/holds a doc now/) });
+        expect((await undo(second)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/has a doc now/) });
         expect(live(made('Third round'))).toBe(true);
     });
 
@@ -416,7 +416,7 @@ describe('undo moves the copy to the trash', () => {
         await approve(id);
         setRule('project_delete', false, [3]);
         setRule('project_close', false, [3]);
-        expect((await undo(id)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/may not delete/) });
+        expect((await undo(id)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/not allowed to delete/) });
         expect(live(made())).toBe(true);
     });
 });

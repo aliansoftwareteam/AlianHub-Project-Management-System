@@ -205,8 +205,8 @@ describe('a count of one reads as one', () => {
     it.each([
         ['Everything.subtasks_n', { n: 1 }, 1, '1 subtask'],
         ['Everything.subtasks_n', { n: 3 }, 3, '3 subtasks'],
-        ['List.risk_factor_subtasks', { done: 0, total: 1 }, 1, 'Only 0 of 1 subtask done'],
-        ['List.risk_factor_subtasks', { done: 1, total: 4 }, 4, 'Only 1 of 4 subtasks done'],
+        ['List.risk_factor_subtasks', { done: 0, total: 1 }, 1, 'Only 0 of 1 subtask finished'],
+        ['List.risk_factor_subtasks', { done: 1, total: 4 }, 4, 'Only 1 of 4 subtasks finished'],
         ['Parity.n_projects', { n: 1 }, 1, '1 project'],
         ['Parity.n_projects', { n: 2 }, 2, '2 projects'],
         ['Parity.n_skills', { n: 1 }, 1, '1 skill'],

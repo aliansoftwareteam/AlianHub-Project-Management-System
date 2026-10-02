@@ -28,17 +28,17 @@ beforeEach(() => {
 describe('AUT-08 task.get stays inside the token scope and what the holder can see', () => {
     it('answers task not found for a task outside the projects the token is scoped to', async () => {
         const outside = task(OUT_OF_SCOPE);
-        expect(await buildBrief(ctx([IN_SCOPE]), outside._id)).toEqual({ error: 'task not found' });
+        expect(await buildBrief(ctx([IN_SCOPE]), outside._id)).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
     });
 
     it('answers task not found for a task in a project the holder cannot open, even with no token scope', async () => {
         const hidden = task(HIDDEN);
-        expect(await buildBrief(ctx(), hidden._id)).toEqual({ error: 'task not found' });
+        expect(await buildBrief(ctx(), hidden._id)).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
     });
 
     it('answers task not found for an invalid or missing id', async () => {
-        expect(await buildBrief(ctx(), 'nope')).toEqual({ error: 'task not found' });
-        expect(await buildBrief(ctx(), '6f00000000000000000000ff')).toEqual({ error: 'task not found' });
+        expect(await buildBrief(ctx(), 'nope')).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+        expect(await buildBrief(ctx(), '6f00000000000000000000ff')).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
     });
 
     it('returns the brief for a task inside the scope', async () => {

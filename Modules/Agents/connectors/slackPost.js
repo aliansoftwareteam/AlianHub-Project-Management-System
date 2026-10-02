@@ -24,13 +24,13 @@ const textOf = (value) => {
 
 /* The change as it is stored and shown: the channel's id and Slack's own name for it, and the exact text. */
 const admit = async (companyId, params = {}) => {
-    if (!flag.slackOn()) throw refuse('The Slack connector is off.', 'connector_off');
+    if (!flag.slackOn()) throw refuse('Slack is switched off on this server.', 'connector_off');
     if (FILE_KEYS.some((key) => params[key] !== undefined)) throw refuse('A Slack message from an agent is text only: no files, attachments or blocks.', 'text_only');
     const text = textOf(params.text);
     const row = await connection.find(companyId);
     if (!row || !(row.secretHandles && row.secretHandles.bot_token)) throw refuse('Slack is not connected in this workspace.', 'not_connected');
     const channel = connection.allowedChannel(row, params.channelId || params.channel);
-    if (!channel) throw refuse('That Slack channel is not on this workspace\'s allow-list.', 'channel_not_allowed');
+    if (!channel) throw refuse('That Slack channel is not on the list agents may post to. An owner or an admin can add it on the Integrations screen.', 'channel_not_allowed');
     return { channelId: channel.id, channelName: channel.name, text };
 };
 

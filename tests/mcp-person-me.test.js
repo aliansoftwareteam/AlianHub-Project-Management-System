@@ -53,7 +53,7 @@ const listed = listedThrough(server);
 const ME = 'person.me';
 const DAYS = 'workdays.get';
 const BOTH = [ME, DAYS];
-const NO_PROJECT = { error: 'project not found' };
+const NO_PROJECT = { error: 'That project was not found. Ask the person which project they mean.' };
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 const user = (uid) => rows(SCHEMA_TYPE.USERS).find((row) => String(row._id) === uid);
@@ -108,7 +108,7 @@ describe('the tools exist with the read tools', () => {
 
     it.each(BOTH)('%s answers a connection that only reads, and refuses one that may not read projects', async (name) => {
         expect(await rpc(readOnly(OWNER), name, {})).not.toHaveProperty('error');
-        expect(await rpc(outside(OWNER, ['tasks:read']), name, {})).toMatchObject({ isError: true, error: expect.stringMatching(/projects:read scope/) });
+        expect(await rpc(outside(OWNER, ['tasks:read']), name, {})).toMatchObject({ isError: true, error: expect.stringMatching(/projects:read permission/) });
         expect((await rpc(ctx(OWNER, { allowedActions: ['tasks.next'] }), name, {})).refused).toBe(true);
     });
 

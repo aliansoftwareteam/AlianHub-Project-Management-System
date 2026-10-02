@@ -151,7 +151,7 @@ describe('the other reminder routes', () => {
     it.each(AGENTS.flatMap(([who, as]) => WRITES.map(([what, route, body]) => [what, who, as, route, body])))('%s is refused for %s, and recorded', async (what, who, as, route, body) => {
         const answer = await ask(route, as(OWNER), { body, params: { id: REMINDER } });
 
-        expect([answer.code, answer.body.statusText]).toEqual([403, 'Agents cannot perform reminder.manage']);
+        expect([answer.code, answer.body.statusText]).toEqual([403, 'That action is not available to agents (reminder.manage).']);
         expect(stored(REMINDER)).toMatchObject({ reminderText: 'Call the client', fired: false });
         expect(notices()).toHaveLength(0);
         expect(refusedActions()).toEqual(['reminder.manage']);

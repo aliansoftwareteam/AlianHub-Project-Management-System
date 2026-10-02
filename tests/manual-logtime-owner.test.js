@@ -37,6 +37,7 @@ const { manualLogTime, deleteManualLogtime } = require('../Modules/LogTime/contr
 const C = '6f0000000000000000000c01';
 const ME = '6f0000000000000000000001';
 const OTHER = '6f0000000000000000000002';
+const THIRD = '6f0000000000000000000003';
 const P1 = '6f0000000000000000000b01';
 const P2 = '6f0000000000000000000b02';
 const ENTRY = '6f0000000000000000000e01';
@@ -45,6 +46,7 @@ const ADMIN = 2;
 const SESSION_NAME = 'Session Person';
 
 let stored;
+let projects;
 
 const logBody = (overrides = {}) => ({
     logTimeDate: '2026-03-02',
@@ -90,9 +92,15 @@ const asMember = ({ scoped = false } = {}) => {
     evaluatePermission.mockImplementation(async (_c, _u, key) => (scoped && key === 'sheet_settings.user_timesheet' ? 2 : 0));
 };
 
+const asAdmin = () => {
+    getRoleType.mockImplementation(async (_c, uid) => (String(uid) === ME ? ADMIN : MEMBER));
+    evaluatePermission.mockResolvedValue(0);
+};
+
 beforeEach(() => {
     jest.clearAllMocks();
     stored = { _id: ENTRY, Loggeduser: OTHER, ProjectId: P1, LogStartTime: 1772442000 };
+    projects = { [P1]: { _id: P1, isPrivateSpace: false, AssigneeUserId: [] }, [P2]: { _id: P2, isPrivateSpace: true, AssigneeUserId: [ME] } };
     visibleProjectIds.mockResolvedValue([P1]);
     asMember();
     mockLocked.mockResolvedValue(false);
@@ -100,6 +108,8 @@ beforeEach(() => {
         if (type === 'users' && method === 'findOne') return { _id: ME, Employee_Name: SESSION_NAME };
         if (type === 'company_users' && method === 'find') return data[0].userId.$in.map((userId) => ({ userId }));
         if (type === 'timesheets' && method === 'findOne') return stored;
+        if (type === 'projects' && method === 'findOne') return projects[String(data[0]._id)] || null;
+        if (type === 'teamsManagement' && method === 'find') return [];
         if (method === 'save') return { _id: 'new', ...data };
         if (method === 'findOneAndUpdate') return { _id: ENTRY, ...data[1].$set };
         if (method === 'deleteOne') return { deletedCount: 1 };
@@ -136,8 +146,17 @@ describe('manual log time records the signed-in user', () => {
         expect(mockNotify).not.toHaveBeenCalled();
     });
 
-    it('logs another person\'s time for a caller whose timesheet scope is everyone, naming the session in history and notification', async () => {
+    it('keeps new time for another person to owners and admins, whatever the timesheet scope', async () => {
         asMember({ scoped: true });
+        const r = await call(manualLogTime, logBody({ userId: OTHER }));
+
+        expect(r.code).toBe(403);
+        expect(writes('save')).toHaveLength(0);
+        expect(mockHistory).not.toHaveBeenCalled();
+    });
+
+    it('logs another person\'s time for an admin, naming the session in history and notification', async () => {
+        asAdmin();
         const r = await call(manualLogTime, logBody({ userId: OTHER }));
 
         expect(r.body.status).toBe(true);
@@ -148,13 +167,23 @@ describe('manual log time records the signed-in user', () => {
         expect(historyMessage()).not.toContain('Body Name');
     });
 
-    it('logs another person\'s time for an admin', async () => {
-        getRoleType.mockResolvedValue(ADMIN);
+    it('logs time only for a person who can open the project', async () => {
+        asAdmin();
+        const r = await call(manualLogTime, logBody({ userId: OTHER, projectId: P2 }));
+
+        expect(r.code).toBe(400);
+        expect(r.body.status).toBe(false);
+        expect(writes('save')).toHaveLength(0);
+        expect(mockHistory).not.toHaveBeenCalled();
+    });
+
+    it('logs time for a person on a private project they are on', async () => {
+        asAdmin();
+        projects[P2].AssigneeUserId = [ME, OTHER];
         const r = await call(manualLogTime, logBody({ userId: OTHER, projectId: P2 }));
 
         expect(r.body.status).toBe(true);
         expect(savedOwner()).toBe(OTHER);
-        expect(historyActor()).toMatchObject({ id: ME });
     });
 
     it('refuses another person\'s time on a project outside the scoped caller\'s projects', async () => {
@@ -214,6 +243,23 @@ describe('editing a manual entry', () => {
         const r = await call(manualLogTime, editBody({ userId: OTHER }));
 
         expect(r.body.status).toBe(false);
+        expect(writes('findOneAndUpdate')).toHaveLength(0);
+    });
+
+    it('moves an entry only to a person who can open the project', async () => {
+        asAdmin();
+        stored.ProjectId = P2;
+        const r = await call(manualLogTime, editBody({ userId: THIRD, projectId: P2 }));
+
+        expect(r.code).toBe(400);
+        expect(writes('findOneAndUpdate')).toHaveLength(0);
+    });
+
+    it('moves another person\'s entry only to a project that person can open', async () => {
+        asAdmin();
+        const r = await call(manualLogTime, editBody({ userId: OTHER, projectId: P2 }));
+
+        expect(r.code).toBe(400);
         expect(writes('findOneAndUpdate')).toHaveLength(0);
     });
 

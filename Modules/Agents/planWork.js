@@ -26,11 +26,11 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const GATE_OWNER_ADMIN = 'owner_admin';
 const DENIED = permissions.REASON;
 const REFUSED = Object.freeze({
-    startsOff: 'an automation of a plan starts switched off; the person switches it on in AlianHub',
-    noRules: 'the automations of a plan are made as automation.create makes one, which this connection may not use',
-    noTasks: 'the first tasks of a plan are made as task.create makes one with its details, which this connection may not use',
-    needsAdmin: 'only an owner or an admin approves an automation, so it was not made; an owner or an admin can add it on the Automations page',
-    unapproved: 'this part is made only once a person has approved the plan',
+    startsOff: 'An automation in a plan always starts switched off, so leave enabled out. The person can switch it on in AlianHub.',
+    noRules: 'the automations in a plan are made the way automation.create makes one, which this connection is not allowed to use. Leave the automations out, or ask the person to allow it.',
+    noTasks: 'the first tasks in a plan are made the way task.create makes one with its details, which this connection is not allowed to use. Leave the tasks out, or ask the person to allow it.',
+    needsAdmin: 'Only an owner or an admin can approve an automation, so it was not made. An owner or an admin can add it on the Automations page.',
+    unapproved: 'This part is made only after a person approves the plan.',
 });
 
 const refuse = (message) => new tools.DeterministicError(message);
@@ -91,7 +91,7 @@ const tasksProblem = (given) => {
         const where = `tasks[${at}]${task.name ? ` (${task.name})` : ''}`;
         if (!task.name) return `${where} needs a name`;
         if (raw.assigneeId !== undefined && !task.assigneeId) return `${where}: assigneeId needs the id of a member of the project`;
-        if (raw.dueDate !== undefined && !task.dueDate) return `${where}: dueDate needs a day as YYYY-MM-DD`;
+        if (raw.dueDate !== undefined && !task.dueDate) return `${where}: dueDate must be a day written as YYYY-MM-DD`;
     }
     return '';
 };
@@ -155,8 +155,8 @@ const named = (names, name) => listOf(names).some((held) => sameName(held, name)
 
 const taskMisfit = async ({ companyId, actor, uid, project, plan, task }) => {
     const projectId = idOf(project._id);
-    if (task.list && !named(plan.lists, task.list) && !(await listNamed(companyId, projectId, task.list, [uid]))) return { error: `"${task.list}" is not a list of this plan or of the project` };
-    if (task.status && !named(plan.statuses, task.status) && !named(statusNamesOf(project), task.status)) return { error: `"${task.status}" is not a status of this plan or of the project` };
+    if (task.list && !named(plan.lists, task.list) && !(await listNamed(companyId, projectId, task.list, [uid]))) return { error: `"${task.list}" is not a list in this plan or in the project` };
+    if (task.status && !named(plan.statuses, task.status) && !named(statusNamesOf(project), task.status)) return { error: `"${task.status}" is not a status in this plan or in the project` };
     if (task.assigneeId) {
         const cannot = await assignable(companyId, projectId, [task.assigneeId]).then(() => '', (error) => error.message);
         if (cannot) return { error: cannot };
@@ -203,11 +203,11 @@ const isAdmin = async (companyId, uid) => {
 
 const performPart = async ({ companyId, actor, depth, approvedBy, within }, action, params) => {
     const entry = registry.get(action);
-    if (!entry) throw refuse(`${action} is switched off here`);
+    if (!entry) throw refuse(`${action} is switched off on this server, so this part was not made.`);
     if (!OBJECT_ID.test(idOf(approvedBy))) throw refuse(REFUSED.unapproved);
     if (entry.gate === GATE_OWNER_ADMIN && !(await isAdmin(companyId, approvedBy))) throw refuse(REFUSED.needsAdmin);
     const own = await permissions.holderMay(companyId, { kind: 'human', userId: approvedBy }, action, params);
-    if (!own.allowed) throw refuse(`the approver may not make this part: ${own.reason}`);
+    if (!own.allowed) throw refuse(`The person approving may not make this part: ${own.reason}`);
     const given = objectOf(within);
     return require('./actions').perform({
         companyId, actor, action, params: { ...params, __proposal: true }, reason: `part of a plan approved by ${approvedBy}`, ip: given.ip || '',
@@ -238,7 +238,7 @@ const addTasks = async ({ projectId, plan, made, who, ...context }) => {
         try {
             const inPlan = task.list ? fresh.find((item) => sameName(item.name, task.list)) : null;
             const sprintId = inPlan ? idOf(inPlan.sprintId) : (task.list ? await listNamed(context.companyId, projectId, task.list, [who.uid, context.approvedBy]) : '');
-            if (task.list && !sprintId) throw refuse(`the list "${task.list}" was not found in this project`);
+            if (task.list && !sprintId) throw refuse(`The list "${task.list}" was not found in this project.`);
             const out = await performPart(context, TASK, { projectId, sprintId, title: task.name, fields: fieldsOf(task) });
             items.push({ name: task.name, made: true, taskId: out.result.taskId, auditId: idOf(out.auditId) });
         } catch (error) {
@@ -251,4 +251,4 @@ const addTasks = async ({ projectId, plan, made, who, ...context }) => {
 const MAKERS = Object.freeze({ rules: addRules, tasks: addTasks });
 const namesOf = (plan, part) => (part === 'rules' ? listOf(plan.rules).map((rule, at) => ruleNameAt(at)) : listOf(plan.tasks).map((task) => task.name));
 
-module.exports = { RULES_MAX, TASKS_MAX, MAKERS, ruleOf, taskOf, partsOf, isAsked, problemIn, needsIn, actionsIn, filingProblem, namesOf };
+module.exports = { RULE, TASK, RULES_MAX, TASKS_MAX, MAKERS, ruleOf, taskOf, fieldsOf, partsOf, isAsked, problemIn, needsIn, actionsIn, filingProblem, namesOf };

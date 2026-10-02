@@ -15,7 +15,7 @@ const { canReadTask } = require('./taskReadAccess');
 const { loadSubtree, REFUSALS } = require('./taskTree');
 const { RichTextLimitError } = require('./cleanRichText');
 const { CANNOT_OPEN_PROJECT, peopleWhoOpen, cannotOpen } = require('../../../Config/projectPeople');
-const { openProject, isChatSpace, listOf, listRef, readableTaskIds, flatStatus, coveredByMapping, moveMappingInto } = require('./taskWritePlacement');
+const { openProject, isChatSpace, startsOwnConversation, listOf, listRef, listLeftBy, readableTaskIds, flatStatus, coveredByMapping, moveMappingInto, conversionRules } = require('./taskWritePlacement');
 
 const { IMPORT_MARK_FIELDS } = require('./importMark');
 
@@ -111,7 +111,17 @@ const newlyNamed = (value, held) => {
     return namedIds(value).filter((id) => !already.has(id));
 };
 
-const peopleOnNewTask = (data) => (isPlainObject(data) ? [...namedIds(data.AssigneeUserId || []), ...namedIds(data.watchers || []), ...namedIds(data.Task_Leader || [])] : []);
+const peopleOnChecklist = (rows) => (Array.isArray(rows) ? rows : [rows]).flatMap((row) => (isPlainObject(row) ? namedIds(row.AssigneeUserId || []) : []));
+
+const peopleOnNewTask = (data) => (isPlainObject(data) ? [...namedIds(data.AssigneeUserId || []), ...namedIds(data.watchers || []), ...namedIds(data.Task_Leader || []), ...peopleOnChecklist(data.checklistArray || [])] : []);
+
+/* Both operations that name one person on a row push them when the history says 'add'; the others carry whole rows. */
+const peopleAddedToChecklist = (payload, stored) => {
+    const held = peopleOnChecklist(stored.checklistArray || []);
+    const history = isPlainObject(payload.historyObj) ? payload.historyObj : {};
+    if (['checklistassignee', 'assigneeremove'].includes(payload.operation)) return history.type === 'add' ? newlyNamed(history.assigneeId, held) : [];
+    return ['taskchecklistcreate', 'checklistadd', 'checklistchecked'].includes(payload.operation) ? newlyNamed(peopleOnChecklist(payload.data), held) : [];
+};
 
 const PEOPLE = Object.freeze({
     create: (payload) => peopleOnNewTask(payload.data),
@@ -120,6 +130,8 @@ const PEOPLE = Object.freeze({
     updateTaskLeader: (payload, stored) => newlyNamed(valueAt(payload, ['firebaseObj', 'Task_Leader']), stored.Task_Leader),
     updateWatcher: (payload, stored) => (payload.add ? newlyNamed(payload.userId, stored.watchers) : []),
     updateQueueList: (payload, stored) => (payload.actionType === 'add' ? newlyNamed(payload.userId, stored.queueListArray) : []),
+    updateChecklists: peopleAddedToChecklist,
+    AddAiChecklist: (payload, stored) => newlyNamed(peopleOnChecklist(payload.checklistArray), peopleOnChecklist(stored.checklistArray || [])),
     carried: (payload, stored) => [...newlyNamed(payload.assignee, stored.AssigneeUserId), ...newlyNamed(payload.watcher, stored.watchers)],
     bulkUpdateAssignee: (payload) => (payload.type === 'assigneRemove' ? [] : namedIds(payload.employeeId)),
     bulkDuplicate: (payload) => [...namedIds(payload.assignee || []), ...namedIds(payload.watcher || [])],
@@ -157,11 +169,15 @@ const holdsTaskType = (payload, stored) => {
  * returns the user ids the write newly names, each of whom must hold a live seat in the company and be able to open
  * the project; `carries` are the lists of people a move or copy takes along. `landing`
  * returns the user ids stored on a task the write creates in the destination, each of whom must be able to open that
- * project. `actor` are the params that receive the signed-in user. `strict` refuses a body key the action does not
- * take, for an action no existing client sends extra fields to.
+ * project. `lands` names, among `others`, the task whose project the written task ends up in when the action names
+ * no destination; that project is written to `projectData`. `rules` is the object that says what each status and
+ * task type becomes in the project the task ends up in: it is rebuilt from the two stored projects, and the body
+ * only chooses among what that project has. `leaves` are the objects that name the list the task leaves, rewritten
+ * from the stored task. `actor` are the params that receive the signed-in user. `strict` refuses a body key the
+ * action does not take, for an action no existing client sends extra fields to.
  */
-const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, status = null, held = null, destination = null, chat = null, list = null, parent = null, mapping = null, attachments = null, people = null, carries = [], landing = null, strict = false, actor }) => Object.freeze({
-    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, status, held, destination, chat, list, parent, mapping, attachments, people, carries, landing, strict,
+const spec = ({ params, writes = {}, owns = [], company = [], fieldNames = [], ids = [], scalars = [], numbers = [], searchKeys = [], objects = [], task = null, others = [], listed = null, project = [], taskIds = [], taskNames = [], projectNames = [], stored = false, status = null, held = null, destination = null, chat = null, list = null, parent = null, mapping = null, attachments = null, people = null, carries = [], landing = null, lands = null, rules = null, leaves = [], strict = false, actor }) => Object.freeze({
+    params, writes, owns, company, fieldNames, ids, scalars, numbers, searchKeys, objects, task, others, listed, project, taskIds, taskNames, projectNames, stored, status, held, destination, chat, list, parent, mapping, attachments, people, carries, landing, lands, rules, leaves, strict,
     actor: actor || (params.includes('userData') ? ['userData'] : []),
 });
 
@@ -186,6 +202,8 @@ const DESTINATION = ['projectData', 'id'];
 const DESTINATION_LIST = Object.freeze({ id: ['sprintObj', 'id'], ref: ['sprintObj'] });
 const LISTED_TASKS = Object.freeze({ path: ['taskIds'] });
 const CARRIED = Object.freeze(['assignee', 'watcher']);
+const RULES = ['oldProject'];
+const LIST_LEFT = [['oldSprintObj']];
 
 const CREATE_DATA_FIELDS = Object.freeze(Object.keys(schema.tasks).filter((field) => !['_id', 'createdBy', 'createdAt', 'ancestors', 'cascadedBy', 'extraLists', ...IMPORT_MARK_FIELDS].includes(field)));
 
@@ -226,8 +244,8 @@ const TASK_ACTION_FIELDS = Object.freeze({
 
     updateWatcher: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'userId', 'add', 'employeeName', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateWatcher }),
     updateTags: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'tagId', 'operation', ...HISTORY_USER], company: companyId, ids: TASK_ID, scalars: [['tagId']], task: TASK_ID[0], project: PROJECT_ID, stored: true }),
-    updateChecklists: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'operation', 'data', 'historyObj', 'taskData', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID }),
-    AddAiChecklist: spec({ params: ['companyId', 'taskId', 'checklistArray', 'sprintId', 'projectId', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID }),
+    updateChecklists: spec({ params: ['companyId', 'projectId', 'sprintId', 'taskId', 'operation', 'data', 'historyObj', 'taskData', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateChecklists }),
+    AddAiChecklist: spec({ params: ['companyId', 'taskId', 'checklistArray', 'sprintId', 'projectId', ...HISTORY_USER], company: companyId, ids: TASK_ID, task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.AddAiChecklist }),
     updateAttachments: spec({ params: ['companyId', 'sprintId', 'taskId', 'taskData', 'id', 'operation', 'data', 'projectData', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ...TASK_DATA], scalars: [['data', 'id']], task: TASK_ID[0], project: [['projectData', 'id']], taskNames: TASK_NAME, projectNames: PROJECT_DATA_NAME, stored: true, attachments: 'added' }),
     updateDescription: spec({ params: ['companyId', 'projectData', 'sprintId', 'task', 'text', ...HISTORY_USER], company: companyId, ids: TASK, task: TASK[0] }),
     updateTaskCustomField: spec({ params: ['companyId', 'taskId', 'updateDetail', 'customFieldId', ...HISTORY_USER], company: companyId, fieldNames: [['customFieldId']], ids: TASK_ID, task: TASK_ID[0], stored: true }),
@@ -236,12 +254,12 @@ const TASK_ACTION_FIELDS = Object.freeze({
     updateQueueList: spec({ params: ['CompanyId', 'projectId', 'sprintId', 'taskId', 'userId', 'actionType', 'taskName', ...HISTORY_USER], company: [['CompanyId']], ids: [...TASK_ID, ['userId']], task: TASK_ID[0], project: PROJECT_ID, people: PEOPLE.updateQueueList }),
     updateArchiveDelete: spec({ params: ['companyId', 'projectData', 'sprintId', 'task', 'deletedStatusKey', ...HISTORY_USER], company: companyId, ids: [...TASK, ['task', 'ParentTaskId']], task: TASK[0], project: PROJECT_DATA }),
 
-    convertToSubTask: spec({ params: ['companyId', 'projectData', 'sprintId', 'selectedTaskId', 'taskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], ...TASK_ID], task: ['selectedTaskId'], others: TASK_ID }),
-    convertToTask: spec({ params: ['companyId', 'projectData', 'taskId', 'sprintObj', 'parentTaskId', 'oldSprintObj', 'oldProject'], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['parentTaskId'], DESTINATION], task: TASK_ID[0], destination: DESTINATION, list: DESTINATION_LIST }),
+    convertToSubTask: spec({ params: ['companyId', 'projectData', 'sprintId', 'selectedTaskId', 'taskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], ...TASK_ID], task: ['selectedTaskId'], others: TASK_ID, lands: TASK_ID[0], rules: RULES }),
+    convertToTask: spec({ params: ['companyId', 'projectData', 'taskId', 'sprintObj', 'parentTaskId', 'oldSprintObj', 'oldProject'], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['parentTaskId'], DESTINATION], task: TASK_ID[0], destination: DESTINATION, list: DESTINATION_LIST, rules: RULES, leaves: LIST_LEFT }),
     convertToList: spec({ params: ['companyId', 'projectData', 'taskId', 'folderData', 'sprintObj', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, DESTINATION], task: TASK_ID[0], destination: DESTINATION }),
-    moveTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'moveTaskId', 'oldSprintObj', 'oldProject', 'isSubTask', 'assignee', 'watcher', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['moveTaskId'], DESTINATION], task: ['moveTaskId'], destination: DESTINATION, list: DESTINATION_LIST, mapping: ['oldProject'], people: PEOPLE.carried, carries: CARRIED }),
-    mergeTask: spec({ params: ['companyId', 'projectData', 'taskId', 'mergeTaskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['mergeTaskId']], task: TASK_ID[0], others: [['mergeTaskId']] }),
-    duplicateTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'selectedTaskId', 'oldProject', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], DESTINATION], task: ['selectedTaskId'], destination: DESTINATION, list: DESTINATION_LIST, people: PEOPLE.carried, carries: CARRIED, landing: peopleOnCopy }),
+    moveTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'moveTaskId', 'oldSprintObj', 'oldProject', 'isSubTask', 'assignee', 'watcher', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['moveTaskId'], DESTINATION], task: ['moveTaskId'], destination: DESTINATION, list: DESTINATION_LIST, mapping: RULES, leaves: LIST_LEFT, people: PEOPLE.carried, carries: CARRIED }),
+    mergeTask: spec({ params: ['companyId', 'projectData', 'taskId', 'mergeTaskId', 'oldProject', 'isSubTask', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [...TASK_ID, ['mergeTaskId']], task: TASK_ID[0], others: [['mergeTaskId']], lands: ['mergeTaskId'], rules: RULES }),
+    duplicateTask: spec({ params: ['companyId', 'projectData', 'sprintObj', 'selectedTaskId', 'oldProject', 'isSubTask', 'duplicateData', 'assignee', 'watcher', 'taskName', 'oldSprintObj', ...HISTORY_USER], owns: PLACEMENT_FIELDS, company: companyId, ids: [['selectedTaskId'], DESTINATION], task: ['selectedTaskId'], destination: DESTINATION, list: DESTINATION_LIST, rules: RULES, leaves: LIST_LEFT, people: PEOPLE.carried, carries: CARRIED, landing: peopleOnCopy }),
 
     addTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', 'type', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0], others: [['relatedTaskId']] }),
     removeTaskRelation: spec({ params: ['companyId', 'taskId', 'relatedTaskId', ...HISTORY_USER], company: companyId, ids: [...TASK_ID, ['relatedTaskId']], task: TASK_ID[0] }),
@@ -586,6 +604,14 @@ const statusAsStored = async (company, task, sent) => {
 };
 
 const projectNotFound = () => new TaskWriteRefusal(404, 'Project not found');
+const listNotFound = () => new TaskWriteRefusal(404, 'List not found');
+
+/* A conversation sits in a list of its chat space that the person starting it may see, under no parent, and that person is in it. */
+const checkConversation = async (req, company, taskSpec, payload, spaceId) => {
+    if (!taskSpec.list || !(await listOf(company, req.uid, spaceId, valueAt(payload, taskSpec.list.id)))) throw listNotFound();
+    if (taskSpec.parent && !isNone(valueAt(payload, taskSpec.parent))) refuse(400, 'A conversation is not a subtask.');
+    if (!startsOwnConversation(req.uid, valueAt(payload, taskSpec.chat.slice(0, -1)))) refuse(400, 'A conversation is started by one of the people in it.');
+};
 
 const CONVERSATION_IN_PROJECT = 'A conversation is started in a chat space, not in a project.';
 
@@ -598,14 +624,17 @@ const destinationOf = async (req, company, taskSpec, payload) => {
     const marked = taskSpec.chat ? valueAt(payload, taskSpec.chat) : false;
     const project = await openProject(company, req.uid, projectId);
     if (!project) {
-        if (marked === true && await isChatSpace(company, projectId)) return null;
+        if (marked === true && await isChatSpace(company, projectId)) {
+            await checkConversation(req, company, taskSpec, payload, projectId);
+            return null;
+        }
         throw projectNotFound();
     }
     /* Any value the schema would store as true, not `true` alone. */
     if (marked) refuse(400, CONVERSATION_IN_PROJECT);
     if (taskSpec.list) {
         const list = await listOf(company, req.uid, projectId, valueAt(payload, taskSpec.list.id));
-        if (!list) throw new TaskWriteRefusal(404, 'List not found');
+        if (!list) throw listNotFound();
         if (taskSpec.list.ref) setAt(payload, taskSpec.list.ref, await listRef(company, list));
     }
     if (isPlainObject(payload.projectData)) {
@@ -628,6 +657,8 @@ const checkParent = async (req, company, taskSpec, payload) => {
 
 const MAPPING_REFUSED = 'A status or task type of this task has no place in the project it moves to.';
 
+const liveRowsUnder = async (company, task) => [task, ...await loadSubtree(company, task._id, { filter: { deletedStatusKey: { $nin: [1] } } })];
+
 /* A move into another project carries its status and type mapping; a move within a project carries none. */
 const checkMoveMapping = async (company, taskSpec, payload, { task, destination }) => {
     const source = await storedProjectOf(company, String(task.ProjectID));
@@ -638,9 +669,25 @@ const checkMoveMapping = async (company, taskSpec, payload, { task, destination 
         return;
     }
     const mapping = moveMappingInto(sent, destination);
-    const rows = [task, ...await loadSubtree(company, task._id, { filter: { deletedStatusKey: { $nin: [1] } } })];
-    if (!mapping || !coveredByMapping(rows, mapping)) refuse(400, MAPPING_REFUSED);
+    if (!mapping || !coveredByMapping(await liveRowsUnder(company, task), mapping)) refuse(400, MAPPING_REFUSED);
     setAt(payload, taskSpec.mapping, { ...names, ...mapping });
+};
+
+const NO_PLACE_IN_PROJECT = 'The project this task goes to has no status or no task type to give it.';
+
+/* The project a task ends up in when the action names another task instead of a destination. */
+const projectOfTask = async (company, payload, row) => {
+    const project = await storedProjectOf(company, String(row.ProjectID));
+    if (!project) throw projectNotFound();
+    payload.projectData = { ...(isPlainObject(payload.projectData) ? payload.projectData : {}), id: String(project._id), ProjectName: project.ProjectName || '', ProjectCode: project.ProjectCode || '' };
+    return project;
+};
+
+const storeConversionRules = async (company, taskSpec, payload, task, into) => {
+    const source = await storedProjectOf(company, String(task.ProjectID));
+    const rules = conversionRules(source, into, valueAt(payload, taskSpec.rules), await liveRowsUnder(company, task));
+    if (!rules) refuse(400, NO_PLACE_IN_PROJECT);
+    setAt(payload, taskSpec.rules, { ...rules, id: String(task.ProjectID) });
 };
 
 /* A new or imported task has no id yet and its body's origin is the client's word, so only its placement counts. */
@@ -728,13 +775,17 @@ const prepareTaskRequest = async (req, taskSpec, label) => {
             taskSpec.projectNames.forEach((path) => setAt(payload, path, (project && project.ProjectName) || ''));
         }
         if (taskSpec.stored) payload.storedTask = stored;
+        taskSpec.leaves.forEach((path) => setAt(payload, path, listLeftBy(stored)));
         if (payload.isUpdateTask === false && !(taskSpec.held && taskSpec.held(payload, stored))) refuse(409, 'The task does not hold the change this request records.');
         if (taskSpec.status) setAt(payload, taskSpec.status, await statusAsStored(company, stored, valueAt(payload, taskSpec.status)));
     }
+    const others = new Map();
     for (const path of taskSpec.others) {
         const otherId = valueAt(payload, path);
-        if (typeof otherId === 'string' && otherId) await visibleTaskOf(req, company, otherId);
+        if (typeof otherId === 'string' && otherId) others.set(nameOf(path), await visibleTaskOf(req, company, otherId));
     }
+    const landsBy = taskSpec.lands ? others.get(nameOf(taskSpec.lands)) : null;
+    const landsIn = landsBy ? await projectOfTask(company, payload, landsBy) : null;
     if (taskSpec.listed) prepared.listed = await keepListed(req, company, payload, taskSpec.listed);
     if (taskSpec.destination) {
         prepared.destination = await destinationOf(req, company, taskSpec, payload);
@@ -743,12 +794,15 @@ const prepareTaskRequest = async (req, taskSpec, label) => {
         /* A conversation in a chat space has no project, and what it names as its parent is not a task. */
         if (prepared.destination && taskSpec.parent) await checkParent(req, company, taskSpec, payload);
     }
+    const endsIn = prepared.destination || landsIn;
+    if (taskSpec.rules && prepared.task && endsIn) await storeConversionRules(company, taskSpec, payload, prepared.task, endsIn);
     if (taskSpec.people) await checkPeople(company, taskSpec, prepared);
     await checkAttachmentKeys(taskSpec, prepared);
     return prepared;
 };
 
 const sendRefusal = (res, error) => res.status(error.statusCode).send({ status: false, statusText: error.message, ...(error.code ? { code: error.code } : {}) });
+const COULD_NOT_BE_PROCESSED = 'The request could not be processed.';
 
 const prepareOrRefuse = async (req, res, taskSpec, label) => {
     try {
@@ -758,16 +812,19 @@ const prepareOrRefuse = async (req, res, taskSpec, label) => {
             sendRefusal(res, error);
         } else {
             logger.error(`task write ${printable(label)} could not be prepared: ${error && error.message}`);
-            res.status(500).send({ status: false, statusText: 'The request could not be processed.' });
+            res.status(500).send({ status: false, statusText: COULD_NOT_BE_PROCESSED });
         }
         return null;
     }
 };
 
+/* The handlers reject with an error, a sentence, or the answer of a helper they called. */
+const failureText = (error) => [error && error.message, error, error && error.statusText].find((text) => typeof text === 'string' && text) || COULD_NOT_BE_PROCESSED;
+
 const sendFailure = (res, error) => {
     if (error instanceof TaskWriteRefusal) return sendRefusal(res, error);
     if (error instanceof RichTextLimitError) return res.status(error.statusCode).send({ status: false, statusText: error.message });
-    return res.send({ status: false, statusText: error && error.message });
+    return res.send({ status: false, statusText: failureText(error) });
 };
 
 module.exports = {
@@ -794,5 +851,6 @@ module.exports = {
     prepareOrRefuse,
     sessionActor,
     employeeNameOf,
+    failureText,
     sendFailure,
 };

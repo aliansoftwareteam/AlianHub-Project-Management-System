@@ -10,7 +10,7 @@ const START = 'agent.run.start';
 /* Over MCP an agent starts one by naming it in a task.comment, so the project answers for the start as it does for that comment. */
 const ASKED_AS = 'task.comment';
 
-const fullReason = (atOnce) => `this project already has ${atOnce} ${atOnce === 1 ? 'agent' : 'agents'} at work, which is as many as it takes at once`;
+const fullReason = (atOnce) => `This project already has ${atOnce} ${atOnce === 1 ? 'agent' : 'agents'} at work, which is as many as it allows at once. Wait until one of them finishes, then ask again.`;
 
 /* Why the project holds the start, or '' when it takes it. The count of tasks is asked last: an answer of yes there is kept.
  * `asked` says the project's rule for the comment was asked already, as it is for one made through an MCP tool, so

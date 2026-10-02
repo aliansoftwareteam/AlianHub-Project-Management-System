@@ -35,7 +35,24 @@
     border-bottom-color: var(--brand);
 }
 .checklist-main .new-checklist-section {
-    margin: 0px 0;
+    display: block;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.checklist-main .new-checklist-section:focus-visible {
+    outline: none;
+    box-shadow: var(--focus);
+    border-radius: var(--r-chip);
+}
+.checklist-main .new-checklist-section:disabled {
+    cursor: progress;
+    opacity: 0.6;
 }
 .checklist-main .new-checklist-section span {
     font-size: 13px;

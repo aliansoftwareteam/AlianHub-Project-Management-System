@@ -232,7 +232,7 @@ const settleChanges = async (companyId, { agent, run, askerId, changes }) => {
         // eslint-disable-next-line no-await-in-loop
         const proposal = await proposals.create(companyId, {
             agent, runId: String(run._id), taskId: group[0].params.taskId ? String(group[0].params.taskId) : null, projectId: projectId || null,
-            what: `${agent.name}: ${group.length} change(s) asked for in chat`, why: group.map((c) => c.label).join('\n'),
+            what: require('./proposalText').joined([agent.name, `${group.length} change(s) asked for in chat`]), why: group.map((c) => c.label).join('\n'),
             changes: group,
         });
         filed.push(String(proposal._id));

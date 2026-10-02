@@ -25,6 +25,7 @@ const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { cannotOpen, CANNOT_OPEN_PROJECT } = require('../../Config/projectPeople');
 const { canCreatePageIn } = require('../Pages/helpers/pageAccess');
 const { readableTaskIds, openProject, listOf } = require('../Tasks/helpers/taskWritePlacement');
 const logger = require('../../Config/loggerConfig');
@@ -174,13 +175,13 @@ const MAX_LOG_MINUTES = 24 * 60;
 /* The entry the manual log form writes (Modules/LogTime manualLogtime), for the person behind the agent only. */
 const timelogEntry = (params) => {
     const minutes = Number(params.minutes);
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_LOG_MINUTES) throw new tools.DeterministicError(`minutes must be a whole number from 1 to ${MAX_LOG_MINUTES}`);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_LOG_MINUTES) throw new tools.DeterministicError(`The time must be a whole number of minutes from 1 to ${MAX_LOG_MINUTES}.`);
     const day = params.date ? String(params.date) : DateTime.utc().toISODate();
     const clock = params.startTime ? String(params.startTime) : '09:00';
-    if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('date must be YYYY-MM-DD and startTime HH:MM (UTC)');
+    if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('The date must be written YYYY-MM-DD and the start time HH:MM (UTC).');
     const start = DateTime.fromISO(`${day}T${clock}`, { zone: 'utc' });
-    if (!start.isValid || start.toISODate() !== day) throw new tools.DeterministicError(`${day} is not a date`);
-    if (start.startOf('day') > DateTime.utc().plus({ days: 1 }).startOf('day')) throw new tools.DeterministicError('time cannot be logged on a future day');
+    if (!start.isValid || start.toISODate() !== day) throw new tools.DeterministicError(`${day} is not a real date.`);
+    if (start.startOf('day') > DateTime.utc().plus({ days: 1 }).startOf('day')) throw new tools.DeterministicError('Time cannot be logged on a day that has not come yet.');
     return { start: Math.floor(start.toSeconds()), minutes };
 };
 
@@ -190,7 +191,7 @@ const contentOfText = (text) => {
     return { html: blocksToHtml(blocks), blocks };
 };
 
-const DRAFT_ELSEWHERE = 'a doc drafted for a task is saved in that task\'s project';
+const DRAFT_ELSEWHERE = 'a doc drafted for a task is saved in that task\'s project, so do not name another project';
 
 /* Where a draft is saved. One written for a task is filed in the task's project, and is its author's alone when the
  * task's list is private: a project doc is read by everyone on the project, a private list's tasks are not.
@@ -220,10 +221,10 @@ const executors = {
     async 'timelog.create'({ companyId, actor, params }) {
         const task = await tools.getTask(companyId, params.taskId);
         const userId = String(actor.userId || '');
-        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('time needs a person to log against');
+        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('Time can only be logged for a person. Ask the person to connect you again.');
         const { start, minutes } = timelogEntry(params);
         if (await isPeriodLocked({ companyId, userId, date: new Date(start * 1000) })) {
-            throw new tools.DeterministicError('that day is in an approved timesheet period, which is locked');
+            throw new tools.DeterministicError('That day is in a timesheet period a person already approved, so no time can be added to it. Ask the person to have it reopened.');
         }
         const a = attribution(actor);
         const saved = await MongoDbCrudOpration(companyId, {
@@ -274,7 +275,9 @@ const executors = {
         const ids = (Array.isArray(params.assigneeIds) ? params.assigneeIds : [params.assigneeId]).filter((v) => OBJECT_ID.test(String(v || ''))).map(String);
         if (!ids.length) throw new tools.DeterministicError('assigneeIds is required');
         const previous = (task.AssigneeUserId || []).map(String);
-        if ((await nonMembersOf(companyId, ids.filter((id) => !previous.includes(id)))).length) throw new tools.DeterministicError(`assigneeIds: ${NOT_A_MEMBER}`);
+        const added = ids.filter((id) => !previous.includes(id));
+        if ((await nonMembersOf(companyId, added)).length) throw new tools.DeterministicError(`assigneeIds: ${NOT_A_MEMBER}`);
+        if (await cannotOpen(companyId, String(task.ProjectID), added)) throw new tools.DeterministicError(`assigneeIds: ${CANNOT_OPEN_PROJECT}`);
         const next = params.replace ? ids : [...new Set([...previous, ...ids])];
         const r = await tools.updateTask(companyId, task._id, { AssigneeUserId: next }, context(actor, 'task.assign', depth));
         return { result: { assignees: next }, undo: { kind: 'assign', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
@@ -312,11 +315,11 @@ const executors = {
 
     async 'task.sprint.move'({ companyId, actor, params, depth }) {
         const task = await tools.getTask(companyId, params.taskId);
-        if (task.ParentTaskId) throw new tools.DeterministicError('a subtask moves with its parent');
+        if (task.ParentTaskId) throw new tools.DeterministicError('A subtask moves with its parent. Move the top-level task instead.');
         const target = oid(params.sprintId);
         if (!target) throw new tools.DeterministicError('a valid list id is required');
         const sprint = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: target, projectId: task.ProjectID }] }, 'findOne');
-        if (!sprint) throw new tools.DeterministicError('list not found in this project');
+        if (!sprint) throw new tools.DeterministicError('That list was not found in this project. Check sprints.list or ask the person which list they mean.');
         const previous = { sprintId: task.sprintId, sprintArray: task.sprintArray, folderObjId: task.folderObjId || null };
         const placement = await sprintPlacementOf(companyId, sprint);
         const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset, pullOfLists([target]));
@@ -341,13 +344,13 @@ const executors = {
     async 'timelog.start'({ companyId, actor, params }) {
         const task = await tools.getTask(companyId, params.taskId);
         const userId = String(actor.userId || '');
-        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('timers need a person to log against');
+        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('A timer can only run for a person. Ask the person to connect you again.');
         const running = await findRunningTimer(companyId, task._id, userId);
         if (running) return { result: { timesheetId: String(running._id), alreadyRunning: true }, undo: null, entityId: task._id, entityName: task.TaskName };
         const a = attribution(actor);
         const now = Math.floor(DateTime.utc().toSeconds());
         if (await isPeriodLocked({ companyId, userId, date: new Date(now * 1000) })) {
-            throw new tools.DeterministicError('today is in an approved timesheet period, which is locked');
+            throw new tools.DeterministicError('Today is in a timesheet period a person already approved, so a timer cannot start. Ask the person to have it reopened.');
         }
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
@@ -366,10 +369,10 @@ const executors = {
         const running = params.timesheetId && OBJECT_ID.test(String(params.timesheetId))
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [{ _id: oid(params.timesheetId), TicketID: String(task._id) }] }, 'findOne')
             : await findRunningTimer(companyId, task._id, actor.userId);
-        if (!running) throw new tools.DeterministicError('no running timer on this task');
+        if (!running) throw new tools.DeterministicError('No timer is running on this task, so there is nothing to stop.');
         const startedAt = new Date((Number(running.LogStartTime) || 0) * 1000);
         if (await isPeriodLocked({ companyId, userId: running.Loggeduser || actor.userId, date: startedAt })) {
-            throw new tools.DeterministicError('the timer started in an approved timesheet period, which is locked');
+            throw new tools.DeterministicError('The timer started in a timesheet period a person already approved, so it cannot be saved. Ask the person to have it reopened.');
         }
         const now = Math.floor(DateTime.utc().toSeconds());
         const minutes = Math.max(0, Math.round((now - Number(running.LogStartTime || now)) / 60));
@@ -428,11 +431,11 @@ const executors = {
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(params.commentId), isDeleted: { $ne: true } }] }, 'findOne')
             : null;
         const own = comment && comment.actorType === 'agent' && String(comment.userId) === uid && String(comment.taskId) === String(params.taskId);
-        if (!own) throw new tools.DeterministicError('that comment is not one an agent wrote for you on this task');
+        if (!own) throw new tools.DeterministicError('You can change only a comment an agent wrote for the person on this task, and this is not one.');
         const body = String(params.body || '').trim();
-        if (!body) throw new tools.DeterministicError('comment body is empty');
+        if (!body) throw new tools.DeterministicError('The comment is empty. Write some text.');
         const answer = await require('./pageRequests').answerOf(require('../Comments/controller').update, { companyId, uid, body: { id: String(comment._id), data: { message: body } } });
-        if (!answer || answer.status !== true) throw new tools.DeterministicError((answer && answer.message) || 'the comment was not changed');
+        if (!answer || answer.status !== true) throw new tools.DeterministicError((answer && answer.message) || 'The comment was not changed. Try again, or tell the person.');
         return { result: { commentId: String(comment._id) }, undo: { kind: 'commentText', commentId: String(comment._id), taskId: String(params.taskId), previous: comment.message || '' }, entityId: params.taskId };
     },
 
@@ -459,10 +462,10 @@ const threadMay = async (companyId, actor, action, params) => {
     if (!task) return true;
     return (await canPostToThread(companyId, actor && actor.userId, tools.commentThreadOf(task))).allowed;
 };
-const THREAD_REFUSAL = 'not_visible: the task\'s comment thread is not one the person behind this agent can open';
-const TASK_REFUSAL = 'not_visible: the task is not one the person behind this agent can open';
-const PROJECT_REFUSAL = 'not_visible: the project is not one the person behind this agent can open';
-const LIST_REFUSAL = 'not_visible: the list is not one the person behind this agent can open in that project';
+const THREAD_REFUSAL = 'not_visible: that task was not found, or the person cannot open its comments. Ask the person which task they mean.';
+const TASK_REFUSAL = 'not_visible: that task was not found, or the person cannot open it. Ask the person which task they mean.';
+const PROJECT_REFUSAL = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
+const LIST_REFUSAL = 'not_visible: that list was not found in that project, or the person cannot open it. Ask the person which list they mean.';
 
 /* These reach their task, project or list through the automation tool layer, which asks nothing about a person, so
  * the task routes' read rule is asked here. Every other executor runs a route's handler or a check of its own. */
@@ -493,7 +496,7 @@ const draftRefusal = async (companyId, actor, action, params) => {
     if (!place) return `permission_denied: ${DRAFT_ELSEWHERE}`;
     const start = await canCreatePageIn(companyId, uid, place.projectId);
     if (start.allowed) return '';
-    return start.statusCode === 403 ? 'permission_denied: the person behind this agent cannot add a doc here' : PROJECT_REFUSAL;
+    return start.statusCode === 403 ? 'permission_denied: the person you act for is not allowed to add a doc here. Ask them to do it in AlianHub, or to name another place.' : PROJECT_REFUSAL;
 };
 
 /* Why the person behind `actor` may not make this change themselves, or '' when they may: the right, the thread,
@@ -543,7 +546,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     }
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
-    if (!exec) throw new tools.DeterministicError(`${action} has no executor`);
+    if (!exec) throw new tools.DeterministicError(`${action} is not ready to be used yet, so nothing was changed.`);
 
     const turn = await taskReads.turnFor({ companyId, actor, action, params, approved });
     if (turn.refusal) throw await refusal(companyId, actor, { action, params, reason: turn.refusal, ip, taint });

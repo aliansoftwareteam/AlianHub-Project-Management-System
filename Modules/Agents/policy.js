@@ -31,24 +31,24 @@ const decide = ({ agent = {}, action, params = {}, rating = null, run = null, ta
     const out = (decision, reason) => ({ decision, reason, rating: isComplete(rating) ? { ...rating } : null });
     const refuse = (reason) => out(DECISION.REFUSE, reason);
 
-    if (isNever(key)) return refuse(`${key} is on the never-list`);
-    if (!registry.has(key)) return refuse(`${key || '(unknown action)'} is not a registry action`);
+    if (isNever(key)) return refuse(`An agent is never allowed to do this (${key}). The person has to do it in AlianHub.`);
+    if (!registry.has(key)) return refuse(`That action is not available to agents (${key || 'none named'}).`);
 
     const allowed = Array.isArray(agent.allowedActions) ? agent.allowedActions.map(String) : [];
-    if (allowed.length && !allowed.includes(key)) return refuse(`${key} is outside this agent's allowed actions`);
+    if (allowed.length && !allowed.includes(key)) return refuse(`This connection is not allowed to use ${key}. Ask the person to allow it in AlianHub.`);
 
     const projects = Array.isArray(agent.projectIds) ? agent.projectIds.map(String) : [];
     const projectId = projectOf({ params, task, run });
-    if (projects.length && !projects.includes(projectId)) return refuse(`project ${projectId || '(none)'} is outside this agent's projects`);
+    if (projects.length && !projects.includes(projectId)) return refuse(`This connection is limited to some projects, and ${projectId ? `project ${projectId}` : 'that place'} is not one of them. Ask the person to widen it in AlianHub.`);
 
     const check = registry.evaluate(key, { ...params, __proposal: true }, { allowedActions: allowed });
     if (!check.allowed) return refuse(check.reason);
-    if (!isComplete(rating)) return refuse(`${key} has no risk rating`);
+    if (!isComplete(rating)) return refuse(`${key} is not ready for agents to use yet.`);
 
     if (!rating.write) return out(DECISION.ACT, `${key} only reads`);
     // An empty projectIds grants reads — an L0 "answers only" agent has no other way
     // to work — but no writes: a write needs a project a person chose on purpose.
-    if (!projects.length) return refuse(`${key} writes, and this agent has no project scope`);
+    if (!projects.length) return refuse(`${key} changes something, and this connection is not tied to a project. Ask the person which project to work in.`);
     const autonomy = Number(agent.autonomy) || 0;
     if (autonomy < REVIEW_LEVEL) return out(DECISION.PROPOSE, `autonomy L${autonomy} proposes every write`);
 
@@ -59,7 +59,7 @@ const decide = ({ agent = {}, action, params = {}, rating = null, run = null, ta
     if (risky.length) return out(DECISION.PROPOSE, `${key} ${risky.join(', ')}${routed ? `; ${taint.reasonFor(run)}` : ''}`);
     // Null is the run's own task; a named task whose project could not be read is ''.
     const target = targetProjectId === null || targetProjectId === undefined ? projectId : String(targetProjectId);
-    if (routed && run.projectId && target !== String(run.projectId)) return out(DECISION.PROPOSE, `${key} writes outside the run's project; ${taint.reasonFor(run)}`);
+    if (routed && run.projectId && target !== String(run.projectId)) return out(DECISION.PROPOSE, `${key} changes something outside the project this run is for; ${taint.reasonFor(run)}`);
     return out(DECISION.ACT, `${key} is a reversible task-scoped write with no money in it`);
 };
 

@@ -90,7 +90,7 @@ describe('a notice a person sends about a task', () => {
 
         expect(row.message).toBe('&lt;img src=x onerror=&quot;go&#40;&#41;&quot;&gt;&lt;b&gt;Look&lt;/b&gt; &amp; see');
         expect(row).toMatchObject({ userId: INSIDER, key: 'task_edit', type: 'tasks', projectId: P_OPEN, taskId: T_OPEN, notificationType: 'push' });
-        expect([row.changeType, row.changeData, row.clearedAt]).toEqual([undefined, undefined, undefined]);
-        expect(row.notSeen.slice().sort()).toEqual(PEOPLE.filter((id) => id !== INSIDER).sort());
+        expect(row.clearedAt).toBeUndefined();
+        expect(row.notSeen.slice().sort()).toEqual([...PEOPLE].sort());
     });
 });

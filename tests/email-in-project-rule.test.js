@@ -49,7 +49,8 @@ beforeEach(() => { jest.clearAllMocks(); seedRows(); });
 
 describe('an email inbox that turns mail into tasks', () => {
     it.each(EVERYONE)('is made by %s only in a project and a list they can open', async (who, uid) => {
-        const missing = await answered(inboxes.createInbox, { uid, body: { projectId: MISSING } });
+        const noProject = await answered(inboxes.createInbox, { uid, body: { projectId: MISSING } });
+        const noList = await answered(inboxes.createInbox, { uid, body: { projectId: P_OPEN, sprintId: MISSING } });
         for (const [projectId, sprintId] of PLACES) {
             const before = kept().length;
             const answer = await answered(inboxes.createInbox, { uid, body: { projectId, sprintId, sprintArray: { id: sprintId, name: 'List' } } });
@@ -57,7 +58,7 @@ describe('an email inbox that turns mail into tasks', () => {
 
             expect([sprintId, answer.status]).toEqual([sprintId, opens]);
             expect(kept().length).toBe(before + (opens ? 1 : 0));
-            if (!opens) expect(answer).toEqual(missing);
+            if (!opens) expect(answer).toEqual(OPEN_PROJECTS[uid].includes(projectId) ? noList : noProject);
         }
     });
 
@@ -75,15 +76,15 @@ describe('an email inbox that turns mail into tasks', () => {
         expect(named.data.map((row) => String(row.sprintId))).toEqual(OPEN_LISTS[uid].includes(L_PRIVATE) ? [L_PRIVATE] : []);
     });
 
-    it.each(EVERYONE)('is switched off or removed by %s only when they can open its project and its list', async (who, uid) => {
-        for (const [, sprintId] of PLACES) {
+    it.each(EVERYONE)('is switched off or removed by %s when it is theirs, or they are an owner or admin, in a project they can open', async (who, uid) => {
+        for (const [projectId, sprintId] of PLACES) {
             const id = String(inboxOf(sprintId)._id);
-            const opens = OPEN_LISTS[uid].includes(sprintId);
+            const manages = (uid === INSIDER || [OWNER, ADMIN].includes(uid)) && OPEN_PROJECTS[uid].includes(projectId);
 
-            expect([sprintId, (await answered(inboxes.updateInbox, { uid, params: { id }, body: { enabled: false } })).status]).toEqual([sprintId, opens]);
-            expect(inboxOf(sprintId).enabled).toBe(!opens);
-            expect([sprintId, (await answered(inboxes.deleteInbox, { uid, params: { id } })).status]).toEqual([sprintId, opens]);
-            expect(inboxOf(sprintId).deletedStatusKey).toBe(opens ? 1 : 0);
+            expect([sprintId, (await answered(inboxes.updateInbox, { uid, params: { id }, body: { enabled: false } })).status]).toEqual([sprintId, manages]);
+            expect(inboxOf(sprintId).enabled).toBe(!manages);
+            expect([sprintId, (await answered(inboxes.deleteInbox, { uid, params: { id } })).status]).toEqual([sprintId, manages]);
+            expect(inboxOf(sprintId).deletedStatusKey).toBe(manages ? 1 : 0);
         }
     });
 });

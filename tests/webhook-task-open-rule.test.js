@@ -25,7 +25,7 @@ const PEOPLE = { owner: OWNER, admin: ADMIN, insider: INSIDER, outsider: OUTSIDE
 const CONVERSATION = '6f0000000000000000000cd2';
 const NOBODY = 'kept-by-nobody';
 
-/* Each person keeps a webhook for every task event; one more was made before a webhook had a keeper. */
+/* Each person keeps a webhook for every task event; one more was made before a webhook had a keeper, and is the owners' and admins'. */
 const seedRows = () => {
     seed();
     Object.entries(PEOPLE).forEach(([name, createdBy]) => mockDb.seed(SCHEMA_TYPE.WEBHOOKS, { name, url: `https://hooks.example.test/${name}`, events: ['*'], secret: 's'.repeat(40), format: 'json', active: true, createdBy }));
@@ -47,7 +47,7 @@ afterEach(async () => { await jest.advanceTimersByTimeAsync(10000); jest.useReal
 describe('a webhook is told of a task', () => {
     it.each([['an open task', T_OPEN], ['a task of a private list', T_SECRET], ['a task of a private project', T_PRIVATE], ['a task of a personal list', T_PERSONAL]])('%s: when the person who keeps it can open that task', async (name, taskId) => {
         const keepers = Object.entries(PEOPLE).filter(([, uid]) => OPENS[uid].includes(taskId)).map(([who]) => who);
-        expect(await toldOf(taskId)).toEqual([...keepers, ...(taskId === T_OPEN ? [NOBODY] : [])].sort());
+        expect(await toldOf(taskId)).toEqual([...keepers, ...(taskId === T_PERSONAL ? [] : [NOBODY])].sort());
     });
 
     it('and never of a conversation', async () => {

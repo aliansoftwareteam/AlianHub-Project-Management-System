@@ -210,6 +210,7 @@ function startAdding() {
     nextTick(() => searchInputRef.value?.focus());
 }
 defineExpose({ startAdding });
+const emit = defineEmits(['changed']);
 
 function cancelAdding() {
     isAdding.value = false;
@@ -273,6 +274,7 @@ function addRelation(targetTask) {
             $toast.success(response.data.statusText, { position: "top-right" });
             cancelAdding();
             fetchRelations();
+            emit('changed');
         } else {
             $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: "top-right" });
         }
@@ -296,6 +298,7 @@ function removeRelation(item) {
         if (response.data?.status) {
             $toast.success(response.data.statusText, { position: "top-right" });
             fetchRelations();
+            emit('changed');
         } else {
             $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: "top-right" });
         }

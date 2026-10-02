@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const logger = require('../../Config/loggerConfig');
 const { myCache } = require('../../Config/config');
 const { dbCollections } = require('../../Config/collections');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 
 const multer = require('multer');
@@ -101,10 +102,10 @@ async function loadActiveMembers(companyId) {
     try {
         const result = await MongoDbCrudOpration(companyId, {
             type: dbCollections.COMPANY_USERS,
-            data: [{ status: { $ne: 'inactive' } }, { _id: 1, userId: 1, Employee_Name: 1, email: 1, role: 1, designation: 1 }],
+            data: [{ ...ACTIVE_SEAT }, { _id: 1, userId: 1, Employee_Name: 1, email: 1, role: 1, designation: 1 }],
         }, 'find');
-        return Array.isArray(result) ? result.map((m) => ({
-            id: String(m.userId || m._id),
+        return Array.isArray(result) ? result.filter((m) => m.userId).map((m) => ({
+            id: String(m.userId),
             name: m.Employee_Name || m.email || 'Unknown',
             role: m.role || m.designation || '',
         })) : [];
@@ -337,16 +338,24 @@ function briefUploadMiddleware(req, res, next) {
     });
 }
 
+/* What needs no file is asked before one is read. The company is asked again once the fields of the request are in. */
+function briefAsked(req, res, next) {
+    if (!isAnyProviderConfigured()) return sendError(res, 503, 'AI provider is not configured');
+    if (!req.uid) return sendError(res, 401, 'Unauthorized');
+    if (!resolveCompanyId(req)) return sendError(res, 403, 'Company access denied');
+    return next();
+}
+
 exports.uploadBrief = [
+    briefAsked,
     briefUploadMiddleware,
     async (req, res) => {
-        if (!isAnyProviderConfigured()) {
-            return sendError(res, 503, 'AI provider is not configured');
-        }
         const uid = req.uid;
-        if (!uid) return sendError(res, 401, 'Unauthorized');
         const companyId = resolveCompanyId(req);
-        if (!companyId) return sendError(res, 403, 'Company access denied');
+        if (!companyId) {
+            if (req.file) safeUnlink(req.file.path);
+            return sendError(res, 403, 'Company access denied');
+        }
         if (!req.file) return sendError(res, 400, 'No file uploaded (field name: file)');
 
         try {
@@ -1022,3 +1031,4 @@ exports.tasksExecute = async (req, res) => {
 };
 
 exports.events = (req, res) => sseEmitter.handleEvents(req, res);
+exports.loadActiveMembers = loadActiveMembers;

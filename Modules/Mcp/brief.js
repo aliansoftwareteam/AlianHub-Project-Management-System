@@ -72,7 +72,7 @@ const threadDigest = (comments) => {
 
 /* task.get returns this, never a row: enough for an agent to do the right work
  * without asking, and to know what it must not decide alone. */
-const TASK_NOT_FOUND = { error: 'task not found' };
+const TASK_NOT_FOUND = { error: 'That task was not found. Ask the person which task they mean.' };
 
 const buildBrief = async (ctx, taskId, vis) => {
     if (!oid(taskId)) return TASK_NOT_FOUND;

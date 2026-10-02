@@ -588,5 +588,6 @@ exports.submitForm = async (req, res) => {
         return send(res, 500, 'Error', '<h1>Something went wrong.</h1>');
     } finally {
         if (cleanupFiles) cleanupFiles();
+        else discardFiles(req.files);
     }
 };

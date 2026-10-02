@@ -1,5 +1,5 @@
 const { ACTIVE_SEAT, INVITED_SEAT } = require('../../../Config/seatStatus');
-const { OBJECT_ID_PATTERN, isPlainObject, queryRefusal } = require('./callerQueryRules');
+const { OBJECT_ID_PATTERN, isPlainObject, queryRefusal, withPlainSearchText, SearchTextRefused } = require('./callerQueryRules');
 
 const MEMBER_STAGES = ['$match', '$project', '$sort', '$limit', '$skip', '$addFields', '$set', '$unset', '$count'];
 
@@ -40,7 +40,14 @@ const scopeCompanyPipeline = (findQuery, own, limited = []) => {
         }
         if (queryRefusal(stage)) return { ok: false, error: 'The pipeline uses an operator that is not allowed.' };
     }
-    return { ok: true, pipeline: [{ $match: { _id: { $in: own } } }, ...(limited.length ? [memberCompanyStage(limited)] : []), ...stages] };
+    let plain;
+    try {
+        plain = withPlainSearchText(stages);
+    } catch (error) {
+        if (!(error instanceof SearchTextRefused)) throw error;
+        return { ok: false, error: error.message };
+    }
+    return { ok: true, pipeline: [{ $match: { _id: { $in: own } } }, ...(limited.length ? [memberCompanyStage(limited)] : []), ...plain] };
 };
 
 const COMPANY_DETAIL_FIELDS = ['Cst_profileImage', 'Cst_CompanyName', 'Cst_Phone', 'Cst_Country', 'Cst_DialCode', 'Cst_State', 'Cst_City',

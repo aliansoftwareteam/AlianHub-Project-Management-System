@@ -36,6 +36,7 @@ const pageVersions = require('./helpers/pageVersions');
 const pageSettle = require('./helpers/pageSettle');
 const { cleanBlocks, cleanHtml } = require('../Tasks/helpers/cleanRichText');
 const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
+const { namedPeopleRefusal } = require('../../Config/projectPeople');
 
 const LIST_FIELDS = 'title parentPageId ProjectID visibility createdBy linkedTasks updatedBy updatedAt createdAt order '
     + 'isWiki ownerId reviewDate reviewedAt reviewedBy createdByAgent agentName agentStatus rawText sharedWith';
@@ -231,6 +232,8 @@ exports.createPage = async (req, res) => {
         if (!(await opensEveryTask(companyId, userId, linkedTasks || []))) {
             return fail(res, 'Task not found.', 404);
         }
+        const ownerRefusal = meta.patch.ownerId ? await namedPeopleRefusal(companyId, projectId, [meta.patch.ownerId]) : '';
+        if (ownerRefusal) return fail(res, ownerRefusal, 400);
         if (parentPageId) {
             const parent = await findPage(companyId, parentPageId, userId);
             if (!parent) {
@@ -385,6 +388,10 @@ exports.updatePage = async (req, res) => {
         const changesProperties = Object.keys(meta.patch).length > 0 || linkedTasks !== undefined;
         if (changesProperties && !(await canUsePage(companyId, existing, userId, { edit: true, named: false }))) {
             return fail(res, 'This doc is shared with you to edit its text; its settings stay with the people who manage it.', 403);
+        }
+        if (meta.patch.ownerId && meta.patch.ownerId !== String(existing.ownerId || '')) {
+            const ownerRefusal = await namedPeopleRefusal(companyId, existing.ProjectID, [meta.patch.ownerId]);
+            if (ownerRefusal) return fail(res, ownerRefusal, 400);
         }
         const writesBody = title !== undefined || contentHtml !== undefined || contentBlocks !== undefined;
         if (writesBody && baseEditedAt !== undefined && stampOf(baseEditedAt) !== stampOf(existing.editedAt)) {

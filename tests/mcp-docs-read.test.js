@@ -55,9 +55,9 @@ describe('F3 — docs.read returns the stored page body', () => {
 
     it('reports a missing or deleted page and an invalid id', async () => {
         const gone = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Trashed', deletedStatusKey: 1, content: { html: '<p>x</p>' } });
-        expect(await read(gone._id)).toEqual({ error: 'page not found' });
-        expect(await read('6f00000000000000000000ff')).toEqual({ error: 'page not found' });
-        expect(await read('not-an-id')).toEqual({ error: 'invalid pageId' });
+        expect(await read(gone._id)).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
+        expect(await read('6f00000000000000000000ff')).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
+        expect(await read('not-an-id')).toEqual({ error: 'That is not a doc id. Use an id from pages.search.' });
     });
 });
 
@@ -74,8 +74,8 @@ describe('defect 5 — docs.read honours the token\'s project scope and page vis
         const companyWide = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Company wide', content: { html: '<p>handbook</p>' } });
 
         expect((await scoped(inside._id)).text).toBe('ok');
-        expect(await scoped(outside._id)).toEqual({ error: 'page not found' });
-        expect(await scoped(companyWide._id)).toEqual({ error: 'page not found' });
+        expect(await scoped(outside._id)).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
+        expect(await scoped(companyWide._id)).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
         expect((await read(companyWide._id)).text).toBe('handbook');
     });
 
@@ -83,7 +83,7 @@ describe('defect 5 — docs.read honours the token\'s project scope and page vis
         const theirs = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Theirs', visibility: 'private', createdBy: 'u2', content: { html: '<p>private</p>' } });
         const mine = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Mine', visibility: 'private', createdBy: 'u1', content: { html: '<p>own notes</p>' } });
 
-        expect(await read(theirs._id)).toEqual({ error: 'page not found' });
+        expect(await read(theirs._id)).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
         expect((await read(mine._id)).text).toBe('own notes');
     });
 });

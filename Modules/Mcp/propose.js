@@ -2,6 +2,7 @@ const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const permissions = require('../Agents/permissions');
 const { toolLabel } = require('../Agents/changeLabels');
+const { joined } = require('../Agents/proposalText');
 const manageFlag = require('./manageFlag');
 
 const SOURCE = 'mcp';
@@ -67,7 +68,7 @@ const holderMayInEach = async (companyId, actor, action, params = {}) => {
 const fileable = async (ctx, tool, params) => {
     const refuse = async (why) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: why, ip: ctx.ip, taint: ctx.taint }); };
     if (ctx.token && ctx.token.oauth && !outsideMayFile(ctx, tool)) {
-        await refuse(`${tool.name} needs a person's approval, which is filed only for a personal access token, or for an outside client that holds the manage grant the tool needs.`);
+        await refuse(`${tool.name} needs a person's approval, but this connection cannot ask for it. Ask the person to do it in AlianHub, or to connect you again with the right permissions.`);
     }
     const check = registry.evaluate(tool.action, { ...params, __proposal: true }, { allowedActions: ctx.allowedActions });
     if (!check.allowed) await refuse(check.reason);
@@ -102,7 +103,7 @@ const propose = async (ctx, tool, params, reason, held = '') => {
     const filed = await file(ctx, {
         taskId: params.taskId || null,
         projectId: params.projectId || null,
-        what: `${tool.name}: ${tool.description}`.slice(0, 300),
+        what: joined([tool.name, tool.description]),
         why: held ? `${reason} (${held})` : reason,
         changes,
     });

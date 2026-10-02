@@ -6,22 +6,12 @@ const logger = require('../../Config/loggerConfig');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo'); // canonical task create
 const R = require('./helpers/emailInRules');
 const { pinSessionTenant } = require('../../Config/tenant');
-const { canEditProject } = require('../../Config/projectAccess');
-const { listOf } = require('../Tasks/helpers/taskWritePlacement');
-const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
-
-const CREATES_TASKS = ['task.task_create'];
-const PROJECT_NOT_FOUND = 'Project not found.';
-
-/* An inbox makes tasks in one list of one project, so it is made, listed, switched and removed by a person who can
- * create tasks in that project and see that list. */
-const opensPlace = async (companyId, uid, projectId, sprintId) => (await canEditProject(companyId, uid, String(projectId), CREATES_TASKS)).allowed === true
-    && Boolean(await listOf(companyId, uid, String(projectId), String(sprintId)));
-const opensInbox = (companyId, uid, inbox) => opensPlace(companyId, uid, inbox.ProjectID, inbox.sprintId);
-
-const liveInbox = (companyId, id) => (oid(id)
-    ? MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [{ _id: oid(id), companyId: String(companyId), deletedStatusKey: { $ne: 1 } }] }, 'findOne')
-    : null);
+const { canEditProject, canReadProject, keepVisibleProjectIds } = require('../../Config/projectAccess');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { sprintIdentities, canSeeSprint, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
+const { actingUser } = require('../Sprints/helpers/actingUser');
+const { activeMemberIds } = require('../notification/activeMembers');
+const { peopleWhoOpen } = require('../../Config/projectPeople');
 
 // AUTO-01 — email-to-task. An inbox doc lives in the GLOBAL db (keyed by token)
 // so the unauthenticated inbound webhook can resolve token -> company without
@@ -33,12 +23,6 @@ const GLOBAL = SCHEMA_TYPE.GOLBAL;
 const DOMAIN = process.env.EMAIL_IN_DOMAIN || 'inbox.alianhub.com';
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 
-/* The lists of the project `uid` does not see, as a clause on the list rows. */
-const hiddenSprintFilterById = async (companyId, uid, projectId) => {
-    const hidden = (await hiddenSprintFilter(companyId, uid, [String(projectId)])).sprintId;
-    return hidden ? { _id: hidden } : {};
-};
-
 const withAddress = (doc) => {
     if (!doc) return doc;
     const o = doc.toObject ? doc.toObject() : { ...doc };
@@ -48,32 +32,44 @@ const withAddress = (doc) => {
 
 // The task template stored on the inbox (mirrors RecurringTasks buildTemplateFromBody
 // so taskMongo.create accepts it). TaskName is filled per-email from the subject.
-const buildTemplate = (b, companyId) => {
+const buildTemplate = (b, companyId, { assignees, creatorId }) => {
     const project = b.projectData || {};
     return {
-        TaskName: '', TaskKey: '-', AssigneeUserId: Array.isArray(b.assignees) ? b.assignees : [], watchers: [],
+        TaskName: '', TaskKey: '-', AssigneeUserId: assignees, watchers: [],
         DueDate: '', dueDateDeadLine: [], TaskType: b.taskType || 'task', TaskTypeKey: Number(b.taskTypeKey) || 1,
         ParentTaskId: '', ProjectID: project._id, CompanyId: project.CompanyId || companyId,
         status: { text: 'To Do', key: 1, type: 'default_active' }, isParentTask: true,
-        Task_Leader: (b.userData && b.userData.id) || '', Task_Priority: b.priority || 'MEDIUM',
+        Task_Leader: creatorId, Task_Priority: b.priority || 'MEDIUM',
         deletedStatusKey: 0, statusType: 'default_active', statusKey: 1, points: null,
         rawDescription: '', descriptionBlock: {},
     };
 };
 
-// Pick the project's first usable sprint (top-level first, then inside folders) so
-// the inbound task has a real target. Read from the sprints collection: a project
-// document's sprintsObj is a legacy copy that no sprint write maintains, so a
-// project whose sprints were created through the API embeds none of them.
-const resolveDefaultSprint = async (companyId, projectId, uid) => {
-    const pid = oid(projectId);
-    if (!pid) return null;
+const CREATES_TASKS = [['task.task_create']];
+const NOT_FOUND = { status: false, statusText: 'Not found.' };
+
+/* The lists of the project an inbox may deliver into: the ones its maker can open.
+ * Read from the sprints collection: a project document's sprintsObj is a legacy copy
+ * that no sprint write maintains, so a project whose sprints were created through the
+ * API embeds none of them. */
+const openLists = async (companyId, uid, projectId) => {
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.SPRINTS,
-        data: [{ projectId: pid, deletedStatusKey: { $ne: 1 }, ...(uid ? await hiddenSprintFilterById(companyId, uid, projectId) : {}) }],
+        data: [{ projectId: oid(projectId), deletedStatusKey: { $ne: 1 } }],
     }, 'find').catch(() => []);
     const sprints = Array.isArray(rows) ? rows : [];
-    const sprint = sprints.find((s) => s && !s.folderId) || sprints[0];
+    if (isPrivileged(await getRoleType(companyId, uid))) return sprints;
+    const identities = await sprintIdentities(companyId, uid);
+    return sprints.filter((sprint) => canSeeSprint(sprint, identities));
+};
+
+/* The list named by the request, or the project's first usable one (top-level first, then
+ * inside folders); its name and folder come from the stored rows. */
+const resolveSprint = async (companyId, uid, projectId, namedId) => {
+    const sprints = await openLists(companyId, uid, projectId);
+    const sprint = namedId
+        ? sprints.find((s) => String(s._id) === String(namedId))
+        : (sprints.find((s) => s && !s.folderId) || sprints[0]);
     if (!sprint) return null;
 
     const sid = String(sprint._id);
@@ -108,25 +104,31 @@ exports.createInbox = async (req, res) => {
         if (!projectId || !oid(projectId)) {
             return res.send({ status: false, statusText: 'A valid projectId is required.' });
         }
-        const project = (await canEditProject(companyId, creatorId, String(projectId), CREATES_TASKS)).allowed
-            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(projectId) }] }, 'findOne').catch(() => null)
-            : null;
-        if (!project) return res.send({ status: false, statusText: PROJECT_NOT_FOUND });
+        const access = await canEditProject(companyId, creatorId, projectId, CREATES_TASKS);
+        if (!access.allowed) {
+            return access.statusCode === 404
+                ? res.status(404).send({ status: false, statusText: 'Project not found.' })
+                : res.status(403).send({ status: false, statusText: 'You do not have permission to perform this action.' });
+        }
+        const project = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(projectId) }] }, 'findOne').catch(() => null);
+        if (!project) return res.status(404).send({ status: false, statusText: 'Project not found.' });
         const projObj = project.toObject ? project.toObject() : project;
 
-        // Sprint: a client-supplied sprintArray wins; otherwise resolve the project's first sprint.
-        let sprintId = (b.sprintArray && (b.sprintArray.id || b.sprintArray._id)) || b.sprintId || '';
-        let sprintArray = (b.sprintArray && (b.sprintArray.id || b.sprintArray._id)) ? b.sprintArray : null;
-        let folderObjId = '';
-        if (!sprintId || !sprintArray) {
-            const def = await resolveDefaultSprint(companyId, projectId, creatorId);
-            if (!def) return res.send({ status: false, statusText: 'This project has no list to receive tasks — create a list first.' });
-            sprintId = def.sprintId; sprintArray = def.sprintArray; folderObjId = def.folderObjId || '';
-        } else if (!(await listOf(companyId, creatorId, String(projectId), String(sprintId)))) {
-            return res.send({ status: false, statusText: PROJECT_NOT_FOUND });
+        const namedSprint = (b.sprintArray && (b.sprintArray.id || b.sprintArray._id)) || b.sprintId || '';
+        if (namedSprint && !oid(namedSprint)) return res.status(404).send({ status: false, statusText: 'List not found.' });
+        const target = await resolveSprint(companyId, creatorId, projectId, namedSprint);
+        if (!target) {
+            return namedSprint
+                ? res.status(404).send({ status: false, statusText: 'List not found.' })
+                : res.send({ status: false, statusText: 'This project has no list to receive tasks — create a list first.' });
         }
+        const { sprintId, sprintArray } = target;
+        const folderObjId = target.folderObjId || '';
 
-        const tmpl = buildTemplate(b, companyId);
+        const creator = await actingUser(req);
+        const members = await activeMemberIds(companyId, (Array.isArray(b.assignees) ? b.assignees : []).filter((id) => typeof id === 'string'));
+        const assignees = await peopleWhoOpen(companyId, String(projectId), members);
+        const tmpl = buildTemplate(b, companyId, { assignees, creatorId });
         tmpl.ProjectID = projObj._id;
         tmpl.CompanyId = companyId;
         tmpl.sprintId = sprintId;
@@ -144,10 +146,7 @@ exports.createInbox = async (req, res) => {
             sprintArray,
             templateSnapshot: tmpl,
             projectSnapshot: { _id: projObj._id, CompanyId: companyId, ProjectCode: projObj.ProjectCode, ProjectName: projObj.ProjectName },
-            userSnapshot: {
-                id: creatorId, Employee_Name: b.userData && b.userData.Employee_Name,
-                companyOwnerId: b.userData && b.userData.companyOwnerId,
-            },
+            userSnapshot: { id: creatorId, Employee_Name: (creator && creator.Employee_Name) || '', companyOwnerId: '' },
             enabled: true,
             createdBy: creatorId,
             receivedCount: 0,
@@ -159,6 +158,16 @@ exports.createInbox = async (req, res) => {
     } catch (e) { logger.error(`createInbox: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
+/* The filter of an inbox this person may change: their own, or any of the workspace's for an owner or admin, in a
+ * project they can still open. */
+const manageableInbox = async (companyId, uid, id) => {
+    if (!oid(id)) return null;
+    const filter = { _id: oid(id), companyId: String(companyId), deletedStatusKey: { $ne: 1 } };
+    if (!isPrivileged(await getRoleType(companyId, uid))) filter.createdBy = String(uid);
+    const inbox = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [filter, { _id: 1, ProjectID: 1 }] }, 'findOne');
+    return inbox && (await canReadProject(companyId, String(uid), String(inbox.ProjectID))).allowed ? filter : null;
+};
+
 // GET /api/v1/email-in/inboxes?projectId=
 exports.listInboxes = async (req, res) => {
     try {
@@ -166,12 +175,14 @@ exports.listInboxes = async (req, res) => {
         if (!companyId) return undefined;
         const q = { companyId: String(companyId), deletedStatusKey: { $ne: 1 } };
         if (req.query && req.query.projectId && oid(req.query.projectId)) q.ProjectID = oid(req.query.projectId);
-        const rows = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [q, {}, { sort: { createdAt: -1 } }] }, 'find');
-        const open = [];
-        for (const row of rows || []) {
-            if (await opensInbox(companyId, String(req.uid || ''), row)) open.push(row);
-        }
-        return res.send({ status: true, data: open.map(withAddress) });
+        const rows = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [q, {}, { sort: { createdAt: -1 } }] }, 'find') || [];
+        /* An inbox's address is the key to adding tasks, so it is shown with its project only, and not when it delivers into a private list the person is not on. */
+        const openable = new Set(await keepVisibleProjectIds(companyId, req.uid, rows.map((row) => String(row.ProjectID))));
+        const privileged = isPrivileged(await getRoleType(companyId, req.uid));
+        const closed = new Set(((await hiddenSprintFilter(companyId, req.uid, [...openable])).sprintId || { $nin: [] }).$nin.map(String));
+        const shown = rows.filter((row) => openable.has(String(row.ProjectID)) && !closed.has(String(row.sprintId)))
+            .map((row) => ({ ...withAddress(row), canManage: privileged || String(row.createdBy) === String(req.uid) }));
+        return res.send({ status: true, data: shown });
     } catch (e) { logger.error(`listInboxes: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
@@ -184,13 +195,13 @@ exports.updateInbox = async (req, res) => {
         if (req.body.enabled !== undefined) set.enabled = !!req.body.enabled;
         if (req.body.name !== undefined) set.name = String(req.body.name).slice(0, 120);
         if (!Object.keys(set).length) return res.send({ status: false, statusText: 'Nothing to update.' });
-        const inbox = await liveInbox(companyId, req.params.id);
-        if (!inbox || !(await opensInbox(companyId, String(req.uid || ''), inbox))) return res.send({ status: false, statusText: 'Not found.' });
+        const own = await manageableInbox(companyId, req.uid, req.params.id);
+        if (!own) return res.status(404).send(NOT_FOUND);
         const updated = await MongoDbCrudOpration(GLOBAL, {
             type: SCHEMA_TYPE.EMAIL_INBOXES,
-            data: [{ _id: oid(req.params.id), companyId: String(companyId) }, { $set: set }, { returnDocument: 'after' }],
+            data: [own, { $set: set }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        if (!updated) return res.send({ status: false, statusText: 'Not found.' });
+        if (!updated) return res.status(404).send(NOT_FOUND);
         removeCache(`email_inboxes:${companyId}`);
         return res.send({ status: true, statusText: 'Inbox updated.', data: withAddress(updated) });
     } catch (e) { logger.error(`updateInbox: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
@@ -201,11 +212,11 @@ exports.deleteInbox = async (req, res) => {
     try {
         const companyId = pinSessionTenant(req, res);
         if (!companyId) return undefined;
-        const inbox = await liveInbox(companyId, req.params.id);
-        if (!inbox || !(await opensInbox(companyId, String(req.uid || ''), inbox))) return res.send({ status: false, statusText: 'Not found.' });
+        const own = await manageableInbox(companyId, req.uid, req.params.id);
+        if (!own) return res.status(404).send(NOT_FOUND);
         await MongoDbCrudOpration(GLOBAL, {
             type: SCHEMA_TYPE.EMAIL_INBOXES,
-            data: [{ _id: oid(req.params.id), companyId: String(companyId) }, { $set: { deletedStatusKey: 1, enabled: false } }],
+            data: [own, { $set: { deletedStatusKey: 1, enabled: false } }],
         }, 'updateOne');
         removeCache(`email_inboxes:${companyId}`);
         return res.send({ status: true, statusText: 'Inbox removed.' });

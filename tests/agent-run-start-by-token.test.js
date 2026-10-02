@@ -66,7 +66,7 @@ const atWork = (projectId, taskId = T_OPEN_2) => mockDb.seed(SCHEMA_TYPE.AGENT_R
 
 /* [what the project is set to, how it is set, what the refusal says] */
 const HELD = [
-    ['has connected agents propose every change', () => { project(P_OPEN).agentPolicy = { connected: 'propose_all' }; }, /propose every change/],
+    ['has connected agents propose every change', () => { project(P_OPEN).agentPolicy = { connected: 'propose_all' }; }, /has to ask a person before every change/],
     ['already has as many agents at work as it takes', () => { project(P_OPEN).agentLimits = { atOnce: 1 }; atWork(P_OPEN); }, /already has 1 agent at work/],
 ];
 

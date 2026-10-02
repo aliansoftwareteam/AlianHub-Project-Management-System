@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const ctrl = require('./controller');
 const aiFields = require('./aiFields/controller');
 const fieldLinks = require('./fieldLinksController');
+const fieldRemoval = require('./fieldRemovalController');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { requireProjectAccess } = require('../../Config/projectAccess');
@@ -9,15 +10,35 @@ const { requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_ACTIONS } = require('../../Config/taskWritePermissions');
 const { fieldInsertFrom, fieldUpdateFrom, isCompanyWide, widensToCompany, requireFieldSettings, requireSameKind, checkFieldWrite } = require('./helpers/fieldWrite');
 const { linkPlan, listOf } = require('./helpers/fieldProjects');
-const { agentsRefused } = require('../Agents/guard');
+const { agentsRefused, projectAsked } = require('../Agents/guard');
+const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 
 const CUSTOM_FIELD_EDIT = [['project.project_custom_field', 'task.task_custom_field']];
 
 /* An agent proposes a field through its MCP tool; a person approves it, and it is then made here as that person. */
 const fieldsByPeople = agentsRefused('fields.create');
 
+const voted = projectAsked((req, body) => ({ action: 'task.field.set', params: { taskId: typeof body.taskId === 'string' ? body.taskId : '' } }));
+
 /* Storing a computed value on a task is held to what editing a field value on it is held to. */
 const COMPUTED_VALUES = Object.freeze({ needs: TASK_ACTIONS.updateTaskCustomField.needs, tasks: [['taskIds', '*']] });
+
+const MOST_TASKS_COMPUTED = 200;
+
+/* The projects of the tasks a request names, among those its person can open. */
+const projectsOfTasks = async (companyId, uid, taskIds) => {
+    const open = await readableTaskIds(companyId, uid, (Array.isArray(taskIds) ? taskIds : []).slice(0, MOST_TASKS_COMPUTED + 1));
+    if (!open.length) return [];
+    const tasks = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: open.map((id) => new mongoose.Types.ObjectId(id)) } }, { ProjectID: 1 }],
+    }, 'find');
+    return [...new Set((tasks || []).map((task) => String(task.ProjectID || '')).filter(Boolean))];
+};
+
+const computed = projectAsked(async (req, body, companyId) => {
+    const projects = await projectsOfTasks(companyId, req.uid, body.taskIds);
+    return (projects.length ? projects : ['']).map((projectId) => ({ action: 'task.fields.compute', params: { projectId } }));
+});
 
 const projectsOf = (field) => (field && field.global !== true && field.projectId ? [].concat(field.projectId) : []);
 
@@ -42,6 +63,26 @@ const leavesNoProject = (stored, body) => {
 
 const insertIsCompanyWide = (req) => isCompanyWide(req.body.updateObject);
 
+/* A field and its values are taken away for good by a person alone; an agent's token is refused and that is recorded. */
+const deletedByPeople = agentsRefused('fields.delete');
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const requireFieldId = (req, res, next) => (OBJECT_ID.test(String(req.params.fieldId || ''))
+    ? next()
+    : res.status(400).json({ status: false, statusText: 'fieldId must be an id.', message: 'fieldId must be an id.' }));
+
+const namedField = (req) => MongoDbCrudOpration(req.headers['companyid'], {
+    type: SCHEMA_TYPE.CUSTOM_FIELDS,
+    data: [{ _id: new mongoose.Types.ObjectId(String(req.params.fieldId)) }, { global: 1, projectId: 1 }],
+}, 'findOne');
+
+/* Whoever may change the field: the field setting for a company-wide one, the field permission in each of its projects otherwise. */
+const managesNamedField = [
+    requireFieldId,
+    requireProjectAccess({ projectIds: async (req) => projectsOf(await namedField(req)), permissions: () => CUSTOM_FIELD_EDIT }),
+    requireFieldSettings(async (req) => isCompanyWide(await namedField(req))),
+];
+
 const updateTouchesCompanyWide = async (req) => {
     const stored = await storedField(req);
     return widensToCompany(req.body.updateObject) || isCompanyWide(stored) || leavesNoProject(stored, req.body);
@@ -64,11 +105,13 @@ exports.init = (app) => {
         ctrl.insertCustomField)
     app.get('/api/v2/custom-fields/formula/scope', ctrl.formulaScope)
     app.post('/api/v2/custom-fields/formula/validate', ctrl.validateFormula)
-    app.post('/api/v2/custom-fields/compute', requireTaskWritePermission(COMPUTED_VALUES), ctrl.computeFields)
+    app.post('/api/v2/custom-fields/compute', requireTaskWritePermission(COMPUTED_VALUES), computed, ctrl.computeFields)
+    app.get('/api/v2/custom-fields/:fieldId/usage', ...managesNamedField, fieldRemoval.fieldUsage)
+    app.post('/api/v2/custom-fields/:fieldId/delete', deletedByPeople, ...managesNamedField, fieldRemoval.deleteCustomField)
     app.post('/api/v2/custom-fields/links/resolve', fieldLinks.resolve)
-    app.post('/api/v2/custom-fields/:fieldId/vote', fieldLinks.vote)
+    app.post('/api/v2/custom-fields/:fieldId/vote', voted, fieldLinks.vote)
     app.post('/api/v2/custom-fields/:fieldId/ai/preview', agentsRefused('ai.spend'), aiFields.preview)
-    app.post('/api/v2/custom-fields/:fieldId/ai/apply', aiFields.apply)
+    app.post('/api/v2/custom-fields/:fieldId/ai/apply', agentsRefused('aifield.apply'), aiFields.apply)
     app.post('/api/v2/custom-fields/:fieldId/ai/jobs', agentsRefused('ai.spend'), aiFields.startJob)
     app.get('/api/v2/custom-fields/ai/jobs/:jobId', aiFields.readJob)
 }

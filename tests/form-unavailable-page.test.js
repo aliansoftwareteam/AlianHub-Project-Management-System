@@ -8,6 +8,7 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn()
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { create: jest.fn() } }));
 jest.mock('../Modules/Forms/helpers/formUpload', () => ({
     storeSubmissionFiles: jest.fn(async () => ({ files: {}, errors: {}, cleanup: () => {} })),
+    discardFiles: jest.fn(),
     messageFor: () => '', REPICK: '', ACCEPT_ATTR: '', MAX_FILE_BYTES: 1, MAX_FILES: 1,
 }));
 

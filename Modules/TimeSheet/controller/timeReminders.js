@@ -8,6 +8,7 @@ const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const { isPrivileged } = require('../../../Config/roleTypes');
 const { ACTIVE_SEAT } = require('../../../Config/seatStatus');
 const { companyWorkingDays } = require('../../Company/helpers/companyWeek');
+const { activeMemberIds } = require('../../notification/activeMembers');
 
 // TIME-06 — time-entry reminders. A daily nudge (prod cron) to members who
 // haven't logged time today; the /send-reminders endpoint runs the same path
@@ -108,6 +109,9 @@ const isCompanyOwner = async (companyId, userId) => {
 exports.triggerReminders = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
+        if (!(await isCompanyOwner(companyId, req.uid))) {
+            return res.status(403).send({ status: false, statusText: 'Only an owner or admin can send the time reminders.' });
+        }
         const result = await sendTimeRemindersForCompany(companyId);
         return res.send({ status: true, statusText: 'Reminders processed.', data: result });
     } catch (error) {
@@ -151,7 +155,7 @@ exports.updateReminderSettings = async (req, res) => {
             if (!Array.isArray(body.userIds)) {
                 return res.status(400).send({ status: false, statusText: 'userIds must be an array.' });
             }
-            patch.userIds = body.userIds;
+            patch.userIds = await activeMemberIds(companyId, body.userIds.filter((id) => typeof id === 'string'));
         }
         if (Object.keys(patch).length === 0) {
             return res.status(400).send({ status: false, statusText: 'No supported fields in body.' });

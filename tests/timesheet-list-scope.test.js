@@ -17,6 +17,9 @@ const { getlogDetailTimeSheet } = require('../Modules/TimeSheet/controller/logDe
 const { getTimeLogTimeSheet } = require('../Modules/TimeSheet/controller/timeLog');
 const { getTimeSheetByAggregate } = require('../Modules/TimeSheet/controller/getTimeSheetByAggregate');
 const { getEstimatedTime, getEstimateByAggregate } = require('../Modules/EstimatedTime/controller');
+const { resolveSheetScope, SHEET_PERMISSION } = require('../Modules/TimeSheet/helpers/timeScope');
+const { scopeTimesheetPipeline, scopeEstimatePipeline, checkStages, withJoinScope } = require('../Modules/TimeSheet/helpers/timesheetQueryScope');
+const { matches } = require('./fixtures/fakeMongo');
 
 const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, T_OPEN, T_SECRET, OPENS, settle } = world;
 const { seed, rows } = world.create(mockDb);
@@ -87,5 +90,49 @@ describe('the time and the plans other people keep against a task', () => {
         expect([...new Set(time.flatMap((row) => row.task.map((task) => task.TaskName)))].sort()).toEqual(TASKS.filter((id) => OPENS[uid].includes(id)).map((id) => (id === T_OPEN ? 'Open task' : 'Secret task')).sort());
         expect([...new Set(lists.flatMap((row) => row.task.flatMap((task) => task.list.map((list) => list.name))))].sort()).toEqual(OPENS[uid].includes(T_SECRET) ? ['Open list', 'Private list'] : ['Open list']);
         expect(rows(SCHEMA_TYPE.TIMESHEET)).toHaveLength(4);
+    });
+});
+
+/* A join that names no field to join on reads the whole collection, so what it starts from is all that holds it. */
+describe('a join a time or plan query makes without tying it to its rows', () => {
+    const TASKS_JOIN = { $lookup: { from: 'tasks', as: 'tasks', pipeline: [{ $project: { TaskName: 1 } }] } };
+    const LISTS_JOIN = { $lookup: { from: 'tasks', as: 'tasks', pipeline: [{ $lookup: { from: 'sprints', as: 'lists', pipeline: [] } }] } };
+    const joinOf = (stages) => stages.map((stage) => stage.$lookup || (stage.$facet && Object.values(stage.$facet)[0][0].$lookup)).find(Boolean);
+    const ROADS = {
+        'the timesheet query': (scope, join) => withJoinScope(CID, scope, [join], (joinScope) => scopeTimesheetPipeline([join], joinScope)),
+        'the plan query': (scope, join) => withJoinScope(CID, scope, [join], (joinScope) => scopeEstimatePipeline([join], joinScope)),
+        'a facet of the time log read': (scope, join) => withJoinScope(CID, scope, [{ $facet: { rows: [join] } }], (joinScope) => checkStages([{ $facet: { rows: [join] } }], joinScope)),
+    };
+    const cases = Object.keys(ROADS).flatMap((road) => EVERYONE.filter(([, uid]) => ![OWNER, ADMIN].includes(uid)).map(([who, uid]) => [road, who, uid]));
+
+    it.each(cases)('%s: gives %s the tasks and the lists they can open, and no other', async (road, who, uid) => {
+        const scope = await resolveSheetScope(CID, uid, [SHEET_PERMISSION.tracker, SHEET_PERMISSION.workload]);
+        const [tasksFirst] = joinOf(await ROADS[road](scope, TASKS_JOIN)).pipeline;
+        const [, listsJoin] = joinOf(await ROADS[road](scope, LISTS_JOIN)).pipeline;
+        const [listsFirst] = listsJoin.$lookup.pipeline;
+
+        expect(rows(SCHEMA_TYPE.TASKS).filter((row) => matches(row, tasksFirst.$match)).map((row) => String(row._id)).sort()).toEqual([...OPENS[uid]].sort());
+        expect(rows(SCHEMA_TYPE.SPRINTS).filter((row) => matches(row, listsFirst.$match)).map((row) => row.name).sort())
+            .toEqual(uid === INSIDER ? ['List of the private project', 'Open list', 'Personal list', 'Private list'] : ['Open list']);
+    });
+});
+
+describe('text typed into a stage of the time log read', () => {
+    const typed = { $addFields: { hit: { $regexMatch: { input: '$LogDescription', regex: '(a+)+$', options: 'i' } } } };
+
+    it('is matched as text, never run as a pattern', async () => {
+        mockDb.calls.length = 0;
+        await answered(getTimeLogTimeSheet, { uid: OUTSIDER, body: { taskIds: [{ TicketID: T_OPEN }], addFields: typed } });
+        const [pipeline] = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.TIMESHEET && call.method === 'aggregate').pop().data;
+
+        expect(pipeline.find((stage) => stage.$addFields).$addFields.hit.$regexMatch.regex).toBe('\\(a\\+\\)\\+\\$');
+    });
+
+    it('is refused when it is too long to be text someone typed', async () => {
+        const res = { statusCode: 200 };
+        res.status = (code) => { res.statusCode = code; return res; };
+        res.json = () => res;
+        await getTimeLogTimeSheet({ uid: OUTSIDER, headers: { companyid: CID }, body: { taskIds: [{ TicketID: T_OPEN }], addFields: { $addFields: { hit: { $regexMatch: { input: '$LogDescription', regex: 'a'.repeat(5000) } } } } } }, res);
+        expect(res.statusCode).toBe(400);
     });
 });

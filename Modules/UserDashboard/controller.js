@@ -26,6 +26,7 @@ const { companyWideMatch, toObjectIds } = require('../Tasks/helpers/taskQueryGua
 const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { forgetCards } = require('../AI/askCardStore');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -3068,6 +3069,15 @@ async function visibleProjectIds(companyId, uid) {
     return (rows || []).map((p) => String(p._id));
 }
 
+/* A project dashboard is listed to everyone who opens the project, so its owner has to be one of them. */
+async function openProjectOf(companyId, uid, projectId) {
+    const id = typeof projectId === "string" ? projectId : "";
+    if (!mongoose.Types.ObjectId.isValid(id)) return "";
+    return (await visibleProjectIds(companyId, uid)).includes(id) ? id : "";
+}
+
+const PROJECT_NOT_FOUND = { status: false, message: "Project not found." };
+
 function canViewDashboard(doc, uid, projectIds) {
     if (!doc || doc.isDeleted === true) return false;
     if (dashboardOwner(doc) === uid) return true;
@@ -3184,10 +3194,11 @@ exports.createSharedDashboard = async (req, res) => {
         const title = String(body.title || "").trim().slice(0, 120);
         if (!title) return res.status(400).json({ status: false, message: "A dashboard needs a name." });
         const visibility = DASHBOARD_VISIBILITY.includes(String(body.visibility)) ? String(body.visibility) : "private";
-        const projectId = visibility === "project" ? String(body.projectId || "") : "";
-        if (visibility === "project" && !projectId) {
+        if (visibility === "project" && !body.projectId) {
             return res.status(400).json({ status: false, message: "A project dashboard needs a project." });
         }
+        const projectId = visibility === "project" ? await openProjectOf(companyId, uid, body.projectId) : "";
+        if (visibility === "project" && !projectId) return res.status(404).json(PROJECT_NOT_FOUND);
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.USERDASHBOARD,
             data: {
@@ -3234,13 +3245,19 @@ exports.updateSharedDashboard = async (req, res) => {
                 return res.status(400).json({ status: false, message: "Unknown visibility." });
             }
             set.visibility = String(body.visibility);
-            set.projectId = set.visibility === "project" ? String(body.projectId || doc.projectId || "") : "";
-            if (set.visibility === "project" && !set.projectId) {
+            const named = set.visibility === "project" ? (body.projectId || String(doc.projectId || "")) : "";
+            if (set.visibility === "project" && !named) {
                 return res.status(400).json({ status: false, message: "A project dashboard needs a project." });
             }
+            set.projectId = named ? await openProjectOf(companyId, uid, named) : "";
+            if (named && !set.projectId) return res.status(404).json(PROJECT_NOT_FOUND);
         }
         if (Array.isArray(body.sharedWith)) {
             set.sharedWith = body.sharedWith.map(String).filter((v) => mongoose.Types.ObjectId.isValid(v)).slice(0, 200);
+            const held = new Set((doc.sharedWith || []).map(String));
+            if ((await nonMembersOf(companyId, set.sharedWith.filter((id) => !held.has(id)))).length) {
+                return res.status(400).json({ status: false, message: NOT_A_MEMBER });
+            }
         }
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.USERDASHBOARD,

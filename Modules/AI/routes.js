@@ -49,7 +49,7 @@ exports.init = (app) => {
     app.post('/api/v1/ai/task-category', askedByPeople, ctrl.categoriseTask);
     app.get('/api/v1/ai/task-assist', assist.capabilities);
     app.post('/api/v1/ai/task-next-steps', askedByPeople, assist.nextSteps);
-    app.post('/api/v1/ai/task-research', assist.research);
+    app.post('/api/v1/ai/task-research', askedByPeople, assist.research);
     app.post('/api/v1/ai/selection/improve', askedByPeople, assist.improve);
     app.post('/api/v1/ai/selection/tasks', askedByPeople, assist.splitTasks);
     // Ask (handoff 13i). Retrieval is scoped to the projects the caller can
@@ -76,7 +76,7 @@ exports.init = (app) => {
     app.post('/api/v1/ai/memory/import/preview', askedByPeople, aiProfileImport.previewImport);
     app.post('/api/v1/ai/memory/import/confirm', agentsRefused('ai.memory.edit'), aiProfileImport.confirmImport);
     app.get('/api/v1/ai/ask/build/:projectId', askBuild.buildTarget);
-    app.post('/api/v1/ai/ask/create-tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/ai/ask/create-tasks'].entry), agentsRefused('tasks.import'), askBuild.createTasks);
+    app.post('/api/v1/ai/ask/create-tasks', agentsRefused('tasks.import'), requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/ai/ask/create-tasks'].entry), askBuild.createTasks);
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").
     app.post('/api/v1/ai/transcribe', askedByPeople, ...transcribe.transcribe);
     app.post('/api/v1/ai/meeting-notes', askedByPeople, meetingNotes.meetingNotesHandler);

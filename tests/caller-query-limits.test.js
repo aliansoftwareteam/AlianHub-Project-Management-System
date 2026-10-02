@@ -24,6 +24,7 @@ jest.mock('../Modules/Project/helpers/projectItemHistory', () => ({
 }));
 jest.mock('../utils/commonFunctions', () => ({ ...jest.requireActual('../utils/commonFunctions'), removeCache: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
+jest.mock('../Config/projectPeople', () => ({ ...jest.requireActual('../Config/projectPeople'), namedPeopleRefusal: jest.fn(async () => '') }));
 
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { visibleProjectIds } = require('../Modules/Agents/scope');

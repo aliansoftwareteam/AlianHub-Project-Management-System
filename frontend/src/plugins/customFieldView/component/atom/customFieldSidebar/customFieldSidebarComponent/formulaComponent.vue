@@ -28,13 +28,9 @@
             :name="'formulaExpression'"
             @inputUpdate="(val) => formulaExpression = val ? val : ''"
         />
-        <div class="formkit__form-wrapper" v-if="referenceableFields.length">
+        <div class="formkit__form-wrapper">
             <label class="formkit-label">{{ $t('CustomField.referenceable_fields') }}</label>
-            <p class="font-size-12 font-weight-400 gray81 m-0">
-                <span v-for="(field, index) in referenceableFields" :key="field._id">
-                    {{ '{' + field.fieldTitle + '}' }}<span v-if="index !== referenceableFields.length - 1">, </span>
-                </span>
-            </p>
+            <p class="formula-tokens" data-formula-tokens>{{ tokens.join(', ') }}</p>
         </div>
         <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
@@ -73,6 +69,7 @@
     import DropDown from '@/components/molecules/DropDown/DropDown.vue';
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
     import CustomFieldInputComponent from "../../customFieldSidebar/customFieldSidebarComponent/customFieldInputComponent/customFieldInputComponent.vue";
+    import { tokensOfFields } from "@/plugins/customFieldView/formulaTokens";
 
     // props
     const props = defineProps({
@@ -111,7 +108,6 @@
     const type = ref(props?.customFieldObject?.type ? props?.customFieldObject?.type : 'task');
     const tabIndexCheck = ref(props.tabIndex);
 
-    // List of existing numeric task custom fields that a formula may reference by {Title}.
     const referenceableFields = computed(() => {
         const list = getters['settings/finalCustomFields'] || [];
         return list.filter((f) =>
@@ -121,6 +117,7 @@
             (!props.customFieldObject || f._id !== props.customFieldObject._id)
         );
     });
+    const tokens = computed(() => tokensOfFields(referenceableFields.value));
 
     // Redirect to the tab where the validation error message is displayed.
     const handleTabComp = (node) => {
@@ -148,3 +145,6 @@
 
     defineExpose({handleTabComp,handleSubmitComp});
 </script>
+<style scoped>
+.formula-tokens { margin: 0; font: 500 11px/1.7 var(--font-mono); color: var(--ink-2); overflow-wrap: anywhere; }
+</style>
