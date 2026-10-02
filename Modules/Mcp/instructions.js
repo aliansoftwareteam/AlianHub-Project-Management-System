@@ -56,7 +56,8 @@ const findingYourWay = (has) => {
 const statusRule = (ctx, has) => {
     if (!has('task.status.set')) return '';
     return manageFlag.managesTasks(ctx)
-        ? '- You may set any status the task\'s project defines. A task you close is recorded as closed through you and stays unchecked until a person checks it.'
+        ? '- You may set any status the task\'s project defines. A task you close is recorded as closed through you and stays unchecked until a person checks it. '
+            + 'Closing a task may wait for a person\'s approval. When it does, tell the person it is waiting and go on with the rest, and do not try to close it again.'
         : '- You may set status to In progress or In review. A person closes the task.';
 };
 
