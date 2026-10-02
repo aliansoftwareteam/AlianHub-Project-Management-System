@@ -3,7 +3,7 @@ const logger = require('../../Config/loggerConfig');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { updateProjectInternal } = require('../Project/controller/updateProject');
-const { updateSprintFun, updateFolderFun, announceFolders } = require('../Sprints/controller');
+const { updateSprintFun, updateFolderFun } = require('../Sprints/controller');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const { leaveLists } = require('../Tasks/helpers/taskListsLeft');
 const pages = require('../Pages/controller');
@@ -180,7 +180,6 @@ exports.removeSampleData = async (req, res) => {
         const seeded = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ ProjectCode: rules.SAMPLE_PROJECT_CODE }, '_id'] }, 'find') || [];
         removed.goals = await trashWhere(companyId, SCHEMA_TYPE.GOALS, { sample: true, sampleProjectId: { $in: seeded.map((project) => String(project._id)) } });
         if (removed.goals) announce('update', companyId);
-        if (removed.folders) announceFolders('update', companyId);
         // updateProjectInternal cleared this before the lists and folders were written.
         if (removed.projects) removeCache('UserProjectData:', true);
         return res.send({ status: true, statusText: 'Sample data removed.', data: removed });
