@@ -1,6 +1,6 @@
 # Handoff: where to start next session
 
-Updated 2026-10-02 22:45 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
+Updated 2026-10-02 23:45 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
 
 ## State
 
@@ -8,13 +8,14 @@ Updated 2026-10-02 22:45 IST. Read this first, then `Tasks/index.md` and the two
   - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent that comes with AlianHub is the person's own Claude or ChatGPT over MCP (decision 30). New agent slots go here.
   - Task 046, "great next to ClickUp" (`Tasks/active/046-better-than-clickup/`, tracker AP-441): no new parity features; fixes, proof and the held PRs remain.
   - In each folder, `progress.md` has every slice with its PR and build, the decisions and what waits for the owner.
-- **`beta` is at build 810** (`14.36.0-beta.810`, #1547). This docs PR becomes the next build.
-- **Live on localhost: build 810.** Nothing is merged and not built. Migrations 071 and 072 are applied (072: two indexes; its dry run was read first). The next free number is 074: batch 26 carries 073 (one index), so run `npm run migrate -- up --dry-run` before the rebuild that follows its merge and tell the owner what it would write.
-- **Hand-checked:** builds 782, 792 to 802, 803 to 806 (eleventh sweep), and by the coordinator on 809 (Group by "Who is working" with no agent connected) and 810 (the Inbox after #1521). The notes are in `Tasks/active/046-better-than-clickup/hand-check-2026-10-01.md`, a working note that is not committed. **Not hand-checked:** batch 26's screens (the list is under "Next steps"), and nothing that needs a connected AI (the MCP flags are off locally).
-- `docs/API.md` and `docs/api/openapi.json` are in sync with build 810. Batch 26 rewords one reply text, so run `npm run api:doc` in the docs PR after it merges.
-- **Usage:** the week stood at 70% at 22:20 with the reset on 3 October at 17:30 IST. Full slots take about 5% of the week per hour. Only the path to the held batches is running.
+- **`beta` is at build 812** (`14.36.0-beta.812`, #1550). This docs PR becomes the next build.
+- **Live on localhost: build 812.** Nothing is merged and not built. Migrations 071, 072 and 073 are applied (each was dry-run first: 072 and 073 only create indexes). The next free number is 074.
+- **Hand-checked:** builds 782, 792 to 802, 803 to 806 (eleventh sweep), and by the coordinator 809 (Group by "Who is working"), 810 (the Inbox) and 812 (the task panel's tabs, the story point scale dialog and the export card in dark, measured in the page). The notes are in `Tasks/active/046-better-than-clickup/hand-check-2026-10-01.md`, a working note that is not committed. **Not hand-checked:** the rest of batch 26 (the list is under "Next steps"), and nothing that needs a connected AI (the MCP flags are off locally).
+- `docs/API.md` and `docs/api/openapi.json` are in sync with build 812 once this docs PR merges.
+- **Usage:** the week stood at 71% at 23:00 with the reset on 3 October at 17:30 IST. Full slots take about 5% of the week per hour. Nothing is running.
+- **Task 047:** every slice that does not need the owner is merged. The next step is the owner's: the MCP flags on, a Claude connected with the manage grant.
 
-## Merged since the last handoff (builds 773 to 810)
+## Merged since the last handoff (builds 773 to 812)
 
 | Build | PR | What it carried |
 |---|---|---|
@@ -44,6 +45,8 @@ Updated 2026-10-02 22:45 IST. Read this first, then `Tasks/index.md` and the two
 | 807, 808 | #1526, #1471 | The docs PR for builds 804 to 806; accessibility checks for the everyday screens |
 | 809 | #1544, twenty-fifth batch | T-4 Group by "Who is working" (#1534); later work in its own context and the speech upload's file types (#1533); the last plain-words batch (#1529); colours batches 5 and 6 (#1506, #1527); tests for 25 pure helpers (#1528) |
 | 810 | #1547, twenty-fourth batch | #1521: a thing read by its id answers only to a person who can open it; batch reads for the Inbox, the timesheet, workload and workflow runs; migration 072 |
+| 811 | #1548 | The docs PR for builds 807 to 810 |
+| 812 | #1550, twenty-sixth batch | S-2 locked parts and leftover rows (#1536); T-2 "@" your own AI in chat (#1537, migration 073); one approval for benchmark jobs 7 and 13 (#1546); work after a change under no bystander's limits (#1535, #1549); the eleventh sweep's fixes (#1538, #1541, #1545); legacy classes 2 (#1531); the benchmark sheet (#1530); three guide chapters (#1532) |
 
 Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choices they made are in 047's `progress.md`, under "Choices to review".
 
@@ -51,11 +54,10 @@ Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choice
 
 | PR | What | State |
 |---|---|---|
-| `chore/integrate-batch-26` (no PR yet) | #1535, #1536, #1537, #1546, #1538, #1541, #1545, #1531, #1530, #1532 | Merged on the branch with today's `beta`; full local checks green; each access PR read by a fresh agent and its findings fixed. **Held** for one fix: `fix/agent-run-keeps-starter-rules` (see the private notes, "NARROW READ of #1535's last commit"). Then merge that branch in, run its test files, open the PR, queue it |
-| #1539, #1540, #1542, #1543 | Cloud drafts: four guide chapters, legacy classes 3, colours 7, web helper specs | Batch 27. #1540 and #1542 are stacked on batch 26 and meet in `scripts/style-baseline.json` |
+| `chore/integrate-batch-27` (no PR yet) | #1539 four guide chapters, #1543 specs for 25 web helpers, #1542 colours 7, #1540 legacy classes 3 | Merged on a branch from batch 26; it needs `beta` merged in and its checks run. **Held** until its screens are seen: both style PRs met the sweep's dark-mode fixes in seven dialog files (the sweep's versions were kept), and legacy classes 3 rewrites 40 files blind |
 | #1306 | The installable app shell | **Held.** It merges alone, after its own rebuild and the 14 checks in `.claude/test-cases/PWA.md` |
 | #1364 | A cloud run's API reference catch-up | Replaced. Close it |
-| This PR | Task docs, the beta log, this handoff | Not a draft, docs only |
+| This PR | Task docs, the beta log, the API reference, this handoff | Not a draft, docs only |
 
 ## The combined-PR method
 
@@ -101,12 +103,12 @@ Access findings and their state are in `~/.claude/projects/-Users-mevil-Alian-Hu
 
 ## Next steps, in order
 
-1. Batch 26: merge `fix/agent-run-keeps-starter-rules`, run its tests and the changed suites, open the PR, queue it. After the merge: the dry run of migration 073, the rebuild, `npm run api:doc` in the docs PR.
-2. Hand-check batch 26 on the local build, light and dark: Estimation scale, Export, Burndown and the four import dialogs; an empty folder; the task panel's tabs at 1280 and 390; Custom Field Manager; archived lists with counts; one toast on Move and Convert; My Settings > Time format on chat, History, the audit log and the Inbox; a plan card with a locked part and with a leftover row; "@" in chat (it offers nothing without a connected AI).
-3. Batch 27 from the cloud drafts, with a review of nothing but merge slips (they are docs, tests and styles).
+1. A full hand check of build 812, light and dark, 1280 and 390: Burndown and the four import dialogs; an empty folder; Custom Field Manager; archived lists with counts; one toast on Move and Convert; My Settings > Time format on chat, History, the audit log and the Inbox; a plan card with a locked part and with a leftover row; "@" in chat (it offers nothing without a connected AI); the status chips in Everything; the AI nav count.
+2. Batch 27: merge `beta` in, run the checks (the scripts print unhandled errors now), build it and look at the 40 files of legacy classes 3 before its pull request.
+3. One agent for the four small bugs the helper specs found (they are listed in 047's `progress.md`).
 4. The slice left open: agent changes over the web routes named and counted as MCP changes are.
 5. 047, without the owner: Home's "Waiting on you" card and the Approvals page approve a plan part by part; the benchmark gaps with no slice.
-6. When the owner has switched the flags on: AI-4a, AI-4e, then the first AI-1 run. The benchmark sheet now marks 10 jobs "should pass", 5 "should pass with approval" once batch 26 is in.
+6. When the owner has switched the flags on: AI-4a, AI-4e, then the first AI-1 run. The benchmark sheet marks 10 jobs "should pass" and 5 "should pass with approval".
 
 ## Learned on 2026-10-02
 
@@ -122,6 +124,7 @@ Access findings and their state are in `~/.claude/projects/-Users-mevil-Alian-Hu
 - **A limit a test sets up by hand may not exist in production.** #1535's tests wrapped an event in a narrowed request; the real road (MCP) never entered one, so the limit had never applied. A reviewer who asks "which real request reaches this line" finds it.
 - **Fixing "inherits the caller" both ways.** Binding later work to no request removes a bystander's limits and also the starter's. Whatever the later work must keep (who started it, how deep in a chain, which limits) is written down when it is filed.
 - **Usage is the limit, not the machine.** About 5% of the week per hour with seven local agents and five cloud sessions. Resuming an agent replays its whole transcript; for a narrow fix a fresh agent with a tight brief is cheaper.
+- **A run can fail with every test passing.** Vitest fails on an unhandled error. Print the `Errors` line of a local run, and after a push to a queued PR wait for the new run to appear before queueing it again: the queue read the old run's failure and dropped the PR.
 - Earlier lessons are in the handoffs of build 772 (`git show 9886c3d4e:Tasks/HANDOFF.md`) and build 766 (`git show 4a955e6bf:Tasks/HANDOFF.md`).
 
 ## Handy commands
