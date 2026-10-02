@@ -79,10 +79,10 @@ export default {
         "currentPassword": "当前密码长度必须至少为 8 个字符，并且至少包含 1 个字母、1 个大写字母、1 个数字和 1 个特殊字符",
         "newPassword": "新密码长度必须至少为 8 个字符，并且至少包含 1 个字母、1 个大写字母、1 个数字和 1 个特殊字符",
         "currentPasswordValid": "当前密码字段必须至少为 8 个字符",
-        "newPasswordValid": "新密码字段必须至少为 8 个字符",
+        "newPasswordValid": "新密码字段必须至少为 8 个字符"
     },
     "companyErrorMessage": {
-        "phoneNumberValid": "电话号码字段至少需要10个字符",
+        "phoneNumberValid": "电话号码字段至少需要10个字符"
     },
     "errorPage": {
         "project_name": "项目名称",
@@ -2371,6 +2371,8 @@ export default {
         "undo_failed": "That could not be undone."
     },
     "AgentActions": {
+        "folder_create": "Make a folder",
+        "list_sprint_set": "Make a list a sprint, or change its dates",
         "task_comment": "Add a comment",
         "task_status_set": "Change the status",
         "task_link": "Attach a link",
@@ -3746,7 +3748,7 @@ export default {
         "has_value": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
-        "date_past": "Past",
+        "date_past": "Past"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -6874,7 +6876,7 @@ export default {
         "mic_denied": "Microphone access was denied or is unavailable.",
         "no_audio": "No audio captured. Please try again.",
         "unsupported": "Recording isn't supported in this browser.",
-        "select_project_first": "Select a project first.",
+        "select_project_first": "Select a project first."
     },
     "call": {
         "start_audio": "Start an audio call",
@@ -9630,7 +9632,7 @@ export default {
     "Tour": {
         "Tag_name_required": "Tag name is required.",
         "tour_completed": "导览已完成",
-        "watch_video": "观看视频",
+        "watch_video": "观看视频"
     },
     "TaskStatus": {
         "To_Do": "待办"
@@ -10217,7 +10219,7 @@ export default {
         "missing_fields_title": "缺少必填字段",
         "missing_fields_text": "您必须分配并确认所有必填字段后才能继续。",
         "incomplete_mapping_title": "映射不完整",
-        "incomplete_mapping_text": "请至少将所有唯一值映射到 Alian Hub 中的一个值后再继续。",
+        "incomplete_mapping_text": "请至少将所有唯一值映射到 Alian Hub 中的一个值后再继续。"
     },
     "importTaskButton": {
         "import_title": "导入任务",
@@ -10254,7 +10256,7 @@ export default {
     },
     "valueMapping": {
         "user_dropdown_text": "选择用户",
-        "status_dropdown_text": "选择状态",
+        "status_dropdown_text": "选择状态"
     },
     "Affiliate": {
         "refferal_code_placeholder": "输入推荐码",
@@ -10619,7 +10621,7 @@ export default {
     },
     "importUserKeywords": {
         "user_email_description": "用户的电子邮件 ID",
-        "user_role_description": "分配给用户的角色或职位。",
+        "user_role_description": "分配给用户的角色或职位。"
     },
     "userSelection": {
         "title": "用户选择",

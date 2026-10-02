@@ -79,10 +79,10 @@ export default {
         "currentPassword": "વર્તમાન પાસવર્ડ ઓછામાં ઓછા 8 અક્ષર લાંબા હોવા જોઈએ, અને ઓછામાં ઓછા 1 મૂળાક્ષર, 1 અપરકેસ, 1 આંકડાકીય અને 1 વિશેષ અક્ષર હોવા જોઈએ",
         "newPassword": "નવા પાસવર્ડ ઓછામાં ઓછા 8 અક્ષરના હોવા જોઈએ અને ઓછામાં ઓછા 1 મૂળાક્ષર, 1 અપરકેસ, 1 આંકડાકીય અને 1 વિશેષ અક્ષર હોવા જોઈએ",
         "currentPasswordValid": "વર્તમાન પાસવર્ડ ફીલ્ડ ઓછામાં ઓછા 8 અક્ષરોનો હોવો જોઈએ",
-        "newPasswordValid": "નવા પાસવર્ડ ફીલ્ડમાં ઓછામાં ઓછા 8 અક્ષરો હોવા જોઈએ",
+        "newPasswordValid": "નવા પાસવર્ડ ફીલ્ડમાં ઓછામાં ઓછા 8 અક્ષરો હોવા જોઈએ"
     },
     "companyErrorMessage": {
-        "phoneNumberValid": "ફોન નંબર ફીલ્ડમાં ઓછામાં ઓછા 10 અક્ષરો હોવા જોઈએ",
+        "phoneNumberValid": "ફોન નંબર ફીલ્ડમાં ઓછામાં ઓછા 10 અક્ષરો હોવા જોઈએ"
     },
     "errorPage": {
         "project_name": "પ્રોજેક્ટ નામ",
@@ -2371,6 +2371,8 @@ export default {
         "undo_failed": "That could not be undone."
     },
     "AgentActions": {
+        "folder_create": "Make a folder",
+        "list_sprint_set": "Make a list a sprint, or change its dates",
         "task_comment": "Add a comment",
         "task_status_set": "Change the status",
         "task_link": "Attach a link",
@@ -3746,7 +3748,7 @@ export default {
         "has_value": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
-        "date_past": "Past",
+        "date_past": "Past"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -6874,7 +6876,7 @@ export default {
         "mic_denied": "Microphone access was denied or is unavailable.",
         "no_audio": "No audio captured. Please try again.",
         "unsupported": "Recording isn't supported in this browser.",
-        "select_project_first": "Select a project first.",
+        "select_project_first": "Select a project first."
     },
     "call": {
         "start_audio": "Start an audio call",
@@ -9630,7 +9632,7 @@ export default {
     "Tour": {
         "Tag_name_required": "Tag name is required.",
         "tour_completed": "પ્રવાસ પૂર્ણ",
-        "watch_video": "વિડિઓ જુઓ",
+        "watch_video": "વિડિઓ જુઓ"
     },
     "TaskStatus": {
         "To_Do": "કરવાનું"
@@ -10217,7 +10219,7 @@ export default {
         "missing_fields_title": "જરૂરી ક્ષેત્રો ગુમ છે",
         "missing_fields_text": "આગળ વધતા પહેલા નીચેના જરૂરી ક્ષેત્રો નકશો અને પુષ્ટિ કરવા પડશે.",
         "incomplete_mapping_title": "અપૂર્ણ મૅપિંગ",
-        "incomplete_mapping_text": "આગળ વધવા માટે કૃપા કરીને બધી અનન્ય કિંમતોને ઓછામાં ઓછી એક Alian Hub કિંમત સાથે નકશો કરો.",
+        "incomplete_mapping_text": "આગળ વધવા માટે કૃપા કરીને બધી અનન્ય કિંમતોને ઓછામાં ઓછી એક Alian Hub કિંમત સાથે નકશો કરો."
     },
     "importTaskButton": {
         "import_title": "કાર્ય આયાત કરો",
@@ -10254,7 +10256,7 @@ export default {
     },
     "valueMapping": {
         "user_dropdown_text": "વપરાશકર્તા પસંદ કરો",
-        "status_dropdown_text": "સ્થિતિ પસંદ કરો",
+        "status_dropdown_text": "સ્થિતિ પસંદ કરો"
     },
     "Affiliate": {
         "refferal_code_placeholder": "રેફરલ કોડ દાખલ કરો",
@@ -10619,7 +10621,7 @@ export default {
     },
     "importUserKeywords": {
         "user_email_description": "વપરાશકર્તાનું ઈમેલ આઈડી",
-        "user_role_description": "સંસ્થામાં વપરાશકર્તાને આપવામાં આવેલ ભૂમિકા અથવા નોકરીનું શીર્ષક.",
+        "user_role_description": "સંસ્થામાં વપરાશકર્તાને આપવામાં આવેલ ભૂમિકા અથવા નોકરીનું શીર્ષક."
     },
     "userSelection": {
         "title": "વપરાશકર્તા પસંદગી",

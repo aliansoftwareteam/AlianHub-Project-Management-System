@@ -79,10 +79,10 @@ export default {
         "currentPassword": "Οι τρέχοντες κωδικοί πρόσβασης πρέπει να έχουν μήκος τουλάχιστον 8 χαρακτήρες και να περιέχουν τουλάχιστον 1 αλφάβητο, 1 κεφαλαίο, 1 αριθμητικό και 1 ειδικό χαρακτήρα",
         "newPassword": "Οι νέοι κωδικοί πρόσβασης πρέπει να έχουν μήκος τουλάχιστον 8 χαρακτήρες και να περιέχουν τουλάχιστον 1 αλφάβητο, 1 κεφαλαίο, 1 αριθμητικό και 1 ειδικό χαρακτήρα",
         "currentPasswordValid": "Το τρέχον πεδίο κωδικού πρόσβασης πρέπει να αποτελείται από τουλάχιστον 8 χαρακτήρες",
-        "newPasswordValid": "Το πεδίο νέου κωδικού πρόσβασης πρέπει να αποτελείται από τουλάχιστον 8 χαρακτήρες",
+        "newPasswordValid": "Το πεδίο νέου κωδικού πρόσβασης πρέπει να αποτελείται από τουλάχιστον 8 χαρακτήρες"
     },
     "companyErrorMessage": {
-        "phoneNumberValid": "Το πεδίο του αριθμού τηλεφώνου πρέπει να έχει τουλάχιστον 10 χαρακτήρες",
+        "phoneNumberValid": "Το πεδίο του αριθμού τηλεφώνου πρέπει να έχει τουλάχιστον 10 χαρακτήρες"
     },
     "errorPage": {
         "project_name": "Όνομα έργου",
@@ -2371,6 +2371,8 @@ export default {
         "undo_failed": "That could not be undone."
     },
     "AgentActions": {
+        "folder_create": "Make a folder",
+        "list_sprint_set": "Make a list a sprint, or change its dates",
         "task_comment": "Add a comment",
         "task_status_set": "Change the status",
         "task_link": "Attach a link",
@@ -3746,7 +3748,7 @@ export default {
         "has_value": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
-        "date_past": "Past",
+        "date_past": "Past"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -6874,7 +6876,7 @@ export default {
         "mic_denied": "Microphone access was denied or is unavailable.",
         "no_audio": "No audio captured. Please try again.",
         "unsupported": "Recording isn't supported in this browser.",
-        "select_project_first": "Select a project first.",
+        "select_project_first": "Select a project first."
     },
     "call": {
         "start_audio": "Start an audio call",
@@ -9630,7 +9632,7 @@ export default {
     "Tour": {
         "Tag_name_required": "Tag name is required.",
         "tour_completed": "Ο Τουρ Ολοκληρώθηκε",
-        "watch_video": "Δείτε το Βίντεο",
+        "watch_video": "Δείτε το Βίντεο"
     },
     "TaskStatus": {
         "To_Do": "Προς Εκτέλεση"
@@ -10217,7 +10219,7 @@ export default {
         "missing_fields_title": "Λείπουν υποχρεωτικά πεδία",
         "missing_fields_text": "Πρέπει να αντιστοιχίσετε και να επιβεβαιώσετε όλα τα υποχρεωτικά πεδία πριν προχωρήσετε.",
         "incomplete_mapping_title": "Μη ολοκληρωμένη αντιστοίχιση",
-        "incomplete_mapping_text": "Παρακαλώ αντιστοιχίστε τουλάχιστον όλες τις μοναδικές τιμές σε μια τιμή στο Alian Hub πριν προχωρήσετε.",
+        "incomplete_mapping_text": "Παρακαλώ αντιστοιχίστε τουλάχιστον όλες τις μοναδικές τιμές σε μια τιμή στο Alian Hub πριν προχωρήσετε."
     },
     "importTaskButton": {
         "import_title": "Εισαγωγή εργασιών",
@@ -10254,7 +10256,7 @@ export default {
     },
     "valueMapping": {
         "user_dropdown_text": "Επιλέξτε χρήστη",
-        "status_dropdown_text": "Επιλέξτε κατάσταση",
+        "status_dropdown_text": "Επιλέξτε κατάσταση"
     },
     "Affiliate": {
         "refferal_code_placeholder": "Εισαγάγετε τον κωδικό παραπομπής",
@@ -10619,7 +10621,7 @@ export default {
     },
     "importUserKeywords": {
         "user_email_description": "Email ID του χρήστη",
-        "user_role_description": "Ο ρόλος ή ο τίτλος εργασίας που έχει ανατεθεί στον χρήστη μέσα στον οργανισμό.",
+        "user_role_description": "Ο ρόλος ή ο τίτλος εργασίας που έχει ανατεθεί στον χρήστη μέσα στον οργανισμό."
     },
     "userSelection": {
         "title": "Επιλογή Χρηστών",

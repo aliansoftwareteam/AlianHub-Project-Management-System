@@ -79,10 +79,10 @@ export default {
         "currentPassword": "les mots de passe actuels doivent comporter au moins 8 caractères et contenir au moins 1 alphabet, 1 majuscule, 1 numérique et 1 caractère spécial",
         "newPassword": "les nouveaux mots de passe doivent comporter au moins 8 caractères et contenir au moins 1 alphabet, 1 majuscule, 1 numérique et 1 caractère spécial",
         "currentPasswordValid": "Le champ du mot de passe actuel doit contenir au moins 8 caractères",
-        "newPasswordValid": "Le champ du nouveau mot de passe doit contenir au moins 8 caractères",
+        "newPasswordValid": "Le champ du nouveau mot de passe doit contenir au moins 8 caractères"
     },
     "companyErrorMessage": {
-        "phoneNumberValid": "Le champ numéro de téléphone doit comporter au moins 10 caractères",
+        "phoneNumberValid": "Le champ numéro de téléphone doit comporter au moins 10 caractères"
     },
     "errorPage": {
         "project_name": "Nom du projet",
@@ -2371,6 +2371,8 @@ export default {
         "undo_failed": "That could not be undone."
     },
     "AgentActions": {
+        "folder_create": "Make a folder",
+        "list_sprint_set": "Make a list a sprint, or change its dates",
         "task_comment": "Add a comment",
         "task_status_set": "Change the status",
         "task_link": "Attach a link",
@@ -3746,7 +3748,7 @@ export default {
         "has_value": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
-        "date_past": "Past",
+        "date_past": "Past"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -6874,7 +6876,7 @@ export default {
         "mic_denied": "Microphone access was denied or is unavailable.",
         "no_audio": "No audio captured. Please try again.",
         "unsupported": "Recording isn't supported in this browser.",
-        "select_project_first": "Select a project first.",
+        "select_project_first": "Select a project first."
     },
     "call": {
         "start_audio": "Start an audio call",
@@ -9630,7 +9632,7 @@ export default {
     "Tour": {
         "Tag_name_required": "Tag name is required.",
         "tour_completed": "Visite terminée",
-        "watch_video": "Regarder la vidéo",
+        "watch_video": "Regarder la vidéo"
     },
     "TaskStatus": {
         "To_Do": "À faire"
@@ -10217,7 +10219,7 @@ export default {
         "missing_fields_title": "Champs obligatoires manquants",
         "missing_fields_text": "Les champs obligatoires suivants doivent être associés et confirmés avant de continuer.",
         "incomplete_mapping_title": "Association incomplète",
-        "incomplete_mapping_text": "Veuillez associer toutes les valeurs uniques à au moins une valeur Alian Hub afin de continuer.",
+        "incomplete_mapping_text": "Veuillez associer toutes les valeurs uniques à au moins une valeur Alian Hub afin de continuer."
     },
     "importTaskButton": {
         "import_title": "Importer des tâches",
@@ -10254,7 +10256,7 @@ export default {
     },
     "valueMapping": {
         "user_dropdown_text": "Sélectionner un utilisateur",
-        "status_dropdown_text": "Sélectionner un statut",
+        "status_dropdown_text": "Sélectionner un statut"
     },
     "Affiliate": {
         "refferal_code_placeholder": "Entrez le code de parrainage",
@@ -10619,7 +10621,7 @@ export default {
     },
     "importUserKeywords": {
         "user_email_description": "Identifiant e-mail de l'utilisateur",
-        "user_role_description": "Le rôle ou l'intitulé du poste attribué à l'utilisateur au sein de l'organisation.",
+        "user_role_description": "Le rôle ou l'intitulé du poste attribué à l'utilisateur au sein de l'organisation."
     },
     "userSelection": {
         "title": "Sélection des Utilisateurs",

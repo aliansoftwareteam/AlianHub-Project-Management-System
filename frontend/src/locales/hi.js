@@ -79,10 +79,10 @@ export default {
         "currentPassword": "वर्तमान पासवर्ड कम से कम 8 अक्षर लंबा होना चाहिए, और इसमें कम से कम 1 अक्षर, 1 अपरकेस, 1 संख्यात्मक और 1 विशेष अक्षर होना चाहिए",
         "newPassword": "नए पासवर्ड कम से कम 8 अक्षर लंबे होने चाहिए और उनमें कम से कम 1 अक्षर, 1 अपरकेस, 1 संख्यात्मक और 1 विशेष अक्षर होना चाहिए।",
         "currentPasswordValid": "वर्तमान पासवर्ड फ़ील्ड कम से कम 8 अक्षर की होनी चाहिए",
-        "newPasswordValid": "नया पासवर्ड फ़ील्ड कम से कम 8 अक्षर का होना चाहिए",
+        "newPasswordValid": "नया पासवर्ड फ़ील्ड कम से कम 8 अक्षर का होना चाहिए"
     },
     "companyErrorMessage": {
-        "phoneNumberValid": "फोन नंबर क्षेत्र में कम से कम 10 वर्ण होने चाहिए",
+        "phoneNumberValid": "फोन नंबर क्षेत्र में कम से कम 10 वर्ण होने चाहिए"
     },
     "errorPage": {
         "project_name": "प्रोजेक्ट नाम",
@@ -2371,6 +2371,8 @@ export default {
         "undo_failed": "That could not be undone."
     },
     "AgentActions": {
+        "folder_create": "Make a folder",
+        "list_sprint_set": "Make a list a sprint, or change its dates",
         "task_comment": "Add a comment",
         "task_status_set": "Change the status",
         "task_link": "Attach a link",
@@ -3746,7 +3748,7 @@ export default {
         "has_value": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
-        "date_past": "Past",
+        "date_past": "Past"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -6874,7 +6876,7 @@ export default {
         "mic_denied": "Microphone access was denied or is unavailable.",
         "no_audio": "No audio captured. Please try again.",
         "unsupported": "Recording isn't supported in this browser.",
-        "select_project_first": "Select a project first.",
+        "select_project_first": "Select a project first."
     },
     "call": {
         "start_audio": "Start an audio call",
@@ -9630,7 +9632,7 @@ export default {
     "Tour": {
         "Tag_name_required": "Tag name is required.",
         "tour_completed": "टूर पूरा हुआ",
-        "watch_video": "वीडियो देखें",
+        "watch_video": "वीडियो देखें"
     },
     "TaskStatus": {
         "To_Do": "करने के लिए"
@@ -10217,7 +10219,7 @@ export default {
         "missing_fields_title": "अनिवार्य फ़ील्ड गुम हैं",
         "missing_fields_text": "आगे बढ़ने से पहले कृपया नीचे दी गई आवश्यक फ़ील्ड्स को मैप करें और पुष्टि करें।",
         "incomplete_mapping_title": "अपूर्ण मैपिंग",
-        "incomplete_mapping_text": "आगे बढ़ने के लिए कृपया सभी अद्वितीय मानों को कम से कम एक Alian Hub मान के साथ मैप करें।",
+        "incomplete_mapping_text": "आगे बढ़ने के लिए कृपया सभी अद्वितीय मानों को कम से कम एक Alian Hub मान के साथ मैप करें।"
     },
     "importTaskButton": {
         "import_title": "कार्य आयात करें",
@@ -10254,7 +10256,7 @@ export default {
     },
     "valueMapping": {
         "user_dropdown_text": "उपयोगकर्ता चुनें",
-        "status_dropdown_text": "स्थिति चुनें",
+        "status_dropdown_text": "स्थिति चुनें"
     },
     "Affiliate": {
         "refferal_code_placeholder": "रेफरल कोड दर्ज करें",
@@ -10619,7 +10621,7 @@ export default {
     },
     "importUserKeywords": {
         "user_email_description": "उपयोगकर्ता का ईमेल आईडी",
-        "user_role_description": "संगठन के भीतर उपयोगकर्ता को सौंपी गई भूमिका या नौकरी का शीर्षक।",
+        "user_role_description": "संगठन के भीतर उपयोगकर्ता को सौंपी गई भूमिका या नौकरी का शीर्षक।"
     },
     "userSelection": {
         "title": "उपयोगकर्ता चयन",

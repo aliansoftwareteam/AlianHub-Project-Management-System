@@ -2394,6 +2394,8 @@ export default {
         undo_failed: "That could not be undone.",
     },
     AgentActions: {
+        folder_create: "Make a folder",
+        list_sprint_set: "Give a list start and end dates",
         task_comment: "Add a comment",
         task_status_set: "Change the status",
         task_link: "Attach a link",

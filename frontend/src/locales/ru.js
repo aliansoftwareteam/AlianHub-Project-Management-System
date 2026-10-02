@@ -79,10 +79,10 @@ export default {
         "currentPassword": "текущие пароли должны иметь длину не менее 8 символов и содержать как минимум 1 буквенный, 1 верхний регистр, 1 цифровой и 1 специальный символ",
         "newPassword": "новые пароли должны иметь длину не менее 8 символов и содержать не менее 1 алфавита, 1 верхнего регистра, 1 цифры и 1 специального символа",
         "currentPasswordValid": "Поле текущего пароля должно содержать не менее 8 символов",
-        "newPasswordValid": "Поле нового пароля должно содержать не менее 8 символов",
+        "newPasswordValid": "Поле нового пароля должно содержать не менее 8 символов"
     },
     "companyErrorMessage": {
-        "phoneNumberValid": "Поле номера телефона должно содержать не менее 10 символов",
+        "phoneNumberValid": "Поле номера телефона должно содержать не менее 10 символов"
     },
     "errorPage": {
         "project_name": "Название проекта",
@@ -2371,6 +2371,8 @@ export default {
         "undo_failed": "That could not be undone."
     },
     "AgentActions": {
+        "folder_create": "Make a folder",
+        "list_sprint_set": "Make a list a sprint, or change its dates",
         "task_comment": "Add a comment",
         "task_status_set": "Change the status",
         "task_link": "Attach a link",
@@ -3746,7 +3748,7 @@ export default {
         "has_value": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
-        "date_past": "Past",
+        "date_past": "Past"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -6874,7 +6876,7 @@ export default {
         "mic_denied": "Microphone access was denied or is unavailable.",
         "no_audio": "No audio captured. Please try again.",
         "unsupported": "Recording isn't supported in this browser.",
-        "select_project_first": "Select a project first.",
+        "select_project_first": "Select a project first."
     },
     "call": {
         "start_audio": "Start an audio call",
@@ -9630,7 +9632,7 @@ export default {
     "Tour": {
         "Tag_name_required": "Tag name is required.",
         "tour_completed": "Тур завершён",
-        "watch_video": "Посмотреть видео",
+        "watch_video": "Посмотреть видео"
     },
     "TaskStatus": {
         "To_Do": "К выполнению"
@@ -10217,7 +10219,7 @@ export default {
         "missing_fields_title": "Отсутствуют обязательные поля",
         "missing_fields_text": "Перед продолжением необходимо сопоставить и подтвердить обязательные поля.",
         "incomplete_mapping_title": "Неполное сопоставление",
-        "incomplete_mapping_text": "Для продолжения сопоставьте все уникальные значения хотя бы с одним значением Alian Hub.",
+        "incomplete_mapping_text": "Для продолжения сопоставьте все уникальные значения хотя бы с одним значением Alian Hub."
     },
     "importTaskButton": {
         "import_title": "Импорт задач",
@@ -10254,7 +10256,7 @@ export default {
     },
     "valueMapping": {
         "user_dropdown_text": "Выберите пользователя",
-        "status_dropdown_text": "Выберите статус",
+        "status_dropdown_text": "Выберите статус"
     },
     "Affiliate": {
         "refferal_code_placeholder": "Введите реферальный код",
@@ -10619,7 +10621,7 @@ export default {
     },
     "importUserKeywords": {
         "user_email_description": "Электронная почта пользователя",
-        "user_role_description": "Роль или должность, назначенная пользователю в организации.",
+        "user_role_description": "Роль или должность, назначенная пользователю в организации."
     },
     "userSelection": {
         "title": "Выбор Пользователей",
