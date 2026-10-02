@@ -123,6 +123,8 @@ const connectionNotices = async (companyId, now) => {
 const runForCompany = async (companyId, now = new Date()) => {
     const results = await Promise.allSettled([tokenNotices(companyId, now), connectionNotices(companyId, now)]);
     results.filter((result) => result.status === 'rejected').forEach((result) => logger.error(`${LOG_PREFIX} ${companyId}: ${result.reason && result.reason.message ? result.reason.message : result.reason}`));
+    // A token or a connection that has run out is revoked by nobody, so what waited for it is closed here.
+    await require('../Agents/manager/chatQuestions').closeEnded(companyId, now);
     return results.reduce((sum, result) => sum + (result.status === 'fulfilled' ? result.value : 0), 0);
 };
 

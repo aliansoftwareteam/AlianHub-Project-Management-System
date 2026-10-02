@@ -51,6 +51,15 @@ const askOwnAi = async (req, companyId, saved) => {
     await require("../Agents/manager/chatQuestions").fromChatMessage(companyId, saved);
 };
 
+/* A question for a person's own AI is what its author last wrote as a signed-in person: any other change of a
+ * message that asked one, an owner's or an admin's included, takes the question back. */
+const ownAiFollowsChange = async (req, companyId, before, after) => {
+    const concerned = Boolean(before.ownAiAsk) || [before.message, after.message].some((message) => parseOwnAiMentionIds(message).length > 0);
+    if (!concerned) return;
+    const byAuthor = String(before.userId) === String(req.uid) && !req.apiToken && !req.mcp && !req.agentRun;
+    await require("../Agents/manager/chatQuestions").afterMessageChange(companyId, { before, after, byAuthor });
+};
+
 /* A summary kept for a task was made from its comments: it goes when one of them is deleted, and is marked as
  * behind when one is edited. A failure here leaves a summary that says less than it should, never a failed write.
  * Required on use: only a delete or an edit needs the store. */
@@ -228,6 +237,9 @@ exports.update = async (req, res) => {
             socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments_project', companyId });
         }
         const deletionChanged = changedKeys.includes('isDeleted') && Boolean(data.isDeleted) !== Boolean(existingComment.isDeleted);
+        if (response && (deletionChanged || changes.message !== undefined)) {
+            await ownAiFollowsChange(req, companyId, existingComment, response).catch((err) => logger.error(`[mentions] own AI did not follow the change: ${err.message}`));
+        }
         if (response) await keptSummaryFollows(companyId, existingComment, { deleted: deletionChanged && Boolean(data.isDeleted), edited: changes.message !== undefined });
         if (response && existingComment.parentId && deletionChanged && await isChatMessage(companyId, existingComment)) {
             await announceThread(companyId, existingComment.parentId)

@@ -38,14 +38,16 @@ export async function fetchOwnAi(taskId) {
     }
 }
 
-/* The person's own connected AI, when they may ask it in this chat conversation. It needs no model on the server. */
+/* The person's own connected AI, when they may ask it in this chat conversation, and where they have one that is
+ * held back there, why. It needs no model on the server. */
 export async function fetchOwnAiInChat({ projectId = "", sprintId = "", taskId = "" } = {}) {
-    if (!projectId || !sprintId || !taskId) return [];
+    const none = { agents: [], why: "" };
+    if (!projectId || !sprintId || !taskId) return none;
     try {
         const res = await apiRequest("get", `${env.AGENTS_CONNECTED}?projectId=${encodeURIComponent(projectId)}&sprintId=${encodeURIComponent(sprintId)}&taskId=${encodeURIComponent(taskId)}`);
-        return res?.data?.status ? (res.data.data || []).map(asPickerRow) : [];
+        return res?.data?.status ? { agents: (res.data.data || []).map(asPickerRow), why: res.data.why || "" } : none;
     } catch (error) {
-        return [];
+        return none;
     }
 }
 

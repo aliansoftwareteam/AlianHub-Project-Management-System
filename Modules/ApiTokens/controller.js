@@ -314,6 +314,7 @@ exports.updateToken = async (req, res) => {
         if (!updated) {
             return res.send({ status: false, statusText: 'Token not found.' });
         }
+        if (update.active === false) await require('../Agents/manager/chatQuestions').connectionEnded(companyId, userId);
         return res.send({ status: true, statusText: 'Token updated.', data: maskToken(updated) });
     } catch (error) {
         logger.error(`ERROR in update api token: ${error.message}`);
@@ -389,6 +390,7 @@ exports.deleteToken = async (req, res) => {
         }
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_TOKENS, data: [{ _id: tokenObjId }] }, 'deleteOne');
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_ACTIVITY_LOGS, data: [{ tokenId: tokenObjId }] }, 'deleteMany').catch(() => {});
+        await require('../Agents/manager/chatQuestions').connectionEnded(companyId, userId);
         return res.send({ status: true, statusText: 'Token deleted.' });
     } catch (error) {
         logger.error(`ERROR in delete api token: ${error.message}`);

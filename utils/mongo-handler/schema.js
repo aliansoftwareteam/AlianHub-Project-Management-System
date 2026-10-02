@@ -4592,7 +4592,7 @@ const schema = {
         agentAsk: { type: Object, required: false },
         agentCitations: { type: Array, required: false },
         agentChanges: { type: Array, required: false },
-        // A chat message that asked its author's own connected AI (Modules/Agents/manager/chatQuestions.js): { ownerId, name, at }.
+        // A chat message that asked its author's own connected AI (Modules/Agents/manager/chatQuestions.js): { at }. It names nobody.
         ownAiAsk: { type: Object, required: false },
         // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
         importedFrom: { type: String, required: false },
