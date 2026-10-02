@@ -21,6 +21,7 @@ import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useTimer } from "./useTimer";
 import { fmtClock, fmtEstimate } from "./homeFormat";
+import { timeLogFailureKey } from "@/composable/timeLogFailure";
 
 defineOptions({ name: "TimerChip" });
 
@@ -44,7 +45,7 @@ async function finish() {
         }
     } catch (error) {
         console.error("timer log failed", error);
-        $toast.error(t("Home.timer_log_failed"), { position: "top-right" });
+        $toast.error(t(timeLogFailureKey(error, "Home.timer_log_failed")), { position: "top-right" });
     } finally {
         stopping.value = false;
     }

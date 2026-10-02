@@ -75,6 +75,8 @@
                         </div>
                     </section>
 
+                    <WorkspaceDoneCheck :privileged="privileged" />
+
                     <div class="acct-callout acct-callout--ok">
                         <strong>{{ $t('Accounts.recommended_label') }}</strong> {{ $t('Accounts.recommended_body') }}
                     </div>
@@ -514,7 +516,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, reactive, ref } from "vue";
+import { computed, inject, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { routeLocationKey } from "vue-router";
 import { useStore } from "vuex";
@@ -524,6 +526,7 @@ import { useGetterFunctions } from "@/composable/index.js";
 import AiSidebar from "./AiSidebar.vue";
 import AccountAttribution from "./AccountAttribution.vue";
 import ConnectedApps from "./ConnectedApps.vue";
+import WorkspaceDoneCheck from "./WorkspaceDoneCheck.vue";
 import { oauthAvailable } from "@/views/OAuth/oauthShared";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
 import { DOCS_GRANT, EXPIRY_OVER_MAX, TASKS_GRANT, TOKEN_SCOPES, canGrantDocs, canGrantTasks, defaultExpiryFor, expiryChoicesFor, grantsOf, tokenFormProblem } from "./tokenPolicy";
@@ -565,6 +568,8 @@ const TABS = ["modes", "link", "attribution", "rules", "connected"];
 const askedTab = String(inject(routeLocationKey, null)?.query?.tab || "");
 const tab = ref(TABS.includes(askedTab) ? askedTab : "modes");
 const draftModes = ref([...MODES]);
+// The stored modes can change under an open page; a draft of the old ones would save them back.
+watch(() => (policy.value.allowedModes || MODES).join(), () => { draftModes.value = [...(policy.value.allowedModes || MODES)]; });
 const savingPolicy = ref(false);
 const policySaved = ref(false);
 const policyError = ref("");

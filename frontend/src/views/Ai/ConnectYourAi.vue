@@ -10,7 +10,8 @@
                 </header>
 
                 <p class="cya__sign" :class="{ 'is-connected': connection.connected }" role="status" aria-live="polite" data-test="connect-ai-sign">
-                    <span class="ah-dot" :class="{ 'ah-dot--ok': connection.connected }" aria-hidden="true"></span>
+                    <span v-if="connection.connected" class="ah-dot ah-dot--ok" aria-hidden="true"></span>
+                    <ShellIcon v-else name="clock" :size="14" class="cya__waiting" />
                     <span>{{ connection.connected ? $t('ConnectAi.sign_connected', { when: formatWhen(connection.lastSeenAt) }) : $t('ConnectAi.sign_waiting') }}</span>
                 </p>
 
@@ -106,6 +107,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref, unref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AiSidebar from "./AiSidebar.vue";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { AI_STATE, aiAvailability } from "@/composable/aiAvailability";
 import { aiConnection as connection, watchAiConnection } from "@/composable/aiConnection";
 import { saveOnboarding } from "@/composable/onboardingState";
@@ -163,6 +165,7 @@ onBeforeUnmount(() => stopWatching());
 .cya__head { display: flex; flex-direction: column; gap: 6px; }
 .cya__lead { margin: 0; font: var(--text-body); color: var(--ink-2); max-width: 720px; }
 .cya__sign { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 14px; border-radius: var(--r-card); border: 1px solid var(--border); background: var(--surface); font: var(--text-body); color: var(--ink); }
+.cya__waiting { flex: none; color: var(--ink-2); }
 .cya__sign.is-connected { background: var(--ok-bg); border-color: transparent; color: var(--ok-ink); }
 .cya__ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 16px; align-items: start; }
 .cya__way { display: flex; flex-direction: column; gap: 10px; min-width: 0; }

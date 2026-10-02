@@ -37,6 +37,7 @@ const ROUTES = Object.freeze({
     fieldUpdate: { routes: () => require('../CustomField/routes'), method: 'put', path: FIELD_ROUTE },
     viewCreate: { routes: () => require('../Project/routes'), method: 'post', path: '/api/v1/project/:id/views' },
     projectUpdate: { routes: () => require('../Project/routes'), method: 'put', path: '/api/v1/project/:id' },
+    statusInsert: { routes: () => require('../settings/templates/routes'), method: 'put', path: '/api/v1/setting/taskStatus' },
 });
 
 const refuse = (message) => new tools.DeterministicError(message);
@@ -322,6 +323,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, withdrawFields, withdrawView, draftsOf, draftsProblem, lookOf, lookProblem, viewNameOf, sourceView, noSource,
+    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, lookOf, lookProblem, viewNameOf, sourceView, noSource,
     FIELD_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX,
 };

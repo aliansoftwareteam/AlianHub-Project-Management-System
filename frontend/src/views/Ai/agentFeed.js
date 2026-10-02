@@ -9,6 +9,7 @@ import { shellState } from "@/components/organisms/Shell/shellState";
  * agentsChanged signal asks for a refresh; the poll only covers a dropped socket and the people's
  * timers, which no agent event announces. */
 export const AGENTS_CHANGED_EVENT = "agentsChanged";
+export const POLICY_CHANGE = "policy";
 const LIVE_POLL_MS = 30000;
 const IDLE_POLL_MS = 120000;
 const BURST_MS = 500;

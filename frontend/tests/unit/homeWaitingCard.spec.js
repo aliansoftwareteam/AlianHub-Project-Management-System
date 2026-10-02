@@ -57,14 +57,24 @@ describe('Waiting on you (Home card)', () => {
         serverApprovals = [];
     });
 
-    it('shows the count and the three most recent things to decide, with a way into the AI Inbox', async () => {
+    it('shows the count and the three most recent things to decide, with a way to the Inbox tab that holds the proposals', async () => {
         serverProposals = [proposal('p1'), proposal('p2'), proposal('p3')];
         serverApprovals = [approval('a1'), approval('a2')];
         const { wrapper } = await open();
         expect(wrapper.find('[data-test="waiting-card"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="waiting-count"]').text()).toBe('5');
         expect(rows(wrapper)).toHaveLength(3);
-        expect(wrapper.find('[data-test="waiting-inbox"]').attributes('href')).toBe('/company-1/ai/inbox');
+        const link = wrapper.find('[data-test="waiting-inbox"]');
+        expect(link.attributes('href')).toBe('/company-1/inbox?tab=approval');
+        expect(link.text()).toBe('Home.waiting_open_inbox');
+    });
+
+    it('keeps the bottom link on the AI Inbox when only workflow steps wait', async () => {
+        serverApprovals = [approval('a1')];
+        const { wrapper } = await open();
+        const link = wrapper.find('[data-test="waiting-inbox"]');
+        expect(link.attributes('href')).toBe('/company-1/ai/inbox');
+        expect(link.text()).toBe('Inbox.open_ai_inbox');
     });
 
     it('approves a proposal through the agent API and drops the row', async () => {
