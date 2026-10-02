@@ -15,10 +15,10 @@ test.describe('custom fields', () => {
         await label.fill(title);
         await label.press('Enter');
 
-        const row = page.getByRole('button', { name: new RegExp(title) });
+        const row = page.getByRole('button', { name: new RegExp(title) }).first();
         await expect(row).toBeVisible();
 
         await page.reload();
-        await expect(page.getByRole('button', { name: new RegExp(title) })).toBeVisible();
+        await expect(page.getByRole('button', { name: new RegExp(title) }).first()).toBeVisible();
     });
 });

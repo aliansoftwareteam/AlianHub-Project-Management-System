@@ -52,9 +52,11 @@ const runStep = (request) => approvalStep.execute(request).catch((error) => {
     throw error;
 });
 
+const PROJECT = new ObjectId();
+
 const taskWith = async (AssigneeUserId) => {
     const _id = new ObjectId();
-    await client.db(COMPANY).collection('tasks').insertOne({ _id, TaskName: 'Automated', CompanyId: COMPANY, ProjectID: id(), AssigneeUserId, Task_Leader: OWNER });
+    await client.db(COMPANY).collection('tasks').insertOne({ _id, TaskName: 'Automated', CompanyId: COMPANY, ProjectID: String(PROJECT), AssigneeUserId, Task_Leader: OWNER });
     return String(_id);
 };
 
@@ -76,6 +78,7 @@ beforeAll(async () => {
     await seat(COMPANY, LEAVER, ROLE_MEMBER);
     await seat(COMPANY, INVITEE, ROLE_MEMBER, SEAT_PENDING);
     await seat(OTHER_COMPANY, OUTSIDER, ROLE_MEMBER);
+    await client.db(COMPANY).collection('projects').insertOne({ _id: PROJECT, ProjectName: 'Automated work', isPrivateSpace: false, isGlobalPermission: true, AssigneeUserId: [OWNER, MEMBER], deletedStatusKey: 0 });
 });
 
 afterAll(async () => {
