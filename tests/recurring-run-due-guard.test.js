@@ -54,7 +54,7 @@ describe('recurring run-due is an owner/admin act', () => {
         });
         routes.init(app);
         const runDue = posts.find((route) => route.path === '/api/v1/recurring-tasks/run-due');
-        expect(runDue.handlers.length).toBe(2);
+        expect(runDue.handlers.length).toBe(3);
     });
 
     it.each([[OWNER], [MEMBER]])('lets an owner through and refuses a member (%s)', async (uid) => {

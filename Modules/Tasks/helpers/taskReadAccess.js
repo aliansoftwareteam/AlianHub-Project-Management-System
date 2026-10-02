@@ -5,14 +5,15 @@ const { mayListTasksIn } = require('./taskListProjects');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { visibilityStage, toObjectIds } = require('./taskQueryGuard');
+const { agentOf } = require('../../../Config/agentRequest');
 
 /* Deleted, archived, or in a deleted project. */
 const NOT_LIVE = Object.freeze([1, 2, 7]);
 
 /* A record with no project behind it has no project rule to inherit. The only such records the
  * app writes are main-chat conversations, which belong to the people in them, owners included;
- * anything else (a task whose project is gone) is refused. */
-const isChatParticipant = (task, uid) => task.mainChat === true
+ * anything else (a task whose project is gone) is refused. An agent's request opens none of them. */
+const isChatParticipant = (task, uid) => task.mainChat === true && !agentOf(uid)
     && (task.AssigneeUserId || []).map(String).includes(String(uid));
 
 const canReadTask = async (companyId, uid, task) => {
