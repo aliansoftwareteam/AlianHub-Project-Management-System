@@ -1,4 +1,4 @@
-import { computed, inject, ref } from 'vue';
+import { computed, inject, ref, toValue } from 'vue';
 
 /* Which empty state a task view shows when it has nothing to list.
  *
@@ -14,30 +14,43 @@ import { computed, inject, ref } from 'vue';
  * - `searchedTask` — once the archive is ruled out this is exact: a query, an assignee pick
  *   or a saved filter is narrowing the list.
  *
- * With the archive and a narrowing both ruled out and a task known to have existed, nothing
- * here can say why the list is empty, so `no_visible_tasks` says exactly that rather than
- * guessing a cause. */
-export function taskEmptyStateKind({ showArchived, lastTaskId, searched }) {
+ * - `lists` — the lists in view. Each carries its own counters of live and archived tasks, so
+ *   when every one of them counts none the view is empty because the lists are, a new list
+ *   above all.
+ *
+ * With the archive and a narrowing both ruled out, a task known to have existed and a list that
+ * counts tasks, nothing here can say why the view is empty, so `no_visible_tasks` says exactly
+ * that rather than guessing a cause. */
+const holdsNoTask = (list) => !Number(list?.tasks || 0) && !Number(list?.archiveTaskCount || 0);
+
+export function taskEmptyStateKind({ showArchived, lastTaskId, searched, lists = [] }) {
     if (showArchived) return 'no_archived';
     if (!lastTaskId) return 'no_tasks';
-    return searched ? 'no_match' : 'no_visible_tasks';
+    if (searched) return 'no_match';
+    if (!lists.length || !lists.every(holdsNoTask)) return 'no_visible_tasks';
+    return lists.length === 1 ? 'empty_list' : 'empty_lists';
 }
 
-/* A sentence is offered only where no task was ever made; the other kinds are not filled by adding tasks. */
-export const taskEmptySentenceKey = (kind) => (kind === 'no_tasks' ? 'EmptyState.say_tasks' : '');
+const SENTENCES = { no_tasks: 'EmptyState.say_tasks', empty_list: 'EmptyState.say_list_tasks' };
 
-export function useTaskEmptyState(project) {
+/* A sentence is offered only where adding tasks fills the view. */
+export const taskEmptySentenceKey = (kind) => SENTENCES[kind] || '';
+
+export function useTaskEmptyState(project, lists = () => []) {
     const searchedTask = inject('searchedTask', ref(false));
     const showArchived = inject('showArchived', ref(false));
+    const listsInView = computed(() => (toValue(lists) || []).filter((list) => list && !list.isFolder));
 
     const kind = computed(() => taskEmptyStateKind({
         showArchived: !!showArchived?.value,
         lastTaskId: project?.value?.lastTaskId,
         searched: !!searchedTask?.value,
+        lists: listsInView.value,
     }));
 
     return {
         emptyTitleKey: computed(() => `EmptyState.${kind.value}_title`),
+        emptyTitleParams: computed(() => ({ list: listsInView.value[0]?.name || '' })),
         emptyMessageKey: computed(() => `EmptyState.${kind.value}_msg`),
         emptySentenceKey: computed(() => taskEmptySentenceKey(kind.value)),
     };

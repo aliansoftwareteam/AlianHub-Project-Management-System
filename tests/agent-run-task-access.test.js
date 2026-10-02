@@ -166,11 +166,20 @@ describe('company scoping', () => {
 });
 
 describe('agent-token callers', () => {
-    it('keep their own rules: the person behind the token need not open the task', async () => {
-        const agentActor = { kind: 'agent', userId: OFF_PROJECT, agentId: AGENT, agentName: 'Reviewer', runId: null, viaAccount: 'workspace', tokenId: null };
-        const r = await start(OFF_PROJECT, { taskId: PRIVATE_TASK, trigger: 'manual' }, { agentActor });
+    const agentOf = (userId) => ({ kind: 'agent', userId, agentId: AGENT, agentName: 'Reviewer', runId: null, viaAccount: 'workspace', tokenId: null });
+
+    it.each([
+        ['on a private project the person is not on', OFF_PROJECT, PRIVATE_TASK],
+        ['in a private sprint the person is not on', OFF_PROJECT, SPRINT_TASK],
+        ['for a guest', GUEST, PRIVATE_TASK],
+    ])('start nothing %s', async (label, uid, taskId) => {
+        expectNothingStarted(await start(uid, { taskId, trigger: 'manual' }, { agentActor: agentOf(uid) }));
+    });
+
+    it('start a run on a task the person behind the token can open', async () => {
+        const r = await start(ON_PROJECT, { taskId: PRIVATE_TASK, trigger: 'manual' }, { agentActor: agentOf(ON_PROJECT) });
         expect(r.body.status).toBe(true);
         expect(runRows()).toHaveLength(1);
-        expect(runRows()[0]).toMatchObject({ taskId: PRIVATE_TASK, startedBy: OFF_PROJECT });
+        expect(runRows()[0]).toMatchObject({ taskId: PRIVATE_TASK, startedBy: ON_PROJECT });
     });
 });

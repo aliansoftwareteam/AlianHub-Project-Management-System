@@ -30,7 +30,7 @@
                         <EmptyState v-if="approvalsEngineOff" data-test="approvals-engine-off" :title="$t('Workflows.engine_off_title')" :message="$t('Workflows.engine_off_body')" />
                         <div v-else-if="!approvalsLoaded" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
                         <EmptyState v-else-if="approvalsError" :title="$t('Ai.load_failed')" :message="approvalsError" :action-label="$t('Ai.retry')" @action="loadApprovals" />
-                        <EmptyState v-else-if="!approvals.length" data-test="approvals-empty" :title="$t('Workflows.approvals_empty_title')" :message="$t('Workflows.approvals_empty_body')" />
+                        <EmptyState v-else-if="!approvals.length" data-test="approvals-empty" :title="$t('Workflows.approvals_empty_title')" :message="$t('Workflows.approvals_empty_body')" :action-label="$t('Ai.back_to_waiting')" @action="switchView('pending')" />
                         <WorkflowApprovalRow
                             v-for="approval in approvals"
                             v-else
@@ -44,7 +44,7 @@
                     <template v-else-if="view === 'reports'">
                         <div v-if="!reportsLoaded" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
                         <EmptyState v-else-if="reportsError" :title="$t('Ai.load_failed')" :message="reportsError" :action-label="$t('Ai.retry')" @action="loadReports" />
-                        <EmptyState v-else-if="!reports.length" data-test="reports-empty" :title="$t('Ai.reports_empty_title')" :message="$t('Ai.reports_empty_body')" />
+                        <EmptyState v-else-if="!reports.length" data-test="reports-empty" :title="$t('Ai.reports_empty_title')" :message="$t('Ai.reports_empty_body')" :action-label="$t('Ai.reports_empty_action')" @action="$router.push({ name: 'AgentTeammates', params: { cid: companyId } })" />
                         <button
                             v-for="r in reports"
                             v-else
@@ -91,7 +91,7 @@
                             <span class="ai-item__time ah-mono">{{ shortTime(p.createdAt) }}</span>
                         </div>
                         <div class="ai-item__what">{{ titleOf(p) }}</div>
-                        <div class="ai-item__why">{{ p.why }}</div>
+                        <div class="ai-item__why">{{ whyOf(p) }}</div>
                     </button>
                 </div>
 
@@ -133,7 +133,7 @@
                     <h2 class="ai-detail__what">{{ titleOf(selected) }}</h2>
 
                     <div class="ah-label">{{ $t('Ai.why') }}</div>
-                    <p class="ai-detail__why">{{ selected.why }}</p>
+                    <p class="ai-detail__why">{{ whyOf(selected) }}</p>
 
                     <div class="ah-label">{{ changesLabel }}</div>
                     <div v-if="selected.batch" class="ai-batch">
@@ -230,6 +230,7 @@ import { skillSourceLabel } from "./skillSourceText";
 import { proposalTitle, sortProposals, waitingDaysOf } from "./plainLabels";
 import { useAgentAccess } from "./agentAccess";
 import { changeLabel } from "./agentActionLabels";
+import { plainReason } from "./auditWords";
 
 defineOptions({ name: "AiInboxPage" });
 
@@ -242,6 +243,8 @@ const companyId = inject("$companyId", null);
 const { canManage, userId, mayUndo } = useAgentAccess();
 const $toast = useToast();
 const { proposals, counts, loadProposals, loadSummary, decide } = useAgents();
+const plain = (reason) => plainReason(t, te, reason);
+const whyOf = (proposal) => plain(proposal.why);
 const {
     approvals,
     count: approvalCount,
@@ -402,7 +405,7 @@ const onApprove = async () => {
         const unapplied = (out?.applied || []).filter((a) => !a.ok);
         showProjects(store, madeProjectIds(out));
         const id = await afterDecision(unapplied.length ? "" : t("Ai.applied"));
-        if (unapplied.length) $toast.error(t("Ai.applied_with_failures", { n: unapplied.length, error: unapplied[0].error || "" }), { position: "top-right" });
+        if (unapplied.length) $toast.error(t("Ai.applied_with_failures", { n: unapplied.length, error: plain(unapplied[0].error) }), { position: "top-right" });
         if (out?.undoUntil && mayUndo({ decidedBy: out.decidedBy || userId.value })) {
             undo.value = { id, until: new Date(out.undoUntil).getTime() };
             setTimeout(() => { if (undo.value && undo.value.id === id) undo.value = null; }, Math.max(0, new Date(out.undoUntil).getTime() - Date.now()));

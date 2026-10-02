@@ -12,7 +12,7 @@
         >
             <ShellIcon name="dots" :size="14" />
         </button>
-        <div v-if="shown" ref="menu" class="ah-pop pt-menu__pop" role="menu" :aria-label="t('ProjectTree.folder_actions', { folder: folder.name })" @keydown.stop="onMenuKeydown">
+        <div v-if="shown" ref="menu" class="ah-pop pt-menu__pop" :class="menuClass" :style="menuStyle" role="menu" :aria-label="t('ProjectTree.folder_actions', { folder: folder.name })" @keydown.stop="onMenuKeydown">
             <button
                 v-for="entry in entries"
                 :key="entry.kind"
@@ -128,7 +128,7 @@ const $toast = useToast();
 const companyId = inject("$companyId");
 const { checkPermission } = useCustomComposable();
 
-const { shown, root, menu, open, close, onMenuKeydown } = useRowMenu();
+const { shown, root, menu, menuClass, menuStyle, open, close, onMenuKeydown } = useRowMenu();
 const mode = ref("");
 const busy = ref(false);
 const cancelButton = ref(null);
@@ -249,7 +249,8 @@ defineExpose({ open });
 .pt-row__more:hover { color: var(--ink); background: var(--fill); }
 .pt-row__more:focus-visible { outline: none; box-shadow: var(--focus); }
 .pt-row:hover .pt-row__more, .pt-row:focus-within .pt-row__more, .pt-row__more[aria-expanded="true"] { visibility: visible; }
-.pt-menu__pop { position: absolute; top: calc(100% + var(--sp-1)); right: 0; z-index: 40; min-width: 180px; }
+.pt-menu__pop { position: absolute; top: calc(100% + var(--sp-1)); right: 0; z-index: 40; min-width: 180px; overflow-y: auto; overscroll-behavior: contain; }
+.pt-menu__pop--up { top: auto; bottom: calc(100% + var(--sp-1)); }
 .pt-menu__danger, .pt-menu__danger:hover { color: var(--danger); }
 .pt-menu__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--sp-7); }
 .pt-menu__card { background: var(--surface); color: var(--ink); border-radius: var(--r-card); width: min(420px, 100%); padding: 18px var(--sp-8) 26px; box-shadow: var(--shadow-pop); font-family: var(--font-ui); }

@@ -7,6 +7,7 @@ const { addSprintFun } = require('./controller');
 const { announceList } = require('./helpers/listEvents');
 const rules = require('./scrumRules');
 const { actingUser } = require('./helpers/actingUser');
+const { backlogsIn } = require('./helpers/backlogs');
 
 /**
  * Scrum sprint lifecycle — opt in, start, complete.
@@ -104,15 +105,6 @@ const totals = (tasks) => {
     const snap = rules.summariseCommitment(tasks);
     return { tasks: snap.tasks, points: snap.points, minutes: snap.minutes };
 };
-
-const backlogsIn = (companyId, projectId) => MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.SPRINTS,
-    data: [{
-        projectId: new mongoose.Types.ObjectId(String(projectId)),
-        isBacklog: true,
-        deletedStatusKey: { $ne: 1 },
-    }, '_id name folderId tasks'],
-}, 'find').catch(() => []);
 
 // An ObjectId leads with its creation time, so the smallest one is the original.
 const oldest = (rows) => (rows || []).slice().sort((a, b) => String(a._id).localeCompare(String(b._id)))[0] || null;

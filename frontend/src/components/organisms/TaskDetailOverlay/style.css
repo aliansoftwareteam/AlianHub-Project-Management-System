@@ -446,7 +446,7 @@
 .ah-timer__btn--stop { padding: 4px 7px; display: inline-flex; }
 .ah-timer__start {
     display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 11px; min-height: var(--control-h-lg, 38px);
-    background: var(--rail); color: var(--rail-ink-strong); border: 0; border-radius: var(--r-md, 9px); cursor: pointer; font: 600 var(--fs-sm, 12px) var(--font-ui); text-align: left;
+    background: var(--rail); color: var(--rail-ink-strong); border: 1px solid var(--border); border-radius: var(--r-md, 9px); cursor: pointer; font: 600 var(--fs-sm, 12px) var(--font-ui); text-align: left;
 }
 .ah-timer__start:disabled { opacity: .55; cursor: not-allowed; }
 .ah-timer__elsewhere { margin-left: auto; color: var(--rail-ink); font-size: var(--fs-xs, 10.5px); }
