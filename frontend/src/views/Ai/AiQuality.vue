@@ -19,7 +19,7 @@
                         @click="pick(d)"
                         @keydown.right.prevent="step(1)"
                         @keydown.left.prevent="step(-1)"
-                    >{{ $t('AiQuality.window_days', { n: d }) }}</button>
+                    >{{ $t('AiQuality.window_days', { n: d }, d) }}</button>
                 </div>
             </div>
 

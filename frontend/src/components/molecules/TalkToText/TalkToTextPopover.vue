@@ -96,6 +96,7 @@
 </template>
 
 <script setup>
+import { defaultStatus } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
@@ -328,7 +329,7 @@ function createTask() {
     const project = selectedProjectItem.value;
     const sprint = selectedSprintItem.value;
     if (!project || !sprint) { errorMsg.value = t('TalkToText.pick_project_sprint'); return; }
-    const status = (project.taskStatusData || []).find((x) => x.type === 'default_active');
+    const status = defaultStatus(project);
     const taskType = (project.taskTypeCounts || [])[0];
     if (!status || !taskType) { errorMsg.value = t('TalkToText.project_not_ready'); return; }
 

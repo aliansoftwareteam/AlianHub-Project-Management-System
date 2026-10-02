@@ -26,7 +26,7 @@
                 <div v-if="!props.from" class="sp__roles">
                     <div v-for="card in roleCards" :key="card.key" class="ah-card sp__role" :class="{ 'is-highlight': card.key === ROLE_MEMBER }">
                         <div class="sp__role-name">{{ card.name }}</div>
-                        <div class="ah-small sp__role-desc">{{ card.desc }} {{ $t('Settings.people_count', { n: card.count }) }}</div>
+                        <div class="ah-small sp__role-desc">{{ card.desc }} {{ $t('Settings.people_count', { n: card.count }, card.count) }}</div>
                     </div>
                 </div>
 

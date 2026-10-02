@@ -282,7 +282,7 @@
                                         <div class="ah-field">
                                             <label class="ah-field__label" for="tok-expiry">{{ $t('Accounts.field_expiry') }}</label>
                                             <select id="tok-expiry" v-model.number="tokenForm.expiresInDays" class="ah-input" :class="{ 'ah-input--error': Boolean(expiryError) }" data-test="token-expiry">
-                                                <option v-for="days in expiryChoices" :key="days" :value="days">{{ $t('Accounts.expiry_days', { n: days }) }}</option>
+                                                <option v-for="days in expiryChoices" :key="days" :value="days">{{ $t('Accounts.expiry_days', { n: days }, days) }}</option>
                                             </select>
                                             <p v-if="expiryError" class="ah-field__error">{{ expiryError }}</p>
                                             <p class="acct-note" data-test="token-expiry-hint">{{ $t('Accounts.expiry_hint') }}</p>
@@ -666,7 +666,7 @@ const tokenMeta = (tk) => [
     (tk.grants || []).includes(CHAT_GRANT) ? t("Accounts.token_grant_chat_short") : "",
     tk.lastUsedAt ? t("Accounts.used_on", { d: new Date(tk.lastUsedAt).toLocaleString() }) : t("Accounts.never_used"),
     tk.agentAccount && tk.agentAccount.mode ? t(`Accounts.mode_${tk.agentAccount.mode}`) : "",
-    tk.projectIds && tk.projectIds.length ? t("Accounts.scoped_projects", { n: tk.projectIds.length }) : ""
+    tk.projectIds && tk.projectIds.length ? t("Accounts.scoped_projects", { n: tk.projectIds.length }, tk.projectIds.length) : ""
 ].filter(Boolean).join(" · ");
 
 const expiryRowMeta = (tk) => [

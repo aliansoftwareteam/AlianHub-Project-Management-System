@@ -60,9 +60,9 @@ const daysLabel = computed(() => {
     // Whole calendar days, so "1 day left" means today is not the last day.
     const left = Math.round((new Date(end.getFullYear(), end.getMonth(), end.getDate())
         - new Date(endOfToday.getFullYear(), endOfToday.getMonth(), endOfToday.getDate())) / 86400000);
-    if (left < 0) return t('Scrum.days_over', { count: Math.abs(left) });
+    if (left < 0) return t('Scrum.days_over', { count: Math.abs(left) }, Math.abs(left));
     if (left === 0) return t('Scrum.last_day');
-    return t('Scrum.days_left', { count: left });
+    return t('Scrum.days_left', { count: left }, left);
 });
 </script>
 

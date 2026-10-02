@@ -170,7 +170,7 @@ async function applyChecklist() {
             userData: userData(),
             projectName: props.project?.ProjectName || ""
         });
-        showUndoToast({ message: t("TaskAi.checklist_added", { n: picked.length }), undo });
+        showUndoToast({ message: t("TaskAi.checklist_added", { n: picked.length }, picked.length), undo });
     } catch (err) {
         console.error("ERROR in adding next steps as a checklist: ", err);
         $toast.error(t("TaskAi.failed"), { position: "top-right" });
@@ -192,7 +192,7 @@ async function applySubtasks() {
             userId: idOf(userId),
             userData: userData()
         });
-        showUndoToast({ message: t("TaskAi.subtasks_added", { n: created.length || picked.length }), undo });
+        showUndoToast({ message: t("TaskAi.subtasks_added", { n: created.length || picked.length }, created.length || picked.length), undo });
     } catch (err) {
         console.error("ERROR in adding next steps as subtasks: ", err);
         $toast.error(t("TaskAi.failed"), { position: "top-right" });

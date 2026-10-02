@@ -41,7 +41,7 @@
                 @change="onWindowChange(Number($event.target.value))"
             >
                 <option v-for="n in validMaxAgeMonths" :key="n" :value="n">
-                    {{ $t('ScreenshotRetention.months_option', { n }) }}
+                    {{ $t('ScreenshotRetention.months_option', { n }, n) }}
                 </option>
             </select>
         </div>
@@ -192,9 +192,9 @@ function formatRelative(dateLike) {
     const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
     if (days <= 0) return t('ScreenshotRetention.today');
     if (days === 1) return t('ScreenshotRetention.yesterday');
-    if (days < 30) return t('ScreenshotRetention.days_ago', { n: days });
+    if (days < 30) return t('ScreenshotRetention.days_ago', { n: days }, days);
     const months = Math.floor(days / 30);
-    return t('ScreenshotRetention.months_ago', { n: months });
+    return t('ScreenshotRetention.months_ago', { n: months }, months);
 }
 
 // Watch isOwner rather than firing once on mount: the Vuex store may

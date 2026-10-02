@@ -220,6 +220,7 @@
 </template>
 
 <script setup>
+import { defaultStatus } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 // PACKAGES
 import { defineComponent, nextTick, onMounted, ref, defineProps, inject, watch, computed, onBeforeUnmount } from "vue";
 import { dbCollections } from "@/utils/Collections";
@@ -1149,7 +1150,7 @@ function saveTask() {
                                 sprintObj.folderName = formData.value.selectedSprint.value.folderName;
                             }
         
-                            let status = projectData.value.taskStatusData.find((x) => x.type === "default_active");
+                            let status = defaultStatus(projectData.value);
         
                             const obj = {
                                 'TaskName': name,

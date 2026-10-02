@@ -87,16 +87,31 @@ describe('one change by the person\'s own agent', () => {
         expect(apiRequest).not.toHaveBeenCalled();
         await gathered();
         expect(reads()).toEqual([['a1']]);
-        expect(notice().text()).toContain('Claude changed Fix login: Comment on a task');
+        expect(notice().text()).toContain(`Claude changed Fix login: ${en.AgentActions.task_comment}`);
         expect(undoButton().exists()).toBe(true);
         expect(showButton().exists()).toBe(false);
     });
 
     it('names no task when the change has none to name', async () => {
-        world.changes.a1 = change('a1', { taskId: '', name: '', label: 'Rename a list' });
+        world.changes.a1 = change('a1', { taskId: '', name: '', action: 'list.rename', label: 'Rename a list' });
         applied('a1');
         await gathered();
-        expect(notice().text()).toContain('Claude made a change: Rename a list');
+        expect(notice().text()).toContain(`Claude made a change: ${en.AgentActions.list_rename}`);
+    });
+
+    it('says it in plain words, not in the registry\'s own label', async () => {
+        world.changes.a1 = change('a1', { action: 'task.status.set', label: 'Set status (In progress / In review only)' });
+        applied('a1');
+        await gathered();
+        expect(notice().text()).toContain(`Claude changed Fix login: ${en.AgentActions.task_status_set}`);
+        expect(notice().text()).not.toContain('In review only');
+    });
+
+    it('keeps the server\'s label for an action that has no words here yet', async () => {
+        world.changes.a1 = change('a1', { action: 'something.new', label: 'Do something new' });
+        applied('a1');
+        await gathered();
+        expect(notice().text()).toContain('Claude changed Fix login: Do something new');
     });
 
     it('offers no Undo for a change that cannot be undone', async () => {
@@ -234,7 +249,7 @@ describe('several changes close together', () => {
         applied('a1');
         applied('b1');
         await gathered();
-        expect(notice().text()).toContain('Claude changed Fix login: Comment on a task');
+        expect(notice().text()).toContain(`Claude changed Fix login: ${en.AgentActions.task_comment}`);
         await undoButton().trigger('click');
         await flushPromises();
         expect(apiRequest).toHaveBeenCalledWith('post', UNDO('a1'), {});
@@ -259,7 +274,7 @@ describe('several changes close together', () => {
         showUndoToast({ message: 'Status updated', undo: vi.fn() });
         applied('a2');
         await gathered();
-        expect(notice().text()).toContain('Claude changed Ship it: Comment on a task');
+        expect(notice().text()).toContain(`Claude changed Ship it: ${en.AgentActions.task_comment}`);
     });
 
     it('wait while the page is out of sight, and are told together when the person comes back', async () => {

@@ -6,8 +6,8 @@
                 <span class="ah-off__text">
                     <strong v-if="away">{{ $t('Inbox.off_title') }}</strong>
                     <template v-if="away"> — {{ $t('Inbox.off_keep_working') }} </template>
-                    <template v-if="syncing">{{ $t('Inbox.off_syncing', { n: pendingCount }) }}</template>
-                    <template v-else-if="pendingCount">{{ $t('Inbox.off_queued', { n: pendingCount }) }}</template>
+                    <template v-if="syncing">{{ $t('Inbox.off_syncing', { n: pendingCount }, pendingCount) }}</template>
+                    <template v-else-if="pendingCount">{{ $t('Inbox.off_queued', { n: pendingCount }, pendingCount) }}</template>
                     <template v-if="conflicts.length"> · {{ $t('Inbox.off_conflicts_n', { n: conflicts.length }) }}</template>
                 </span>
                 <button type="button" class="ah-off__review" @click="open = !open">
@@ -42,7 +42,7 @@
                         </div>
                         <div v-if="queue.length > visibleQueue.length" class="ah-off__row ah-off__row--more">
                             <span class="ah-off__tag">+{{ queue.length - visibleQueue.length }}</span>
-                            <span class="ah-off__row-text">{{ $t('Inbox.off_more_changes', { n: queue.length - visibleQueue.length }) }}</span>
+                            <span class="ah-off__row-text">{{ $t('Inbox.off_more_changes', { n: queue.length - visibleQueue.length }, queue.length - visibleQueue.length) }}</span>
                         </div>
                     </div>
 

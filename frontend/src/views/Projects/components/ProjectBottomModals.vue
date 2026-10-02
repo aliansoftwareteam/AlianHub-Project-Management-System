@@ -2,7 +2,7 @@
     <div>
         <DropDown mode="dialog" themed :aria-label="$t('Projects.all_views')" :title="$t('Projects.all_views')" :ref="projectAddView" :bodyClass="{'viewlist-mobile-dropdown-new' : true}" maxHeight="unset" v-if="clientWidth <= 768">
             <template #button="{ triggerAttrs }">
-                <span ref="allViewsTrigger" v-bind="triggerAttrs"></span>
+                <span ref="allViewsTrigger" v-bind="triggerAttrs" aria-hidden="true"></span>
             </template>
             <template #options>
                 <div>

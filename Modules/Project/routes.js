@@ -16,6 +16,7 @@ const { sprintUpdateNamesOnlyMembers } = require('../Sprints/helpers/sprintPeopl
 const { requireSprintAccess } = require('../Sprints/helpers/sprintVisibility');
 const { CHAT_CHANNEL, isChatSpace, requireChatAccess } = require('../Sprints/helpers/chatAccess');
 const { READ, requireProjectAccess, keepVisibleProjects, projectIdsFrom, fieldsOf, permissionsForProjectUpdate, requireSupportedProjectUpdate, DELETE_OR_CLOSE, FIELD_PERMISSIONS } = require('../../Config/projectAccess');
+const { projectUpdateGuard, agentsRefused } = require('../Agents/guard');
 
 const CHECKLIST_ASSIGN_KEYS = ['assigneeAdd', 'assigneeRemove'];
 const SPRINT_EDIT = ['project.project_sprint_name_edit', 'project.sprint_type_change'];
@@ -36,10 +37,10 @@ exports.init = (app) => {
     app.post('/api/v1/project/search',projectFilterCtrl.projectFilter);
     app.get('/api/v1/project/:id', readsProject((req) => req.params.id), Projectctrl.getProjectById);
     app.get('/api/v1/project', projectListCtrl.getProjectList);
-    app.put('/api/v1/project/:id', requireSupportedProjectUpdate, requireProjectAccess({ projectIds: (req) => req.params.id, permissions: (req) => permissionsForProjectUpdate(req.body && req.body.updateObject, req.uid) }), projectUpdateNamesOnlyMembers, updateProjectCtrl.updateProject);
+    app.put('/api/v1/project/:id', requireSupportedProjectUpdate, projectUpdateGuard, requireProjectAccess({ projectIds: (req) => req.params.id, permissions: (req) => permissionsForProjectUpdate(req.body && req.body.updateObject, req.uid) }), projectUpdateNamesOnlyMembers, updateProjectCtrl.updateProject);
     app.put('/api/v1/project/:id/view-settings', editsProjectViews, viewSettingsCtrl.saveViewSettings);
     app.post('/api/v1/project/:id/views', editsProjectViews, viewSettingsCtrl.createView);
-    app.put('/api/v1/project/allTask/:id', requireProjectAccess({ projectIds: (req) => req.params.id, permissions: () => [DELETE_OR_CLOSE] }), projectAlltaskUpdateCtrl.projectAlltaskUpdate);
+    app.put('/api/v1/project/allTask/:id', agentsRefused('project.delete'), requireProjectAccess({ projectIds: (req) => req.params.id, permissions: () => [DELETE_OR_CLOSE] }), projectAlltaskUpdateCtrl.projectAlltaskUpdate);
     app.get('/api/v1/project/sprintFolder/:id', readsProject((req) => req.params.id), projectSprintFolderCtrl.getSprintFolder);
     app.put('/api/v1/project/sprint/:id', requireProjectAccess({
         projectIds: sprintUpdateContainers,
