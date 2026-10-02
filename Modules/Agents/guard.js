@@ -7,21 +7,14 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
-const { canReadProject } = require('../../Config/projectAccess');
+const { canReadProject, fieldsOf } = require('../../Config/projectAccess');
+const { refuse } = require('./personDecides');
 
 // Middleware that applies the registry to the ordinary REST routes when the
 // caller is an agent token. Humans pass straight through — the guard never
 // changes what the web app can do.
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
-
-const refuse = async (req, res, actor, { action, reason, params, entityId }) => {
-    const companyId = req.headers['companyid'] || '';
-    const auditId = await audit.recordRefusal(companyId, actor, {
-        action, reason, params, entityId, path: `${req.method} ${String(req.originalUrl || '').split('?')[0]}`, ip: req.ip || '',
-    });
-    return res.status(403).json({ status: false, message: reason, statusText: reason, auditId });
-};
 
 const withActor = (fn) => async (req, res, next) => {
     try {
@@ -257,6 +250,16 @@ const pageCreateGuard = (req, res, next) => pageCreateChecked(req, res, () => {
 /* For a write route the registry has no action for, or only one behind a flag: `action` names it in the refusal and its audit row. */
 const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
 
+/* What the project update moves a project with: the trash, the archive and the way back, and its open or closed state. */
+const PROJECT_MOVES = { deletedStatusKey: 'project.delete', status: 'project.status.set', statusType: 'project.status.set' };
+const projectMoveRefused = Object.fromEntries([...new Set(Object.values(PROJECT_MOVES))].map((action) => [action, agentsRefused(action)]));
+
+/* An agent changes a project's other details as its person may; where the project sits is a person's to change. */
+const projectUpdateGuard = (req, res, next) => {
+    const move = fieldsOf(req.body && req.body.updateObject).map((field) => PROJECT_MOVES[field]).find(Boolean);
+    return move ? projectMoveRefused[move](req, res, next) : next();
+};
+
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const WORD = /^[a-z][a-z-]*$/;
 const sourcesAlone = (body) => Object.keys(body).length === 1 && body.sources !== undefined;
@@ -314,4 +317,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };

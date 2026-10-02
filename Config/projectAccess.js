@@ -6,6 +6,7 @@ const logger = require('./loggerConfig');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { allowsProject } = require('./tokenNarrowing');
 const { PRIVATE_PROJECTS, seesEveryPrivateProject } = require('./rulePermissions');
+const { PROJECT_AGENT_FIELDS } = require('./projectAgentFields');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TEAM_PREFIX = 'tId_';
@@ -52,12 +53,13 @@ const FIELD_PERMISSIONS = {
     watchers: [],
 };
 
-// Kept by the server: who owns the project, its tenant, and the counters and activity other
-// writes maintain. No client screen edits them through the project update.
+// Kept by the server: who owns the project, its tenant, the counters and activity other
+// writes maintain, and the settings for agents. No client screen edits them through the project update.
 const SERVER_ONLY_FIELDS = new Set([
     '_id', 'CompanyId', 'companyId', 'projectCreatedBy', 'personalOwner', 'isPersonal', 'isRestrict',
     'sprintsObj', 'sprintsfolders', 'lastTaskId', 'milestoneAmount', 'proposalIdNumeric',
     'lastProjectActivity', 'userActivity', 'legacyId', 'demo',
+    ...PROJECT_AGENT_FIELDS,
 ]);
 
 const PROJECT_UPDATE_OPERATORS = ['$set', '$unset', '$push', '$pull', '$addToSet'];

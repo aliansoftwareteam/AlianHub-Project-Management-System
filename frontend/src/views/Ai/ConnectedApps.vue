@@ -18,7 +18,7 @@
                     <div class="ca__chips">
                         <span v-for="scope in grant.scopes" :key="scope" class="ah-chip" data-test="grant-scope">{{ $t(scopeNameKey(scope)) }}</span>
                     </div>
-                    <p v-for="scope in grant.scopes.filter(isManageScope)" :key="`manage-${scope}`" class="ca__manage" data-test="grant-manage">
+                    <p v-for="scope in grant.scopes.filter(isOptInScope)" :key="`manage-${scope}`" class="ca__manage" data-test="grant-manage">
                         <span class="ah-small">{{ $t(scopeSentenceKey(scope)) }}</span>
                         <button type="button" class="ah-btn ah-btn--link ah-btn--sm" :disabled="busy === grant.grantId" :data-test="`withdraw-${scope}`" @click="withdraw(grant, scope)">{{ $t('ConnectedApps.withdraw') }}</button>
                     </p>
@@ -38,7 +38,7 @@ import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
-import { scopeNameKey, scopeSentenceKey, isManageScope, refusalOf, formatWhen } from "@/views/OAuth/oauthShared";
+import { scopeNameKey, scopeSentenceKey, isOptInScope, refusalOf, formatWhen } from "@/views/OAuth/oauthShared";
 
 defineOptions({ name: "ConnectedApps" });
 

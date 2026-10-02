@@ -148,12 +148,17 @@ async function startRefusal() {
 /**
  * One timer per person: starting a second one stops (and logs) the first.
  * Returns the entry that was stopped, so the caller can say so. Throws with the
- * server's code when today cannot take time, leaving any running timer as it was.
+ * server's code when today cannot take time or the first could not be logged,
+ * leaving any running timer as it was.
  */
 export async function startTimer(context) {
     const refusal = await startRefusal();
     if (refusal) throw Object.assign(new Error(refusal.statusText || refusal.code), { code: refusal.code });
-    const previous = timerState.entry && timerState.entry.taskId !== String(context.taskId) ? await stopTimer() : null;
+    let previous = null;
+    if (timerState.entry && timerState.entry.taskId !== String(context.taskId)) {
+        previous = await stopTimer();
+        if (timerState.entry) throw Object.assign(new Error(previous?.statusText || "log_failed"), { code: previous?.code, timerKept: true });
+    }
     timerState.entry = {
         ...context,
         taskId: String(context.taskId),
@@ -217,25 +222,47 @@ function toLogPayload(entry, endedAt) {
     };
 }
 
-/**
- * Stops the running timer and writes a manual time log for it. Anything
- * under a minute is discarded rather than logged as zero.
- */
-export async function stopTimer() {
-    const entry = timerState.entry;
-    if (!entry) return null;
-    const endedAt = Date.now();
-    const elapsedMs = entry.accumulatedMs + (entry.paused || !entry.startedAt ? 0 : endedAt - entry.startedAt);
-    timerState.entry = null;
-    persist();
-    if (elapsedMs < 60000) return { ...entry, logged: false, tooShort: true };
+const sameTimer = (a, b) => Boolean(a && b) && a.taskId === b.taskId && a.firstStartedAt === b.firstStartedAt;
+
+async function logStopped(entry, endedAt) {
     try {
-        const response = await apiRequest("post", env.ADD_TIMELOG, toLogPayload(withUserContext(entry), endedAt));
-        return { ...entry, logged: response?.data?.status !== false, statusText: response?.data?.statusText, code: response?.data?.code };
+        const answer = (await apiRequest("post", env.ADD_TIMELOG, toLogPayload(withUserContext(entry), endedAt)))?.data;
+        return { logged: answer?.status !== false, statusText: answer?.statusText, code: answer?.code };
     } catch (error) {
         console.error("ERROR in stopTimer: ", error);
-        return { ...entry, logged: false };
+        return { logged: false };
     }
+}
+
+let stopBeingSent = null;
+
+/**
+ * Stops the running timer and writes a manual time log for it. Anything
+ * under a minute is discarded rather than logged as zero. The timer is cleared
+ * only once the server has taken its time: a refused or failed stop leaves it
+ * as it was and answers `timerKept`. A second press while the first is being
+ * sent waits for it and answers null.
+ */
+export async function stopTimer() {
+    if (stopBeingSent) {
+        await stopBeingSent;
+        return null;
+    }
+    const entry = timerState.entry;
+    if (!entry) return null;
+    const stopped = { ...entry };
+    const endedAt = Date.now();
+    const elapsedMs = stopped.accumulatedMs + (stopped.paused || !stopped.startedAt ? 0 : endedAt - stopped.startedAt);
+    if (elapsedMs < 60000) {
+        discardTimer();
+        return { ...stopped, logged: false, tooShort: true };
+    }
+    stopBeingSent = logStopped(stopped, endedAt);
+    const outcome = await stopBeingSent;
+    stopBeingSent = null;
+    if (!outcome.logged) return { ...stopped, ...outcome, timerKept: true };
+    if (sameTimer(timerState.entry, stopped)) discardTimer();
+    return { ...stopped, ...outcome };
 }
 
 export function discardTimer() {

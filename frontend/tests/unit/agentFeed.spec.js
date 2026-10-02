@@ -7,6 +7,7 @@ vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => key } } }));
 const TEAM = '/api/v2/agents/team';
 const RUNS = '/api/v2/agents/runs';
 const PROPOSALS = '/api/v2/agents/proposals';
+const HELD = '/api/v2/agents/work-queue/held';
 
 const WORKING = { people: [], agents: [{ id: 'a1', name: 'Reviewer', status: 'running', run: { taskKey: 'AP-1' } }] };
 const QUIET = { people: [], agents: [{ id: 'a1', name: 'Reviewer', status: 'idle', run: null }] };
@@ -21,6 +22,7 @@ const answer = (type, url) => {
     if (url === TEAM) return world.team();
     if (url.startsWith(RUNS)) return ok(world.rows, { summary: { runs: world.open } });
     if (url.startsWith(PROPOSALS)) return ok(world.pending);
+    if (url === HELD) return ok(world.held);
     return ok({});
 };
 
@@ -56,7 +58,7 @@ beforeEach(async () => {
     vi.useFakeTimers();
     vi.resetModules();
     apiRequest.mockReset();
-    world = { team: () => ok(WORKING), rows: [], open: [], pending: [] };
+    world = { team: () => ok(WORKING), rows: [], open: [], pending: [], held: [] };
     apiRequest.mockImplementation(answer);
     showTab(true);
     feed = await import('@/views/Ai/agentFeed');
@@ -104,6 +106,14 @@ describe('the shared read of live agents', () => {
             expect(call[0]).toBe('get');
             expect(call[4]).toMatchObject({ background: true });
         });
+    });
+
+    it('reads nothing again for a change the person\'s own connected agent applied', async () => {
+        watch();
+        await settle();
+        socket.fire(feed.AGENTS_CHANGED_EVENT, { kind: feed.APPLIED_CHANGE, companyId: 'c1', auditId: 'a1' });
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(cycles()).toBe(1);
     });
 
     it('stops when the last watcher leaves', async () => {
@@ -322,6 +332,7 @@ describe('the agent state of one project', () => {
 
         expect(reads(RUNS)).toBe(1);
         expect(reads(PROPOSALS)).toBe(1);
+        expect(reads(HELD)).toBe(1);
         expect(apiRequest.mock.calls.some(([, url]) => url.includes('projectId'))).toBe(false);
 
         expect(board.runFor('t1')).toMatchObject({ agentName: 'Reviewer', skill: 'code_review' });
@@ -339,9 +350,38 @@ describe('the agent state of one project', () => {
         board.start('p2');
         await settle();
         expect(board.runFor('t9')).toMatchObject({ agentName: 'Elsewhere' });
-        expect(apiRequest.mock.calls).toHaveLength(3);
+        expect(apiRequest.mock.calls).toHaveLength(4);
 
         board.stop();
         expect(board.summary.value).toBeNull();
+    });
+});
+
+describe('the tasks connected agents hold', () => {
+    const CLAIM = { taskId: 't1', projectId: 'p1', name: 'Claude, for Priya', since: '2026-10-02T08:42:00.000Z' };
+
+    it('are read only for a surface that shows them, and again when an agent takes or leaves one', async () => {
+        watch();
+        await settle();
+        expect(reads(HELD)).toBe(0);
+
+        world.held = [CLAIM];
+        watch({ claims: true });
+        await settle();
+        expect(reads(HELD)).toBe(1);
+        expect(feed.heldTasks.value).toEqual([CLAIM]);
+
+        world.held = [];
+        socket.fire(feed.AGENTS_CHANGED_EVENT, { kind: 'claim' });
+        await vi.advanceTimersByTimeAsync(6000);
+        expect(reads(HELD)).toBe(2);
+        expect(feed.heldTasks.value).toEqual([]);
+    });
+
+    it('stay empty when the server answers with something that is no list', async () => {
+        world.held = { refused: true };
+        watch({ claims: true });
+        await settle();
+        expect(feed.heldTasks.value).toEqual([]);
     });
 });

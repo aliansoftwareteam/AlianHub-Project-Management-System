@@ -344,6 +344,17 @@ describe('CommandPalette', () => {
         closeQuickCreate();
     });
 
+    it('hands the words after "new task" to the create dialog as the task name', async () => {
+        closeQuickCreate();
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'new task Call supplier');
+        expect(activeOption(wrapper).attributes('data-kind')).toBe('command');
+        await key(wrapper, { key: 'Enter' });
+        expect(quickCreate.open).toBe(true);
+        expect(quickCreate.name).toBe('Call supplier');
+        closeQuickCreate();
+    });
+
     it('keeps Ask AI below a command that only partly matches, and records first', async () => {
         const wrapper = await mountPalette();
         await typeQuery(wrapper, 'budget');

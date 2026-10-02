@@ -9,6 +9,9 @@ import { shellState } from "@/components/organisms/Shell/shellState";
  * agentsChanged signal asks for a refresh; the poll only covers a dropped socket and the people's
  * timers, which no agent event announces. */
 export const AGENTS_CHANGED_EVENT = "agentsChanged";
+export const POLICY_CHANGE = "policy";
+// Sent to one person about their own connected agent's change (./agentChangeNotice); nothing this feed shows moves with it.
+export const APPLIED_CHANGE = "change";
 const LIVE_POLL_MS = 30000;
 const IDLE_POLL_MS = 120000;
 const BURST_MS = 500;
@@ -23,6 +26,8 @@ export const agents = ref([]);
 export const runs = ref([]);
 export const openRuns = ref([]);
 export const proposals = ref([]);
+// What connected agents hold, each as { taskId, projectId, name, since }, already kept to the tasks this person can open.
+export const heldTasks = ref([]);
 // A paused agent can still hold a run waiting on a person; the server counts it as paused, not live.
 export const live = computed(() => agents.value.filter((a) => a.status === "running" && a.run));
 export const running = computed(() => live.value.length);
@@ -30,6 +35,7 @@ export const running = computed(() => live.value.length);
 const runHooks = new Set();
 let subscribers = 0;
 let proposalWatchers = 0;
+let claimWatchers = 0;
 let inFlight = null;
 let again = false;
 let stale = false;
@@ -81,12 +87,18 @@ const readProposals = shared(async () => {
     if (ok(res)) proposals.value = res.data.data || [];
 });
 
-const agentsBusy = () => running.value > 0 || openRuns.value.length > 0;
+const readHeld = shared(async () => {
+    const res = await get(`${env.AGENT_WORK_QUEUE}/held`);
+    if (ok(res)) heldTasks.value = Array.isArray(res.data.data) ? res.data.data : [];
+});
+
+const agentsBusy = () => running.value > 0 || openRuns.value.length > 0 || heldTasks.value.length > 0;
 const pollEvery = () => (agentsBusy() ? LIVE_POLL_MS : IDLE_POLL_MS);
 
 const cycle = async () => {
     const reads = [readTeam(), readRuns()];
     if (proposalWatchers > 0) reads.push(readProposals());
+    if (claimWatchers > 0) reads.push(readHeld());
     const results = await Promise.allSettled(reads);
     lastCycleAt = Date.now();
     const refusal = results.map((result) => result.reason).find(isBusy);
@@ -126,8 +138,8 @@ export function refreshAgentFeed() {
     return inFlight;
 }
 
-function onAgentsChanged() {
-    if (!subscribers) return;
+function onAgentsChanged(change) {
+    if (!subscribers || change?.kind === APPLIED_CHANGE) return;
     if (inFlight) {
         again = true;
         return;
@@ -191,17 +203,20 @@ const readNow = (read) => {
 };
 
 /* onRuns is handed the latest runs after every read of them, and once on joining if a read has
- * already landed. proposals: true is for the surfaces that show pending proposals; nobody else pays
- * for that read. Returns the function that ends the subscription. */
-export function subscribeAgentFeed({ onRuns, proposals: wantsProposals = false } = {}) {
+ * already landed. proposals: true is for the surfaces that show pending proposals, claims: true for
+ * those that mark the tasks a connected agent holds; nobody else pays for those reads. Returns the
+ * function that ends the subscription. */
+export function subscribeAgentFeed({ onRuns, proposals: wantsProposals = false, claims: wantsClaims = false } = {}) {
     const first = subscribers === 0;
     if (onRuns) runHooks.add(onRuns);
     if (wantsProposals) proposalWatchers += 1;
+    if (wantsClaims) claimWatchers += 1;
     subscribers += 1;
     if (first) start();
     else {
         if (onRuns && lastCycleAt) onRuns(runs.value);
         if (wantsProposals && proposalWatchers === 1) readNow(readProposals);
+        if (wantsClaims && claimWatchers === 1) readNow(readHeld);
     }
 
     let released = false;
@@ -210,6 +225,7 @@ export function subscribeAgentFeed({ onRuns, proposals: wantsProposals = false }
         released = true;
         if (onRuns) runHooks.delete(onRuns);
         if (wantsProposals) proposalWatchers -= 1;
+        if (wantsClaims) claimWatchers -= 1;
         subscribers -= 1;
         if (subscribers === 0) stop();
     };

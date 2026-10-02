@@ -23,7 +23,7 @@
                  they are the same question asked twice. Whose numbers these are moved to
                  the card header, next to the period it covers. -->
             <div class="tss-meta">
-                <span class="tss-total">{{ $t('dashboardCard.tss_total', { n: total }) }}</span>
+                <span class="tss-total">{{ $t('dashboardCard.tss_total', { n: total }, total) }}</span>
                 <input
                     v-model="userSearch"
                     type="search"

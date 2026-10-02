@@ -226,7 +226,7 @@ const spanLabel = computed(() => {
 });
 
 const metaFor = (m) => {
-    const parts = [t("Billing.tasks_count", { count: m.taskCount })];
+    const parts = [t("Billing.tasks_count", { count: m.taskCount }, m.taskCount)];
     if (m.percentBp !== null && m.percentBp > 0) parts.push(t("Billing.percent_done", { percent: percentFromBp(m.percentBp) }));
     if (m.loggedMinutes > 0) parts.push(t("Billing.hours_logged", { hours: hoursFromMinutes(m.loggedMinutes) }));
     else if (!m.taskCount) return t("Billing.no_tasks_linked");

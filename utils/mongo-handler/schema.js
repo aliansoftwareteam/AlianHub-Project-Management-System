@@ -1168,6 +1168,21 @@ const schema = {
         // { why: 'taken_back' | 'finished', userId, name, at }: not handed to an agent again while the row stays open.
         leftQueue: { type: Object, required: false },
     },
+    // What agents leave while they work (Modules/Agents/workMarks.js): one row per scope and key, taken by a conditional write.
+    //   place:<projectId> / <n>   one of the project's places for agents at work; `by` holds it for the queue item `ref`
+    //   hand / <connection>       the one queue item `ref` a connected agent holds
+    //   read:<taskId> / <reader>  the task's change stamp `seen` when that agent last read it
+    //   turn / <taskId>           the agent `by` that is changing the task until `until`
+    agentWorkMarks: {
+        scope: { type: String, required: true },
+        key: { type: String, required: true },
+        by: { type: String, required: false },
+        ref: { type: String, required: false },
+        at: { type: Date, required: false },
+        until: { type: Date, required: false },
+        seen: { type: Date, required: false },
+        rev: { type: Number, default: 0, required: false },
+    },
     // Agents as teammates — managed by Modules/Agents.
     agents: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
@@ -1460,6 +1475,8 @@ const schema = {
         agentName: { type: String, required: false },
         runId: { type: String, required: false },
         taskId: { type: String, required: false },
+        // Every task a batch names. A person who cannot read one of them does not see the proposal (Agents/access.js).
+        taskIds: { type: [String], default: undefined, required: false },
         projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
         what: { type: String, required: true },
         why: { type: String, required: false },
@@ -3606,6 +3623,11 @@ const schema = {
         },
         // { done: 'never' | 'approval' | 'yes', connected: 'propose_all' | 'single_task', updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectPolicy.js).
         agentPolicy: {
+            type: Object,
+            required: false
+        },
+        // { atOnce, paused, pausedBy, pausedAt, updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectLimits.js).
+        agentLimits: {
             type: Object,
             required: false
         },

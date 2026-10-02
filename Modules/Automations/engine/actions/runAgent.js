@@ -51,7 +51,7 @@ module.exports = {
         if (!String(config.agent || '').trim()) throw refuse('This rule does not name an agent — pick one so its pause switch, spend cap and allowed actions apply.');
         const agent = await findAgent(companyId, config.agent);
         if (!agent) throw refuse(`No agent named "${config.agent}" in this workspace.`);
-        const check = await runs.canStart(agent, { trigger: 'rule', companyId, depth: context.depth });
+        const check = await runs.canStart(agent, { trigger: 'rule', companyId, depth: context.depth, projectId: task.ProjectID });
         if (!check.ok) {
             if (check.code === runs.LOOP_DEPTH_EXCEEDED) await recordLoopRefusal(companyId, agent, { taskId: entity.id, context, check });
             throw refuse(`${agent.name} cannot run: ${check.reason}`);

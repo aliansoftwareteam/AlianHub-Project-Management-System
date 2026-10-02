@@ -2,6 +2,7 @@ const { toCompanyRoom } = require('../roomAccess');
 const socketEmitter = require('../../event/socketEventEmitter');
 
 const EVENT = 'agentsChanged';
+const APPLIED_CHANGE = 'change';
 const REMEMBERED_RUNS = 2000;
 
 const lastStatus = new Map();
@@ -21,15 +22,23 @@ const runMoved = (companyId, run) => {
 
 const worthTelling = (companyId, data) => {
     if (data.kind === 'run') return runMoved(companyId, data.run);
-    if (data.kind === 'proposal') return true;
+    if (data.kind === 'proposal' || data.kind === 'claim' || data.kind === 'policy') return true;
     if (data.kind === 'agent') return Boolean(data.pausedAll || data.deleted || data.paused || data.agent);
     return false;
+};
+
+/* What a person's own connected agent applied goes to that person's sockets alone, with the id they read it by. */
+const tellThePerson = (companyId, { userId, auditId }) => {
+    const person = String(userId || '');
+    if (!person || !auditId) return undefined;
+    return toCompanyRoom(companyId, (entry) => entry.socket.emit(EVENT, { kind: APPLIED_CHANGE, companyId, auditId: String(auditId) }), (identity) => String(identity.uid) === person);
 };
 
 /* Only the fact of a change is sent; each client reads again through the API, which decides what it may see. */
 const relay = (change) => {
     const companyId = String((change && change.companyId) || '');
     const data = (change && change.data) || {};
+    if (companyId && data.kind === APPLIED_CHANGE) return tellThePerson(companyId, data);
     if (!companyId || !worthTelling(companyId, data)) return undefined;
     return toCompanyRoom(companyId, (entry) => entry.namespace.to(entry.roomName).emit(EVENT, { kind: data.kind }));
 };

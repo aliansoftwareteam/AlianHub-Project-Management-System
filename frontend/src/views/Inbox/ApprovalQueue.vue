@@ -7,7 +7,7 @@
                 <li v-for="p in reviewRows" :key="p.proposalId" class="aq__review-item" data-test="queue-review-item">
                     <div class="aq__what"><strong>{{ whoOf(p) }}</strong> {{ t('Inbox.wants_to') }} {{ titleOf(p) }}</div>
                     <ul class="aq__changes">
-                        <li v-for="(change, i) in p.changes" :key="i" class="aq__change">
+                        <li v-for="(change, i) in readChanges(p)" :key="i" class="aq__change">
                             <span class="aq__change-label">{{ changeText(change) }}</span>
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ t('Ai.not_reversible') }}</span>
                         </li>
@@ -65,8 +65,8 @@
 
                 <div class="aq__label">{{ t('Inbox.queue_changes_label') }}</div>
                 <ul class="aq__changes">
-                    <li v-for="(change, i) in changesOf(p)" :key="i" class="aq__change">
-                        <IntentPreview v-if="change.preview" class="aq__intent" :preview="change.preview" />
+                    <li v-for="(change, i) in shownChanges(p)" :key="i" class="aq__change">
+                        <IntentPreview v-if="change.preview" class="aq__intent" :preview="change.preview" @open-task="emit('open-task', $event)" />
                         <span v-else class="aq__change-label">{{ change.label }}</span>
                         <span v-if="!change.reversible" class="ah-chip ah-chip--warn" data-test="queue-permanent">{{ t('Ai.not_reversible') }}</span>
                         <button
@@ -217,7 +217,7 @@ const props = defineProps({
     applied: { type: Array, default: () => [] },
     stamp: { type: Function, default: () => '' },
 });
-const emit = defineEmits(['decided', 'undone']);
+const emit = defineEmits(['decided', 'undone', 'open-task']);
 
 const SLACK_POST = 'slack.message.post';
 const SOURCE_MCP = 'mcp';
@@ -250,7 +250,7 @@ const holdAlwaysPanel = (el) => { alwaysPanel = el; };
 // A connected agent's proposal is filed under its tool's name and description, which is no sentence for a person.
 const onlyPreview = (p) => (p.source === SOURCE_MCP && (p.changes || []).length === 1 ? p.changes[0].preview : null);
 /* A change the project's rules filed is worded here from the facts it carries; its stored text is the fallback. */
-const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || intentTitle(t, onlyPreview(p)) || proposalTitle(t, p);
+const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || intentTitle(t, p.batch || onlyPreview(p)) || proposalTitle(t, p);
 const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || p.why;
 const changeText = (change) => intentSummary(t, change.preview) || change.label;
 // The preview is the server's reading of a change for this viewer, never part of the change sent back.
@@ -272,6 +272,9 @@ const toggleAll = (on) => { picked.value = on ? selectable.value.map((p) => p.pr
 
 const isEditing = (p) => editing.value === p.proposalId;
 const changesOf = (p) => (isEditing(p) ? kept.value : p.changes || []);
+// A batch is read as one card: how many tasks, what changes on them and which tasks, not a line for each change.
+const readChanges = (p) => (p.batch ? [{ preview: p.batch, label: '', reversible: (p.changes || []).every((change) => change.reversible) }] : p.changes || []);
+const shownChanges = (p) => (isEditing(p) ? kept.value : readChanges(p));
 const toggleEdit = (p) => {
     if (isEditing(p)) { editing.value = ''; return; }
     editing.value = p.proposalId;
@@ -340,6 +343,7 @@ const undoApplied = async (p) => {
     busy.value = false;
     if (!result.ok) { errors[p.proposalId] = result.error; return; }
     delete errors[p.proposalId];
+    summary.value = result.left.length ? t('Inbox.queue_undo_left', { why: result.left[0] }) : '';
     emit('undone', { id: p.proposalId });
 };
 

@@ -53,6 +53,7 @@
             <span v-if="!renaming && metaText" class="lv2__key">{{ metaText }}</span>
             <TaskHomeMark v-if="!renaming && !isSub" :task="data" :list="viewedList" />
             <span v-if="tracking" class="lv2__timer" :title="$t('List.tracking_now')">● {{ timerText }}</span>
+            <TaskAgentMark v-if="!renaming" :task-id="String(data._id)" />
             <button v-if="agentLine" type="button" class="lv2__agent-line" :title="agentLine" @click.stop="$emit('review-agent', proposal)">
                 ✦ {{ agentLine }}
             </button>
@@ -143,6 +144,7 @@ import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.v
 import { defaultColumns, listColumnClass } from "@/views/Projects/composables/viewColumns";
 import { taskMenuItems } from "@/views/Projects/composables/taskMenu";
 import TaskHomeMark from "@/views/Projects/components/TaskHomeMark.vue";
+import TaskAgentMark from "@/views/Projects/components/TaskAgentMark.vue";
 import { MAX_DEPTH } from "@taskTreeRules";
 
 defineOptions({ name: "ListRow" });
@@ -215,11 +217,7 @@ const timerText = computed(() => {
     return h ? `${h}:${m}:${s}` : `${m}:${s}`;
 });
 
-const agentLine = computed(() => {
-    if (props.proposal) return `${props.proposal.agentName}: ${proposalTitle(t, props.proposal)}`;
-    if (props.run) return `${props.run.agentName}: ${t("List.agent_working")}`;
-    return "";
-});
+const agentLine = computed(() => (props.proposal ? `${props.proposal.agentName}: ${proposalTitle(t, props.proposal)}` : ""));
 
 function open() {
     emit("open", props.data);

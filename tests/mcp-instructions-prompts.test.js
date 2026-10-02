@@ -169,6 +169,15 @@ describe('what a connecting agent is told', () => {
         expect(await told(ctx(OWNER))).toMatch(/A person closes the task/);
     });
 
+    it('tells a caller that may close a task that the close can wait for a person, and to say so and go on', async () => {
+        flags('MCP_TOOLS_MANAGE');
+        const text = await told(managing(OWNER));
+        expect(text).toMatch(/Closing a task may wait for a person's approval/);
+        expect(text).toMatch(/tell the person it is waiting and go on with the rest/);
+        expect(text).toMatch(/do not try to close it again/);
+        expect(await told(ctx(OWNER))).not.toMatch(/Closing a task may wait/);
+    });
+
     it.each(EVERY_MIX)('stays under the set length and in plain words for %s', async (label, mix, caller) => {
         flags(...mix);
         const text = await told(caller());

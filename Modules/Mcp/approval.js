@@ -9,6 +9,7 @@ const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
 const goalTokens = require('../Goals/goalTokens');
+const { ACTION: NEW_PROJECT } = require('../Agents/projectCreate');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
 // approval re-asks everything the original call was asked and adds the
@@ -20,8 +21,9 @@ const GATE_OWNER_ADMIN = 'owner_admin';
 
 const refused = (error, status = 403) => ({ error, status });
 
-const targetOf = (params = {}) => {
-    const target = {};
+/* A new project sits in no project yet: like a goal it is the workspace's, which a token kept to some projects is refused. */
+const targetOf = (params = {}, action = '') => {
+    const target = action === NEW_PROJECT ? { ...goalTokens.WRITE_TARGET } : {};
     if (params.taskId) target.taskId = String(params.taskId);
     if (params.relatedTaskId) target.relatedTaskId = String(params.relatedTaskId);
     if (params.projectId) target.projectId = String(params.projectId);
@@ -82,7 +84,7 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     const { tokenLists } = filer;
 
     for (const c of changes) {
-        const target = targetOf(c.params);
+        const target = targetOf(c.params, c.action);
         // eslint-disable-next-line no-await-in-loop
         const own = await permissions.holderMay(companyId, { kind: 'human', userId: decider.userId }, c.action, c.params || {});
         if (!own.allowed) return refused(`The approver may not make this change: ${own.reason}`);

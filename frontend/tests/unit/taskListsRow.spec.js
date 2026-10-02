@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { h, ref } from 'vue';
+import { dismissUndoToast, undoToast } from '@/composable/useUndoToast';
 
 const { api, toast, rights } = vi.hoisted(() => ({
     api: { lists: [], write: null, calls: [] },
@@ -205,7 +206,8 @@ describe('removing from a list', () => {
         expect(writes().map((call) => call.body)).toEqual([{ action: 'removeFromList', taskId: 'task-1', sprintId: 'list-2' }]);
         expect(chips(wrapper)).toEqual(['Sprint board Home', 'Launch plan Marketing']);
         expect(wrapper.emitted('changed')).toEqual([[[stored('proj-2', 'list-3')]]]);
-        expect(toast.success).toHaveBeenCalledWith('Removed from Design queue.', expect.anything());
+        expect(undoToast.current.message).toBe('Removed from Design queue.');
+        dismissUndoToast();
         expect(chipOf(wrapper, 'list-3').find('.ah-detail__list-remove').attributes('aria-label')).toBe('Remove from Launch plan');
     });
 });

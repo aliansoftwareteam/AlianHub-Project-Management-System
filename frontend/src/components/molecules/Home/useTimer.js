@@ -46,10 +46,11 @@ export function useTimer() {
         if (!timerState.entry) return null;
         const snapshot = { taskName: timerState.entry.taskName, elapsedMs: elapsedMs.value };
         const result = await stopTimer();
-        if (result && !result.logged && !result.tooShort) {
-            throw Object.assign(new Error(result.statusText || "log failed"), { code: result.code });
+        if (!result) return null;
+        if (!result.logged && !result.tooShort) {
+            throw Object.assign(new Error(result.statusText || "log failed"), { code: result.code, timerKept: result.timerKept });
         }
-        return { ...snapshot, logged: Boolean(result && result.logged) };
+        return { ...snapshot, logged: result.logged };
     }
 
     return { timer, elapsedMs, isTracking: isTimerFor, start, pause: pauseTimer, resume: resumeTimer, stop, clear: discardTimer };

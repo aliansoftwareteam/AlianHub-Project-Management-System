@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
+const socketEmitter = require('../../event/socketEventEmitter');
 const registry = require('./registry');
 const runs = require('./runs');
 const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
@@ -31,6 +32,8 @@ const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
 const confidence = require('./engine/confidence');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const triggers = require('./triggers');
+const { agentsRefused } = require('./guard');
+const { personDecides } = require('./personDecides');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
 const companyOf = (req) => String(req.headers['companyid'] || '');
@@ -484,6 +487,8 @@ exports.startRun = async (req, res) => {
             // never executed and never finished — "running" forever in every counter.
             return fail(res, 'This agent needs a task to run on. Assign the agent to a task, @mention it in a task comment, or run it on a task from the agent\'s page.');
         }
+        const paused = await runs.pausedIn(companyId, task.ProjectID);
+        if (paused) return fail(res, paused, 409);
         const { run, deduplicated } = await runs.start(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note, spendCapUsd, notifyMe: Boolean(notifyMe), idempotencyKey });
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
         if (deduplicated) return res.send({ status: true, statusText: 'Run already started.', data: { ...plain, deduplicated: true } });
@@ -613,8 +618,9 @@ exports.createProposal = async (req, res) => {
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
-const decide = (fn) => async (req, res) => {
+const decide = (action, fn) => async (req, res) => {
     try {
+        if (!(await personDecides(req, res, action))) return undefined;
         const companyId = companyOf(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid proposal id are required.');
         const caller = await callerOf(req, companyId);
@@ -630,9 +636,9 @@ const decide = (fn) => async (req, res) => {
 
 const approveOnceOrAlways = (companyId, id, { always, ...decision }) => (always ? standingApprovals.approveAlways(companyId, id, decision) : proposals.approve(companyId, id, decision));
 
-exports.approveProposal = decide(approveOnceOrAlways);
-exports.declineProposal = decide(proposals.decline);
-exports.undoProposal = decide(proposals.undoApproval);
+exports.approveProposal = decide('proposal.approve', approveOnceOrAlways);
+exports.declineProposal = decide('proposal.decline', proposals.decline);
+exports.undoProposal = decide('proposal.undo', proposals.undoApproval);
 
 /* GET / PUT / DELETE /api/v2/agents/account — my personal coding-agent link */
 exports.getAccount = async (req, res) => {
@@ -675,16 +681,27 @@ exports.getPolicy = async (req, res) => {
     } catch (e) { return fail(res, e.message, 500); }
 };
 
-exports.setPolicy = async (req, res) => {
+const POLICY_EDIT_ACTION = 'workspace.agent_policy.edit';
+const POLICY_CHANGE = 'policy';
+
+/* An API token never changes it, whoever holds it: the policy is what holds a token's agent. */
+const saveWorkspacePolicy = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
-        if (!canManageAgents(await callerOf(req, companyId))) return fail(res, 'Owner/admin only.', 403);
+        if (req.apiToken) return fail(res, 'An API token cannot change the workspace\'s agent settings.', 403);
+        const caller = await callerOf(req, companyId);
+        if (!canManageAgents(caller)) return fail(res, 'Owner/admin only.', 403);
         const out = await accounts.setPolicy(companyId, req.body || {});
         if (out.error) return fail(res, out.error, out.status || 400);
+        await agentAudit.recordWorkspacePolicyChange(companyId, caller.actor, { from: out.from, to: out.policy, ip: req.ip || '' });
+        socketEmitter.emit('update', { type: 'update', module: 'agent', companyId, data: { kind: POLICY_CHANGE }, updatedFields: { kind: POLICY_CHANGE }, actor: { kind: 'human' }, depth: 1 });
         return res.send({ status: true, statusText: 'Policy updated.', data: out.policy });
     } catch (e) { logger.error(`setPolicy: ${e.message}`); return fail(res, e.message, 500); }
 };
+
+exports.setPolicy = [agentsRefused(POLICY_EDIT_ACTION), saveWorkspacePolicy];
+exports.POLICY_EDIT_ACTION = POLICY_EDIT_ACTION;
 
 /* GET /api/v2/agents/team — the Team board (13h): people and agents, what each
  * is on right now, load for the week, PTO, and a composed standup. */

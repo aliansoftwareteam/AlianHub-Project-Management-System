@@ -44,6 +44,7 @@ const findings = require('../Modules/Agents/manager/findings');
 const dailyLook = require('../Modules/Agents/manager/dailyLook');
 const workQueue = require('../Modules/Agents/manager/workQueue');
 const controller = require('../Modules/Agents/manager/controller');
+const socketEmitter = require('../event/socketEventEmitter');
 const instructions = require('../Modules/Mcp/instructions');
 const tools = require('../Modules/Mcp/tools');
 const server = require('../Modules/Mcp/server');
@@ -485,6 +486,17 @@ describe('a task a person hands over', () => {
 });
 
 describe('what people see, and taking an item back', () => {
+    it('turning the project manager off or on tells open pages to read the queue again', async () => {
+        const turn = (on) => through(controller.putProjectManager, request(OWNER, 'PUT', `/api/v2/agents/project-manager/${P_OPEN}`, { projectId: P_OPEN }, { body: { on } }));
+        const announced = () => socketEmitter.emit.mock.calls.filter(([, payload]) => payload && payload.module === 'agent' && payload.data && payload.data.kind === 'claim');
+        socketEmitter.emit.mockClear();
+        expect(await turn(false)).toMatchObject({ code: 200, body: { status: true } });
+        expect(announced()).toHaveLength(1);
+        expect(announced()[0][1]).toMatchObject({ type: 'update', companyId: CID });
+        expect(await turn(true)).toMatchObject({ code: 200 });
+        expect(announced().length).toBeGreaterThanOrEqual(2);
+    });
+
     it('the card and the task say who holds an item, to the people who can open it', async () => {
         const { orphan, itemId } = await orphanItem();
         expect((await card(MEMBER)).findings).toMatchObject([{ id: itemId, rule: RULE.NO_OWNER }]);

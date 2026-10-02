@@ -100,7 +100,7 @@
                 />
 
                 <template v-else>
-                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" />
+                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" @open-task="openQueueTask" />
                     <article
                         v-for="(it, i) in rows"
                         :key="rowKey(it)"
@@ -823,6 +823,7 @@ const undoApprovals = async (ids) => {
         // eslint-disable-next-line no-await-in-loop
         const result = await decideOne(sendProposalDecision, id, 'undo', {}, t('Inbox.action_failed'));
         if (!result.ok) refused.push(result.error);
+        else if (result.left.length) refused.push(t('Inbox.queue_undo_left', { why: result.left[0] }));
     }
     busy.value = false;
     if (refused.length) $toast.error(refused[0], { position: 'top-right' });
@@ -839,6 +840,7 @@ const onQueueDecided = ({ id, verb, undo: canUndo }) => {
     showUndo(t('Inbox.queue_approved', { n: approved.length }, approved.length), undoIds.length ? () => undoApprovals(undoIds) : null);
     Object.assign(undo.value, { approved, undoIds });
 };
+const openQueueTask = (task) => openTask({ companyId: companyId?.value, projectId: task.projectId, sprintId: task.sprintId, folderId: task.folderId || '', taskId: task.taskId });
 const onQueueUndone = ({ id }) => {
     applied.value = applied.value.filter((p) => p.proposalId !== id);
     $toast.success(t('Inbox.always_undone'), { position: 'top-right' });

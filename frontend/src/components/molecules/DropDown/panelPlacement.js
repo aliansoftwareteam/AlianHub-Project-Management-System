@@ -35,3 +35,39 @@ export function positionPanel(panelEl, triggerRect, { belowOffset } = {}) {
     panelEl.style.left = `${left}px`;
     panelEl.style.top = `${top}px`;
 }
+
+// A panel is measured the moment it opens, before content that arrives later (a catalogue fetched on mount) has given it its real size, so it is placed again whenever that size changes.
+// A ResizeObserver reports only when the page draws a frame, and a page that draws none (a tab in the background) would leave the panel where it first landed, so the content is watched as well.
+export function followPanelSize(panelEl, locate) {
+    const sizeOf = () => {
+        const { width, height } = panelEl.getBoundingClientRect();
+        return `${width}x${height}`;
+    };
+    let placedSize = sizeOf();
+    const place = () => {
+        const { rect, options } = locate();
+        positionPanel(panelEl, rect, options);
+        placedSize = sizeOf();
+    };
+    const placeIfResized = () => {
+        if (sizeOf() !== placedSize) place();
+    };
+
+    const observers = [];
+    if (typeof ResizeObserver !== 'undefined') {
+        const sizeObserver = new ResizeObserver(placeIfResized);
+        sizeObserver.observe(panelEl);
+        observers.push(sizeObserver);
+    }
+    if (typeof MutationObserver !== 'undefined') {
+        const contentObserver = new MutationObserver(placeIfResized);
+        contentObserver.observe(panelEl, { childList: true, subtree: true, characterData: true });
+        observers.push(contentObserver);
+    }
+    window.addEventListener('resize', place);
+
+    return () => {
+        observers.forEach((observer) => observer.disconnect());
+        window.removeEventListener('resize', place);
+    };
+}

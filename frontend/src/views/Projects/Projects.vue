@@ -12,6 +12,9 @@
                             :sprint="headerSprint"
                             :folders="headerFolders"
                             :agentSummary="agentSummary"
+                            :agentsAtWork="agentWorkCountIn(projectData?._id)"
+                            :agentsPaused="projectData?.agentLimits?.paused === true"
+                            @show-agent-work="setAgentWorking(true)"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
                             @select-project="selectProject({ _id: $event }, true)"
@@ -269,6 +272,7 @@
                                 v-model:taskDescriptionSearch="taskDescriptionSearch"
                                 :filterUsers="filterUsers"
                                 :doneBy="doneBy"
+                                :agentWorking="agentWorking"
                                 v-model:userSidebar="userSidebar"
                                 v-model:collapsed="collapsed"
                                 :groupBy="shownGroupBy"
@@ -287,6 +291,7 @@
                                 @toggleSearch="toggleSearch"
                                 @manageFilterUsers="manageFilterUsers"
                                 @update:doneBy="setDoneBy"
+                                @update:agentWorking="setAgentWorking"
                                 @changeAssignee="(type, $event) => changeAssignee(type, $event)"
                                 @openAi="openAiSidebar = true"
                                 @openAiAssist="openAiTaskCreator()"
@@ -491,6 +496,7 @@ import ProjectTreePanel from './components/ProjectTreePanel.vue';
 import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
 import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
+import { agentWorkCountIn } from './composables/agentWork';
 import SavedViewBar from './components/SavedViewBar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
@@ -702,7 +708,7 @@ const { changeAssignee } = useProjectAssignee(projectData);
 const { archive, showSidebar, showSpinner, updateProject } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
 const projectSearch = useProjectSearch(projectData, showArchived, { buildFilterQuery });
-const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy } = projectSearch;
+const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy, agentWorking, setAgentWorking } = projectSearch;
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));

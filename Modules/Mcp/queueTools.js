@@ -54,12 +54,12 @@ const HELD = 'so no item is claimed here. Work from queue.list without a claim: 
 
 /* Names the item's task and project for the checks every write meets; an id the caller cannot read answers as a missing one. */
 const named = (action) => async (ctx, args, vis) => {
-    const item = await workQueue.itemFor({ companyId: ctx.companyId, uid: ctx.userId, itemId: args.itemId, allowsProject: vis.allowsProject, allowsTask: vis.allowsTask });
+    const item = await workQueue.itemFor({ companyId: ctx.companyId, uid: ctx.userId, itemId: args.itemId, allowsProject: vis.allowsProject, allowsTask: vis.allowsTask, asAgent: true });
     if (!item) return { answer: { ...NO_ITEM } };
     const params = { itemId: String(item.row._id), projectId: String(item.row.projectId) };
     const rule = await projectPolicy.ask({ companyId: ctx.companyId, actor: ctx.actor, action, params });
     if (rule.decision !== projectPolicy.DECISION.ACT) {
-        throw await actions.refusal(ctx.companyId, ctx.actor, { action, params, reason: `${rule.reason}, ${HELD}`, ip: ctx.ip, taint: ctx.taint });
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action, params, reason: rule.paused ? rule.reason : `${rule.reason}, ${HELD}`, ip: ctx.ip, taint: ctx.taint });
     }
     return { args: { ...args, ...params, taskId: String(item.row.taskId) } };
 };

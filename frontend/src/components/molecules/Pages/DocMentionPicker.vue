@@ -22,8 +22,7 @@
                 @mouseenter="active = flat.indexOf(item)"
             >
                 <span v-if="item.type === 'user'" class="ah-avatar ah-avatar--sm">
-                    <img v-if="item.image" :src="item.image" alt="">
-                    <template v-else>{{ item.initials }}</template>
+                    <AvatarImage :src="item.image">{{ item.initials }}</AvatarImage>
                 </span>
                 <span v-else-if="item.type === 'task'" class="ah-chip ah-chip--mono dmp__key">{{ item.meta }}</span>
                 <span v-else class="dmp__glyph" aria-hidden="true"><ShellIcon name="docs" :size="12" /></span>
@@ -35,6 +34,7 @@
 </template>
 
 <script setup>
+import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 

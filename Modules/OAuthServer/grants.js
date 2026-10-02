@@ -276,11 +276,11 @@ async function revokeOwnGrant(userId, grantId, now = new Date()) {
     return revokeGrant(grant.grantId, REVOKED.REVOKED_BY_USER, now);
 }
 
-/* A person takes back a manage scope they gave and keeps the rest of the connection. */
+/* A person takes back an opt-in scope they gave and keeps the rest of the connection. */
 async function withdrawOwnManageScopes(userId, grantId, scopes, now = new Date()) {
     const grant = await store.grants.find(grantId);
     if (!grant || String(grant.userId) !== String(userId) || grant.revokedAt) return false;
-    const dropped = scopes.filter((scope) => config.isManageScope(scope) && grant.scopes.includes(scope));
+    const dropped = scopes.filter((scope) => config.isOptInScope(scope) && grant.scopes.includes(scope));
     if (!dropped.length) return false;
     await narrowGrant(grant, (scope) => !dropped.includes(scope), REVOKED.REVOKED_BY_USER, now);
     return true;

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createI18n } from 'vue-i18n';
+import { ref } from 'vue';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -97,8 +98,30 @@ describe('the line on a task', () => {
         expect(line().exists()).toBe(true);
     });
 
+    it('reads the task again when the server says the queue changed, so a switched-off project stops offering the hand-over', async () => {
+        const listeners = {};
+        const socket = { on: vi.fn((event, handler) => { listeners[event] = handler; }), off: vi.fn((event, handler) => { if (listeners[event] === handler) delete listeners[event]; }) };
+        answers({ [`get ${TASK_URL}`]: about({ canHandOver: true }) });
+        const words = i18n();
+        wrapper = mount(TaskAgentClaim, { props: { taskId: 't1' }, global: { plugins: [words], mocks: { $t: words.global.t }, provide: { $socket: ref(socket) } } });
+        await flushPromises();
+        expect(wrapper.find('[data-test="hand-over"]').exists()).toBe(true);
+
+        answers({ [`get ${TASK_URL}`]: about({ on: false }) });
+        listeners.agentsChanged({ kind: 'run' });
+        await flushPromises();
+        expect(wrapper.find('[data-test="hand-over"]').exists()).toBe(true);
+        listeners.agentsChanged({ kind: 'claim' });
+        await flushPromises();
+        expect(wrapper.find('[data-test="task-agent-claim"]').exists()).toBe(false);
+
+        wrapper.unmount();
+        wrapper = null;
+        expect(listeners.agentsChanged).toBeUndefined();
+    });
+
     it('is on the task panel, colours with tokens only and wraps on a narrow screen', () => {
-        expect(fs.readFileSync(PANEL, 'utf8')).toMatch(/<TaskAgentClaim v-if="task\._id" :task-id="String\(task\._id\)" \/>/);
+        expect(fs.readFileSync(PANEL, 'utf8')).toMatch(/<TaskAgentClaim v-if="task\._id" :task-id="String\(task\._id\)" :round="claimRound" \/>/);
         const source = fs.readFileSync(LINE, 'utf8');
         const style = source.slice(source.indexOf('<style'));
         expect(style).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);

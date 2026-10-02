@@ -9,7 +9,9 @@ const groups = require('./registryGroups');
 const { SCOPE, read, write } = require('./registryKit');
 const permissions = require('./permissions');
 const projectPolicy = require('./projectPolicy');
+const taskReads = require('./taskReads');
 const audit = require('./agentAudit');
+const changeNotice = require('./changeNotice');
 const { attribution, isAgent } = require('./actor');
 const { shownAs } = require('./actingAgent');
 const stepCredential = require('../Workflows/stepCredential');
@@ -305,9 +307,9 @@ const executors = {
         const task = await tools.getTask(companyId, params.taskId);
         if (task.ParentTaskId) throw new tools.DeterministicError('a subtask moves with its parent');
         const target = oid(params.sprintId);
-        if (!target) throw new tools.DeterministicError('a valid sprintId is required');
+        if (!target) throw new tools.DeterministicError('a valid list id is required');
         const sprint = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: target, projectId: task.ProjectID }] }, 'findOne');
-        if (!sprint) throw new tools.DeterministicError('sprint not found in this project');
+        if (!sprint) throw new tools.DeterministicError('list not found in this project');
         const previous = { sprintId: task.sprintId, sprintArray: task.sprintArray, folderObjId: task.folderObjId || null };
         const placement = await sprintPlacementOf(companyId, sprint);
         const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset, pullOfLists([target]));
@@ -491,10 +493,13 @@ const liveStep = async (companyId, actor, { action, params, ip, taint }) => {
 };
 
 /* Run one action for an actor. Refusals are audited and thrown as RefusedError.
+ * This is the one place every agent's change passes, so "changed since you read it" (./taskReads) is asked here,
+ * last, with nothing written yet.
  * A policy `decision` of refuse is honoured before the registry check, so a
  * policy refusal leaves the same audit row as a registry one. `approved` is an
- * argument and never read from `params`, so only the approval of a proposal sets it. */
-const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false }) => {
+ * argument and never read from `params`, so only the approval of a proposal sets it; `approvedBy` is the person who
+ * approved, for an executor that holds each of its parts to that person's rights too. */
+const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false, approvedBy = '' }) => {
     await liveStep(companyId, actor, { action, params, ip, taint });
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip, taint });
     const check = registry.evaluate(action, params, { allowedActions });
@@ -513,35 +518,45 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);
 
-    const standing = rule.standing || null;
-    const auditId = await audit.openAction(companyId, actor, {
-        action, params, cost, ip, entityId: params.taskId, taint, standing,
-        reason: standing ? `${reason || action} (standing approval ${standing.id}, made by ${standing.madeBy})` : reason,
-    });
-    let out;
+    const turn = await taskReads.turnFor({ companyId, actor, action, params, approved });
+    if (turn.refusal) throw await refusal(companyId, actor, { action, params, reason: turn.refusal, ip, taint });
+    let changed = false;
     try {
-        out = await exec({ companyId, actor, params, depth: clampDepth(depth) });
-    } catch (e) {
-        await audit.failAction(companyId, auditId, e.message);
-        throw e;
+        const standing = rule.standing || null;
+        const auditId = await audit.openAction(companyId, actor, {
+            action, params, cost, ip, entityId: params.taskId, taint, standing,
+            reason: standing ? `${reason || action} (standing approval ${standing.id}, made by ${standing.madeBy})` : reason,
+        });
+        let out;
+        try {
+            out = await exec({ companyId, actor, params, depth: clampDepth(depth), approvedBy: approved ? String(approvedBy || '') : '' });
+        } catch (e) {
+            await audit.failAction(companyId, auditId, e.message);
+            throw e;
+        }
+        changed = true;
+        if (isAgent(actor) && params.taskId && !WRITES_OWN_COMPLETION.has(action)) {
+            await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
+        }
+        await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });
+        if (standing) {
+            await require('./standingApprovals').recordUse(companyId, standing, { action, params, auditId, reason })
+                .catch((e) => logger.error(`[standing-approval] ${standing.id} applied ${action} (audit ${auditId}) but its use was not recorded: ${e.message}`));
+        }
+        if (!approved) changeNotice.announce(companyId, actor, auditId);
+        return { result: out.result, auditId, undo: out.undo, task: out.task || null, ...(standing ? { standing } : {}) };
+    } finally {
+        await turn.end(changed);
     }
-    if (isAgent(actor) && params.taskId && !WRITES_OWN_COMPLETION.has(action)) {
-        await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
-    }
-    await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });
-    if (standing) {
-        await require('./standingApprovals').recordUse(companyId, standing, { action, params, auditId, reason })
-            .catch((e) => logger.error(`[standing-approval] ${standing.id} applied ${action} (audit ${auditId}) but its use was not recorded: ${e.message}`));
-    }
-    return { result: out.result, auditId, undo: out.undo, task: out.task || null, ...(standing ? { standing } : {}) };
 };
 
 /* Reads still go through the registry so a refusal is logged the same way. */
-const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', allowedActions }) => {
+const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', allowedActions, opens = null }) => {
     await liveStep(companyId, actor, { action, params, ip });
     const check = registry.evaluate(action, params, { allowedActions });
     if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
-    const holder = await permissions.holderMay(companyId, actor, action, params);
+    // `opens` says whether the caller can open what `params` names. What it cannot open is judged as an id that names nothing is.
+    const holder = await permissions.holderMay(companyId, actor, action, params, { byWorkspaceRules: Boolean(opens) && !(await opens()) });
     if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip });
     return true;
 };

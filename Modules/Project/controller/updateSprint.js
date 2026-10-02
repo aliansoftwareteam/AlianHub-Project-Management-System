@@ -27,7 +27,7 @@ exports.updateSprint = async(req,res) => {
         const sprintId = req.params.id;
 
         if (!validateObjectId(sprintId)) {
-            return res.status(400).json({ message: "Invalid sprint ID" });
+            return res.status(400).json({ message: "Invalid list ID" });
         }
 
         const favourite = ownFavourite(req.body, req.uid);
@@ -45,13 +45,13 @@ exports.updateSprint = async(req,res) => {
         }, 'findOneAndUpdate');
 
         if (!sprint) {
-            return res.status(400).json({ message: "sprint not updated" });
+            return res.status(400).json({ message: "The list was not updated" });
         }
 
         recordSprintFavourite({ companyId, previous, updateObject, key, actorId: req.uid })
             .catch((error) => logger.error(`sprint favourite history failed: ${(error && error.message) || error}`));
         return res.status(200).json(sprint);
     } catch (error) {
-        return res.status(500).json({ message: "An error occurred while update the sprint",error:error });
+        return res.status(500).json({ message: "An error occurred while updating the list",error:error });
     }
 }

@@ -34,7 +34,7 @@ exports.recordVisit = async (req, res) => {
             return res.send({ status: false, statusText: 'companyId is required.' });
         }
         if (!VISIT_TYPES.includes(entityType) || !OBJECT_ID_PATTERN.test(String(entityId || ''))) {
-            return res.send({ status: false, statusText: 'A valid task, project, sprint or doc is required.' });
+            return res.send({ status: false, statusText: 'A valid task, project, list or doc is required.' });
         }
 
         await MongoDbCrudOpration(companyId, {
