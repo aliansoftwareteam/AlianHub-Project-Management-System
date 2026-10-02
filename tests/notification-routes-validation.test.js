@@ -3,6 +3,12 @@ jest.mock('../Modules/notification-count/controller', () => ({
     unsetAllCounts: jest.fn(async () => ({ status: true, statusText: 'Counts cleared' })),
 }));
 
+// Who may reset a project's counters has its own suite (unread-counter-reset-access); these cases are about the answers.
+jest.mock('../Modules/notification-count/counterReset', () => ({
+    ...jest.requireActual('../Modules/notification-count/counterReset'),
+    mayReset: jest.fn(async () => ({ allowed: true })),
+}));
+
 const counts = require('../Modules/notification-count/controller');
 
 const C = '6f0000000000000000000c01';
@@ -36,7 +42,7 @@ describe('MSG-05 POST /api/v1/unsetCommentCounts', () => {
         const r = await call('/api/v1/unsetCommentCounts', { companyId: C, projectId: P });
         expect(r.code).toBe(200);
         expect(r.body).toMatchObject({ status: true });
-        expect(counts.unsetAllCounts).toHaveBeenCalledWith(C, P, '', { searchKey: undefined });
+        expect(counts.unsetAllCounts).toHaveBeenCalledWith(C, P, '', { searchKey: '' });
     });
 
     it('answers a missing project and search key with 400', async () => {

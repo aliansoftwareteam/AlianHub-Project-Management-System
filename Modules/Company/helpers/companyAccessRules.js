@@ -66,4 +66,4 @@ const companyUpdateKind = (body) => {
 // Invitation.vue records an invited owner while they accept, so only that write takes the caller's own pending row.
 const seatFilter = (uid, kind) => ({ userId: String(uid), ...(kind === 'ownerClaim' ? INVITED_SEAT : ACTIVE_SEAT) });
 
-module.exports = { OBJECT_ID_PATTERN, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind, seatFilter };
+module.exports = { OBJECT_ID_PATTERN, containsForbidden, ownCompanyIds, allowedCompanyIds, scopeCompanyPipeline, companyUpdateKind, seatFilter };

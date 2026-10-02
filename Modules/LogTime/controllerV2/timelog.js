@@ -26,7 +26,6 @@ exports.getTimelog = async (req, res) => {
     if (!companyId) return;
     const actor = await trackerUser(req, res);
     if (!actor) return;
-    const { type = SCHEMA_TYPE.TIMESHEET } = req.body;
     var startDate = new Date();
     startDate.setHours(0);
     startDate.setMinutes(0);
@@ -45,7 +44,7 @@ exports.getTimelog = async (req, res) => {
     }
 
     let obj = {
-        type: type,
+        type: SCHEMA_TYPE.TIMESHEET,
         data: [{
             Loggeduser: actor.id,
             createdAt: {

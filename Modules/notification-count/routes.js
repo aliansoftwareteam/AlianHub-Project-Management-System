@@ -1,4 +1,5 @@
 const ctrl = require('./controller');
+const { resetTargetOf, mayReset } = require('./counterReset');
 exports.init = (app) => {
       /**
      * @swagger
@@ -83,12 +84,20 @@ exports.init = (app) => {
         if (bodyCompanyId && String(bodyCompanyId) !== sessionCompanyId) {
             return res.status(403).send({ status: false, statusText: "companyId does not match your session" });
         }
-        if (!projectId && !searchKey) {
-            return res.status(400).send({ status: false, statusText: "projectId or searchKey is required" });
+        const target = resetTargetOf({ projectId, sprintId, searchKey });
+        if (!target) {
+            return res.status(400).send({ status: false, statusText: "A reset names one project, by projectId or by its counter key" });
         }
-        return ctrl.unsetAllCounts(sessionCompanyId, projectId, sprintId, { searchKey })
+        return mayReset(sessionCompanyId, req.uid, target)
+            .then((decision) => {
+                if (decision.allowed) return ctrl.unsetAllCounts(sessionCompanyId, target.projectId, target.sprintId, { searchKey: target.searchKey });
+                res.status(decision.statusCode).send(decision.statusCode === 404
+                    ? { status: false, statusText: "Project not found." }
+                    : { status: false, statusText: "You do not have permission to perform this action." });
+                return null;
+            })
             .then((result) => {
-                res.send({ status: true, statusText: result.statusText, data: result.data });
+                if (result) res.send({ status: true, statusText: result.statusText, data: result.data });
             })
             .catch((error) => {
                 const statusText = (error && (error.statusText || error.message)) || String(error);

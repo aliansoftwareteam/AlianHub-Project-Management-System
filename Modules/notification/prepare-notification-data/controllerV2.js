@@ -14,24 +14,48 @@ const { pinSessionTenant } = require('../../../Config/tenant');
 const { activeMemberIds } = require('../activeMembers');
 const { reasonFor } = require('../../Inbox/helpers/inboxRules');
 const { wakeOnActivity } = require('../../Inbox/helpers/inboxState');
+const { canReadProject } = require('../../../Config/projectAccess');
+
+const REQUEST_TEXT_FIELDS = ['key', 'type', 'message', 'projectId', 'taskId', 'sprintId', 'folderId', 'changeType', 'comments_id'];
+
+const requestFields = (body) => Object.fromEntries(REQUEST_TEXT_FIELDS
+    .filter((field) => typeof body[field] === 'string')
+    .map((field) => [field, body[field]]));
+
+const readersOf = async (companyId, projectId, userIds) => {
+    const readable = await Promise.all(userIds.map(async (uid) => (await canReadProject(companyId, uid, projectId)).allowed));
+    return userIds.filter((uid, index) => readable[index]);
+};
 
 
 
 // The tenant, sender and recipients are pinned here rather than in handleNotificationtFun: every
 // other caller of that is an internal one passing a synthetic { body } it built from trusted data.
+// A request is about a project its sender can open and reaches the members who can open it too;
+// it carries the fields a notice is written from and none of the ones the server fills in.
 exports.handleNotification = async (req, res) => {
   const companyId = pinSessionTenant(req, res);
   if (!companyId) return;
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
-    const claimed = Array.isArray(body.assigneeUsers) ? body.assigneeUsers.map(String) : [];
-    const leader = body.task_leader_ID ? String(body.task_leader_ID) : '';
-    const members = new Set(await activeMemberIds(companyId, [...claimed, leader]));
+    const fields = requestFields(body);
+    if (!(await canReadProject(companyId, req.uid, fields.projectId)).allowed) {
+      return res.status(404).json({ status: false, message: 'Project not found.' });
+    }
+    const claimed = (Array.isArray(body.assigneeUsers) ? body.assigneeUsers : []).filter((id) => typeof id === 'string');
+    const leader = typeof body.task_leader_ID === 'string' ? body.task_leader_ID : '';
+    const members = await activeMemberIds(companyId, [...claimed, leader]);
+    const readers = new Set(await readersOf(companyId, fields.projectId, members));
+    const assigneeUsers = [...new Set(claimed)].filter((id) => readers.has(id));
     req.body = {
-      ...body,
+      ...fields,
+      changeData: body.changeData && typeof body.changeData === 'object' && !Array.isArray(body.changeData) ? body.changeData : {},
+      companyId,
       userId: String(req.uid),
-      assigneeUsers: [...new Set(claimed)].filter((id) => members.has(id)),
-      task_leader_ID: members.has(leader) ? leader : '',
+      assigneeUsers,
+      notSeen: assigneeUsers,
+      isSelected: false,
+      task_leader_ID: readers.has(leader) ? leader : '',
     };
     res.json(await exports.handleNotificationtFun(req));
   } catch (error) {

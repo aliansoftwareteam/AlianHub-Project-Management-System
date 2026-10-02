@@ -26,7 +26,7 @@ const { handleFileUploadForTrackerSS,handleuploadMainFileForbase64Thumbnail } = 
  */
 const { updateProjectForTimelog, findAndUpdateProjectOrTaskStartDate, updateRemainingTime } = require('./helpers');
 const { pinSessionTenant } = require('../../../Config/tenant');
-const { trackerUser, refuse } = require('./sessionUser');
+const { trackerUser, trackedTask, refuse } = require('./sessionUser');
 const { escapeHtml } = require('../../../utils/escapeHtml');
 const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
 const { START_LOCKED } = require('./timerRules');
@@ -62,6 +62,7 @@ exports.timeTrackerStart = async (req, res) => {
         })
         return;
     }
+    if (!(await trackedTask(req, res, companyId, actor.id))) return;
     const utcDateTime = DateTime.utc();
     const timeStamp = Math.floor(utcDateTime.toSeconds());
     if (await startsInLockedPeriod(companyId, actor.id, timeStamp)) {
@@ -134,6 +135,7 @@ exports.timeTrackerStart2 = async (req, res) => {
         })
         return;
     }
+    if (!(await trackedTask(req, res, companyId, actor.id))) return;
     const utcDateTime = DateTime.utc();
     const timeStamp = Math.floor(utcDateTime.toSeconds());
     let data = {
