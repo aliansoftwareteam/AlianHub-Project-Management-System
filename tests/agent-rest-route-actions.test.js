@@ -386,6 +386,9 @@ const PROPOSED_ON_THE_WEB = {
         'importing a ClickUp space as a project': [...NO_ACTION['importing a ClickUp space as a project'], {}, 'tasks.import'],
         'opening a personal list': ['POST /api/v1/project/personal', {}],
     },
+    'project.duplicate': {
+        'copying a project with its tasks': ['POST /api/v2/projects/:id/duplicate', { name: 'Copy', withTasks: true }, inProject, 'project.create'],
+    },
     'automation.create': {
         'adding an automation': ['POST /api/v2/automations', rule],
         'changing an automation': ['PUT /api/v2/automations/:id', rule, { id: RULE }, 'automation.update'],

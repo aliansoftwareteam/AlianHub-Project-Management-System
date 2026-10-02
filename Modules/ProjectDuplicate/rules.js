@@ -90,6 +90,14 @@ const hasCurrency = (project) => Boolean(project.ProjectCurrency) && typeof proj
 
 const withCaller = (people, caller) => [...new Set([...(Array.isArray(people) ? people : []).map(String), String(caller)])];
 
+/* What a copy is made from, for one person alone: a private project with only them on it and on each of its private
+   lists, whoever is on the source. */
+const forCallerAlone = (bundle, caller) => ({
+    ...bundle,
+    source: { ...bundle.source, isPrivateSpace: true, AssigneeUserId: [caller] },
+    lists: bundle.lists.map((list) => (list.private === true ? { ...list, AssigneeUserId: [caller] } : list)),
+});
+
 /* The copy is a project of its own: no proposal id, favourites, watchers or activity of the source come with it. */
 const projectCopy = (source, { id, name, code, caller, companyId, include, ids, currency = {} }) => ({
     ...remap(pick(source, PROJECT_SETTINGS), ids),
@@ -201,6 +209,6 @@ const taskLevels = (rows) => {
 
 module.exports = {
     INLINE_TASK_LIMIT, BATCH, MAX_NAME, JOB_SOURCE, LIVE, TRASHED, OBJECT_ID, PROJECT_DATES, LIST_DATES, TASK_FIELDS, TASK_DATES,
-    isPlainObject, refusal, parseRequest, refusedPaths, newId, idOf, pick, remap, nextProjectCode, projectCopy, hasCurrency,
+    isPlainObject, refusal, parseRequest, refusedPaths, newId, idOf, pick, remap, nextProjectCode, forCallerAlone, projectCopy, hasCurrency,
     isLive, folderCopies, listCopies, ruleTargets, ruleCopy, permissionCopies, withoutPeople, taskLevels,
 };
