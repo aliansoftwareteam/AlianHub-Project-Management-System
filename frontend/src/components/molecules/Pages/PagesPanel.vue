@@ -51,6 +51,17 @@
                     @deleted="onDeleted"
                     @close="requestClose"
                 />
+                <EmptyState
+                    v-else-if="loaded && !pages.length && (embedded || workspace)"
+                    class="pg__none"
+                    illustration="docs"
+                    data-test="docs-empty"
+                    :title="$t('Docs.empty_title')"
+                    :message="$t('Docs.empty_msg')"
+                    :actionLabel="$t('Projects.add_page')"
+                    :actionAllowed="writesDocs"
+                    @action="createPage(null)"
+                />
                 <div v-else class="pg__blank">
                     <button v-if="!embedded && !workspace" type="button" class="pg__icon pg__blank-close" :title="$t('Docs.close')" @click="requestClose">
                         <ShellIcon name="x" :size="15" />
@@ -70,6 +81,7 @@ import { computed, ref, watch } from "vue";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import PageDocument from "@/components/molecules/Pages/PageDocument.vue";
 import { useDocRights } from '@/components/molecules/Pages/useDocRights';
 import { apiRequest } from '@/services';
@@ -92,6 +104,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue']);
 
 const pages = ref([]);
+const loaded = ref(false);
 const currentId = ref('');
 const doc = ref(null);
 const query = ref('');
@@ -166,6 +179,7 @@ function fetchPages() {
     apiRequest('get', `${env.PAGES}${queryString}`)
         .then((response) => {
             pages.value = response.data?.status ? (response.data.data || []) : [];
+            loaded.value = true;
             if (!expanded.value.size) {
                 expanded.value = new Set(pages.value.filter((p) => p.parentPageId).map((p) => String(p.parentPageId)));
             }
@@ -282,6 +296,7 @@ function requestClose() {
 
 .pg__main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
 .pg__blank { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; position: relative; padding: 24px; text-align: center; }
+.pg__none { flex: 1; }
 .pg__blank-close { position: absolute; top: 14px; right: 16px; }
 .pg__blank-icon { color: var(--ink-2); }
 .pg__blank-text { margin: 0; }

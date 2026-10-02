@@ -79,7 +79,7 @@
                 <div class="rp-card">
                     <div class="rp-card__head">
                         {{ $t('Reports.capacity_week') }}
-                        <span class="rp-card__note">{{ capacity ? $t('Reports.n_people', { n: capacity.totals.users }) : '' }}</span>
+                        <span class="rp-card__note">{{ capacity ? $t('Reports.n_people', { n: capacity.totals.users }, capacity.totals.users) : '' }}</span>
                     </div>
                     <div v-for="u in capacityRows" :key="u.userId" class="rp-meter">
                         <span class="rp-meter__name" :title="u.name">{{ u.name }}</span>

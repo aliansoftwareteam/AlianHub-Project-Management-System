@@ -35,7 +35,7 @@
         <li v-for="entry in history" :key="entry.revision" class="wb-view__history-row" :data-wb-history-row="entry.revision">
           <span class="wb-view__history-what">
             <span class="wb-view__history-who">{{ nameOf(entry.savedBy) }}</span>
-            <span class="wb-view__history-when">{{ whenOf(entry.savedAt) }} · {{ $t('Views.whiteboard_items', { n: entry.cards }) }}</span>
+            <span class="wb-view__history-when">{{ whenOf(entry.savedAt) }} · {{ $t('Views.whiteboard_items', { n: entry.cards }, entry.cards) }}</span>
           </span>
           <button v-if="canEdit" class="ah-btn ah-btn--secondary ah-btn--sm" type="button" :data-wb-restore="entry.revision" :disabled="restoring" @click="restore(entry.revision)">{{ $t('Views.whiteboard_restore') }}</button>
         </li>

@@ -60,7 +60,7 @@ const visible = computed(() => props.enabled && !unavailable.value && Boolean(wr
 const meta = computed(() => {
     if (!summary.value || !summaryCount.value) return "";
     const when = updatedAt.value ? moment(updatedAt.value).format("H:mm") : "";
-    return t("TaskPanel.summary_meta", { n: summaryCount.value, time: when });
+    return t("TaskPanel.summary_meta", { n: summaryCount.value, time: when }, summaryCount.value);
 });
 
 /* A summary costs a model call, so only `write` asks for one. Opening the task, the poll and a new comment read

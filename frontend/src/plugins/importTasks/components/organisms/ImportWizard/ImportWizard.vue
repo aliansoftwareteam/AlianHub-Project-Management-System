@@ -85,7 +85,7 @@
                                 </div>
                             </div>
                             <div class="iw__note" v-if="unmappedCount">
-                                <strong>{{ $t('Import.unmapped_count', { count: unmappedCount }) }}</strong> {{ $t('Import.unmapped_note') }}
+                                <strong>{{ $t('Import.unmapped_count', { count: unmappedCount }, unmappedCount) }}</strong> {{ $t('Import.unmapped_note') }}
                             </div>
                         </template>
 
@@ -319,8 +319,8 @@ const canAdvance = computed(() => {
 });
 
 const primaryLabel = computed(() => {
-    if (step.value === 2) return t("Import.review_rows", { count: dataRows.value.length });
-    if (step.value === 3) return running.value ? t("Import.importing") : t("Import.import_rows", { count: report.value.importable });
+    if (step.value === 2) return t("Import.review_rows", { count: dataRows.value.length }, dataRows.value.length);
+    if (step.value === 3) return running.value ? t("Import.importing") : t("Import.import_rows", { count: report.value.importable }, report.value.importable);
     return t("Import.next");
 });
 
@@ -492,7 +492,7 @@ async function runImport() {
         return;
     }
     progress.value = 100;
-    result.value = { failed: false, message: t("Import.import_done", { created, skipped }), adjusted: adjustedLines(adjustedTotals(answers), t, "Import.adjusted"), droppedFieldValues: droppedFieldValuesTotal(answers) };
+    result.value = { failed: false, message: t("Import.import_done", { created, skipped }, created), adjusted: adjustedLines(adjustedTotals(answers), t, "Import.adjusted"), droppedFieldValues: droppedFieldValuesTotal(answers) };
     emit("imported", { created, skipped });
 }
 

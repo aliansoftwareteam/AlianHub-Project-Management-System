@@ -141,7 +141,7 @@
 
                         <div class="kn-section">
                             <div class="in-card__head"><span class="in-card__title">{{ $t('Knowledge.files_title') }}</span></div>
-                            <p class="ah-small">{{ $t('Knowledge.files_pending', { n: detail.files.pending }) }}</p>
+                            <p class="ah-small">{{ $t('Knowledge.files_pending', { n: detail.files.pending }, detail.files.pending) }}</p>
                             <table v-if="detail.files.reasons.length" class="in-table">
                                 <thead><tr><th>{{ $t('Knowledge.col_reason') }}</th><th>{{ $t('Knowledge.col_files') }}</th><th>{{ $t('Knowledge.col_exhausted') }}</th></tr></thead>
                                 <tbody>
@@ -392,7 +392,7 @@ const cancelReindex = (sourceType) => {
 
 const retryFiles = () => {
     if (!window.confirm(t("Knowledge.retry_confirm", { name: openName.value }))) return undefined;
-    return run(`${base()}/retry-files`, {}, (data) => t("Knowledge.retry_done", { n: data.reset }));
+    return run(`${base()}/retry-files`, {}, (data) => t("Knowledge.retry_done", { n: data.reset }, data.reset));
 };
 
 const validId = (sourceType, id) => (sourceType === "file" ? FILE_ID.test(id) : OBJECT_ID.test(id));
