@@ -77,7 +77,7 @@
                                 <tr v-for="action in actions" :key="action.key">
                                     <td class="ah-mono">{{ action.key }}</td>
                                     <td>
-                                        {{ action.label }}
+                                        {{ actionLabel(t, action) }}
                                         <div v-if="action.constraint" class="ah-small">{{ action.constraint }}</div>
                                     </td>
                                     <td><span class="ah-chip" :class="riskChip(action.risk)">{{ action.risk }}</span></td>

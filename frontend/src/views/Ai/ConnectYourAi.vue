@@ -9,13 +9,14 @@
                     <p class="cya__lead">{{ $t('ConnectAi.lead') }}</p>
                 </header>
 
-                <p class="cya__sign" :class="{ 'is-connected': connection.connected }" role="status" aria-live="polite" data-test="connect-ai-sign">
-                    <span v-if="connection.connected" class="ah-dot ah-dot--ok" aria-hidden="true"></span>
+                <p class="cya__sign" :class="{ 'is-connected': connected }" role="status" aria-live="polite" data-test="connect-ai-sign">
+                    <span v-if="connected" class="ah-dot ah-dot--ok" aria-hidden="true"></span>
                     <ShellIcon v-else name="clock" :size="14" class="cya__waiting" />
-                    <span>{{ connection.connected ? $t('ConnectAi.sign_connected', { when: formatWhen(connection.lastSeenAt) }) : $t('ConnectAi.sign_waiting') }}</span>
+                    <span v-if="!known">{{ $t('ConnectAi.sign_checking') }}</span>
+                    <span v-else>{{ connected ? $t('ConnectAi.sign_connected', { when: formatWhen(connection.lastSeenAt) }) : $t('ConnectAi.sign_waiting') }}</span>
                 </p>
 
-                <section v-if="connection.connected" class="ah-card cya__first" data-test="connect-ai-first">
+                <section v-if="connected" class="ah-card cya__first" data-test="connect-ai-first">
                     <div class="ah-card__body">
                         <span class="ah-label">{{ $t('ConnectAi.first_title') }}</span>
                         <div class="cya__copy-row">
@@ -28,7 +29,7 @@
                     </div>
                 </section>
 
-                <div class="cya__ways">
+                <div v-if="known" class="cya__ways">
                     <section v-for="app in APPS" :key="app" class="ah-card" :data-test="`connect-ai-way-${app}`">
                         <div class="ah-card__body cya__way">
                             <h2 class="ah-h3">{{ $t(`ConnectAi.${app}_title`) }}</h2>
@@ -67,7 +68,7 @@
                     </section>
                 </div>
 
-                <section class="ah-card" data-test="connect-ai-tools">
+                <section v-if="known" class="ah-card" data-test="connect-ai-tools">
                     <div class="ah-card__body cya__way">
                         <h2 class="ah-h3">{{ $t('ConnectAi.tools_title') }}</h2>
                         <ul class="cya__list">
@@ -92,7 +93,7 @@
                 </p>
 
                 <footer v-if="welcome" class="cya__foot">
-                    <button v-if="connection.connected" type="button" class="ah-btn ah-btn--primary" data-test="connect-ai-continue" @click="goHome">{{ $t('ConnectAi.go_home') }}</button>
+                    <button v-if="connected" type="button" class="ah-btn ah-btn--primary" data-test="connect-ai-continue" @click="goHome">{{ $t('ConnectAi.go_home') }}</button>
                     <template v-else>
                         <button type="button" class="ah-btn ah-btn--secondary" data-test="connect-ai-skip" @click="skip">{{ $t('ConnectAi.skip') }}</button>
                         <span class="cya__note">{{ $t('ConnectAi.skip_note') }}</span>
@@ -109,7 +110,7 @@ import { useRoute, useRouter } from "vue-router";
 import AiSidebar from "./AiSidebar.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { AI_STATE, aiAvailability } from "@/composable/aiAvailability";
-import { aiConnection as connection, watchAiConnection } from "@/composable/aiConnection";
+import { aiConnection as connection, aiConnectionKnownFor, watchAiConnection } from "@/composable/aiConnection";
 import { saveOnboarding } from "@/composable/onboardingState";
 import { formatWhen } from "@/views/OAuth/oauthShared";
 
@@ -125,6 +126,8 @@ const router = useRouter();
 const companyId = inject("$companyId", "");
 
 const welcome = computed(() => route.meta?.welcome === true);
+const known = computed(() => aiConnectionKnownFor(unref(companyId)));
+const connected = computed(() => known.value && connection.connected === true);
 const toolsOn = computed(() => TOOL_KEYS.filter((key) => connection.tools?.[key]));
 const toolsOff = computed(() => TOOL_KEYS.filter((key) => !connection.tools?.[key]));
 const mayAddServerKey = computed(() => aiAvailability.state === AI_STATE.UNCONFIGURED && aiAvailability.canConfigureInstance === true);

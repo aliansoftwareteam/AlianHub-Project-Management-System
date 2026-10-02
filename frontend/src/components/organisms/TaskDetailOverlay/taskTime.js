@@ -38,9 +38,25 @@ export function timeFormFromEntry(entry) {
 
 export const durationOf = (form) => Math.max(0, Math.round(Number(form.hours) || 0)) * 60 + Math.max(0, Math.round(Number(form.minutes) || 0));
 
-/* An i18n key for what stops the entry being saved, or "". The manual-time route stores the
+const MINUTE_STEP = 5;
+const MAX_MINUTES = 59;
+const MAX_HOURS = 23;
+
+/* The arrow keys move the minutes to the next multiple of five; any whole minute can still be typed. */
+export function nudgedMinutes(minutes, direction) {
+    const now = Number(minutes) || 0;
+    const next = direction > 0 ? (Math.floor(now / MINUTE_STEP) + 1) * MINUTE_STEP : (Math.ceil(now / MINUTE_STEP) - 1) * MINUTE_STEP;
+    return Math.min(MAX_MINUTES, Math.max(0, next));
+}
+
+const wholeUpTo = (value, max) => value === "" || value === null || value === undefined || (Number.isInteger(value) && value >= 0 && value <= max);
+
+/* An i18n key for what stops the entry being saved, or "". The form does its own checking (the browser's
+ * is switched off, because it refuses without a word the page can show). The manual-time route stores the
  * start and end on the entry's day, so an entry cannot run past midnight. */
 export function timeFormProblem(form) {
+    if (!wholeUpTo(form.hours, MAX_HOURS) || !wholeUpTo(form.minutes, MAX_MINUTES)) return "TaskPanel.time_whole_numbers";
+    if (!form.start) return "TaskPanel.time_start_required";
     const duration = durationOf(form);
     if (!form.date || duration <= 0) return "TaskPanel.time_duration_required";
     if (minutesOfClock(form.start) + duration > MINUTES_PER_DAY - 1) return "TaskPanel.time_past_midnight";
