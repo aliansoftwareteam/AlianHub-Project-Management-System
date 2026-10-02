@@ -1,14 +1,16 @@
 const { test, expect } = require('../support/test');
-const { PASSWORD, emailFor, invitationPath, inviteMember, mailedInvitationPath, registerVerifiedAccount, sendInvitation, uniqueSuffix } = require('../support/fixtures');
+const { PASSWORD, createWorkspace, emailFor, invitationPath, inviteMember, mailedInvitationPath, registerVerifiedAccount, sendInvitation, uniqueSuffix } = require('../support/fixtures');
 const { firstScreenSettled, signInThroughForm, skipFirstRun, watchApiAnswers } = require('../support/pages');
 
 test.describe.configure({ timeout: 60000 });
 
-const signIn = async (page, email) => {
-    await page.goto('/#/login');
-    await page.locator('#email').fill(email);
-    await page.locator('#password').fill(PASSWORD);
-    await page.locator('.auth__actions button[type="submit"]').click();
+/* Someone with an account and a workspace of their own, invited into the suite's workspace. */
+const invitedPersonWithWorkspace = async ({ state, owner, label }) => {
+    const email = `${label}.${uniqueSuffix()}@e2e.alianhub.test`;
+    const userId = await registerVerifiedAccount(state.baseURL, { firstName: 'Ina', lastName: 'Invited', email });
+    const ownCompanyId = await createWorkspace(state.baseURL, { email, name: `Own ${uniqueSuffix()}` });
+    const invitation = await sendInvitation({ ownerApi: owner.api, companyId: state.companyId, role: 'member', email });
+    return { email, userId, ownCompanyId, invitation };
 };
 
 /* The session of someone who joins a workspace was issued before they were in it. Each way in has to end with a
@@ -33,14 +35,10 @@ test.describe('joining by invitation', () => {
     });
 
     test('accepting on the invitation page while signed in opens the workspace with no refused request', async ({ page, state, loginAs }) => {
-        const owner = await loginAs('owner');
-        const email = `invited.${uniqueSuffix()}@e2e.alianhub.test`;
-        await registerVerifiedAccount(state.baseURL, { firstName: 'Ina', lastName: 'Invited', email });
-        const invitation = await sendInvitation({ ownerApi: owner.api, companyId: state.companyId, role: 'member', email });
+        const invited = await invitedPersonWithWorkspace({ state, owner: await loginAs('owner'), label: 'invited' });
 
-        await signIn(page, email);
-        await expect(page.getByRole('textbox', { name: 'Name your workspace' })).toBeVisible();
-        await page.goto(invitationPath(state.companyId, invitation));
+        await signInThroughForm(page, { email: invited.email, password: PASSWORD, companyId: invited.ownCompanyId });
+        await page.goto(invitationPath(state.companyId, invited.invitation));
         await expect(page.getByRole('heading', { name: 'Accept your invitation' })).toBeVisible();
 
         const answers = watchApiAnswers(page);
@@ -54,17 +52,13 @@ test.describe('joining by invitation', () => {
     });
 
     test('following the mailed link while signed in opens the workspace with no refused request', async ({ page, state, loginAs }) => {
-        const owner = await loginAs('owner');
-        const email = `mailed.${uniqueSuffix()}@e2e.alianhub.test`;
-        const userId = await registerVerifiedAccount(state.baseURL, { firstName: 'Mila', lastName: 'Mailed', email });
-        const invitation = await sendInvitation({ ownerApi: owner.api, companyId: state.companyId, role: 'member', email });
+        const invited = await invitedPersonWithWorkspace({ state, owner: await loginAs('owner'), label: 'mailed' });
 
-        await signIn(page, email);
-        await expect(page.getByRole('textbox', { name: 'Name your workspace' })).toBeVisible();
+        await signInThroughForm(page, { email: invited.email, password: PASSWORD, companyId: invited.ownCompanyId });
+        await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
 
         const answers = watchApiAnswers(page);
-        await page.goto(mailedInvitationPath({ userId, companyId: state.companyId, invitation }));
-        await expect(page.getByRole('heading', { name: 'Invitation accepted' })).toBeVisible();
+        await page.goto(mailedInvitationPath({ userId: invited.userId, companyId: state.companyId, invitation: invited.invitation }));
         await page.waitForURL(new RegExp(`#/${state.companyId}(/|\\?|$)`));
         await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
         await firstScreenSettled(page);
