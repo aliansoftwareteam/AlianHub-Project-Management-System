@@ -450,3 +450,28 @@ describe.each(MODES)('with permission enforcement %s', (mode) => {
         });
     });
 });
+
+describe('what a status and a task type become in the project a task goes to', () => {
+    const { conversionRules } = require('../Modules/Tasks/helpers/taskWritePlacement');
+    const open = { _id: P_OPEN, ProjectName: 'Open', taskStatusData: STATUSES, taskTypeCounts: [{ key: 1, value: 'task', name: 'Task' }] };
+    const other = { _id: P_OTHER, ProjectName: 'Other', taskStatusData: OTHER_STATUSES, taskTypeCounts: OTHER_TYPES };
+    const bare = { _id: P_PRIVATE, ProjectName: 'Bare', taskStatusData: [], taskTypeCounts: [] };
+
+    it('covers every status and type of the project it leaves and of the rows that leave it', () => {
+        const rules = conversionRules(open, other, null, [{ statusKey: 9, TaskType: 'story' }]);
+
+        expect(rules).toMatchObject({ id: P_OPEN, ProjectName: 'Open' });
+        expect(rules.taskStatusData.map((row) => [row.key, row.convertStatus.key])).toEqual([[1, BACKLOG], [2, BACKLOG], [3, OTHER_DONE], [9, BACKLOG]]);
+        expect(rules.taskTypeCounts).toEqual([{ value: 'task', convertType: { value: 'bug', key: 5 } }, { value: 'story', convertType: { value: 'bug', key: 5 } }]);
+    });
+
+    it('keeps every status as it is inside one project', () => {
+        expect(conversionRules(open, open, becomes(2, 3), []).taskStatusData.map((row) => [row.key, row.convertStatus.key])).toEqual([[1, 1], [2, 2], [3, 3]]);
+        expect(conversionRules(bare, bare, null, [])).toEqual({ id: P_PRIVATE, ProjectName: 'Bare', taskStatusData: [], taskTypeCounts: [] });
+    });
+
+    it('has nothing to give in another project that has no status or no task type', () => {
+        expect(conversionRules(open, bare, null, [])).toBeNull();
+        expect(conversionRules(open, { ...other, taskTypeCounts: [] }, null, [])).toBeNull();
+    });
+});

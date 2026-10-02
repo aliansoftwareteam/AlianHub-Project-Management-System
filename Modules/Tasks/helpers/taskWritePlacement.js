@@ -111,14 +111,15 @@ const distinct = (values) => values.filter((value, at) => value !== undefined &&
 /* What each status and task type of `source`, and of the `rows` that leave it, becomes in `destination`, in the
  * shape the copy and conversion handlers read. Both sides come from the stored projects. `sent` chooses among
  * what the destination has; a status it leaves out keeps its name there or starts in the opening one, a task
- * type keeps its value or its name or becomes the first one. Null when the destination has no status or no type. */
+ * type keeps its value or its name or becomes the first one. Null when another project has no status or no type to give. */
 const conversionRules = (source, destination, sent, rows = []) => {
     const from = source || {};
     const sameProject = Boolean(source) && idOf(source._id) === idOf(destination._id);
     const statuses = (Array.isArray(destination.taskStatusData) ? destination.taskStatusData : []).map(flatStatus).filter(Boolean);
     const types = (Array.isArray(destination.taskTypeCounts) ? destination.taskTypeCounts : []).filter(Boolean);
     const opening = statuses.find((status) => status.type === 'default_active') || statuses[0];
-    if (!opening || !types.length) return null;
+    const named = { id: source ? idOf(source._id) : '', ProjectName: from.ProjectName || '' };
+    if (!opening || !types.length) return sameProject ? { ...named, taskStatusData: [], taskTypeCounts: [] } : null;
 
     const sourceStatuses = (Array.isArray(from.taskStatusData) ? from.taskStatusData : []).map(flatStatus).filter(Boolean);
     const sourceTypes = (Array.isArray(from.taskTypeCounts) ? from.taskTypeCounts : []).filter(Boolean);
@@ -144,8 +145,7 @@ const conversionRules = (source, destination, sent, rows = []) => {
             || types[0];
     };
     return {
-        id: source ? idOf(source._id) : '',
-        ProjectName: from.ProjectName || '',
+        ...named,
         taskStatusData: distinct([...sourceStatuses.map((status) => status.key), ...rows.map((row) => row.statusKey)]).map((key) => {
             const to = statusFor(key);
             return { key, convertStatus: { key: to.key, name: to.name, type: to.type } };
