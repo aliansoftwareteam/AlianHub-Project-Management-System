@@ -139,7 +139,7 @@ These need the `tasks:manage` permission, except `page.create` and `page.update`
 | `task.archive` | `tasks:manage` | At once. Archives a task with its subtasks | Nothing is deleted |
 | `task.restore` | `tasks:manage` | At once. Brings an archived task back | |
 | `comment.update` | `tasks:manage` | At once. Changes a comment an agent wrote for you | A person's comment is refused |
-| `tasks.batch` | `tasks:manage` | At once when every operation names the same task. Waits, as one request, when the operations name more than one task | Up to 25 operations; a waiting batch stays inside one project |
+| `tasks.batch` | `tasks:manage` | At once when every operation names the same task. Waits, as one request, when the operations name more than one task | Up to 50 operations when it names more than one task, 25 on one task; a waiting batch stays inside one project |
 | `task.from_message` | `tasks:manage` | At once. A task made from a chat message or a task comment you can read | Needs `messageId`; a direct message needs `projectId` |
 | `page.create` | `docs:manage` | At once. A doc, marked as an agent's draft until a person approves it | Plain text or simple Markdown |
 | `page.update` | `docs:manage` | At once. A doc's title or text. The old text is kept in the version history | Plain text or simple Markdown |
@@ -160,7 +160,7 @@ None of these needs a grant. A read takes the read scope and a write takes the w
 | `goals.list` | `projects:read` | Reads. The goals you can read, with progress and targets | `mine`, `archived`, `limit` |
 | `goal.get` | `projects:read` | Reads. One goal | Needs `goalId` |
 | `automation.catalogue` | `projects:read` | Reads. What a rule can be made of | No arguments |
-| `queue.list` | `tasks:read` | Reads. Work waiting for an agent: questions its person asked it in chat, and work in projects whose project manager is switched on | At most 25 items; `projectId` optional |
+| `queue.list` | `tasks:read` | Reads. Work waiting for an agent: questions its person asked it in chat, and work in projects whose project manager is switched on (a question asked in a project's channel needs that switch too) | At most 25 items; `projectId` optional |
 | `task.tags.add` | `tasks:write` | At once. Puts a project tag on a task | Tag by id or name |
 | `task.tags.remove` | `tasks:write` | At once. Takes a tag off | |
 | `task.relation.add` | `tasks:write` | At once. Links two tasks: `blocks`, `blocked_by`, `duplicates`, `duplicated_by`, `relates_to` | One link per pair |
@@ -411,7 +411,7 @@ These need `tasks:manage`, except where a plain form is described.
 { "name": "task.archive", "arguments": { "taskId": "<task id>", "reason": "Superseded" } }
 ```
 
-`tasks.batch`: up to 25 write tools in one call, run in order. When every operation names the same task, each is checked and applied on its own and reports its own result, so one refusal neither stops nor undoes the others: that batch is not all-or-nothing. The operations that applied are recorded as one group that a person can undo together. When the operations name more than one task, nothing runs: the changes are filed as one request that waits in the AI Inbox for a person to approve or decline whole, and the result says `pending: true`. A waiting batch stays inside one project; send one batch for each project. An operation cannot use the id of a task an earlier operation created; make those calls separately.
+`tasks.batch`: several write tools in one call, run in order: up to 25 when every operation names the same task, and up to 50 when the operations name more than one task. Only a batch that waits for a person as one proposal takes the larger number. A call past its number is refused before anything is read, and its answer says why and what to send instead. When every operation names the same task, each is checked and applied on its own and reports its own result, so one refusal neither stops nor undoes the others: that batch is not all-or-nothing. The operations that applied are recorded as one group that a person can undo together. When the operations name more than one task, nothing runs: the changes are filed as one request that waits in the AI Inbox for a person to approve or decline whole, and the result says `pending: true`. A waiting batch stays inside one project; send one batch for each project. When one request changes many tasks, or several things on each of them, put every change in one batch, so the person approves once: twenty tasks given a priority and an assignee are forty operations and one approval. The Inbox card counts the tasks and the changes, names the first five tasks and shows the rest behind "Show all". An operation cannot use the id of a task an earlier operation created; make those calls separately.
 
 ```json
 { "name": "tasks.batch", "arguments": { "reason": "Friday tidy", "operations": [
@@ -503,7 +503,7 @@ The fields and their first values can be one approval: add `values`, up to 50, e
 { "name": "fields.create", "arguments": { "projectId": "<project id>", "fields": [{ "name": "Cost total", "type": "rollup", "function": "sum", "source": "Cost" }] } }
 ```
 
-A rollup of a field that is not there or is not a number, and a formula that cannot be read or that closes a circle with another formula, are answered at once and nothing is filed. The Inbox card says in words what each works out. A rollup has its number on each task as soon as it is approved; a formula has it on a task once a field value of that task is next saved. Read the number with `task.fields.list`. `project.setup` and `project.create` take the other types only.
+A rollup of a field that is not there or is not a number, and a formula that cannot be read or that closes a circle with another formula, are answered at once and nothing is filed. The Inbox card says in words what each works out. A rollup has its number on each task as soon as it is approved; a formula has it on a task once a field value of that task is next saved. Read the number with `task.fields.list`. `project.setup` takes a rollup and a formula too, written the same way; `project.create` takes the other types only.
 - Approved, the fields are made first, then each value is set as `task.field.set` sets it, and only on a live task of the project that the person behind the token and the approver can both open and may both edit the fields of. A value that is not set does not stop the others: `values` in the result says, for each, `set` or the reason.
 - Undo puts each value back to what the task held, then takes the fields away as above. A value on a task the person undoing cannot open stays, and so does the field that holds it.
 
@@ -517,6 +517,12 @@ A rollup of a field that is not there or is not a number, and a formula that can
 
 ```json
 { "name": "project.setup", "arguments": { "projectId": "<project id>", "statuses": ["In Review"], "lists": ["Backlog", "This week"], "fields": [{ "name": "Budget", "type": "money" }], "views": [{ "name": "Review board", "kind": "board", "groupBy": "status", "showFields": ["Budget"] }], "rules": [{ "trigger": "task.status_changed", "conditions": [{ "field": "statusRef", "op": "changedTo", "value": "In Review" }], "actions": [{ "action": "notify", "config": { "recipients": ["task_assignees"], "message": "Ready for review" } }] }], "tasks": [{ "name": "Write the brief", "list": "Backlog", "status": "In Review", "dueDate": "2026-11-02" }] } }
+```
+
+When one request needs more than one of these, send one plan, not a call for each part: each call of `fields.create` or `view.create` waits for an approval of its own. A total of a number field for each group and on each parent task, for example, is a view that shows the field (a list or a table view totals each number column it shows, group by group) and a rollup field, in one plan. A rollup or a formula in a plan is checked as `fields.create` checks it, and the plan is answered at once, with nothing filed, where the field form would not save it. A view shows a field of the same plan by name in `showFields`, and is then made only together with that field.
+
+```json
+{ "name": "project.setup", "arguments": { "projectId": "<project id>", "fields": [{ "name": "Cost total", "type": "rollup", "function": "sum", "source": "Cost" }], "views": [{ "name": "Cost by status", "groupBy": "status", "showFieldIds": ["<id of the Cost field>"], "showFields": ["Cost total"] }] } }
 ```
 
 What happens to a plan:
@@ -778,7 +784,7 @@ The task's description is the message's text, stored as text, followed by a line
 
 ## The work queue, performance numbers and delegated sessions
 
-**The work queue** (`MCP_TOOLS_WORK`). `queue.list` shows work waiting for an agent in the projects whose project manager is switched on: tasks a person handed over, and what the daily look found that needs judgement (a task with no owner or no estimate, a new task nobody sorted, a person with too much planned). It lists only items about tasks you can open, and leaves out the ones another agent holds. It also lists the questions your person asked you by naming you with "@" in a chat message, wherever they asked: each comes with its own text, where it was asked and who asked, and with no other message of the chat. Only that person's own connection is given a question, and only while the person can still open the conversation; what else of the chat you may read is still decided by `chat:read`. You cannot write in chat, so answer the person yourself. `queue.claim` takes one item for 30 minutes (claim it again to keep it longer). A claim gives no extra rights: the change itself is made with the usual tools and is checked and approved as always. `queue.release` gives an item back; with `finished: true` it leaves the queue. When the project has enough agents at work, a claim is told to wait.
+**The work queue** (`MCP_TOOLS_WORK`). `queue.list` shows work waiting for an agent in the projects whose project manager is switched on: tasks a person handed over, and what the daily look found that needs judgement (a task with no owner or no estimate, a new task nobody sorted, a person with too much planned). It lists only items about tasks you can open, and leaves out the ones another agent holds. It also lists the questions your person asked you by naming you with "@" in a chat message: each comes with its own text, where it was asked and who asked, and with no other message of the chat. A question asked in a project's channel is listed while that project's manager is switched on, as a handed task is; one asked in a chat space's channel or in a conversation needs no switch. Only that person's own connections are given a question, and only while the person can still open the conversation; what else of the chat you may read is still decided by `chat:read`. The text is the message as its author last wrote it: when anyone else changes the message, or the author deletes it or takes your name out, the question leaves the queue. You cannot write in chat, so answer the person yourself. `queue.claim` takes one item for 30 minutes (claim it again to keep it longer). A claim gives no extra rights: the change itself is made with the usual tools and is checked and approved as always. `queue.release` gives an item back; with `finished: true` it leaves the queue. When the project has enough agents at work, a claim is told to wait.
 
 ```json
 { "name": "queue.claim", "arguments": { "itemId": "<item id>" } }

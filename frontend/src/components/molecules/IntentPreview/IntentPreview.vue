@@ -16,8 +16,11 @@
             >
                 <dt class="ipv__label">{{ line.label }}</dt>
                 <dd v-if="line.open" class="ipv__text ipv__open">
-                    <button v-for="task in line.open" :key="task.taskId" type="button" class="ipv__task" data-test="intent-open-task" @click="emit('open-task', task)">{{ task.name }}</button>
-                    <span v-if="line.text" data-test="intent-more">{{ line.text }}</span>
+                    <button v-for="task in tasksOf(line)" :key="task.taskId" type="button" class="ipv__task" data-test="intent-open-task" @click="emit('open-task', task)">{{ task.name }}</button>
+                    <span v-if="moreOf(line)" data-test="intent-more">{{ moreOf(line) }}</span>
+                    <button v-if="line.rest" type="button" class="ipv__all" data-test="intent-show-all" :aria-expanded="showAll" @click="showAll = !showAll">
+                        {{ showAll ? t('IntentPreview.tasks_show_fewer') : t('IntentPreview.tasks_show_all', { n: line.open.length + line.rest.length }) }}
+                    </button>
                 </dd>
                 <dd v-else-if="choosing && line.picks?.length" class="ipv__text ipv__picks">
                     <label v-for="pick in line.picks" :key="pick.key" class="ipv__pick" :class="{ 'is-out': isOut(pick.key), 'is-locked': isLocked(pick.key) }">
@@ -43,11 +46,11 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { kindLabel, linesOf, titleOf } from './intentLines';
-import { broughtBack, canChoose, heldWith, hiddenParts, keptText, LOCKED_BY_RIGHTS, lockedParts, lockReason, pickNames, toggled } from './planPicks';
+import { broughtBack, canChoose, heldWith, hiddenParts, keptText, lockedParts, lockReason, pickNames, toggled } from './planPicks';
 
 defineOptions({ name: 'IntentPreview' });
 
@@ -71,13 +74,18 @@ const went = ref('');
 
 const hidden = computed(() => hiddenParts(props.preview).length);
 
+const showAll = ref(false);
+watch(() => props.preview, () => { showAll.value = false; });
+const tasksOf = (line) => (showAll.value && line.rest ? [...line.open, ...line.rest] : line.open);
+const moreOf = (line) => (showAll.value && line.rest ? line.restText : line.text);
+
 const locked = computed(() => lockedParts(props.preview));
 const isLocked = (key) => choosing.value && locked.value.includes(key);
+const LOCK_NOTES = Object.freeze({ owner_admin: 'IntentPreview.pick_locked', own_rights: 'IntentPreview.pick_locked_rights', not_this_plan: 'IntentPreview.pick_locked_plan' });
 /* Who can approve a part this person may not, said on that part alone and not on the parts held out with it. */
 const lockNote = (key) => {
     const why = isLocked(key) ? lockReason(props.preview, key) : '';
-    if (!why) return '';
-    return t(why === LOCKED_BY_RIGHTS ? 'IntentPreview.pick_locked_rights' : 'IntentPreview.pick_locked');
+    return why ? t(LOCK_NOTES[why]) : '';
 };
 
 /* Several parts of one kind in a row are headed once, in the plural, where each has its own tick box. */
@@ -131,8 +139,9 @@ const toggle = (key) => {
 .ipv__label { color: var(--ink-2); font-size: var(--fs-sm, 11.5px); line-height: 1.5; }
 .ipv__text { margin: 0; min-width: 0; overflow-wrap: anywhere; white-space: pre-line; line-height: 1.45; }
 .ipv__open { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; white-space: normal; }
-.ipv__task { border: 0; padding: 0; background: transparent; color: var(--brand); font: inherit; text-align: left; text-decoration: underline; cursor: pointer; min-width: 0; overflow-wrap: anywhere; }
-.ipv__task:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm, 6px); }
+.ipv__task, .ipv__all { border: 0; padding: 0; background: transparent; color: var(--brand); font: inherit; text-align: left; text-decoration: underline; cursor: pointer; min-width: 0; overflow-wrap: anywhere; }
+.ipv__all { color: var(--ink-2); }
+.ipv__task:focus-visible, .ipv__all:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm, 6px); }
 .ipv__picks { display: flex; flex-wrap: wrap; gap: 2px 14px; white-space: normal; }
 .ipv__pick { display: inline-flex; align-items: flex-start; gap: 6px; min-width: 0; min-height: var(--hit-min, 24px); cursor: pointer; }
 .ipv__pick .ah-check { flex: none; margin-top: 2px; }

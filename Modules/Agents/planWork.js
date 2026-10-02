@@ -37,7 +37,11 @@ const refuse = (message) => new tools.DeterministicError(message);
 /* A part that was not made because of who asked or who approved, which asking again does not change. */
 const withheld = (message) => Object.assign(refuse(message), { refused: true });
 const REFUSED_BY_RULES = 'RefusedError';
-const failedItem = (name, error) => ({ name, made: false, error: error.message, ...(error.refused || error.name === REFUSED_BY_RULES ? { refused: true } : {}) });
+const failedItem = (name, error) => ({
+    name, made: false, error: error.message,
+    ...(error.refused || error.name === REFUSED_BY_RULES ? { refused: true } : {}),
+    ...(require('./projectSetup').mayPassLater(error) ? { tryAgain: true } : {}),
+});
 const idOf = (value) => (value === undefined || value === null ? '' : String(value));
 const listOf = (value) => (Array.isArray(value) ? value : []);
 const objectOf = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});

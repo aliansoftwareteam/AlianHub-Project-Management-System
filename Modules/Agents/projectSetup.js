@@ -26,13 +26,19 @@ const CLOSING_TYPES = Object.freeze(['done', 'close']);
 const NEW_STATUS_COLOURS = Object.freeze(['#6473e8', '#ff9600', '#9b59b6', '#00a3bf', '#e8590c', '#2f9e44']);
 const LIST_CREATE = 'project.project_sprint_create';
 const ADMIN_ONLY = 'This status does not exist in the company yet, and only an owner or an admin can add one.';
+const NOT_THIS_PLAN = 'This status is new to the workspace, and it cannot be added through this plan. An owner or admin can add it in Settings, or ask their own AI.';
 
 const work = () => require('./workRequests');
 const planWork = () => require('./planWork');
 const refuse = (message) => new tools.DeterministicError(message);
 /* A part that was not made because of who asked or who approved, which asking again does not change. */
 const withheld = (message) => Object.assign(refuse(message), { refused: true });
-const failedItem = (name, error) => ({ name, made: false, error: error.message, ...(error.refused ? { refused: true } : {}) });
+const SERVER_FAULT = 500;
+/* Whether a part that was not made may be made by trying again: the web app's own route failed, or something
+ * broke that is no answer about the plan. A refusal, or an answer that the plan asks for what cannot be, is final. */
+const mayPassLater = (error) => Boolean(error.tryAgain) || (!error.deterministic && !error.refused && error.name !== 'RefusedError');
+const failedItem = (name, error) => ({ name, made: false, error: error.message, ...(error.refused ? { refused: true } : {}), ...(mayPassLater(error) ? { tryAgain: true } : {}) });
+const routeFailure = (answer, fallback) => Object.assign(refuse(setup.reasonOf(answer, fallback)), answer.code >= SERVER_FAULT ? { tryAgain: true } : {});
 const idOf = (value) => (value === undefined || value === null ? '' : String(value));
 const lower = (value) => String(value).trim().toLowerCase();
 const listOf = (value) => (Array.isArray(value) ? value : []);
@@ -171,13 +177,16 @@ const newToCompany = async (companyId, held, names) => {
     return listOf(names).map((name) => !known.some((has) => sameName(has, name)));
 };
 
-/* A status the company does not have is added to its list first, as the settings screen adds one: by an owner or an admin. */
+/* A status the company does not have is added to its list first, as the settings screen adds one: by an owner or
+ * an admin. It is added as the person behind the agent, so where that person is someone else than the approver
+ * and is neither, no approval can add it. */
 const addToCompany = async ({ companyId, who, approvedBy, name, at }) => {
+    if (approvedBy && who.uid !== approvedBy && !(await isAdmin(companyId, who.uid))) throw withheld(NOT_THIS_PLAN);
     if (approvedBy && !(await isAdmin(companyId, approvedBy))) throw withheld(ADMIN_ONLY);
     const colour = NEW_STATUS_COLOURS[at % NEW_STATUS_COLOURS.length];
     const answer = await setup.answerOf('statusInsert', { companyId, who, body: { name, textColor: colour, bgColor: `${colour}35`, isDeleted: false } });
     const saved = answer.code === 200 ? listOf(answer.body && answer.body.settings).map(plain).filter((status) => status && sameName(status.name, name)).pop() : null;
-    if (!saved) throw (answer.code === 403 ? withheld : refuse)(setup.reasonOf(answer, 'the status was not added'));
+    if (!saved) throw answer.code === 403 ? withheld(setup.reasonOf(answer, 'the status was not added')) : routeFailure(answer, 'the status was not added');
     return saved;
 };
 
@@ -192,9 +201,9 @@ const newStatusRefusal = async (companyId, uid, held, names) => {
 /* The project's statuses are saved as the status form saves them: the whole list, through the project route. */
 const saveStatuses = async ({ companyId, who, projectId, next }) => {
     const answer = await setup.answerOf('projectUpdate', { companyId, who, params: { id: projectId }, body: { updateObject: { taskStatusData: next } } });
-    if (answer.code !== 200) return setup.reasonOf(answer, 'the statuses were not saved');
+    if (answer.code !== 200) return routeFailure(answer, 'the statuses were not saved');
     socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: await storedProject(companyId, projectId), updatedFields: { taskStatusData: next }, module: 'project' });
-    return '';
+    return null;
 };
 
 /* A new status is a working stage: it goes after the stages the project has and before the ones that close a task. */
@@ -222,7 +231,7 @@ const addStatuses = async ({ companyId, who, approvedBy, project, projectId, pla
     const closing = held.findIndex((status) => CLOSING_TYPES.includes(status.type));
     const at = closing < 0 ? held.length : closing;
     const failed = await saveStatuses({ companyId, who, projectId, next: [...held.slice(0, at), ...added, ...held.slice(at)] });
-    return failed ? items.map((item) => (item.made ? { name: item.name, made: false, error: failed } : item)) : items;
+    return failed ? items.map((item) => (item.made ? failedItem(item.name, failed) : item)) : items;
 };
 
 const addLists = async ({ companyId, who, projectId, plan }) => {
@@ -232,7 +241,7 @@ const addLists = async ({ companyId, who, projectId, plan }) => {
             const made = await work().createList({ companyId, who, projectId, name });
             items.push({ name: made.name, made: true, sprintId: made.sprintId });
         } catch (error) {
-            items.push({ name, made: false, error: error.message });
+            items.push(failedItem(name, error));
         }
     }
     return items;
@@ -252,7 +261,7 @@ const addViews = async ({ companyId, who, projectId, plan, fields }) => {
             const made = await setup.createView({ companyId, who, projectId, name: view.name, kind: view.kind, look: { ...view.look, ...(shown.length ? { showFieldIds: shown } : {}) } });
             items.push({ name: made.name, kind: made.kind, made: true, viewId: made.viewId, leftOut: unique([...made.leftOut, ...(found.length < named.length ? ['columns'] : [])]) });
         } catch (error) {
-            items.push({ name: view.name, kind: view.kind, made: false, error: error.message });
+            items.push({ ...failedItem(view.name, error), kind: view.kind });
         }
     }
     return items;
@@ -284,7 +293,7 @@ const carryOut = async ({ companyId, who, approvedBy, projectId, plan, asked = {
             const items = await makerOf(part)({ ...asked, companyId, who, approvedBy, projectId, plan, fields, made: parts, project: await storedProject(companyId, projectId) });
             parts.push({ part, ok: items.every((item) => !item.error), items });
         } catch (failure) {
-            parts.push({ part, ok: false, error: failure.message, items: [] });
+            parts.push({ part, ok: false, error: failure.message, ...(mayPassLater(failure) ? { tryAgain: true } : {}), items: [] });
         }
     }
     return parts;
@@ -345,7 +354,7 @@ const withdrawStatuses = async ({ companyId, who, projectId, statusKeys }, out) 
     }
     if (!going.length) return;
     const failed = await saveStatuses({ companyId, who, projectId, next: held.filter((row) => !going.includes(row)) });
-    if (failed) out.kept.push(...going.map((status) => ({ part: 'statuses', name: status.name, reason: failed })));
+    if (failed) out.kept.push(...going.map((status) => ({ part: 'statuses', name: status.name, reason: failed.message })));
     else out.removed.statuses.push(...going.map((status) => status.name));
 };
 
@@ -392,4 +401,4 @@ const inverses = {
     },
 };
 
-module.exports = { executors, inverses, planOf, planProblem, setupPlanOf, setupProblem, refusedParts, whyNot, newToCompany, newStatusRefusal, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, ALL_PARTS, PLAN_KEY, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };
+module.exports = { executors, inverses, planOf, planProblem, setupPlanOf, setupProblem, refusedParts, whyNot, newToCompany, newStatusRefusal, mayPassLater, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, ALL_PARTS, PLAN_KEY, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };

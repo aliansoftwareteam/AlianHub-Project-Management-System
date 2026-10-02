@@ -19,7 +19,7 @@ const { apiRequest, persistMessage, store, echo, agentSources } = vi.hoisted(() 
         dispatch: vi.fn(() => Promise.resolve({})),
     },
     echo: (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key),
-    agentSources: { fetchChatAgents: vi.fn(), fetchOwnAiInChat: vi.fn() },
+    agentSources: { fetchChatAgents: vi.fn(), fetchOwnAiInChat: vi.fn(), fetchConnectedAgents: vi.fn() },
 }));
 
 const composable = vi.hoisted(() => ({
@@ -78,7 +78,8 @@ beforeEach(() => {
     apiRequest.mockReset();
     apiRequest.mockResolvedValue({ data: { status: true, data: [] } });
     agentSources.fetchChatAgents.mockReset().mockResolvedValue([HELPER]);
-    agentSources.fetchOwnAiInChat.mockReset().mockResolvedValue([OWN_AI]);
+    agentSources.fetchOwnAiInChat.mockReset().mockResolvedValue({ agents: [OWN_AI], why: '' });
+    agentSources.fetchConnectedAgents.mockReset().mockResolvedValue([ENTRY]);
     persistMessage.mockReset();
     Object.assign(aiAvailability, { state: AI_STATE.UNKNOWN, loaded: false, planAllowsAi: null });
 });
@@ -88,19 +89,25 @@ describe('where the chat learns of the person\'s own AI', () => {
 
     it('asks the server whether it may be asked in this conversation, and shapes it for the "@" menu', async () => {
         apiRequest.mockResolvedValue({ data: { status: true, data: [ENTRY] } });
-        await expect((await source())(CHANNEL)).resolves.toEqual([OWN_AI]);
+        await expect((await source())(CHANNEL)).resolves.toEqual({ agents: [OWN_AI], why: '' });
         expect(apiRequest).toHaveBeenCalledWith('get', '/api/v2/agents/connected?projectId=proj-1&sprintId=chan-1&taskId=default');
+    });
+
+    it('carries why the server holds it back, where it does', async () => {
+        apiRequest.mockResolvedValue({ data: { status: true, data: [], why: 'project_manager_off' } });
+        await expect((await source())(CHANNEL)).resolves.toEqual({ agents: [], why: 'project_manager_off' });
     });
 
     it('offers none before the conversation exists, when the server refuses, or when the request fails', async () => {
         const fetchOwnAiInChat = await source();
-        await expect(fetchOwnAiInChat({ projectId: 'proj-1', sprintId: 'chan-1', taskId: '' })).resolves.toEqual([]);
-        await expect(fetchOwnAiInChat()).resolves.toEqual([]);
+        const NONE = { agents: [], why: '' };
+        await expect(fetchOwnAiInChat({ projectId: 'proj-1', sprintId: 'chan-1', taskId: '' })).resolves.toEqual(NONE);
+        await expect(fetchOwnAiInChat()).resolves.toEqual(NONE);
         expect(apiRequest).not.toHaveBeenCalled();
-        apiRequest.mockResolvedValueOnce({ data: { status: false, statusText: 'no' } });
-        await expect(fetchOwnAiInChat(CHANNEL)).resolves.toEqual([]);
+        apiRequest.mockResolvedValueOnce({ data: { status: false, statusText: 'no', why: 'project_manager_off' } });
+        await expect(fetchOwnAiInChat(CHANNEL)).resolves.toEqual(NONE);
         apiRequest.mockImplementationOnce(() => { throw new Error('network down'); });
-        await expect(fetchOwnAiInChat(CHANNEL)).resolves.toEqual([]);
+        await expect(fetchOwnAiInChat(CHANNEL)).resolves.toEqual(NONE);
     });
 });
 
@@ -114,6 +121,7 @@ describe('the "@" menu of a chat conversation', () => {
         return wrapper;
     };
     const offered = (wrapper) => wrapper.findComponent(MainChatComposer).props('agents');
+    const note = (wrapper) => wrapper.findComponent(MainChatComposer).props('agentsNote');
 
     it('with no model on the server, offers the connected AI alone and asks for no in-product agent', async () => {
         aiAvailability.state = AI_STATE.UNCONFIGURED;
@@ -121,6 +129,15 @@ describe('the "@" menu of a chat conversation', () => {
         expect(agentSources.fetchChatAgents).not.toHaveBeenCalled();
         expect(agentSources.fetchOwnAiInChat).toHaveBeenCalledWith(CHANNEL);
         expect(offered(wrapper)).toEqual([OWN_AI]);
+        expect(note(wrapper)).toBe('');
+    });
+
+    it('says in one line why the AI is not offered in a channel of a project whose project manager is off', async () => {
+        agentSources.fetchOwnAiInChat.mockResolvedValue({ agents: [], why: 'project_manager_off' });
+        const wrapper = await mountPanel();
+        expect(offered(wrapper)).toEqual([]);
+        expect(note(wrapper)).toBe('AgentChat.own_ai_manager_off');
+        expect(en.AgentChat.own_ai_manager_off).toMatch(/project manager/);
     });
 
     it('with a model, offers the in-product agents and the person\'s own AI', async () => {
@@ -131,9 +148,11 @@ describe('the "@" menu of a chat conversation', () => {
     });
 
     it('offers nothing where the person has no AI of their own, and nothing in a conversation with an in-product agent', async () => {
-        agentSources.fetchOwnAiInChat.mockResolvedValue([]);
+        agentSources.fetchOwnAiInChat.mockResolvedValue({ agents: [], why: '' });
         aiAvailability.state = AI_STATE.UNCONFIGURED;
-        expect(offered(await mountPanel())).toEqual([]);
+        const plain = await mountPanel();
+        expect(offered(plain)).toEqual([]);
+        expect(note(plain)).toBe('');
         agentSources.fetchOwnAiInChat.mockClear();
         expect(offered(await mountPanel({ agentId: 'a1' }))).toEqual([]);
         expect(agentSources.fetchOwnAiInChat).not.toHaveBeenCalled();
@@ -142,15 +161,15 @@ describe('the "@" menu of a chat conversation', () => {
 
 describe('the own AI in the mention list', () => {
     const Composer = defineComponent({
-        props: { agents: Array },
+        props: { agents: Array, agentsNote: String },
         setup(props) {
             const text = ref('');
-            return () => h('div', [h(CommentInput, { modelValue: text.value, 'onUpdate:modelValue': (v) => { text.value = v; }, userIds: ['u1', 'u2'], agents: props.agents, reply: {} }), h('output', text.value)]);
+            return () => h('div', [h(CommentInput, { modelValue: text.value, 'onUpdate:modelValue': (v) => { text.value = v; }, userIds: ['u1', 'u2'], agents: props.agents, agentsNote: props.agentsNote, reply: {} }), h('output', text.value)]);
         },
     });
     const provide = { $defaultUserAvatar: ref(''), $clientWidth: ref(1280) };
-    const open = async (agents) => {
-        const wrapper = mount(Composer, { props: { agents }, attachTo: document.body, global: { provide, mocks: { $t: echo } } });
+    const open = async (agents, agentsNote = '') => {
+        const wrapper = mount(Composer, { props: { agents, agentsNote }, attachTo: document.body, global: { provide, mocks: { $t: echo } } });
         const box = wrapper.find('textarea');
         box.element.value = '@';
         await box.trigger('input');
@@ -170,6 +189,18 @@ describe('the own AI in the mention list', () => {
         expect(rows[1]).toContain('TaskPanel.my_ai {"name":"Claude"}');
     });
 
+    it('shows the one line under the list when the AI is held back, and no line otherwise', async () => {
+        const held = await open([], 'AgentChat.own_ai_manager_off');
+        const line = held.find('[data-test="mention-note"]');
+        expect(line.text()).toBe('AgentChat.own_ai_manager_off');
+        expect(line.attributes('role')).toBeUndefined();
+        expect(held.findAll('[role="option"]').some((row) => row.text().includes('own_ai_manager_off'))).toBe(false);
+        held.unmount();
+        const free = await open([OWN_AI]);
+        expect(free.find('[data-test="mention-note"]').exists()).toBe(false);
+        free.unmount();
+    });
+
     it('writes the name the server reads as the person\'s own AI', async () => {
         const wrapper = await open([OWN_AI]);
         await wrapper.find('[role="group"] [role="option"]').trigger('click');
@@ -181,38 +212,57 @@ describe('the own AI in the mention list', () => {
 });
 
 describe('the mark on a message that asked the person\'s own AI', () => {
-    const mountMessage = (message) => mount(MainChatMessage, {
-        props: { message: { _id: 'm1', type: 'text', userId: 'u1', message: `${NAMED} what is left?`, createdAt: new Date().toISOString(), ...message } },
-        global: {
-            provide: { $companyId: ref('co1') },
-            stubs: { RouterLink: RouterLinkStub, DropDown: true, DropDownOption: true, ReactionBar: true, MainChatAvatar: true, MainChatMessageBody: true },
-            mocks: { $t: echo },
-        },
-    });
+    const mountMessage = async (message, companyId = 'co-member') => {
+        const wrapper = mount(MainChatMessage, {
+            props: { message: { _id: 'm1', type: 'text', userId: 'u1', message: `${NAMED} what is left?`, createdAt: new Date().toISOString(), ...message } },
+            global: {
+                provide: { $companyId: ref(companyId) },
+                stubs: { RouterLink: RouterLinkStub, DropDown: true, DropDownOption: true, ReactionBar: true, MainChatAvatar: true, MainChatMessageBody: true },
+                mocks: { $t: echo },
+            },
+        });
+        await flushPromises();
+        return wrapper;
+    };
     const mark = (wrapper) => wrapper.find('[data-test="own-ai-asked"]');
-    const ASKED = { ownerId: 'u1', name: 'Claude, for Asha Rao', at: '2026-10-02T09:00:00.000Z' };
+    const ASKED = { at: '2026-10-02T09:00:00.000Z' };
 
-    it('says who was asked, for whom, and when that AI gets the question', () => {
-        const wrapper = mountMessage({ ownAiAsk: ASKED });
+    it('tells a member who was asked, for whom, and when that AI gets the question', async () => {
+        const wrapper = await mountMessage({ ownAiAsk: ASKED });
         expect(mark(wrapper).text()).toBe('AgentChat.asked_own_ai {"name":"Claude, for Asha Rao"}');
         expect(mark(wrapper).attributes('title')).toBe('AgentChat.asked_own_ai_hint');
     });
 
-    it('is on no other message, and goes with a deleted one and with one edited to name the AI no more', () => {
-        expect(mark(mountMessage({})).exists()).toBe(false);
-        expect(mark(mountMessage({ ownAiAsk: { ownerId: 'u1' } })).exists()).toBe(false);
-        expect(mark(mountMessage({ isDeleted: true, ownAiAsk: ASKED })).exists()).toBe(false);
-        expect(mark(mountMessage({ message: 'never mind', ownAiAsk: ASKED })).exists()).toBe(false);
+    it('tells a guest, who is given no colleague\'s AI, that an AI was asked and not whose or which', async () => {
+        agentSources.fetchConnectedAgents.mockResolvedValue([]);
+        const wrapper = await mountMessage({ ownAiAsk: ASKED }, 'co-guest');
+        expect(mark(wrapper).text()).toBe('AgentChat.asked_their_ai');
+        expect(wrapper.text()).not.toMatch(/Claude|Asha/);
+    });
+
+    it('asks for the names once for a workspace however many marks it draws, and not at all with no mark to draw', async () => {
+        await mountMessage({}, 'co-quiet');
+        expect(agentSources.fetchConnectedAgents).not.toHaveBeenCalled();
+        await Promise.all([mountMessage({ ownAiAsk: ASKED }, 'co-many'), mountMessage({ _id: 'm2', ownAiAsk: ASKED }, 'co-many')]);
+        await mountMessage({ _id: 'm3', ownAiAsk: ASKED }, 'co-many');
+        expect(agentSources.fetchConnectedAgents).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows what the server stores and hides nothing of it: the mark is there with the field and gone without it', async () => {
+        expect(mark(await mountMessage({})).exists()).toBe(false);
+        expect(mark(await mountMessage({ ownAiAsk: null })).exists()).toBe(false);
+        expect(mark(await mountMessage({ message: 'reworded by its author', ownAiAsk: ASKED })).exists()).toBe(true);
     });
 
     it('has its words in the locale file', () => {
         expect(en.AgentChat.asked_own_ai).toContain('{name}');
+        expect(en.AgentChat.asked_their_ai).not.toContain('{');
         expect(en.AgentChat.asked_own_ai_hint).toBeTruthy();
     });
 });
 
 describe('the mark as the sender meets it', () => {
-    const MARK = { ownerId: 'u1', name: 'Claude, for Asha Rao', at: '2026-10-02T09:00:00.000Z' };
+    const MARK = { at: '2026-10-02T09:00:00.000Z' };
     const TEXT = '@[Claude](myai_u1) what is left';
     const open = async () => {
         const handlers = {};
@@ -248,5 +298,23 @@ describe('the mark as the sender meets it', () => {
         handlers.commentUpdate({ fullDocument: { ...stored(sent), ownAiAsk: MARK } });
         expect(chat.messages.value).toHaveLength(1);
         expect(chat.messages.value[0]).toMatchObject({ _id: 'saved-1', ownAiAsk: MARK });
+    });
+});
+
+describe('a mark the server takes off', () => {
+    it('goes from the row when the update says so', async () => {
+        const handlers = {};
+        const socket = ref({ id: 'sock-1', emit: vi.fn(), on: (event, fn) => { handlers[event] = fn; }, off: vi.fn() });
+        const row = { _id: 'm-1', userId: 'u1', type: 'text', message: `${NAMED} what is left?`, createdAt: '2026-10-02T09:00:00.000Z', ownAiAsk: { at: '2026-10-02T09:00:00.000Z' } };
+        apiRequest.mockResolvedValueOnce({ data: { status: true, data: [row] } });
+        const chat = useMainChatConversation({
+            socket, companyId: ref('company-1'), userId: ref('u1'), target: () => ({ ...CHANNEL, folderId: '', isDefaultProject: false }),
+            participants: () => ['u1', 'u2'], currentUser: () => ({ id: 'u1', Employee_Name: 'Asha Rao' }),
+        });
+        await chat.load();
+        chat.attach();
+        expect(chat.messages.value[0].ownAiAsk).toBeTruthy();
+        handlers.commentUpdate({ fullDocument: { ...row, message: 'never mind', ownAiAsk: null } });
+        expect(chat.messages.value[0]).toMatchObject({ message: 'never mind', ownAiAsk: null });
     });
 });

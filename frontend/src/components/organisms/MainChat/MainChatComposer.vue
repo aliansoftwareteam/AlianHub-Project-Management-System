@@ -52,6 +52,7 @@
                             :reply="{}"
                             :userIds="userIds"
                             :agents="agents"
+                            :agentsNote="agentsNote"
                             :sendMessageAllowed="!disabled"
                             :loadingChat="false"
                             aiMention
@@ -149,6 +150,7 @@ const props = defineProps({
     disabledReason: { type: String, default: '' },
     userIds: { type: Array, default: () => [] },
     agents: { type: Array, default: () => [] },
+    agentsNote: { type: String, default: '' },
     conversationKey: { type: String, default: '' },
     placeholder: { type: String, default: '' },
 });

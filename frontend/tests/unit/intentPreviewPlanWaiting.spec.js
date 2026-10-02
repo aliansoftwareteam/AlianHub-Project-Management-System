@@ -116,6 +116,29 @@ describe('a part of a plan the person reading may not make', () => {
     });
 });
 
+describe('a part this plan cannot make for anyone', () => {
+    const PLAN_NOTE = 'This cannot be made through this plan. An owner or admin can add the status in Settings, or ask their own AI.';
+    const stuck = () => ({ ...forMember(), locked: ['statuses:1'], lockedWhy: { 'statuses:1': 'not_this_plan' } });
+
+    it('says so in one line on that part, holds it unticked and leaves it out of what is sent', () => {
+        expect(lockReason(stuck(), 'statuses:1')).toBe('not_this_plan');
+        mountCard(stuck());
+        expect(noteOf('statuses:1')).toBe(PLAN_NOTE);
+        expect(box('statuses:1').element.checked).toBe(false);
+        expect(box('statuses:1').element.disabled).toBe(true);
+        expect(box('lists:0').element.disabled).toBe(false);
+        expect(chosenParts(stuck(), [])).toEqual({ statuses: [0], lists: [0, 1], fields: [0], tasks: [0] });
+    });
+
+    it('is named on a row that holds nothing else, which nobody can approve', () => {
+        mountQueue([row('p1', stuck(), { locked: true, lockedWhy: 'not_this_plan', mayDecline: true })]);
+        expect(wrapper.find('[data-test="queue-locked"]').text()).toBe('Cannot be made through this plan');
+        expect(wrapper.find('[data-test="queue-locked-note"]').text()).toBe('Nothing in this plan can be made through it. Decline it. An owner or admin can add the status in Settings, or ask their own AI.');
+        expect(wrapper.find('[data-test="queue-approve"]').exists()).toBe(false);
+        expect(wrapper.find('[data-test="queue-decline"]').exists()).toBe(true);
+    });
+});
+
 describe('a part that was not made the first time', () => {
     const again = (over = {}) => row('p9', { kind: 'setup', title: 'Website', lines: [{ kind: 'newLists', names: ['Backlog'], picks: ['lists:0'] }], needs: {} }, { retry: { why: 'The server was busy.' }, ...over });
 
