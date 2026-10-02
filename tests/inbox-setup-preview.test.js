@@ -16,7 +16,7 @@ const world = require('./fixtures/mcpWorkWorld');
 const queue = require('../Modules/Inbox/helpers/approvalQueue');
 const intentPreview = require('../Modules/Agents/intentPreview');
 
-const { CID, OWNER, INSIDER, OUTSIDER, P_OPEN, P_PRIVATE, settle } = world;
+const { CID, OWNER, INSIDER, OUTSIDER, P_OPEN, P_PRIVATE, T_OPEN, T_SECRET, T_PRIVATE, MISSING, settle } = world;
 const { seed } = world.create(mockDb);
 
 const AGENT = '6f0000000000000000000a91';
@@ -71,6 +71,41 @@ describe('waiting fields carry their preview', () => {
             kind: 'fields', title: 'Stage',
             lines: [{ kind: 'place', project: 'Open', list: '' }, { kind: 'field', name: 'Stage', type: '', options: ['Lead'] }],
         });
+    });
+});
+
+describe('waiting fields with their first values', () => {
+    const values = [
+        { taskId: T_OPEN, field: 'Client', value: 'Acme' },
+        { taskId: T_OPEN, field: 'Budget', value: 120 },
+        { taskId: T_OPEN, field: 'Owner', value: [OUTSIDER, MISSING] },
+        { taskId: T_OPEN, field: 'Signed', value: true },
+        { taskId: T_OPEN, field: 'Region', value: null },
+        { taskId: T_SECRET, field: 'Client', value: 'Hidden' },
+        { taskId: T_PRIVATE, field: 'Client', value: 'Elsewhere' },
+        { taskId: { $ne: '' }, field: 'Client', value: 'x' },
+    ];
+
+    it('lists each value under the fields, on a task by its name', async () => {
+        propose('valued', [change('fields.create', { projectId: P_OPEN, definitions: FIVE, values })]);
+        const lines = (await previewOf(INSIDER, 'valued')).lines.slice(6);
+        expect(lines).toEqual([
+            { kind: 'fieldValue', field: 'Client', task: 'Open task', value: 'Acme', others: 0 },
+            { kind: 'fieldValue', field: 'Budget', task: 'Open task', value: '120', others: 0 },
+            { kind: 'fieldValue', field: 'Owner', task: 'Open task', value: 'Mia Member', others: 1 },
+            { kind: 'fieldValue', field: 'Signed', task: 'Open task', checked: true },
+            { kind: 'fieldValue', field: 'Region', task: 'Open task', value: '', others: 0 },
+            { kind: 'fieldValue', field: 'Client', task: 'Secret task', value: 'Hidden', others: 0 },
+            { kind: 'fieldValuesHidden', count: 2 },
+        ]);
+    });
+
+    it('names no task the person looking cannot open, and none of its values', async () => {
+        propose('valued', [change('fields.create', { projectId: P_OPEN, definitions: FIVE, values })]);
+        const preview = await previewOf(OUTSIDER, 'valued');
+        expect(preview.lines.slice(6).map((line) => line.kind)).toEqual(['fieldValue', 'fieldValue', 'fieldValue', 'fieldValue', 'fieldValue', 'fieldValuesHidden']);
+        expect(preview.lines[preview.lines.length - 1]).toEqual({ kind: 'fieldValuesHidden', count: 3 });
+        expect(JSON.stringify(preview)).not.toMatch(/Secret task|Hidden|Elsewhere|Private task/);
     });
 });
 
