@@ -264,6 +264,19 @@ const ACTIONS = Object.freeze({
     'workload.move': 'Move planned work',
     'workspace.create': 'Make a workspace',
     'workspace.settings': 'Change the workspace\'s settings',
+    'aifield.apply': 'Apply AI suggestions to a field',
+    'comment.assign': 'Assign a comment',
+    'comment.resolve': 'Resolve a comment',
+    'epic.assign': 'Put a task in an epic',
+    'epic.create': 'Make an epic',
+    'epic.update': 'Change an epic',
+    'project.comment': 'Comment on a project',
+    'project.update': 'Change a project\'s details',
+    'reaction.set': 'React to a comment or a task',
+    'task.reorder': 'Change the order of tasks',
+    'time.plan': 'Plan time on a task',
+    'timelog.edit': 'Change logged time',
+    'whiteboard.update': 'Change a whiteboard',
 });
 
 const AGENT_ROWS = Object.freeze(['agent.action', 'agent.action_refused', 'agent.action_undone']);

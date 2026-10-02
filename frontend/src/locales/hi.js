@@ -8861,7 +8861,20 @@ export default {
         "webhook_manage": "Make or change a webhook",
         "workload_move": "Move planned work",
         "workspace_create": "Make a workspace",
-        "workspace_settings": "Change the workspace's settings"
+        "workspace_settings": "Change the workspace's settings",
+        "aifield_apply": "Apply AI suggestions to a field",
+        "comment_assign": "Assign a comment",
+        "comment_resolve": "Resolve a comment",
+        "epic_assign": "Put a task in an epic",
+        "epic_create": "Make an epic",
+        "epic_update": "Change an epic",
+        "project_comment": "Comment on a project",
+        "project_update": "Change a project's details",
+        "reaction_set": "React to a comment or a task",
+        "task_reorder": "Change the order of tasks",
+        "time_plan": "Plan time on a task",
+        "timelog_edit": "Change logged time",
+        "whiteboard_update": "Change a whiteboard"
     },
     "QuickCreate": {
         "title": "New task",

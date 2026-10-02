@@ -9,12 +9,14 @@ const { requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_ACTIONS } = require('../../Config/taskWritePermissions');
 const { fieldInsertFrom, fieldUpdateFrom, isCompanyWide, widensToCompany, requireFieldSettings, requireSameKind, checkFieldWrite } = require('./helpers/fieldWrite');
 const { linkPlan, listOf } = require('./helpers/fieldProjects');
-const { agentsRefused } = require('../Agents/guard');
+const { agentsRefused, projectAsked } = require('../Agents/guard');
 
 const CUSTOM_FIELD_EDIT = [['project.project_custom_field', 'task.task_custom_field']];
 
 /* An agent proposes a field through its MCP tool; a person approves it, and it is then made here as that person. */
 const fieldsByPeople = agentsRefused('fields.create');
+
+const voted = projectAsked((req, body) => ({ action: 'task.field.set', params: { taskId: typeof body.taskId === 'string' ? body.taskId : '' } }));
 
 /* Storing a computed value on a task is held to what editing a field value on it is held to. */
 const COMPUTED_VALUES = Object.freeze({ needs: TASK_ACTIONS.updateTaskCustomField.needs, tasks: [['taskIds', '*']] });
@@ -66,9 +68,9 @@ exports.init = (app) => {
     app.post('/api/v2/custom-fields/formula/validate', ctrl.validateFormula)
     app.post('/api/v2/custom-fields/compute', requireTaskWritePermission(COMPUTED_VALUES), ctrl.computeFields)
     app.post('/api/v2/custom-fields/links/resolve', fieldLinks.resolve)
-    app.post('/api/v2/custom-fields/:fieldId/vote', fieldLinks.vote)
+    app.post('/api/v2/custom-fields/:fieldId/vote', voted, fieldLinks.vote)
     app.post('/api/v2/custom-fields/:fieldId/ai/preview', agentsRefused('ai.spend'), aiFields.preview)
-    app.post('/api/v2/custom-fields/:fieldId/ai/apply', aiFields.apply)
+    app.post('/api/v2/custom-fields/:fieldId/ai/apply', agentsRefused('aifield.apply'), aiFields.apply)
     app.post('/api/v2/custom-fields/:fieldId/ai/jobs', agentsRefused('ai.spend'), aiFields.startJob)
     app.get('/api/v2/custom-fields/ai/jobs/:jobId', aiFields.readJob)
 }

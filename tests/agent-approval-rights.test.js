@@ -47,8 +47,8 @@ const { matchesLikeMongo, oid } = require('./fixtures/storedForms');
 
 mongoHelper.getTotalSprintCount = async () => true;
 
-const { CID, OWNER, ADMIN, MEMBER, OTHER, OUTSIDER, TOKEN, P_OPEN, P_PRIVATE, PL_OTHER, TASKS_GRANT, settle } = world;
-const { seed, rows } = world.create(mockDb);
+const { CID, OWNER, ADMIN, MEMBER, OTHER, OUTSIDER, TOKEN, P_OPEN, P_PRIVATE, PL_OTHER, LOCKED_PROJECT, LOCKED_TASK, S_NEXT, STATUSES, TYPES, TASKS_GRANT, settle } = world;
+const { seed, rows, stored: storedTask } = world.create(mockDb);
 const store = persistence.useInMemory();
 
 const GUEST = OUTSIDER;
@@ -248,6 +248,62 @@ describe('what is counted as waiting for a person', () => {
         expect(inQueue('ownNoRight')).toMatchObject({ locked: true, lockedWhy: 'own_rights', mayDecline: true });
         expect(inQueue('gated')).toMatchObject({ locked: true, lockedWhy: 'owner_admin', mayDecline: false });
         expect(inQueue('open')).toMatchObject({ locked: false, mayDecline: true });
+    });
+
+    it('a row carries its change as it was filed only for a reader who may approve it', async () => {
+        const queued = await queue.readQueue(CID, MEMBER);
+        const changesOf = (key) => queued.find((p) => p.proposalId === ids[key]).changes;
+
+        expect(changesOf('open')[0]).toMatchObject({ action: 'task.comment', params: { taskId: String(fx.top._id), body: 'Looks ready' } });
+        ['noRight', 'gated'].forEach((key) => {
+            expect(changesOf(key)).toHaveLength(1);
+            expect(changesOf(key).filter((change) => 'params' in change)).toEqual([]);
+        });
+        ['connected', 'ownNoRight'].forEach((key) => expect(changesOf(key).filter((change) => 'params' in change)).toEqual([]));
+    });
+});
+
+describe('a row is offered as open exactly when its approval would be taken', () => {
+    const listFor = async (uid) => (await send(LIST, uid)).body;
+    const rowFor = async (uid, id) => (await listFor(uid)).data.find((row) => String(row._id) === id);
+    const queuedFor = async (uid, id) => (await queue.readQueue(CID, uid)).find((row) => row.proposalId === id);
+    const HELD = { locked: true, lockedWhy: 'own_rights' };
+
+    it('a move a connected agent filed, out of a project whose tasks the reader may not move', async () => {
+        Object.assign(rows(SCHEMA_TYPE.PROJECTS).find((project) => String(project._id) === LOCKED_PROJECT), {
+            isPrivateSpace: false, ProjectName: 'Locked', CompanyId: CID, taskStatusData: STATUSES, taskTypeCounts: TYPES, AssigneeUserId: [],
+        });
+        Object.assign(storedTask(LOCKED_TASK), {
+            CompanyId: CID, TaskName: 'Locked task', TaskKey: 'LCK-1', deletedStatusKey: 0, isParentTask: true, ParentTaskId: '', ancestors: [], AssigneeUserId: [], watchers: [],
+            sprintId: String(mockDb.seed(SCHEMA_TYPE.SPRINTS, { projectId: LOCKED_PROJECT, name: 'Locked list', AssigneeUserId: [], deletedStatusKey: 0 })._id),
+            status: { key: 2, text: 'In Progress', type: 'active' }, statusType: 'active', statusKey: 2, TaskType: 'task', TaskTypeKey: 1,
+        });
+        const id = file({ ...byConnection(OWNER), projectId: LOCKED_PROJECT, taskId: LOCKED_TASK, changes: [{ action: 'task.move', params: { taskId: LOCKED_TASK, projectId: P_OPEN, sprintId: S_NEXT }, label: 'Move' }] });
+
+        expect(await rowFor(MEMBER, id)).toMatchObject({ ...HELD, mayDecline: false });
+        expect(await queuedFor(MEMBER, id)).toMatchObject({ ...HELD, mayDecline: false });
+        expect((await listFor(MEMBER)).counts.waiting).toBe(0);
+        expect(await send(APPROVE, MEMBER, { id })).toMatchObject({ code: 403, body: { status: false } });
+        expect(await send(DECLINE, MEMBER, { id }, { reason: 'Not now' })).toMatchObject({ code: 403, body: { status: false, reason: 'not_permitted' } });
+        expect(stored(id).status).toBe('pending');
+        expect(await rowFor(OWNER, id)).toMatchObject({ locked: false, mayDecline: true });
+    });
+
+    it('a dashboard card a connected agent asked for, which the person it was asked for approves and no one else', async () => {
+        const id = file({ ...byConnection(MEMBER), projectId: null, taskId: null, changes: [{ action: 'dashboard.card.add', params: { card: 'my_time', period: 'last_week' }, label: 'Add a card' }] });
+
+        for (const uid of [OWNER, ADMIN]) {
+            expect(await rowFor(uid, id)).toMatchObject({ ...HELD, mayDecline: true });
+            expect(await queuedFor(uid, id)).toMatchObject({ ...HELD, mayDecline: true });
+            expect((await listFor(uid)).counts.waiting).toBe(0);
+            expect(await send(APPROVE, uid, { id })).toMatchObject({ code: 403, body: { status: false } });
+            expect(stored(id).status).toBe('pending');
+        }
+        expect(await rowFor(MEMBER, id)).toMatchObject({ locked: false, mayDecline: true });
+        expect((await listFor(MEMBER)).counts.waiting).toBe(1);
+
+        expect(await send(DECLINE, OWNER, { id }, { reason: 'Not now' })).toMatchObject({ code: 200, body: { status: true } });
+        expect(stored(id)).toMatchObject({ status: 'declined', decidedBy: OWNER });
     });
 });
 

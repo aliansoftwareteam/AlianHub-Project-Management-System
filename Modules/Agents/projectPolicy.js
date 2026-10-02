@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const registry = require('./registry');
+const routeWrites = require('./routeWrites');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
 const projectLimits = require('./projectLimits');
@@ -193,9 +194,10 @@ const pastTheCount = async ({ companyId, actor, action, params, projectIds, appl
  * approval turns one answer, a connected agent's change that would wait, into "act" and comes back with it;
  * it never answers for a close, for a refusal, for a proposeOnly action, or for the count of tasks.
  * `applying` is passed only by a caller that makes the change on an answer of "act": that is when the change is
- * counted. Every other caller is told what the count would answer and takes no place in it. */
-const ask = async ({ companyId, actor, action, params = {}, approved = false, standing = false, taint = null, applying = false }) => {
-    const entry = registry.get(action);
+ * counted. Every other caller is told what the count would answer and takes no place in it.
+ * `onRoute` is passed only by the guard of a web route, whose writes are also the ones ./routeWrites names. */
+const ask = async ({ companyId, actor, action, params = {}, approved = false, standing = false, taint = null, applying = false, onRoute = false }) => {
+    const entry = registry.get(action) || (onRoute ? routeWrites.get(action) : null);
     if (!isAgent(actor) || !entry || !entry.write || ASKS_NOTHING.has(entry.key)) return act;
     const given = params && typeof params === 'object' ? params : {};
     const paused = approved ? '' : await pausedFor(companyId, actor, given);
