@@ -691,14 +691,14 @@ exports.execute = async (req, res) => {
         // attributed to the real person who triggered the run — matching the
         // manual flow — instead of a generic label.
         let currentUserName = '';
+        let allowed = new Set();
         try {
             const members = await loadActiveMembers(companyId);
-            const allowed = new Set(members.map((m) => String(m.id)));
+            allowed = new Set(members.map((m) => String(m.id)));
             const me = members.find((m) => String(m.id) === String(uid));
             if (me && me.name) currentUserName = me.name;
-            const sanitized = sanitizeMemberIds(plan, allowed);
-            plan = sanitized.plan;
-        } catch (_e) { /* leave as-is */ }
+        } catch (_e) { /* a roster that cannot be read names nobody */ }
+        plan = sanitizeMemberIds(plan, allowed).plan;
 
         const userData = {
             id: String(uid),
@@ -1001,13 +1001,14 @@ exports.tasksExecute = async (req, res) => {
         if (!(await guardTaskTarget(res, { companyId, uid, projectId, mode }))) return;
 
         let currentUserName = '';
+        let allowed = new Set();
         try {
             const members = await loadActiveMembers(companyId);
-            const allowed = new Set(members.map((m) => String(m.id)));
+            allowed = new Set(members.map((m) => String(m.id)));
             const me = members.find((m) => String(m.id) === String(uid));
             if (me && me.name) currentUserName = me.name;
-            plan = sanitizeTaskPlanMemberIds(plan, allowed).plan;
-        } catch (_e) { /* leave as-is */ }
+        } catch (_e) { /* a roster that cannot be read names nobody */ }
+        plan = sanitizeTaskPlanMemberIds(plan, allowed).plan;
 
         const userData = {
             id: String(uid),

@@ -50,6 +50,7 @@ const { checkProjectPlan, removeProjectCount } = require('../createProject/contr
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
 const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
 const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
+const { keptOnProject } = require('../../Config/projectPeople');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
@@ -796,8 +797,13 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     // follow-up $inc.
     const parentDocs = [];
     const subtaskDocs = [];
-    for (const t of tasks) {
-        const subs = Array.isArray(t.subtasks) ? t.subtasks : [];
+    // A plan names people from the company's roster. The project is stored by now, so each task keeps the ones who
+    // can open it: on a private project, the people and teams it is shared with, the owners and the admins.
+    const keepPeople = keptOnProject(companyId, String(projectDoc._id));
+    const withPeopleOnProject = async (planned) => ({ ...planned, AssigneeUserId: await keepPeople(planned.AssigneeUserId || []) });
+    for (const planned of tasks) {
+        const t = await withPeopleOnProject(planned);
+        const subs = await Promise.all((Array.isArray(t.subtasks) ? t.subtasks : []).map(withPeopleOnProject));
         const parentDoc = buildTaskDoc({
             task: t, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid,
             subTaskCount: subs.length,
