@@ -60,7 +60,7 @@
                     <ShellIcon name="plus" :size="14" /> {{ $t('Settings.add_new_projects') }}
                 </button>
             </header>
-            <div class="st__content ah-scroll">
+            <div class="st__content ah-scroll" tabindex="0">
                 <router-view v-if="!accessPending && !routeHidden" />
             </div>
         </div>
