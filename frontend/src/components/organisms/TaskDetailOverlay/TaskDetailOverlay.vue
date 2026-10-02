@@ -38,17 +38,17 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
-import TaskDetailPanel from "./TaskDetailPanel.vue";
+import { loadTaskDetailPanel } from "./lazyPanel";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { initTimer } from "./useTaskTimer";
 import { useFocusTrap } from "@/composable/useFocusTrap";
 import {
     overlayState, isExpanded, bindRouter, openTask, closeTask, expandTask, minimizeTask,
-    restoreTask, dismissMinimized, stepTask, restoreFromSequence, closeOnPageChange, loadMinimizedTray, TASK_QUERY_KEY
+    restoreTask, dismissMinimized, stepTask, restoreFromSequence, closeOnRouteChange, loadMinimizedTray, TASK_QUERY_KEY
 } from "./useTaskOverlay";
 import { trayStorageKey } from "./minimizedTray";
 import { navKeyDirection } from "./taskNavigation";
@@ -58,6 +58,8 @@ import UndoToast from "@/components/molecules/UndoToast/UndoToast.vue";
 import "./style.css";
 
 defineOptions({ name: "TaskDetailOverlay" });
+
+const TaskDetailPanel = defineAsyncComponent(loadTaskDetailPanel);
 
 defineProps({
     /** Set by the host when an agent run is in progress for the open task; the panel renders a strip for it. */
@@ -174,7 +176,7 @@ watch(isExpanded, (expanded) => {
 });
 watch(() => route.params?.taskId, openFromRoute);
 watch(() => route.query?.[TASK_QUERY_KEY], (value) => { if (value) restoreFromQuery(); });
-watch(() => route.path, closeOnPageChange);
+watch([() => route.path, () => route.query?.[TASK_QUERY_KEY], () => route.params?.taskId], closeOnRouteChange);
 watch(() => [userId.value, companyId.value], loadTray);
 
 onMounted(() => {

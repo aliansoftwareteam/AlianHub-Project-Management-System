@@ -8,30 +8,22 @@
             :message="$t('Upgrades.the_feature_not_available')"
         />
     </div>
-    <div v-else>
+    <div v-else class="board-view" :data-density="density">
         <template v-if="isLoading">
             <div class="kanban-board-skeleton">
                 <div class="kanban-column-skeleton" v-for="j in skeletonColumns" :key="j">
-                    <div class="d-flex justify-content-between w-100 mb-15px">
-                        <Skelaton class="border-radius-5-px" style="height: 25px; width: 70px;" />
-                        <span class="cursor-pointer">
-                            <Skelaton class="border-radius-5-px" style="height: 25px; width: 24px;" />
-                        </span>
+                    <div class="kanban-column-skeleton__head">
+                        <Skelaton class="kanban-skel kanban-skel--count" />
+                        <Skelaton class="kanban-skel kanban-skel--add" />
                     </div>
-                    <div class="">
-                        <div class="kanban-card-wrapper-skeleton">
-                            <div class="kanban-card-skeleton pt-10px pl-10px pr-10px pb-5px w-100 mb-10px" v-for="i in SKELETON_CARDS" :key="i">
-                                <Skelaton class="border-radius-5-px mt-5px" style="height: 22px; width: 278px;" />
-                                <div class="d-flex align-items-center mt-5px justify-content-between">
-                                    <div class="d-flex align-items-center">
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                    </div>
-                                    <div class="d-flex align-items-center justify-content-between">
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                        <Skelaton class="mr-8px border-radius-50-per" style="height: 21px; width: 21px;" />
-                                        <Skelaton class="mr-8px border-radius-5-px" style="height: 21px; width: 30px;" />
-                                        <Skelaton class="border-radius-50-per" style="height: 21px; width: 21px;" />
-                                    </div>
+                    <div class="kanban-column-skeleton__cards">
+                        <div class="kanban-card-skeleton" v-for="i in SKELETON_CARDS" :key="i">
+                            <Skelaton class="kanban-skel kanban-skel--title" />
+                            <div class="kanban-card-skeleton__foot">
+                                <Skelaton class="kanban-skel kanban-skel--avatar" />
+                                <div class="kanban-card-skeleton__chips">
+                                    <Skelaton class="kanban-skel kanban-skel--chip" />
+                                    <Skelaton class="kanban-skel kanban-skel--chip" />
                                 </div>
                             </div>
                         </div>
@@ -51,15 +43,17 @@
                         @move="cardFields.move"
                         @reset="cardFields.reset"
                     />
+                    <ViewDensityControl :model-value="density" @update:model-value="setDensity" />
                 </div>
-                <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" />
+                <KanbanBoard :data="processedBoardData" :group="grouped" :sprintId="sprintId" :otherRows="otherOnBoard" :otherProjects="otherRows.projects.value" :otherTruncated="otherRowsShown && otherRows.truncated.value" />
             </template>
             <template v-else>
-                <div class="d-flex align-items-center justify-content-center flex-column mt-1">
+                <div class="board-view__empty">
                     <EmptyState
                         v-if="project?.deletedStatusKey !== 2"
                         :title="$t(emptyTitleKey)"
                         :message="$t(emptyMessageKey)"
+                        :sentence="emptySentenceKey ? $t(emptySentenceKey) : ''"
                         helpPath="tasks"
                     />
                 </div>
@@ -79,13 +73,19 @@ import isEqual from 'lodash/isEqual';
 import KanbanBoard from '@/views/Projects/Kanban/KanbanBoard.vue';
 import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 import { taskInGroup } from '@/views/Projects/ListView/listFilter';
+import { inList } from '@/store/ProjectData/listMembership';
+import { placeOnBoard, useOtherProjectRows } from '@/views/Projects/composables/otherProjectRows';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
+import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import { columnCatalogue, useViewColumns } from '@/views/Projects/composables/viewColumns';
 import ListSortControl from '@/views/Projects/ListView/ListSortControl.vue';
 import { sortChoices, sortTasks, useListSort } from '@/views/Projects/composables/viewSort';
 import { useProjectCustomFields } from '@/views/Projects/composables/projectCustomFields';
+import { useListRowMenu } from '@/views/Projects/ListView/useListRowMenu.js';
+import { useListInlineEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
@@ -109,7 +109,7 @@ const { groupBy } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
-const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
 
 const customFields = useProjectCustomFields(project, { archived: showArchiveVar });
 const cardCatalogue = computed(() => columnCatalogue('board', { fields: customFields.defs.value }));
@@ -117,7 +117,13 @@ const cardFields = useViewColumns(computed(() => project.value?._id), 'board', c
 provide('boardCardFields', cardFields.visibleColumns);
 provide('boardFieldTasks', customFields.allTasks);
 
+/* The card menu's rights and the two actions it borrows from the List, built once for the
+   board rather than once per card. */
+const rowMenu = useListRowMenu(project, showArchiveVar);
+provide('boardTaskMenu', { rights: rowMenu.rights, duplicate: rowMenu.duplicate, removeFromList: rowMenu.removeFromList, rename: useListInlineEdit(project).rename });
+
 const boardSort = useListSort();
+const { density, setDensity } = useViewSettings();
 const sortOptions = computed(() => sortChoices(customFields.defs.value));
 const userNames = computed(() => new Map((getters['users/users'] || []).map((user) => [user._id, user.Employee_Name])));
 const sortContext = computed(() => ({
@@ -151,7 +157,7 @@ const taskSourceArray = computed(() => {
     if (searchedTask.value && searchedTasksData.value.length > 0) {
         const currentSprintId = props.sprints[0]?.id;
         if (!currentSprintId) return [];
-        return searchedTasksData.value.filter(task => task.sprintId === currentSprintId);
+        return searchedTasksData.value.filter(task => inList(task, currentSprintId));
     } else if (!searchedTask.value && project.value?._id && props.sprints[0]?.id) {
         return allProjectTasks.value[project.value._id]?.[props.sprints[0].id]?.tasks || [];
     }
@@ -221,6 +227,11 @@ const processedBoardData = computed(() => {
     });
 });
 
+/* A search or a filter is matched against this project's own data, which says nothing of a task that lives elsewhere. */
+const otherRows = useOtherProjectRows(project, computed(() => props.sprints[0]?.id || ''));
+const otherRowsShown = computed(() => !searchedTask.value && !showArchiveVar.value);
+const otherOnBoard = computed(() => placeOnBoard(otherRowsShown.value ? otherRows.rows.value : [], processedBoardData.value));
+
 // Watch for changes in grouping type or sprints to regenerate the group structure
 watch([() => props.grouped, () => props.sprints,() => route?.params], ([newGroup, newSprints, newRouteParams], [oldGroup, oldSprints, oldRouteParams]) => {
     if (project.value?._id && (newGroup !== oldGroup || !isEqual(newSprints, oldSprints))) {        
@@ -241,12 +252,13 @@ onMounted(async () => {
         isLoading.value = true;
 
         try {
-            const needsInitialGrouping = !allProjectTasks.value[project.value._id]?.[props.sprints[0].id];
+            /* The sprint being in the store does not say its columns were read: the Table reads a
+               row's subtasks into it. Each column asks, and one that was read answers at once. */
             await new Promise((resolve) => {
-                groupBy(props.grouped, needsInitialGrouping, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+                groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
                     internalGroupedTasks.value = resp;
-                    resolve(); 
-                });
+                    resolve();
+                }, { firstPageOnly: true });
             });
 
         } catch (error) {
@@ -263,6 +275,6 @@ onMounted(async () => {
 <style src="./new-style.css" />
 
 <style>
-.board-card-fields { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 6px 20px 0; }
-@media (max-width: 767px) { .board-card-fields { padding: 6px 16px 0; } }
+.board-card-fields { display: flex; justify-content: flex-end; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--page-pad-x, 20px) 0; }
+@media (max-width: 767px) { .board-card-fields { padding: var(--sp-2) 16px 0; } }
 </style>

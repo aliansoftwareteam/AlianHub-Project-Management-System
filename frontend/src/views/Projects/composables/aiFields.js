@@ -1,6 +1,7 @@
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { flatTasks } from './projectCustomFields';
+import { maxOf as ratingFieldMax, settings as ratingSettings, type as RATING_FIELD } from '@fieldTypes/rating';
 
 /* Each output the builder offers: the field type that stores and renders it, and the output the server checks. */
 const OUTPUTS = {
@@ -13,7 +14,7 @@ const OUTPUTS = {
 };
 
 export const AI_OUTPUTS = Object.keys(OUTPUTS);
-export const AI_FIELD_TYPES = [...new Set(AI_OUTPUTS.map((key) => OUTPUTS[key].fieldType))];
+export const AI_FIELD_TYPES = [...new Set([...AI_OUTPUTS.map((key) => OUTPUTS[key].fieldType), RATING_FIELD])];
 export const AI_READ_PARTS = ['title', 'description', 'comments', 'subtasks'];
 export const OPTION_OUTPUTS = ['dropdown', 'labels'];
 export const DATE_RULES = ['', 'after_start', 'not_past'];
@@ -30,7 +31,11 @@ export const aiConfigOf = (def) => (def?.fieldAi?.enabled === true && AI_FIELD_T
 
 export const isAiField = (def) => Boolean(aiConfigOf(def));
 
+/* A rating output is a rating field with its own maximum. One saved before that type existed is a number field from 1 to 5, and stays one. */
+export const aiRatingMaxOf = (def) => (def?.fieldType === RATING_FIELD ? ratingFieldMax(def) : RATING_MAX);
+
 export function aiOutputOf(def) {
+    if (def?.fieldType === RATING_FIELD) return 'rating';
     const matching = AI_OUTPUTS.filter((key) => OUTPUTS[key].fieldType === def?.fieldType);
     return matching.find((key) => OUTPUTS[key].output === def?.fieldAi?.output) || matching[0] || 'textarea';
 }
@@ -48,7 +53,7 @@ export function aiFillFailure(task, def) {
 export function newAiDraft() {
     return {
         _id: '', fieldTitle: '', output: 'textarea', template: 'summary', language: '', prompt: '', reads: [...DEFAULT_READS], autoRefill: false, options: [],
-        min: '', max: '', decimals: '', outOfRange: 'clamp', dateRule: ''
+        min: '', max: '', decimals: '', outOfRange: 'clamp', dateRule: '', ratingOnNumber: false, fieldRatingMax: RATING_MAX
     };
 }
 
@@ -71,7 +76,9 @@ export function aiDraftFrom(field) {
         max: settingText(config.max),
         decimals: settingText(config.decimals),
         outOfRange: config.outOfRange === 'reject' ? 'reject' : 'clamp',
-        dateRule: DATE_RULES.includes(config.dateRule) ? config.dateRule : ''
+        dateRule: DATE_RULES.includes(config.dateRule) ? config.dateRule : '',
+        ratingOnNumber: output === 'rating' && field?.fieldType !== RATING_FIELD,
+        fieldRatingMax: aiRatingMaxOf(field)
     };
 }
 
@@ -97,6 +104,7 @@ export function validateAiDraft(draft, t) {
         const decimals = numberOrNull(draft.decimals);
         if (decimals !== null && !(Number.isInteger(decimals) && decimals >= 0 && decimals <= DECIMALS_MAX)) errors.decimals = t('AiFields.error_decimals', { max: DECIMALS_MAX });
     }
+    if (draft.output === 'rating' && !draft.ratingOnNumber && ratingSettings(draft).error) errors.settings = t('FieldTypes.rating_max_error');
     if (!(draft.reads || []).some((part) => AI_READ_PARTS.includes(part))) errors.reads = t('AiFields.error_reads');
     return errors;
 }
@@ -108,11 +116,12 @@ const bound = (n) => (n === null ? '' : String(n));
 export function aiFieldPayload(draft) {
     const title = String(draft.fieldTitle || '').trim();
     const spec = OUTPUTS[draft.output] || OUTPUTS.textarea;
+    const onRatingField = draft.output === 'rating' && draft.ratingOnNumber !== true;
     const payload = {
         fieldTitle: title,
         fieldDescription: title,
         fieldPlaceholder: '',
-        fieldType: spec.fieldType,
+        fieldType: onRatingField ? RATING_FIELD : spec.fieldType,
         type: 'task',
         fieldAi: {
             enabled: true,
@@ -138,7 +147,8 @@ export function aiFieldPayload(draft) {
         Object.assign(payload.fieldAi, { min, max, decimals: numberOrNull(draft.decimals), outOfRange: draft.outOfRange === 'reject' ? 'reject' : 'clamp' });
         Object.assign(payload, { fieldMinimum: bound(min), fieldMaximum: bound(max) });
     }
-    if (draft.output === 'rating') Object.assign(payload, { fieldMinimum: '1', fieldMaximum: String(RATING_MAX) });
+    if (onRatingField) payload.fieldRatingMax = (ratingSettings(draft).settings || ratingSettings({}).settings).fieldRatingMax;
+    else if (draft.output === 'rating') Object.assign(payload, { fieldMinimum: '1', fieldMaximum: String(RATING_MAX) });
     if (draft.output === 'date') {
         payload.fieldAi.dateRule = DATE_RULES.includes(draft.dateRule) ? draft.dateRule : '';
         Object.assign(payload, { fieldDateFormate: 'YYYY-MM-DD', fieldTimeFormate: '', fieldPastFuture: ['Past', 'Future'], fieldDaysDisable: [] });

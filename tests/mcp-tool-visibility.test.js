@@ -3,6 +3,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Modules/Automations/engine/tools', () => ({ oid: (id) => (/^[0-9a-fA-F]{24}$/.test(String(id)) ? String(id) : null) }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(), visibleProjects: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ ...jest.requireActual('../Config/permissionGuard'), getRoleType: jest.fn() }));
 jest.mock('../Modules/Agents/actions', () => {
@@ -59,6 +60,7 @@ const keys = (out) => out.tasks.map((t) => t.key).sort();
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     jest.clearAllMocks();
+    [P_A, P_B, P_C].forEach((_id) => mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id, deletedStatusKey: 0 }));
     const sprint = (projectId, extra = {}) => mockDb.seed(SCHEMA_TYPE.SPRINTS, { projectId, name: 'Sprint', AssigneeUserId: [], ...extra });
     const sOpen = sprint(P_A);
     const sPriv = sprint(P_A, { private: true, AssigneeUserId: [SOMEONE] });

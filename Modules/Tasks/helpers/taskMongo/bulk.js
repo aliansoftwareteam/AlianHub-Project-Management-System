@@ -26,7 +26,9 @@ const socketEmitter = require('../../../../event/socketEventEmitter');
 const { HandleHistory } = require('../mongo_helper');
 const { HandleBothNotification } = require('../handleNotification');
 const { recordCompletion } = require('./recordCompletion.js');
-const { escapeText } = require('../taskWriteFields');
+const { escapeText, TaskWriteRefusal, statusInProject, NOT_A_PROJECT_STATUS } = require('../taskWriteFields');
+const { projectHoldsTag, TAG_NOT_IN_PROJECT } = require('../taskItemHistory');
+const { ancestorsOf, loadSubtree, canNest } = require('../taskTree');
 const {
     taskAssigneeAdd, taskAssigneeRemove, taskAssigneeReplace,
     taskStatusChange, taskPriorityChange, shownStatus, shownPriority,
@@ -72,13 +74,14 @@ const mergeTaskUpdate = (task, fields) => {
 // listener (taskSocket.js:122) fans this out as `taskUpdate` to every
 // client subscribed to that project+sprint room — exactly what single-task
 // findOneAndUpdate does today through the same emitter.
-const emitTaskUpdate = (task, updatedFields) => {
+const emitTaskUpdate = (companyId, task, updatedFields) => {
     try {
         socketEmitter.emit('update', {
             type: 'update',
             data: mergeTaskUpdate(task, updatedFields),
             updatedFields: updatedFields || {},
             module: 'task',
+            companyId,
         });
     } catch (error) {
         logger.error(`emitTaskUpdate failed: ${error.message}`);
@@ -141,6 +144,22 @@ function makeProjectLoader(companyId) {
         cache.set(key, project || null);
         return project || null;
     };
+}
+
+/* Asks `judge` once for each project the tasks are in, and answers what it said for a task's project. */
+async function judgedByProject(tasks, judge) {
+    const verdicts = new Map();
+    for (const task of tasks) {
+        const projectId = String(task.ProjectID);
+        if (!verdicts.has(projectId)) verdicts.set(projectId, await judge(projectId));
+    }
+    return (task) => verdicts.get(String(task.ProjectID));
+}
+
+/* The tasks `verdictOf` passes; the rest join `skipped` under `reason`. */
+function keepJudged(found, verdictOf, skipped, reason) {
+    found.filter((task) => !verdictOf(task)).forEach((task) => skipped.push({ taskId: String(task._id), reason }));
+    return found.filter(verdictOf);
 }
 
 // Build the summary response shape returned to the route.
@@ -211,36 +230,38 @@ module.exports = {
                 if (!companyId) return reject(new Error('companyId required'));
                 if (!newStatus || !newStatus.status) return reject(new Error('newStatus required'));
 
-                const { tasks, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
-                if (!tasks.length) {
+                const { tasks: found, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
+                if (!found.length) {
                     return resolve(summarize({ updated: [], skipped, errors: [] }));
                 }
                 const loadProject = makeProjectLoader(companyId);
-                const taskObjIds = tasks.map((t) => t._id);
+                const statusOf = await judgedByProject(found, async (projectId) => statusInProject(await loadProject(projectId), newStatus));
+                const tasks = keepJudged(found, statusOf, skipped, 'status-not-in-project');
+                if (!tasks.length) return reject(new TaskWriteRefusal(400, NOT_A_PROJECT_STATUS));
                 const errors = [];
 
                 try {
-                    await MongoDbCrudOpration(companyId, {
-                        type: dbCollections.TASKS,
-                        data: [
-                            { _id: { $in: taskObjIds } },
-                            { $set: { ...newStatus }, $unset: { groupByStatusIndex: 1 } },
-                        ],
-                    }, 'updateMany');
+                    for (const projectId of new Set(tasks.map((t) => String(t.ProjectID)))) {
+                        const inProject = tasks.filter((t) => String(t.ProjectID) === projectId);
+                        await MongoDbCrudOpration(companyId, {
+                            type: dbCollections.TASKS,
+                            data: [
+                                { _id: { $in: inProject.map((t) => t._id) } },
+                                { $set: { ...statusOf(inProject[0]) }, $unset: { groupByStatusIndex: 1 } },
+                            ],
+                        }, 'updateMany');
+                    }
                 } catch (error) {
                     logger.error(`bulkUpdateStatus updateMany error: ${error.message}`);
                     return reject(error);
                 }
 
                 const updated = tasks.map((t) => String(t._id));
-                const newStatusText = newStatus.status.text;
                 for (const task of tasks) {
                     try {
                         const projectData = await loadProject(task.ProjectID);
-                        if (!projectData) {
-                            skipped.push({ taskId: String(task._id), reason: 'project-not-found' });
-                            continue;
-                        }
+                        const stored = statusOf(task);
+                        const newStatusText = stored.status.text;
                         const prevStatusName = task?.status?.text || '';
                         const historyObj = {
                             key: 'Task_Status',
@@ -254,7 +275,7 @@ module.exports = {
                             const notifContext = {
                                 ProjectName: projectData.ProjectName,
                                 taskName: task.TaskName,
-                                ...shownStatus({ statusName: prevStatusName }, newStatus).template,
+                                ...shownStatus({ statusName: prevStatusName }, stored).template,
                             };
                             HandleBothNotification({
                                 type: 'tasks',
@@ -272,16 +293,16 @@ module.exports = {
 
                         // Same provenance record the single-task path writes; without it a
                         // bulk close left no closedBy and the task showed no badge.
-                        recordCompletion({ companyId, taskId: task._id, task, newStatus, userData });
+                        recordCompletion({ companyId, taskId: task._id, task, newStatus: stored, userData });
 
-                        emitTaskUpdate(task, { ...newStatus });
+                        emitTaskUpdate(companyId, task, { ...stored });
                     } catch (error) {
                         logger.error(`bulkUpdateStatus task ${task._id}: ${error.message}`);
                         errors.push({ taskId: String(task._id), reason: error.message });
                     }
                 }
 
-                emitBulkSummary('bulkUpdateStatus', { taskIds: updated, newStatus });
+                emitBulkSummary('bulkUpdateStatus', { taskIds: updated, newStatus: statusOf(tasks[0]) });
                 resolve(summarize({ updated, skipped, errors }));
             } catch (error) {
                 logger.error(`bulkUpdateStatus error: ${error.message}`);
@@ -358,7 +379,7 @@ module.exports = {
                             }).catch((err) => logger.error(`bulkUpdatePriority notification ${task._id}: ${err.message}`));
                         }
 
-                        emitTaskUpdate(task, { ...firebaseObj });
+                        emitTaskUpdate(companyId, task, { ...firebaseObj });
                     } catch (error) {
                         logger.error(`bulkUpdatePriority task ${task._id}: ${error.message}`);
                         errors.push({ taskId: String(task._id), reason: error.message });
@@ -449,7 +470,7 @@ module.exports = {
                                     { date: newDate },
                                 ],
                             };
-                        emitTaskUpdate(task, dueFields);
+                        emitTaskUpdate(companyId, task, dueFields);
                     } catch (error) {
                         logger.error(`bulkUpdateDueDate task ${task._id}: ${error.message}`);
                         errors.push({ taskId: String(task._id), reason: error.message });
@@ -485,7 +506,7 @@ module.exports = {
         }
 
         tasks.forEach((task) => {
-            emitTaskUpdate(task, fieldsOf(task));
+            emitTaskUpdate(companyId, task, fieldsOf(task));
             const historyObj = {
                 key: 'Project_DueDate',
                 sprintId: task.sprintId,
@@ -697,7 +718,7 @@ module.exports = {
                             const drop = new Set(empIdArr);
                             nextAssignees = currentAssignees.filter((id) => !drop.has(id));
                         }
-                        emitTaskUpdate(task, { AssigneeUserId: nextAssignees });
+                        emitTaskUpdate(companyId, task, { AssigneeUserId: nextAssignees });
                         updated.add(String(task._id));
                     } catch (error) {
                         logger.error(`bulkUpdateAssignee task ${task._id}: ${error.message}`);
@@ -726,10 +747,16 @@ module.exports = {
                 }
                 if (!tagId) return reject(new Error('tagId required'));
 
-                const { tasks, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
-                if (!tasks.length) {
+                const { tasks: found, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
+                if (!found.length) {
                     return resolve(summarize({ updated: [], skipped, errors: [] }));
                 }
+                // A tag the project no longer has can still be taken off its tasks.
+                const holdsTag = operation === 'add'
+                    ? await judgedByProject(found, (projectId) => projectHoldsTag(companyId, projectId, tagId))
+                    : () => true;
+                const tasks = keepJudged(found, holdsTag, skipped, 'tag-not-in-project');
+                if (!tasks.length) return reject(new TaskWriteRefusal(400, TAG_NOT_IN_PROJECT));
                 const taskObjIds = tasks.map((t) => t._id);
                 const errors = [];
 
@@ -757,7 +784,7 @@ module.exports = {
                     const nextTags = operation === 'add'
                         ? Array.from(new Set([...currentTags, tagIdStr]))
                         : currentTags.filter((id) => id !== tagIdStr);
-                    emitTaskUpdate(task, { tagsArray: nextTags });
+                    emitTaskUpdate(companyId, task, { tagsArray: nextTags });
                 }
                 emitBulkSummary('bulkUpdateTags', { taskIds: updated, tagId, operation });
                 resolve(summarize({ updated, skipped, errors }));
@@ -795,10 +822,22 @@ module.exports = {
             try {
                 if (!companyId) return reject(new Error('companyId required'));
 
-                const { tasks, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived, includeDeleted });
+                const { tasks: selected, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived, includeDeleted });
                 const loadProject = makeProjectLoader(companyId);
                 const updated = [];
                 const errors = [];
+
+                /* Archiving or deleting a live task carries its live subtree, so a live row
+                 * selected together with a live task above it is left to that cascade. Handled
+                 * on its own as well, it would race the cascade for its state and its count. */
+                const liveSelected = new Set(selected.filter((t) => !t.deletedStatusKey).map((t) => String(t._id)));
+                const carriedByAnother = (task) => deletedStatusKey !== 0 && !task.deletedStatusKey
+                    && [String(task.ParentTaskId || ''), ...ancestorsOf(task)].some((above) => liveSelected.has(above));
+                const tasks = selected.filter((task) => {
+                    if (!carriedByAnother(task)) return true;
+                    skipped.push({ taskId: String(task._id), reason: 'carried-with-its-parent' });
+                    return false;
+                });
 
                 await Promise.allSettled(tasks.map(async (task) => {
                     try {
@@ -915,7 +954,7 @@ module.exports = {
                 // the single-task sidebar (a person picked them for this move) and
                 // wrong here, where every task has to keep its own. So each task,
                 // parent or subtask, moves on its own values.
-                const selectedIds = new Set(tasks.map((t) => String(t._id)));
+                const selectedRoots = new Set(tasks.filter((t) => t.isParentTask === true).map((t) => String(t._id)));
                 const queue = [];
                 const queued = new Set();
                 const enqueue = (task, carried) => {
@@ -927,9 +966,10 @@ module.exports = {
 
                 for (const task of tasks) {
                     if (task.isParentTask !== true) {
-                        // Its parent is selected too, so the parent's pass below picks
-                        // it up. Moving it here as well would move it twice.
-                        if (selectedIds.has(String(task.ParentTaskId || ''))) continue;
+                        // The task it sits under, at any level, is selected too, so that
+                        // task's pass below picks it up. Moving it here as well would
+                        // move it twice.
+                        if ([String(task.ParentTaskId || ''), ...ancestorsOf(task)].some((id) => selectedRoots.has(id))) continue;
 
                         // On its own, though, it does not move at all. A subtask has no
                         // existence outside its parent: the list renders subtasks nested
@@ -956,16 +996,7 @@ module.exports = {
                     // been bulk-moved before this fix has some. Matching on parentage
                     // alone means selecting the parent gathers them all back, which is
                     // the one way an already-stranded subtask can be reached at all.
-                    //
-                    // ParentTaskId is a String on the task schema, not an ObjectId.
-                    const children = await MongoDbCrudOpration(companyId, {
-                        type: dbCollections.TASKS,
-                        data: [{
-                            ParentTaskId: String(task._id),
-                            isParentTask: false,
-                            deletedStatusKey: { $nin: [1] },
-                        }],
-                    }, 'find').catch((error) => {
+                    const children = await loadSubtree(companyId, task._id, { filter: { deletedStatusKey: { $nin: [1] } } }).catch((error) => {
                         logger.error(`bulkMove subtasks of ${task._id}: ${error.message}`);
                         return null;
                     });
@@ -1007,6 +1038,8 @@ module.exports = {
                             oldProject,
                             // Each task moves as itself; the family was expanded above.
                             isSubTask: false,
+                            rowOnly: true,
+                            carried,
                             assignee: Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId : [],
                             watcher: Array.isArray(task.watchers) ? task.watchers : [],
                             userData,
@@ -1058,8 +1091,8 @@ module.exports = {
                 }, 'findOne');
                 if (!parent) return reject(new Error('parent task not found'));
                 if (parent.deletedStatusKey === 1) return reject(new Error('that parent task has been deleted'));
-                // Only one level of nesting exists, so a subtask cannot take children.
-                if (parent.isParentTask !== true) return reject(new Error('a subtask cannot be a parent'));
+                const room = canNest(parent.ParentTaskId ? parent : { _id: parent._id });
+                if (!room.ok) return reject(new TaskWriteRefusal(400, room.reason, room.code));
 
                 const { tasks, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
                 const updated = [];
@@ -1114,10 +1147,10 @@ module.exports = {
                         skipped.push({ taskId: id, reason: 'already-a-subtask-of-this-parent' });
                         continue;
                     }
-                    // Converting a parent carries its own subtasks across, so a
-                    // subtask whose parent is also selected is handled by that pass.
+                    // Converting a task carries its whole subtree across, so a
+                    // subtask under another selected task is handled by that pass.
                     // Doing it again would reparent it twice and count it twice.
-                    if (task.isParentTask !== true && selectedIds.has(String(task.ParentTaskId || ''))) {
+                    if (task.isParentTask !== true && [String(task.ParentTaskId || ''), ...ancestorsOf(task)].some((above) => selectedIds.has(above))) {
                         skipped.push({ taskId: id, reason: 'carried-with-its-parent' });
                         continue;
                     }
@@ -1141,11 +1174,7 @@ module.exports = {
                             selectedTaskId: id,
                             taskId: parent._id,
                             oldProject,
-                            // A converted parent's own subtasks come across with it and
-                            // land beside it under the new parent, because only one
-                            // level of nesting exists. Leaving them behind would strand
-                            // them under a task that is no longer a parent.
-                            isSubTask: task.isParentTask === true && Number(task.subTasks || 0) > 0,
+                            isSubTask: Number(task.subTasks || 0) > 0,
                             userData,
                         });
 
@@ -1324,7 +1353,7 @@ module.exports = {
                             }, 'findOneAndUpdate').then((restored) => {
                                 socketEmitter.emit('update', {
                                     type: 'update', data: restored,
-                                    updatedFields: { deletedStatusKey: wasDeletedStatusKey }, module: 'task',
+                                    updatedFields: { deletedStatusKey: wasDeletedStatusKey }, module: 'task', companyId,
                                 });
                             }).catch((error) => {
                                 logger.error(`bulkConvertToTask restore ${id}: ${error && error.message}`);

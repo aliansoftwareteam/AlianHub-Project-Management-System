@@ -14,7 +14,7 @@ describe('SetupChecklist', () => {
                     { key: 'permissions', label: 'Home.step_permissions', note: 'Home.step_permissions_note', done: false },
                 ],
             },
-            global: { mocks: { $t: (key) => words[key] || key } },
+            global: { mocks: { $t: (key) => words[key] || key }, stubs: { ShellIcon: true } },
         });
         expect(wrapper.find('.hc-setup__steps').text().replace(/\s+/g, ' ')).toContain('Review member permissions (defaults applied)');
     });

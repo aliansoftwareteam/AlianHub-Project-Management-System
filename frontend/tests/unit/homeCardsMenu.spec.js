@@ -32,8 +32,8 @@ const rowIds = (wrapper) => wrapper.findAll('[data-test="home-card-row"]').map((
 const lastSaved = () => apiRequestWithoutCompnay.mock.calls.at(-1);
 
 describe('Home cards and the dashboard catalogue', () => {
-    it('has its own cards, including Recents', () => {
-        expect(HOME_CARDS.map((c) => c.id)).toEqual(['waiting', 'standup', 'assigned_comments', 'recents']);
+    it('has its own cards, including Recents and Goals', () => {
+        expect(HOME_CARDS.map((c) => c.id)).toEqual(['waiting', 'standup', 'assigned_comments', 'recents', 'goals']);
     });
 
     it('offers only built dashboard cards, read from the dashboard catalogue', () => {

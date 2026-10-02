@@ -43,7 +43,7 @@ async function uploadFile(accessToken, fields) {
     }));
 }
 
-const trackerPath = () => `Project/${state.projects.shared._id}/Sprint/${randomId()}/TimeLog/${randomId()}/${Date.now()}.png`;
+const trackerPath = (timeSheetId = randomId()) => `Project/${state.projects.shared._id}/Sprint/${randomId()}/TimeLog/${timeSheetId}/${Date.now()}.png`;
 
 /* Same URL, headers, fields and field order as TrackerController.ScreenShotCapture in time-tracker-app. */
 async function captureScreenshot(accessToken, companyHeader, { companyId, filePath, timeSheetId = randomId() }) {
@@ -192,8 +192,9 @@ describe('POST /api/v4/timeTracker/capture checks access before it writes', () =
             description: `storage ${uniqueSuffix()}`, projectId: state.projects.shared._id, taskId: state.tasks[0]._id, companyId: COMPANY_A, userId: member.uid,
         });
         expect(started.body.status).toBe(true);
-        const filePath = trackerPath();
-        const res = await captureScreenshot(member.accessToken, COMPANY_A, { companyId: COMPANY_A, filePath, timeSheetId: String(started.body.statusText) });
+        const timeSheetId = String(started.body.statusText);
+        const filePath = trackerPath(timeSheetId);
+        const res = await captureScreenshot(member.accessToken, COMPANY_A, { companyId: COMPANY_A, filePath, timeSheetId });
         expect(res.status).toBe(200);
         expect(fs.readFileSync(path.join(STORAGE_ROOT, COMPANY_A, filePath))).toEqual(SCREENSHOT);
     });

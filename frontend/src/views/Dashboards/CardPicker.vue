@@ -11,7 +11,7 @@
                     class="ah-input dpick__search"
                     :placeholder="$t('Dash.search_cards')"
                 />
-                <button type="button" class="dpick__close" :title="$t('Dash.close')" @click="$emit('close')">
+                <button type="button" class="dpick__close" :title="$t('Dash.close')" :aria-label="$t('Dash.close')" @click="$emit('close')">
                     <ShellIcon name="x" :size="15" />
                 </button>
             </header>
@@ -101,7 +101,7 @@ onMounted(() => searchInput.value && searchInput.value.focus());
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: var(--sp-9);
 }
 .dpick__panel {
     width: min(920px, 100%);
@@ -114,22 +114,18 @@ onMounted(() => searchInput.value && searchInput.value.focus());
     overflow: hidden;
 }
 .dpick__head {
-    position: relative;
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr auto auto;
     align-items: center;
-    gap: 10px;
-    padding: 16px 20px;
+    gap: var(--sp-4);
+    padding: var(--sp-7) var(--sp-8);
     border-bottom: 1px solid var(--hairline);
 }
 .dpick__lede { margin: 0; font: var(--text-small); color: var(--ink-2); }
-.dpick__search { width: 220px; height: 34px; }
+.dpick__search { width: 220px; height: max(var(--hit-min), var(--control-h-lg, 34px)); }
 .dpick__close {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    width: 28px;
-    height: 28px;
+    width: max(var(--hit-min), var(--control-h, 28px));
+    height: max(var(--hit-min), var(--control-h, 28px));
     display: grid;
     place-items: center;
     border: 0;
@@ -139,15 +135,15 @@ onMounted(() => searchInput.value && searchInput.value.focus());
     cursor: pointer;
 }
 .dpick__close:hover { background: var(--surface-hover); color: var(--ink); }
-.dpick__body { padding: 16px 20px 20px; overflow: auto; display: flex; flex-direction: column; gap: 20px; }
-.dpick__family-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 9px; }
+.dpick__body { padding: var(--sp-7) var(--sp-8) var(--sp-8); overflow: auto; display: flex; flex-direction: column; gap: var(--sp-8); }
+.dpick__family-head { display: flex; align-items: baseline; gap: var(--sp-4); margin-bottom: calc(var(--sp-3) + 1px); }
 .dpick__question { font: var(--text-small); color: var(--ink-2); }
-.dpick__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 10px; }
+.dpick__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: var(--sp-4); }
 .dpick__card {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    padding: 11px 13px;
+    gap: calc(var(--sp-1) + 1px);
+    padding: var(--card-pad-y, 11px) var(--card-pad-x, 13px);
     border: 1px solid var(--hairline);
     border-radius: var(--r-input);
     background: var(--surface);
@@ -156,22 +152,24 @@ onMounted(() => searchInput.value && searchInput.value.focus());
 .dpick__card.is-disabled { background: var(--surface-2); }
 .dpick__card-title { font: var(--text-h3); color: var(--ink); }
 .dpick__card.is-disabled .dpick__card-title { color: var(--ink-2); }
-.dpick__card-answer { margin: 0; font: var(--text-small); font-size: 12px; color: var(--ink-2); line-height: 1.45; flex: 1 1 auto; }
-.dpick__card-foot { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.dpick__card-answer { margin: 0; font: var(--text-small); font-size: var(--fs-sm, 12px); color: var(--ink-2); line-height: var(--lh-body, 1.45); flex: 1 1 auto; }
+.dpick__card-foot { display: flex; align-items: center; gap: var(--sp-3); margin-top: var(--sp-1); }
 .dpick__add { margin-left: auto; }
 .dpick__soon { margin-left: auto; background: var(--surface-hover); color: var(--ink-label); }
 .dpick__none { margin: 30px auto; }
 .dpick__foot {
-    padding: 11px 20px;
+    padding: calc(var(--sp-4) + 1px) var(--sp-8);
     border-top: 1px solid var(--hairline);
     font: var(--text-small);
-    font-size: 11.5px;
+    font-size: var(--fs-sm, 11.5px);
     color: var(--ink-2);
 }
 @media (max-width: 768px) {
     .dpick { padding: 0; }
     .dpick__panel { max-height: 100vh; height: 100%; border-radius: 0; }
-    .dpick__head { grid-template-columns: 1fr; }
-    .dpick__search { width: 100%; }
+    .dpick__head { grid-template-columns: 1fr auto; }
+    .dpick__close { grid-area: 1 / 2; }
+    .dpick__lede { grid-column: 1 / -1; }
+    .dpick__search { grid-column: 1 / -1; width: 100%; }
 }
 </style>

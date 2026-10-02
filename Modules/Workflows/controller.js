@@ -27,7 +27,7 @@ const dryRun = require('./dryRun');
 //
 // Everything here is behind WORKFLOW_ENGINE. With the flag off there is no
 // engine to talk to, so the whole surface answers 503: the feature is not
-// refused, it is not running.
+// refused, it is not running. The approvals list is the exception (see listApprovals).
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const STEP_ID = /^[A-Za-z0-9_.-]{1,64}$/;
@@ -77,7 +77,7 @@ const readableRun = async (companyId, caller, runId) => {
     if (!OBJECT_ID.test(String(runId || ''))) return null;
     const run = await store.getRun(companyId, runId);
     if (!run) return null;
-    if (caller.privileged) return run;
+    if (caller.privileged) return (await access.readableRuns(companyId, caller, [run])).length ? run : null;
     if (String(run.startedBy || '') === String(caller.actor.userId)) return run;
     const visible = await access.visibleProjectIdsFor(companyId, caller);
     if (run.projectId && visible && visible.includes(String(run.projectId))) return run;
@@ -260,7 +260,7 @@ exports.listRuns = async (req, res) => {
         const ctx = await context(req, res);
         if (!ctx) return undefined;
         const rows = (await store.listRuns(ctx.companyId, req.query || {})) || [];
-        if (ctx.caller.privileged) return ok(res, 'Runs fetched.', rows);
+        if (ctx.caller.privileged) return ok(res, 'Runs fetched.', await access.readableRuns(ctx.companyId, ctx.caller, rows));
         const visible = await access.visibleProjectIdsFor(ctx.companyId, ctx.caller);
         const mine = rows.filter((run) => String(run.startedBy || '') === String(ctx.caller.actor.userId)
             || (run.projectId && visible && visible.includes(String(run.projectId))));
@@ -473,9 +473,13 @@ const namesForApprovals = (rows) => people.namesOf(rows.flatMap((row) => [
  * What a person is being asked to decide. A reader who is neither an Owner nor
  * an Admin sees the ones they own and the ones on a run they may already read —
  * the same visibility `readableRun` gives, so an approval never reveals a run
- * the caller could not open for themselves. */
+ * the caller could not open for themselves.
+ *
+ * Home asks this on every visit, so with the engine off it is the one route that
+ * answers 200: nothing is waiting, and `engineOff` says why. */
 exports.listApprovals = async (req, res) => {
     try {
+        if (!flag.enabled()) return res.send({ status: true, statusText: UNAVAILABLE, data: [], engineOff: true });
         const ctx = await context(req, res);
         if (!ctx) return undefined;
         const status = String((req.query || {}).status || approvals.STATUS.PENDING);

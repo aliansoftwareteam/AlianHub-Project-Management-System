@@ -38,7 +38,7 @@
                         :key="'user'+index"
                     >   
                         <div class="d-flex align-items-center" :title="user.label">
-                            <UserProfile
+                            <UserProfile decorative
                                 :showDot="false"
                                 class="cursor-pointer ml--5px"
                                 :data="user"
@@ -76,6 +76,7 @@
         </slot>
 
         <Sidebar
+            themed
             :title="$t('Projects.list_of_user')"
             :value="detailedUsers.map((x) => ({value: x.id, label: x.title ,id: x.id, image: x.image, isOnline: x.isOnline,designation:x.designation}))"
             v-model:visible="visible"
@@ -249,6 +250,8 @@ function selectFun(event) {
         emit('agent', event);
         return;
     }
+    // The panel closes itself only on a new pick; taking the one person off must close it too.
+    if (!props.multiSelect) visible.value = false;
     selectedUser.value.includes(event.id) ? emit('removed', event) : emit('selected', event)
 }
 // Temporary team assign hide
@@ -286,10 +289,11 @@ const detailedOptions = computed(() => {
             options: props.agents.map((agent) => ({
                 id: `agent_${agent._id}`,
                 value: `agent_${agent._id}`,
-                label: agent.name,
+                label: agent.connected ? t('TaskPanel.my_ai', { name: agent.name }) : agent.name,
                 image: '',
                 type: 'agent',
                 agentId: agent._id,
+                ...(agent.connected ? { connected: true, ownerId: agent.ownerId, shownAs: agent.shownAs } : {}),
                 tag: t('TaskPanel.agent_tag'),
                 teamColor: { color: '#fff', bgColor: 'var(--agent)' }
             }))

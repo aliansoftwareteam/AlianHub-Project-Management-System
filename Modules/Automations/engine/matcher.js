@@ -64,6 +64,9 @@ async function loadRules(companyId) {
     }
 }
 
+/* The enabled rules a company holds on one trigger, from the same cache the matcher walks. */
+const rulesFor = async (companyId, eventType) => (await loadRules(String(companyId))).get(eventType) || [];
+
 const invalidate = (companyId) => { ruleCache.delete(String(companyId)); };
 const invalidateAll = () => { ruleCache.clear(); };
 
@@ -95,6 +98,7 @@ const inScope = (rule, envelope) => {
  * priority change, is an infinite loop that costs one tenant their database. */
 const acceptsActor = (rule, envelope) => {
     const kind = envelope.actor?.kind;
+    if (kind === 'import') return false;
     if (kind !== 'automation' && kind !== 'agent') return true;
     return rule.reactToAutomation === true;
 };
@@ -118,4 +122,4 @@ async function match(companyId, envelope) {
     });
 }
 
-module.exports = { match, invalidate, invalidateAll, contextFor, inScope, acceptsActor, indexRules, CACHE_TTL_MS };
+module.exports = { match, rulesFor, invalidate, invalidateAll, contextFor, inScope, acceptsActor, indexRules, CACHE_TTL_MS };

@@ -36,11 +36,17 @@ const { updateStatus, stub, slotStub, exposed, perms, apps, toast, projectPayloa
 
 const { openRuns } = vi.hoisted(() => ({ openRuns: { rows: [] } }));
 const { sessions, flags } = vi.hoisted(() => ({ sessions: { rows: [] }, flags: { agentSessions: false } }));
+const { taskReads } = vi.hoisted(() => ({ taskReads: { byId: {} } }));
 vi.mock('@/config/publicConfig', () => ({ publicConfig: flags }));
 
 vi.mock('@/services', () => ({
-    apiRequest: vi.fn((method, url) => {
+    apiRequest: vi.fn((method, url, body) => {
         if (String(url).includes('/taskData')) return Promise.resolve({ status: 200, data: [projectPayload] });
+        if (method === 'post' && url === '/api/v1/task/find') {
+            const ids = body?.findQuery?.[0]?.$match?._id?.objId?.$in;
+            return Promise.resolve({ status: 200, data: ids ? ids.map((id) => taskReads.byId[id]).filter(Boolean).reverse() : [] });
+        }
+        if (method === 'get' && String(url).startsWith('/api/v1/task/')) return Promise.resolve({ status: 200, data: taskReads.byId[String(url).split('/').pop()] });
         if (String(url).includes('/agents/runs?status=open')) return Promise.resolve({ status: 200, data: { status: true, data: openRuns.rows } });
         if (String(url).includes('/agents/runs/') && String(url).endsWith('/stop')) return Promise.resolve({ status: 200, data: { status: true, data: {} } });
         if (String(url).includes('/agent-sessions?taskId=')) return Promise.resolve({ status: 200, data: { status: true, data: sessions.rows } });
@@ -91,6 +97,8 @@ vi.mock('@/components/organisms/TaskDetailOverlay/TaskTrackerHandoff.vue', () =>
 
 import TaskDetailPanel from '@/components/organisms/TaskDetailOverlay/TaskDetailPanel.vue';
 import { undoToast, runUndo, dismissUndoToast } from '@/composable/useUndoToast';
+import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
+import { apiRequest } from '@/services';
 import en from '@/locales/en.js';
 import { inkOf, worstContrast } from './wcagContrast';
 
@@ -98,9 +106,10 @@ const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 const t = i18n.global.t;
 
-function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null, width = 1280, stubs = {} } = {}) {
+function mountPanel({ roleType = 1, userId = 'u1', socket = null, nav = null, width = 1280, stubs = {}, folders = [] } = {}) {
     const store = createStore({
         getters: {
+            'projectData/folders': () => ({ 'proj-1': folders }),
             'settings/companyUserDetail': () => ({ roleType }),
             'settings/companyOwnerDetail': () => ({}),
             'projectData/gettaskDetailData': () => null,
@@ -385,6 +394,107 @@ describe('TaskDetailPanel', () => {
         });
     });
 
+    describe('three levels of subtasks', () => {
+        const base = { _id: 'task-1', TaskName: 'Write spec', TaskKey: 'AH-1', statusKey: 'st-open', statusType: 'open', AssigneeUserId: [] };
+        const levelOne = { ...base, isParentTask: true };
+        const levelTwo = { ...base, isParentTask: false, ParentTaskId: 'parent-1', ancestors: ['parent-1'] };
+        const levelThree = { ...base, isParentTask: false, ParentTaskId: 'parent-1', ancestors: ['root-1', 'parent-1'] };
+        const quickLabels = (wrapper) => wrapper.get('.ah-detail__quick').findAll('button').map((button) => button.text());
+        const tabLabels = (wrapper) => wrapper.findAll('[role="tab"]').map((tab) => tab.text());
+        const trail = (wrapper) => wrapper.get('.ah-detail__crumb').findAll('.ah-detail__trail > *:not(.ah-detail__crumb-sep)').map((el) => el.text());
+        const reads = (method, match) => apiRequest.mock.calls.filter(([m, url]) => m === method && match(String(url)));
+
+        beforeEach(() => {
+            for (const key of Object.keys(perms)) delete perms[key];
+            projectPayload.sprintsObj = [];
+            projectPayload.sprintsfolders = [];
+            taskReads.byId = {
+                'root-1': { _id: 'root-1', TaskName: 'Launch plan', TaskKey: 'AH-7', sprintId: 'sprint-1', isParentTask: true },
+                'parent-1': { _id: 'parent-1', TaskName: 'Landing page', TaskKey: 'AH-8', sprintId: 'sprint-1', isParentTask: false, ParentTaskId: 'root-1', ancestors: ['root-1'] }
+            };
+        });
+        afterEach(() => { taskReads.byId = {}; });
+
+        it('offers Add subtask and the subtasks tab on a task and on a subtask', async () => {
+            for (const task of [levelOne, levelTwo]) {
+                Object.assign(projectPayload, { sprintsObj: [], sprintsfolders: [] });
+                projectPayload.tasks[0] = task;
+                const wrapper = mountPanel();
+                await flushPromises();
+                expect(quickLabels(wrapper)).toContain('Add subtask');
+                expect(tabLabels(wrapper)).toContain('Subtasks');
+                expect(wrapper.find('.ah-detail__depth-note').exists()).toBe(false);
+            }
+        });
+
+        it('hides both on a third-level subtask and says why', async () => {
+            projectPayload.tasks[0] = levelThree;
+            const wrapper = mountPanel();
+            await flushPromises();
+            expect(quickLabels(wrapper)).toEqual(['Relate', 'Checklist', 'Attach']);
+            expect(tabLabels(wrapper)).not.toContain('Subtasks');
+            expect(wrapper.get('.ah-detail__depth-note').text()).toBe(en.TaskPanel.subtask_depth_limit);
+        });
+
+        it('keeps the reason from a member who could not add a subtask anyway', async () => {
+            projectPayload.tasks[0] = levelThree;
+            perms['task.sub_task_create'] = false;
+            const wrapper = mountPanel();
+            await flushPromises();
+            expect(wrapper.find('.ah-detail__depth-note').exists()).toBe(false);
+        });
+
+        it('names the whole chain above a third-level subtask from one read', async () => {
+            projectPayload.tasks[0] = levelThree;
+            const wrapper = mountPanel();
+            await flushPromises();
+            expect(trail(wrapper)).toEqual(['Launch plan', 'Landing page', 'Write spec']);
+            expect(wrapper.get('.ah-detail__crumb [aria-current="page"]').text()).toBe('Write spec');
+            const chainReads = reads('post', (url) => url === '/api/v1/task/find').filter(([, , body]) => body.findQuery[0].$match._id);
+            expect(chainReads).toHaveLength(1);
+            expect(chainReads[0][2].findQuery[0].$match._id).toEqual({ objId: { $in: ['root-1', 'parent-1'] } });
+            expect(reads('get', (url) => url.startsWith('/api/v1/task/'))).toHaveLength(0);
+        });
+
+        it('opens the task behind each name of the chain', async () => {
+            projectPayload.tasks[0] = levelThree;
+            const wrapper = mountPanel();
+            await flushPromises();
+            const links = wrapper.get('.ah-detail__crumb').findAll('.ah-detail__trail button');
+            expect(links).toHaveLength(2);
+            await links[0].trigger('click');
+            expect(openTask).toHaveBeenLastCalledWith(expect.objectContaining({ taskId: 'root-1', projectId: 'proj-1', sprintId: 'sprint-1' }));
+            await links[1].trigger('click');
+            expect(openTask).toHaveBeenLastCalledWith(expect.objectContaining({ taskId: 'parent-1' }));
+        });
+
+        it('falls back to the one parent for a subtask that has no chain yet', async () => {
+            projectPayload.tasks[0] = { ...base, isParentTask: false, ParentTaskId: 'parent-1' };
+            const wrapper = mountPanel();
+            await flushPromises();
+            expect(trail(wrapper)).toEqual(['Landing page', 'Write spec']);
+            expect(reads('get', (url) => url === '/api/v1/task/parent-1')).toHaveLength(1);
+            expect(reads('post', (url) => url === '/api/v1/task/find').filter(([, , body]) => body.findQuery[0].$match._id)).toHaveLength(0);
+            expect(wrapper.findComponent({ name: 'TaskDetailRightSide' }).vm.$attrs.parentTask).toMatchObject({ _id: 'parent-1' });
+        });
+
+        it('shows no chain on a task', async () => {
+            projectPayload.tasks[0] = levelOne;
+            const wrapper = mountPanel();
+            await flushPromises();
+            expect(wrapper.find('.ah-detail__trail').exists()).toBe(false);
+        });
+
+        it('lets a phone reach the tasks above', async () => {
+            projectPayload.tasks[0] = levelThree;
+            const wrapper = mountPanel({ width: 390 });
+            await flushPromises();
+            const nav = wrapper.get('nav.ah-detail__trail-row');
+            expect(nav.attributes('aria-label')).toBe(en.TaskPanel.parent_tasks);
+            expect(nav.findAll('button').map((button) => button.text())).toEqual(['Launch plan', 'Landing page']);
+        });
+    });
+
     describe('the phone header chips', () => {
         beforeEach(() => {
             for (const key of Object.keys(perms)) delete perms[key];
@@ -495,6 +605,36 @@ describe('TaskDetailPanel', () => {
                 expect(worstContrast(inkOf(style), style.background, 'light'), chip.text()).toBeGreaterThanOrEqual(4.5);
                 expect(worstContrast(style.getPropertyValue('--status-ink-dark'), style.background, 'dark'), chip.text()).toBeGreaterThanOrEqual(4.5);
             }
+        });
+    });
+
+    describe('the breadcrumb of a task in a subfolder', () => {
+        const subfolder = { _id: 'f-sub', name: 'Icons', projectId: 'proj-1', deletedStatusKey: 0, parentFolderId: 'f-top' };
+        const parent = { _id: 'f-top', name: 'Design', projectId: 'proj-1', deletedStatusKey: 0, parentFolderId: null };
+        const crumbs = (wrapper) => wrapper.findAll('nav.ah-detail__crumb .ah-detail__crumb-link').map((crumb) => crumb.text());
+
+        beforeEach(() => {
+            projectPayload.ProjectName = 'Alpha';
+            projectPayload.sprintsObj = [{ _id: 'sprint-1', name: 'Sprint 1', projectId: 'proj-1', folderId: 'f-sub' }];
+            projectPayload.sprintsfolders = [subfolder];
+            projectPayload.tasks[0] = { _id: 'task-1', TaskName: 'Write spec', TaskKey: 'AH-1', statusKey: 'st-open', statusType: 'open', AssigneeUserId: [], isParentTask: true, sprintId: 'sprint-1', folderObjId: 'f-sub', sprintArray: { name: 'Sprint 1', folderName: 'Icons' } };
+        });
+        afterEach(() => {
+            delete projectPayload.ProjectName;
+            projectPayload.sprintsObj = [];
+            projectPayload.sprintsfolders = [];
+        });
+
+        it('names the parent folder before the subfolder when the project\'s folders are loaded', async () => {
+            const wrapper = mountPanel({ folders: [parent, subfolder] });
+            await flushPromises();
+            expect(crumbs(wrapper)).toEqual(['Alpha', 'Design', 'Icons', 'Sprint 1']);
+        });
+
+        it('names the task\'s own folder alone when they are not', async () => {
+            const wrapper = mountPanel();
+            await flushPromises();
+            expect(crumbs(wrapper)).toEqual(['Alpha', 'Icons', 'Sprint 1']);
         });
     });
 });

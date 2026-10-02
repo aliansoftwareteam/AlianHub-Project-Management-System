@@ -10,6 +10,7 @@
         <th colspan="100%">
             <div class="days-selected-dropdown">
                 <SelectComp
+                    themed
                     :name="SelectionuiqId"
                     title=""
                     displayKey="name"
@@ -24,6 +25,7 @@
             </div>
             <div class="days-selected-dropdown days-selected-dropdown-value" v-if="days && days.length">
                 <SelectComp
+                    themed
                     :name="SelectionuiqIds"
                     title=""
                     displayKey="name"
@@ -49,7 +51,7 @@
                 >                                 
                     <div class="date_days_month month_avalue">
                         <span class="month_name_data">
-                            <span class="monthDateFamily font-weight-700">{{tableHeadIndex < 9 ? '0' : ''}}{{tableHeadIndex + 1}}</span> <span class="monthDateFamily font-weight-400">{{ thead.day }}</span>
+                            <span class="monthDateFamily mr-day">{{tableHeadIndex < 9 ? '0' : ''}}{{tableHeadIndex + 1}}</span> <span class="monthDateFamily">{{ thead.day }}</span>
                         </span>
                     </div>
                 </th>
@@ -59,7 +61,7 @@
             <template v-for="(thead, tableHeadIndex) in allMonths" :key="'H'+tableHeadIndex">
                 <th :class="[{'bg-color-highlight':new Date().getMonth() === tableHeadIndex,'border-color-highlight-left':new Date().getMonth() === tableHeadIndex,'border-color-highlight-left-next':new Date().getMonth() + 1 === tableHeadIndex}]">                                 
                     <div class="date_days_month month_avalue">
-                        <span class="month_name_data monthFamily cursor-pointer" :style="[{color: new Date().getMonth() === tableHeadIndex ?  '' : '#3B3B3B'}]" @click="handleMonth(tableHeadIndex,year1[0].name)">{{ thead.name }}</span>
+                        <span class="month_name_data monthFamily cursor-pointer" @click="handleMonth(tableHeadIndex,year1[0].name)">{{ thead.name }}</span>
                     </div>
                 </th>
             </template>

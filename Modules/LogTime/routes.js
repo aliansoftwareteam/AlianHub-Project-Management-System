@@ -560,6 +560,7 @@ exports.init = (app) => {
      */
     app.post('/api/v2/timetracker/timelog', ctrlV2.getTimelog)
     app.get('/api/v2/timetracker/running', ctrlV2.listRunningTimers);
+    app.get('/api/v2/timetracker/can-start', ctrlV2.canStartTimer);
     app.post('/api/v2/timetracker/trim', ctrlV2.trimTimer);
 
 

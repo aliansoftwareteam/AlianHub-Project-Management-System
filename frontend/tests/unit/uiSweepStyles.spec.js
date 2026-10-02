@@ -75,7 +75,7 @@ describe('the calendar controls in the project toolbar', () => {
         const rule = ruleBody(phone, '.pft .top-filter-section');
         expect(rule).toMatch(/box-sizing:\s*border-box/);
         expect(rule).toMatch(/width:\s*auto/);
-        expect(rule).toMatch(/min-width:\s*40px/);
+        expect(rule).toMatch(/min-width:\s*var\(--hit-min\)/);
     });
 
     test('the previous and next chevrons have no white disc', () => {
@@ -97,6 +97,11 @@ describe('the project calendar card in dark mode', () => {
     test('the legacy white sprint card takes the dark surface when it holds the calendar', () => {
         const css = read('assets/css/tokens.css');
         expect(ruleBody(css, ':root[data-theme="dark"] .ah-page .sprint:has(.cv)')).toMatch(/background-color:\s*var\(--surface\)/);
+    });
+
+    test('a collapsed list on the calendar tab takes it too', () => {
+        const css = read('assets/css/tokens.css');
+        expect(ruleBody(css, ':root[data-theme="dark"] .ah-page .sprint:has(.spr__head)')).toMatch(/background-color:\s*var\(--surface\)/);
     });
 });
 

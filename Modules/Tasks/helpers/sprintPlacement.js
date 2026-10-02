@@ -4,6 +4,8 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { taskIdMatch } = require('../../Comments/helpers/taskIdMatch');
 const { scheduleReconciliation } = require('./reconcileTaskCount');
+const { placeDescendants } = require('./taskTree');
+const socketEmitter = require('../../../event/socketEventEmitter');
 
 const asObjectId = (id) => (/^[0-9a-fA-F]{24}$/.test(String(id || '')) ? new mongoose.Types.ObjectId(String(id)) : null);
 
@@ -46,4 +48,15 @@ const followSprintMove = async (companyId, { taskId, projectId, fromSprintId, to
     ]);
 };
 
-module.exports = { sprintPlacementOf, followSprintMove };
+/* A task's subtasks, at every level, live where it lives: they take the placement it was given,
+ * and each one's sprint count and comment thread follow as the task's own did. */
+const moveDescendants = async (companyId, topId, placement, toSprintId) => {
+    const rows = await placeDescendants(companyId, topId, placement);
+    for (const row of rows) {
+        socketEmitter.emit('update', { type: 'update', data: { ...row, ...placement.set }, updatedFields: placement.set, module: 'task', companyId });
+        await followSprintMove(companyId, { taskId: row._id, projectId: row.ProjectID, fromSprintId: row.sprintId, toSprintId });
+    }
+    return rows.length;
+};
+
+module.exports = { sprintPlacementOf, followSprintMove, moveDescendants };

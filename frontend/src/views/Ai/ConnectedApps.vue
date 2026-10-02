@@ -18,7 +18,12 @@
                     <div class="ca__chips">
                         <span v-for="scope in grant.scopes" :key="scope" class="ah-chip" data-test="grant-scope">{{ $t(scopeNameKey(scope)) }}</span>
                     </div>
+                    <p v-for="scope in grant.scopes.filter(isManageScope)" :key="`manage-${scope}`" class="ca__manage" data-test="grant-manage">
+                        <span class="ah-small">{{ $t(scopeSentenceKey(scope)) }}</span>
+                        <button type="button" class="ah-btn ah-btn--link ah-btn--sm" :disabled="busy === grant.grantId" :data-test="`withdraw-${scope}`" @click="withdraw(grant, scope)">{{ $t('ConnectedApps.withdraw') }}</button>
+                    </p>
                     <span class="ah-small" data-test="last-used">{{ grant.lastUsedAt ? `${$t('ConnectedApps.last_used')} ${formatWhen(grant.lastUsedAt)}` : $t('ConnectedApps.never_used') }}</span>
+                    <span v-if="formatWhen(grant.expiresAt)" class="ah-small" data-test="grant-ends">{{ $t('ConnectedApps.ends', { d: formatWhen(grant.expiresAt) }) }}</span>
                     <div class="ca__actions">
                         <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy === grant.grantId" data-test="revoke-grant" @click="revoke(grant)">{{ $t('ConnectedApps.revoke') }}</button>
                     </div>
@@ -33,7 +38,7 @@ import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
-import { scopeNameKey, refusalOf, formatWhen } from "@/views/OAuth/oauthShared";
+import { scopeNameKey, scopeSentenceKey, isManageScope, refusalOf, formatWhen } from "@/views/OAuth/oauthShared";
 
 defineOptions({ name: "ConnectedApps" });
 
@@ -70,6 +75,22 @@ const revoke = async (grant) => {
     }
 };
 
+const withdraw = async (grant, scope) => {
+    busy.value = grant.grantId;
+    actionError.value = "";
+    try {
+        await apiRequest("post", `${env.OAUTH_GRANTS}/${encodeURIComponent(grant.grantId)}/withdraw`, { scopes: [scope] });
+        const left = grant.scopes.filter((s) => s !== scope);
+        grants.value = left.length
+            ? grants.value.map((g) => (g.grantId === grant.grantId ? { ...g, scopes: left } : g))
+            : grants.value.filter((g) => g.grantId !== grant.grantId);
+    } catch (error) {
+        actionError.value = refusalOf(error, t("ConnectedApps.withdraw_failed"));
+    } finally {
+        busy.value = "";
+    }
+};
+
 onMounted(load);
 </script>
 
@@ -78,6 +99,7 @@ onMounted(load);
 .ca__row { display: grid; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line, #e5e7eb); }
 .ca__who { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 .ca__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ca__manage { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; margin: 0; }
 .ca__actions { display: flex; justify-content: flex-end; }
 .ca__error { color: var(--danger, #b42318); }
 </style>

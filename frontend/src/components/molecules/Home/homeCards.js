@@ -8,7 +8,8 @@ export const HOME_CARDS = Object.freeze([
     { id: "waiting", labelKey: "Home.card_waiting", hintKey: "Home.card_waiting_hint" },
     { id: "standup", labelKey: "Home.card_standup", hintKey: "Home.card_standup_hint" },
     { id: "assigned_comments", labelKey: "Home.assigned_comments", hintKey: "Home.card_assigned_comments_hint" },
-    { id: "recents", labelKey: "Home.card_recents", hintKey: "Home.card_recents_hint" }
+    { id: "recents", labelKey: "Home.card_recents", hintKey: "Home.card_recents_hint" },
+    { id: "goals", labelKey: "Home.card_goals", hintKey: "Home.card_goals_hint" }
 ]);
 
 // Dashboard cards that need no per-card setup; each loads through its own endpoint, which applies the dashboard's access rules.
@@ -30,17 +31,22 @@ export function resolveHomeLayout(stored) {
     return [...new Set(source.filter((id) => typeof id === "string" && homeCardInfo(id)))];
 }
 
-export const homeCards = reactive({ userId: null, layout: [...DEFAULT_HOME_LAYOUT] });
+export const isHomeArranged = (stored) => Array.isArray(stored?.layout) || (Array.isArray(stored?.hidden) && stored.hidden.length > 0);
+
+/* `arranged` is read once, when the person's record arrives, so a card does not move under them the moment they first change Home. */
+export const homeCards = reactive({ userId: null, layout: [...DEFAULT_HOME_LAYOUT], arranged: false });
 
 export function resetHomeCards() {
     homeCards.userId = null;
     homeCards.layout = [...DEFAULT_HOME_LAYOUT];
+    homeCards.arranged = false;
 }
 
 export function syncHomeCards(userId, stored) {
     if (!userId || homeCards.userId === userId) return;
     homeCards.userId = userId;
     homeCards.layout = resolveHomeLayout(stored);
+    homeCards.arranged = isHomeArranged(stored);
 }
 
 export const isHomeCardShown = (id) => homeCards.layout.includes(id);

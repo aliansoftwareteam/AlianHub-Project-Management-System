@@ -1,19 +1,20 @@
-/* The chevron is a dark PNG, so this button keeps a literal light fill and rule
- * in both themes — a --surface here would hide the icon in dark mode. */
 .scroll-bottom-btn {
+  display: inline-flex;
   box-shadow: var(--shadow-card);
   padding: 12px;
-  background: #dbf1ff;
-  color: white;
+  background: var(--surface);
+  color: var(--ink-2);
   right: 12px;
   top: -55px;
-  border: 1px solid #CECECE;
+  border: 1px solid var(--border);
   border-radius: var(--r-card);
 }
-/* Sits in the hard-white legacy footer, where a translucent --fill would
- * composite back to white and leave the button looking enabled. */
+.scroll-bottom-btn:hover { color: var(--ink); border-color: var(--brand); }
 .disable__send-button{
-  background-color: #e3e3e3 !important;
+  background-color: var(--fill) !important;
+}
+/* The icon inside the button carries cursor-pointer, and there the utility decides. */
+.disable__send-button:where(:not(.cursor-pointer)){
   cursor: not-allowed !important;
 }
 .highlighted-message{
@@ -75,6 +76,8 @@
 .record__progress{
   height: 5px;
 }
+.record__progress--done { background: var(--ok); }
+.record__progress--left { background: var(--track); }
 .send__media-btn{
   height: 54px !important; 
   width: 54px;
@@ -101,3 +104,25 @@
 audio {width: 225px !important;}
 .upload-body-dragged.media__extension.chat__drag-drop{width: calc(98.8% - 8px);}
 }
+
+/* On the project's Comments tab the feed sits on the theme canvas (.list-view-body--detail). The task
+   panel paints its own copy of the feed in TaskDetailOverlay/style.css. */
+.list-view-body--detail .commments__component-wrapper { background: transparent; }
+.list-view-body--detail .message_id-sent { color: var(--ink); }
+.list-view-body--detail .message_id-sent.bg-white { background-color: var(--surface); }
+.list-view-body--detail .message_id-sent.bg-light-blue { background-color: var(--brand-tint); }
+.list-view-body--detail .show__user { color: var(--ink); }
+.list-view-body--detail .message_replay { background-color: var(--fill); }
+.list-view-body--detail :is(.show__userlist, .reply-box) { background-color: var(--surface); color: var(--ink); }
+/* An id, to outweigh the rule that keeps .bg-white on light controls in dark. */
+.list-view-body--detail #comment_footer {
+  background-color: var(--surface);
+  border-color: var(--hairline);
+  color-scheme: var(--scheme);
+}
+.list-view-body--detail .write-message { border-color: var(--border); background: var(--surface); color: var(--ink); }
+.list-view-body--detail .write-message::placeholder { color: var(--ink-2); }
+.list-view-body--detail .write-message:focus { border-color: var(--brand); }
+.list-view-body--detail .write-message.disabled,
+.list-view-body--detail .disable__send-button { background-color: var(--fill) !important; }
+.list-view-body--detail .msg__initaluser { background-color: var(--surface); color: var(--ink); }

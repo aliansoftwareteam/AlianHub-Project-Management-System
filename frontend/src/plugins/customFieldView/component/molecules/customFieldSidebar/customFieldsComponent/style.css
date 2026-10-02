@@ -3,10 +3,10 @@
     bottom: 0;
     display: flex;
     right: 0;
-    border-top: 1px solid #DFE1E6;
+    border-top: 1px solid var(--hairline);
     width: 100%;
     justify-content: end;
-    background-color: white;
+    background-color: var(--surface);
 }
 .custom_field-btn .formkit-outer {
     margin: 15px 0px;
@@ -21,11 +21,22 @@
 }
 .custom_field-btn > div:first-child .formkit-input {
     background: transparent;
-    color: #2F3990;
-    border: 1px solid #2F3990;
+    color: var(--brand);
+    border: 1px solid var(--brand);
     margin-right: 20px !important;
 }
 .custom_field-btn > div:last-child .formkit-input {
-    background: #2F3990;
+    background: var(--brand);
+    color: var(--on-brand);
     margin-right: 20px;
+}
+.custom_field-btn--three .formkit-input {
+    font-size: 14px !important;
+    padding: 2.2px 10px !important;
+}
+.custom_field-btn--three > div .formkit-input { margin-right: 8px !important; }
+.custom_field-btn--three > div:nth-child(2) .formkit-input {
+    background: transparent;
+    color: var(--brand);
+    border: 1px solid var(--brand);
 }

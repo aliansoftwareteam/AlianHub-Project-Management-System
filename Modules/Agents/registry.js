@@ -6,15 +6,23 @@
 // status.set("Done") are ABSENT — not disabled, absent — so a compromised token
 // has nothing to switch on. The guard, the MCP server and the proposal approver
 // all resolve actions through this one file.
+//
+// One exception is deliberate and off by default: with MCP_TOOLS_MANAGE on, a
+// person may create a token whose agent closes tasks for them (task.status.change).
+// Nothing else reaches it, and the close is recorded as theirs, made through the
+// agent, and unchecked.
+//
+// Flagged actions sit one group per file in ./registry, so two changes that each add a
+// group never edit the same lines: a new group is a new file there, and nothing here changes.
 
-const performanceFlag = require('./performanceFlag');
-const dataFlag = require('../Mcp/dataFlag');
+const { RISK } = require('./registryKit');
+const groups = require('./registryGroups');
+const { CREATE_FIELDS } = require('./registry/manage');
 
 // `permission` names the Security & Permissions catalogue entry
 // (Config/permissionGuard) that governs the same operation for a person.
 // perform() evaluates it for the person behind the agent, so a token never
 // exceeds its holder's role. An action without one cannot be registered.
-const RISK = Object.freeze({ LOW: 'low', MEDIUM: 'medium', HIGH: 'high' });
 const PERMISSION_KEY = /^[a-z_]+\.[a-z_]+$/;
 const DONE_STATUS_TYPE = 'close';
 const DONE_STATUS_TYPES = Object.freeze(['close', 'done', 'default_close']);
@@ -57,28 +65,13 @@ const ACTIONS = Object.freeze([
 
 // Registered only while their flag is on. ACTIONS stays the unflagged list, so
 // everything that reads it directly is unchanged whatever the flags say.
-const FLAGGED = Object.freeze([
-    {
-        enabled: performanceFlag.enabled,
-        action: Object.freeze({ key: performanceFlag.ACTION, label: 'Read project performance numbers', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' }),
-    },
-    ...[
-        { key: 'projects.list', label: 'List projects', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_list' },
-        { key: 'project.get', label: 'Read a project', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-        { key: 'sprints.list', label: 'List a project\'s sprints', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_list' },
-        { key: 'statuses.list', label: 'List a project\'s statuses', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'comments.list', label: 'Read a task\'s comments', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-        { key: 'pages.search', label: 'Search pages', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-        { key: 'page.get', label: 'Read a page', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-        { key: 'timesheet.read', label: 'Read time entries', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: { key: 'sheet_settings.user_timesheet', write: false } },
-        { key: 'comment.create', label: 'Comment on a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_comment' },
-        { key: 'timelog.create', label: 'Log time on a task (own time)', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'sheet_settings.user_timesheet' },
-    ].map((action) => ({ enabled: dataFlag.enabled, action: Object.freeze(action) })),
-]);
+const FLAGGED = Object.freeze(groups.flatMap((g) => g.entries));
 
 /* A string maps the whole action at its own level (write for writes, read for
- * reads); { key, write } pins the level; { byField } holds each task.update
- * field to the entry a person editing that field is held to. */
+ * reads); { key, write } pins the level; { byField } holds each edited field
+ * to the entry, or entries, a person editing that field is held to, beside
+ * the action's own { key } when it has one; { anyOf } is met by any one of its
+ * entries, as a route that takes several keys for one control is. */
 const permissionsFor = (key, params = {}) => {
     const action = get(key);
     if (!action) return [];
@@ -86,10 +79,13 @@ const permissionsFor = (key, params = {}) => {
     if (typeof p === 'string') return [{ key: p, write: Boolean(action.write) }];
     if (p && p.byField) {
         const fields = Object.keys(params.fields || {});
-        const keys = [...new Set((fields.length ? fields : action.fields || []).map((f) => p.byField[f]).filter(Boolean))];
+        // With a key of its own the action needs that key and one per field named; without, naming no field asks for every one.
+        const named = p.key || fields.length ? fields : action.fields || [];
+        const keys = [...new Set([...(p.key ? [p.key] : []), ...named.flatMap((f) => p.byField[f] || [])])];
         return keys.map((k) => ({ key: k, write: true }));
     }
     if (p && p.key) return [{ key: p.key, write: typeof p.write === 'boolean' ? p.write : Boolean(action.write) }];
+    if (p && Array.isArray(p.anyOf)) return [{ key: p.anyOf[0], anyOf: [...p.anyOf], write: Boolean(action.write) }];
     return [];
 };
 
@@ -102,11 +98,13 @@ const validate = (entries) => {
             return;
         }
         if (p && p.byField && typeof p.byField === 'object') {
-            const unmapped = (a.fields || []).filter((f) => !PERMISSION_KEY.test(String(p.byField[f] || '')));
+            const unmapped = (a.fields || []).filter((f) => { const keys = [].concat(p.byField[f] || []); return !keys.length || keys.some((k) => !PERMISSION_KEY.test(String(k))); });
             if (!a.fields || !a.fields.length || unmapped.length) throw bad(a, `leaves fields without a permission mapping: ${unmapped.join(', ') || '(no fields)'}`);
+            if (p.key !== undefined && !PERMISSION_KEY.test(String(p.key))) throw bad(a, `has an invalid permission mapping "${p.key}"`);
             return;
         }
         if (p && typeof p.key === 'string' && PERMISSION_KEY.test(p.key)) return;
+        if (p && Array.isArray(p.anyOf) && p.anyOf.length && p.anyOf.every((k) => PERMISSION_KEY.test(String(k)))) return;
         throw bad(a, 'has no permission mapping; every action must name the catalogue entry that governs it for a person');
     });
     return entries;
@@ -190,10 +188,10 @@ const evaluate = (key, params = {}, { allowedActions } = {}) => {
             return { allowed: false, reason: `Agents cannot perform task.status.set("${label}")`, action };
         }
     }
-    if (action.key === 'task.update') {
+    if (Array.isArray(action.fields)) {
         const fields = Object.keys(params.fields || {});
         const bad = fields.filter((f) => !action.fields.includes(f));
-        if (bad.length) return { allowed: false, reason: `Agents cannot perform task.update on ${bad.join(', ')}`, action };
+        if (bad.length) return { allowed: false, reason: `Agents cannot perform ${action.key} on ${bad.join(', ')}`, action };
     }
     if (action.proposeOnly && !params.__proposal) {
         return { allowed: false, reason: `Agents cannot perform ${action.key} directly — it must be proposed`, action };
@@ -229,5 +227,5 @@ const manifest = () => ({
 
 module.exports = {
     ACTIONS, NEVER, RISK, AUTONOMY, DONE_STATUS_TYPE, DONE_STATUS_TYPES, AGENT_STATUS_NAMES,
-    get, has, keys, knows, allowedActionsToStore, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest, permissionsFor, validate,
+    CREATE_FIELDS, get, has, keys, knows, allowedActionsToStore, isNever, indexActions, evaluate, isAgentSettableStatus, mayActDirectly, manifest, permissionsFor, validate,
 };

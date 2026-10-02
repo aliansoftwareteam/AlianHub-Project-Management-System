@@ -26,6 +26,8 @@ const clientNames = async (rows) => {
     return (row) => byId.get(`${row.companyId}|${row.clientId}`) || fromRows.get(row.clientId) || row.clientId;
 };
 
+exports.clientNames = clientNames;
+
 exports.list = async (req, res) => {
     try {
         if (!personOrRefuse(req, res)) return undefined;
@@ -45,6 +47,19 @@ exports.list = async (req, res) => {
         return res.send({ status: true, statusText: 'Connected apps fetched.', data });
     } catch (error) {
         logger.error(`ERROR in list oauth grants: ${error.message}`);
+        return refuse(res, 500, 'Something went wrong.');
+    }
+};
+
+exports.withdraw = async (req, res) => {
+    try {
+        if (!personOrRefuse(req, res)) return undefined;
+        const grantId = String(req.params.grantId || '');
+        const scopes = req.body && Array.isArray(req.body.scopes) ? req.body.scopes.filter((scope) => typeof scope === 'string') : [];
+        if (!GRANT_ID.test(grantId) || !(await grants.withdrawOwnManageScopes(req.uid, grantId, scopes))) return refuse(res, 404, 'No such permission on a connected app.');
+        return res.send({ status: true, statusText: 'Permission withdrawn.' });
+    } catch (error) {
+        logger.error(`ERROR in withdraw oauth grant scopes: ${error.message}`);
         return refuse(res, 500, 'Something went wrong.');
     }
 };

@@ -9,8 +9,8 @@
             <button
                 type="button"
                 class="ah-rail__item ah-rail__item--new"
-                :title="$t('QuickCreate.rail_title')"
-                :aria-keyshortcuts="shortcutPrefs.singleKeys ? 'c' : null"
+                :title="newTaskTitle"
+                :aria-keyshortcuts="ariaKeyShortcuts('create-task')"
                 :tabindex="focusIndex('new')"
                 @click="openQuickCreate()"
             >
@@ -101,7 +101,7 @@
                 <transition name="ah-fade">
                     <div v-if="shellState.profileOpen" class="ah-pop ah-rail__pop ah-rail__pop--profile" role="menu" @click.stop>
                         <div class="ah-rail__me">
-                            <UserProfile :showDot="false" :data="{ image: me.Employee_profileImageURL, title: me.Employee_Name }" width="34px" :thumbnail="'35x35'" />
+                            <UserProfile decorative :showDot="false" :data="{ image: me.Employee_profileImageURL, title: me.Employee_Name }" width="34px" :thumbnail="'35x35'" />
                             <div class="ah-rail__me-text">
                                 <strong>{{ me.Employee_Name }}</strong>
                                 <span class="ah-small">{{ me.Employee_Email }}</span>
@@ -117,6 +117,10 @@
                         <button type="button" class="ah-pop__item" role="menuitem" @click="toggleTheme()">
                             <ShellIcon :name="shellState.theme === 'dark' ? 'sun' : 'moon'" :size="15" />
                             <span>{{ shellState.theme === 'dark' ? $t('Shell.theme_light') : $t('Shell.theme_dark') }}</span>
+                        </button>
+                        <button type="button" class="ah-pop__item" role="menuitem" data-test="open-shortcuts" :aria-keyshortcuts="ariaKeyShortcuts('help')" @click="showShortcuts()">
+                            <ShellIcon name="command" :size="15" /><span>{{ $t('Shortcuts.title') }}</span>
+                            <KeyHint shortcut="help" />
                         </button>
                         <template v-if="otherCompanies.length">
                             <div class="ah-pop__sep"></div>
@@ -148,9 +152,12 @@ import { useGetterFunctions } from "@/composable/index.js";
 import { useAppVersion } from "@/composable/useAppVersion";
 import { useAuth } from "@/services";
 import { useNavItems } from "./navItems";
-import { shellState, openPanel, closePopovers, toggleTheme, syncNavPreferences } from "./shellState";
+import { shellState, openPanel, closePopovers, toggleTheme, syncNavPreferences, keepOnRail } from "./shellState";
+import { placesInUse } from "./placesInUse";
 import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
-import { shortcutPrefs } from "@/composable/shortcuts";
+import { useI18n } from "vue-i18n";
+import KeyHint from "@/components/atom/KeyHint/KeyHint.vue";
+import { ariaKeyShortcuts, openShortcutSheet, shortcutHint } from "@/composable/shortcuts";
 import { useInboxUnread } from "./inboxUnread";
 
 const emit = defineEmits(["change"]);
@@ -164,6 +171,12 @@ const router = useRouter();
 const { rail, more, isActive, moreActive } = useNavItems(companyId);
 const { unread, badge } = useInboxUnread();
 
+const { t } = useI18n();
+const newTaskTitle = computed(() => {
+    const keys = shortcutHint("create-task", t);
+    return keys ? t("Shortcuts.with_keys", { label: t("QuickCreate.rail_title"), keys }) : t("QuickCreate.rail_title");
+});
+
 const railLogo = "/api/v1/getlogo?key=favicon";
 const logoOk = ref(true);
 const brand = computed(() => getters["brandSettingTab/brandSettings"] || {});
@@ -173,6 +186,9 @@ const productInitial = computed(() => productName.value.charAt(0).toUpperCase())
 const me = computed(() => getUser(userId.value) || {});
 const myRecord = computed(() => (getters["users/users"] || []).find((u) => u._id === userId.value));
 watch(myRecord, (record) => { if (record) syncNavPreferences(userId.value, record.navPreferences); }, { immediate: true });
+watch(() => Boolean(myRecord.value) && shellState.nav.mode === "simple", (asks) => {
+    if (asks) placesInUse().then((keys) => keys.forEach(keepOnRail));
+}, { immediate: true });
 const companies = computed(() => getters["settings/companies"] || []);
 const otherCompanies = computed(() => companies.value.filter((c) => c._id !== companyId.value));
 
@@ -218,4 +234,11 @@ const switchCompany = (company) => {
     emit("change", company._id);
 };
 const logout = () => logOut({ islogOut: true });
+const profileBtn = ref(null);
+// The menu row is gone by the time the sheet closes, so focus is parked on the button that will get it back.
+const showShortcuts = () => {
+    if (profileBtn.value) profileBtn.value.focus();
+    closePopovers();
+    openShortcutSheet();
+};
 </script>

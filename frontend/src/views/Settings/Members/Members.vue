@@ -86,10 +86,12 @@
                     <span></span>
                 </div>
 
-                <div v-for="item in visibleList" :key="item.requestId || item._id" class="mbv__row" :class="{ 'is-pending': item.status !== 2 }" :style="gridStyle">
+                <template v-for="item in visibleList" :key="item.requestId || item._id">
+                <div class="mbv__row" :class="{ 'is-pending': item.status !== 2 }" :style="gridStyle">
                     <div class="mbv__person">
-                        <img v-if="item.Employee_profileImageURL" class="ah-avatar" :src="item.Employee_profileImageURL" :alt="item.Employee_Name" />
-                        <span v-else-if="item.status === 2" class="ah-avatar">{{ initial(item) }}</span>
+                        <span v-if="item.Employee_profileImageURL || item.status === 2" class="ah-avatar">
+                            <AvatarImage :src="item.Employee_profileImageURL" :alt="item.Employee_Name">{{ initial(item) }}</AvatarImage>
+                        </span>
                         <span v-else class="mbv__avatar-pending" aria-hidden="true"></span>
                         <div class="mbv__person-text">
                             <div class="mbv__name">{{ item.Employee_Name || item.userEmail }}</div>
@@ -147,10 +149,35 @@
                         </div>
                     </div>
                 </div>
-
-                <div v-if="!visibleList.length" class="ah-empty mbv__empty">
-                    {{ search ? $t('Members.empty_search') : $t('Members.empty_all') }}
+                <div v-if="agentUnder(item)" class="mbv__agent" data-test="member-agent">
+                    <span class="ah-avatar ah-avatar--agent ah-avatar--sm" aria-hidden="true"><ShellIcon name="agent" :size="11" /></span>
+                    <span class="mbv__agent-name">{{ agentUnder(item).name }}</span>
+                    <span class="ah-chip ah-chip--agent">{{ $t('Members.agent_tag') }}</span>
+                    <span class="mbv__agent-note">{{ $t('Members.agent_connected_by', { name: agentUnder(item).ownerName || item.Employee_Name }) }} · {{ lastWorked(agentUnder(item)) }} · {{ $t('Members.agent_no_seat') }}</span>
                 </div>
+                </template>
+
+                <EmptyState
+                    v-if="!visibleList.length && search"
+                    compact
+                    class="ah-empty mbv__empty"
+                    illustration="search"
+                    data-test="members-no-match"
+                    :title="$t('Members.empty_search')"
+                    :action-label="$t('Members.clear_search')"
+                    @action="search = ''"
+                />
+                <EmptyState
+                    v-else-if="!visibleList.length"
+                    compact
+                    class="ah-empty mbv__empty"
+                    illustration="people"
+                    data-test="members-empty"
+                    :title="$t('Members.empty_all')"
+                    :action-label="$t('Members.invite')"
+                    :action-allowed="canInvite && !inviteOpen"
+                    @action="inviteOpen = true"
+                />
             </section>
         </template>
         <AppState v-else kind="denied" />
@@ -159,16 +186,20 @@
 
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import Swal from "sweetalert2";
 import AppState from "@/components/molecules/AppState/AppState.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useCustomComposable } from "@/composable";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import { memberData } from "./helperMember.js";
+import { fetchConnectedAgents } from "@/views/Ai/useRunnableAgents";
 import { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER } from "@/utils/roles";
 
 defineOptions({ name: "MembersSettings" });
@@ -185,8 +216,12 @@ const userId = inject("$userId");
 const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 const listing = ref([]);
+const connectedAgents = ref([]);
 const tab = ref(0);
 const search = ref("");
+// ⌘K opens a person here with ?q=…; watched, not read once, because Members may already be open.
+const route = useRoute();
+watch(() => (typeof route?.query?.q === "string" ? route.query.q : ""), (term) => { search.value = term; }, { immediate: true });
 const inviteOpen = ref(false);
 const emails = ref([]);
 const emailDraft = ref("");
@@ -252,14 +287,32 @@ function invitedOn(item) {
     return new Date(raw).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
+const shortSpan = (minutes) => {
+    if (minutes < 60) return `${minutes}m`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h`;
+    return `${Math.floor(minutes / 1440)}d`;
+};
+
 function lastActive(item) {
     if (item.status !== 2 || item.lastActive === null || item.lastActive === undefined) return "—";
     const minutes = Math.floor((Date.now() - Number(item.lastActive) * 1000) / 60000);
     if (!Number.isFinite(minutes) || minutes < 0) return "—";
     if (minutes < 1) return t("Members.last_active_now");
-    if (minutes < 60) return `${minutes}m`;
-    if (minutes < 1440) return `${Math.floor(minutes / 60)}h`;
-    return `${Math.floor(minutes / 1440)}d`;
+    return shortSpan(minutes);
+}
+
+/* A connected AI is drawn under its person and kept out of `listing`, so no seat count and no tab count ever includes it. */
+const agentsByOwner = computed(() => new Map(connectedAgents.value.map((agent) => [String(agent.ownerId), agent])));
+
+function agentUnder(item) {
+    if (tab.value !== 0 || item.status !== 2 || item.isDelete || !item.userId) return null;
+    return agentsByOwner.value.get(String(item.userId)) || null;
+}
+
+function lastWorked(agent) {
+    const minutes = Math.floor((Date.now() - new Date(agent.lastWorkedAt).getTime()) / 60000);
+    if (!Number.isFinite(minutes) || minutes < 1) return t("Members.agent_last_worked_now");
+    return t("Members.agent_last_worked", { when: shortSpan(minutes) });
 }
 
 function usesSso(item) {
@@ -427,8 +480,7 @@ async function removeMember(item) {
         text: `${t("conformationmsg.Are_you_sure_you_want_to_delete")} ${item.Employee_Name || item.userEmail}?`,
         showCancelButton: true,
         icon: "warning",
-        confirmButtonColor: "#2F3990",
-        cancelButtonColor: "#c1121f",
+        customClass: { confirm: 'swal2-deny' },
         cancelButtonText: t("Home.no"),
         confirmButtonText: t("Home.yes")
     });
@@ -513,6 +565,7 @@ watch(() => getters["settings/companyUsers"], () => { listing.value = getCompany
 
 onMounted(() => {
     listing.value = getCompanyUsers();
+    fetchConnectedAgents().then((agents) => { connectedAgents.value = agents; });
     toolbarReady.value = !!document.getElementById("top_section");
     document.addEventListener("click", closeMenus);
     loadSso();

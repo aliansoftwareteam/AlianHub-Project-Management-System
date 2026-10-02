@@ -1,7 +1,24 @@
 /* List view (handoff 14a) */
 
 .lv2 {
-    --lv2-cols: 28px minmax(0, 1fr) minmax(0, .45fr) 56px 64px 72px 48px 80px 88px;
+    --lv2-cols: 28px var(--lv2-title-track) minmax(56px, .45fr) 56px 64px 72px 48px 80px 88px;
+    --lv2-grip-w: 12px;
+    /* Wide enough that its centre stays 12px from the status circle at the tightest spacing step. */
+    --lv2-disclose-w: 12px;
+    /* The status circle's width. The circle is drawn in other views too, outside this scope, so its own rule keeps the number. */
+    --lv2-status-w: 24px;
+    --lv2-depth: 1;
+    --lv2-depth-max: 2;
+    /* The name's floor plus what the deepest row puts before its name: the grip's place, an indent
+       step for each level down, the disclosure and the status circle, each with its gap. */
+    --lv2-title-min: calc(var(--row-name-min) + var(--lv2-grip-w) + var(--lv2-disclose-w) + var(--lv2-status-w) + 3 * var(--sp-3) + var(--lv2-depth-max) * var(--row-indent));
+    --lv2-title-track: minmax(var(--lv2-title-min), 1fr);
+    /* Under this width the List scrolls sideways: the floors of the other tracks with their gaps,
+       which the view sets, the name's floor, and the indent, border and padding around a row. */
+    --lv2-fixed-w: 0px;
+    --lv2-min-w: calc(var(--lv2-fixed-w) + var(--lv2-title-min) + 2 * var(--cell-pad-x, 12px) + 18px);
+    --lv2-check: 15px;
+    --lv2-check-room: calc((var(--hit-min) + 2px - var(--lv2-check)) / 2);
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -17,16 +34,16 @@
 .lv2__scroll {
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
-    padding: 0 20px 24px;
+    overflow: auto;
+    padding: 0 var(--page-pad-x, 20px) 24px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    font-size: 12.5px;
+    gap: var(--gap-stack, 12px);
+    font-size: var(--row-font);
 }
 
-/* The left padding is the 16px group indent plus the group card's 1px border and 12px
-   row padding, so a header label sits on exactly the same x as the cells under it. */
+/* The left padding is the 16px group indent plus the group card's 1px border and the row's
+   side padding, so a header label sits on exactly the same x as the cells under it. */
 .lv2__cols {
     position: sticky;
     top: 0;
@@ -34,21 +51,24 @@
     display: grid;
     grid-template-columns: var(--lv2-cols);
     gap: 10px;
-    padding: 14px 13px 8px 29px;
+    padding: 14px calc(var(--cell-pad-x, 12px) + 1px) 8px calc(var(--cell-pad-x, 12px) + 17px);
     background: var(--canvas);
-    font: var(--text-label);
+    font: 600 var(--fs-xs, 10.5px)/1.2 var(--font-mono);
     letter-spacing: .06em;
     text-transform: uppercase;
     color: var(--ink-label);
     justify-items: end;
+    /* The Task header holds buttons and is the tallest; the labels beside it sit on its line. */
+    align-items: center;
 }
 .lv2__cols > [role="columnheader"] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv2__cols > .lv2__head-title { display: flex; align-items: center; gap: 6px; overflow: visible; }
 .lv2__chooser { margin-left: auto; }
 .lv2__c-field { justify-self: stretch; min-width: 0; }
+.lv2__cols > .lv2__c-done { justify-self: start; }
 .lv2__group-points::before { content: "\00b7"; margin-right: 6px; }
 
-.lv2__sprint { display: flex; flex-direction: column; gap: 12px; }
+.lv2__sprint { display: flex; flex-direction: column; gap: var(--gap-stack, 12px); }
 .lv2__sprint-head {
     display: flex;
     align-items: center;
@@ -61,9 +81,11 @@
     color: var(--ink);
     cursor: pointer;
 }
-.lv2__sprint-name { font: var(--text-h2); letter-spacing: -.3px; }
-.lv2__sprint-meta { font: var(--text-data); color: var(--ink-label); }
+.lv2__sprint-name { font: var(--fw-title, 600) calc(var(--fs-xl, 20px) - 1px)/var(--lh-tight, 1.2) var(--font-ui); letter-spacing: -.3px; }
+.lv2__sprint-meta { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--ink-label); }
 .lv2__aria-row { display: contents; }
+.lv2__sprint-bar { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.lv2__sprint-bar .lv2__sprint-head { width: auto; min-width: 0; }
 .lv2__sprint > .lv2__group,
 .lv2__sprint .lv2__collapsed-item { margin-left: 16px; }
 
@@ -71,41 +93,66 @@
     background: var(--surface);
     border: 1px solid var(--hairline);
     border-radius: var(--r-card);
-    overflow: hidden;
+    box-shadow: var(--shadow-surface, none);
+    /* Not hidden: that would make the card a scroll container and hold the sticky cells of its rows. */
+    overflow: clip;
+}
+/* The group's select-all sits beside the header button, in line with the row checkboxes. */
+.lv2__group-bar {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+}
+/* The box is drawn 15px. Its label keeps a square a little over --hit-min clear around it, so
+   the header button starts at least 12px from the box's centre, which is what the 24px target
+   rule measures. The button gives the same room back, so the caret stays where it was. */
+.lv2__group-select {
+    flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: calc(var(--hit-min) + 2px); height: var(--hit-min);
+    margin-left: calc(var(--cell-pad-x, 12px) - var(--lv2-check-room));
+    cursor: pointer;
 }
 .lv2__group-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 9px 12px;
+    flex: 1;
+    min-width: 0;
+    min-height: var(--hit-min);
+    padding: var(--cell-pad-y) var(--cell-pad-x, 12px);
     background: var(--surface);
-    border-bottom: 1px solid var(--hairline);
-    width: 100%;
-    border-top: 0; border-left: 0; border-right: 0;
+    border: 0;
     text-align: left;
     color: var(--ink);
     cursor: pointer;
 }
+.lv2__group-select + .lv2__group-head { padding-left: calc(var(--cell-pad-x, 12px) - var(--lv2-check-room)); }
+.lv2__group-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .lv2__caret {
-    font-size: 10px;
+    font-size: var(--fs-2xs, 10px);
     color: var(--ink-2);
     width: 10px;
     flex: none;
     transition: transform var(--t-state) var(--ease);
 }
 .lv2__caret--open { transform: rotate(90deg); }
-.lv2__caret--sprint { font-size: 8px; width: 12px; color: var(--ink-2); transform: none; }
+.lv2__caret--sprint { font-size: calc(var(--fs-2xs, 10px) - 2px); width: 12px; color: var(--ink-2); transform: none; }
 .lv2__swatch { width: 8px; height: 8px; border-radius: 2px; flex: none; background: var(--ink-3); }
-.lv2__group-name { font-weight: 600; }
-.lv2__group-meta { font: var(--text-data); color: var(--ink-label); }
-.lv2__wip { margin-left: auto; font: 500 10px/1 var(--font-mono); color: var(--warn-ink); }
+.lv2__group-name { font-weight: var(--fw-strong, 600); }
+.lv2__group-meta { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--ink-label); }
+.lv2__wip { margin-left: auto; font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--warn-ink); }
 .lv2__wip--over { color: var(--danger-ink); }
 
+/* min-height sizes the content box, so the row's padding comes off --row-h. */
 .lv2__row {
+    --lv2-row-tint: transparent;
     display: grid;
     grid-template-columns: var(--lv2-cols);
     gap: 10px;
-    padding: 9px 12px;
+    min-height: calc(var(--row-h) - 2 * var(--cell-pad-y));
+    padding: var(--cell-pad-y) var(--cell-pad-x, 12px);
     align-items: center;
     justify-items: end;
     border-bottom: 1px solid var(--hairline);
@@ -114,27 +161,31 @@
 }
 .lv2__c-select, .lv2__c-title { justify-self: stretch; }
 .lv2__c-tags { justify-self: stretch; min-width: 0; }
-.lv2__row:hover { background: var(--surface-hover); }
-.lv2__row.is-selected { background: var(--brand-tint); }
+.lv2__row:hover { --lv2-row-tint: var(--surface-hover); background: var(--lv2-row-tint); }
+.lv2__row.is-selected { --lv2-row-tint: var(--brand-tint); background: var(--lv2-row-tint); }
 .lv2__row.is-agent { box-shadow: inset 0 0 0 1.5px var(--rail); }
 .lv2__row.is-sub {
-    padding: 7px 12px;
-    font-size: 12px;
+    padding: max(1px, calc(var(--cell-pad-y) - 2px)) var(--cell-pad-x, 12px);
+    font-size: calc(var(--row-font) - .5px);
     color: var(--ink-2);
 }
 .lv2__row:last-child { border-bottom: 0; }
 
 .lv2__select { display: flex; align-items: center; }
-.lv2__title { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.lv2__title--sub { padding-left: 22px; }
+.lv2__title { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; }
+/* Past the parent's grip, then one indent step for each level down. Every subtask keeps the
+   place of a disclosure, used or not, so its circle and name start one step to the right of
+   its parent's and level with its siblings'. */
+.lv2__title--sub { padding-left: calc(var(--lv2-grip-w) + var(--sp-3) + var(--row-indent) * var(--lv2-depth)); }
 .lv2__disclose {
     background: none; border: 0; padding: 0;
-    font-size: 10px; color: var(--ink-2); cursor: pointer; line-height: 1;
-    width: 10px; flex: none;
+    font-size: var(--fs-2xs, 10px); color: var(--ink-2); cursor: pointer; line-height: 1;
+    width: var(--lv2-disclose-w); flex: none;
 }
+.lv2__disclose--none { visibility: hidden; }
 .lv2__name {
     background: none; border: 0; padding: 0;
-    font: 600 12.5px/1.3 var(--font-ui);
+    font: var(--fw-strong, 600) var(--row-font)/var(--lh-snug, 1.3) var(--font-ui);
     color: var(--ink);
     cursor: pointer;
     text-align: left;
@@ -143,10 +194,10 @@
 .lv2__name:hover { color: var(--brand); }
 .lv2__row.is-sub .lv2__name { font-weight: 400; }
 .lv2__row.is-sub.is-done .lv2__name { text-decoration: line-through; color: var(--ink-2); opacity: .75; }
-.lv2__key { font: 500 10px/1 var(--font-mono); color: var(--ink-label); flex: none; }
-.lv2__timer { font: 500 10px/1 var(--font-mono); color: var(--ok-ink); display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.lv2__key { font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--ink-label); flex: none; }
+.lv2__timer { font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--ok-ink); display: inline-flex; align-items: center; gap: 4px; flex: none; }
 .lv2__agent-line {
-    font: 500 10px/1.3 var(--font-ui);
+    font: 500 var(--fs-2xs, 10px)/1.3 var(--font-ui);
     color: var(--brand);
     background: none; border: 0; padding: 0;
     cursor: pointer;
@@ -157,6 +208,7 @@
     color: var(--ink-2);
     cursor: grab;
     display: inline-flex;
+    width: var(--lv2-grip-w);
     flex: none;
 }
 .lv2__row:hover .lv2__grip { opacity: 1; }
@@ -166,12 +218,12 @@
 .lv2__c-due, .lv2__c-est, .lv2__c-risk, .lv2__c-prio { white-space: nowrap; }
 .lv2__due { color: var(--ink-2); text-transform: capitalize; }
 .lv2__due--overdue { color: var(--danger); }
-.lv2__est { font: 500 11px/1 var(--font-mono); color: var(--ink); }
+.lv2__est { font: 500 var(--fs-xs, 11px)/1 var(--font-mono); color: var(--ink); }
 .lv2__row.is-sub .lv2__est { color: var(--ink-2); }
 
 .lv2__risk {
     display: inline-flex; align-items: center; gap: 5px;
-    font: 500 11px/1 var(--font-mono);
+    font: 500 var(--fs-xs, 11px)/1 var(--font-mono);
     background: none; border: 0; padding: 0;
     color: var(--ink);
     cursor: help;
@@ -182,34 +234,67 @@
 
 .lv2__add {
     display: flex; align-items: center; gap: 9px;
-    padding: 8px 12px 8px 50px;
+    min-height: var(--hit-min);
+    padding: calc(var(--cell-pad-y) - 1px) var(--cell-pad-x, 12px) calc(var(--cell-pad-y) - 1px) 50px;
     color: var(--ink-2);
-    font-size: 12.5px;
+    font-size: var(--row-font);
     background: none; border: 0; width: 100%; text-align: left;
     cursor: pointer;
 }
 .lv2__add:hover { color: var(--ink-2); background: var(--surface-hover); }
+.lv2__more {
+    display: flex; align-items: center; gap: var(--sp-5);
+    min-height: var(--hit-min);
+    padding: calc(var(--cell-pad-y) - 1px) var(--cell-pad-x, 12px) calc(var(--cell-pad-y) - 1px) 50px;
+    font-size: var(--row-font);
+}
+.lv2__more-btn {
+    display: inline-flex; align-items: center;
+    min-height: var(--hit-min);
+    background: none; border: 0; padding: 0;
+    color: var(--brand);
+    font: var(--fw-strong, 600) var(--row-font)/var(--lh-snug, 1.3) var(--font-ui);
+    cursor: pointer;
+}
+.lv2__more-btn:hover:not(:disabled) { text-decoration: underline; }
+.lv2__more-btn:disabled { color: var(--ink-2); cursor: default; }
+.lv2__more-hint { color: var(--ink-2); }
+.lv2__totals {
+    --lv2-row-tint: transparent;
+    display: grid;
+    grid-template-columns: var(--lv2-cols);
+    gap: 10px;
+    padding: var(--cell-pad-y) var(--cell-pad-x, 12px);
+    align-items: center;
+    justify-items: end;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface);
+    font: 600 var(--fs-sm, 11.5px)/1.2 var(--font-mono);
+    color: var(--ink);
+}
+.lv2__totals-label { color: var(--ink-2); }
+.lv2__totals-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv2__add-plus { color: var(--brand); }
-.lv2__create { padding: 8px 12px; }
-.lv2__template { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; max-width: 100%; color: var(--ink-label); font: 500 11px/1.2 var(--font-ui); }
-.lv2__template-select { min-width: 0; max-width: 220px; border: 1px solid var(--border); border-radius: var(--r-input, 8px); padding: 4px 6px; background: var(--surface); color: var(--ink); font: 400 12px/1.2 var(--font-ui); }
+.lv2__create { padding: calc(var(--cell-pad-y) - 1px) var(--cell-pad-x, 12px); }
+.lv2__template { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; max-width: 100%; color: var(--ink-label); font: 500 var(--fs-xs, 11px)/1.2 var(--font-ui); }
+.lv2__template-select { min-width: 0; max-width: 220px; border: 1px solid var(--border); border-radius: var(--r-input, 8px); padding: 4px 6px; background: var(--surface); color: var(--ink); font: 400 var(--fs-sm, 12px)/1.2 var(--font-ui); }
 .lv2__template-select:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .lv2__first-task { width: 100%; max-width: 560px; }
 
 .lv2__collapsed-item {
     display: inline-flex; align-items: center; gap: 6px;
     align-self: flex-start;
-    background: none; border: 0; padding: 2px 12px;
+    background: none; border: 0; padding: 2px var(--cell-pad-x, 12px);
     cursor: pointer;
     color: var(--ink-2);
-    font-weight: 600;
+    font-weight: var(--fw-strong, 600);
     text-align: left;
 }
 .lv2__collapsed-item:hover { color: var(--ink); }
-.lv2__collapsed-count { font: var(--text-data); color: var(--ink-label); }
+.lv2__collapsed-count { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--ink-label); }
 
-.lv2__empty-group { margin: 0; padding: 10px 12px; color: var(--ink-2); font-size: 12px; }
-.lv2__skeleton { height: 44px; border-radius: var(--r-card); }
+.lv2__empty-group { margin: 0; padding: 10px var(--cell-pad-x, 12px); color: var(--ink-2); font-size: var(--fs-sm, 12px); }
+.lv2__skeleton { height: calc(26px + 2 * var(--cell-pad-y)); border-radius: var(--r-card); }
 
 /* Task 038 — edit from the row: status circle, inline cells, row actions. */
 .lv2__status {
@@ -238,16 +323,16 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
     display: inline-flex; align-items: center; justify-content: center; gap: 4px;
     min-width: 24px; min-height: 24px;
     padding: 0 4px;
-    border: 0; border-radius: 6px;
+    border: 0; border-radius: var(--r-sm, 6px);
     background: none;
     color: inherit; font: inherit;
     cursor: pointer;
     white-space: nowrap;
 }
 .lv2__cell-btn:hover { background: var(--surface-hover); }
-.lv2__cell-more { font: 500 10px/1 var(--font-mono); color: var(--ink-2); }
+.lv2__cell-more { font: 500 var(--fs-2xs, 10px)/1 var(--font-mono); color: var(--ink-2); }
 .lv2__cell-empty { color: var(--ink-2); opacity: 0; transition: opacity var(--t-state) var(--ease); }
-.lv2__cell-flag { font-size: 13px; line-height: 1; }
+.lv2__cell-flag { font-size: var(--fs-md, 13px); line-height: 1; }
 .lv2__row:hover .lv2__cell-empty,
 .lv2__row:focus-within .lv2__cell-empty { opacity: 1; }
 .lv2__c-assignee-value { display: inline-flex; min-height: 24px; align-items: center; }
@@ -255,20 +340,20 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
 .lv2__rename {
     flex: 1; min-width: 0;
     padding: 2px 6px;
-    border: 1px solid var(--brand); border-radius: 6px;
+    border: 1px solid var(--brand); border-radius: var(--r-sm, 6px);
     background: var(--surface);
     color: var(--ink);
-    font: 600 12.5px/1.3 var(--font-ui);
+    font: var(--fw-strong, 600) var(--row-font)/var(--lh-snug, 1.3) var(--font-ui);
 }
 
 .lv2__actions { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; flex: none; }
 .lv2__act {
     display: inline-flex; align-items: center; justify-content: center;
     width: 24px; height: 24px;
-    padding: 0; border: 0; border-radius: 6px;
+    padding: 0; border: 0; border-radius: var(--r-sm, 6px);
     background: none;
     color: var(--ink-2);
-    font-size: 13px; line-height: 1;
+    font-size: var(--fs-md, 13px); line-height: 1;
     cursor: pointer;
     text-decoration: none;
     opacity: 0;
@@ -278,9 +363,58 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
 .lv2__row:hover .lv2__act,
 .lv2__row:focus-within .lv2__act,
 .lv2__act[aria-expanded="true"] { opacity: 1; }
+/* In the flow, the hidden actions held up to 128px of the title cell, and the task name was
+   cut short beside what looked like free space. From tablet width up they sit over the end
+   of the cell on the row's own colour, and take no clicks until they show. No transform
+   here: the row menu inside is fixed to the viewport. */
+@media (min-width: 768px) {
+    .lv2__cols, .lv2__sprint { min-width: var(--lv2-min-w); }
+    .lv2__cols { box-sizing: border-box; }
+    /* The checkbox and the name stay in view while the other columns pass under them, and the
+       hover actions anchor to the name's cell. A sticky box paints as a layer of its own, so the
+       row whose menu is open is lifted over the rows after it and over the header. An offset
+       counts from inside the scroller's padding, so each one takes the page gutter back and the
+       stuck cells reach the scroller's edge with nothing showing beside them. */
+    .lv2__c-select, .lv2__c-title {
+        position: sticky;
+        z-index: 1;
+        align-self: stretch;
+        background: linear-gradient(var(--lv2-row-tint), var(--lv2-row-tint)) var(--surface);
+    }
+    /* The checkbox's cell reaches over the gap to the name and over the row's padding, less the
+       2px an agent row's ring is drawn in. */
+    .lv2__c-select {
+        left: calc(0px - var(--page-pad-x, 20px));
+        margin-left: calc(2px - var(--cell-pad-x, 12px));
+        padding-left: calc(var(--cell-pad-x, 12px) - 2px);
+        margin-right: -10px;
+        padding-right: 10px;
+    }
+    .lv2__c-title { left: calc(var(--cell-pad-x, 12px) + 36px - var(--page-pad-x, 20px)); }
+    .lv2__cols > .lv2__c-select, .lv2__cols > .lv2__c-title { background: var(--canvas); }
+    .lv2__c-title:has(.lv2__menu) { z-index: 3; }
+    /* A group's bar is as wide as its rows; its select-all and label keep to the left with them. */
+    .lv2__group-select, .lv2__group-label { position: sticky; }
+    .lv2__group-select { left: calc(var(--cell-pad-x, 12px) - 2px - var(--lv2-check-room) - var(--page-pad-x, 20px)); }
+    .lv2__group-label { left: calc(2 * var(--cell-pad-x, 12px) - 2 * var(--lv2-check-room) + var(--hit-min) - var(--page-pad-x, 20px)); }
+    .lv2__actions {
+        position: absolute;
+        top: 0; bottom: 0; right: 0;
+        z-index: 1;
+        padding-left: var(--sp-3);
+        background: linear-gradient(var(--lv2-row-tint), var(--lv2-row-tint)) var(--surface);
+        opacity: 0;
+        pointer-events: none;
+        /* Unseen buttons lying over the name would still count as targets beside it. */
+        visibility: hidden;
+    }
+    .lv2__row:hover .lv2__actions,
+    .lv2__row:focus-within .lv2__actions,
+    .lv2__actions:has([aria-expanded="true"]) { opacity: 1; pointer-events: auto; visibility: visible; }
+}
 .lv2__menu { position: fixed; z-index: 30; max-height: calc(100vh - 16px); overflow-y: auto; }
 .lv2__menu .lv2__menu-danger, .lv2__menu .lv2__menu-danger:hover { color: var(--danger); }
-.lv2__create--sub { padding-left: 50px; }
+.lv2__create--sub { padding-left: calc(50px + var(--row-indent) * (var(--lv2-depth) - 1)); }
 
 /* Handoff 29b — who did the work, who checked it, who closed it. */
 .lv2__c-done { display: flex; align-items: center; min-width: 0; }
@@ -288,12 +422,12 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
 /* One track per cell still displayed, or the row wraps and doubles in height: 9 at full
    width, 8 without Done by, 6 without Est and Risk. */
 @media (max-width: 1100px) {
-    .lv2 { --lv2-cols: 28px minmax(0, 1fr) minmax(0, .45fr) 56px 64px 72px 48px 80px; }
+    .lv2 { --lv2-cols: 28px var(--lv2-title-track) minmax(56px, .45fr) 56px 64px 72px 48px 80px; }
     .lv2__c-done { display: none; }
 }
 @media (max-width: 1024px) {
-    .lv2 { --lv2-cols: 28px minmax(0, 1fr) minmax(0, .45fr) 56px 64px 72px; }
-    .lv2__c-est, .lv2__c-risk, .lv2__c-extra { display: none; }
+    .lv2 { --lv2-cols: 28px var(--lv2-title-track) minmax(56px, .45fr) 56px 64px 72px; }
+    .lv2__c-est, .lv2__c-risk, .lv2__c-extra, .lv2__totals { display: none; }
 }
 /* At phone width the title takes the whole first line and assignee, due date and priority
    fold into a meta line under it, one max-content track each, with the tags in what is left. */
@@ -312,9 +446,9 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
     .lv2__scroll { padding: 0 16px 20px; }
     .lv2__row, .lv2__cols { gap: 8px; }
     .lv2__row { min-height: 44px; row-gap: 2px; }
-    .lv2__add { padding-left: 24px; min-height: 44px; }
+    .lv2__add, .lv2__more { padding-left: 24px; min-height: 44px; }
     /* 16px of a 375px viewport is worth more to the task name than to the indent. */
-    .lv2__cols { padding: 12px 13px 8px; }
+    .lv2__cols { padding: 12px calc(var(--cell-pad-x, 12px) + 1px) 8px; }
     .lv2__sprint > .lv2__group,
     .lv2__sprint .lv2__collapsed-item { margin-left: 0; }
 }

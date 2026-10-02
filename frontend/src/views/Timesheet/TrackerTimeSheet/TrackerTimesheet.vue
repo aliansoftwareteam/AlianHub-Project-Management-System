@@ -9,20 +9,22 @@
         />
     </div>
     <div v-else>
-        <div class="timesheet_view Usertimesheet_view timesheet_view_latest bg-light-gray time_tracker__timesheet" v-if="error404">
+        <div class="ah-page timesheet_view Usertimesheet_view timesheet_view_latest time_tracker__timesheet" v-if="error404">
             <div class="row">
                 <div class="col-md-12">
                     <div class="page_title_row d-flex">
                         <div class="page-title d-flex">
                             <ul class="breadcrumb title_strip">
-                                <li @click="goHome()">
-                                    <img class="cursor-pointer" src="@/assets/images/home_icon.png" alt="home_icon"/>
+                                <li>
+                                    <button type="button" class="ts-home" :aria-label="$t('Milestone.home_link')" @click="goHome()">
+                                        <span class="ah-mask-icon" :style="maskOf(homeIcon)" aria-hidden="true"></span>
+                                    </button>
                                 </li>
                                 <li class="pro_route_link">
-                                    <router-link :to="`/${companyId}/project`" class="text-decoration-underline font-size-18 font-weight-700">{{$t('UserTimesheet.back_projects')}}</router-link>
+                                    <router-link :to="`/${companyId}/project`" class="ts-crumb">{{$t('UserTimesheet.back_projects')}}</router-link>
                                 </li>
                                 <li>
-                                    <span class="workload_title font-size-18 font-weight-700">{{$t('UserTimesheet.tracker_timesheet')}}</span>
+                                    <span class="workload_title ts-crumb">{{$t('UserTimesheet.tracker_timesheet')}}</span>
                                 </li>
                             </ul>
                         <TimesheetTabs active="tracker" class="ts-legacy-tabs" />
@@ -30,10 +32,10 @@
                     </div>
                 </div>
             </div>
-            <div class="timesheet__wrapper page-content bg-light-gray h-100">
+            <div class="timesheet__wrapper page-content h-100">
                 <div class="page_top_data  d-flex align-items-center justify-content-between flex-wrap">
                     <div class="d-flex" :class="[{'flex-wrap' : clientWidth <=767}]" :style="[{width : clientWidth > 768 ? 'calc(100% - 233px)' : '100%'}]"> 
-                    <span class="cursor-pointer"><img class="position-re left__arrow-img" src="@/assets/images/rectangle_leftArrow.png" @click="dateChange('left')"></span>
+                    <button type="button" class="ts-day-nav ts-day-nav--prev" :aria-label="$t('Projects.previous')" @click="dateChange('left')"><span class="ah-mask-icon" :style="maskOf(chevronIcon)" aria-hidden="true"></span></button>
                         <span class="tracker-timesheet-calender-wrapper">
                             <CalenderCompo
                                 class="tracker-timesheet-calender"
@@ -42,12 +44,12 @@
                                 @update:model-value="($event) => {dateUpdate($event)}"
                             />
                         </span>
-                        <span class="cursor-pointer"><img class="position-re right__arrow-img" src="@/assets/images/rectangle_rightArrow.png" @click="dateChange('right')" ></span>
+                        <button type="button" class="ts-day-nav" :aria-label="$t('Home.Next')" @click="dateChange('right')"><span class="ah-mask-icon" :style="maskOf(chevronIcon)" aria-hidden="true"></span></button>
                         <div class="wf_filter cursor-pointer" @click.stop="$refs.filter_tt_click.click()"  :style="[{marginTop : clientWidth <= 767 ? '15px' : '0px', marginLeft : clientWidth <=767 ? '0' : '17px' }]">
-                            <span class="timesheet_user_filter bg-white">
-                                <DropDown mode="listbox" id="" class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
+                            <span class="timesheet_user_filter">
+                                <DropDown mode="listbox" id="" themed class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
                                     <template #button="{ triggerAttrs }">
-                                        <button type="button" ref="filter_tt_click" class="btn-white border dot-btn" v-bind="triggerAttrs">
+                                        <button type="button" ref="filter_tt_click" class="dot-btn" v-bind="triggerAttrs">
                                             <span class="link_disable_css">{{$t('Filters.filter_by')}}</span>
                                         </button>
                                     </template>
@@ -64,13 +66,13 @@
                                     <div v-if="filterType!=''">
                                         <div class="wf_header">
                                             <a @click="handleFilterType('back','')">
-                                                <img src="@/assets/images/svg/filter_back_icon.svg"/>&nbsp;
+                                                <span class="ah-mask-icon ts-back" :style="maskOf(backIcon)" aria-hidden="true"></span>&nbsp;
                                                 {{$t('UserTimesheet.back')}}
                                             </a>
                                             <span>{{$t(`UserTimesheet.${filterType}`)}}</span>
                                         </div>
                                         <span class="filter_search_block">
-                                            <input type="search" class="form-control" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
+                                            <input type="search" class="ah-input" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
                                         </span>
                                         <div class="wf_body filter_body_scroll checklist-main" :class="{'filter_body_scroll': optionFilter.length >= 5}">
                                             <span
@@ -79,8 +81,8 @@
                                             :key="index"
                                             v-show="filterType.toLowerCase()=='users' && isEveryOne">
                                                 <a class="vs-dropdown-users d-flex align-items-center">
-                                                    <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                    <UserProfile
+                                                    <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
+                                                    <UserProfile decorative
                                                         v-if="filterType.toLowerCase() == 'users'"
                                                         :showDot="false"
                                                         class="timesheet_user_profile mr-10px"
@@ -109,7 +111,7 @@
                                             :key="index"
                                             v-show="filterType.toLowerCase()=='projects'">
                                                 <a class="vs-dropdown-users d-flex align-items-center">
-                                                    <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
+                                                    <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
                                                     <span v-if="item?.projectIcon && item?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center inital-box" :style="[{'background-color': item?.projectIcon.data}]">{{ item?.name.charAt(0).toUpperCase()}}</span>
                                                     <img v-if="item?.projectIcon && item?.projectIcon.type === 'image' && validateURL(item?.projectIcon.data)" class="profile-sm-square inital-box" :src="item?.projectIcon.data" alt=""/>
                                                     <WasabiImage 
@@ -131,11 +133,10 @@
                                     <span class="user_name" :title="chip.name" >
                                             {{  `${$t(`general.${chip.type.slice(0,-1)}`)} : ${chip.name}` }}
                                         </span>
-                                        <button @click="handleFilterItem(chip,'remove')" type="button" class="btn-close vs-chip--close cursor-pointer">
-                                            <img src="@/assets/images/svg/close_timesheet.svg" alt="cancel"/>
-                                        </button>
+                                        <button @click="handleFilterItem(chip,'remove')" type="button" class="ts-chip-x" :aria-label="$t('Reports.remove_filter')">×</button>
                                 </span>
                             </div>
+                            <span class="ah-mask-icon wf_filter__icon" :style="maskOf(filterIcon)" aria-hidden="true"></span>
                         </div>
                     </div>
                 </div>
@@ -144,9 +145,9 @@
                         <TimebarComponent :logRangeValue="logRange" :selectedSlot="selectedSlot" @toggle="selectedSlot = $event"/>
                     </div>
                     <div class="mt-12px">
-                        <div class="screenShotTime red mt-50px text-center" v-if="subSpinner">
-                            <div class="screenShotTime-skelaton bg-white" v-for="(sKey) in skelatonArray" :key="sKey">
-                                <div class="screenShotTime-skelaton--time font-size-18 black">
+                        <div class="screenShotTime mt-50px text-center" v-if="subSpinner">
+                            <div class="screenShotTime-skelaton" v-for="(sKey) in skelatonArray" :key="sKey">
+                                <div class="screenShotTime-skelaton--time">
                                     <Skelaton class="" style="height: 22px; width: 170px;"/>
                                 </div>
                             </div>
@@ -190,6 +191,11 @@
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
     import { isOwnerOrAdmin } from "@/utils/roles";
+    import { maskOf } from '@/utils/iconMask';
+    const homeIcon = require('@/assets/images/home_icon.png');
+    const backIcon = require('@/assets/images/svg/filter_back_icon.svg');
+    const filterIcon = require('@/assets/images/svg/filter_icon.svg');
+    const chevronIcon = require('@/assets/images/table_arrow.png');
     const {getUser} = useGetterFunctions();
     defineComponent({
         name: "UserTimesheet",
@@ -752,7 +758,6 @@
     }
 </script>
 <style src="../style.css"></style>
-<style src="../legacyTimesheetTheme.css"></style>
 <style scoped>
 .screenShotTime-skelaton--time {
     font-weight: 500;
@@ -764,19 +769,39 @@
     align-items: center;
 }
 .screenShotTime-skelaton {
-    border: 1px solid #e8e8e8;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 12px;
     margin-bottom: 20px;
 }
-.left__arrow-img{
-    right:-2px;
-    min-width: 32px;
+.ts-day-nav{
+    display: inline-grid;
+    place-content: center;
+    flex: none;
+    width: 32px;
     height: 30px;
+    margin-left: -1px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 0 var(--r-chip) var(--r-chip) 0;
+    background: var(--surface);
+    color: var(--ink-2);
+    cursor: pointer;
 }
-.right__arrow-img{
-    left:-2px;
-    min-width: 32px;
-    height: 30px;
+.ts-day-nav:hover{
+    background: var(--surface-hover);
+    color: var(--ink);
+}
+.ts-day-nav .ah-mask-icon{
+    width: 9px;
+    height: 9px;
+}
+.ts-day-nav--prev{
+    margin: 0 -1px 0 0;
+    border-radius: var(--r-chip) 0 0 var(--r-chip);
+}
+.ts-day-nav--prev .ah-mask-icon{
+    transform: rotate(180deg);
 }
 .page-content {
     padding: 15px;
@@ -813,7 +838,7 @@ ul.breadcrumb.title_strip li:first-child {
 ul.breadcrumb.title_strip li {
     list-style: none;
     padding: 0px 20px;
-    border-left: 1px solid #b7b7b7;
+    border-left: 1px solid var(--border);
     font-family: var(--font-ui);
     font-weight:700;
 }
@@ -824,7 +849,7 @@ ul.breadcrumb.title_strip li {
 }
 span.chipusername_wrapper {
     display: flex;
-    background-color: #f1efef;
+    background-color: var(--fill);
     border-radius: 10px;
     margin-right: 10px;
     padding: 1px 4px 0.77px 8px;
@@ -833,7 +858,7 @@ span.chipusername_wrapper {
     min-width: fit-content;
 }
 .link_disable_css {
-    color: #000;
+    color: var(--ink);
     text-decoration: none;
     font-size: 16px;
 }
@@ -846,6 +871,9 @@ span.chipusername_wrapper button {
     width: 17px;
     height: 17px;
     background: transparent !important;
+    color: var(--ink-2);
+    font: 400 var(--fs-lg, 16px)/1 var(--font-ui);
+    cursor: pointer;
 }
 .timesheet__wrapper .wf_filter {
     height: 30px;
@@ -875,13 +903,13 @@ span.chipusername_wrapper button {
 }
 .wf_filter::-webkit-scrollbar-thumb {
     border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);
-    background-color: #C1C1C1;
+    -webkit-box-shadow: inset 0 0 6px var(--shadow-ink);
+    background-color: var(--border);
 }
 .wf_filter::-webkit-scrollbar {
     width: 5px;
     height: 5px;
-    background-color: #F5F5F5;
+    background-color: var(--fill);
 }
 .wf_filter{
     overflow-x: auto !important;
@@ -893,20 +921,20 @@ span.chipusername_wrapper button {
 span.chipusername_wrapper span.user_name {
     font-size: 13px;
     font-weight: 500;
-    color: #505050;
+    color: var(--ink-2);
     line-height: 19.24px;
     min-width: max-content;
 }
 .circlegreen {
   width: 10px;
   height: 10px;
-  background-color: #1CB303;
+  background-color: var(--ok);
   border-radius: 50%;
 }
 .circlePurple {
   width: 10px;
   height: 10px;
-  background-color: #7367F0;
+  background-color: var(--agent);
   border-radius: 50%;
 }
 .timesheet_user_filter button.dot-btn {
@@ -914,17 +942,17 @@ span.chipusername_wrapper span.user_name {
   height: 28px;
 }
 .tracker-timesheet-calender-wrapper{
-    border:1px solid #DFE1E6;
+    border:1px solid var(--border);
     height: 30px;
-    background-color: #FFFFFF;
+    background-color: var(--surface);
     width: 143px;
     min-width: 143px;
 }
 .tracker-timesheet-calender {
     margin: 2px 10px 0;
 }
-.tracker-timesheet-calender .date_format_cal.calendar-comp::placeholder{font-size: 16px !important;color: #000 !important;}
-.tracker-timesheet-calender .date_format_cal.calendar-comp{font-size: 16px !important;color: #000 !important;}
+.tracker-timesheet-calender .date_format_cal.calendar-comp::placeholder{font-size: 16px !important;color: var(--ink) !important;}
+.tracker-timesheet-calender .date_format_cal.calendar-comp{font-size: 16px !important;color: var(--ink) !important;}
 
 .timebarWrapper{
     margin-top: 16px;
@@ -938,15 +966,15 @@ span.chipusername_wrapper span.user_name {
 .screenShotTime::-webkit-scrollbar {
     width: 6px;
     height: 6px;
-    background: #D9D9D9 !important;
+    background: var(--fill) !important;
     border-radius: 6px;
 }
 .screenShotTime.style-scroll::-webkit-scrollbar-thumb {
-    background: #2f3990;
+    background: var(--brand);
     border-radius: 6px;
 }
 .screenShotTime.style-scroll::-webkit-scrollbar-track{
-    background-color: #D9D9D9 !important;
+    background-color: var(--fill) !important;
     border-radius: 6px;
 }
 .timesheetDropdown_wrapper {
@@ -956,7 +984,7 @@ span.chipusername_wrapper span.user_name {
   border: 0 !important;
   margin-top: 9px;
   margin-left: -11px;
-  filter: drop-shadow(0px 2px 12px rgba(0, 0, 0, 0.15)) !important;
+  filter: drop-shadow(0px 2px 12px var(--shadow-ink)) !important;
 }
 .timesheet__wrapper .range-picker.rangeComp{
     min-width: 251px !important;
@@ -973,7 +1001,7 @@ span.chipusername_wrapper span.user_name {
     max-height: calc(100vh - 335px);
     overflow: auto;
 }
-.timesheetDropdown_wrapper span.filter_search_block .form-control {padding: 15.5px 10px !important;}
+.timesheetDropdown_wrapper span.filter_search_block .ah-input {padding: 15.5px 10px !important;}
 .timesheetDropdown_wrapper .wf_header span{font-size: 18px;}
 .timesheetDropdown_wrapper span.filter_search_block{padding: 20px 0 20px;}
 .timesheetDropdown_wrapper span.filter_list_item{font-size: 16px !important; line-height: 21px;}

@@ -7,6 +7,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { default: mongoose } = require('mongoose');
 const { updateSprintCount } = require('../../notification-count/controller');
+const { parentCountFields } = require('../../notification-count/unreadParents');
 const { updateSprintFun } = require('../../Sprints/controller');
 const { dbCollections } = require('../../../Config/collections');
 const { handleTaskAttachmentsDuplicateFunctionality } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
@@ -21,24 +22,31 @@ const SPRINT_PLAN_CHECK_TTL_SECONDS = 30;
 const { updateCommentCollection, addCommentCollection } = require('../../Comments/controller');
 // BUG-033 / #87 — self-healing reconciliation for sprint task counts.
 const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcileTaskCount');
+const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED } = require('./taskTree');
+const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
+const { withDescriptionBlock } = require('./descriptionBlock');
+const { withoutImportMark } = require('./importMark');
+const { cleanDescription } = require('./cleanRichText');
+const { copyFieldFiles } = require('../../CustomField/helpers/fieldFiles');
+const extraLists = require('./taskExtraLists');
+const { historyFields } = require('../../Agents/actingAgent');
 
 /* ------------- TASK ------------- */
-exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) => {
+exports.HandleTask = async (companyId, object, isUpdate, id = null, userData, { importMark = null } = {}) => {
     return new Promise(async (resolve, reject) => {
         try {
             const hasPermission = await exports.getTotalSprintCount(companyId, object.sprintId);
             if(hasPermission){
-                // Check if is update
                 if (isUpdate && id === null) {
                     reject("Id field should not be empty or undefined.");
                     return;
                 }
-    
-                // Required keys for validation
+
                 let keys = ["TaskName", "TaskKey", "TaskType", "ProjectID", "CompanyId"];
                 let valid = "";
-    
-                object = JSON.parse(JSON.stringify(object));
+
+                object = withoutImportMark(JSON.parse(JSON.stringify(object)));
+                if (importMark && !isUpdate) Object.assign(object, importMark);
     
                 keys.forEach(key => {
                     if (typeof object[key] !== "object" && (object[key] === undefined || !object[key].length)) {
@@ -63,14 +71,24 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) =>
                     object.dueDateDeadLine = object.dueDateDeadLine.map((x) => new Date(x.date));
                     object.DueDate = new Date(object.DueDate);
                 }
-    
+
+                cleanDescription(object);
+
+                /* Every new task document is saved here: a create, an import row, a form, a template, a copy. */
+                let droppedFieldValues = 0;
+                if (object.customField !== undefined) {
+                    const kept = await storableFieldValues({ companyId, task: object });
+                    object.customField = kept.customField;
+                    droppedFieldValues = kept.dropped.length;
+                }
+
                 let data;
                 if (isUpdate || id !== null) {
                     data = [{
                         _id: id
                     }, {...object}]
                 } else {
-                    data = {...object};
+                    data = withDescriptionBlock({...object});
 
                     if(data._id) {
                         data._id = new mongoose.Types.ObjectId(data._id);
@@ -87,7 +105,7 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) =>
                 const sanitizedNewTaskName = serviceFun.sanitizeInput(object.TaskName);
                 MongoDbCrudOpration(companyId, objSchema, isUpdate ? 'updateOne' : 'save')
                     .then(async (response) => {
-                        socketEmitter.emit('insert', { type: "insert", data: response , module: 'task'});
+                        socketEmitter.emit('insert', { type: "insert", data: response , module: 'task', companyId});
                         const historyObj = {
                             message: `<b>${userData.Employee_Name}</b> has created new <b>${sanitizedNewTaskName}</b> ${object.TaskType.replace(/_/g, '-')}.`,
                             key: "Task_Created",
@@ -112,7 +130,7 @@ exports.HandleTask = async (companyId, object, isUpdate, id = null, userData) =>
                                     logger.error(`HandleTask project-history error: ${error && error.message ? error.message : error}`);
                                 }),
                         ]);
-                        resolve({ status: true, id: isUpdate ? id : response._id, message: "Task created successfully." });
+                        resolve({ status: true, id: isUpdate ? id : response._id, message: "Task created successfully.", ...(droppedFieldValues ? { droppedFieldValues } : {}) });
                     }).catch(error => {
                         reject(error);
                     })
@@ -153,6 +171,7 @@ exports.HandleHistory = (type, companyId, projectId, taskId, object, userData) =
                 'ProjectId': projectId,
                 'TaskId': taskId !== null ? taskId : "",
                 'Message': object.message,
+                ...historyFields(),
             }
             let typeSchema = SCHEMA_TYPE.HISTORY
           
@@ -182,7 +201,8 @@ exports.changeDateFormat = (date, format) => {
     return formatDate(date, format);
 }
 
-exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTask, task, oldProject, isMainSubTask,isSubTask,userData) => {
+/* `chain` is the converted row's new `ancestors`. Its own subtasks stay under it, so its count of them is kept. */
+exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTask, task, oldProject, isMainSubTask,isSubTask,userData,chain) => {
     return new Promise((resolve, reject) => {
         try {
             let deleteObj = {
@@ -200,11 +220,11 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                 ]
             }
             MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate").then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
                 let obj = {
                     isParentTask: false,
                     ParentTaskId: task._id,
-                    subTasks: 0,
+                    ancestors: chain,
                     deletedStatusKey : 0
                 };
                 let unsetObj = {}
@@ -261,6 +281,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         ...obj,
                     }
                 }
+                const hadLists = extraLists.extraListsOf(convertTask).map((entry) => ({ projectId: String(entry.projectId), sprintId: String(entry.sprintId) }));
                 let queryObj = {
                     type: SCHEMA_TYPE.TASKS,
                     data: [
@@ -269,7 +290,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         },
                         {
                             $set: {...obj},
-                            $unset: unsetObj
+                            $unset: {...unsetObj, cascadedBy: '', extraLists: ''}
                         },
                         {
                             returnDocument: 'after'
@@ -277,7 +298,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                     ]
                 }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: hadLists.length ? { ...obj, extraLists: [] } : obj, module: 'task', companyId, ...(hadLists.length ? { leftLists: hadLists } : {}) });
                     /*When a subtask is converted to another subtask within a parent task, and a subtask is removed, the count of the parent task is reduced.*/
                     if (isMainSubTask === true) {
                         let object = {
@@ -288,7 +309,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                             ]
                         }
                         MongoDbCrudOpration(companyId, object, "updateOne").then((mainRes)=>{
-                            socketEmitter.emit('update', { type: "update", data: mainRes , updatedFields: {subTasks: mainRes.subTasks}, module: 'task' });
+                            socketEmitter.emit('update', { type: "update", data: mainRes , updatedFields: {subTasks: mainRes.subTasks}, module: 'task', companyId });
                         })
                     }
                     /*When a task is converted into  asubtask, at that moment, if a subtask is added to the selected task, the count needs to be increased.*/
@@ -301,7 +322,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         ]
                     }
                     MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((taskres)=>{
-                        socketEmitter.emit('update', { type: "update", data: taskres , updatedFields: {subTasks: taskres.subTasks}, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: taskres , updatedFields: {subTasks: taskres.subTasks}, module: 'task', companyId });
                     })
                     // update comment count
                     exports.removeCommentCount(companyId,projectData.id,convertTask.sprintId,convertTask._id,convertTask.ParentTaskId).catch((error) => {
@@ -374,9 +395,13 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
     })
 }
 
-exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSprintObj, oldProject,assignee,watcher,userData,isSubTask) => {
+/* A `carried` row moves because the task above it did: it keeps the state it holds, and its sprints count it in that state. */
+exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSprintObj, oldProject,assignee,watcher,userData,isSubTask,carried = false) => {
     return new Promise((resolve, reject) => {
         try {
+            const keptKey = carried ? (moveTask.deletedStatusKey || 0) : 0;
+            const counted = sprintCountChange(DELETED, keptKey);
+            const left = Object.fromEntries(Object.entries(counted).map(([field, by]) => [field, -by]));
             let deleteObj = {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
@@ -391,8 +416,11 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                     }
                 ]
             }
-            MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate").then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task' });
+            Promise.all([
+                MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate"),
+                extraLists.afterHomeMove(companyId, moveTask, { projectId: projectData.id, sprintId: sprintObj.id }),
+            ]).then(([result, extras]) => {
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
                 let obj = {};
                 let unsetObj = {}
                 if (JSON.parse(JSON.stringify(moveTask.ProjectID)) !== JSON.parse(JSON.stringify(projectData.id))) {
@@ -414,7 +442,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                         statusKey: statusData.convertStatus.key,
                         TaskType: typeData.convertType.value,
                         TaskTypeKey: typeData.convertType.key,
-                        deletedStatusKey : 0,
+                        deletedStatusKey : keptKey,
                     }
                     if(sprintObj.folderId){
                         obj.folderObjId = sprintObj.folderId;
@@ -432,7 +460,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                         ProjectID: new mongoose.Types.ObjectId(moveTask.ProjectID),
                         sprintId: new mongoose.Types.ObjectId(sprintObj.id),
                         sprintArray: sprintObj,
-                        deletedStatusKey: 0,
+                        deletedStatusKey: keptKey,
                     }
                     if(sprintObj.folderId){
                         obj.folderObjId = sprintObj.folderId;
@@ -445,8 +473,8 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                         }
                     }
                 }
-                obj.AssigneeUserId = assignee || [];
-                obj.watchers = watcher || [];
+                if (!carried || assignee) obj.AssigneeUserId = assignee || [];
+                if (!carried || watcher) obj.watchers = watcher || [];
                 let queryObj = {
                     type: SCHEMA_TYPE.TASKS,
                     data: [
@@ -455,13 +483,16 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                         },
                         {
                             $set: {...obj},
-                            $unset: unsetObj
+                            $unset: unsetObj,
+                            $pull: extras.pull
                         },
                         {
                             returnDocument: 'after'
                         }
                     ]
                 }
+                /* A convert that carries a subtree has no acting user to name in a history line. */
+                if (userData && userData.id) {
                 const historyObj = {
                     key: "Task_Moved",
                     sprintId: sprintObj.id,
@@ -477,8 +508,17 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 // userData.id, so any caller that omits it took the server down.
                 exports.HandleHistory('task', companyId, projectData.id, moveTask._id, historyObj, userData)
                     .catch((error) => { logger.error(`ERROR IN MOVE TASK HISTORY: ${error && error.message}`); });
+                if (extras.dropped.length) {
+                    const where = extras.dropped.map(({ entry, list }) => extraLists.listPhrase({ ProjectID: projectData.id }, entry, list, escapeHtml)).join(', ');
+                    exports.HandleHistory('task', companyId, projectData.id, moveTask._id, {
+                        key: extraLists.HISTORY_KEY,
+                        sprintId: sprintObj.id,
+                        message: `<b>${escapeHtml(moveTask.TaskName)}</b> moved to another project and is no longer in ${where}.`,
+                    }, userData).catch((error) => { logger.error(`ERROR IN MOVE TASK HISTORY: ${error && error.message}`); });
+                }
+                }
                 MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((ele) => {
-                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: obj, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: extraLists.extraListsOf(moveTask).length ? { ...obj, extraLists: extraLists.extraListsOf(ele) } : obj, module: 'task', companyId, ...(extras.dropped.length ? { leftLists: extras.dropped.map(({ entry }) => entry) } : {}) });
                     resolve({ status: true, statusText: "MOVE" });
 
                     updateCommentCollection(companyId, moveTask,sprintObj,projectData,moveTask._id).catch((err) => { logger.error(`${err},ERROR IN ADD COMMENTS IN SUBTASK`); })
@@ -490,11 +530,12 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                     exports.removeCommentCount(companyId,oldProject.id,oldSprintObj.id,moveTask._id,moveTask.ParentTaskId).catch((error) => {
                         logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
                     })
+                    if (!Object.keys(counted).length) return;
                     const incObj = {
                         body: {
                             companyId: companyId,
                             projectId: projectData.id,
-                            updateObject :{$inc: { tasks: 1}},
+                            updateObject :{$inc: counted},
                             folderId: sprintObj?.folderId || null,
                         },
                         params : {
@@ -513,7 +554,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                         body: {
                             companyId: companyId,
                             projectId: oldProject.id,
-                            updateObject :{$inc: { tasks: -1}},
+                            updateObject :{$inc: left},
                             folderId: oldSprintObj?.folderId || null,
                         },
                         params : {
@@ -535,12 +576,30 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                     // both ends so the user sees correct numbers.
                     scheduleReconciliation(companyId, [sprintObj?.id, oldSprintObj?.id]);
                 })
-            })
+            }).catch(reject)
         } catch (error) {
             reject(error);
         }
     })
 }
+
+/* The rows under `topId` go where it went: each takes the chain its new place gives and, when the
+ * place is another sprint or project, the target placement through the per-row move, keeping its
+ * own people and state. `chain` is the top's new `ancestors`. A deleted row keeps its place, as
+ * in the app's own move, but not its old chain. */
+exports.carrySubtree = async (companyId, topId, chain, { projectData, sprintObj, oldProject, userData }) => {
+    const rows = await loadSubtree(companyId, topId);
+    if (!rows.length) return 0;
+    await rewriteDescendantAncestors(companyId, topId, chain);
+    for (const row of rows) {
+        const inPlace = String(row.sprintId) === String(sprintObj.id) && String(row.ProjectID) === String(projectData.id);
+        if (inPlace || row.deletedStatusKey === DELETED) continue;
+        const from = { id: row.sprintId, folderId: row.folderObjId || null, name: (row.sprintArray && row.sprintArray.name) || '', folderName: (row.sprintArray && row.sprintArray.folderName) || '' };
+        await exports.moveTaskFunction(companyId, projectData, sprintObj, row, from, oldProject, null, null, userData, false, true)
+            .catch((error) => { logger.error(`carrySubtree ${row._id}: ${error && error.message}`); });
+    }
+    return rows.length;
+};
 
 exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldSprintObj) => {
     return new Promise((resolve, reject) => {
@@ -559,7 +618,10 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
                 },
                 ParentTaskId: '',
                 isParentTask: true,
+                ancestors: [],
             }
+            delete obj.cascadedBy;
+            delete obj.extraLists;
             let unsetObj = {};
             if (sprintObjData.folderId !== undefined && sprintObjData?.folderId) {
                 obj.sprintArray.folderId = sprintObjData.folderId,
@@ -581,7 +643,7 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
                     { _id: new mongoose.Types.ObjectId(parseSubTask._id) },
                     { 
                         $set: { ...obj } ,
-                        $unset: unsetObj
+                        $unset: { ...unsetObj, cascadedBy: '', extraLists: '' }
                     },
                 ]
             }
@@ -627,9 +689,14 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
     })
 }
 
-exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) => {
+/* `slot` is where the caller placed the subtask: the kept task, or the nearest task above it that can take the subtask's own subtree. */
+exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, slot) => {
     return new Promise((resolve, reject) => {
         try {
+            const placedUnder = { ParentTaskId: String(slot.parent._id), ancestors: slot.ancestors, isParentTask: false };
+            const unsetObj = { cascadedBy: '' };
+            if (mergeTask.folderObjId) placedUnder.folderObjId = mergeTask.folderObjId;
+            else unsetObj.folderObjId = '';
             let obj;
             if (subTask.ProjectID !== mergeTask.ProjectID) {
                 let Ind = oldProject.taskStatusData.findIndex((x) => { return x.key === subTask.statusKey });
@@ -643,7 +710,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) 
                         name: mergeTask.sprintArray.name,
                         value: mergeTask.sprintArray.value,
                     },
-                    ParentTaskId: mergeTask.isParentTask === true ? mergeTask._id : mergeTask.ParentTaskId,
+                    ...placedUnder,
                     ProjectID: mergeTask.ProjectID,
                     status: {
                         key: statusData.convertStatus.key,
@@ -664,7 +731,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) 
                         name: mergeTask.sprintArray.name,
                         value: mergeTask.sprintArray.value,
                     },
-                    ParentTaskId: mergeTask.isParentTask === true ? mergeTask._id : mergeTask.ParentTaskId,
+                    ...placedUnder,
                     ProjectID: mergeTask.ProjectID,
                 }
             }
@@ -675,7 +742,8 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) 
                         _id: new mongoose.Types.ObjectId(subTask._id)
                     },
                     {
-                        $set: {...obj}
+                        $set: {...obj},
+                        $unset: unsetObj
                     },
                     {
                         returnDocument: 'after'
@@ -683,9 +751,9 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) 
                 ]
             }
             MongoDbCrudOpration(companyId,queryObj,"findOneAndUpdate").then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj, module: 'task', companyId });
                 resolve({ status: true, statusText: "Sub Task merged Succesfully" });
-                let mergeId = mergeTask.isParentTask === true ? mergeTask._id : mergeTask.ParentTaskId;
+                let mergeId = slot.parent._id;
                 let incObj = {
                     type: SCHEMA_TYPE.TASKS,
                     data: [
@@ -695,7 +763,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) 
                     ]
                 }
                 MongoDbCrudOpration(companyId,incObj,"findOneAndUpdate").then((res)=>{
-                    socketEmitter.emit('update', { type: "update", data: res , updatedFields: {subTasks: res.subTasks}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: res , updatedFields: {subTasks: res.subTasks}, module: 'task', companyId });
                 }).catch((err) => {
                     logger.error(`ERROR in ${err}`);
                 })
@@ -745,7 +813,8 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject) 
     })
 }
 
-exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, parentId, userData, oldProject, duplicateData) => {
+/* `chain` is the copy's `ancestors`: the copies above it, root first. The source's own subtasks are copied under the copy. */
+exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, parentId, userData, oldProject, duplicateData, chain = [String(parentId)], copied = null) => {
     return new Promise((resolve, reject) => {
         try {
             let obj = {};
@@ -799,6 +868,8 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                 delete obj.folderObjId;
             }
             delete obj._id;
+            delete obj.cascadedBy;
+            obj.ancestors = chain;
             let object = {
                 type:SCHEMA_TYPE.PROJECTS,
                 data: [
@@ -816,10 +887,12 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                 ]
             }
             MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
-                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {taskTypeCounts: response.taskTypeCounts,lastTaskId: response.lastTaskId}, module: 'task' });
                 obj.TaskKey = projectData.ProjectCode + '-' +  response.lastTaskId;
-                exports.HandleTask(companyId, obj, false, null, userData).then((taskResult) => {
+                exports.HandleTask(companyId, obj, false, null, userData).then(async (taskResult) => {
+                    if (copied) copied.set(String(subtask._id), String(taskResult.id));
                     if(duplicateData.includes('Attachments')){
+                        copyFieldFiles({ companyId, source: subtask, target: { _id: taskResult.id, ProjectID: projectData.id } })
+                            .catch((error) => logger.error(`field files copy on duplicate: ${error && error.message}`));
                         if(subtask.attachments.length > 0) {
                             /* Only a file stored for the source task is copied; any other key stays as it was, read under its own owner. */
                             const promises = subtask.attachments.map(async (x) => {
@@ -846,7 +919,7 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                                     ]
                                 }
                                 MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate").then((ele)=>{
-                                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: {attachments : subtask.attachments}, module: 'task' });
+                                    socketEmitter.emit('update', { type: "update", data: ele , updatedFields: {attachments : subtask.attachments}, module: 'task', companyId });
                                 })
                             })
                         }
@@ -874,13 +947,18 @@ exports.duplicateSubTaskFunction = (companyId, projectData, sprintObj, subtask, 
                     updateSprintFun(countObj).catch((error) => {
                         logger.error(`error in update task count : ${error}`)
                     });
+                    const ownSubtasks = await MongoDbCrudOpration(companyId, {
+                        type: SCHEMA_TYPE.TASKS,
+                        data: [{ ParentTaskId: String(subtask._id), deletedStatusKey: { $nin: [1] } }],
+                    }, 'find').catch(() => []);
+                    await Promise.allSettled((ownSubtasks || []).map((own) => exports.duplicateSubTaskFunction(companyId, projectData, sprintObj, own, taskResult.id, userData, oldProject, duplicateData, [...chain, String(taskResult.id)], copied)));
                     resolve({ status: true, statusText: "Duplicate Task Added"});
                     try {
                         if (duplicateData.includes('Activity')) {
                             exports.addHistoryCollection(companyId, projectData, subtask, taskResult, sprintObj).catch((err) => { logger.error(`${err},ERROR IN ADD HISTORY IN SUBTASK`); })
                         }
                         if (duplicateData.includes('Comments')) {
-                            addCommentCollection(companyId, projectData, subtask, taskResult, sprintObj)
+                            addCommentCollection(companyId, projectData, subtask, taskResult, sprintObj, userData)
                             .catch((err) => { logger.error(`${err},ERROR IN ADD COMMENTS IN SUBTASK`); })
                         }
                     } catch (error) {
@@ -940,15 +1018,15 @@ exports.addHistoryCollection = (companyId, projectData, task, newTaskData, sprin
     })
 }
 
-exports.removeCommentCount = (companyId,projectId,sprintId,taskId,parentTaskId = '') => {
+/* A row's unread count comes off every task above it: the parent named by the caller (the one
+ * the row is leaving) and the tasks above that, or the row's own stored chain. */
+exports.removeCommentCount = async (companyId,projectId,sprintId,taskId,parentTaskId = '') => {
+    const parentTaskField = await parentCountFields(companyId, { projectId, sprintId, taskId, parentTaskId })
+        .catch(() => (parentTaskId ? [`parentTask_${projectId}_${sprintId}_${parentTaskId}_comments`] : []));
     return new Promise((resolve,reject) => {
         try {
             const sprintFieldName = `sprint_${projectId}_${sprintId}_comments`;
             const taskFieldName = `task_${projectId}_${sprintId}_${taskId}_comments`;
-            let parentTaskField = ``;
-            if(parentTaskId !== '') {
-                parentTaskField = `parentTask_${projectId}_${sprintId}_${parentTaskId}_comments`
-            }
             let obj = {
                 type: dbCollections.USERID,
                 data: [{
@@ -995,7 +1073,8 @@ exports.removeCommentCount = (companyId,projectId,sprintId,taskId,parentTaskId =
                                         socketEmitter.emit('update', { 
                                             type: "update", 
                                             data: dty, 
-                                            module: 'userIdNotification' 
+                                            module: 'userIdNotification',
+                                            companyId
                                         });
                                         count++;
                                         countFunction(ele[count]);

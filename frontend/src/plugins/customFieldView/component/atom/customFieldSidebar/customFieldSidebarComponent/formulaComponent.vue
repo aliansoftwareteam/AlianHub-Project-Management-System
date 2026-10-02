@@ -1,5 +1,5 @@
 <template>
-    <div v-show="tabIndexCheck === 1">
+    <div v-show="tabIndexCheck === 1" data-field-tab="1">
         <CustomFieldInputComponent
             :label="$t('PlaceHolder.field_label')"
             :type="'text'"
@@ -14,10 +14,9 @@
             :label="$t('Description.description')"
             :type="'textarea'"
             :placeholder="$t('PlaceHolder.Enter_Description')"
-            :validations="'required:trim|length:10'"
+            :validations="''"
             :bindValue="props.customFieldObject?.fieldDescription ? props.customFieldObject.fieldDescription : fieldDescription"
             :validationVisibility="'blur'"
-            :className="'custom__field-required'"
             :name="'fieldDescription'"
         />
         <CustomFieldInputComponent
@@ -37,7 +36,7 @@
                 </span>
             </p>
         </div>
-        <DropDown mode="listbox" :zIndex="10" v-if="isType">
+        <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                     <div class="custom__field-required">
@@ -125,7 +124,7 @@
 
     // Redirect to the tab where the validation error message is displayed.
     const handleTabComp = (node) => {
-        if(!(node._value.fieldDescription && node._value.fieldTitle)){
+        if(!node._value.fieldTitle){
             tabIndexCheck.value = 1;
             emit('tabIndexUpdate',tabIndexCheck.value)
         }
@@ -137,7 +136,7 @@
         object.fieldImageGrey = props.componentDetail.cfIconGrey;
         object.formulaExpression = object.formulaExpression ? String(object.formulaExpression).trim() : '';
         object.fieldTitle = object.fieldTitle.trim();
-        object.fieldDescription = object.fieldDescription.trim();
+        object.fieldDescription = (object.fieldDescription || '').trim();
         if(props.isType === true){
             object.type = type.value;
         }

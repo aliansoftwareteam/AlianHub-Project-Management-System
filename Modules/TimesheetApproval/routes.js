@@ -7,4 +7,5 @@ exports.init = (app) => {
     app.get('/api/v2/timesheet-approval/pending', ctrl.listPending);
     app.get('/api/v2/timesheet-approval/queue', ctrl.listQueue);
     app.post('/api/v2/timesheet-approval/:id/review', ctrl.reviewTimesheet);
+    app.post('/api/v2/timesheet-approval/bulk-review', ctrl.reviewTimesheetsBulk);
 }

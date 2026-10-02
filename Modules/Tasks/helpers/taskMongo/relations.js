@@ -7,12 +7,21 @@ const socketEmitter = require('../../../../event/socketEventEmitter');
 const { HandleHistory } = require("../mongo_helper");
 const { HandleBothNotification } = require("../handleNotification");
 const { INVERSE_RELATION, RELATION_LABELS, validateTaskRef, validateRelationPair, validateRelationInput, selectOpenBlockers } = require('./relationRules');
+const { readableTaskIds } = require('../taskWritePlacement');
 
 // Task-to-task relations (blocks / blocked_by / duplicates / duplicated_by /
 // relates_to). A link is stored on BOTH task documents as an entry in the
 // `relations` array — `{ taskId, type, createdBy, createdAt }` — with the
 // inverse type on the related side, so reading either task shows the link
 // without a join. One link per task pair; changing its type is remove + add.
+
+/* The links of a task that `userData` may be shown: the ones to tasks that person can open. Kept off the
+ * exported object, whose every method the task route can dispatch. */
+const openableRelations = async (companyId, userData, task) => {
+    const linked = (task && task.relations) || [];
+    const openable = new Set(await readableTaskIds(companyId, userData && userData.id, linked.map((rel) => String(rel.taskId))));
+    return linked.filter((rel) => openable.has(String(rel.taskId)));
+};
 
 module.exports = {
 
@@ -49,8 +58,8 @@ module.exports = {
                     this.pushRelationEntry(companyId, relatedObjId, { taskId: taskObjId, type: inverseType, createdBy, createdAt }),
                 ]);
 
-                socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask?.relations || [] }, module: 'task' });
-                socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated?.relations || [] }, module: 'task' });
+                socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask?.relations || [] }, module: 'task', companyId });
+                socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated?.relations || [] }, module: 'task', companyId });
 
                 this.addRelationHistory({ companyId, task, otherKey: relatedTask.TaskKey, type, userData });
                 this.addRelationHistory({ companyId, task: relatedTask, otherKey: task.TaskKey, type: inverseType, userData });
@@ -61,7 +70,7 @@ module.exports = {
                 resolve({
                     status: true,
                     statusText: `${task.TaskKey} now ${RELATION_LABELS[type]} ${relatedTask.TaskKey}.`,
-                    data: { taskId, relatedTaskId, type, relations: updatedTask?.relations || [] },
+                    data: { taskId, relatedTaskId, type, relations: await openableRelations(companyId, userData, updatedTask) },
                 });
             } catch (error) {
                 logger.error(`ERROR in add task relation: ${error.message}`);
@@ -89,8 +98,9 @@ module.exports = {
                 if (!task) {
                     return reject(new Error('Task not found.'));
                 }
-                const existing = (task.relations || []).some((rel) => String(rel.taskId) === String(relatedTaskId));
-                if (!existing) {
+                const linked = (task.relations || []).some((rel) => String(rel.taskId) === String(relatedTaskId));
+                const [openable] = await readableTaskIds(companyId, userData && userData.id, [String(relatedTaskId)]);
+                if (!linked || !openable) {
                     return reject(new Error('These tasks are not linked.'));
                 }
 
@@ -102,10 +112,10 @@ module.exports = {
                 ]);
 
                 if (updatedTask) {
-                    socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask.relations || [] }, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: updatedTask, updatedFields: { relations: updatedTask.relations || [] }, module: 'task', companyId });
                 }
                 if (updatedRelated) {
-                    socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated.relations || [] }, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: updatedRelated, updatedFields: { relations: updatedRelated.relations || [] }, module: 'task', companyId });
                 }
 
                 this.removeRelationHistory({ companyId, task, otherKey: relatedTask ? relatedTask.TaskKey : 'a deleted task', userData });
@@ -121,7 +131,7 @@ module.exports = {
                 resolve({
                     status: true,
                     statusText: 'Task link removed successfully.',
-                    data: { taskId, relatedTaskId, relations: updatedTask?.relations || [] },
+                    data: { taskId, relatedTaskId, relations: await openableRelations(companyId, userData, updatedTask) },
                 });
             } catch (error) {
                 logger.error(`ERROR in remove task relation: ${error.message}`);
@@ -131,8 +141,9 @@ module.exports = {
     },
 
     /* -------------- LIST RELATIONS OF A TASK (WITH TASK SUMMARIES) -----------------*/
-    // payload: { companyId, taskId }
-    getTaskRelations({ companyId, taskId }) {
+    // payload: { companyId, taskId, userData }. `userData` is the reader: a link to a task they cannot
+    // open is left out whole, so neither the answer nor its length says the link exists.
+    getTaskRelations({ companyId, taskId, userData }) {
         return new Promise(async (resolve, reject) => {
             try {
                 const check = validateTaskRef({ companyId, taskId });
@@ -144,7 +155,7 @@ module.exports = {
                 if (!task) {
                     return reject(new Error('Task not found.'));
                 }
-                const relations = task.relations || [];
+                const relations = await openableRelations(companyId, userData, task);
                 if (!relations.length) {
                     return resolve({ status: true, statusText: 'No linked tasks.', data: [] });
                 }
@@ -178,13 +189,13 @@ module.exports = {
     },
 
     /* -------------- LIST OPEN BLOCKERS OF A TASK -----------------*/
-    // payload: { companyId, taskId }. Returns the `blocked_by` links whose
+    // payload: { companyId, taskId, userData }. Returns the `blocked_by` links whose
     // blocking task is still open — i.e. why this task isn't unblocked yet.
     // Drives the "blocked by N open task(s)" warning shown on the task.
-    getOpenBlockers({ companyId, taskId }) {
+    getOpenBlockers({ companyId, taskId, userData }) {
         return new Promise(async (resolve, reject) => {
             try {
-                const relationsResult = await this.getTaskRelations({ companyId, taskId });
+                const relationsResult = await this.getTaskRelations({ companyId, taskId, userData });
                 const openBlockers = selectOpenBlockers(relationsResult.data || []);
                 resolve({
                     status: true,

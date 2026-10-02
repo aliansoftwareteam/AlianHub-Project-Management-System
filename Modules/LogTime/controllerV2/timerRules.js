@@ -5,6 +5,7 @@ const RUNNING_WINDOW_SEC = 10 * 60;
 const OVERNIGHT_HOURS = 12;
 const SUGGESTED_TRIM_MINUTES = 180;
 const MAX_TRIM_MINUTES = 24 * 60;
+const START_LOCKED = "This timesheet period is approved and locked — a timer can't start in it.";
 
 /* A desktop-tracker session refreshes `startTimeTracker` on every capture, so a
  * session is live only when that stamp is recent; older stamps are abandoned
@@ -31,4 +32,4 @@ const trimBounds = ({ startSec, minutes }) => ({
     LogTimeDuration: minutes,
 });
 
-module.exports = { RUNNING_WINDOW_SEC, OVERNIGHT_HOURS, SUGGESTED_TRIM_MINUTES, MAX_TRIM_MINUTES, classifyTimer, validateTrimMinutes, trimBounds };
+module.exports = { RUNNING_WINDOW_SEC, OVERNIGHT_HOURS, SUGGESTED_TRIM_MINUTES, MAX_TRIM_MINUTES, START_LOCKED, classifyTimer, validateTrimMinutes, trimBounds };

@@ -6,10 +6,10 @@
                 <div class="taskStatusInSidebar" :style="[{'background-color': taskStatus && taskStatus.textColor,'color':taskStatus && taskStatus.textColor}]"></div>
                 <div class="text-ellipsis pr-10px pl-2px">
                     <!-- <div v-if="data.isParentTask === false"><span class="text-ellipsis gray parent-taskname-merge font-size-12">{{taskData.filter((x) => x.id === data.ParentTaskId)[0]?.TaskName}}</span></div> -->
-                    <div v-if="data.isParentTask === false" class="text-ellipsis d-block w-100 data__is-parenttask"><span class="text-ellipsis gray parent-taskname-merge font-size-11 font-weight-400 text-capitalize">{{taskData.filter((x) => x._id === data.ParentTaskId)[0]?.TaskName || data.parentTaskName}}</span></div>
+                    <div v-if="data.isParentTask === false" class="text-ellipsis d-block w-100 data__is-parenttask"><span class="text-ellipsis gray parent-taskname-merge font-size-11 font-weight-400">{{taskData.filter((x) => x._id === data.ParentTaskId)[0]?.TaskName || data.parentTaskName}}</span></div>
                     <div class="text-ellipsis d-block w-100 mt--1px">
                         <img v-if="data.isParentTask === false" :src="subTaskDefineArrowImg">
-                        <span class="text-ellipsis converted__subtask-nam font-size-14 font-weight-400 ml-5px text-capitalize">{{data.TaskName}}</span>
+                        <span class="text-ellipsis converted__subtask-nam font-size-14 font-weight-400 ml-5px">{{data.TaskName}}</span>
                     </div>
                 </div>
             </div>
@@ -38,7 +38,7 @@
                             >
                                 <div class="d-flex align-items-center" :title="user.label">
                                     <!-- <img :src="user.image" class="profile-image" alt="user image"> -->
-                                    <UserProfile
+                                    <UserProfile decorative
                                         :showDot="true"
                                         :data="{ image: user.Employee_profileImageURL, title: user.Employee_Name}"
                                         width="25px" class="cursor-pointer converted__subtask-image"
@@ -91,6 +91,7 @@ import { taskPlanPermission } from "@/composable/commonFunction";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { treeRefusalReason } from '@/views/Projects/composables/taskDepth';
 const { t } = useI18n();
 const emit = defineEmits([
     'dataToParent','closeTaskSidebar','mergeTask','taskSelect'
@@ -511,6 +512,7 @@ const convertTaskToSub = () => {
     .catch((err) => {
         console.error(err);
         isSpiner.value = false;
+        $toast.error(treeRefusalReason(err) || t('Toast.something_went_wrong'), {position: 'top-right'});
     })
 }
 

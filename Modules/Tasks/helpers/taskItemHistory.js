@@ -4,7 +4,8 @@ const logger = require('../../../Config/loggerConfig');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { HandleHistory } = require('./helper');
 const { escapeText } = require('./taskWriteFields');
-const { fieldValueText, customFieldDefinitionOf } = require('../../CustomField/helpers/customFieldText');
+const { fieldValueText, fieldValueContext, customFieldDefinitionOf } = require('../../CustomField/helpers/customFieldText');
+const { typeModuleOf } = require('../../CustomField/fieldTypes');
 
 const HISTORY = Object.freeze({
     CUSTOM_FIELD_VALUE: 'Project_Category',
@@ -16,10 +17,14 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 
-const describeCustomFieldValue = ({ actor, definition, next, previous, viaAi = false }) => {
+const describeCustomFieldValue = ({ actor, definition, next, previous, viaAi = false, context = {} }) => {
     if (!definition || !next) return null;
-    const shown = fieldValueText(definition, next);
-    if (previous && fieldValueText(definition, previous) === shown) return null;
+    /* The log is read by everyone who can open the task, and not all of them may see what such a field holds. */
+    if ((typeModuleOf(definition.fieldType) || {}).sideStored) {
+        return { key: HISTORY.CUSTOM_FIELD_VALUE, message: `<b>${actor.Employee_Name}</b> has changed the <b>${escapeText(definition.fieldTitle)}</b> Custom Field.` };
+    }
+    const shown = fieldValueText(definition, next, context);
+    if (previous && fieldValueText(definition, previous, context) === shown) return null;
     return {
         key: HISTORY.CUSTOM_FIELD_VALUE,
         message: viaAi
@@ -51,12 +56,20 @@ const projectTagsOf = async (companyId, projectId) => {
     return (project && plain(project).tagsArray) || [];
 };
 
+const TAG_NOT_IN_PROJECT = 'The tag is not one of this project\'s tags.';
+const namesTag = (tagId) => ['string', 'number'].includes(typeof tagId) && String(tagId) !== '';
+
+const projectHoldsTag = async (companyId, projectId, tagId) => namesTag(tagId) && (await projectTagsOf(companyId, projectId))
+    .some((tag) => tag && tag.uid !== undefined && tag.uid !== null && String(tag.uid) === String(tagId));
+
 const logFailure = (what) => (error) => logger.error(`${what}: ${(error && error.message) || JSON.stringify(error)}`);
 
 const recordCustomFieldValue = async ({ companyId, task, customFieldId, updateDetail, actor, viaAi = false }) => {
     const stored = plain(task);
     const definition = await customFieldDefinitionOf(companyId, customFieldId);
-    const entry = describeCustomFieldValue({ actor, definition, next: updateDetail, previous: stored.customField && stored.customField[customFieldId], viaAi });
+    const previous = stored.customField && stored.customField[customFieldId];
+    const context = await fieldValueContext(companyId, definition, [updateDetail, previous]);
+    const entry = describeCustomFieldValue({ actor, definition, next: updateDetail, previous, viaAi, context });
     if (!entry) return;
     await HandleHistory('task', companyId, String(stored.ProjectID), String(stored._id), entry, actor).catch(logFailure('custom field value history'));
 };
@@ -81,4 +94,6 @@ module.exports = {
     describeTaskTag,
     recordCustomFieldValue,
     recordTaskTag,
+    projectHoldsTag,
+    TAG_NOT_IN_PROJECT,
 };

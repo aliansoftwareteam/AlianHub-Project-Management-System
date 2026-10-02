@@ -4,7 +4,8 @@ const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const { oid } = require('../Automations/engine/tools');
 const { resolveSheetScope, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
-const { NOT_VISIBLE } = require('./visibility');
+const { NOT_VISIBLE, TASK_ACCESS_FIELDS } = require('./visibility');
+const { ownOrNotPersonal, isSomeoneElsesPersonalList } = require('../PersonalList/ownership');
 const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
@@ -39,13 +40,10 @@ const listOf = async (ctx, tool, args, key, { type, filter, sort, fields }, row,
 
 const projectParams = (args) => (isId(args.projectId) ? { projectId: String(args.projectId) } : {});
 
-// Another person's personal list stays theirs even for owners and admins (Modules/Agents/scope).
-const personalClause = (ctx) => ({ $or: [{ isPersonal: { $ne: true } }, { personalOwner: String(ctx.userId) }] });
-
 const loadProject = async (ctx, vis, projectId) => {
     if (!isId(projectId) || !vis.allowsProject(projectId)) return null;
     const project = await findOne(ctx, SCHEMA_TYPE.PROJECTS, { _id: oid(projectId), deletedStatusKey: { $nin: [1] } });
-    if (!project || (project.isPersonal === true && String(project.personalOwner || '') !== String(ctx.userId))) return null;
+    if (!project || isSomeoneElsesPersonalList(project, ctx.userId)) return null;
     return project;
 };
 
@@ -141,7 +139,7 @@ const TOOLS = [
         paginated: true,
         readParams: () => ({}),
         run: async (ctx, args, vis) => {
-            const filter = { deletedStatusKey: { $nin: [1] }, $and: [personalClause(ctx)] };
+            const filter = { deletedStatusKey: { $nin: [1] }, $and: [ownOrNotPersonal(ctx.userId)] };
             if (vis.projectIds !== null) filter._id = { $in: oids(vis.projectIds) };
             if (args.query) filter.ProjectName = { $regex: escapeRegex(str(args.query, 120)), $options: 'i' };
             return listOf(ctx, 'projects.list', args, 'projects', { type: SCHEMA_TYPE.PROJECTS, filter, sort: { ProjectName: 1, _id: 1 } }, projectRow,
@@ -208,7 +206,7 @@ const TOOLS = [
         paginated: true,
         run: async (ctx, args, vis) => {
             const task = isId(args.taskId)
-                ? await findOne(ctx, SCHEMA_TYPE.TASKS, { _id: oid(String(args.taskId)), deletedStatusKey: { $ne: 1 } }, { ProjectID: 1, sprintId: 1 })
+                ? await findOne(ctx, SCHEMA_TYPE.TASKS, { _id: oid(String(args.taskId)), deletedStatusKey: { $ne: 1 } }, TASK_ACCESS_FIELDS)
                 : null;
             if (!vis.allowsTask(task)) return { ...NO_TASK };
             const filter = { taskId: taskIdMatch(task._id), isDeleted: { $ne: true } };
@@ -291,6 +289,7 @@ const TOOLS = [
             const filter = { Loggeduser: target };
             const projects = entryProjects(ctx, vis, args, sheetVisible);
             if (projects !== null) filter.ProjectId = { $in: idForms(projects) };
+            else if (vis.excludedProjectIds.length) filter.ProjectId = { $nin: idForms(vis.excludedProjectIds) };
             if (range) filter.LogStartTime = range;
             const out = await listOf(ctx, 'timesheet.read', args, 'entries', { type: SCHEMA_TYPE.TIMESHEET, filter, sort: { LogStartTime: -1, _id: -1 } }, entryRow, async (rows) => {
                 const named = await names.resolver(ctx, { projectIds: rows.map((e) => idOf(e.ProjectId)), userIds: [target] });
@@ -352,4 +351,4 @@ const SCOPES = Object.freeze({
 
 const offered = () => TOOLS.filter((t) => registry.has(t.action));
 
-module.exports = { TOOLS, SCOPES, offered };
+module.exports = { TOOLS, SCOPES, offered, listOf, loadProject, NO_PROJECT, NO_TASK, NO_PAGE };

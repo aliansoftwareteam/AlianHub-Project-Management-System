@@ -1,10 +1,14 @@
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useCustomComposable } from "@/composable";
 import { isAiSectionRoute } from "@/router/ai/section";
+import { CONNECT_AI_ROUTE } from "@/router/ai/connect";
 import { aiReachable, canUseAi } from "@/composable/aiAvailability";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
+import { canApprove } from "@/views/Approvals/approvalAccess";
+import { keepOnRail, shellState } from "./shellState";
+import { SIMPLE_PLACES } from "./navMode";
 
 const PROJECT_ROUTE_PREFIX = "Project";
 
@@ -31,8 +35,10 @@ export function useNavItems(companyId) {
         return null;
     });
 
-    const rail = computed(() => [
+    const places = computed(() => [
         { key: "home", label: "Shell.home", icon: "home", to: to("Home"), match: (r) => r.name === "Home" || r.name === "PersonalList", show: true },
+        { key: "everything", label: "Shell.everything", icon: "layers", to: to("Everything"), match: (r) => r.name === "Everything", show: ready.value && exists("Everything") },
+        { key: "goals", label: "Shell.goals", icon: "target", to: to("Goals"), match: (r) => r.name === "Goals" || r.name === "Goal", show: ready.value && exists("Goals") },
         { key: "projects", label: "Header.Projects", icon: "projects", to: to("Projects"), match: (r) => String(r.name || "").startsWith(PROJECT_ROUTE_PREFIX), show: allowed("project.project_list") },
         { key: "inbox", label: "Inbox.title", icon: "inbox", to: to("inbox"), match: (r) => r.name === "inbox", show: ready.value },
         { key: "planner", label: "Shell.planner", icon: "planner", to: to("Planner"), match: (r) => r.name === "Planner", show: exists("Planner") },
@@ -43,13 +49,14 @@ export function useNavItems(companyId) {
         { key: "time", label: "Shell.time", icon: "time", to: timesheetRoute.value ? to(timesheetRoute.value) : null, match: (r) => String(r.name || "").includes("Timesheet"), show: !!timesheetRoute.value }
     ].filter((i) => i.show));
 
-    const more = computed(() => {
+    const menu = computed(() => {
         const groups = [
             {
                 label: "Shell.work",
                 items: [
                     { key: "portfolio", label: "Header.Portfolio", icon: "portfolio", to: to("Portfolio"), match: (r) => r.name === "Portfolio", show: ready.value },
                     { key: "automations", label: "Automations.title", icon: "automations", to: to("Automations"), match: (r) => r.name === "Automations", show: ready.value && exists("Automations") },
+                    { key: "approvals", label: "Time.approvals", icon: "checkSquare", to: to("Approvals"), match: (r) => r.name === "Approvals", show: ready.value && exists("Approvals") && canApprove(companyUser.value) },
                     { key: "integrations", label: "Header.Integrations", icon: "integrations", to: to("IntegrationsHub"), match: (r) => r.name === "IntegrationsHub", show: ready.value && exists("IntegrationsHub") },
                     { key: "connections", label: "Parity.nav_connections", icon: "key", to: to("Connections"), match: (r) => r.name === "Connections", show: ready.value && exists("Connections") },
                     { key: "externalData", label: "Provenance.nav_external_data", icon: "globe", to: to("ExternalData"), match: (r) => r.name === "ExternalData", show: ready.value && exists("ExternalData") }
@@ -71,7 +78,7 @@ export function useNavItems(companyId) {
                     { key: "clips", label: "Clips.title", icon: "clips", panel: "clips", show: ready.value },
                     { key: "reminders", label: "Reminders.header_tooltip", icon: "reminder", panel: "reminders", show: ready.value },
                     { key: "talk", label: "TalkToText.title", icon: "mic", panel: "talkToText", show: ready.value && canUseAi() },
-                    { key: "tour", label: "Header.take_tour", icon: "tour", panel: "tour", show: ready.value }
+                    { key: "tour", label: "Home.take_tour", icon: "tour", panel: "tourAsked", show: ready.value }
                 ]
             },
             {
@@ -90,9 +97,28 @@ export function useNavItems(companyId) {
     });
 
     const isActive = (item) => !!(item.match && item.match(route));
+
+    const simple = computed(() => shellState.nav?.mode === "simple");
+    const inSimple = (item) => {
+        if (item.key === "everything") return { ...item, label: "Shell.my_work", to: to("Everything", { query: { mine: "1" } }) };
+        // Where the built-in AI cannot answer this person (no model on the server, say), Ask leads to connecting their own.
+        if (item.key === "ai") return { ...item, label: "Shell.ask", to: !canUseAi() && exists(CONNECT_AI_ROUTE) ? to(CONNECT_AI_ROUTE) : item.to };
+        return item;
+    };
+    const rail = computed(() => {
+        if (!simple.value) return places.value;
+        const kept = shellState.nav.pinned || [];
+        const five = SIMPLE_PLACES.map((key) => places.value.find((item) => item.key === key)).filter(Boolean).map(inSimple);
+        return [...five, ...places.value.filter((item) => !SIMPLE_PLACES.includes(item.key) && kept.includes(item.key))];
+    });
+    const more = computed(() => {
+        const tucked = simple.value ? places.value.filter((item) => !rail.value.some((shown) => shown.key === item.key)) : [];
+        return tucked.length ? [{ label: "Shell.more_places", items: tucked }, ...menu.value] : menu.value;
+    });
+    watch(() => (simple.value ? places.value.find(isActive)?.key : ""), (key) => { if (key) keepOnRail(key); }, { immediate: true });
     // Connections sits in both the AI section and the More menu; a rail tile that already
     // claims the route wins, so the two never light up together.
     const moreActive = computed(() => !rail.value.some(isActive) && more.value.some((g) => g.items.some(isActive)));
 
-    return { rail, more, isActive, moreActive, ready, companyUser, isOwnerOrAdmin };
+    return { rail, more, isActive, moreActive, ready, companyUser, isOwnerOrAdmin, simple };
 }

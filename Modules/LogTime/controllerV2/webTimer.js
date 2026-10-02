@@ -6,13 +6,30 @@ const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard')
 const logger = require('../../../Config/loggerConfig');
 const socketEmitter = require('../../../event/socketEventEmitter.js');
 const { removeCache } = require('../../../utils/commonFunctions');
-const { isPeriodLocked } = require('../../TimesheetApproval/helpers/lockGuard');
+const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
 const { updateProjectForTimelog, updateRemainingTime } = require('./helpers');
 const T = require('./timerRules');
 
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
+
+/* GET /api/v2/timetracker/can-start — the web timer lives in the browser until it stops, so it asks
+ * here before it starts; a day the desktop tracker may not start on is refused in the same words. */
+exports.canStartTimer = async (req, res) => {
+    try {
+        const companyId = sessionTenantOf(req);
+        if (!req.uid) return res.send({ status: false, statusText: 'An authenticated user is required.' });
+        if (await isPeriodLocked({ companyId, userId: req.uid, date: new Date() })) {
+            return res.send({ status: false, statusText: T.START_LOCKED, code: PERIOD_LOCKED });
+        }
+        return res.send({ status: true, statusText: 'OK' });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`canStartTimer: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
 
 // GET /api/v2/timetracker/running?timeZone= — the caller's open tracker sessions
 // (live or abandoned), flagged when they ran overnight so the client can offer a trim.

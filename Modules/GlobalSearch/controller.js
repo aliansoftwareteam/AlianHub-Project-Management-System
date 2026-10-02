@@ -5,9 +5,11 @@ const logger = require("../../Config/loggerConfig");
 const { escapeRegex } = require("../../utils/escapeRegex");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { visibleProjectIds } = require("../Agents/scope");
-const { pageVisibilityFilter } = require("../Pages/helpers/pageRules");
+const { pageReachFilter } = require("../Pages/helpers/pageRules");
 const { validateSearchInput, truncate, RESULT_LIMIT_PER_TYPE } = require('./helpers/searchRules');
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
+const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
+const { listsForViewerOf } = require('../Tasks/helpers/taskExtraLists');
 
 // Regex rather than $text: it works on every existing tenant database and keeps
 // short queries and substring matches predictable.
@@ -31,7 +33,9 @@ const onVisibleTasks = async (companyId, comments, projectIds, sprintClause) => 
         .map((comment) => ({ comment, task: comment.taskId ? visible.get(String(comment.taskId)) : null }));
 };
 
-const toTaskRow = (task) => {
+/* `otherLists` counts the lists the task was added to that this caller can open: the ones the
+ * viewer read names. The entries themselves stay out of the row. */
+const toTaskRow = (task, lists) => {
     const sprint = task.sprintArray || {};
     return {
         _id: task._id,
@@ -46,6 +50,7 @@ const toTaskRow = (task) => {
         sprintName: sprint.name || '',
         folderName: sprint.folderName || '',
         updatedAt: task.updatedAt,
+        otherLists: (lists.get(String(task._id)) || []).filter((entry) => entry.name !== undefined).length,
     };
 };
 
@@ -64,7 +69,9 @@ exports.globalSearch = async (req, res) => {
         if (roleType === null) {
             return res.status(403).send({ status: false, statusText: 'You are not a member of this company.' });
         }
-        const projectIds = asObjectIds(await visibleProjectIds(companyId, uid));
+        const visible = await visibleProjectIds(companyId, uid);
+        const projectIds = asObjectIds(visible);
+        const taskProjectIds = asObjectIds(await keepTaskListProjectIds(companyId, uid, visible));
         const hidden = isPrivileged(roleType) ? [] : await hiddenSprintIds(companyId, uid, projectIds);
         const sprintClause = hidden.length ? { sprintId: { $nin: hidden } } : {};
 
@@ -74,8 +81,8 @@ exports.globalSearch = async (req, res) => {
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
-                    { ProjectID: { $in: projectIds }, ...sprintClause, deletedStatusKey: { $ne: 1 }, $or: [{ TaskName: rx }, { TaskKey: rx }] },
-                    'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey sprintArray updatedAt',
+                    { ProjectID: { $in: taskProjectIds }, ...sprintClause, deletedStatusKey: { $ne: 1 }, $or: [{ TaskName: rx }, { TaskKey: rx }] },
+                    'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey sprintArray updatedAt extraLists',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
                 ],
             }, 'find'),
@@ -101,17 +108,15 @@ exports.globalSearch = async (req, res) => {
                     {
                         deletedStatusKey: { $ne: 1 },
                         title: rx,
-                        $and: [
-                            { $or: [{ ProjectID: { $in: projectIds } }, { ProjectID: { $in: [null, undefined] } }] },
-                            pageVisibilityFilter(uid),
-                        ],
+                        ...pageReachFilter({ uid, projectIds }),
                     },
                     'title ProjectID updatedBy updatedAt',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
                 ],
             }, 'find').catch(() => []),
         ]);
-        const visibleComments = await onVisibleTasks(companyId, comments || [], projectIds, sprintClause);
+        const visibleComments = await onVisibleTasks(companyId, comments || [], taskProjectIds, sprintClause);
+        const taskLists = await listsForViewerOf(companyId, uid, tasks || []);
 
         // Client project routes always carry a sprint segment, so attach each
         // project's first active sprint (the sprint the sidebar lands on).
@@ -150,7 +155,7 @@ exports.globalSearch = async (req, res) => {
             status: true,
             statusText: 'Search complete.',
             data: {
-                tasks: (tasks || []).map(toTaskRow),
+                tasks: (tasks || []).map((task) => toTaskRow(task, taskLists)),
                 projects: projectResults,
                 comments: visibleComments.map(({ comment, task }) => ({
                     _id: comment._id,

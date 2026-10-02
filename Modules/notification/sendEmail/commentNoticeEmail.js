@@ -1,10 +1,11 @@
 const config = require('../../../Config/config');
 const {
-    Notification_key: { COMMENT_REPLY, COMMENT_ASSIGNED, DOC_COMMENT_MENTION, DOC_COMMENT_REPLY },
+    Notification_key: { COMMENT_REPLY, COMMENT_ASSIGNED, DOC_COMMENT_MENTION, DOC_COMMENT_REPLY, DOC_COMMENT_ASSIGNED },
     TemplateType,
 } = require('../../../Config/notificationKey');
 const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { AI_ACTOR } = require('../../Comments/helpers/aiActor');
+const { CHAT_THREAD_REPLY, chatThreadPath } = require('../../Comments/helpers/chatThreads');
 const { subjectText, urlSegment } = require('../../Template/emailText');
 const mainTemplate = require('../../Template/emailTemplate/main-template');
 const { docLink } = require('./docMentionEmail');
@@ -14,11 +15,14 @@ const COMMENT_NOTICE_TEXT = {
     [COMMENT_ASSIGNED]: { headline: (who, task) => `${who} assigned you a comment on ${task}` },
     [DOC_COMMENT_MENTION]: { headline: (who, doc) => `${who} mentioned you in a comment on ${doc}` },
     [DOC_COMMENT_REPLY]: { headline: (who, doc) => `${who} replied to a comment on ${doc}` },
+    [DOC_COMMENT_ASSIGNED]: { headline: (who, doc) => `${who} assigned you a comment on ${doc}` },
 };
-const DOC_KEYS = [DOC_COMMENT_MENTION, DOC_COMMENT_REPLY];
+const DOC_KEYS = [DOC_COMMENT_MENTION, DOC_COMMENT_REPLY, DOC_COMMENT_ASSIGNED];
 const SOMEONE = 'Someone';
 const A_TASK = 'a task';
 const A_DOC = 'a doc';
+const CHAT = 'Chat';
+const chatThreadHeadline = (who) => `${who} replied in a chat thread`;
 const OPEN_COMMENT = 'Open comment';
 
 const isCommentNotice = (key) => Object.prototype.hasOwnProperty.call(COMMENT_NOTICE_TEXT, key);
@@ -41,6 +45,9 @@ const trailOf = (task) => {
 const docCommentLink = ({ companyId, changeData = {} }) => `${docLink(companyId, changeData.pageId)}?comment=${urlSegment(changeData.commentId)}`;
 
 const placeOf = (notification, projects, tasks) => {
+    if (notification.changeType === CHAT_THREAD_REPLY) {
+        return { headline: chatThreadHeadline, header: { title: CHAT, description: [] }, link: `${config.WEBURL}/#/${chatThreadPath(notification)}` };
+    }
     if (DOC_KEYS.includes(notification.key)) {
         const title = (notification.changeData && notification.changeData.pageTitle) || '';
         return { label: subjectText(title) || A_DOC, header: { title, description: [] }, link: docCommentLink(notification) };
@@ -60,7 +67,7 @@ const commentNoticeEmail = ({ notification = {}, projects = [], tasks = [] }) =>
     if (!text || String(notification.userId || '') === AI_ACTOR) return null;
     const place = placeOf(notification, projects, tasks);
     const who = subjectText(notification.User_Employee_Name) || SOMEONE;
-    const headline = text.headline(who, place.label);
+    const headline = place.headline ? place.headline(who) : text.headline(who, place.label);
     const html = mainTemplate.renderHTML({
         templateHeader: place.header,
         templateBody: [{

@@ -3,6 +3,15 @@
 
 .tv2 {
     --tv2-cols: 28px minmax(220px, 1fr) 110px 72px 96px 96px 84px 64px 170px minmax(200px, 1.3fr) 110px 140px 96px;
+    --tv2-depth: 0;
+    --tv2-select-w: 28px;
+    --tv2-gap: 10px;
+    --tv2-pad-x: var(--cell-pad-x, 14px);
+    --tv2-gutter: var(--page-pad-x, 20px);
+    --tv2-check: 15px;
+    /* A control drawn as a chip is --chip-h tall and --hit-min to the pointer: this much of it,
+       above and below, is a transparent border. */
+    --tv2-chip-inset: calc((var(--hit-min) - var(--chip-h)) / 2);
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -13,26 +22,29 @@
 .tv2__bar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 14px 20px 0;
+    gap: var(--sp-3);
+    padding: var(--page-pad-y, 14px) var(--tv2-gutter) 0;
 }
+/* A small control, and on a phone no shorter than the touch floor. */
 .tv2__add {
+    height: max(var(--control-h, 32px), var(--hit-min));
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-input);
-    padding: 6px 10px;
-    font: var(--text-small);
+    padding: 0 var(--sp-4);
+    font: 400 var(--fs-sm, 12.5px)/1 var(--font-ui);
     color: var(--ink);
     cursor: pointer;
 }
 .tv2__add:hover { background: var(--surface-hover); }
+.tv2__add:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .tv2__scroll {
     flex: 1;
     min-height: 0;
     overflow: auto;
-    padding: 14px 20px 24px;
-    font-size: 12.5px;
+    padding: var(--page-pad-y, 14px) var(--tv2-gutter) var(--sp-9);
+    font-size: var(--row-font);
 }
 
 /* No non-visible overflow here: it would capture .tv2__head's sticky positioning,
@@ -43,12 +55,15 @@
     border-radius: var(--r-card);
 }
 
+/* A sticky box is offset from inside the scroller's padding, so the header takes the top inset
+   back: with top: 0 a strip of rows showed above it. */
 .tv2__head {
     display: grid;
     grid-template-columns: var(--tv2-cols);
-    gap: 10px;
-    padding: 9px 14px;
-    font: var(--text-label);
+    gap: var(--tv2-gap);
+    align-items: center;
+    padding: var(--cell-pad-y) var(--tv2-pad-x);
+    font: 600 var(--fs-xs, 10.5px)/1.2 var(--font-mono);
     letter-spacing: .06em;
     text-transform: uppercase;
     color: var(--ink-label);
@@ -56,38 +71,54 @@
     background: var(--surface-2);
     border-radius: var(--r-card) var(--r-card) 0 0;
     position: sticky;
-    top: 0;
+    top: calc(0px - var(--page-pad-y, 14px));
     z-index: 2;
 }
 .tv2__head-ai { color: var(--brand); }
-.tv2__head-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.tv2__head-name { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
 .tv2__chooser { margin-left: auto; }
 .tv2__head-col { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tv2__row > [role="cell"] { min-width: 0; }
 .tv2__row > [role="cell"]:focus { outline: none; }
-.tv2__row > [role="cell"]:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
+.tv2__row > [role="cell"]:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm, 4px); }
 .tv2__cell { display: flex; align-items: center; }
+.tv2__c-select { display: flex; align-items: center; }
 .tv2__status-cell { display: flex; align-items: center; min-width: 0; }
-.tv2 .lv2__status-chip { border: 0; cursor: pointer; font: inherit; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The status chip follows the density like every chip: drawn --chip-h tall in the chip type,
+   and a full target when it is a button. The shorthand on the chip's own style would reset the clip. */
+.tv2 .lv2__status-chip { display: inline-block; max-width: 100%; line-height: var(--chip-h); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv2 button.lv2__status-chip {
+    box-sizing: border-box;
+    height: var(--hit-min);
+    border: solid transparent;
+    border-width: var(--tv2-chip-inset) 0;
+    border-radius: calc(var(--r-chip) + var(--tv2-chip-inset));
+    background-clip: padding-box !important;
+    cursor: pointer;
+}
 .tv2 .lv2__status-chip:focus-visible { outline: none; box-shadow: var(--focus); }
+/* The cell controls the Table borrows from the List are full targets here on a phone too. */
+.tv2 .lv2__cell-btn { min-width: var(--hit-min); min-height: var(--hit-min); }
 .tv2__points-total { font: var(--text-data); color: var(--ink-label); }
+.tv2__points-total::before { content: "\00b7"; margin-inline-end: 6px; }
 .tv2__row:hover .lv2__cell-empty, .tv2__row:focus-within .lv2__cell-empty { opacity: 1; }
 .tv2__sort {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--sp-1);
+    min-height: var(--hit-min);
     background: none; border: 0; padding: 0;
     font: inherit; color: inherit;
     cursor: pointer;
     text-transform: inherit;
     letter-spacing: inherit;
-    border-radius: 3px;
+    border-radius: var(--r-sm, 3px);
 }
 .tv2__sort:hover { color: var(--ink); }
 .tv2__sort:focus-visible { outline: none; box-shadow: var(--focus); color: var(--ink); }
 .tv2__sort--col { max-width: 100%; min-width: 0; }
 .tv2__sort-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tv2__sort-caret { flex: none; font-size: 8px; opacity: 0; transition: opacity var(--t-state) var(--ease); }
+.tv2__sort-caret { flex: none; font-size: calc(var(--fs-2xs, 10px) - 2px); opacity: 0; transition: opacity var(--t-state) var(--ease); }
 .tv2__sort-caret.is-on { opacity: 1; color: var(--brand); }
 .tv2__sort:hover .tv2__sort-caret, .tv2__sort:focus-visible .tv2__sort-caret { opacity: 1; }
 
@@ -97,9 +128,9 @@
 .tv2__sprint-head {
     display: flex;
     align-items: center;
-    gap: 8px;
     width: 100%;
-    padding: 10px 14px;
+    min-height: max(var(--row-h), var(--hit-min));
+    padding: 0 var(--tv2-pad-x);
     background: none;
     border: 0;
     color: var(--ink);
@@ -108,61 +139,101 @@
 }
 .tv2__sprint-head:hover { background: var(--surface-hover); }
 .tv2__sprint-head:focus-visible { outline: none; box-shadow: var(--focus); }
+.tv2__sprint-label { display: inline-flex; align-items: center; gap: var(--sp-3); min-width: 0; }
 .tv2__sprint-name { font: var(--text-h3); }
 .tv2__sprint-meta { font: var(--text-data); color: var(--ink-label); }
 .tv2__caret {
-    font-size: 10px;
+    font-size: var(--fs-2xs, 10px);
     color: var(--ink-2);
     transition: transform var(--t-state) var(--ease);
 }
 .tv2__caret--open { transform: rotate(90deg); }
 
-.tv2__group { border-bottom: 1px solid var(--hairline); }
+.tv2__group { display: flex; border-bottom: 1px solid var(--hairline); background: var(--surface-2); }
 .tv2__group-cell {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 14px 8px 30px;
-    background: var(--surface-2);
-    font-weight: 600;
+    gap: var(--sp-3);
+    min-height: var(--hit-min);
+    padding: calc(var(--cell-pad-y) - 1px) var(--tv2-pad-x);
+    font-weight: var(--fw-title, 600);
+}
+/* The box is drawn 15px in a label that is a full target, and sits on the x of the row checkboxes. */
+.tv2__group-select {
+    flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: var(--hit-min); height: var(--hit-min);
+    margin: 0 0 0 calc((var(--tv2-check) - var(--hit-min)) / 2);
+    cursor: pointer;
 }
 .tv2__group-count { font: var(--text-data); color: var(--ink-label); }
 
+/* min-height sizes the content box, so the row's padding comes off --row-h. */
 .tv2__row {
+    --tv2-row-tint: transparent;
     display: grid;
     grid-template-columns: var(--tv2-cols);
-    gap: 10px;
-    padding: 10px 14px;
+    gap: var(--tv2-gap);
+    min-height: calc(var(--row-h) - 2 * var(--cell-pad-y));
+    padding: var(--cell-pad-y) var(--tv2-pad-x);
     align-items: center;
     border-bottom: 1px solid var(--hairline);
     transition: background var(--t-state) var(--ease);
 }
-.tv2__row:hover { background: var(--surface-hover); }
-.tv2__row.is-selected { background: var(--brand-tint); }
+/* The row before the looks had 10px above and below its cells; the classic cell padding is 9px. */
+:root[data-variant="classic"] .tv2__row { padding-top: calc(var(--cell-pad-y) + 1px); padding-bottom: calc(var(--cell-pad-y) + 1px); }
+.tv2__row:hover { --tv2-row-tint: var(--surface-hover); background: var(--tv2-row-tint); }
+.tv2__row.is-selected { --tv2-row-tint: var(--brand-tint); background: var(--tv2-row-tint); }
 .tv2__row:last-child { border-bottom: 0; border-radius: 0 0 var(--r-card) var(--r-card); }
 
-.tv2__name-cell { min-width: 0; display: block; }
+.tv2__name-cell {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding-left: calc(var(--row-indent) * var(--tv2-depth));
+}
+/* Every row keeps the disclosure's room, so the names of a group line up. */
+.tv2__disclose {
+    width: var(--hit-min);
+    height: var(--hit-min);
+    flex: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    font-size: var(--fs-2xs, 10px);
+    line-height: 1;
+    color: var(--ink-2);
+    cursor: pointer;
+    border-radius: var(--r-chip);
+}
+.tv2__disclose:hover { background: var(--surface-hover); color: var(--ink); }
+.tv2__disclose:focus-visible { outline: none; box-shadow: var(--focus); }
+.tv2__disclose--none { visibility: hidden; }
+.tv2__sub-count { flex: none; font: var(--text-data); color: var(--ink-label); }
 .tv2__tags { min-width: 0; }
 .tv2__name {
     background: none; border: 0; padding: 0;
-    max-width: 100%;
-    font: 600 12.5px/1.3 var(--font-ui);
+    min-width: 0;
+    min-height: var(--hit-min);
+    font: var(--fw-strong, 600) var(--row-font)/var(--lh-snug, 1.3) var(--font-ui);
     color: var(--ink);
     text-align: left;
     cursor: pointer;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.tv2__row.is-sub .tv2__name { font-weight: 400; }
 .tv2__name:hover { color: var(--brand); }
-.tv2__name:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 3px; }
+.tv2__name:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm, 3px); }
 .tv2 .tv2__status { justify-self: start; }
 
 .tv2__cell-ai { position: relative; min-width: 0; }
 .tv2__summary {
     color: var(--ink-2);
-    line-height: 1.4;
-    font-size: 12px;
+    line-height: var(--lh-body, 1.4);
+    font-size: calc(var(--row-font) - .5px);
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: var(--row-lines);
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -170,12 +241,12 @@
 .tv2__source {
     display: none;
     align-items: center;
-    gap: 6px;
-    margin-top: 4px;
-    font: 500 10px/1 var(--font-mono);
+    gap: var(--sp-2);
+    margin-top: var(--sp-1);
+    font: 500 var(--fs-2xs, 10px)/1 var(--font-mono);
     color: var(--ink-label);
 }
-.tv2__cell-ai:hover .tv2__source, .tv2__source.is-pinned { display: flex; }
+.tv2__cell-ai:hover .tv2__source, .tv2__source.is-pinned, .tv2__source.is-stale { display: flex; }
 .tv2__source > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tv2__pin {
     background: none; border: 0; padding: 0;
@@ -187,13 +258,18 @@
 }
 .tv2__pin:hover, .tv2__pin.is-on { color: var(--brand); }
 .tv2__gen {
+    min-height: var(--hit-min);
     background: none; border: 0; padding: 0;
-    font: var(--text-small);
-    color: var(--brand);
+    font: 400 calc(var(--row-font) - .5px)/1 var(--font-ui);
+    color: var(--ink-2);
     cursor: pointer;
+    white-space: nowrap;
 }
+.tv2__gen:hover, .tv2__gen:focus-visible { color: var(--brand); }
+.tv2__gen:hover { text-decoration: underline; }
+.tv2__gen:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm, 3px); }
 
-.tv2__risk { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; cursor: help; }
+.tv2__risk { display: inline-flex; align-items: center; gap: var(--sp-2); font-size: calc(var(--row-font) - .5px); cursor: help; }
 .tv2__risk-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ok); }
 .tv2__risk--med .tv2__risk-dot { background: var(--warn); }
 .tv2__risk--high .tv2__risk-dot { background: var(--danger); }
@@ -201,20 +277,62 @@
 .tv2 .tv2__area {
     display: inline-block;
     max-width: 100%;
-    line-height: 22px;
+    line-height: var(--chip-h);
     font-weight: 400;
     overflow: hidden;
     text-overflow: ellipsis;
     cursor: help;
 }
 .tv2__done { display: flex; align-items: center; min-width: 0; }
-.tv2__area-empty { color: var(--ink-2); font-size: 11.5px; font-style: italic; }
+.tv2__area-empty { color: var(--ink-2); font-size: calc(var(--row-font) - 1px); font-style: italic; }
 
+.tv2__empty { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .tv2__sentinel { height: 1px; }
-.tv2__skeleton { height: 38px; border-radius: 8px; margin: 6px 14px; }
+.tv2__totals {
+    --tv2-row-tint: transparent;
+    display: grid;
+    grid-template-columns: var(--tv2-cols);
+    gap: var(--tv2-gap);
+    padding: var(--cell-pad-y) var(--tv2-pad-x);
+    align-items: center;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface);
+    font: 600 var(--fs-sm, 11.5px)/1.2 var(--font-mono);
+    color: var(--ink);
+}
+.tv2__totals > [role="cell"] { min-width: 0; }
+.tv2__totals-label { color: var(--ink-2); }
+.tv2__totals-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.tv2__skeleton { height: var(--row-h); border-radius: var(--r-md, 8px); margin: var(--sp-2) var(--tv2-pad-x); }
+
+/* When the columns need more than the screen the Table scrolls sideways, and the checkbox and
+   the name stay in view while the other columns pass under them. A sticky box is offset from
+   inside the scroller's padding, so each offset takes the gutter back and the stuck cells reach
+   the scroller's edge. Their margins reach over the row's padding and the gap between them. */
+@media (min-width: 768px) {
+    .tv2__c-select, .tv2__c-name {
+        position: sticky;
+        z-index: 1;
+        align-self: stretch;
+        background: linear-gradient(var(--tv2-row-tint), var(--tv2-row-tint)) var(--surface);
+    }
+    .tv2__c-select {
+        left: calc(0px - var(--tv2-gutter));
+        margin: 0 calc(0px - var(--tv2-gap)) 0 calc(0px - var(--tv2-pad-x));
+        padding: 0 var(--tv2-gap) 0 var(--tv2-pad-x);
+    }
+    .tv2__c-name { left: calc(var(--tv2-pad-x) + var(--tv2-select-w) + var(--tv2-gap) - var(--tv2-gutter)); }
+    .tv2__head > .tv2__c-select, .tv2__head > .tv2__c-name { background: var(--surface-2); }
+    .tv2__head > .tv2__c-select { border-top-left-radius: var(--r-card); }
+    /* A sprint's and a group's label stay on the left with them. */
+    .tv2__sprint-label, .tv2__group-cell { position: sticky; }
+    .tv2__sprint-label { left: calc(var(--tv2-pad-x) - var(--tv2-gutter)); }
+    .tv2__group-cell { left: calc(0px - var(--tv2-gutter)); }
+}
 
 @media (max-width: 767px) {
-    .tv2__scroll { padding: 12px 16px 20px; }
+    .tv2__scroll { padding: var(--sp-5) 16px var(--sp-8); }
+    .tv2__head { top: calc(0px - var(--sp-5)); }
     .tv2__row { min-height: 44px; }
     .tv2__row .lv2__cell-empty { opacity: 1; }
 }

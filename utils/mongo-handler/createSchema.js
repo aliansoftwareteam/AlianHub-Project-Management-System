@@ -11,6 +11,19 @@ const { CLEARED_RETENTION_SECONDS } = require('../../Modules/Inbox/helpers/inbox
 // privilege-escalation surface flagged in the security audit. If a
 // new legitimate field needs to land, declare it in `./schema.js`.
 const taskSchema = new Schema(schema.tasks, { strict: true, timestamps: true });
+/* A task gains extra lists only on a stored row, through Modules/Tasks/helpers/taskExtraLists.js.
+ * Every writer of a new task document passes one of these two, so a created, imported, copied or
+ * templated row cannot carry the lists of the row it was built from. */
+taskSchema.pre('save', function dropExtraListsFromNewTask() {
+    if (this.isNew) this.set('extraLists', undefined);
+});
+taskSchema.pre('insertMany', function dropExtraListsFromNewTasks(next, docs) {
+    [].concat(docs || []).forEach((doc) => {
+        if (doc && typeof doc.set === 'function') doc.set('extraLists', undefined);
+        else if (doc) delete doc.extraLists;
+    });
+    next();
+});
 const commentSchema = new Schema(schema.comments, { strict: true, timestamps: true });
 const timeSheetSchema = new Schema(schema.timesheet, { strict: true, timestamps: true });
 // BUG-046 / #100 — every other schema in this file already uses
@@ -110,6 +123,11 @@ importJobsSchema.index({ userId: 1, createdAt: -1 });
 const aiFieldJobsSchema = new Schema(schema.aiFieldJobs, {strict: true, timestamps: true});
 aiFieldJobsSchema.index({ userId: 1, createdAt: -1 });
 aiFieldJobsSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+const customFieldLinksSchema = new Schema(schema.customFieldLinks, {strict: true, timestamps: true});
+customFieldLinksSchema.index({ taskId: 1, fieldId: 1 }, { unique: true });
+customFieldLinksSchema.index({ fieldId: 1, ids: 1 });
+customFieldLinksSchema.index({ fieldId: 1, kind: 1 });
+customFieldLinksSchema.index({ ids: 1 });
 const epicsSchema = new Schema(schema.epics, {strict: true, timestamps: true});
 epicsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 const pagesSchema = new Schema(schema.pages, {strict: true, timestamps: true});
@@ -117,6 +135,7 @@ pagesSchema.index({ parentPageId: 1, deletedStatusKey: 1 });
 pagesSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
 // "Which docs are attached to this task?" is asked on every task detail open.
 pagesSchema.index({ linkedTasks: 1, deletedStatusKey: 1 });
+pagesSchema.index({ 'sharedWith.userId': 1 }, { sparse: true });
 const pageVersionsSchema = new Schema(schema.pageVersions, {strict: true, timestamps: true});
 pageVersionsSchema.index({ pageId: 1, createdAt: -1 });
 const pageCommentsSchema = new Schema(schema.pageComments, {strict: true, timestamps: true});
@@ -134,6 +153,20 @@ recurringTasksSchema.index({ enabled: 1, deletedStatusKey: 1, nextRunAt: 1 });
 recurringTasksSchema.index({ sourceTaskId: 1, deletedStatusKey: 1 });
 const taskTemplatesSchema = new Schema(schema.task_templates, {strict: true, timestamps: true});
 taskTemplatesSchema.index({ scope: 1, ProjectID: 1, deletedStatusKey: 1 });
+const viewTemplatesSchema = new Schema(schema.view_templates, {strict: true, timestamps: true});
+viewTemplatesSchema.index({ deletedStatusKey: 1, name: 1 });
+const projectSnapshotsSchema = new Schema(schema.project_snapshots, {strict: true, timestamps: true});
+projectSnapshotsSchema.index({ kind: 1, deletedStatusKey: 1 });
+projectSnapshotsSchema.index({ templateId: 1, part: 1 });
+const everythingViewsSchema = new Schema(schema.everything_views, {strict: true, timestamps: true});
+everythingViewsSchema.index({ userId: 1, deletedStatusKey: 1 });
+const goalsSchema = new Schema(schema.goals, {strict: true, timestamps: true});
+goalsSchema.index({ deletedStatusKey: 1, ownerUserId: 1 });
+goalsSchema.index({ deletedStatusKey: 1, visibility: 1 });
+goalsSchema.index({ 'targets.sources.taskIds': 1 });
+goalsSchema.index({ 'targets.sources.sprintIds': 1 });
+const whiteboardsSchema = new Schema(schema.whiteboards, {strict: true, timestamps: true});
+whiteboardsSchema.index({ projectId: 1, sprintId: 1 }, { unique: true, partialFilterExpression: { deletedStatusKey: 0 } });
 const remindersSchema = new Schema(schema.reminders, {strict: true, timestamps: true});
 remindersSchema.index({ userId: 1, fired: 1, reminderAt: 1 });
 const notesSchema = new Schema(schema.notes, {strict: true, timestamps: true});
@@ -247,6 +280,11 @@ const agentFindingsSchema = new Schema(schema.agentFindings, {strict: true, time
 agentFindingsSchema.index({ taskId: 1, factId: 1 }, { unique: true });
 agentFindingsSchema.index({ projectId: 1, status: 1 });
 
+const projectFindingsSchema = new Schema(schema.projectFindings, {strict: true, timestamps: true});
+// One row per project and cause. Unique, so two servers looking at once cannot file the same finding twice.
+projectFindingsSchema.index({ projectId: 1, key: 1 }, { unique: true, name: 'project_cause' });
+projectFindingsSchema.index({ projectId: 1, status: 1, openedAt: -1 });
+
 const agentsSchema = new Schema(schema.agents, {strict: true, timestamps: true});
 agentsSchema.index({ paused: 1 });
 agentsSchema.index({ ownerId: 1 });
@@ -306,6 +344,8 @@ agentProposalsSchema.index({ status: 1, createdAt: -1 });
 agentProposalsSchema.index({ createdAt: -1 });
 agentProposalsSchema.index({ agentId: 1, createdAt: -1 });
 agentProposalsSchema.index({ taskId: 1 });
+const agentStandingApprovalsSchema = new Schema(schema.agentStandingApprovals, {strict: true, timestamps: true});
+agentStandingApprovalsSchema.index({ projectId: 1, action: 1, status: 1 });
 const callsSchema = new Schema(schema.calls, {strict: true, timestamps: true});
 callsSchema.index({ callId: 1 }, { unique: true });
 callsSchema.index({ chatId: 1, createdAt: -1 });
@@ -350,6 +390,9 @@ const permissionDecisionsSchema = new Schema(schema.permissionDecisions, {strict
 permissionDecisionsSchema.index({ day: 1, mode: 1, method: 1, route: 1, permission: 1, role: 1, scope: 1, reason: 1 }, { unique: true, name: 'decision_key' });
 permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
+const connectorConnectionsSchema = new Schema(schema.connectorConnections, {strict: true, timestamps: true});
+connectorConnectionsSchema.index({ connector: 1, deletedStatusKey: 1 });
+connectorConnectionsSchema.index({ userId: 1, connector: 1, deletedStatusKey: 1 });
 const instructionPatternsSchema = new Schema(schema.instructionPatterns, {strict: true, timestamps: false});
 const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
 agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
@@ -359,6 +402,12 @@ const agentSessionEndpointsSchema = new Schema(schema.agentSessionEndpoints, {st
 agentSessionEndpointsSchema.index({ clientId: 1 }, { unique: true, name: 'client_id' });
 const askThreadsSchema = new Schema(schema.askThreads, {strict: true, timestamps: true});
 askThreadsSchema.index({ ownerId: 1, lastTurnAt: -1 });
+const dashboardCardAnswersSchema = new Schema(schema.dashboardCardAnswers, {strict: true, timestamps: false});
+dashboardCardAnswersSchema.index({ dashboardId: 1, cardUid: 1, userId: 1 }, { unique: true, name: 'one_per_card_viewer' });
+dashboardCardAnswersSchema.index({ userId: 1 });
+const taskAiValuesSchema = new Schema(schema.taskAiValues, {strict: true, timestamps: false});
+taskAiValuesSchema.index({ taskId: 1, kind: 1 }, { unique: true, name: 'one_per_task_kind' });
+taskAiValuesSchema.index({ madeBy: 1 });
 const aiFeedbackSchema = new Schema(schema.aiFeedback, {strict: true, timestamps: false});
 aiFeedbackSchema.index({ userId: 1, feature: 1, itemId: 1 }, { unique: true, name: 'one_per_person_item' });
 aiFeedbackSchema.index({ createdAt: -1 });
@@ -416,7 +465,18 @@ taskSchema.index({ ProjectID: 1, sprintId: 1, deletedStatusKey: 1 });
 taskSchema.index({ sprintId: 1, deletedStatusKey: 1 });
 taskSchema.index({ AssigneeUserId: 1 });
 taskSchema.index({ ParentTaskId: 1 });
+taskSchema.index({ ancestors: 1 });
 taskSchema.index({ TaskKey: 1 });
+// An import looks up what it already brought into a project, and its undo what it created.
+taskSchema.index({ ProjectID: 1, importSourceId: 1 }, { sparse: true });
+taskSchema.index({ importJobId: 1 }, { sparse: true });
+// The due-date trigger reads a day-wide range of this every few minutes (Modules/Automations/engine/dueDateTrigger).
+taskSchema.index({ DueDate: 1 });
+// The Everything view pages across projects on these; Modules/Tasks/helpers/everythingQuery.js sorts in their order.
+taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, updatedAt: -1, _id: 1 });
+taskSchema.index({ ProjectID: 1, deletedStatusKey: 1, DueDate: 1, _id: 1 });
+// The tasks a list also shows that live elsewhere (Modules/Tasks/helpers/taskExtraLists.js).
+taskSchema.index({ 'extraLists.sprintId': 1, deletedStatusKey: 1 });
 
 // comments: every comment is fetched by task/sprint/project triplet.
 commentSchema.index({ 'objId.taskId': 1, deletedStatusKey: 1 });
@@ -480,6 +540,7 @@ module.exports = {
     exportJobsSchema,
     importJobsSchema,
     aiFieldJobsSchema,
+    customFieldLinksSchema,
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,
@@ -489,6 +550,11 @@ module.exports = {
     publicShareIndexSchema,
     recurringTasksSchema,
     taskTemplatesSchema,
+    viewTemplatesSchema,
+    projectSnapshotsSchema,
+    everythingViewsSchema,
+    goalsSchema,
+    whiteboardsSchema,
     remindersSchema,
     notesSchema,
     generalRemindersSchema,
@@ -513,6 +579,7 @@ module.exports = {
     workflowApprovalsSchema,
     workflowDefinitionsSchema,
     agentFindingsSchema,
+    projectFindingsSchema,
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
@@ -522,6 +589,7 @@ module.exports = {
     aiReplaysSchema,
     aiAlertsSchema,
     agentProposalsSchema,
+    agentStandingApprovalsSchema,
     agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,
@@ -541,10 +609,13 @@ module.exports = {
     auditRedactionsSchema,
     auditChainKeySchema,
     egressAllowlistsSchema,
+    connectorConnectionsSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,
     askThreadsSchema,
+    dashboardCardAnswersSchema,
+    taskAiValuesSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
     assignmentRulesSchema,

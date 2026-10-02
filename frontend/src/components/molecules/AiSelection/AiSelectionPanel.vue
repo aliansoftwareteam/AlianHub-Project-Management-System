@@ -53,7 +53,7 @@
                 <div v-if="lists.length > 1" class="ais__list">
                     <label class="ais__label" :for="listSelectId">{{ $t('AiSelection.list_label') }}</label>
                     <select :id="listSelectId" v-model="listId" class="ah-input ais__select" data-test="ai-task-list">
-                        <option v-for="list in lists" :key="list.id" :value="list.id">{{ list.folderName ? `${list.folderName} / ${list.name}` : list.name }}</option>
+                        <option v-for="list in lists" :key="list.id" :value="list.id">{{ listLabel(list) }}</option>
                     </select>
                 </div>
                 <ul class="ais__titles">
@@ -79,6 +79,7 @@ import * as env from "@/config/env";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { useGetterFunctions } from "@/composable";
 import { sprintObjOf, userDataOf } from "@/utils/aiTargets";
+import { listLabel } from "@/utils/folderTree";
 
 defineOptions({ name: "AiSelectionPanel" });
 

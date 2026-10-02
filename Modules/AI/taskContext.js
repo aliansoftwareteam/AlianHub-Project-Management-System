@@ -8,7 +8,7 @@ const { memberProfiles } = require('../../utils/companyMembers');
 const { visibleProjectIds, visibleProjects } = require('../Agents/scope');
 const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
-const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
+const { pageReachFilter } = require('../Pages/helpers/pageRules');
 const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -42,10 +42,7 @@ const loadDocs = async (companyId, uid, task) => {
         data: [{
             linkedTasks: oid(task._id),
             deletedStatusKey: { $ne: 1 },
-            $and: [
-                pageVisibilityFilter(uid),
-                { $or: [{ ProjectID: { $in: visible.map(oid) } }, { ProjectID: { $in: [null, undefined] } }] },
-            ],
+            ...pageReachFilter({ uid, projectIds: visible.map(oid) }),
         }, 'title rawText ProjectID', { limit: MAX_DOCS }],
     }, 'find');
 };

@@ -1,5 +1,5 @@
 <template>
-<div ref="viewRoot" class="w-100 list-view-wrapper ah-page lv2" :class="{ 'lv2--sorted': !sortState.isManual.value }" :style="listGridStyle">
+<div ref="viewRoot" class="w-100 list-view-wrapper ah-page lv2" :class="{ 'lv2--sorted': !sortState.isManual.value }" :style="listGridStyle" :data-density="density">
     <div v-if="!currentCompany?.planFeature?.listView">
         <UpgradePlan
             :buttonText="$t('Upgrades.upgrade_your_plan')"
@@ -38,7 +38,7 @@
                     :calendarDateChange="calendarDateChange"
                 />
             </div>
-            <template v-else-if="groupedTasks.length && (totalTasks || !countsSettled)">
+            <template v-else-if="groupedTasks.length && (totalTasks || !countsSettled || otherRowsShown)">
                 <ListBulkBar v-if="project" :project="project" />
                 <ConvertToSubTaskSidebar
                     v-if="rowMenu.moving.value"
@@ -49,6 +49,7 @@
                     @isConvertSubtaskOPen="rowMenu.cancelMove"
                     @bulkMoveConfirm="rowMenu.confirmMove"
                 />
+                <TaskMenuSidebars :mode="rowMenu.sidebar.value?.mode" :task="rowMenu.sidebar.value?.task" @close="rowMenu.closeSidebar" />
                 <div class="lv2__scroll ah-scroll" id="list_scroll" role="table">
                     <div class="lv2__cols" role="row">
                         <span class="lv2__c-select" role="columnheader"><span class="ah-sr-only">{{ $t('List.col_select') }}</span></span>
@@ -61,6 +62,7 @@
                                 @move="columnState.move"
                                 @reset="columnState.reset"
                             />
+                            <ViewDensityControl :model-value="density" @update:model-value="setDensity" />
                             <ListSortControl :sort="sortState.sort.value" :options="sortOptions" @key="sortState.setKey" @dir="sortState.setDir" />
                         </span>
                         <span
@@ -76,12 +78,13 @@
                     </div>
 
                     <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
-                        <div v-if="groupedTasks.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__aria-row">
+                        <div v-if="groupedTasks.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__sprint-bar">
                         <button type="button" class="lv2__sprint-head" :aria-expanded="!!sprint.isExpanded" @click="toggleSprints(sprint?.id)">
                             <span class="lv2__caret lv2__caret--sprint" aria-hidden="true">{{ sprint.isExpanded ? '▼' : '►' }}</span>
                             <span class="lv2__sprint-name">{{ sprint.name }}</span>
                             <span class="lv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprintCount(sprint) }}</span>
                         </button>
+                        <ListMenu v-if="project?._id && sprint?.id && !sprint.isFolder" :project="project" :sprint="sprint" :archived-view="Boolean(showArchived)" />
                         </div></div>
 
                         <template v-if="sprint.isExpanded">
@@ -110,6 +113,15 @@
                                 </button>
                                 </div></div>
                             </template>
+                            <div v-if="otherRowsShown && sprint.id === openSprint?.id" role="row" class="lv2__aria-row"><div role="cell" class="lv2__aria-row">
+                                <OtherProjectRows
+                                    heading
+                                    :rows="otherRows.rows.value"
+                                    :projects="otherRows.projects.value"
+                                    :truncated="otherRows.truncated.value"
+                                    :list="{ sprintId: sprint.id, projectId: project?._id }"
+                                />
+                            </div></div>
                         </template>
                     </section>
                 </div>
@@ -129,9 +141,11 @@
                 <EmptyState
                     v-else-if="project?.deletedStatusKey !== 2"
                     :image="noSearchResult"
+                    :illustration="emptyTitleKey === 'EmptyState.no_match_title' ? 'search' : 'tasks'"
                     :title="showArchived ? $t('ProjectSlider.no_archived') : $t(emptyTitleKey)"
                     :message="showArchived ? '' : $t(emptyMessageKey)"
                     :actionLabel="emptyActionLabel"
+                    :sentence="!showArchived && emptySentenceKey ? $t(emptySentenceKey) : ''"
                     :helpPath="showArchived ? '' : 'tasks'"
                     @action="onEmptyAction"
                 />
@@ -144,7 +158,7 @@
 <script setup>
 // PACKAGES
 import { ref, defineProps, defineEmits, nextTick, inject, watch,
-    onMounted, computed, provide
+    onMounted, onBeforeUnmount, computed, provide
 } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
@@ -156,6 +170,7 @@ import SprintListing from "@/components/organisms/SprinstList/SprintsList.vue"
 import Skelaton from "@/components/atom/Skelaton/Skelaton.vue"
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import ListGroup from './ListGroup.vue';
+import ListMenu from '@/components/molecules/ListMenu/ListMenu.vue';
 import ListBulkBar from './ListBulkBar.vue';
 import CreateTask from '@/components/atom/CreateTask/CreateTask.vue';
 import isEqual from 'lodash/isEqual';
@@ -169,13 +184,21 @@ import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyStat
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useListRowEdit } from './useListInlineEdit.js';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
+import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
+import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import AiFieldColumnHead from '@/views/Projects/components/columns/AiFieldColumnHead.vue';
 import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiFields';
 import ListSortControl from './ListSortControl.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';
 import { useListRowMenu } from './useListRowMenu.js';
+import { SUBTASK_EXPANSION, createSubtaskExpansion } from './subtaskExpansion.js';
+import { eachRow } from '@/store/ProjectData/taskTree';
+import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
 import { sortChoices, useListSort } from '@/views/Projects/composables/viewSort';
-import { columnCatalogue, gridTracks, listColumnClass, listColumnsAt, useViewColumns } from '@/views/Projects/composables/viewColumns';
+import { columnCatalogue, listColumnClass, listColumnsAt, listGridVars, useViewColumns } from '@/views/Projects/composables/viewColumns';
+import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
+import OtherProjectRows from '@/views/Projects/components/OtherProjectRows.vue';
+import { useOtherProjectRows } from '@/views/Projects/composables/otherProjectRows';
 
 // UTILS
 const {getters} = useStore();
@@ -191,18 +214,22 @@ const clearTaskFilters = inject("clearTaskFilters", () => {});
 const {
     groupBy,
     getSprintTasks,
+    getGroupCounts,
     getMongoDBUpdate
 } = taskListHelper();
 const { checkApps, checkPermission } = useCustomComposable();
 const tagsOn = computed(() => checkApps("tags") && checkPermission("task.task_tag", project.value?.isGlobalPermission) !== null);
 const agents = useProjectAgentActivity();
-const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
 const rowEdit = useListRowEdit(project, showArchived);
 provide('listRowEdit', rowEdit);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { searched: Boolean(searchedTask?.value) }));
 const rowMenu = useListRowMenu(project, showArchived);
 provide('listRowMenu', rowMenu);
+const subtaskExpansion = createSubtaskExpansion();
+provide(SUBTASK_EXPANSION, subtaskExpansion);
 const sortState = useListSort();
+const { density, setDensity } = useViewSettings();
 provide('listSort', sortState.sort);
 const sortOptions = computed(() => sortChoices(rowEdit.fields.defs.value));
 const userNames = computed(() => new Map((getters['users/users'] || []).map((user) => [user._id, user.Employee_Name])));
@@ -217,10 +244,22 @@ const listCatalogue = computed(() => columnCatalogue('list', {
 }));
 const columnState = useViewColumns(computed(() => project.value?._id), 'list', listCatalogue);
 provide('listColumns', columnState.visibleColumns);
+/* Tags is the one column that shares the free width with the task name. While no row the List
+ * holds has a tag it keeps only the room of its header and the add button. */
+const EMPTY_TAGS_TRACK = '56px';
+const anyTagged = computed(() => {
+    const held = getters['projectData/tasks']?.[project.value?._id] || {};
+    const lists = searchedTask.value
+        ? [getters['projectData/searchedTasks'] || []]
+        : (held.sprints || []).map((sprintId) => held[sprintId]?.tasks || []);
+    return lists.some((rows) => [...eachRow(rows)].some((row) => row.tagsArray?.length));
+});
+const gridColumns = computed(() => listColumnsAt(columnState.visibleColumns.value, clientWidth?.value || 1280)
+    .map((column) => (column.id === 'tags' && !anyTagged.value ? { ...column, track: EMPTY_TAGS_TRACK } : column)));
 /* Phone width keeps the stylesheet's two-line row; wider, the tracks follow the chosen columns. */
-const listGridStyle = computed(() => ((clientWidth?.value || 1280) <= 767
-    ? {}
-    : { '--lv2-cols': gridTracks('list', listColumnsAt(columnState.visibleColumns.value, clientWidth?.value || 1280)) }));
+const listGridStyle = computed(() => ((clientWidth?.value || 1280) <= 767 ? {} : listGridVars(gridColumns.value)));
+/* Not narrowed to the width: the group header keeps its story point total where the columns themselves are folded away. */
+const totalColumns = computed(() => totalColumnsOf(columnState.visibleColumns.value));
 
 // EMITS
 defineEmits(['change'])
@@ -273,6 +312,8 @@ setActiveView('list');
 watch(() => project.value?._id, (newId) => {
     creatingFirstTask.value = false;
     openedEmptyGroups.value.clear();
+    subtaskExpansion.expandedIds.value = [];
+    subtaskExpansion.autoExpandedIds.value = [];
     if (newId) {
         setActiveProject(String(newId));
         agents.load(newId);
@@ -346,32 +387,85 @@ function reviewAgent() {
     if (router.hasRoute('AiInbox')) router.push({ name: 'AiInbox', params: { cid: companyId.value } }).catch(() => {});
 }
 
-const timer = ref(null);
-function debouncer(timeout = 1000) {
-    return new Promise((resolve) => {
-        if(timer.value) {
-            clearTimeout(timer.value);
-        }
-        timer.value = setTimeout(() => {
-            resolve();
-        }, timeout);
-    })
-}
+const INIT_SETTLE_MS = 150;
+let initTimer = null;
+let initStarted = false;
+let refetchWanted = false;
+let fetchedFor = '';
 
+/* The first call, and the first one that has sprints to fetch, load at once. The page then
+ * calls again several times while the sprint list and the props settle, so later calls wait
+ * for the last of a burst, and a fetch is skipped when the same project, grouping and sprints
+ * were fetched already. */
 function init (group,refetch,projects,sprints,groupedTasksData,isBoard,isInitial) {
     if(isInitial == true){
         isLoading.value = true;
     }
-    debouncer(1000).then(() => {
-        groupBy(group,refetch,projects,sprints,groupedTasksData,isBoard,'list',false,true,(resp)=>{
+    refetchWanted = refetchWanted || refetch === true;
+    const run = () => {
+        const signature = JSON.stringify([projects?._id, group, (sprints || []).map((sprint) => sprint?.id)]);
+        const fetch = refetchWanted && signature !== fetchedFor;
+        refetchWanted = false;
+        if(fetch && sprints?.length) fetchedFor = signature;
+        const heldBefore = Boolean(getters['projectData/tasks']?.[projects?._id]);
+        groupBy(group,fetch,projects,sprints,groupedTasksData,isBoard,'list',false,true,(resp)=>{
             groupedTasks.value = resp;
             if(!props.sprintLoading){
                 isLoading.value = false;
             }
             adjustListViewHeight();
-        });
-    })
+            /* Groups the store already held are not fetched again, so their counts are. */
+            if(fetch && heldBefore) refreshGroupCounts();
+        }, { firstPageOnly: true });
+    };
+    clearTimeout(initTimer);
+    const atOnce = !initStarted || (refetchWanted && !fetchedFor);
+    initStarted = true;
+    if(atOnce) {
+        run();
+        return;
+    }
+    initTimer = setTimeout(run, INIT_SETTLE_MS);
 }
+
+const COUNT_SETTLE_MS = 400;
+let countTimer = null;
+const openSprint = computed(() => groupedTasks.value.find((sprint) => sprint?.isExpanded));
+
+/* A search or a filter is matched against this project's own data, which says nothing of a task that lives elsewhere. */
+const otherRows = useOtherProjectRows(project, computed(() => (openSprint.value && !openSprint.value.isFolder ? openSprint.value.id : '')));
+const otherRowsShown = computed(() => !searchedTask.value && !showArchived.value && otherRows.rows.value.length > 0);
+
+function refreshGroupCounts() {
+    const sprint = openSprint.value;
+    if(!sprint || !project.value?._id) return;
+    getGroupCounts({ projectId: project.value._id, sprintId: sprint.id, items: sprint.items || [], projectData: project.value, totals: totalColumns.value })
+        .catch((error) => console.error("ERROR in list group counts: ", error));
+}
+
+function scheduleGroupCounts() {
+    clearTimeout(countTimer);
+    countTimer = setTimeout(refreshGroupCounts, COUNT_SETTLE_MS);
+}
+/* A group that holds only part of its tasks asks for its totals; the answer comes with the counts, for every group at once. */
+provide('listTotals', { columns: totalColumns, refresh: scheduleGroupCounts });
+
+/* The store raises the marker when a change from the server may have moved a task it cannot
+ * place. Only a rise while the same sprint is open counts: opening a sprint reads an old one. */
+watch(() => [
+    `${project.value?._id}|${openSprint.value?.id}`,
+    getters['projectData/tasks']?.[project.value?._id]?.[openSprint.value?.id]?.countsStale || 0,
+    getters['projectData/tasks']?.[project.value?._id]?.[openSprint.value?.id]?.totalsStale || 0
+], ([sprintKey, stale, totalsStale], [previousKey, previousStale, previousTotalsStale]) => {
+    if(sprintKey !== previousKey) return;
+    const totalsMoved = totalColumns.value.length > 0 && totalsStale > previousTotalsStale;
+    if(stale <= previousStale && !totalsMoved) return;
+    scheduleGroupCounts();
+});
+onBeforeUnmount(() => {
+    clearTimeout(initTimer);
+    clearTimeout(countTimer);
+});
 
 watch(clientWidth, () => {
     adjustListViewHeight();

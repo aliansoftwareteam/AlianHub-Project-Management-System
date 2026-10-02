@@ -112,6 +112,7 @@ exports.submitTimesheet = async (req, res) => {
             reviewedAt: null,
             reviewedBy: '',
             reviewerName: '',
+            selfApproved: false,
             rejectionReason: '',
             deletedStatusKey: 0,
         };
@@ -186,54 +187,67 @@ exports.listPending = async (req, res) => {
     }
 };
 
+const refused = (code, statusText) => ({ ok: false, code, statusText });
+
+/* The one review path: the single route and the bulk route both go through it, so a rule added here holds for both. */
+const reviewOne = async (req, { id, action, reason, reviewerName = reviewerNameOf }) => {
+    const companyId = sessionTenantOf(req);
+    const uid = actorId(req);
+    if (!isObjectIdString(id)) return refused('invalid_id', 'A valid id is required.');
+    const { ok } = await callerCanReview(req);
+    if (!ok) return refused('not_allowed', 'Only an owner or admin can review timesheets.');
+
+    const _id = new mongoose.Types.ObjectId(id);
+    const doc = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
+        data: [{ _id, deletedStatusKey: 0 }],
+    }, 'findOne');
+    if (!doc) return refused('not_found', 'Timesheet submission not found.');
+
+    const transition = resolveTransition({ from: doc.status, action });
+    if (!transition.valid) return refused('wrong_state', transition.reason);
+    if (action === 'reject') {
+        const reasonCheck = validateReason(reason);
+        if (!reasonCheck.valid) return refused('invalid_reason', reasonCheck.reason);
+    }
+
+    const reviewed = action !== 'reopen';
+    const actorName = await reviewerName(uid);
+    const at = new Date();
+    // An owner or admin may approve their own week; the approval says so, and so does its history entry.
+    const selfApproved = action === 'approve' && String(doc.userId) === uid;
+    const update = {
+        status: transition.to,
+        rejectionReason: action === 'reject' ? String(reason).trim() : '',
+        reviewedAt: reviewed ? at : null,
+        reviewedBy: reviewed ? uid : '',
+        reviewerName: reviewed ? actorName : '',
+        selfApproved,
+    };
+    const entry = { action, from: doc.status, to: transition.to, by: uid, byName: actorName, at };
+    // A reopening clears the review it undoes, so the week's history keeps both: who reopened it and whose review that was.
+    const history = {
+        approve: { ...entry, selfApproved },
+        reopen: { ...entry, reviewedBy: doc.reviewedBy || '', reviewerName: doc.reviewerName || '', reviewedAt: doc.reviewedAt || null },
+    }[action];
+    const write = history ? { $set: update, $push: { history } } : { $set: update };
+    // Matching on the status that was read keeps a second reviewer from overwriting a review that landed in between.
+    const updated = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
+        data: [{ _id, status: doc.status, deletedStatusKey: 0 }, write, { returnDocument: 'after' }],
+    }, 'findOneAndUpdate');
+    if (!updated) return refused('wrong_state', 'This timesheet was reviewed by someone else just now.');
+    socketEmitter.emit('update', { type: 'update', data: updated, module: 'timesheetApproval' });
+    return { ok: true, data: updated };
+};
+
 /* POST /api/v2/timesheet-approval/:id/review  body: { action, reason? } */
 exports.reviewTimesheet = async (req, res) => {
     try {
-        const companyId = sessionTenantOf(req);
-        const uid = actorId(req);
-        const { id } = req.params;
-        if (!isObjectIdString(id)) {
-            return res.send({ status: false, statusText: 'A valid id is required.' });
-        }
-        const { ok } = await callerCanReview(req);
-        if (!ok) return res.send({ status: false, statusText: 'Only an owner or admin can review timesheets.' });
-
         const { action, reason } = req.body || {};
-        const doc = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
-            data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: 0 }],
-        }, 'findOne');
-        if (!doc) return res.send({ status: false, statusText: 'Timesheet submission not found.' });
-
-        const transition = resolveTransition({ from: doc.status, action });
-        if (!transition.valid) return res.send({ status: false, statusText: transition.reason });
-
-        const reviewerName = await reviewerNameOf(uid);
-        const update = { status: transition.to };
-        if (action === 'reject') {
-            const reasonCheck = validateReason(reason);
-            if (!reasonCheck.valid) return res.send({ status: false, statusText: reasonCheck.reason });
-            update.rejectionReason = String(reason).trim();
-            update.reviewedAt = new Date();
-            update.reviewedBy = uid;
-            update.reviewerName = reviewerName;
-        } else if (action === 'approve') {
-            update.rejectionReason = '';
-            update.reviewedAt = new Date();
-            update.reviewedBy = uid;
-            update.reviewerName = reviewerName;
-        } else { // reopen — clear the review trail so it can be resubmitted/re-reviewed
-            update.rejectionReason = '';
-            update.reviewedAt = null;
-            update.reviewedBy = '';
-            update.reviewerName = '';
-        }
-        const updated = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
-            data: [{ _id: new mongoose.Types.ObjectId(id) }, { $set: update }, { returnDocument: 'after' }],
-        }, 'findOneAndUpdate');
-        socketEmitter.emit('update', { type: 'update', data: updated, module: 'timesheetApproval' });
-        return res.send({ status: true, statusText: `Timesheet ${transition.to}.`, data: updated });
+        const outcome = await reviewOne(req, { id: req.params.id, action, reason });
+        if (!outcome.ok) return res.send({ status: false, statusText: outcome.statusText });
+        return res.send({ status: true, statusText: `Timesheet ${outcome.data.status}.`, data: outcome.data });
     } catch (error) {
         if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in review timesheet: ${error.message}`);
@@ -241,8 +255,50 @@ exports.reviewTimesheet = async (req, res) => {
     }
 };
 
+const BULK_REVIEW_MAX = 100;
+const BULK_OUTCOMES = { approve: 'approved', reject: 'sent_back' };
+const BULK_SKIP_REASONS = { invalid_id: 'not_found', not_found: 'not_found', not_allowed: 'not_allowed', wrong_state: 'already_reviewed' };
+
+/* POST /api/v2/timesheet-approval/bulk-review  body: { ids, action: approve|reject, reason? }
+ * Answers per id; an id that cannot be reviewed is skipped with a reason and the rest still go through. */
+exports.reviewTimesheetsBulk = async (req, res) => {
+    try {
+        sessionTenantOf(req);
+        const { ids, action, reason } = req.body || {};
+        const refuse = (statusText) => res.status(400).send({ status: false, statusText });
+        if (!Array.isArray(ids) || !ids.length) return refuse('ids must be a non-empty list.');
+        if (ids.length > BULK_REVIEW_MAX) return refuse(`At most ${BULK_REVIEW_MAX} timesheets can be reviewed at once.`);
+        if (!Object.keys(BULK_OUTCOMES).includes(action)) return refuse('action must be approve or reject.');
+        if (action === 'reject') {
+            const reasonCheck = validateReason(reason);
+            if (!reasonCheck.valid) return refuse(reasonCheck.reason);
+        }
+
+        let name;
+        const reviewerName = (uid) => { name = name || reviewerNameOf(uid); return name; };
+        const results = [];
+        for (const id of [...new Set(ids.map(String))]) {
+            const outcome = await reviewOne(req, { id, action, reason, reviewerName }).catch((error) => {
+                logger.error(`ERROR in bulk review timesheet ${id}: ${error.message}`);
+                return refused('failed', error.message);
+            });
+            results.push(outcome.ok
+                ? { id, outcome: BULK_OUTCOMES[action] }
+                : { id, outcome: 'skipped', reason: BULK_SKIP_REASONS[outcome.code] || 'failed' });
+        }
+        const counts = { approved: 0, sent_back: 0, skipped: 0 };
+        results.forEach((r) => { counts[r.outcome] += 1; });
+        return res.send({ status: true, statusText: 'OK', data: { results, counts } });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in bulk review timesheets: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
 const { summarize: billableSplit } = require('../TimeSheet/helpers/billableRules');
 const pto = require('../Pto/helpers/ptoRules');
+const { companyWeekendDays } = require('../Company/helpers/companyWeek');
 
 /* GET /api/v2/timesheet-approval/queue?hoursPerDay= — the review queue with the
  * context a manager needs on one card: who, the period, billable/internal split
@@ -264,6 +320,7 @@ exports.listQueue = async (req, res) => {
         }, 'find').catch(() => []) : [];
         const userById = {};
         (users || []).forEach((u) => { userById[String(u._id)] = u; });
+        const weekendDays = await companyWeekendDays(companyId);
 
         const data = await Promise.all(docs.map(async (doc) => {
             const start = new Date(doc.periodStart); start.setHours(0, 0, 0, 0);
@@ -279,12 +336,15 @@ exports.listQueue = async (req, res) => {
                 }, 'find').catch(() => []),
             ]);
             const split = billableSplit(entries || []);
-            const cap = pto.computeAvailableCapacity({ rangeStart: start, rangeEnd: end, ptoEntries: ptoRows || [], workingHoursPerDay: hoursPerDay });
+            const cap = pto.computeAvailableCapacity({ rangeStart: start, rangeEnd: end, ptoEntries: ptoRows || [], workingHoursPerDay: hoursPerDay, weekendDays });
             const capacityMinutes = Math.round(cap.availableHours * 60);
             const u = userById[String(doc.userId)];
             const o = typeof doc.toObject === 'function' ? doc.toObject() : doc;
             return {
                 ...o,
+                // The stored totals are the week as first submitted; a reopened week keeps taking time, so the card totals what its split is made of.
+                totalMinutes: split.totalMinutes,
+                entryCount: (entries || []).length,
                 userName: u ? u.Employee_Name || u.Employee_Email || '' : '',
                 userAvatar: u ? u.Employee_profileImageURL || '' : '',
                 billableMinutes: split.billableMinutes,

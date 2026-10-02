@@ -103,5 +103,5 @@ onMounted(load);
 <style scoped src="@/components/organisms/DashboardCard/cardBody.css"></style>
 <style scoped>
 .mt__stats { margin-top: 2px; }
-.dc-stat__num--sm { font-size: 16px; }
+.dc-stat__num--sm { font-size: calc(var(--fs-xl, 20px) - 4px); }
 </style>

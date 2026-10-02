@@ -15,7 +15,7 @@ const NAME = 'vector-atlas';
 const INDEX_NAME = 'knowledge_chunks_vector';
 const VECTOR_PATH = 'embedding';
 /* Every chunk field an access clause reads, so the pre-filter can narrow by it. */
-const FILTER_PATHS = ['companyId', 'sourceType', 'deleted', 'embeddingModel', 'projectId', 'sprintId', 'participants', 'visibility', 'createdBy', 'agentId', 'scope'];
+const FILTER_PATHS = ['companyId', 'sourceType', 'deleted', 'embeddingModel', 'projectId', 'sprintId', 'participants', 'visibility', 'createdBy', 'sharedWith', 'agentId', 'scope'];
 const MODEL_DIMENSIONS = { 'text-embedding-3-small': 1536, 'text-embedding-3-large': 3072, 'text-embedding-ada-002': 1536 };
 const DEFAULT_LIMIT = 100;
 const DEFAULT_NUM_CANDIDATES = 1000;

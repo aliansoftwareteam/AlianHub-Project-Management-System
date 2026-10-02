@@ -23,6 +23,9 @@ export function taskEmptyStateKind({ showArchived, lastTaskId, searched }) {
     return searched ? 'no_match' : 'no_visible_tasks';
 }
 
+/* A sentence is offered only where no task was ever made; the other kinds are not filled by adding tasks. */
+export const taskEmptySentenceKey = (kind) => (kind === 'no_tasks' ? 'EmptyState.say_tasks' : '');
+
 export function useTaskEmptyState(project) {
     const searchedTask = inject('searchedTask', ref(false));
     const showArchived = inject('showArchived', ref(false));
@@ -36,5 +39,6 @@ export function useTaskEmptyState(project) {
     return {
         emptyTitleKey: computed(() => `EmptyState.${kind.value}_title`),
         emptyMessageKey: computed(() => `EmptyState.${kind.value}_msg`),
+        emptySentenceKey: computed(() => taskEmptySentenceKey(kind.value)),
     };
 }

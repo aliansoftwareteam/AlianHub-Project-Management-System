@@ -23,6 +23,51 @@
     box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.15);
     border-radius: 12px!important;
 }
+/* The themed panel, which is the default: the panel, and what DropDown and DropDownOption render
+   inside it, take the tokens and so follow the theme. A host passes :themed="false" to keep the
+   legacy white panel while its contents still paint fixed colours. */
+:root[data-theme="dark"] .drop-down-menu:not(.dd-tokens) { color-scheme: light; }
+.dd-tokens {
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    box-shadow: var(--shadow-pop);
+}
+.dd-tokens .drop-down-options,
+.dd-tokens .drop-down-search,
+.dd-tokens .mobile-title-header { color: var(--ink); }
+.dd-tokens .mobile-title-header,
+.dd-tokens > .border-bottom { border-bottom-color: var(--hairline) !important; }
+.dd-tokens .drop-down-item { color: var(--ink-2); }
+.dd-tokens .project-mobile-desc { color: inherit; }
+.dd-tokens .drop-down-item.bg-gray91 { background-color: var(--fill); }
+.dd-tokens .drop-down-item:hover { background-color: var(--surface-hover) !important; color: var(--ink) !important; }
+.dd-tokens .drop-down-item[aria-selected="true"] { background-color: var(--brand-tint); color: var(--brand); }
+.dd-tokens .form-control { background: var(--surface); color: var(--ink) !important; border-color: var(--border); }
+.dd-tokens .form-control::placeholder { color: var(--ink-2) !important; }
+.dd-tokens .form-control:focus-visible { outline-color: var(--brand); }
+.dd-tokens .btn-primary:not(.bg-transparent) { background: var(--brand); color: var(--on-brand); }
+/* A highlighted option carries .bg-blue.white, whose white is !important. */
+.dd-tokens .drop-down-item.bg-blue.white { background-color: var(--brand-tint); color: var(--brand) !important; }
+/* Colours that hosts and the option component set on what they put in the panel. */
+.dd-tokens .project-mobile-desc, .dd-tokens .project-list-mobiletitle { color: inherit; }
+.dd-tokens :is(.dropDelete, .mobile-deleteIcon, .mobile-delete-status) { color: var(--danger-ink) !important; }
+.dd-tokens :is(.mainDiv, .option):hover { background: var(--surface-hover); }
+.dd-tokens :is(.border_bottom_status, .user_detail_mil, .chipDiv-hr, .wf_header) { border-bottom-color: var(--hairline); }
+.dd-tokens .customfield__form-control { background: var(--surface); color: var(--ink); border-color: var(--border); }
+.dd-tokens :is(.user__employename, .user__employeename) { color: var(--ink) !important; }
+.dd-tokens .sprint-watcher-count { background: var(--fill); color: var(--ink-2); }
+.dd-tokens .additional-users-count { background: var(--brand); color: var(--on-brand); }
+.dd-tokens .project-checkbox-mark { background-color: var(--surface); border-color: var(--border); }
+.dd-tokens .project-custom-checkbox:hover .project-checkbox-mark { background-color: var(--surface-hover); }
+.dd-tokens .project-custom-checkbox input:checked ~ .project-checkbox-mark { background-color: var(--brand); border-color: var(--brand); }
+.dd-tokens .project-custom-checkbox .project-checkbox-mark:after { border-color: var(--on-brand); }
+.dd-tokens .padding_wrapper_advance_filter { background: var(--surface); }
+.dd-tokens .dropDownScroll { border-color: var(--hairline); }
+.dd-tokens .dropDownScroll::-webkit-scrollbar, .dd-tokens .dropDownScroll::-webkit-scrollbar-track { background-color: var(--fill); box-shadow: none; }
+.dd-tokens .dropDownScroll::-webkit-scrollbar-thumb { background-color: var(--border); }
+/* Black icon files: the sheet's close cross, and the sprint picker of the board's new-task form. */
+:root[data-theme="dark"] .dd-tokens :is(.mobileCloseIcon, .task__option img) { filter: invert(1) hue-rotate(180deg); }
 .drop-down-hide {
     transform: translateY(5%);
     opacity: 0 !important;
@@ -80,7 +125,11 @@
     width: 100%;
 }
 @media(max-width: 767px){
-    .dropdown-back-drop { background-color: rgb(0 0 0 / 70%);}
+    .dropdown-back-drop { background-color: var(--scrim);}
+    /* !important: the option component forces its phone colours with it. */
+    .dd-tokens .drop-down-item { background: var(--fill) !important; color: var(--ink) !important; }
+    .dd-tokens .drop-down-item[aria-selected="true"] { background: var(--brand-tint) !important; color: var(--brand) !important; }
+    .dd-tokens .drop-down-item .drop-down-options-image { background-color: transparent !important; }
     .dropDownScroll::-webkit-scrollbar {
         display: none !important;
     }

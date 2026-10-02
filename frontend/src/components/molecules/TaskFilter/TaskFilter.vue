@@ -4,7 +4,7 @@
 -->
 <template>
     <div class="d-flex align-items-center position-re" :class="{'mr-15' : clientWidth > 767 , 'mr-010' : clientWidth <= 767}">
-        <DropDown mode="dialog" :aria-label="$t('Filters.filter')" maxHeight="47dvh" zIndex="99" :bodyClass="{'main-filter-dropdown-wrapper' : true}" :bodyClassHeader="{'top-filter-section' : true}">
+        <DropDown mode="dialog" themed :aria-label="$t('Filters.filter')" maxHeight="47dvh" zIndex="99" :bodyClass="{'main-filter-dropdown-wrapper' : true}" :bodyClassHeader="{'top-filter-section' : true}">
             <template #head>
                 <div class="d-flex align-items-center justify-content-between filter-title" v-if="clientWidth <= 767">
                     <h3 class="m-0">{{$t('Filters.filter')}}</h3>
@@ -26,10 +26,10 @@
                 </button>
             </template>
             <template #options>
-                <div class="bottom-filter-section bg-white" >
+                <div class="bottom-filter-section">
                     <div class="d-flex justify-content-between w-100 mb-13px" v-if="clientWidth > 767">
                         <div class="filter-title">
-                            <h2 class="m-0 font-size-18 text-capitalize">{{ isEdit === true ? selectedRow.name : $t('Filters.filter')}}</h2>
+                            <h2 class="m-0 font-size-18">{{ isEdit === true ? selectedRow.name : $t('Filters.filter')}}</h2>
                         </div>
                         <div class="filter-info d-flex">
                             <a href="https://help.alianhub.com/" target="_blank">
@@ -56,7 +56,7 @@
                     <div class="d-flex w-100 add-filter-wrapper">
                         <div class="add-section mb-13px" :class="{'d-flex justify-content-between w-100' : clientWidth <= 767}" v-if="keysArray.length">
                             <span><a href="#" class="mr-10px"  @click.stop.prevent="clearFilter($event), $refs.closeFilterRef.click()" v-if="clientWidth <= 767" :class="{'font-weight-500 font-size-18' : clientWidth <=767}">{{$t('Filters.clearall')}}</a></span>
-                            <a href="#" class="blue" @click.stop.prevent="addRow" :class="{'font-weight-400 font-size-12' : clientWidth > 767 , 'font-weight-500 font-size-18' : clientWidth <= 767}">+ {{$t('Filters.addfilter')}}</a>
+                            <a href="#" class="tf-link" @click.stop.prevent="addRow" :class="{'font-weight-400 font-size-12' : clientWidth > 767 , 'font-weight-500 font-size-18' : clientWidth <= 767}">+ {{$t('Filters.addfilter')}}</a>
                         </div>
                     </div>
                     <FieldsActions

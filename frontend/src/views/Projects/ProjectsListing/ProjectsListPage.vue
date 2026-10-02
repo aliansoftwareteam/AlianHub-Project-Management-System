@@ -89,6 +89,8 @@
                             <button type="button" class="ah-pop__item" @click="menuFor = ''; toggleFavourite(project)">
                                 {{ isFavourite(project) ? $t('Projects.unfavourite') : $t('Projects.favourite') }}
                             </button>
+                            <button v-if="canCreate" type="button" class="ah-pop__item" data-test="duplicate-project" @click="menuFor = ''; duplicating = project">{{ $t('Projects.duplicate_project') }}</button>
+                            <button v-if="canCreate" type="button" class="ah-pop__item" data-test="save-project-template" @click="menuFor = ''; savingTemplate = project">{{ $t('Projects.template_save_entry') }}</button>
                             <template v-if="isArchived(project)">
                                 <div class="ah-pop__sep"></div>
                                 <button type="button" class="ah-pop__item" @click="menuFor = ''; restore(project)">{{ $t('Projects.restore') }}</button>
@@ -129,6 +131,8 @@
             @closeSidebar="creating = false"
         />
         <AiProjectCreator v-if="aiCreating" :visible="aiCreating" @close="aiCreating = false" @created="onAiCreated" />
+        <DuplicateProjectDialog v-if="duplicating" :project="duplicating" @close="duplicating = null" />
+        <SaveProjectTemplateDialog v-if="savingTemplate" :project="savingTemplate" @close="savingTemplate = null" />
 
         <ConfirmationSidebar
             v-model="confirmOpen"
@@ -155,6 +159,8 @@ import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
 import CreateProjectSidebar from '@/components/organisms/CreateProject/CreateProjectSidebar.vue';
 import AiProjectCreator from '@/components/organisms/AiProjectCreator/AiProjectCreator.vue';
+import DuplicateProjectDialog from '@/components/molecules/DuplicateProjectDialog/DuplicateProjectDialog.vue';
+import SaveProjectTemplateDialog from '@/components/molecules/SaveProjectTemplateDialog/SaveProjectTemplateDialog.vue';
 import { SAMPLE_PROJECT_NAME } from '@/components/organisms/CreateProject/templates';
 import { useProjectsHelper } from '../helper';
 import { useProjectLifecycle } from '../composables/useProjectLifecycle';
@@ -192,6 +198,8 @@ const allProjects = computed(() => getters['projectData/allProjects']?.data || [
 const aiEnabled = computed(() => canUseAi());
 const hasPortfolio = computed(() => router.hasRoute('Portfolio'));
 const canCreate = computed(() => checkPermission('project.project_create') === true);
+const duplicating = ref(null);
+const savingTemplate = ref(null);
 
 const visible = computed(() => allProjects.value.filter((p) => p && !p.isPersonal && lifecycleOf(p, 'project') !== TRASHED));
 const activeCount = computed(() => visible.value.filter((p) => !isArchived(p)).length);

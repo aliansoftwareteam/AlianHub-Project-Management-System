@@ -17,7 +17,7 @@ const CREDIT_NOTES = 'InvoiceAndCreditNotes/';
 const CREDIT_NOTE_COMPANY = /^InvoiceAndCreditNotes\/CreditNotes\/([a-f0-9]{24})\//i;
 const LOOKUP_CACHE_TTL = 60;
 
-const refuse = (res, code, statusText) => res.status(code).json({ status: false, statusText, message: statusText });
+const refuse = (res, code, statusText, reason) => res.status(code).json({ status: false, statusText, message: statusText, ...(reason ? { code: reason } : {}) });
 const refusal = (code, statusText) => ({ code, statusText });
 
 const inAudience = (aud, companyId) => {
@@ -176,7 +176,7 @@ function refuseUpload(findRefusal) {
     return async (req, res, next) => {
         try {
             const found = req.uploadRefusal || await findRefusal(req);
-            return found ? refuse(res, found.code, found.statusText) : next();
+            return found ? refuse(res, found.code, found.statusText, found.reason) : next();
         } catch (error) {
             return refuse(res, 500, error.message);
         }

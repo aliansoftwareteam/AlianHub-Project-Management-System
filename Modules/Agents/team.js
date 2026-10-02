@@ -5,6 +5,8 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const runs = require('./runs');
 const { agentProjectsFor } = require('./access');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { privateWorkOf, readsRun } = require('./privateWork');
 const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
 const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require('../TimeSheet/helpers/timeScope');
 const { CLOSED_STATUS_TYPES, isClosedTask, isBlockedTask, taskRef } = require('../Tasks/helpers/taskSignals');
@@ -65,7 +67,7 @@ const activePto = async (companyId) => {
     return rows || [];
 };
 
-/* The filter the viewer's own task list applies: {} for company-wide readers. */
+/* The filter the viewer's own task list applies; it names no ProjectID for company-wide readers. */
 const taskFilterFor = async (companyId, viewerId) => {
     const stage = await visibilityStage(companyId, viewerId);
     return stage ? stage.$match : {};
@@ -103,10 +105,12 @@ const assigneeIds = (task) => {
  * how loaded they are this week. A task the viewer cannot open is never named:
  * the row says only that its person or agent is busy. */
 const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
-    const [taskFilter, sheetScope] = await Promise.all([
+    const [taskFilter, sheetScope, viewerRole] = await Promise.all([
         taskFilterFor(companyId, viewerId),
         resolveSheetScope(companyId, viewerId, SHEET_PERMISSION.workload),
+        getRoleType(companyId, viewerId),
     ]);
+    const privateWork = isPrivileged(viewerRole) ? await privateWorkOf(companyId, viewerId) : null;
     const scoped = Object.keys(taskFilter).length > 0;
     const showsHoursOf = (uid) => sheetScope.everyone || uid === sheetScope.uid;
     const [members, timers, weekMinutes, pto, tasks, agents, openRuns, recentRuns] = await Promise.all([
@@ -117,7 +121,7 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
         inProgressTasks(companyId, taskFilter),
         MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { createdAt: 1 } }] }, 'find').catch(() => []),
         runs.list(companyId, { status: 'open', limit: 50 }),
-        runs.list(companyId, { limit: 60, projectIds: visibleProjectIdsOf(taskFilter) }),
+        runs.list(companyId, { limit: 60, projectIds: visibleProjectIdsOf(taskFilter), privateWork }),
     ]);
 
     const userIds = (members || []).map((m) => String(m.userId || '')).filter(Boolean);
@@ -187,6 +191,7 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
     (openRuns || []).forEach((r) => { if (!runsByAgent[String(r.agentId)]) runsByAgent[String(r.agentId)] = r; });
     const runTaskById = await tasksById(companyId, [...(openRuns || []), ...(recentRuns || [])].map((r) => r.taskId), taskFilter);
     const hiddenTask = (taskId) => scoped && Boolean(taskId) && !runTaskById[String(taskId)];
+    const hiddenRun = (run) => hiddenTask(run.taskId) || Boolean(privateWork && !readsRun(privateWork, run));
 
     const agentRows = (agents || []).map((a) => {
         const run = runsByAgent[String(a._id)];
@@ -204,12 +209,12 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
             ...agentProjectsFor(a, visibleProjectIdsOf(taskFilter)),
             spend: { usd: Math.round(Number(month.usd || 0) * 100) / 100, cap: Number(a.spendCapUsd || 0), runs: Number(month.runs || 0) },
             run: run ? {
-                id: hiddenTask(run.taskId) ? '' : String(run._id),
+                id: hiddenRun(run) ? '' : String(run._id),
                 status: run.status,
-                taskId: hiddenTask(run.taskId) ? '' : String(run.taskId || ''),
+                taskId: hiddenRun(run) ? '' : String(run.taskId || ''),
                 taskKey: task ? task.TaskKey : '',
                 taskName: task ? task.TaskName : '',
-                hidden: hiddenTask(run.taskId),
+                hidden: hiddenRun(run),
                 startedAt: run.startedAt,
                 elapsedMs: Math.max(0, now - new Date(run.startedAt || now).getTime()),
             } : null,
@@ -218,7 +223,7 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
         };
     });
 
-    const activity = (recentRuns || []).filter((r) => !hiddenTask(r.taskId)).slice(0, 12).map((r) => ({
+    const activity = (recentRuns || []).filter((r) => !hiddenRun(r)).slice(0, 12).map((r) => ({
         at: r.finishedAt || r.startedAt,
         kind: 'agent',
         who: r.agentName || '',

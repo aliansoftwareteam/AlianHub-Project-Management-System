@@ -9,7 +9,6 @@
             @dragleave="onColumnDragLeave"
             @drop="hoveredColumnIndex = null"
         >
-            <!-- Card Area -->
             <div class="kanban-card-wrapper">
                 <div class="column-head column-head-wrap">
                     <span class="status-color-dot" :style="`background-color: ${column.textColor || 'var(--ink-3)'}`"></span>
@@ -35,14 +34,13 @@
                         :aria-label="$t('Projects.add_task_to_column', { name: column.name })"
                         @click="showAddInput(column.key)"
                     >
-                        <img class="add-task-icon" src="@/assets/images/svg/pluss.svg" alt="" aria-hidden="true">
+                        <span class="ah-mask-icon add-task-icon" :style="maskOf(plusIcon)" aria-hidden="true"></span>
                     </button>
                 </div>
                 <div class="add-task-section" v-if="activeColumnId === column.key" :id="column.key">
                     <BoardViewTaskCreateVue :data="column" :groupValue="groupValue" @toggle="(val) => showAddInput(val)" :sprintData="{}" :sprintId="sprintId" />
                 </div>
 
-                <!-- Tasks List -->
                 <div class="kanban-cards-area">
                     <Draggable
                         class="kanban-cards"
@@ -61,6 +59,7 @@
                             <div class="kanban-card" :class="{ 'is-agent-run': !!runFor(element._id) }" :data-task-type="element.TaskTypeKey" v-bind="taskNavAttrs(element)">
                                 <BoardViewDisplayCardComponent
                                     :data="element"
+                                    :itemData="column"
                                     :groupValue="groupValue"
                                     :isSubTask="false"
                                     :agentRun="runFor(element._id)"
@@ -69,23 +68,36 @@
                             </div>
                         </template>
                     </Draggable>
-                    <p v-if="!column.tasksArray?.length" class="column-empty">{{ $t('Projects.column_empty_drop') }}</p>
+                    <OtherProjectRows as="card" :rows="otherRows.placed[column.key] || []" :projects="otherProjects" :list="viewedList" />
+                    <p v-if="!column.tasksArray?.length && !otherRows.placed[column.key]?.length" class="column-empty">{{ $t('Projects.column_empty_drop') }}</p>
                 </div>
 
                 <button v-if="moreCount(column) > 0" type="button" class="more-count" @click="loadMore(column)">{{ $t('Projects.more_count', { n: moreCount(column) }) }}</button>
             </div>
 
-            <!-- Drop Area -->
             <div class="column-drop-area" :class="{ 'highlight-drop': hoveredColumnIndex === columnIndex }"></div>
+        </div>
+        <div v-if="otherRows.unplaced.length || otherTruncated" class="kanban-column" data-other-project-column>
+            <div class="kanban-card-wrapper">
+                <div class="column-head column-head-wrap">
+                    <span class="column-title" :title="$t('TaskLists.other_projects')">{{ $t('TaskLists.other_projects') }}</span>
+                </div>
+                <div class="kanban-cards-area">
+                    <OtherProjectRows as="card" :rows="otherRows.unplaced" :projects="otherProjects" :list="viewedList" :truncated="otherTruncated" />
+                </div>
+            </div>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, defineProps, nextTick, inject, watch, onMounted, onUnmounted, computed } from 'vue'
+import { ref, defineProps, nextTick, inject, provide, watch, onMounted, onUnmounted, computed } from 'vue'
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
+import { isAddedRow, putBack } from "@/views/Projects/composables/taskHomeMark";
+import OtherProjectRows from "@/views/Projects/components/OtherProjectRows.vue";
 
 //Cmponents
 import BoardViewTaskCreateVue from "@/views/Projects/Kanban/BoardViewTaskCreate"
@@ -95,6 +107,7 @@ import BoardViewDisplayCardComponent from '@/views/Projects/Kanban/BoardViewDisp
 import { useUpdateTasks } from "../helper";
 import { groupTakesTask } from "@/views/Projects/composables/customFieldQuery";
 import * as env from '@/config/env';
+import { indexRepairBody, indexRepairRows, plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
 import { apiRequest } from "../../../services";
 import { useCustomComposable } from "@/composable";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
@@ -102,6 +115,10 @@ import { useProjectAgents } from "@/views/Projects/Kanban/useProjectAgents";
 import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
 import { useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
+import { useSubtaskTree } from "@/views/Projects/composables/subtaskTree";
+import { maskOf } from "@/utils/iconMask";
+
+const plusIcon = require("@/assets/images/svg/pluss.svg");
 
 //Props
 const props = defineProps({
@@ -114,6 +131,19 @@ const props = defineProps({
     },
     sprintId: {
         type: String
+    },
+    /** Cards of tasks added to this list from other projects: `placed` by column key, `unplaced` when no column is named for them. */
+    otherRows: {
+        type: Object,
+        default: () => ({ placed: {}, unplaced: [] })
+    },
+    otherProjects: {
+        type: Object,
+        default: () => ({})
+    },
+    otherTruncated: {
+        type: Boolean,
+        default: false
     }
 })
 
@@ -126,12 +156,14 @@ const groupValue = ref(props.group)
 const activeColumnId = ref(null)
 const companyId = inject("$companyId")
 const projectData = inject("selectedProject")
+const viewedList = computed(() => ({ sprintId: props.sprintId, projectId: projectData.value?._id }))
 const showArchiveVar = inject("showArchived");
 const clientWidth = inject("$clientWidth");
 const hoveredColumnIndex = ref(null)
 const timer = ref(null)
 const { dispatch, commit } = useStore()
 const { t } = useI18n()
+const $toast = useToast();
 const { updateTaskByGroup } = useUpdateTasks()
 const { checkPermission } = useCustomComposable();
 
@@ -146,6 +178,26 @@ setActiveView('kanban');
 watch(() => projectData.value?._id, (newId) => {
     if (newId) setActiveProject(String(newId));
 }, { immediate: true });
+
+/* The open subtask lists are held here, not in the card, so a card keeps its list when it is
+   redrawn or dropped in another column. */
+const subtasks = useSubtaskTree({
+    project: projectData,
+    sprintId: computed(() => columns.value[0]?.sprintId || props.sprintId),
+    rows: computed(() => columns.value.flatMap((column) => column.tasksArray || [])),
+    showArchived: showArchiveVar,
+    searched: inject("searchedTask", ref(false))
+});
+const subtaskFor = ref("");
+provide("boardSubtaskTree", {
+    ...subtasks,
+    subtaskFor,
+    startSubtask: (task, column) => {
+        subtasks.expand(task, column);
+        subtaskFor.value = String(task._id);
+    },
+    cancelSubtask: () => { subtaskFor.value = ""; }
+});
 
 // Computed properties
 const isDisabled = computed(() => {
@@ -187,50 +239,21 @@ onMounted(() => {
 })
 
 function init() {
-    let taskWithoutFilter = []
-    let taskArray = [];
+    const taskListPermission = checkPermission('task.task_list', projectData.value?.isGlobalPermission);
+    const rows = columns.value.flatMap((column) => indexRepairRows(column.tasksArray, column, taskListPermission));
+    if (!rows.length) return;
 
-    columns.value.forEach((data) => {
-        if (data.customFieldId) return;
-        let withoutIndexTask = data.tasksArray?.filter((x) => {
-            return (x[data.indexName] === undefined || x[data.indexName] === null) && x.TaskKey !== '--'
-        })
-        if (withoutIndexTask?.length > 0) {
-            withoutIndexTask.map((x) => taskWithoutFilter.push({ data: x._id, item: data, taskKey: x.TaskKey }))
-            withoutIndexTask.map((x) => taskArray.push(x));
-        }
-    })
-
-    if (!(taskWithoutFilter.length === 0 && taskArray.length === 0)) {
-        var newObj = { pid: projectData.value._id, sprintId: columns.value[0].sprintId || props.sprintId, tasksArray: taskArray, indexName: columns.value[0].indexName };
-        commit("projectData/mutateTaskIndex", newObj)
-        let count = 0;
-
-        let countFunction = async (row) => {
-            if (count >= taskWithoutFilter.length) {
-                return;
-            } else {
-                if (row.taskKey != '--') {
-                    await apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, {
-                        taskUpdate: row,
-                        companyId: companyId.value,
-                    }).then(() => {
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update project history: ", error);
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                } else {
-                    count++;
-                    countFunction(taskWithoutFilter[count]);
-                }
-            }
-        }
-        countFunction(taskWithoutFilter[count])
-    }
+    commit("projectData/mutateTaskIndex", { pid: projectData.value._id, sprintId: columns.value[0].sprintId || props.sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: columns.value[0].indexName });
+    const next = (index) => {
+        if (index >= rows.length) return;
+        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(rows[index], companyId.value))
+            .then(() => next(index + 1))
+            .catch((error) => {
+                console.error("ERROR in update task index: ", error);
+                next(index + 1);
+            });
+    };
+    next(0);
 }
 
 function debouncer(timeout = 1000) {
@@ -285,6 +308,14 @@ const updateEvent = (event, task) => {
     if (element) {
         if (event.added) {
             updateTaskByGroup(element, task, groupValue.value, null, true).catch((error) => console.error("ERROR in board drop: ", error));
+        }
+        /* A card of a task added to this list takes the column it is dropped in; its place is kept by the list it lives in. */
+        if (isAddedRow(element, columns.value[0]?.sprintId || props.sprintId)) {
+            if (event.moved) {
+                putBack(task.tasksArray, event.moved);
+                $toast.info(t("TaskLists.order_kept_at_home"), { position: "top-right" });
+            }
+            return;
         }
         if (task.customFieldId) return;
         let relevantIndex
@@ -359,7 +390,7 @@ const updateEvent = (event, task) => {
             isFirstWithRecord: (index === 0 && taskDt.tasksArray.length !== 1 && taskDt.tasksArray.length !== 0) ? true : false,
             indexName: task.indexName,
             sprintId: element.sprintId,
-            relevantKey: task.searchValue,
+            relevantKey: plainGroupValue(task.searchValue),
             searchKey: task.searchKey,
             taskKey: element.TaskKey,
             updateData: UpdateData

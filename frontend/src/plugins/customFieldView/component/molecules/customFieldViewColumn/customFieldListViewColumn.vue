@@ -37,6 +37,16 @@
                 :defs="finalCustomFieldsList"
             />
         </div>
+        <div v-else-if="moduleDefs[obj.key] && appliesTo(obj.key)" class="position-re" @click.stop>
+            <component
+                :is="fieldTypeUi(moduleDefs[obj.key].fieldType).value"
+                compact
+                :def="moduleDefs[obj.key]"
+                :value="props.task.customField?.[obj.key]?.fieldValue"
+                :label="moduleDefs[obj.key].fieldTitle || ''"
+                v-bind="taskPropFor(moduleDefs[obj.key].fieldType, props.task)"
+            />
+        </div>
     </span>
 </template>
 
@@ -59,6 +69,7 @@
     import { useStore } from 'vuex';
     import { useI18n } from "vue-i18n";
     import { fieldAppliesToTask } from '@fieldTaskTypes';
+    import { fieldTypeUi, taskPropFor } from '@/plugins/customFieldView/fieldTypes';
     const { t } = useI18n();
 
     const {checkPermission, checkApps} = useCustomComposable();
@@ -92,6 +103,11 @@
         });
         return map;
     });
+
+    /* The legacy list only shows these types; they are edited in the List and Table views and the task panel. */
+    const moduleDefs = computed(() => Object.fromEntries(finalCustomFieldsList.value
+        .filter((def) => def && fieldTypeUi(def.fieldType))
+        .map((def) => [def._id, def])));
 
     // Flat, de-duped task list (parents + subtasks) for rollup aggregation — from the
     // sources populated in the List/Board/Table flow (the row task's own subtaskArray

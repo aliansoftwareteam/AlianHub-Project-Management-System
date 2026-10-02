@@ -82,7 +82,7 @@
 .picker__fit--good { color: var(--ok-ink); }
 .picker__fit--off { color: var(--ink-2); }
 .picker__explain { margin-top: auto; padding: 12px 14px; }
-.picker__explain p { font: var(--text-small); color: var(--ink-label); line-height: 1.55; margin: 8px 0 0; }
+.picker__explain p { font: var(--text-body); color: var(--ink-label); line-height: 1.55; margin: 8px 0 0; }
 
 .picker__aside { padding: 20px 18px; display: flex; flex-direction: column; gap: 12px; background: var(--surface); }
 .picker__confirm { padding: 12px 14px; border: 1.5px solid var(--brand); border-radius: 11px; background: var(--brand-tint); display: flex; flex-direction: column; gap: 9px; }
@@ -175,4 +175,8 @@ a.ask__cite-ref:focus-visible { outline: none; box-shadow: var(--focus); border-
     .ask__cards { grid-template-columns: 1fr; }
     .route__to { width: auto; }
     .picker__row { min-height: 44px; }
+}
+@media (max-width: 767px) {
+    .ah-page.route-page .ah-toolbar { padding: 0 16px; gap: 8px; }
+    .route-page .ah-toolbar__title, .route-page .parity-count { white-space: nowrap; }
 }

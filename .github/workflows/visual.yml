@@ -1,0 +1,95 @@
+name: Visual
+
+# Until a baseline is committed there is nothing to compare a pull request with, so the check runs
+# after each merge and on demand. Add `pull_request: branches: [beta]` back with the baseline.
+on:
+  push:
+    branches: [beta]
+  workflow_dispatch:
+    inputs:
+      update:
+        description: Propose a fresh baseline for every core screen
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    name: Core screens
+    runs-on: ubuntu-24.04
+    # Not blocking while the baseline is new. Once it is committed and the tolerance in
+    # e2e/visual/settings.js is tuned, remove this line and add "Core screens" to the
+    # required checks of beta.
+    continue-on-error: true
+    timeout-minutes: 30
+    container:
+      # The operating system, fonts and browser build come from this image and nowhere else.
+      # The tag is the @playwright/test version in package.json; tests/visual-report.test.js
+      # fails when the two differ.
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001 --ipc=host
+    services:
+      mongo:
+        image: mongo:7
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # A job in a container reaches a service by its name, not through a mapped port.
+      E2E_MONGODB_URL: mongodb://mongo:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+          VUE_APP_ENVIRONMENT: ci
+          VUE_APP_APIKEY: placeholder
+          VUE_APP_AUTHDOMAIN: placeholder
+          VUE_APP_PROJECTID: placeholder
+          VUE_APP_STORAGEBUCKET: placeholder
+          VUE_APP_MESSAGINGSENDERID: placeholder
+          VUE_APP_APPID: placeholder
+          VUE_APP_MEASUREMENTID: placeholder
+          VUE_APP_STORAGE_TYPE: server
+          VUE_APP_AFFILIATEON: "false"
+          VUE_APP_IS_GOOGLE_LOGIN: "false"
+          VUE_APP_IS_GITHUB_LOGIN: "false"
+          VUE_APP_IS_GITLAB_LOGIN: "false"
+      - run: npm run visual ${{ inputs.update && '-- --update' || '' }}
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baseline
+          path: e2e/visual-proposed
+          retention-days: 14
+          if-no-files-found: ignore
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-report
+          path: |
+            e2e/visual-report
+            e2e/visual-results
+            e2e/.state/*.log
+          retention-days: 14
+          include-hidden-files: true
+          if-no-files-found: ignore

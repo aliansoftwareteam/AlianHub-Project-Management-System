@@ -3,8 +3,7 @@ const { MongoClient } = require('mongodb');
 const { resolveMongoUrl } = require('../../e2e/support/env');
 const { listSprints, loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
-/* Follow-up 118. Comments carried in by a Trello import count as unread for the task's people, as a comment
- * written in the app does, and the change reaches them over the socket. */
+/* An import is quiet: the comments it carries in are stored, but nobody's unread count moves and nothing is pushed. */
 
 const state = readState();
 
@@ -41,7 +40,7 @@ afterAll(async () => {
     if (client) await client.close();
 });
 
-it('counts imported comments as unread for the task\'s member and tells them over the socket', async () => {
+it('stores imported comments without counting them as unread or telling anyone over the socket', async () => {
     const name = `[QA import comments] ${uniqueSuffix()}`;
     const importing = owner.api.post('/api/v2/imports/trello', {
         projectId: target.projectId,
@@ -57,10 +56,10 @@ it('counts imported comments as unread for the task\'s member and tells them ove
         },
     });
     const pushed = new Promise((resolve) => {
-        const timer = setTimeout(() => resolve(null), 10000);
+        const timer = setTimeout(() => resolve(null), 4000);
         socket.on('userIdNoticationUpdate', (payload) => {
             const doc = payload && payload.fullDocument;
-            const hit = doc && Object.keys(doc).find((key) => key.startsWith(`task_${target.projectId}_${target.sprintId}_`) && doc[key] === 2);
+            const hit = doc && Object.keys(doc).find((key) => key.startsWith(`task_${target.projectId}_${target.sprintId}_`) && key.endsWith('_comments'));
             if (hit) { clearTimeout(timer); resolve(hit); }
         });
     });
@@ -73,7 +72,7 @@ it('counts imported comments as unread for the task\'s member and tells them ove
 
     expect(await db.collection('comments').countDocuments({ taskId: task._id })).toBe(2);
     const counters = db.collection('userId');
-    expect((await counters.findOne({ userId: String(member.userId) }) || {})[field]).toBe(2);
+    expect((await counters.findOne({ userId: String(member.userId) }) || {})[field]).toBeUndefined();
     expect((await counters.findOne({ userId: String(owner.userId) }) || {})[field]).toBeUndefined();
-    expect(await pushed).toBe(field);
+    expect(await pushed).toBeNull();
 });

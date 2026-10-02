@@ -386,7 +386,7 @@ onMounted(load);
 .sso__link { border: 0; background: transparent; color: var(--brand); font: 600 12px/1 var(--font-ui); cursor: pointer; padding: 4px 2px; }
 .sso__link:disabled { color: var(--ink-2); opacity: .55; cursor: not-allowed; }
 .sso__link:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
-.sso__form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sso__form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .sso__span { grid-column: 1 / -1; }
 .sso__values { padding: 10px 12px; background: var(--surface-2); border-radius: 8px; display: flex; flex-direction: column; gap: 5px; font: 400 11.5px/1.4 var(--font-mono); color: var(--ink-label); }
 .sso__value { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -415,6 +415,6 @@ onMounted(load);
 .sso__save { flex: 1; }
 .sso__actions a { text-decoration: none; }
 .sso__ok { display: inline-flex; align-items: center; gap: 6px; color: var(--ok-ink); }
-@media (max-width: 1279px) { .sso { grid-template-columns: 1fr; } }
-@media (max-width: 767px) { .sso__form-grid { grid-template-columns: 1fr; } .sso__provider-status { text-align: left; margin-left: 0; width: 100%; } }
+@media (max-width: 1279px) { .sso { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 767px) { .sso__form-grid { grid-template-columns: minmax(0, 1fr); } .sso__provider-status { text-align: left; margin-left: 0; width: 100%; } }
 </style>

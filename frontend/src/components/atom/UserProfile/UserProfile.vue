@@ -1,21 +1,18 @@
 <template lang="">
     <div class="position-re setting_project-owner" :style="{width: width, height: width}">
         <template v-if="!data.type || data.type === 'user'">
-            <!-- PROFILE -->
             <template v-if="data.image">
-                 <img v-if="data.image?.includes('http')" :title="data.title ? data.title : 'N/A'" class="profile-image asignee-profile" :class="{ 'border-red': isBorder }" :src="data.image" alt="" :style="{width: width, height: width}"/>
-                 <WasabiImage :style="{width: width, height: width}" v-else :userImage="true" class="profile-image asignee-profile" :data="{title: data.title ? data.title : 'N/A', url: data?.image, filename: data?.image?.split('/').pop(), extension: data.image?.split('/').pop().split('.').pop()}" :thumbnail="thumbnail"/>
+                 <img v-if="data.image?.includes('http')" :title="data.title ? data.title : 'N/A'" class="profile-image asignee-profile" :class="{ 'border-red': isBorder }" :src="data.image" :alt="altText" :style="{width: width, height: width}"/>
+                 <WasabiImage :style="{width: width, height: width}" v-else :userImage="true" :alt="altText" class="profile-image asignee-profile" :data="{title: data.title ? data.title : 'N/A', url: data?.image, filename: data?.image?.split('/').pop(), extension: data.image?.split('/').pop().split('.').pop()}" :thumbnail="thumbnail"/>
              </template>
              <template v-else>
                 <img :title="data.title ? data.title : 'N/A'" 
                 class="profile-image asignee-profile"
                 :class="{ 'border-red': isBorder }"
-                :src="defaultUserAvatar" 
-                alt="" 
+                :src="defaultUserAvatar"
+                :alt="altText"
                 :style="{width: width, height: width}" />
              </template>
-            <!-- <img :src="data.image" alt="user image" class="profile-image asignee-profile" :title="data.title ? data.title : 'N/A'" :style="{width: width, height: width, verticalAlign: 'middle'}"/> -->
-            <!-- STATUS -->
             <img v-if="showDot" :src="data.isOnline ? onlineDot : offlineDot" alt="user status" class="user-status"/>
         </template>
         <template v-if="data.type && data.type === 'team'">
@@ -24,18 +21,14 @@
     </div>
 </template>
 <script setup>
-// PACKAGES
-import {defineProps, inject} from "vue";
-
-// COMPONENTS
+import { computed, defineProps, inject } from "vue";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
 
-// IMAGES
 const onlineDot = require("@/assets/images/png/greenDot.png");
 const offlineDot = require("@/assets/images/png/redDot.png");
 const defaultUserAvatar = inject("$defaultUserAvatar")
 
-defineProps({
+const props = defineProps({
     data: {
         type: Object,
         default: () => {}
@@ -54,8 +47,15 @@ defineProps({
     isBorder: {
         type: Boolean,
         default: true
+    },
+    /* Set where the person's name is written beside the picture, so it is not read out twice. */
+    decorative: {
+        type: Boolean,
+        default: false
     }
 })
+
+const altText = computed(() => (props.decorative ? '' : (props.data?.title || '')));
 
 </script>
 <style>

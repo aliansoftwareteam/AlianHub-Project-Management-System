@@ -57,9 +57,11 @@
                             type="button"
                             class="fb__type"
                             :class="{ 'fb__type--computed': option.computed || option.ai }"
+                            :data-field-type-option="option.key"
                             :disabled="!canEdit"
                             @click="startNew(option.key)"
                         >
+                            <ShellIcon v-if="option.icon" :name="option.icon" :size="14" class="fb__type-icon" />
                             <strong>{{ option.label }}</strong> <span>· {{ option.hint }}</span>
                         </button>
                     </div>
@@ -68,7 +70,7 @@
             </div>
         </div>
 
-        <aside class="fb__panel">
+        <aside ref="panel" class="fb__panel">
             <template v-if="aiDraft">
                 <div class="fb__panel-head">
                     <span class="fb__panel-mark" aria-hidden="true">✦</span>
@@ -76,18 +78,20 @@
                     <span class="fb__panel-kind">{{ $t('Fields.type_ai') }}</span>
                 </div>
                 <AiFieldPanel v-model="aiDraft" :errors="errors" />
-                <FieldTaskTypesPicker v-model="aiDraft.fieldTaskTypes" />
+                <FieldTaskTypesPicker v-model="aiDraft.fieldTaskTypes" :projectIds="selectedProjectIds" />
                 <div class="fb__warn">{{ $t('AiFields.builder_note') }}</div>
                 <div class="fb__panel-foot">
-                    <button type="button" class="ah-btn ah-btn--primary fb__save" data-ai-field-save :disabled="saving" @click="saveAi">
+                    <button type="button" class="ah-btn ah-btn--primary fb__save" data-ai-field-save :disabled="saving" @click="saveAi()">
                         {{ saving ? $t('Fields.saving') : $t('Fields.save_field') }}
                     </button>
+                    <button v-if="!aiDraft._id" type="button" class="ah-btn ah-btn--secondary" data-field-save-another :disabled="saving" @click="saveAi({ another: true })">{{ $t('Fields.save_and_add_another') }}</button>
                     <button type="button" class="ah-btn ah-btn--ghost" @click="closeDraft">{{ $t('Fields.cancel') }}</button>
                 </div>
             </template>
             <template v-else-if="draft">
                 <div class="fb__panel-head">
-                    <span class="fb__panel-mark">{{ draft.fieldType === 'rollup' ? 'Σ' : 'ƒ' }}</span>
+                    <span v-if="draftUi" class="fb__panel-mark"><ShellIcon :name="draftUi.icon" :size="14" /></span>
+                    <span v-else class="fb__panel-mark">{{ draft.fieldType === 'rollup' ? 'Σ' : 'ƒ' }}</span>
                     <span class="fb__panel-title">{{ draft.fieldTitle || $t('Fields.untitled') }}</span>
                     <span class="fb__panel-kind">{{ typeLabel(draft.fieldType) }}</span>
                 </div>
@@ -101,6 +105,7 @@
                         class="ah-input"
                         :class="{ 'ah-input--error': errors.fieldTitle }"
                         :placeholder="$t('Fields.field_label_placeholder')"
+                        @keydown.enter.prevent="saveFromName"
                     />
                     <span v-if="errors.fieldTitle" class="ah-field__error">{{ errors.fieldTitle }}</span>
                 </div>
@@ -152,6 +157,7 @@
                             <button type="button" :class="{ 'is-active': draft.rollupScope !== 'sprint' }" @click="draft.rollupScope = 'subtask'">{{ $t('Fields.rollup_scope_subtasks') }}</button>
                             <button type="button" :class="{ 'is-active': draft.rollupScope === 'sprint' }" @click="draft.rollupScope = 'sprint'">{{ $t('Fields.rollup_scope_sprint') }}</button>
                         </div>
+                        <p class="ah-field__hint" data-test="fb-rollup-help">{{ $t('Fields.rollup_help') }}</p>
                     </div>
                 </template>
 
@@ -162,14 +168,17 @@
                     </div>
                 </div>
 
-                <FieldTaskTypesPicker v-model="draft.fieldTaskTypes" />
+                <component :is="draftUi.settings" v-if="draftUi?.settings" v-model="draft" :error="errors.settings" />
 
-                <div class="fb__warn">{{ isComputed(draft) ? $t('Fields.formula_rules') : $t('Fields.plain_field_note') }}</div>
+                <FieldTaskTypesPicker v-model="draft.fieldTaskTypes" :projectIds="selectedProjectIds" />
+
+                <div class="fb__warn">{{ draftNote }}</div>
 
                 <div class="fb__panel-foot">
-                    <button type="button" class="ah-btn ah-btn--primary fb__save" :disabled="saving" @click="save">
+                    <button type="button" class="ah-btn ah-btn--primary fb__save" :disabled="saving" @click="save()">
                         {{ saving ? $t('Fields.saving') : $t('Fields.save_field') }}
                     </button>
+                    <button v-if="!draft._id" type="button" class="ah-btn ah-btn--secondary" data-field-save-another :disabled="saving" @click="save({ another: true })">{{ $t('Fields.save_and_add_another') }}</button>
                     <button v-if="draft.fieldType === 'formula'" type="button" class="ah-btn ah-btn--secondary" :disabled="testing" @click="test">{{ $t('Fields.test') }}</button>
                     <button type="button" class="ah-btn ah-btn--ghost" @click="closeDraft">{{ $t('Fields.cancel') }}</button>
                 </div>
@@ -185,7 +194,7 @@
             v-if="legacyVisible"
             :componentDetail="legacyDetail"
             :customFieldObject="legacyObject"
-            :isCustomField="legacyVisible"
+            v-model:isCustomField="legacyVisible"
             :isType="true"
             @customFieldStore="storeLegacyField"
             @closeSidebar="closeLegacy"
@@ -207,8 +216,10 @@ import UpgradePlan from "@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import CustomFieldsSidebarComponent from "../../molecules/customFieldSidebar/customFieldsSidebarComponent/customFieldsSidebarComponent.vue";
 import AiFieldPanel from "./AiFieldPanel.vue";
 import FieldTaskTypesPicker from "../../atom/FieldTaskTypesPicker/FieldTaskTypesPicker.vue";
-import { useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
+import { fieldProjectIds, useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
 import { fieldTaskTypes } from "@fieldTaskTypes";
+import { fieldTypeUi, moduleFieldDraft, moduleFieldSettings, moduleFieldSettingsError } from "@/plugins/customFieldView/fieldTypes";
+import { MODULE_FIELD_TYPES } from "@fieldTypes";
 import { aiDraftFrom, aiFieldPayload, isAiField, newAiDraft, validateAiDraft } from "@/views/Projects/composables/aiFields";
 
 defineOptions({ name: "FieldBuilder" });
@@ -220,7 +231,7 @@ const { checkPermission } = useCustomComposable();
 const userId = inject("$userId");
 
 const COMPUTED_TYPES = ["formula", "rollup"];
-const NUMERIC_TYPES = ["number", "money", "formula", "rollup"];
+const NUMERIC_TYPES = ["number", "money", "rating", "progress", "formula", "rollup"];
 const MAX_TOKENS = 5;
 
 const displayFormats = ["money", "number", "text"];
@@ -237,6 +248,7 @@ const typeOptions = [
     { key: "checkbox", label: t("Fields.type_checkbox"), hint: t("Fields.hint_checkbox") },
     { key: "email", label: t("Fields.type_email"), hint: t("Fields.hint_email") },
     { key: "phone", label: t("Fields.type_phone"), hint: t("Fields.hint_phone") },
+    ...MODULE_FIELD_TYPES.map((key) => ({ key, label: t(`Fields.type_${key}`), hint: t(`Fields.hint_${key}`), icon: fieldTypeUi(key).icon })),
     { key: "formula", label: t("Fields.type_formula"), hint: t("Fields.hint_formula"), computed: true },
     { key: "rollup", label: t("Fields.type_rollup"), hint: t("Fields.hint_rollup"), computed: true },
     { key: "ai", label: t("Fields.type_ai"), hint: t("Fields.hint_ai"), ai: true }
@@ -251,6 +263,7 @@ const testing = ref(false);
 const preview = ref({ value: null, error: "" });
 const scopeNames = ref([]);
 const exprRef = ref(null);
+const panel = ref(null);
 const legacyVisible = ref(false);
 const legacyDetail = ref({});
 const legacyObject = ref({});
@@ -264,6 +277,7 @@ const fields = computed(() => (getters["settings/finalCustomFields"] || [])
     .sort((a, b) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime()));
 
 const taskTypeOptionList = useTaskTypeOptions();
+const selectedProjectIds = computed(() => fieldProjectIds(fields.value.find((field) => selectedId.value && field._id === selectedId.value)));
 const taskTypeNames = computed(() => new Map(taskTypeOptionList.value.map((option) => [option.key, option.name])));
 
 const numericFields = computed(() => fields.value.filter((field) => NUMERIC_TYPES.includes(field.fieldType) && field._id !== draft.value?._id));
@@ -274,6 +288,11 @@ const visibleNames = computed(() => scopeNames.value.slice(0, MAX_TOKENS));
 const hiddenNameCount = computed(() => Math.max(scopeNames.value.length - MAX_TOKENS, 0));
 
 const isComputed = (field) => COMPUTED_TYPES.includes(field?.fieldType);
+const draftUi = computed(() => fieldTypeUi(draft.value?.fieldType));
+const draftNote = computed(() => {
+    if (draftUi.value) return t("FieldTypes.builder_note");
+    return isComputed(draft.value) ? t("Fields.formula_rules") : t("Fields.plain_field_note");
+});
 const isRequired = (field) => Array.isArray(field?.fieldRequired) && field.fieldRequired.length > 0;
 const typeLabel = (key) => (typeOptions.find((option) => option.key === key) || {}).label || key;
 
@@ -304,13 +323,30 @@ function detailFor(fieldType) {
     return option ? { cfType: fieldType, cfTitle: option.label, cfDescrption: option.hint, cfIcon: '', cfIconGrey: '' } : {};
 }
 
+const focusName = () => nextTick(() => panel.value?.querySelector("#fb-title, #ai-field-title")?.focus());
+
 function startNew(fieldType) {
     if (!canEdit.value) return;
+    openNew(fieldType);
+    focusName();
+}
+
+function selectField(field) {
+    openField(field);
+    focusName();
+}
+
+function openNew(fieldType) {
     selectedId.value = "";
     aiDraft.value = null;
     if (fieldType === "ai") {
         draft.value = null;
         aiDraft.value = { ...newAiDraft(), fieldTaskTypes: [] };
+        errors.value = {};
+        return;
+    }
+    if (fieldTypeUi(fieldType)) {
+        draft.value = moduleFieldDraft({ fieldType });
         errors.value = {};
         return;
     }
@@ -335,12 +371,17 @@ function startNew(fieldType) {
     preview.value = { value: null, error: "" };
 }
 
-function selectField(field) {
+function openField(field) {
     selectedId.value = field._id;
     aiDraft.value = null;
     if (isAiField(field)) {
         draft.value = null;
         aiDraft.value = { ...aiDraftFrom(field), fieldTaskTypes: fieldTaskTypes(field) };
+        errors.value = {};
+        return;
+    }
+    if (fieldTypeUi(field.fieldType)) {
+        draft.value = moduleFieldDraft(field);
         errors.value = {};
         return;
     }
@@ -437,11 +478,16 @@ function validate() {
     if (draft.value.fieldType === "formula" && !String(draft.value.formulaExpression || "").trim()) {
         next.formulaExpression = t("Fields.error_expression_required");
     }
+    if (draftUi.value && moduleFieldSettingsError(draft.value)) next.settings = t(moduleFieldSettingsError(draft.value));
     errors.value = next;
     return !Object.keys(next).length;
 }
 
-async function save() {
+function saveFromName(event) {
+    if (!event.isComposing && !saving.value) save();
+}
+
+async function save({ another = false } = {}) {
     if (!validate()) return;
     saving.value = true;
     try {
@@ -453,15 +499,18 @@ async function save() {
             }
         }
         const detail = detailFor(draft.value.fieldType);
-        const payload = {
-            fieldTitle: draft.value.fieldTitle,
-            fieldDescription: draft.value.fieldDescription || draft.value.fieldTitle,
-            fieldType: draft.value.fieldType,
+        const typeSettings = draftUi.value ? moduleFieldSettings(draft.value) : {
             fieldValidation: draft.value.fieldValidation,
             formulaExpression: draft.value.fieldType === "formula" ? String(draft.value.formulaExpression).trim() : "",
             rollupSourceFieldId: draft.value.fieldType === "rollup" ? draft.value.rollupSourceFieldId : "",
             rollupFunction: draft.value.fieldType === "rollup" ? draft.value.rollupFunction : "",
-            rollupScope: draft.value.fieldType === "rollup" ? draft.value.rollupScope : "",
+            rollupScope: draft.value.fieldType === "rollup" ? draft.value.rollupScope : ""
+        };
+        const payload = {
+            fieldTitle: draft.value.fieldTitle,
+            fieldDescription: draft.value.fieldDescription || draft.value.fieldTitle,
+            fieldType: draft.value.fieldType,
+            ...typeSettings,
             fieldTaskTypes: draft.value.fieldTaskTypes || [],
             fieldImage: detail.cfIcon || "",
             fieldImageGrey: detail.cfIconGrey || "",
@@ -482,7 +531,8 @@ async function save() {
             commit("settings/mutateFinalCustomFields", { data: { ...created, _id: response?.data?._id || "" }, op: "added" });
         }
         $toast.success(t("Toast.Field_Updated_Successfully"), { position: "top-right" });
-        closeDraft();
+        if (another) startNew(payload.fieldType);
+        else closeDraft();
     } catch (error) {
         const message = error?.response?.data?.message || error?.message || t("Toast.something_went_wrong");
         errors.value = { ...errors.value, formulaExpression: draft.value?.fieldType === "formula" ? message : errors.value.formulaExpression };
@@ -492,7 +542,7 @@ async function save() {
     }
 }
 
-async function saveAi() {
+async function saveAi({ another = false } = {}) {
     const next = validateAiDraft(aiDraft.value, t);
     if (!next.fieldTitle && fields.value.some((field) => field._id !== aiDraft.value._id && slugOf(field.fieldTitle) === slugOf(aiDraft.value.fieldTitle))) {
         next.fieldTitle = t("Fields.error_title_taken");
@@ -522,7 +572,8 @@ async function saveAi() {
             commit("settings/mutateFinalCustomFields", { data: { ...created, _id: response?.data?._id || "" }, op: "added" });
         }
         $toast.success(t("Toast.Field_Updated_Successfully"), { position: "top-right" });
-        closeDraft();
+        if (another) startNew("ai");
+        else closeDraft();
     } catch (error) {
         $toast.error(error?.response?.data?.message || error?.message || t("Toast.something_went_wrong"), { position: "top-right" });
     } finally {

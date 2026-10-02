@@ -1,7 +1,7 @@
 const { escapeHtml } = require('../../../../utils/escapeHtml');
 const { dbCollections } = require('../../../../Config/collections')
 const { sanitizeInput } = require("../../../serviceFunction");
-const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection} = require("../mongo_helper")
+const { HandleHistory,HandleTask,convertToSubTaskFunction, moveTaskFunction, convertToListSubTask,mergeSubTask, duplicateSubTaskFunction, addHistoryCollection, removeCommentCount,updateHistoryCollection, updateTimesheetCollection, updateEstimatedTimeCollection, carrySubtree} = require("../mongo_helper")
 
 const { createTask, taskAssigneeAdd, taskAssigneeRemove,taskAssigneeReplace, taskNameEdit, taskPriorityChange, taskStatusChange, taskAttachmentAdd, taskAttachmentRemove, taskTypeChage, taskTotalEstimate } = require('../notificationTemplate')
 const { HandleBothNotification } = require("../handleNotification")
@@ -22,10 +22,15 @@ const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, plainIdOf, TaskWriteRefusal } = require('../taskWriteFields');
+const keptAiValues = require('../../../AI/taskAiValues');
+const { cascadeStatus, sprintCountChange, loadSubtree, storedTask, slotUnder } = require('../taskTree');
+const { removeLinksOfTasks } = require('../../../CustomField/helpers/fieldLinkStore');
 module.exports = {
 
     /* The counts, the parent and the current state come from the stored task; the body only says which task and which state it goes to. */
-    updateArchiveDelete({companyId, projectData, task, userData, deletedStatusKey = 0}) {
+    /* `quiet` is set by the undo of an import alone, which trashes many tasks at once and notifies no one; the task
+     * routes drop it from a body. */
+    updateArchiveDelete({companyId, projectData, task, userData, deletedStatusKey = 0, quiet = false}) {
         return new Promise((resolve, reject) => {
             try {
                 const taskId = plainIdOf(task && task._id).id;
@@ -45,128 +50,71 @@ module.exports = {
                     }
                     const projectId = String(before.ProjectID);
                     const sprintId = String(before.sprintId);
+                    const from = before.deletedStatusKey || 0;
                     const query = {
                         type: dbCollections.TASKS,
-                        data: [filter, { $set: { deletedStatusKey } }, { returnDocument: 'after' }]
+                        data: [filter, { $set: { deletedStatusKey }, $unset: { cascadedBy: '' } }, { returnDocument: 'after' }]
                     }
-                    return MongoDbCrudOpration(companyId, query, "findOneAndUpdate").then((result) => {
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey}, module: 'task' });
+                    return MongoDbCrudOpration(companyId, query, "findOneAndUpdate").then(async (result) => {
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey}, module: 'task', companyId });
+                        let carried = [];
                         try {
-                            if(before.ParentTaskId) {
-                                if(!deletedStatusKey || (!before.deletedStatusKey && deletedStatusKey) ) {
-                                    this.updateParentCount(
-                                        companyId,
-                                        before.ParentTaskId,
-                                        !deletedStatusKey ? 1 : -1
-                                    );
-                                }
+                            if(before.ParentTaskId && !from !== !deletedStatusKey) {
+                                this.updateParentCount(companyId, before.ParentTaskId, deletedStatusKey ? -1 : 1);
                             }
-                            if(before.isParentTask) {
-                                let filterBy = {ParentTaskId: taskId};
-                                let taskDeleteStatusKey = 0;
-                                if(!deletedStatusKey) {
-                                    filterBy = {...filterBy, deletedStatusKey :{$eq: 3}};
-                                    taskDeleteStatusKey = 0;
-                                } else {
-                                    filterBy = {...filterBy, deletedStatusKey :{$eq: 0}};
-                                    if(deletedStatusKey === 2) {
-                                        taskDeleteStatusKey = 3
-                                    } else if(deletedStatusKey === 1) {
-                                        taskDeleteStatusKey = 1
-                                    }
-                                }
-
-                                const batchQyery = {
-                                    type: dbCollections.TASKS,
-                                    data: [
-                                        {
-                                            ...filterBy
-                                        }, {
-                                            $set: {
-                                                deletedStatusKey: taskDeleteStatusKey
-                                            },
-                                        }
-                                    ]
-                                }
-                                MongoDbCrudOpration(companyId, batchQyery, "updateMany")
-                                .catch((error) => {
-                                    logger.error(`ERORR in update parent count: ${error.message}`);
+                            carried = await cascadeStatus(companyId, before, deletedStatusKey);
+                            carried.forEach((row) => {
+                                socketEmitter.emit('update', { type: "update", data: row, updatedFields: {deletedStatusKey: row.deletedStatusKey}, module: 'task', companyId });
+                                removeCommentCount(companyId,row.ProjectID,row.sprintId,row._id).catch((error) => {
+                                    logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
                                 })
-
-                                if(taskDeleteStatusKey !== 0) {
-                                    const countResetData = {
-                                        companyId : companyId,
-                                        projectId,
-                                        userIds: [...(result.AssigneeUserId || [])],
-                                        "read": true,
-                                        key: 2,
-                                        taskId,
-                                        sprintId
-                                    }
-                                    updateUnReadCommentsCountFun(countResetData)
-                                    .catch((error) => {
-                                        logger.error(`ERORR in update parent count: ${error?.message}`);
-                                    })
+                            });
+                            if(before.isParentTask && deletedStatusKey !== 0) {
+                                const countResetData = {
+                                    companyId : companyId,
+                                    projectId,
+                                    userIds: [...(result.AssigneeUserId || [])],
+                                    "read": true,
+                                    key: 2,
+                                    taskId,
+                                    sprintId
                                 }
+                                updateUnReadCommentsCountFun(countResetData)
+                                .catch((error) => {
+                                    logger.error(`ERORR in update parent count: ${error?.message}`);
+                                })
                             }
                         } catch (error) {
                             logger.error(`ERORR in update parent count: ${error.message}`);
                         }
                         resolve({status: true, statusText: "deleteStatus updated successfully"});
-                        const subTaskCount = (before.subTasks || 0) + 1;
-                        let updateObject = {};
 
-                        if(deletedStatusKey === 2) {
-                            updateObject = { $inc: { archiveTaskCount : before.isParentTask ? subTaskCount : 1, tasks : before.isParentTask ? -1 * subTaskCount : -1} }
-                        } else if (deletedStatusKey === 0) {
-                            updateObject= { $inc: { archiveTaskCount: before.isParentTask ? -1 * subTaskCount : -1, tasks : before.isParentTask ? subTaskCount : 1}
+                        const updateObject = sprintCountChange(from, deletedStatusKey, 1 + carried.length);
+                        if(Object.keys(updateObject).length) {
+                            const countObj = {
+                                body: {
+                                    companyId: companyId,
+                                    projectId,
+                                    updateObject: { $inc: updateObject }
+                                },
+                                params : {
+                                    id : sprintId
+                                }
                             }
-                        } else if (deletedStatusKey === 1) {
-                            if(before.deletedStatusKey === 2){
-                                updateObject= { $inc: { archiveTaskCount: before.isParentTask ? -1 * subTaskCount : -1} }
-                            }else{
-                                updateObject= { $inc: { tasks : before.isParentTask ? -1 * subTaskCount : -1} }
+                            if(before.folderObjId){
+                                countObj.body.folder = {
+                                    folderId: before.folderObjId,
+                                    folderName: (before.sprintArray && before.sprintArray.folderName) || ""
+                                }
                             }
-                        }
-                        const countObj = {
-                            body: {
-                                companyId: companyId,
-                                projectId,
-                                updateObject :updateObject
-                            },
-                            params : {
-                                id : sprintId
-                            }
-                        }
-                        if(before.folderObjId){
-                            countObj.body.folder = {
-                                folderId: before.folderObjId,
-                                folderName: (before.sprintArray && before.sprintArray.folderName) || ""
-                            }
-                        }
 
-                        updateSprintFun(countObj).catch((error) => {
-                            logger.error(`error in update task count : ${error}`)
-                        });
+                            updateSprintFun(countObj).catch((error) => {
+                                logger.error(`error in update task count : ${error}`)
+                            });
+                        }
                         removeCommentCount(companyId,before.ProjectID,before.sprintId,before._id,before.ParentTaskId).catch((error) => {
                             logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
                         })
-
-                        if(before.subTasks > 0){
-                            let data = [
-                                {
-                                    isParentTask: false,
-                                    ParentTaskId: taskId
-                                }
-                            ]
-                            MongoDbCrudOpration(companyId, {type: dbCollections.TASKS,data: data}, "find").then(async(result) => {
-                                result.forEach((subTask) => {
-                                    removeCommentCount(companyId,subTask.ProjectID,subTask.sprintId,subTask._id).catch((error) => {
-                                        logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
-                                    })
-                                })
-                            })
-                        }
 
                         try {
                             const verb = deletedStatusKey === 0 ? 'restored' : deletedStatusKey === 1 ? 'deleted' : 'archieved';
@@ -193,7 +141,7 @@ module.exports = {
                                     logger.error(`ERROR in history: ${error.message}`);
                                 });
                             }
-                            if(notificationObject && Object.keys(notificationObject).length) {
+                            if(!quiet && notificationObject && Object.keys(notificationObject).length) {
                                 HandleBothNotification({type: 'tasks', companyId, projectId, taskId, folderId: before.folderObjId || '', sprintId: before.sprintId || '',  object: notificationObject, userData})
                                 .catch((error) => {
                                     logger.error(`ERROR in add notification: ${error.message}`);
@@ -215,80 +163,32 @@ module.exports = {
         })
     },
 
-    convertToSubTask({companyId, projectData, sprintId,selectedTaskId, taskId,oldProject,isSubTask,userData}) {
-        return new Promise(async(resolve, reject) => {
-            try {
-            let convertTaskArray = [];
-            let isMainSubTask = false;
-            let object = {
-                type: dbCollections.TASKS,
-                data: [{ _id : new mongoose.Types.ObjectId(selectedTaskId)}]
-            }
-            await MongoDbCrudOpration(companyId,object, "findOne").then(async(tasData) => {
-                if (!tasData) {
-                    reject(taskNotFound());
-                    return;
-                }
-                if(tasData.isParentTask === false) {
-                    isMainSubTask = true;
-                }
-                convertTaskArray.push(tasData);
-                let subTasks = []
-                if(isSubTask === true){
-                    let data = [
-                        {
-                            ProjectID : new mongoose.Types.ObjectId(oldProject.id),
-                            sprintId: new mongoose.Types.ObjectId(tasData.sprintId),
-                            isParentTask: false,
-                            ParentTaskId: selectedTaskId,
-                            deletedStatusKey: { $nin: [1] }
-                        }
-                    ]
-                    await MongoDbCrudOpration(companyId, {type: dbCollections.TASKS,data: data}, "find").then((result) => {
-                        subTasks = result;
-                    })
-                }
-                convertTaskArray = convertTaskArray.concat(subTasks);
-                let object = {
-                    type: dbCollections.TASKS,
-                    data: [{ _id : new mongoose.Types.ObjectId(taskId)}]
-                }
-                await MongoDbCrudOpration(companyId,object, "findOne").then((task) => {
-                    if (!task) {
-                        reject(taskNotFound());
-                        return;
-                    }
-                    let promisesArr = [];
-                    convertTaskArray.forEach((ctask) => {
-                        promisesArr.push(
-                            new Promise(async(resolve1, reject1) => {
-                                try {
-                                    convertToSubTaskFunction(companyId, projectData, sprintId, ctask,task,oldProject,isMainSubTask,isSubTask,userData).then((response) => {
-                                        resolve1();
-                                    }).catch((error) => {
-                                        logger.error(`ERROR IN CONVERT TO SUBTASK FUNCTION ${error}`)
-                                        reject1(error);
-                                    })
-                                } catch (error) {
-                                    reject1(error)
-                                }
-                            })
-                        )
-                    })
-                    Promise.allSettled(promisesArr).then(() => {
-                        resolve({status: true, statusText: "Convert to task successfully",sprintCount: convertTaskArray.length});
-                    }).catch((error) => {
-                        reject(error);
-                    })
-                })
-            })
-            } catch (error) {
-                reject(error);
-            }
-        })
+    /* The task goes under `taskId` with its subtree intact: every row takes the chain its new place
+     * gives and the placement of the new root. Refused, before anything is written, when the result
+     * would pass three levels or put the task under itself. */
+    async convertToSubTask({companyId, projectData, sprintId,selectedTaskId, taskId,oldProject,isSubTask,userData}) {
+        const selected = await storedTask(companyId, selectedTaskId);
+        if (!selected) throw taskNotFound();
+        const descendants = await loadSubtree(companyId, selectedTaskId, { projection: { ancestors: 1 } });
+        const slot = await slotUnder(companyId, taskId, { task: selected, descendants });
+        if (!slot.ok) throw new TaskWriteRefusal(slot.code === 'PARENT_NOT_FOUND' ? 404 : 400, slot.reason, slot.code);
+        const parent = slot.parent;
+        const wasSubTask = selected.isParentTask === false;
+
+        await convertToSubTaskFunction(companyId, projectData, sprintId, selected, parent, oldProject, wasSubTask, isSubTask, userData, slot.ancestors);
+        await carrySubtree(companyId, selectedTaskId, slot.ancestors, {
+            projectData: { ...projectData, id: String(slot.placement.ProjectID) },
+            sprintObj: slot.placement.sprintArray,
+            oldProject,
+            userData,
+        });
+        return {status: true, statusText: "Convert to task successfully",sprintCount: 1 + descendants.length};
     },
 
-    moveTask({companyId, projectData, sprintObj,moveTaskId ,oldSprintObj,oldProject,isSubTask,assignee,watcher,userData}) {
+    /* `rowOnly` and `carried` are set by bulkMove alone, which lists the task's subtree itself so
+     * every row keeps its own assignees and names the rows that only follow; the task routes drop
+     * both from a body. A row that follows keeps the state it holds. */
+    moveTask({companyId, projectData, sprintObj,moveTaskId ,oldSprintObj,oldProject,isSubTask,assignee,watcher,userData,rowOnly = false,carried = false}) {
         try {
             return new Promise((resolve, reject) => {
                 let moveTaskArray = [];
@@ -305,31 +205,20 @@ module.exports = {
                         reject(taskNotFound());
                         return;
                     }
-                    moveTaskArray.push(move);
-                    let subMove = [];
-                    if(isSubTask === true){
-                        let data = [
-                            {
-                                ProjectID : new mongoose.Types.ObjectId(oldProject.id),
-                                sprintId: new mongoose.Types.ObjectId(move.sprintId),
-                                isParentTask:false,
-                                ParentTaskId:moveTaskId,
-                                deletedStatusKey: { $nin: [1] }
-                            }
-                        ]
-                        await MongoDbCrudOpration(companyId, {type: dbCollections.TASKS,data: data}, "find").then((result) => {
-                            result.filter((x)=>{
-                                subMove.push(x);
-                            })
-                        })
+                    if (!rowOnly && move.ParentTaskId) {
+                        reject(new TaskWriteRefusal(400, 'A subtask moves with its parent.', 'SUBTASK_MOVES_WITH_PARENT'));
+                        return;
                     }
-                    moveTaskArray = moveTaskArray.concat(subMove);
+                    moveTaskArray.push(move);
+                    if (!rowOnly) {
+                        moveTaskArray = moveTaskArray.concat(await loadSubtree(companyId, moveTaskId, { filter: { deletedStatusKey: { $nin: [1] } } }));
+                    }
                     let promisesArr = [];
-                    moveTaskArray.forEach((moveTask) => {
+                    moveTaskArray.forEach((moveTask, at) => {
                         promisesArr.push(
                             new Promise(async(resolve1, reject1) => {
                                 try {
-                                    moveTaskFunction(companyId, projectData, sprintObj, moveTask,oldSprintObj,oldProject,assignee,watcher,userData,isSubTask).then(() => {
+                                    moveTaskFunction(companyId, projectData, sprintObj, moveTask,oldSprintObj,oldProject,assignee,watcher,userData,isSubTask,carried || at > 0).then(() => {
                                         if(JSON.parse(JSON.stringify(moveTask))?.ProjectID !== projectData.id){
                                             let indexObj = {
                                                 indexName : "groupByStatusIndex",
@@ -400,7 +289,7 @@ module.exports = {
                     }
 
                     MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate").then((result)=>{
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: { deletedStatusKey: 1 }, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: { deletedStatusKey: 1 }, module: 'task', companyId });
                     })
 
                     const addObj = {
@@ -456,7 +345,7 @@ module.exports = {
                             }
                             MongoDbCrudOpration(companyId, updateObj1, "findOneAndUpdate").then((result)=>{
                                 if (!result) return;
-                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task' });
+                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task', companyId });
                             })
                         }
 
@@ -468,44 +357,26 @@ module.exports = {
                                 }
                             ]
                         }
-                        MongoDbCrudOpration(companyId, delObj, "deleteOne");
+                        MongoDbCrudOpration(companyId, delObj, "deleteOne")
+                            .then(() => removeLinksOfTasks(companyId, [task._id]))
+                            .catch((error) => logger.error(`convert to list, removing the task: ${error && error.message}`));
+                        keptAiValues.forgetTask(companyId, task._id).catch((error) => logger.error(`kept AI values of converted task ${task._id}: ${error.message}`));
 
-                        if(isSubTask === true) {
-                            let getdataObj = {
-                                type: schema,
-                                data: [
-                                    {
-                                        ParentTaskId: task._id,
-                                        deletedStatusKey: { $nin: [1] }
-                                    }
-                                ]
-                            }
-                            MongoDbCrudOpration(companyId, getdataObj, "find").then((result) => {
-
-                                let promisesArr = [];
-                                result.forEach((subTask) => {
-                                    promisesArr.push(
-                                        new Promise(async(resolve1, reject1) => {
-                                            try {
-                                                convertToListSubTask(companyId, projectData, subTask, res.data, sprintObj).then(() => {
-                                                    resolve1();
-                                                }).catch((error) => {
-                                                    logger.error(`ERROR IN CONVERT TO LIST FUNCTION ${error}`)
-                                                    reject1(error);
-                                                })
-                                            } catch (error) {
-                                                reject1(error)
-                                            }
-                                        })
-                                    )
-                                })
-                                Promise.allSettled(promisesArr).then(() => {
-                                    resolve({status: true, statusText: "Convert to list updated successfully"});
-                                }).catch((error) => {
-                                    reject(error);
-                                })
-                            });
-                        }
+                        /* Its subtasks become tasks of the new list whatever the request says, or they
+                         * would be left under a task that no longer exists; theirs stay under them. */
+                        const newList = res.data;
+                        if (!newList) return;
+                        const element ={ id: newList._id, name: newList.name, value: String(newList.name || '').replace(/\s/g, "_").toUpperCase() };
+                        if (newList.folderId) Object.assign(element, { folderId: newList.folderId, folderName: newList.folderName });
+                        MongoDbCrudOpration(companyId, { type: schema, data: [{ ParentTaskId: String(task._id), deletedStatusKey: { $nin: [1] } }] }, "find").then((result) => {
+                            return Promise.allSettled(result.map((subTask) => convertToListSubTask(companyId, projectData, subTask, newList, sprintObj)
+                                .then(() => carrySubtree(companyId, subTask._id, [], { projectData, sprintObj: element, oldProject: { id: projectData.id }, userData }))
+                                .catch((error) => {
+                                    logger.error(`ERROR IN CONVERT TO LIST FUNCTION ${error}`)
+                                })));
+                        }).catch((error) => {
+                            logger.error(`ERROR IN CONVERT TO LIST SUBTASKS ${error}`)
+                        });
                     })
                 }).catch(reject);
             } catch (error) {
@@ -532,7 +403,7 @@ module.exports = {
                     ]
                 }
                 MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate").then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
                     let object = {
                         type: dbCollections.TASKS,
                         data: [
@@ -552,6 +423,7 @@ module.exports = {
                             obj = {
                                 isParentTask : true,
                                 ParentTaskId : '',
+                                ancestors: [],
                                 sprintId : sprintObj.id,
                                 sprintArray : sprintObj,
                                 status:{
@@ -581,6 +453,7 @@ module.exports = {
                             obj = {
                                 isParentTask : true,
                                 ParentTaskId : '',
+                                ancestors: [],
                                 sprintId : sprintObj.id,
                                 sprintArray : sprintObj,
                                 deletedStatusKey : 0,
@@ -604,7 +477,7 @@ module.exports = {
                                 },
                                 {
                                     $set: {...obj},
-                                    $unset: unsetObj
+                                    $unset: {...unsetObj, cascadedBy: '', extraLists: ''}
                                 },
                                 {
                                     returnDocument: 'after'
@@ -612,17 +485,20 @@ module.exports = {
                             ]
                         }
                         MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((result) => {
-                            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...obj,folderId: ''}, module: 'task' });
+                            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...obj,folderId: ''}, module: 'task', companyId });
                             let object = {
                                 type:SCHEMA_TYPE.TASKS,
                                 data: [
-                                    { _id: new mongoose.Types.ObjectId(parentTaskId) },
+                                    { _id: new mongoose.Types.ObjectId(task.ParentTaskId || parentTaskId) },
                                     {$inc: {"subTasks": -1}},
                                     {returnDocument: 'after'}
                                 ]
                             }
-                            MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((response) => {
-                                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {subTasks: response.subTask}, module: 'task' });
+                            MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then(async (response) => {
+                                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {subTasks: response.subTask}, module: 'task', companyId });
+                                await carrySubtree(companyId, taskId, [], { projectData, sprintObj, oldProject }).catch((error) => {
+                                    logger.error(`ERROR IN CONVERT TO TASK SUBTREE ${error}`)
+                                });
                                 resolve({status: true, statusText: "Convert TO Task"});
                                 if(oldSprintObj.id !== sprintObj.id || JSON.parse(JSON.stringify(oldProject)).id !== JSON.parse(JSON.stringify(projectData)).id){
                                     const decObj = {

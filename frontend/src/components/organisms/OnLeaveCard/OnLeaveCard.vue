@@ -34,7 +34,7 @@
                         <tr v-for="r in rows" :key="r.taskId">
                             <td class="olc-user">
                                 <div class="olc-user-cell">
-                                    <UserProfile
+                                    <UserProfile decorative
                                         :data="{ image: getUserProfile(r.userId).Employee_profileImageURL || r.avatar, title: r.userName }"
                                         :showDot="false"
                                         width="22px"

@@ -139,6 +139,20 @@ export const CARD_CATALOG = [
         settings: [
             { name: 'question', type: 'text', required: true, maxLength: 500, labelKey: 'Dash.settings_question', placeholderKey: 'Dash.settings_question_placeholder', hintKey: 'Dash.settings_question_hint' },
             { name: 'projectId', type: 'project', labelKey: 'Dash.settings_ask_project' },
+            {
+                name: 'refreshAfter',
+                type: 'choice',
+                default: '24',
+                labelKey: 'Dash.settings_refresh_after',
+                hintKey: 'Dash.settings_refresh_after_hint',
+                options: [
+                    { id: '1', labelKey: 'Dash.refresh_after_hour' },
+                    { id: '6', labelKey: 'Dash.refresh_after_6_hours' },
+                    { id: '24', labelKey: 'Dash.refresh_after_day' },
+                    { id: '168', labelKey: 'Dash.refresh_after_week' },
+                    { id: 'never', labelKey: 'Dash.refresh_after_never' },
+                ],
+            },
         ],
     }),
 ];

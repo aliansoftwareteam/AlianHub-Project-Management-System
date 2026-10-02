@@ -10,6 +10,7 @@ import { isBundledPriorityImage } from "@/composable/commonFunction";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { taskDueDateAdd, taskDueDateChange } from "@/utils/NotificationTemplate";
 import { permittedAssignees, sprintOf } from "@/utils/assigneeOptions";
+import { locate } from "@/store/ProjectData/taskTree";
 import {
     assigneeInverse, dueChange, dueRestore, dueSnapshot, fieldEditRights, nextAssignees, priorityAppOn, projectHasApp, rowEditRights
 } from "./listRowEdit";
@@ -18,6 +19,8 @@ import {
     COMPUTED_TYPES, customFieldPayload, emptyFieldDetail, projectFieldDefs, storedEntry, useProjectCustomFields
 } from "@/views/Projects/composables/projectCustomFields";
 import { recomputeCustomFields } from "@/plugins/customFieldView/formulaEngine.js";
+import { fieldTypeUi } from "@/plugins/customFieldView/fieldTypes";
+import { taskUrl } from "@/views/Projects/composables/taskLink";
 
 const ASSIGNEE_OPERATION = { add: "assigneeAdd", remove: "assigneRemove", replace: "replace" };
 const TOAST = { position: "top-right" };
@@ -54,7 +57,7 @@ export function useListInlineEdit(projectRef) {
      * searched copy instead, and only the server can say whether the task still matches. */
     function reflectSearch(task, fields) {
         if (!searched.value) return;
-        const stored = (getters["projectData/searchedTasks"] || []).find((x) => x._id === task._id);
+        const stored = locate({ tasks: getters["projectData/searchedTasks"] || [] }, task._id)?.row;
         if (stored) commit("projectData/mutateSearchTask", { op: "modified", data: [{ ...stored, ...fields }] });
         if (typeof refreshSearch === "function") refreshSearch();
     }
@@ -67,12 +70,15 @@ export function useListInlineEdit(projectRef) {
     }
 
     /* taskClass only writes the List's copy and the actor's socket gets no echo, so a
-     * Table row would keep the old value until a reload. */
+     * Table row would keep the old value until a reload. The row may sit in the table of a
+     * list the task was added to, not only in its home list's. */
     function reflectTable(task, fields) {
         const pid = String(task.ProjectID || project()._id || "");
-        const sprintId = String(task.sprintId || "");
-        const stored = getters["projectData/tableTasks"]?.[pid]?.[sprintId]?.tasks?.find((x) => String(x._id) === String(task._id));
-        if (stored) commit("projectData/mutateTypesenseTableTasks", { pid, sprintId, data: { ...stored, ...fields } });
+        const held = getters["projectData/tableTasks"]?.[pid] || {};
+        (held.sprints || []).forEach((sprintId) => {
+            const stored = held[sprintId]?.tasks?.find((x) => String(x._id) === String(task._id));
+            if (stored) commit("projectData/mutateTypesenseTableTasks", { pid, sprintId, data: { ...stored, ...fields } });
+        });
     }
 
     /* A change can move the row into another group or out of the filter; focus then goes to
@@ -93,7 +99,7 @@ export function useListInlineEdit(projectRef) {
         }, 0));
     }
 
-    function settle(promise, { task, fields, before, undoing, message, undo, failure }) {
+    function settle(promise, { task, fields, before, undoing, message, undo, failure = "Toast.something_went_wrong" }) {
         reflectTable(task, fields);
         return promise.then(() => {
             reflectSearch(task, fields);
@@ -102,8 +108,12 @@ export function useListInlineEdit(projectRef) {
             else $toast.success(message, TOAST);
         }).catch((error) => {
             console.error("ERROR in list inline edit: ", error);
+            if (error?.announced) {
+                if (before) reflectTable({ ...task, ...fields }, before);
+                return;
+            }
             if (before) writeTasks({ ...task, ...fields }, before);
-            $toast.error(t(failure), TOAST);
+            $toast.error(error?.serverReason || t(failure), TOAST);
         });
     }
 
@@ -121,15 +131,15 @@ export function useListInlineEdit(projectRef) {
             },
             projectData: projectSlice(),
             task: { ...task },
-            userData: actor()
+            userData: actor(),
+            announce: true
         });
         keepFocus(row);
         return settle(promise, {
             task, fields, undoing,
             before: current.key !== undefined ? { status: { text: current.name, key: current.key, type: current.type, value: current.value }, statusType: current.type, statusKey: current.key } : null,
             message: t("Toast.Status_updated_successfully"),
-            undo: current.key !== undefined ? () => setStatus({ ...task, ...fields }, current, { undoing: true }) : null,
-            failure: "Toast.Status_not_updated"
+            undo: current.key !== undefined ? () => setStatus({ ...task, ...fields }, current, { undoing: true }) : null
         });
     }
 
@@ -142,17 +152,15 @@ export function useListInlineEdit(projectRef) {
             taskData: { ...task, AssigneeUserId: [...before] },
             employeeName: getUser(uid)?.Employee_Name,
             type: ASSIGNEE_OPERATION[type] || "",
-            userData: actor()
+            userData: actor(),
+            announce: true
         });
-        // taskClass drops the picked person on a replace; the list must show who the server will hold.
-        writeTasks(task, { AssigneeUserId: after });
         keepFocus(row);
         const inverse = assigneeInverse(type, uid, before);
         return settle(promise, {
             task, fields: { AssigneeUserId: after }, before: { AssigneeUserId: before }, undoing,
             message: t(`Toast.Assignee ${type === "remove" ? "removed" : "added"} successfully`),
-            undo: () => setAssignee({ ...task, AssigneeUserId: after }, inverse, { undoing: true }),
-            failure: "Toast.Assignee_not_updated"
+            undo: () => setAssignee({ ...task, AssigneeUserId: after }, inverse, { undoing: true })
         });
     }
 
@@ -175,7 +183,8 @@ export function useListInlineEdit(projectRef) {
             project: projectSlice(),
             task: { ...task },
             obj: dueNotification(task, previous, fields.DueDate),
-            userData: actor()
+            userData: actor(),
+            announce: true
         });
     }
 
@@ -189,11 +198,8 @@ export function useListInlineEdit(projectRef) {
             message: t("Toast.Due_date_updated_successfully"),
             undo: () => {
                 const restored = dueRestore(snapshot);
-                return settle(writeDue({ ...task, ...fields }, restored, date), {
-                    task, fields: restored, undoing: true, failure: "Toast.Due_date_not_updated"
-                });
-            },
-            failure: "Toast.Due_date_not_updated"
+                return settle(writeDue({ ...task, ...fields }, restored, date), { task, fields: restored, undoing: true });
+            }
         });
     }
 
@@ -204,34 +210,34 @@ export function useListInlineEdit(projectRef) {
 
     const imageLink = (image) => getWasabiImageLink(project().CompanyId, image).catch(() => "");
 
-    async function setPriority(task, option, { row = null, undoing = false } = {}) {
+    function setPriority(task, option, { row = null, undoing = false } = {}) {
         const previous = priorityMeta(task.Task_Priority);
         const next = priorityMeta(option?.value);
-        if (next.value === previous.value) return;
+        if (next.value === previous.value) return Promise.resolve();
         const user = actor();
         const fields = { Task_Priority: next.value };
-        const priorityObj = {
-            statusImage: await imageLink(previous.image),
+        const priorityObj = Promise.all([imageLink(previous.image), imageLink(next.image)]).then(([statusImage, newStatusImage]) => ({
+            statusImage,
             priorityName: previous.name,
             taskId: task._id,
             taskName: task.TaskName,
             userName: user.Employee_Name,
-            newStatusImage: await imageLink(next.image),
+            newStatusImage,
             newPriorityName: next.name
-        };
+        }));
         const promise = taskClass.updatePriority({
             firebaseObj: fields,
             projectData: { _id: project()._id || "", ProjectName: project().ProjectName, CompanyId: project().CompanyId },
             taskData: { ...task },
             priorityObj,
-            userData: user
+            userData: user,
+            announce: true
         });
         keepFocus(row);
         return settle(promise, {
             task, fields, before: { Task_Priority: task.Task_Priority || "" }, undoing,
             message: t("Toast.Priority_updated_successfully"),
-            undo: () => setPriority({ ...task, ...fields }, { value: previous.value }, { undoing: true }),
-            failure: "Toast.Priority_not_updated"
+            undo: () => setPriority({ ...task, ...fields }, { value: previous.value }, { undoing: true })
         });
     }
 
@@ -245,13 +251,13 @@ export function useListInlineEdit(projectRef) {
             projectData: projectSlice(),
             taskData: { ...task },
             obj: { previousTaskName: task.TaskName, userName: user.Employee_Name },
-            userData: user
+            userData: user,
+            announce: true
         });
         return settle(promise, {
             task, fields, before: { TaskName: task.TaskName }, undoing,
             message: t("Toast.Task_name_updated_successfully"),
-            undo: () => rename({ ...task, ...fields }, task.TaskName, { undoing: true }),
-            failure: "Toast.something_went_wrong"
+            undo: () => rename({ ...task, ...fields }, task.TaskName, { undoing: true })
         });
     }
 
@@ -292,8 +298,7 @@ export function useListInlineEdit(projectRef) {
         return settle(promise, {
             task, fields, before: { totalEstimatedTime: task.totalEstimatedTime || 0 }, undoing,
             message: t("Toast.Task_total_estimate_update_succesfull"),
-            undo: () => setEstimate({ ...task, ...fields }, previous, { undoing: true, reason: t("ViewColumns.estimate_undo_reason") }),
-            failure: "Toast.something_went_wrong"
+            undo: () => setEstimate({ ...task, ...fields }, previous, { undoing: true, reason: t("ViewColumns.estimate_undo_reason") })
         });
     }
 
@@ -312,13 +317,14 @@ export function useListInlineEdit(projectRef) {
         }).then((response) => {
             if (!response?.status) throw new Error("custom field not saved");
             if (hasComputedFields()) recomputeCustomFields({ taskIds: [task._id], projectId: project()._id || "" });
+        }).catch((error) => {
+            throw Object.assign(new Error("custom field not saved"), { serverReason: error?.error?.response?.data?.statusText || "" });
         });
         keepFocus(row);
         return settle(promise, {
             task, fields, before: { customField: { ...(task.customField || {}) } }, undoing,
             message: t("Toast.Custom_field_updated_successfully"),
-            undo: () => writeField({ ...task, ...fields }, def, previous ? { ...previous } : emptyFieldDetail(def), { undoing: true }),
-            failure: "Toast.something_went_wrong"
+            undo: fieldTypeUi(def.fieldType)?.noUndo ? null : () => writeField({ ...task, ...fields }, def, previous ? { ...previous } : emptyFieldDetail(def), { undoing: true })
         });
     }
 
@@ -367,21 +373,17 @@ export function useListRowEdit(projectRef, showArchived) {
     const multipleAssignees = computed(() => projectHasApp(project.value, "MultipleAssignees"));
     const companyUsers = computed(() => (getters["settings/companyUsers"] || []).map((x) => x.userId));
 
-    const assigneeOptions = (task) => permittedAssignees({
-        task, sprint: sprintOf(project.value, task), project: project.value, companyUsers: companyUsers.value
+    /* A subtask row passes the task it sits under: its people narrow the subtask's, as they do
+     * in the task panel and on the Board. */
+    const assigneeOptions = (task, parent = null) => permittedAssignees({
+        task,
+        sprint: sprintOf(project.value, task),
+        project: project.value,
+        parentAssignees: parent ? (parent.AssigneeUserId || []) : undefined,
+        companyUsers: companyUsers.value
     });
 
-    function taskHref(task) {
-        const folderId = task.folderObjId || "";
-        const params = { cid: companyId.value || project.value.CompanyId, id: project.value._id, sprintId: task.sprintId, taskId: task._id };
-        if (folderId) params.folderId = folderId;
-        try {
-            const { href } = router.resolve({ name: folderId ? "ProjectFolderSprintTask" : "ProjectSprintTask", params });
-            return new URL(href, window.location.href).toString();
-        } catch (error) {
-            return "";
-        }
-    }
+    const taskHref = (task) => taskUrl(router, { companyId: companyId.value, project: project.value, task });
 
     async function copy(text, successKey) {
         try {

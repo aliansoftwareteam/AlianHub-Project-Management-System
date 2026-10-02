@@ -110,6 +110,8 @@
                                 <div class="iw__progress-fill" :style="{ width: progress + '%' }"></div>
                             </div>
                             <div v-if="result" class="iw__note" :class="{ 'iw__note--ok': !result.failed }">{{ result.message }}</div>
+                            <div v-for="line in (result && result.adjusted) || []" :key="line.reason" class="iw__note" data-test="iw-adjusted">{{ line.text }} <span v-if="line.names">{{ line.names }}</span></div>
+                            <div v-if="result && result.droppedFieldValues" class="iw__note" data-test="iw-dropped">{{ $t('Import.dropped_field_values', { count: result.droppedFieldValues }) }}</div>
 
                             <div v-if="report.issues.length" class="iw__rows">
                                 <div v-for="issue in report.issues.slice(0, 100)" :key="'iss' + issue.row" class="iw__rowline" :class="{ 'is-skipped': issue.errors.some((e) => e.fatal) }">
@@ -192,10 +194,11 @@ import { computed, inject, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
-import * as XLSX from "xlsx";
+import { loadXlsx } from "@/utils/loadXlsx";
 import * as env from "@/config/env";
 import { apiRequest } from "@/services";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import { adjustedLines, adjustedTotals, droppedFieldValuesTotal, importChunks } from "@/plugins/importTasks/importTree";
 
 defineOptions({ name: "ImportWizard" });
 
@@ -238,7 +241,9 @@ const targets = ref([
     { key: "startDate", label: t("Import.target_start_date") },
     { key: "estimate", label: t("Import.target_estimate") },
     { key: "loggedTime", label: t("Import.target_logged_time") },
-    { key: "tags", label: t("Import.target_tags") }
+    { key: "tags", label: t("Import.target_tags") },
+    { key: "taskKey", label: t("Import.target_task_key") },
+    { key: "parent", label: t("Import.target_parent") }
 ]);
 const report = ref({ total: 0, importable: 0, skipped: 0, issues: [], unknownStatuses: [], unknownUsers: [] });
 const running = ref(false);
@@ -363,8 +368,9 @@ function readFile(file) {
     }
     fileName.value = file.name;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
         try {
+            const XLSX = await loadXlsx();
             const workbook = XLSX.read(event.target.result, { type: "binary", codepage: 65001 });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
@@ -392,7 +398,7 @@ function setHeaderRow(index) {
 function autoMap() {
     Object.keys(columnTarget).forEach((key) => delete columnTarget[key]);
     const guesses = {
-        taskName: ["task name", "summary", "title", "name"],
+        taskName: ["task name", "taskname", "summary", "title", "name"],
         description: ["description", "desc", "notes"],
         status: ["status", "state"],
         priority: ["priority"],
@@ -401,7 +407,9 @@ function autoMap() {
         startDate: ["start date", "startdate", "start"],
         estimate: ["estimate", "story points", "original estimate"],
         loggedTime: ["time spent", "logged time", "worklog"],
-        tags: ["tags", "labels"]
+        tags: ["tags", "labels"],
+        taskKey: ["task key", "taskkey", "key", "issue key", "task id", "issue id", "id"],
+        parent: ["parent key", "parent task key", "parent", "parent task", "parent id", "parent task id"]
     };
     headers.value.forEach((header) => {
         const key = Object.keys(guesses).find((target) => guesses[target].includes(header.trim().toLowerCase()) && !takenBy(target, header));
@@ -446,10 +454,11 @@ async function runImport() {
     let created = 0;
     let skipped = 0;
     let failure = "";
+    let sent = 0;
+    const answers = [];
     const userData = { id: userId?.value || "", Employee_Name: getters["users/currentUser"]?.Employee_Name || "" };
 
-    for (let start = 0; start < rows.length; start += CHUNK_SIZE) {
-        const chunk = rows.slice(start, start + CHUNK_SIZE);
+    for (const chunk of importChunks(rows, mapping.value, CHUNK_SIZE)) {
         // eslint-disable-next-line no-await-in-loop
         const response = await apiRequest("post", env.IMPORT_CSV, {
             rows: chunk,
@@ -472,7 +481,9 @@ async function runImport() {
         if (!data?.status) { failure = data?.statusText || t("Toast.something_went_wrong"); break; }
         created += data.data?.created || 0;
         skipped += data.data?.skipped || 0;
-        progress.value = Math.round(Math.min(start + CHUNK_SIZE, rows.length) / rows.length * 100);
+        answers.push(data.data || {});
+        sent += chunk.length;
+        progress.value = Math.round(sent / rows.length * 100);
     }
 
     running.value = false;
@@ -481,7 +492,7 @@ async function runImport() {
         return;
     }
     progress.value = 100;
-    result.value = { failed: false, message: t("Import.import_done", { created, skipped }) };
+    result.value = { failed: false, message: t("Import.import_done", { created, skipped }), adjusted: adjustedLines(adjustedTotals(answers), t, "Import.adjusted"), droppedFieldValues: droppedFieldValuesTotal(answers) };
     emit("imported", { created, skipped });
 }
 

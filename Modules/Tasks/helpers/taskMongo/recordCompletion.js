@@ -10,8 +10,11 @@ const logger = require('../../../../Config/loggerConfig');
  * Shared by the single-task path (updateBasic.updateStatus) and the bulk path
  * (bulk.bulkUpdateStatus). Bulk re-implements the per-task side effects inline
  * rather than looping updateStatus, so without one shared helper a bulk close
- * silently recorded nothing and the task showed no badge. */
-const recordCompletion = ({ companyId, taskId, task, newStatus, userData }) => {
+ * silently recorded nothing and the task showed no badge.
+ *
+ * `eventActor` goes on the event of the record: the event bus folds it into the
+ * status change's own event and keeps the actor of the later one. */
+const recordCompletion = ({ companyId, taskId, task, newStatus, userData, eventActor = null }) => {
     const actorId = userData && (userData.id || userData._id);
     if (!companyId || !taskId || !actorId) return;
     completionStore.forStatusChange(companyId, taskId, {
@@ -22,7 +25,7 @@ const recordCompletion = ({ companyId, taskId, task, newStatus, userData }) => {
     .then((outcome) => {
         if (!outcome || outcome.error || !outcome.completion) return null;
         return completionStore.save(companyId, taskId, outcome.completion).then((saved) => {
-            socketEmitter.emit('update', { type: 'update', data: saved, updatedFields: { completion: outcome.completion }, module: 'task' });
+            socketEmitter.emit('update', { type: 'update', data: saved, updatedFields: { completion: outcome.completion }, module: 'task', companyId, ...(eventActor ? { actor: eventActor } : {}) });
         });
     })
     .catch((error) => logger.error(`ERROR in task completion record: ${error.message}`));

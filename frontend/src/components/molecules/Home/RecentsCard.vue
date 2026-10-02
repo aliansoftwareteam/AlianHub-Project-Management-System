@@ -75,13 +75,13 @@ onMounted(load);
 
 <style scoped>
 .hrec__hide {
-    width: 26px; height: 26px; display: grid; place-items: center; flex: none;
+    width: var(--control-h, 26px); height: var(--control-h, 26px); display: grid; place-items: center; flex: none;
     border: 0; border-radius: var(--r-chip); background: transparent; color: var(--ink-2); cursor: pointer;
 }
 .hrec__hide:hover { background: var(--surface-hover); color: var(--ink); }
 .hrec__hide:focus-visible { outline: none; box-shadow: var(--focus); }
 .hrec__note { margin: 0; }
-.hrec__retry { border: 0; background: none; padding: 0; color: var(--brand); font: inherit; font-weight: 600; cursor: pointer; }
+.hrec__retry { display: inline-flex; align-items: center; min-height: var(--hit-min); border: 0; background: none; padding: 0; color: var(--brand); font: inherit; font-weight: 600; cursor: pointer; }
 .hrec__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .hrec__row {
     width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 6px; min-width: 0;
@@ -91,8 +91,8 @@ onMounted(load);
 .hrec__row:focus-visible { outline: none; box-shadow: var(--focus); }
 .hrec__icon { flex: none; color: var(--ink-2); }
 .hrec__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1 1 auto; }
-.hrec__title { font: 500 13px/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hrec__meta { font: 400 11.5px/1.3 var(--font-ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hrec__title { font: 500 var(--fs-md, 13px)/1.35 var(--font-ui); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hrec__meta { font: 400 var(--fs-sm, 11.5px)/1.3 var(--font-ui); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 767px) {
     .hrec__row { min-height: 44px; }
     .hrec__hide { width: 44px; height: 44px; }

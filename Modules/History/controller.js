@@ -8,14 +8,16 @@ const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
+const MADE_BY_AGENT = 'agent';
 
 /* The bar the UI already draws: a project's log needs the project list to be anything
  * but None, a task's log needs Task Activity Log switched on (TaskDetailPanel canSeeHistory). */
 const canReadLog = (permission, forTask) => (forTask ? permission === true : permission !== null && permission !== undefined);
 
 exports.getActivityLog = async (req, res) => {
-    const { fromProject, projectId, taskId, skip, limit } = req.query;
+    const { fromProject, projectId, taskId, skip, limit, madeBy } = req.query;
     const forTask = fromProject === 'false';
+    const byAgent = madeBy === MADE_BY_AGENT ? [{ actorType: MADE_BY_AGENT }] : [];
 
     try {
         const companyId = req.headers['companyid'] || '';
@@ -34,8 +36,8 @@ exports.getActivityLog = async (req, res) => {
         }
 
         const match = forTask
-            ? { $and: [{ Type: { $ne: "project" } }, { ProjectId: { $in: idForms(String(projectId)) } }, { TaskId: String(taskId) }] }
-            : { $and: [{ Type: "project" }, { ProjectId: { $in: idForms(String(projectId)) } }] };
+            ? { $and: [{ Type: { $ne: "project" } }, { ProjectId: { $in: idForms(String(projectId)) } }, { TaskId: String(taskId) }, ...byAgent] }
+            : { $and: [{ Type: "project" }, { ProjectId: { $in: idForms(String(projectId)) } }, ...byAgent] };
         const pipeline = [
             { $match: match },
             { $sort: { createdAt: -1, _id: 1 } },

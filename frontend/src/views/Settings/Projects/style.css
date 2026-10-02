@@ -2,9 +2,9 @@
   padding: 0;
 }
 .activeTab {
-  color: #2f3990 !important;
+  color: var(--brand) !important;
   font-weight: 500;
-  background-color: #ffff;
+  background-color: var(--surface);
   border-radius: 5px 5px 0px 0px;
 }
 .tab-option {
@@ -15,6 +15,7 @@
   font-size: 14px;
   font-weight: 500;
   line-height: 30px;
+  color: var(--ink-2);
   text-align: left;
   max-width: 151px;
   padding: 7px 10px;
@@ -27,7 +28,7 @@
   display: flex;
   flex-direction: row-reverse;
   margin-bottom: 10px;
-  border-bottom: 1px solid #cfcfcf;
+  border-bottom: 1px solid var(--border);
 }
 
 .mainProjectlistingInSetting::-webkit-scrollbar {
@@ -51,8 +52,8 @@
 .pagination span.active {
   padding: 9.5px 14.1px;
   border-radius: 6px;
-  color: #ffffff;
-  background: #2f3990;
+  color: var(--on-brand);
+  background: var(--brand);
   border: none;
 }
 
@@ -60,14 +61,10 @@
   cursor: default;
 }
 
-.project-search {
+.ah-input.project-search {
   z-index: 2;
-  max-width: 558px !important;
-  border-radius: 6px;
-  border: 1px;
-  border-width: 1px;
-  border-style: solid;
-  border-color: #e0e0e0;
+  max-width: 558px;
+  height: var(--control-h, 30px);
 }
 
 .pagination div {
@@ -81,7 +78,9 @@ label {
 #itemsPerPageSelect {
   padding: 5px;
   border-radius: 5px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .button {
@@ -91,7 +90,7 @@ label {
   padding: 8px 14px;
   gap: 5px;
   border-radius: 6px;
-  border: 1px solid #CFCFCF !important;
+  border: 1px solid var(--border) !important;
   
 }
 
@@ -127,7 +126,7 @@ label {
 
 .page_button .button.arrow-left {
   margin-right: 10px; 
-  color: #959595;
+  color: var(--ink-2);
 
 }
 
@@ -138,8 +137,8 @@ label {
 .page_button span {
   padding: 8.5px 13.1px;
   border-radius: 6px;
-  border: 1px solid #CFCFCF;
-  color: #959595;
+  border: 1px solid var(--border);
+  color: var(--ink-2);
 }
 
 .pagination-pages {
@@ -172,4 +171,14 @@ label {
     margin-top: 15px;
     margin-bottom: 10px;
   }
+}
+.pg__arrow {
+  width: 10px;
+  height: 10px;
+  vertical-align: middle;
+}
+@media (max-width: 576px) {
+  .totalCountActiveClose { flex-wrap: wrap-reverse; row-gap: 8px; }
+  .totalCountActiveClose .project-search { flex: 1 1 100%; max-width: 100% !important; margin-bottom: 8px; }
+  .totalCountActiveClose .tab-option { white-space: nowrap; max-width: none; }
 }

@@ -1,5 +1,5 @@
 <template>
-    <div v-show="tabIndexCheck === 1">
+    <div v-show="tabIndexCheck === 1" data-field-tab="1">
         <CustomFieldInputComponent
             :label="$t('PlaceHolder.field_label')"
             :type="'text'"
@@ -14,10 +14,9 @@
             :label="$t('Description.description')"
             :type="'textarea'"
             :placeholder="$t('PlaceHolder.Enter_Description')"
-            :validations="'required:trim|length:10'"
+            :validations="''"
             :bindValue="props.customFieldObject?.fieldDescription ? props.customFieldObject.fieldDescription : fieldDescription"
             :validationVisibility="'blur'"
-            :className="'custom__field-required'"
             :name="'fieldDescription'"
         />
         <CustomFieldInputComponent
@@ -32,7 +31,7 @@
             :className="'custom__field-radio custom__field-Separator'"
 
         />
-        <DropDown mode="listbox" :zIndex="10" v-if="isType">
+        <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                     <div class="custom__field-required">
@@ -60,7 +59,7 @@
             </template>
         </DropDown>
     </div>
-    <div v-show="tabIndexCheck === 2">
+    <div v-show="tabIndexCheck === 2" data-field-tab="2">
         <CustomFieldInputComponent
             :label="$t('CustomField.date_format')"
             :type="'radio'"
@@ -73,7 +72,7 @@
             :help="$t('CustomField.select_date_format')"
         />
     </div>
-    <div v-show="tabIndexCheck === 3">
+    <div v-show="tabIndexCheck === 3" data-field-tab="3">
         <CustomFieldInputComponent
             :type="'checkbox'"
             :options="liteMode"
@@ -97,12 +96,12 @@
             />
         </div>
     </div>
-    <div v-show="tabIndexCheck === 4">
+    <div v-show="tabIndexCheck === 4" data-field-tab="4">
         <CustomFieldInputComponent
             :label="$t('CustomField.past_and_future')"
             :type="'checkbox'"
-            :options="fieldPastFuture"
-            :bindValue="props.customFieldObject?.fieldPastFuture ? props.customFieldObject.fieldPastFuture : fieldPastFuture"
+            :options="pastFutureOptions"
+            :bindValue="pastFutureValue"
             :validationVisibility="'blur'"
             :name="'fieldPastFuture'"
             :help="$t('CustomField.select_dates_past_future')"
@@ -122,13 +121,15 @@
 </template>
 
 <script setup>
-    import { ref,watch } from "vue";
+    import { computed, ref, watch } from "vue";
     import { useCustomComposable } from '@/composable';
     import DropDown from '@/components/molecules/DropDown/DropDown.vue';
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
     import CustomFieldInputComponent from "../../customFieldSidebar/customFieldSidebarComponent/customFieldInputComponent/customFieldInputComponent.vue";
     const {makeUniqueId} = useCustomComposable();
     import { useI18n } from "vue-i18n";
+    import { PAST, FUTURE } from '@datePastFuture';
+    import { storedPastFuture } from '@/plugins/customFieldView/dateFieldLimits';
     const { t } = useI18n();
     const dropDownArrow = require('@/assets/images/svg/triangleBlack.svg');
 
@@ -156,7 +157,9 @@
     //FIRST Tab
     const fieldLabel = ref('');
     const fieldSeparatorSelected = ref('-');
-    const fieldPastFuture = ref([t('CustomField.past'),t('CustomField.future')]);
+    const pastFutureOptions = [{ value: PAST, label: t('CustomField.past') }, { value: FUTURE, label: t('CustomField.future') }];
+    /* The input resets to its bound value whenever that changes identity, so the ticks are computed once per field. */
+    const pastFutureValue = computed(() => storedPastFuture(props.customFieldObject));
     const fieldDescription = ref('');
     const fieldSeparator = ref(['-', '/', '.']);
     const fieldDateFormate = ref(['MM-DD-YYYY','DD-MM-YYYY','YYYY-MM-DD']);
@@ -229,7 +232,7 @@
     };
     // Redirect to the tab where the validation error message is displayed.
     const handleTabComp = (node) => {
-        if(!(node._value.fieldDescription && node._value.fieldTitle)){
+        if(!node._value.fieldTitle){
             tabIndexCheck.value = 1;
             emit('tabIndexUpdate',tabIndexCheck.value)
         }
@@ -247,7 +250,7 @@
         }
         object.fieldImage = props.componentDetail.cfIcon;
         object.fieldImageGrey = props.componentDetail.cfIconGrey;
-        object.fieldDescription = object.fieldDescription.trim();
+        object.fieldDescription = (object.fieldDescription || '').trim();
         if(props.isType === true){
             object.type = type.value;
         }

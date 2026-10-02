@@ -52,6 +52,36 @@ const validateStep = (step, index, errors, { trigger } = {}) => {
     if (typeof action.validate === 'function') action.validate(config, { trigger }).forEach((error) => errors.push(`${at}.config.${error}`));
 };
 
+const STEP_CONFIG_ERROR = /^steps\[(\d+)\]\.config\.(\w+): (.+)$/;
+const NO_STEPS = 'steps: at least one action is required';
+const NAME_REQUIRED = 'name: required';
+
+const issueCode = (text) => {
+    if (/^required\b/.test(text) || /^name at least one\b/.test(text)) return 'required';
+    return text.startsWith('must be one of') ? 'not_an_option' : 'other';
+};
+
+const issueOf = (error, steps) => {
+    const at = STEP_CONFIG_ERROR.exec(error);
+    if (!at) return { code: error === NO_STEPS ? 'no_steps' : 'other', text: error.replace(/^[\w.[\]]+: /, '') };
+    const [, index, field, text] = at;
+    return { step: Number(index), action: steps[Number(index)].action, field, code: issueCode(text), text };
+};
+
+/* The same failures as `errors`, in parts: the builder words each one with the step's number, the action's name and
+ * the field's label, in the reader's language. `text` is the reason without its path. A field its schema and its
+ * action both call missing is one issue. The builder never asks for a name, so the name an unusable rule lacks is
+ * not one of them. */
+const issuesOf = (errors, steps) => {
+    const seen = new Set();
+    return errors.filter((error) => error !== NAME_REQUIRED).map((error) => issueOf(error, steps)).filter((issue) => {
+        const key = issue.code === 'other' ? JSON.stringify(issue) : `${issue.step}.${issue.field}.${issue.code}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+};
+
 const validateRuleV2 = (input = {}, { people = [] } = {}) => {
     const errors = [];
 
@@ -77,7 +107,7 @@ const validateRuleV2 = (input = {}, { people = [] } = {}) => {
     }
 
     const steps = Array.isArray(input.steps) ? input.steps : [];
-    if (!steps.length) errors.push('steps: at least one action is required');
+    if (!steps.length) errors.push(NO_STEPS);
     if (steps.length > MAX_STEPS) errors.push(`steps: at most ${MAX_STEPS} allowed`);
     steps.forEach((step, i) => validateStep(step, i, errors, { trigger: trigger.event }));
 
@@ -87,8 +117,8 @@ const validateRuleV2 = (input = {}, { people = [] } = {}) => {
     // Composing the name needs a rule that parses, so an unusable one still has to
     // carry its own.
     if (errors.length) {
-        if (!name) errors.push('name: required');
-        return { valid: false, errors, value: null };
+        if (!name) errors.push(NAME_REQUIRED);
+        return { valid: false, errors, issues: issuesOf(errors, steps), value: null };
     }
 
     const scope = isPlainObject(input.scope) ? input.scope : {};
@@ -116,7 +146,7 @@ const validateRuleV2 = (input = {}, { people = [] } = {}) => {
     // list, the audit trail and the run log all quote a rule that was never saved.
     if (!value.name) value.name = composedName(value, people);
 
-    return { valid: true, errors: [], value };
+    return { valid: true, errors: [], issues: [], value };
 };
 
 /* One-line human summary for the rule list — the same sentence the builder shows,

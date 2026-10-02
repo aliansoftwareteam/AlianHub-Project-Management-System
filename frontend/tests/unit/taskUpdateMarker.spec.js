@@ -38,6 +38,7 @@ vi.mock('@/plugins/customFieldView/helper.js', () => ({ customField: () => ({ is
 import { useListDragDrop } from '@/views/Projects/ListView/useListDragDrop';
 import KanbanBoard from '@/views/Projects/Kanban/KanbanBoard.vue';
 import ItemList from '@/components/organisms/ItemList/ItemList.vue';
+import TaskItemList from '@/plugins/tasklistDashboard/components/organisms/TaskItemList/TaskItemList.vue';
 import { mutateUpdateFirebaseTasks } from '@/store/ProjectData/mutations';
 
 const TAB_ID = /^tab-[0-9a-f]{32}$/;
@@ -148,6 +149,55 @@ describe('drag writers mark their update with the per-tab id, never a credential
             await dragInList(group);
         }
         expect(new Set(sentMarkers().map((marker) => marker.user)).size).toBe(1);
+    });
+});
+
+describe("a drag in a person's group names the person as one plain value", () => {
+    // helper.js groupBy gives a person's group its member as a one-item list, which the index route refuses.
+    const person = { ...GROUPS[1], searchValue: ['u1'] };
+    const sentGroupValues = () => h.apiRequest.mock.calls.filter(([, url]) => url === '/api/v1/taskIndex').map(([, , body]) => body.relevantKey);
+
+    it.each([['list view', dragWithList], ['kanban', dragOnKanban], ['legacy list', dragInList]])('%s drag', async (_, drag) => {
+        await drag(person);
+        expect(sentGroupValues()).toEqual(['u1']);
+    });
+});
+
+describe('a row waiting for its position is parked under the index of the group it is shown in', () => {
+    const waiting = { ...row('t1', 0), groupByStatusIndex: undefined };
+    const listGlobal = () => ({
+        provide: {
+            selectedProject: ref({ _id: PROJECT, viewColumn: [], taskFields: {} }), showArchived: ref(false), searchedTask: '',
+            taskCollapsed: ref(false), $companyId: ref('c1'), $userId: ref('u1'), $clientWidth: ref(1280), $containerWidth: ref(1280)
+        },
+        stubs: { draggable: true, CustomFieldsSidebarComponent: true, Task: true, Toggle: true, CreateTask: true, Assignee: true, DropDown: true, WasabiImage: true, DropDownOption: true, Skelaton: true }
+    });
+    const listProps = () => ({ item: { operation: 'eq', ...GROUPS[0], _id: 'g1', isExpanded: true, users: [] }, groupType: 0, sprintId: SPRINT, projectId: PROJECT, project: { _id: PROJECT } });
+    const parked = () => h.commit.mock.calls.filter(([type]) => type === 'projectData/mutateTaskIndex').map(([, payload]) => payload);
+
+    beforeEach(() => {
+        h.getters['projectData/tasks'] = { [PROJECT]: { [SPRINT]: { tasks: [waiting, row('t2', 65536)], found: {}, index: {} } } };
+        h.getters['settings/finalCustomFields'] = [];
+    });
+
+    it('in the legacy list', async () => {
+        const wrapper = mount(ItemList, { props: { ...listProps(), sprintObject: { id: SPRINT } }, global: listGlobal() });
+        await flushPromises();
+
+        expect(parked()).toEqual([{ pid: PROJECT, sprintId: SPRINT, tasksArray: [{ _id: 't1' }], indexName: 'groupByStatusIndex' }]);
+        wrapper.unmount();
+    });
+
+    it('in the dashboard list', async () => {
+        const project = { _id: PROJECT, viewColumn: [], taskFields: {} };
+        const wrapper = mount(TaskItemList, {
+            props: { ...listProps(), project, sprintObject: { id: SPRINT, isExpanded: true, projectId: PROJECT }, filteredProjects: [project] },
+            global: listGlobal()
+        });
+        await flushPromises();
+
+        expect(parked()).toEqual([{ pid: PROJECT, sprintId: SPRINT, tasksArray: [{ _id: 't1' }], indexName: 'groupByStatusIndex' }]);
+        wrapper.unmount();
     });
 });
 

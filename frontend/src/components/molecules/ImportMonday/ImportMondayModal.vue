@@ -32,7 +32,7 @@
                 <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
                 <select v-model="selectedSprintId" class="mimport__select font-size-13">
                     <option v-for="sprint in sprintOptions" :key="'mon-'+sprint.id" :value="sprint.id">
-                        {{ sprint.folderName ? sprint.folderName + ' / ' : '' }}{{ sprint.name }}
+                        {{ listLabel(sprint) }}
                     </option>
                 </select>
                 <button class="btn-primary font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId || !mapping.taskName" @click="startImport">
@@ -47,7 +47,9 @@
 
 <script setup>
 import { computed, defineProps, inject, ref, watch } from "vue";
+import { folderPathLabel, listLabel } from "@/utils/folderTree";
 import * as XLSX from "xlsx";
+import { textEncodingOf } from "@/components/organisms/WorkspaceImport/readSheet";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from '@/services';
@@ -96,7 +98,7 @@ const sprintOptions = computed(() => {
     });
     Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
         Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
-            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderId: folder.folderId });
+            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderPath: folderPathLabel(props.projectData?.sprintsfolders, folder), folderId: folder.folderId });
         });
     });
     return options;
@@ -130,7 +132,7 @@ function parseFile(event) {
     const reader = new FileReader();
     reader.onload = (loadEvent) => {
         try {
-            const workbook = XLSX.read(loadEvent.target.result, { type: 'array' });
+            const workbook = XLSX.read(loadEvent.target.result, { type: 'array', ...textEncodingOf(loadEvent.target.result) });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             rows.value = XLSX.utils.sheet_to_json(sheet, { defval: '' });
             resultText.value = '';

@@ -33,7 +33,7 @@
                         v-model="editTaskName"
                         :is-direct-focus="true"
                         :max-length="250"
-                        @blur="editFocusOut()"
+                        @blur="commitName"
                         :place-holder="$t('Projects.task_name')"
                         @enter="saveName"
                         @keydown="cancelOnEscape"
@@ -93,9 +93,16 @@
     // Only a keyboard exit returns focus: a blur means the user already moved it somewhere.
     const focusTitle = () => nextTick(() => titleButton.value?.focus());
 
-    const saveName = () => {
-        emit('update:taskName', editTaskName.value);
+    const commitName = () => {
+        if (!isEditName.value) return;
+        const next = editTaskName.value.trim();
         isEditName.value = false;
+        editTaskName.value = '';
+        if (next && next !== props.taskName) emit('update:taskName', next);
+    }
+
+    const saveName = () => {
+        commitName();
         focusTitle();
     }
 
@@ -106,13 +113,6 @@
         isEditName.value = false;
         editTaskName.value = '';
         focusTitle();
-    }
-
-    const editFocusOut = () => {
-        if(isEditName.value) {
-            isEditName.value = false;
-        }
-        editTaskName.value = '';
     }
 
     const copyText = (text) => {

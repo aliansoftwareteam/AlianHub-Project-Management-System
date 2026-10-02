@@ -9,6 +9,7 @@ jest.mock('../Modules/Tasks/helpers/taskWriteFields', () => ({ sessionActor: asy
 jest.mock('../Modules/Importers/helpers/importAccess', () => ({
     importTargetAccess: jest.fn(),
     previewAccess: jest.fn(),
+    canAddDetails: jest.fn(async () => true),
     refuseImport: (res, decision) => res.status(decision.statusCode === 403 ? 403 : 404).send({ status: false, statusText: 'refused' }),
 }));
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { createMultipleTasks: jest.fn() } }));
@@ -41,9 +42,9 @@ const project = (id = PROJECT) => (companyDb().store[SCHEMA_TYPE.PROJECTS] || []
 const created = () => taskMongo.createMultipleTasks.mock.calls[0][0];
 const sent = (name) => created().tasks.find((task) => task.TaskName === name);
 
-const seedPerson = (uid, email, companyId = COMPANY) => {
+const seedPerson = (uid, email, companyId = COMPANY, roleType = 3) => {
     globalDb().seed(dbCollections.USERS, { _id: uid, Employee_Email: email, Employee_Name: email, AssignCompany: [companyId] });
-    mockDbFor(companyId).seed(SCHEMA_TYPE.COMPANY_USERS, { companyId, userId: uid, userEmail: email, roleType: 3, designation: 0, status: SEAT_ACTIVE, isDelete: false });
+    mockDbFor(companyId).seed(SCHEMA_TYPE.COMPANY_USERS, { companyId, userId: uid, userEmail: email, roleType, designation: 0, status: SEAT_ACTIVE, isDelete: false });
 };
 
 const seedProject = (id) => companyDb().seed(SCHEMA_TYPE.PROJECTS, {
@@ -69,7 +70,7 @@ beforeEach(() => {
     Object.keys(mockDbs).forEach((key) => { delete mockDbs[key]; });
     jest.clearAllMocks();
     seedProject(PROJECT);
-    seedPerson(OWNER, 'owner@company.test');
+    seedPerson(OWNER, 'owner@company.test', COMPANY, 1);
     seedPerson(MEMBER, 'max@member.test');
     seedPerson(OUTSIDER, 'ghost@nowhere.test', '6f0000000000000000000c99');
     importTargetAccess.mockImplementation(async (_companyId, _uid, { sprintId }) => ({ allowed: true, sprint: { id: String(sprintId), name: 'Sprint' } }));
@@ -92,8 +93,38 @@ describe('a ClickUp export imported into an existing project', () => {
     it('keeps subtasks under their parent', async () => {
         await importIntoProject();
         expect(sent('Write the billing tests').ParentTaskId).toBe('86a1aaa01');
-        expect(sent('Check the rounding').ParentTaskId).toBe('86a1aaa01');
+        expect(sent('Check the rounding').ParentTaskId).toBe('86a1aaa02');
         expect(sent('Set up the billing page')._id).toBe('86a1aaa01');
+    });
+
+    it('tells the person which rows the create path had to re-hang', async () => {
+        taskMongo.createMultipleTasks.mockImplementation(async ({ tasks }) => ({
+            status: true,
+            createdTasks: tasks,
+            adjusted: [
+                { _id: 'a', TaskName: 'Too deep', reason: 'TOO_DEEP' },
+                { _id: 'b', TaskName: 'Deeper still', reason: 'TOO_DEEP' },
+                { _id: 'c', TaskName: 'Follow up with legal', reason: 'PARENT_MISSING' },
+            ],
+        }));
+        const res = await importIntoProject();
+        expect(res.body.data.adjusted).toEqual({
+            tooDeep: 2,
+            parentMissing: 1,
+            cycle: 0,
+            rows: [
+                { name: 'Too deep', reason: 'TOO_DEEP' },
+                { name: 'Deeper still', reason: 'TOO_DEEP' },
+                { name: 'Follow up with legal', reason: 'PARENT_MISSING' },
+            ],
+        });
+        expect(res.body.statusText).toMatch(/2 subtasks were deeper than three levels and were placed under their nearest parent/);
+        expect(res.body.statusText).toMatch(/1 row named a parent that is not in the file/);
+    });
+
+    it('says nothing about re-hung rows when the tree fitted', async () => {
+        const res = await importIntoProject();
+        expect(res.body.data.adjusted).toBeUndefined();
     });
 
     it('maps statuses onto the project and adds the missing one', async () => {
@@ -115,11 +146,14 @@ describe('a ClickUp export imported into an existing project', () => {
         expect(sent('Set up the billing page').tagNames).toBeUndefined();
     });
 
-    it('carries estimates in minutes and the custom fields', async () => {
+    it('carries estimates in minutes, and each field value under the field it created in the project', async () => {
         await importIntoProject();
         expect(sent('Set up the billing page').totalEstimatedTime).toBe(150);
         expect(sent('Write the billing tests').totalEstimatedTime).toBe(60);
-        expect(sent('Set up the billing page')['custom_Story Points']).toEqual({ type: 'number', value: 5 });
+        const points = companyDb().store[SCHEMA_TYPE.CUSTOM_FIELDS].find((field) => field.fieldTitle === 'Story Points');
+        expect(points).toMatchObject({ fieldType: 'number', global: false, projectId: [PROJECT] });
+        expect(sent('Set up the billing page').customField[String(points._id)]).toEqual({ fieldValue: '5', _id: String(points._id) });
+        expect(Object.keys(sent('Set up the billing page')).filter((key) => key.startsWith('custom_'))).toEqual([]);
     });
 
     it('assigns people by email among the company\'s members and never creates the unknown ones', async () => {

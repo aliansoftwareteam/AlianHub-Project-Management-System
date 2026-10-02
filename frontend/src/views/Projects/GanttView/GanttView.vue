@@ -94,7 +94,7 @@
                         <ul class="gv__shift-list ah-scroll">
                             <li v-for="row in shiftRows" :key="row.id" class="gv__shift-row">
                                 <span class="gv__shift-name" :title="row.name">{{ row.name }}</span>
-                                <span class="ah-mono gv__shift-days">{{ $t('Views.shift_days', { n: row.days }, row.days) }}</span>
+                                <span class="ah-mono gv__shift-days">{{ $t(shiftDaysKey, { n: row.days }, row.days) }}</span>
                                 <span class="ah-mono gv__shift-range">{{ row.range }}</span>
                             </li>
                         </ul>
@@ -104,11 +104,12 @@
                         <ul class="gv__shift-list ah-scroll">
                             <li v-for="row in conflictRows" :key="row.id" class="gv__shift-row">
                                 <span class="gv__shift-name" :title="row.name">{{ row.name }}</span>
-                                <span class="ah-mono gv__shift-days">{{ $t('Views.shift_needs', { days: $t('Views.shift_days', { n: row.days }, row.days) }) }}</span>
+                                <span class="ah-mono gv__shift-days">{{ $t('Views.shift_needs', { days: $t(shiftDaysKey, { n: row.days }, row.days) }) }}</span>
                             </li>
                         </ul>
                     </template>
                     <p v-if="cycleChain" class="gv__shift-warn">{{ $t('Views.shift_cycle', { chain: cycleChain }) }}</p>
+                    <p v-if="!everyDayWorks" class="gv__shift-note">{{ $t('Views.shift_working_note', { days: workingDayNames }) }}</p>
                     <p class="gv__shift-note">{{ $t('Views.shift_earlier') }}</p>
                     <div class="gv__shift-actions">
                         <button
@@ -137,10 +138,12 @@ import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import taskClass from '@/utils/TaskOperations';
+import { readLookLength } from '@/utils/lookTokens';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { criticalPath } from '@/views/Projects/composables/criticalPath';
 import { fsCollisionLinks } from '@/views/Projects/composables/ganttCollisions';
 import { shiftDependants } from '@/views/Projects/composables/ganttShift';
+import { workingDaysFor, countsEveryDay } from '@workingDays';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { showUndoToast } from '@/composable/useUndoToast';
 import { useToast } from 'vue-toast-notification';
@@ -229,9 +232,19 @@ const sprintName = (id) => {
 
 const blocksOf = (task) => (task.relations || []).filter((r) => r.type === 'blocks').map((r) => String(r.taskId));
 
+const workingDays = computed(() => workingDaysFor(getters['settings/selectedCompany'], props.projectData));
+const everyDayWorks = computed(() => countsEveryDay(workingDays.value));
+const shiftDaysKey = computed(() => (everyDayWorks.value ? 'Views.shift_days' : 'Views.shift_working_days'));
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0];
+const workingDayNames = computed(() => MONDAY_FIRST.filter((day) => workingDays.value.includes(day))
+    .map((day) => t(`weekName.${WEEKDAY_KEYS[day]}`)).join(', '));
+/* Only the day scale has a column per day; a week column cannot be a day off. */
+const dayOffClass = (date) => (zoom.value === 'Day' && !workingDays.value.includes(date.getDay()) ? 'gv-off' : '');
+
 const critical = computed(() => criticalPath(scheduled.value.map((task) => ({
     id: String(task._id), startDate: task.startDate, DueDate: task.DueDate, blocks: blocksOf(task),
-}))));
+})), { workingDays: workingDays.value }));
 // The toggle decides what is painted, not what is known: Replan reads the chain either way.
 const criticalIds = computed(() => (showCritical.value ? new Set(critical.value.path) : new Set()));
 const collisionLinks = computed(() => fsCollisionLinks(scheduled.value.map((task) => ({
@@ -413,7 +426,7 @@ function onTaskDragged(id) {
         scheduled.value.flatMap((row) => blocksOf(row).map((target) => ({ source: String(row._id), target }))),
         String(id),
         to,
-        { canEdit: mayShift },
+        { canEdit: mayShift, workingDays: workingDays.value },
     );
     if (!plan.shifts.length && !plan.conflicts.length && !plan.cycle.length) {
         saveDates(task, to);
@@ -503,9 +516,12 @@ function schedule(task) {
 }
 
 /* ------------------------------------- zoom ------------------------------------- */
+// dhtmlx lays its rows out in pixels: the List's row height for the look, 36px where a look names none.
+const lookRowHeight = () => readLookLength('--row-h', 36);
+
 function applyScales(level) {
     if (!gantt) return;
-    gantt.config.scale_height = 34;
+    gantt.config.scale_height = lookRowHeight() - 2;
     if (level === 'Day') {
         gantt.config.scales = [
             { unit: 'day', step: 1, format: '%d %M' },
@@ -541,7 +557,7 @@ const replanLines = computed(() => {
     const chain = path.map((id) => findTask(id)).filter(Boolean);
     const last = chain[chain.length - 1];
     const end = last ? new Date(last.DueDate) : null;
-    const lines = [t('Views.replan_chain', {
+    const lines = [t(everyDayWorks.value ? 'Views.replan_chain' : 'Views.replan_chain_working', {
         n: chain.length,
         days: critical.value.durationDays,
         date: end ? end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '',
@@ -611,7 +627,7 @@ onMounted(async () => {
         gantt.config.drag_links = !readOnly.value;
         gantt.config.drag_progress = false;
         gantt.config.fit_tasks = true;
-        gantt.config.row_height = 36;
+        gantt.config.row_height = lookRowHeight();
         gantt.config.bar_height = 16;
         gantt.config.show_markers = true;
         gantt.config.columns = [
@@ -632,6 +648,8 @@ onMounted(async () => {
             if (collisionLinks.value.has(`${link.source}_${link.target}`)) classes.push('gv-link-collision');
             return classes.join(' ');
         };
+        gantt.templates.timeline_cell_class = (task, date) => dayOffClass(date);
+        gantt.templates.scale_cell_class = (date) => dayOffClass(date);
         applyScales(zoom.value);
 
         gantt.init(ganttEl.value);
@@ -696,6 +714,7 @@ async function loadProposals() {
 
 watch(signature, () => { if (ready && !suppress) renderData(); });
 watch(criticalIds, () => { if (ready && !suppress) renderData(); });
+watch(workingDays, () => { if (ready && gantt) gantt.render(); });
 
 watch(readOnly, (ro) => {
     if (!ready || !gantt) return;

@@ -110,3 +110,67 @@ describe('GET /api/v1/agile/milestones without a projectId', () => {
         expect(names).not.toContain('Secret launch');
     });
 });
+
+describe.each([
+    ['GET /api/v1/agile/burndown'],
+    ['GET /api/v1/agile/sprint-insights'],
+    ['GET /api/v1/agile/provenance'],
+])('%s, addressed by sprint, is bound to the sprint\'s project', (path) => {
+    let sprint;
+    beforeEach(() => {
+        sprint = mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: oid(), name: 'Sprint 1', projectId: String(hidden._id), isScrum: true });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: oid(), TaskName: 'Quiet work', TaskKey: 'SEC-1', ProjectID: String(hidden._id), sprintId: String(sprint._id), statusType: 'onhold', points: 3, isParentTask: true, deletedStatusKey: 0, createdAt: new Date(), updatedAt: new Date() });
+    });
+
+    it('answers 404 for a sprint in a private project the caller is not on', async () => {
+        const res = await call(path, MEMBER, { sprintId: String(sprint._id) });
+        expect(res.statusCode).toBe(404);
+        expect(JSON.stringify(res.body)).not.toContain('Sprint 1');
+        expect(JSON.stringify(res.body)).not.toContain('Quiet work');
+    });
+
+    it('answers 404 for a sprint in a personal list that is someone else\'s, whatever the role', async () => {
+        const list = mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: oid(), ProjectName: 'Errands', isPrivateSpace: true, isPersonal: true, personalOwner: MEMBER, AssigneeUserId: [MEMBER] });
+        const mine = mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: oid(), name: 'Mine', projectId: String(list._id), isScrum: true });
+        expect((await call(path, OWNER, { sprintId: String(mine._id) })).statusCode).toBe(404);
+        expect((await call(path, MEMBER, { sprintId: String(mine._id) })).body).toMatchObject({ status: true });
+    });
+
+    it('lets an owner through to the handler', async () => {
+        const res = await call(path, OWNER, { sprintId: String(sprint._id) });
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toMatchObject({ status: true });
+    });
+});
+
+describe('GET /api/v1/agile/provenance, addressed by project', () => {
+    const PATH = 'GET /api/v1/agile/provenance';
+    const ON_SPRINT = 'a00000000000000000000004';
+    let open;
+    beforeEach(() => {
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ON_SPRINT, roleType: MEMBER_ROLE, status: 2, isDelete: false });
+        open = mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: oid(), ProjectName: 'Open', isPrivateSpace: false, AssigneeUserId: [] });
+        const shared = mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: oid(), name: 'Shared', projectId: String(open._id) });
+        const closedDoor = mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: oid(), name: 'Closed door', projectId: String(open._id), private: true, AssigneeUserId: [ON_SPRINT] });
+        const done = (sprintId, points) => mockDb.seed(SCHEMA_TYPE.TASKS, {
+            _id: oid(), TaskName: 'Done', ProjectID: String(open._id), sprintId: String(sprintId), statusType: 'close', points, isParentTask: true, deletedStatusKey: 0,
+        });
+        done(shared._id, 2);
+        done(closedDoor._id, 5);
+    });
+
+    it('answers 404 for a private project the caller is not on', async () => {
+        const res = await call(PATH, MEMBER, { projectId: String(hidden._id) });
+        expect(res.statusCode).toBe(404);
+    });
+
+    it.each([
+        ['a member not on the private sprint', MEMBER, 2],
+        ['a member on it', ON_SPRINT, 7],
+        ['an owner', OWNER, 7],
+    ])('counts, for %s, the points in the sprints they can open', async (_who, uid, points) => {
+        const res = await call(PATH, uid, { projectId: String(open._id) });
+        expect(res.body.status).toBe(true);
+        expect(res.body.data.completed).toBe(points);
+    });
+});

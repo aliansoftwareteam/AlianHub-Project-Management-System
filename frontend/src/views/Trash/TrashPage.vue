@@ -24,6 +24,8 @@
 
         <EmptyState
             v-else-if="!rows.length"
+            data-test="trash-empty"
+            :heading-level="2"
             :title="$t('Trash.empty_title')"
             :message="$t('Trash.empty_message', { kind: $t(`Trash.empty_${kind}`) })"
         />
@@ -40,11 +42,11 @@
                 <ShellIcon :name="ICONS[kind]" :size="14" class="tr__row-icon" />
                 <span class="tr__row-title" :title="row.title">
                     <span v-if="row.code" class="ah-chip ah-chip--mono">{{ row.code }}</span>
-                    {{ row.title }}
+                    <span class="tr__row-name">{{ row.title }}</span>
                 </span>
                 <span class="tr__row-project tr__c-project">{{ projectNameOf(row.projectId) }}</span>
                 <span class="tr__row-time tr__c-when">{{ shortDate(row.updatedAt) }}</span>
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :disabled="busy === row._id" @click="restore(row)">
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :aria-label="$t('Trash.restore_named', { name: row.title })" :disabled="busy === row._id" @click="restore(row)">
                     <ShellIcon name="restore" :size="13" />{{ $t('Trash.restore') }}
                 </button>
             </div>
@@ -62,8 +64,8 @@ import { useGetterFunctions } from '@/composable';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 
-const KINDS = ['projects', 'lists', 'tasks', 'docs'];
-const ICONS = { projects: 'projects', lists: 'layout', tasks: 'checkSquare', docs: 'file' };
+const KINDS = ['projects', 'folders', 'lists', 'tasks', 'docs'];
+const ICONS = { projects: 'projects', folders: 'book', lists: 'layout', tasks: 'checkSquare', docs: 'file' };
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -116,7 +118,7 @@ async function restore(row) {
         $toast.success(t('Trash.restored'), { position: 'top-right' });
     } catch (error) {
         console.error('ERROR in restore: ', error);
-        $toast.error(t('Trash.restore_failed'), { position: 'top-right' });
+        $toast.error(error?.response?.data?.statusText || t('Trash.restore_failed'), { position: 'top-right' });
     } finally {
         busy.value = '';
     }
@@ -143,7 +145,9 @@ onMounted(load);
 .tr__row:last-child { border-bottom: 0; }
 .tr__row:hover { background: var(--surface-hover); }
 .tr__row-icon { color: var(--ink-2); }
-.tr__row-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.tr__row-title { min-width: 0; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.tr__row-title .ah-chip { flex: none; }
+.tr__row-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .tr__row-project { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tr__row-time { font: 500 10.5px var(--font-mono); color: var(--ink-2); }
 @media (max-width: 767px) {

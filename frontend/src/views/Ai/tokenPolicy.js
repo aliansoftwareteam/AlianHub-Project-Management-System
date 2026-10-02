@@ -2,16 +2,21 @@
 
 export const TOKEN_SCOPES = ["read", "write"];
 export const EXPIRY_CHOICES = [7, 30, 90, 180, 365];
-export const DEFAULT_TOKEN_POLICY = { strict: false, scopes: TOKEN_SCOPES, minExpiryDays: 1, maxExpiryDays: 365, graceDays: 30, strictSince: null };
+export const DEFAULT_EXPIRY_DAYS = 30;
+export const DEFAULT_TOKEN_POLICY = { strict: false, scopes: TOKEN_SCOPES, minExpiryDays: 1, maxExpiryDays: 365, defaultExpiryDays: DEFAULT_EXPIRY_DAYS, graceDays: 30, strictSince: null };
 export const EXPIRY_OVER_MAX = "API_TOKEN_EXPIRY_OVER_MAX";
+export const TASKS_GRANT = "tasks:manage";
+export const DOCS_GRANT = "docs:manage";
 
 const maxDaysOf = (policy) => Number(policy?.maxExpiryDays) || DEFAULT_TOKEN_POLICY.maxExpiryDays;
 
-/* The choices end at the maximum lifetime, which is itself offered when it is not a round choice. */
+export const defaultExpiryFor = (policy) => Math.min(Number(policy?.defaultExpiryDays) || DEFAULT_EXPIRY_DAYS, maxDaysOf(policy));
+
+/* The choices end at the maximum lifetime; it and the default are themselves offered when they are not round choices. */
 export const expiryChoicesFor = (policy) => {
     const max = maxDaysOf(policy);
     const within = EXPIRY_CHOICES.filter((days) => days <= max);
-    return within.includes(max) ? within : [...within, max];
+    return [...new Set([...within, max, defaultExpiryFor(policy)])].sort((a, b) => a - b);
 };
 
 /* { field, key, params? } for the first thing that stops the form being sent, or null. */
@@ -23,3 +28,15 @@ export const tokenFormProblem = (form, policy) => {
     if (!Array.isArray(form.scopes) || !form.scopes.length) return { field: "scopes", key: "Accounts.token_scope_required" };
     return null;
 };
+
+/* The server names a grant only while its tools are on, and gives it to a token that may write. */
+const canGrant = (grant, form, policy) => Array.isArray(policy?.grants) && policy.grants.includes(grant)
+    && (!policy.strict || (Array.isArray(form.scopes) && form.scopes.includes("write")));
+
+export const canGrantTasks = (form, policy) => canGrant(TASKS_GRANT, form, policy);
+export const canGrantDocs = (form, policy) => canGrant(DOCS_GRANT, form, policy);
+
+export const grantsOf = (form, policy) => [
+    ...(form.manageTasks && canGrantTasks(form, policy) ? [TASKS_GRANT] : []),
+    ...(form.manageDocs && canGrantDocs(form, policy) ? [DOCS_GRANT] : []),
+];

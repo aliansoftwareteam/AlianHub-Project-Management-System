@@ -1,6 +1,8 @@
-import { isOwnTabUpdate } from '@/utils/taskUpdateMarker';
+import { isOwnTabUpdate, ownEditsInFlight } from '@/utils/taskUpdateMarker';
 import { useCustomComposable } from '@/composable/index.js';
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { locate, placeRow, removeRow, treeOf } from "./taskTree";
+import { isStranger, leftList, otherHolders, shownInList, touchesOtherProjects } from "./listMembership";
 const { checkPermission } = useCustomComposable();
 
 export const mutateMongoUpdatedTask = (state, payload) => {
@@ -181,32 +183,142 @@ function returnItemCountDetails(tasks, groupBy, updatedFields = null, taskId) {
     return obj;
 }
 
-// HANDLE TASK
-/* A task has just been attached to `taskIndex` as a subtask. Raise that parent's
-   subtask count by one.
+const GROUP_FIELDS = { 0: ["statusKey"], 1: ["AssigneeUserId"], 2: ["Task_Priority"], 3: ["DueDate"] };
+const MEMBERSHIP_FIELDS = ["deletedStatusKey", "sprintId", "isParentTask", "extraLists"];
 
-   Counted UP rather than recomputed from subtaskArray.length, which is what the
-   line here used to try. That array is paginated at 35 and only filled when a row
-   is expanded, so a parent with 40 subtasks — or one never opened — would have had
-   its count rewritten downwards. That is why the recompute was commented out, and
-   why it stays out.
-
-   Guarded on dragDropcheck so only a genuine re-parent counts. The same branch
-   also runs for every ordinary field change on a subtask, and a partially loaded
-   subtaskArray means "not in the array" cannot be read as "newly added" on its own.
-
-   The parent's own document update follows from the server carrying the
-   authoritative count, and merges straight over this. This exists so the arrow
-   appears immediately rather than after that round trip. */
-function bumpParentSubtaskCount(state, pid, sprintId, taskIndex, dragDropcheck) {
-    if (dragDropcheck !== true) return;
-    const parent = state.tasks?.[pid]?.[sprintId]?.tasks?.[taskIndex];
-    if (!parent) return;
-    parent.subTasks = (Number(parent.subTasks) || 0) + 1;
+/* Whether an event from the server can have changed how many tasks a group holds. The
+   arithmetic below only knows the group a task left when the store holds that task, and it
+   covers neither removals nor a team assignee or grouping by custom field, so the List asks the
+   server for the counts after any of these. Local, optimistic writes are left out: the
+   server may not have stored them yet. */
+function changesGroupCounts(groupBy, op, data, updatedFields) {
+    if(data?.isParentTask === false && !("isParentTask" in (updatedFields || {}))) return false;
+    if(op === "removed" || op === "added") return true;
+    if(op !== "modified") return false;
+    const fields = Object.keys(updatedFields || {});
+    if(!fields.length) return true;
+    const grouping = GROUP_FIELDS[groupBy.type];
+    return fields.some((field) => MEMBERSHIP_FIELDS.includes(field) || (grouping ? grouping.includes(field) : field.startsWith("customField")));
 }
 
-export const mutateUpdateFirebaseTasks = (state, payload) => {
-    const {pid, sprintId, op, data, snap, updatedFields,dragDropcheck, groupBy: payloadGroupBy} = payload;
+/* A value a group total adds was changed on the server. A group that is only partly loaded cannot add it up itself. */
+function changesGroupTotals(op, data, updatedFields) {
+    if(op !== "modified" || data?.isParentTask === false) return false;
+    return Object.keys(updatedFields || {}).some((field) => field === "points" || field.startsWith("customField"));
+}
+
+/* The sort key of the last row a page brought for a group: where its next page starts. */
+export const mutatePageFrontier = (state, payload) => {
+    const {pid, sprintId, key, row} = payload;
+    if(!state.tasks?.[pid]?.sprints?.includes(sprintId)) return;
+    state.tasks[pid][sprintId].frontier = {...state.tasks[pid][sprintId].frontier, [key]: row};
+}
+
+export const mutateGroupCounts = (state, payload) => {
+    const {pid, sprintId, found, totals} = payload;
+    if(!state.tasks?.[pid]?.sprints?.includes(sprintId)) return;
+    state.tasks[pid][sprintId].found = {...state.tasks[pid][sprintId].found, ...found};
+    if(totals) state.tasks[pid][sprintId].totals = {...state.tasks[pid][sprintId].totals, ...totals};
+}
+
+export const mutateTableGroupCounts = (state, payload) => {
+    const {pid, sprintId, found, totals} = payload;
+    const held = state.tableGroupCounts[pid]?.[sprintId];
+    state.tableGroupCounts = {
+        ...state.tableGroupCounts,
+        [pid]: {
+            ...state.tableGroupCounts[pid],
+            [sprintId]: {found: {...held?.found, ...found}, totals: totals ? {...held?.totals, ...totals} : held?.totals}
+        }
+    };
+}
+
+// HANDLE TASK
+/* A reorder this tab made comes back from the server with its own marker. The row already
+   holds the new place, so an echo that is not newer only confirms the index it carries. */
+function keepsOwnReorder(bucket, data, updatedFields) {
+    if(data.isParentTask === false || data.islocalSnapStop !== true || !isOwnTabUpdate(data.updateToken)) return false;
+    const row = bucket.tasks.find((x) => x._id === data._id);
+    if(!(row?.updateTimeStamp <= updatedFields?.updateToken?.timeStamp)) return false;
+    const updatedIndex = Object.keys(updatedFields).find((x) => ['groupByDueDateIndex','groupByPriorityIndex','groupByAssigneeIndex','groupByStatusIndex'].includes(x));
+    if(updatedIndex) {
+        row[updatedIndex] = data[updatedIndex];
+    }
+    return true;
+}
+
+/* An event from the server while this tab's edit of the same task is unanswered: the fields
+   that edit holds stay as the person left them, and are not counted as a move. */
+function keepOwnEdits({data, updatedFields}) {
+    const held = data ? ownEditsInFlight(data._id) : {};
+    const fields = Object.keys(held);
+    if(!fields.length) return {data, updatedFields};
+    return {
+        data: {...data, ...held},
+        updatedFields: Object.fromEntries(Object.entries(updatedFields || {}).filter(([field]) => !fields.includes(field)))
+    };
+}
+
+/* Grouped by assignee a task sits in the group of each person it names, or in Unassigned. A
+   team is left to the server's count: it puts the task in the group of every member. */
+function assigneeCountMoves(tasks, groupBy, updatedFields, taskId) {
+    const next = updatedFields?.AssigneeUserId;
+    const row = tasks?.find((x) => x._id === taskId);
+    if(groupBy.type !== 1 || !row || !Array.isArray(next)) return [];
+    const previous = row.AssigneeUserId || [];
+    if([...previous, ...next].some((id) => String(id).startsWith("tId_"))) return [];
+    const keyOf = (id) => groupBy.items?.find((x) => (id === null ? x.value === "[]" : Array.isArray(x.value) && x.value[0] === id))?.key;
+    const groupsOf = (ids) => (ids.length ? ids : [null]);
+    const before = groupsOf(previous);
+    const after = groupsOf(next);
+    return [
+        ...after.filter((id) => !before.includes(id)).map((id) => [keyOf(id), 1]),
+        ...before.filter((id) => !after.includes(id)).map((id) => [keyOf(id), -1])
+    ].filter(([key]) => key);
+}
+
+function groupKeyOf(groupBy, row) {
+    const field = GROUP_FIELDS[groupBy.type]?.[0];
+    if(!field || groupBy.type === 1) return undefined;
+    return returnItemCountDetails([], groupBy, {[field]: row[field]}, row._id).addKey;
+}
+
+function movesHome(updatedFields) {
+    return "sprintId" in (updatedFields || {});
+}
+
+/* A task counts once, in the group of the list it lives in. A server event that changes its home
+   list moves one from the group it left to the group it entered, in every list the store holds,
+   whichever room the event came through. The same event can arrive through two rooms, so a list
+   remembers the tasks it has counted in. */
+function moveHomeCounts(state, payload) {
+    const {pid, op, data, updatedFields, snap} = payload;
+    const project = state.tasks?.[pid];
+    if(!snap || op !== "modified" || !project?.groupBy || !data?._id || data.isParentTask === false || !movesHome(updatedFields)) return;
+    const home = String(data.sprintId);
+    project.sprints.forEach((sprintId) => {
+        const bucket = project[sprintId];
+        const row = locate(bucket, data._id)?.row;
+        const wasHome = Boolean(row) && String(row.sprintId) === sprintId;
+        const entered = bucket.homeEntries || {};
+        if(sprintId !== home) {
+            if(entered[data._id]) delete entered[data._id];
+            if(!wasHome) return;
+            const key = groupKeyOf(project.groupBy, row);
+            if(key) bucket.found[key] = Math.max(0, (bucket.found[key] || 0) - 1);
+        } else {
+            if(wasHome || entered[data._id]) return;
+            const key = groupKeyOf(project.groupBy, data);
+            if(key) bucket.found[key] = (bucket.found[key] || 0) + 1;
+            bucket.homeEntries = {...entered, [data._id]: true};
+        }
+        bucket.countsStale = (bucket.countsStale || 0) + 1;
+    });
+}
+
+function applyTaskChange(state, payload, sprintId) {
+    const {pid, op, snap, dragDropcheck, groupBy: payloadGroupBy} = payload;
+    const {data, updatedFields} = snap && op === "modified" ? keepOwnEdits(payload) : payload;
 
     const projectFound = Object.keys(state.tasks).includes(pid);
 
@@ -214,8 +326,15 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
         const {groupBy} = state.tasks[pid];
         const sprintFound = state.tasks[pid].sprints.includes(sprintId);
         if(sprintFound) {
+            if(data && data._id && isStranger(state.tasks[pid][sprintId], data, pid, sprintId)) return;
             if(groupBy) {
-                if(["modified", "added"]?.includes(op) && data.isParentTask) {
+                if(snap && changesGroupCounts(groupBy, op, data, payload.updatedFields)) {
+                    state.tasks[pid][sprintId].countsStale = (state.tasks[pid][sprintId].countsStale || 0) + 1;
+                }
+                if(snap && changesGroupTotals(op, data, payload.updatedFields)) {
+                    state.tasks[pid][sprintId].totalsStale = (state.tasks[pid][sprintId].totalsStale || 0) + 1;
+                }
+                if(["modified", "added"]?.includes(op) && data.isParentTask && !(op === "modified" && movesHome(updatedFields))) {
                     const {addKey, removeKey} = returnItemCountDetails(state.tasks[pid][sprintId].tasks, groupBy, updatedFields, data._id);
                     if(addKey) {
                         if(state.tasks[pid][sprintId].found[addKey]) {
@@ -231,6 +350,12 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
                             state.tasks[pid][sprintId].found[removeKey] = 0
                         }
                     }
+                    if(op === "modified") {
+                        const found = state.tasks[pid][sprintId].found;
+                        assigneeCountMoves(state.tasks[pid][sprintId].tasks, groupBy, updatedFields, data._id).forEach(([key, step]) => {
+                            found[key] = Math.max(0, (found[key] || 0) + step);
+                        });
+                    }
                 } else if(["removed"]?.includes(op)) {
                     const {removeKey} = returnItemCountDetails(state.tasks[pid][sprintId].tasks, groupBy, null, data._id);
 
@@ -243,130 +368,45 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
                     }
                 }
             }
+            const bucket = state.tasks[pid][sprintId];
             if(op === "inital") {
-                if(!state.tasks[pid][sprintId].snapshot) {
-                    state.tasks[pid][sprintId].snapshot = snap
+                if(!bucket.snapshot) {
+                    bucket.snapshot = snap
                 }
                 state.tasks[pid].groupBy = payloadGroupBy;
             } else if(op === "added") {
-                if(data.isParentTask === false) {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
-                    if(taskIndex !== -1) {
-                        if(state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.length) {
-                            const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
-                            if(subTaskIndex === -1) {
-                                state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.push(data);
-                            } else {
-                                state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex], ...data};
-                            }
-                        } else {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray= [data];
-                        }
-                    }
-                } else {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-
-                    if(taskIndex === -1) {
-                        // state.tasks[pid][sprintId].found[``] += 1;
-                        state.tasks[pid][sprintId].tasks = [...state.tasks[pid][sprintId].tasks, data];
-                    } else {
-                        state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                    }
-                }
+                placeRow(bucket, data);
             } else if(op === "modified") {
-                if(data.isParentTask === false) {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
-                    if(taskIndex !== -1 && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray) {
-                        const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
-                        if(subTaskIndex !== -1){
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex], ...data};
-                        }else{
-                            if(state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.length){
-                                state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.push(data);
-                            }else{
-                                state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
-                            }
-                            bumpParentSubtaskCount(state, pid, sprintId, taskIndex, dragDropcheck);
-                        }
-                    }
-                    // taskIndex is -1 when the parent is not in this view — filtered
-                    // out, in another group, or past the 35-row page. Reading
-                    // tasks[-1].subtaskArray threw from inside the mutation, which
-                    // aborts the commit and leaves the drop half applied.
-                    else if(dragDropcheck === true && taskIndex !== -1 && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray === undefined && data.ParentTaskId){
-                        state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
-                        bumpParentSubtaskCount(state, pid, sprintId, taskIndex, dragDropcheck);
-                    }
-                } else {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                    
-                    if (data.islocalSnapStop && data.islocalSnapStop === true) {     
-                        if (!isOwnTabUpdate(data.updateToken)) {
-                            if(taskIndex !== -1) {
-                                state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                            }else{
-                                state.tasks[pid][sprintId].tasks.push(data);
-                            }
-                        } else {
-                            const temp = state.tasks[pid][sprintId].tasks?.[taskIndex]
-                            if (temp?.updateTimeStamp <= updatedFields.updateToken?.timeStamp) {
-                                let indexes = ['groupByDueDateIndex','groupByPriorityIndex','groupByAssigneeIndex','groupByStatusIndex']
-                                let updatedIndex = Object.keys(updatedFields).find((x) => indexes.includes(x))
-                                if (updatedIndex) {
-                                    state.tasks[pid][sprintId].tasks[taskIndex][updatedIndex] = data[updatedIndex]
-                                }
-                            } else {
-                                if(taskIndex !== -1) {
-                                    state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                                }else{
-                                    state.tasks[pid][sprintId].tasks.push(data);
-                                }
-                            }
-                        }
-                    } else {
-                        if(taskIndex !== -1) {
-                            state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                        }else{
-                            state.tasks[pid][sprintId].tasks.push(data);
-                        }
+                if(!keepsOwnReorder(bucket, data, updatedFields)) {
+                    const parent = placeRow(bucket, data);
+                    if(parent && dragDropcheck === true) {
+                        parent.subTasks = (Number(parent.subTasks) || 0) + 1;
                     }
                 }
             } else if(op === "removed") {
-                if(data.isParentTask === false) {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
-                    if(taskIndex !== -1 && state?.tasks?.[pid]?.[sprintId]?.tasks?.[taskIndex]?.subtaskArray) {                        
-                        const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
-                        state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.splice(subTaskIndex, 1);
-                        state.tasks[pid][sprintId].tasks[taskIndex].subTasks = state?.tasks?.[pid]?.[sprintId]?.tasks[taskIndex]?.subtaskArray?.length || 0;
-                    }
-                } else {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                    if(taskIndex !== -1) {
-                        state.tasks[pid][sprintId].tasks.splice(taskIndex, 1);
-                    }
+                const parent = removeRow(bucket, data._id);
+                if(parent) {
+                    parent.subTasks = Math.max(0, (Number(parent.subTasks) || 0) - 1);
                 }
             }
-            if(data !== null && data.sprintId !== sprintId && updatedFields?.sprintId){
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                if(taskIndex !== -1) {
-                    state.tasks[pid][sprintId].tasks.splice(taskIndex, 1);
-                }
-            }
-            if(data !== null && data.sprintId === sprintId && (updatedFields?.isParentTask === true || updatedFields?.isParentTask === false || updatedFields?.subTasks)){
-                if(data.isParentTask === false) {
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                    if(taskIndex !== -1) {
-                        state.tasks[pid][sprintId].tasks.splice(taskIndex,1);
-                    }
-                }else{
-                    const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-                    if(taskIndex === -1){
-                        state.tasks[pid][sprintId].tasks.push(data)
-                    }
-                }
+            if(data !== null && leftList(data, pid, sprintId, updatedFields)){
+                removeRow(bucket, data._id);
             }
         }
     }
+}
+
+export const mutateUpdateFirebaseTasks = (state, payload) => {
+    const {pid, sprintId, op, data} = payload;
+    /* Rows of another project's tasks are not kept here: a list reads them on its own, and reads them again when this rises. */
+    if(touchesOtherProjects(data, pid, op === "modified" ? payload.updatedFields : null)) state.otherProjectChanges = (state.otherProjectChanges || 0) + 1;
+    moveHomeCounts(state, payload);
+    applyTaskChange(state, payload, sprintId);
+    if(!data?._id || !["modified", "removed"].includes(op)) return;
+    otherHolders(state.tasks[pid], data, pid, sprintId).forEach((holder) => {
+        if(holder.shown) applyTaskChange(state, payload, holder.sprintId);
+        else removeRow(state.tasks[pid][holder.sprintId], data._id);
+    });
 }
 
 export const mutateUpdateFirebaseTableTasks = (state, payload) => {
@@ -455,32 +495,7 @@ export const mutateTypesenseTasks = (state, payload) => {
             };
             if(!data) return;
 
-            if(data.isParentTask === false) {
-
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data.ParentTaskId);
-
-                if(taskIndex !== -1) {
-                    if(state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray) {
-                        const subTaskIndex = state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x._id === data._id);
-
-                        if(subTaskIndex !== -1) {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray[subTaskIndex] = {...data};
-                        } else {
-                            state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray.push(data);
-                        }
-                    } else {
-                        state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
-                    }
-                }
-            } else {
-                const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);
-
-                if(taskIndex !== -1) {
-                    state.tasks[pid][sprintId].tasks[taskIndex] = {...state.tasks[pid][sprintId].tasks[taskIndex], ...data};
-                } else {
-                    state.tasks[pid][sprintId].tasks.push(data);
-                }
-            }
+            placeRow(state.tasks[pid][sprintId], data);
         } else {
 
             state.tasks[pid].sprints.push(sprintId);
@@ -495,7 +510,7 @@ export const mutateTypesenseTasks = (state, payload) => {
                 snapshot: null
             };
             if(data) {
-                state.tasks[pid][sprintId].tasks = [data];
+                placeRow(state.tasks[pid][sprintId], data);
             }
         }
     } else {
@@ -515,7 +530,7 @@ export const mutateTypesenseTasks = (state, payload) => {
             sprints: [sprintId]
         };
         if(data) {
-            state.tasks[pid][sprintId].tasks = [data];
+            placeRow(state.tasks[pid][sprintId], data);
         }
     }
 }
@@ -650,9 +665,16 @@ export const emptyTableTasks = (state, payload) => {
 }
 
 export const mutateTypesenseTableTasks = (state, payload) => {
-    const {pid, sprintId, data, nextPage, total = 0 } = payload;
+    const {pid, sprintId, data, nextPage, total = 0, op } = payload;
     const keys = Object.keys(state.tableTasks);
     const projectFound = keys.includes(pid);
+    /* An event, unlike a page the Table asked for, can be about a task this list does not show (any more). */
+    if(op && data && !shownInList(data, pid, sprintId)) {
+        const held = projectFound ? state.tableTasks[pid][sprintId]?.tasks : null;
+        const at = held ? held.findIndex((x) => x._id === data._id) : -1;
+        if(at !== -1) held.splice(at, 1);
+        return;
+    }
     if(projectFound) {
         const sprintFound = state.tableTasks[pid].sprints.includes(sprintId);
         if(sprintFound) {
@@ -701,33 +723,13 @@ export const mutateTypesenseTableTasks = (state, payload) => {
 }
 
 export const mutateSearchTask = (state, payload) => {
-    let mapTasks = [];
-    payload.data.sort((a, b) => a.isParentTask > b.isParentTask ? -1 : 1);
-
     if(payload.op === "added"){
-        payload.data.forEach((task) => {
-            if(task.isParentTask) {
-                const index = mapTasks.findIndex((x) => x._id === task._id)
-    
-                if(index !== -1) {
-                    mapTasks[index] = {...mapTasks[index], ...task};
-                } else {
-                    mapTasks.push({...task, subtaskArray: []})
-                }
-            } else {
-                const index = mapTasks.findIndex((x) => x._id === task.ParentTaskId)
-    
-                if(index !== -1) {
-                    mapTasks[index].subtaskArray.push(task);
-                }
-            }
-        })
-        state.searchedTasks = mapTasks;
-    }else{
-        let index = state.searchedTasks.findIndex((x) => x._id === payload.data[0]._id);
-        if(index !== -1){
-            state.searchedTasks[index] = payload.data[0];
-        }
+        state.searchedTasks = treeOf(payload.data);
+        return;
+    }
+    const found = locate({ tasks: state.searchedTasks }, payload.data[0]._id);
+    if(found){
+        found.siblings[found.index] = payload.data[0];
     }
 }
 
@@ -941,6 +943,11 @@ export const mutateFolders = (state,payload) => {
         }
     }
 }
+
+export const replaceFolders = (state, { projectId, folders }) => {
+    state.folders = { ...state.folders, [projectId]: folders };
+}
+
 export const mutateSearchedProjects = (state,payload) => {
     let searchedProjects = [];
     let searchData = payload.data;
@@ -963,6 +970,7 @@ export const mutateSearchedProjects = (state,payload) => {
                                 legacyId : folder?.legacyId ? folder?.legacyId : '',
                                 id: folder._id,
                                 _id: folder._id,
+                                parentFolderId: folder.parentFolderId || null,
                                 isExpanded: true
                             };
                         }

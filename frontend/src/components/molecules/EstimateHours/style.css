@@ -1,18 +1,68 @@
 .estimate-sidebar .sidebar-content .sidebar-head {
     height: 46px !important;
 }
+/* The shared Sidebar is white in both themes and sits in a host that keeps light controls; this one is repainted. */
+:root[data-theme="dark"] .estimate-sidebar,
+:root[data-theme="dark"] .estimate-sidebar .bg-white {
+    color-scheme: dark;
+}
+.estimate-sidebar .sidebar-content,
+.estimate-sidebar .sidebar-body {
+    background-color: var(--surface);
+    color: var(--ink);
+}
+.estimate-sidebar .sidebar-content .sidebar-head {
+    background-color: var(--surface);
+    border-bottom-color: var(--hairline);
+    color: var(--ink) !important;
+}
+.estimate-sidebar__title {
+    margin: 0;
+    font: var(--text-h3);
+    font-size: 16px;
+    color: var(--ink);
+}
+.estimate-sidebar__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.estimate-sidebar__card {
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-md, 8px);
+    background: var(--surface-2);
+}
+.estimate-sidebar .taskstatustitle-desktop,
+.estimate-sidebar .taskstatustitle-mobile {
+    color: var(--ink-label) !important;
+}
+.estimate-sidebar .form-control {
+    border-color: var(--border);
+    background: var(--surface);
+    color: var(--ink);
+}
+.estimate-sidebar .form-control:disabled {
+    color: var(--ink-2);
+}
+.estimate-sidebar .calendar-comp::placeholder,
+.estimate-sidebar .form-control::placeholder {
+    color: var(--ink-2);
+    opacity: 1;
+}
 
 .task-esitmate-hours {
     border-radius: 7px;
     border-width: 2px;
     height: 24px;
-    font-size: 13px;
     font-family: var(--font-ui);
     font-style: normal;
     font-weight: 400;
     line-height: 23px;
     padding: 0px 8px 0px 8px;
-    margin-left: -7px;
+    margin-left: -8px;
+}
+.task-esitmate-hours--over {
+    color: var(--danger);
 }
 .createProjectBlankUseTemplateWrapper .createprojectContent .form-group .input-field-group {
     width: calc(100% - 150px);
@@ -30,13 +80,13 @@
     width: calc(100% - 150px);
 }
 .due-date.duedate__estimate .dp__main {
-    border: 1px solid #DFE1E6 !important;
+    border: 1px solid var(--border) !important;
     border-radius: 6px;
     height: 30px;
 
 }
 td.est_esditing_block.disbleDate , th.disbleDate{
-    background: #FFEBEB !important;
+    background: var(--danger-bg) !important;
 }
 th.disbleDate span{
     opacity: 1;
@@ -45,15 +95,11 @@ th.disbleDate span{
     left: 0px;
     z-index: 2;
     top: 0; 
-    background-color: rgba(0, 0, 0, 0.208);
-}
-@media(max-width: 1199px){
-.task-esitmate-hours{
-    margin-left: -4px;
-}
+    background-color: var(--scrim);
 }
 @media(max-width: 767px){
     .task-detail-right-side-label .task-esitmate-hours{font-size: 16px !important;padding-right: 0 !important;}
+    .estimate-sidebar__card { border: 0; background: transparent; }
     .estimate__hours-wrapper .calendar-comp {
         height: 55px;
         padding-left: 10px;

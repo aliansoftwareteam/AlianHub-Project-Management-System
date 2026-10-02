@@ -17,13 +17,14 @@
 
         <div class="cv__body">
             <div class="cv__main">
-                <div v-if="showSprints && sprintBands.length" class="cv__bands">
+                <div v-if="showSprints && sprintBands.length" class="cv__bands" :style="{ '--lanes': sprintLaneCount }">
                     <span
                         v-for="band in sprintBands"
                         :key="band.id"
                         class="cv__band"
                         :class="{ 'is-current': band.current }"
-                        :style="{ left: `${band.left}%`, width: `${band.width}%` }"
+                        :style="{ left: `${band.left}%`, width: `${band.width}%`, '--lane': band.lane }"
+                        :title="band.label"
                     >{{ band.label }}</span>
                 </div>
 
@@ -39,6 +40,7 @@
                                 class="cv__chip"
                                 :class="{ 'cv__chip--pto': arg.event.extendedProps.kind === 'pto', 'cv__chip--done': arg.event.extendedProps.isClosed }"
                                 :style="chipStyle(arg.event)"
+                                :title="chipTitle(arg.event)"
                             >
                                 <img v-if="arg.event.extendedProps.kind !== 'pto' && !arg.event.extendedProps.isParent" class="cv__chip-icon" :src="subTask" alt="" />
                                 {{ arg.event.title }}
@@ -97,6 +99,9 @@
     import { apiRequest } from '../../../services';
     import { useI18n } from "vue-i18n";
     import { proposalTitle } from "@/views/Ai/plainLabels";
+    import { eachRow } from "@/store/ProjectData/taskTree";
+    import { ancestorsOf } from "@taskTreeRules";
+    import { assignLanes } from "@/views/Projects/composables/sprintLanes";
 
     defineOptions({ name: "CalendarViewComponent" });
 
@@ -184,11 +189,31 @@
         };
     };
 
+    /* Names of the tasks seen so far, by id: an entry says which task it sits under. Not reactive,
+       because it is written where the entries themselves are built. */
+    const taskNames = new Map();
+    const rememberNames = (tasks) => tasks.forEach((task) => { if (task?._id) taskNames.set(String(task._id), task.TaskName); });
+
+    /* A task made top-level again can still carry the chain it had. */
+    const chainOf = (task) => {
+        if (task?.isParentTask === true) return [];
+        const chain = ancestorsOf(task);
+        if (chain.length) return chain;
+        return task?.ParentTaskId ? [String(task.ParentTaskId)] : [];
+    };
+    const parentTrail = (ids) => (ids || []).map((id) => taskNames.get(String(id))).filter(Boolean).join(' › ');
+
+    const chipTitle = (event) => {
+        const parent = parentTrail(event.extendedProps.ancestorIds);
+        return parent ? t('Views.subtask_title', { name: event.title, parent }) : event.title;
+    };
+
     const trayMeta = (task) => {
+        const parent = parentTrail(chainOf(task));
         const owner = task.Task_Leader ? getUser(task.Task_Leader)?.Employee_Name : '';
         const estimate = Number(task.taskFinalEstimate || task.totalTaskEstMin || 0);
         const hours = estimate ? `${Math.round((estimate / 60) * 10) / 10}h` : '';
-        return [owner, hours].filter(Boolean).join(' · ');
+        return [parent ? t('Views.subtask_of', { parent }) : '', owner, hours].filter(Boolean).join(' · ');
     };
 
     const handleEventClick = (clickInfo) => {
@@ -270,7 +295,7 @@
         if (!start || !end) return [];
         const span = end.getTime() - start.getTime();
         if (span <= 0) return [];
-        return sprintsOfProject.value
+        const bands = sprintsOfProject.value
             .filter((s) => s.startDate && s.endDate)
             .map((s) => {
                 const from = new Date(s.startDate).getTime();
@@ -281,12 +306,17 @@
                     id: String(s.id || s._id),
                     current: String(s.id || s._id) === String(props.sprint?.id || props.sprint?._id),
                     label: `${(s.name || t('Views.sprint_fallback')).toUpperCase()} · ${dayLabel(formatDate(from))}–${dayLabel(formatDate(to))}`,
+                    from: formatDate(from),
+                    to: formatDate(to),
                     left,
                     width,
                 };
             })
             .filter((band) => band.width > 0 && band.left < 100);
+        return assignLanes(bands);
     });
+
+    const sprintLaneCount = computed(() => Math.max(1, ...sprintBands.value.map((band) => band.lane + 1)));
 
     const sprintRanges = computed(() => sprintsOfProject.value
         .filter((s) => s.startDate && s.endDate)
@@ -404,6 +434,7 @@
             textColor: 'black',
             borderLeftColor: status ? status.textColor : 'var(--brand)',
             isParent: data.isParentTask ? data.isParentTask : false,
+            ancestorIds: chainOf(data),
             isClosed: status ? status.type === 'close' : false,
             dueDateDeadLine: data?.dueDateDeadLine ? data.dueDateDeadLine : [],
             projectId: data?.ProjectID ? data.ProjectID : "",
@@ -430,13 +461,8 @@
     const manageSearchData = (mdata) => {
         if(searchedTask.value) {
             const project = JSON.parse(JSON.stringify(projectData.value));
-            let allTasks = [];
-            mdata.forEach((task) => {
-                allTasks = [...allTasks, task]
-                if(task.subtaskArray?.length) {
-                    allTasks = [...allTasks, ...task.subtaskArray]
-                }
-            })
+            let allTasks = [...eachRow(mdata)];
+            rememberNames(allTasks);
             unscheduled.value = allTasks.filter((x) => (!x?.startDate || x.startDate === 0) && (!x?.DueDate || x.DueDate === 0));
             allTasks = allTasks.filter((x) => !((!x?.startDate || x.startDate === 0) && (!x?.DueDate || x.DueDate === 0)));
             calendarOptions.value.events = JSON.parse(JSON.stringify(
@@ -454,6 +480,7 @@
         if(pid === projectData.value._id && sprintId === props.sprint.id) {
             const project = JSON.parse(JSON.stringify(projectData.value));
             const calendarData = calendarOptions.value.events;
+            rememberNames([taskData]);
             const index = calendarData.findIndex((x) => x.id === taskData._id);
             if (index !== -1) {
                 calendarData[index] = eventFromTask(withFallbackDates(taskData), project);
@@ -750,6 +777,7 @@
             apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery}).then((data) => {
                 if (data.status === 200 && data.data.length) {
                     let taskData = [...data.data];
+                    rememberNames(taskData);
                     // A task with neither date is the tray's content, not a dropped row.
                     unscheduled.value = taskData.filter((x) => (!x.DueDate || x.DueDate === 0) && (!x.startDate || x.startDate === 0));
                     taskData = taskData

@@ -137,12 +137,12 @@ onMounted(() => nextTick(() => input.value && input.value.focus()));
 </script>
 
 <style scoped>
-.mc-ask-form { display: flex; flex-direction: column; gap: 6px; }
+.mc-ask-form { display: flex; flex-direction: column; gap: var(--sp-2); }
 .mc-ask-input { width: 100%; box-sizing: border-box; resize: vertical; }
-.mc-ask-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.mc-ask-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-3); flex-wrap: wrap; }
 .mc-ask-private { margin-right: auto; color: var(--ink-2); }
 .mc-ai-answer { max-height: 40vh; overflow: auto; }
-.mc-ai-answer :deep(p), .mc-ai-answer :deep(ul), .mc-ai-answer :deep(ol) { margin: 0 0 6px; }
-.mc-ai-answer :deep(ul), .mc-ai-answer :deep(ol) { padding-left: 20px; }
+.mc-ai-answer :deep(p), .mc-ai-answer :deep(ul), .mc-ai-answer :deep(ol) { margin: 0 0 var(--sp-2); }
+.mc-ai-answer :deep(ul), .mc-ai-answer :deep(ol) { padding-left: var(--sp-8); }
 .mc-ai-answer :deep(.ask-cite) { color: var(--brand); font-weight: 600; }
 </style>

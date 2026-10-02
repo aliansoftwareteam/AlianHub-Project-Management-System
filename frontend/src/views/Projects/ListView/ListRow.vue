@@ -19,16 +19,17 @@
             />
         </span>
 
-        <div class="lv2__title lv2__c-title" role="cell" :class="{ 'lv2__title--sub': isSub }">
+        <div class="lv2__title lv2__c-title" role="cell" :class="{ 'lv2__title--sub': isSub }" :style="isSub ? { '--lv2-depth': level } : null">
             <span v-if="!isSub" class="lv2__grip draggable_icon" aria-hidden="true"><ShellIcon name="grip" :size="12" /></span>
             <button
-                v-if="!isSub && data.isParentTask && subtaskCount"
+                v-if="canNest && subtaskCount"
                 type="button"
                 class="lv2__disclose"
                 :aria-expanded="expanded"
                 :aria-label="$t('List.toggle_subtasks')"
                 @click.stop="$emit('toggle-subtasks')"
             >{{ expanded ? '▾' : '▸' }}</button>
+            <span v-else-if="isSub" class="lv2__disclose lv2__disclose--none" aria-hidden="true"></span>
             <ListStatusCircle
                 :task="data"
                 :statuses="statuses"
@@ -50,7 +51,9 @@
             />
             <button v-else type="button" class="lv2__name" :title="data.TaskName" @click.stop="open">{{ data.TaskName }}</button>
             <span v-if="!renaming && metaText" class="lv2__key">{{ metaText }}</span>
+            <TaskHomeMark v-if="!renaming && !isSub" :task="data" :list="viewedList" />
             <span v-if="tracking" class="lv2__timer" :title="$t('List.tracking_now')">● {{ timerText }}</span>
+            <TaskAgentMark v-if="!renaming" :task-id="String(data._id)" />
             <button v-if="agentLine" type="button" class="lv2__agent-line" :title="agentLine" @click.stop="$emit('review-agent', proposal)">
                 ✦ {{ agentLine }}
             </button>
@@ -58,24 +61,8 @@
                 v-if="edit && !renaming"
                 :task="data"
                 :href="edit.taskHref(data)"
-                :can-rename="rights.rename"
-                :can-subtask="!isSub && rights.subtask"
-                :can-template="!isSub && rights.template"
-                :can-archive="menuRights.archive"
-                :can-delete="menuRights.delete"
-                :can-move="!isSub && menuRights.move"
-                :can-duplicate="!isSub && menuRights.duplicate"
-                @rename="startRename"
-                @add-subtask="$emit('add-subtask', data)"
-                @copy-link="edit.copyLink(data)"
-                @copy-key="edit.copyKey && edit.copyKey(data)"
-                @open="open"
-                @save-template="openTemplateDialog({ mode: 'save', task: data })"
-                @archive="menu.archive(data)"
-                @delete="menu.remove(data)"
-                @move="menu.startMove(data)"
-                @duplicate="menu.duplicate(data)"
-                @duplicate-subtasks="menu.duplicate(data, { withSubtasks: true })"
+                :items="menuItems"
+                @choose="runMenu"
             />
         </div>
 
@@ -88,7 +75,7 @@
                 <ListAssigneeCell
                     :task="data"
                     :editable="rights.assignee"
-                    :options="rights.assignee ? edit.assigneeOptions(data) : []"
+                    :options="rights.assignee ? edit.assigneeOptions(data, parent) : []"
                     :multiple="Boolean(edit && edit.multipleAssignees.value)"
                     @change="(change) => edit.setAssignee(data, change, { row: rowEl })"
                 />
@@ -155,12 +142,18 @@ import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavig
 import EstimateCell from "@/views/Projects/components/columns/EstimateCell.vue";
 import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.vue";
 import { defaultColumns, listColumnClass } from "@/views/Projects/composables/viewColumns";
+import { taskMenuItems } from "@/views/Projects/composables/taskMenu";
+import TaskHomeMark from "@/views/Projects/components/TaskHomeMark.vue";
+import TaskAgentMark from "@/views/Projects/components/TaskAgentMark.vue";
+import { MAX_DEPTH } from "@taskTreeRules";
 
 defineOptions({ name: "ListRow" });
 
 const props = defineProps({
     data: { type: Object, required: true },
     isSub: { type: Boolean, default: false },
+    depth: { type: Number, default: 0 },
+    parent: { type: Object, default: null },
     selected: { type: Boolean, default: false },
     expanded: { type: Boolean, default: false },
     canSelect: { type: Boolean, default: false },
@@ -176,7 +169,12 @@ const NO_RIGHTS = { status: false, assignee: false, due: false, priority: false,
 const edit = inject("listRowEdit", null);
 const rights = computed(() => edit?.rights.value || NO_RIGHTS);
 const menu = inject("listRowMenu", null);
-const menuRights = computed(() => menu?.rights.value || {});
+const menuRights = computed(() => ({ rename: rights.value.rename, subtask: rights.value.subtask, template: rights.value.template, ...menu?.rights.value }));
+/* How many levels down the row sits. A row on the last level takes no subtasks. */
+const level = computed(() => props.depth || (props.isSub ? 1 : 0));
+const canNest = computed(() => level.value < MAX_DEPTH);
+const viewedList = inject("viewedList", ref(null));
+const menuItems = computed(() => taskMenuItems(props.data, menuRights.value, { isSub: props.isSub, canNest: canNest.value, listId: viewedList.value?.sprintId }));
 const statuses = computed(() => edit?.statuses.value || []);
 const showPriority = computed(() => (edit ? edit.showPriority.value : true));
 const rowEl = ref(null);
@@ -219,11 +217,7 @@ const timerText = computed(() => {
     return h ? `${h}:${m}:${s}` : `${m}:${s}`;
 });
 
-const agentLine = computed(() => {
-    if (props.proposal) return `${props.proposal.agentName}: ${proposalTitle(t, props.proposal)}`;
-    if (props.run) return `${props.run.agentName}: ${t("List.agent_working")}`;
-    return "";
-});
+const agentLine = computed(() => (props.proposal ? `${props.proposal.agentName}: ${proposalTitle(t, props.proposal)}` : ""));
 
 function open() {
     emit("open", props.data);
@@ -256,5 +250,31 @@ function cancelRename() {
 
 function onSelect(event) {
     emit("select", props.data, event);
+}
+
+/* A subtask moves and duplicates through the sidebars the Board uses: the List's own
+ * move and duplicate are bulk calls that place whole tasks. */
+function runMenu(id) {
+    const task = props.data;
+    const viaSidebar = () => menu.openSidebar(id, task);
+    const actions = {
+        rename: startRename,
+        subtask: () => emit("add-subtask", task),
+        "copy-link": () => edit.copyLink(task),
+        "copy-key": () => edit.copyKey?.(task),
+        open,
+        "save-template": () => openTemplateDialog({ mode: "save", task }),
+        "convert-subtask": viaSidebar,
+        "convert-list": viaSidebar,
+        move: props.isSub ? viaSidebar : () => menu.startMove(task),
+        "remove-from-list": () => menu.removeFromList(task, viewedList.value?.sprintId),
+        duplicate: props.isSub ? viaSidebar : () => menu.duplicate(task),
+        "duplicate-subtasks": () => menu.duplicate(task, { withSubtasks: true }),
+        merge: viaSidebar,
+        archive: () => menu.archive(task),
+        restore: () => menu.restore(task),
+        delete: () => menu.remove(task)
+    };
+    actions[id]?.();
 }
 </script>

@@ -7,8 +7,13 @@ const { TRASHED, quotaStatus, syncProjectQuota, privacyChange, syncProjectType }
 const logger = require('../../../Config/loggerConfig');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { recordProjectChanges } = require('../helpers/projectHistory');
+const { checkWorkingDays } = require('../../Company/helpers/workingDays');
+const socketEmitter = require('../../../event/socketEventEmitter');
+const { holdProjectDescription, ProjectDescriptionRefused } = require('../helpers/projectDescription');
+const { RichTextLimitError } = require('../../Tasks/helpers/cleanRichText');
 
 exports.updateProjectInternal = async (companyId, projectId, updateObject, key, arrayFilters) => {
+    holdProjectDescription(updateObject, key);
     // Trashing and restoring a project are the only writes that change what a company
     // owns, and every client reaches them through here. A counter failure must not block
     // the delete: a stuck count is recoverable, a project nobody can remove is not.
@@ -146,6 +151,22 @@ const guardSourceUpdate = async (companyId, projectId, updateObject, touchesSour
     return check.valid ? {} : { error: "A proposal id is required for Upwork projects" };
 };
 
+/* The override is written whole: a list replaces it and null hands the project back to the company's week. */
+const guardWorkingDays = (updateObject, key) => {
+    const paths = Object.keys(updateObject).filter((path) => path.split('.')[0] === 'workingDays');
+    if (!paths.length) return {};
+    if (paths.some((path) => path !== 'workingDays') || (key && key !== '$set')) {
+        return { error: 'Working days must be sent as a full list with $set, or as null to use the company\'s.' };
+    }
+    if (updateObject.workingDays === null) return { touched: true };
+    const week = checkWorkingDays(updateObject.workingDays);
+    if (!week.ok) return { error: week.error };
+    updateObject.workingDays = week.days;
+    return { touched: true };
+};
+
+const plain = (document) => (document && typeof document.toObject === 'function' ? document.toObject() : document);
+
 exports.updateProject = async (req, res) => {
     try {
         const { id: projectId } = req.params;
@@ -175,11 +196,20 @@ exports.updateProject = async (req, res) => {
             }
             updateObject.skills = await resolveProjectSkills(companyId, updateObject.skills);
         }
+        const week = guardWorkingDays(updateObject, key);
+        if (week.error) return res.status(400).json({ status: false, statusText: week.error, message: week.error });
         exports.updateProjectInternal(companyId, projectId, updateObject, key, arrayFilters).then((project) => {
+            if (week.touched && project) {
+                const updatedFields = { workingDays: updateObject.workingDays };
+                socketEmitter.emit('update', { type: 'update', data: { ...plain(project), ...updatedFields }, updatedFields, module: 'project' });
+            }
             recordProjectChanges({ companyId, projectId, actorId: req.uid, previous: project, updateObject, key, arrayFilters, timeZone: req.body.timeZone })
                 .catch((error) => logger.error(`project history after update failed: ${(error && error.message) || error}`));
             return res.status(200).json(project);
         }).catch((error) => {
+            if (error instanceof ProjectDescriptionRefused || error instanceof RichTextLimitError) {
+                return res.status(error.statusCode).json({ status: false, statusText: error.message, message: error.message });
+            }
             return res.status(500).json({ message: "An error occurred while fetching the project",error:error });
         })
     } catch (error) {

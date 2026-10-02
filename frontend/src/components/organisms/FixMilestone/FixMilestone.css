@@ -1,14 +1,18 @@
 .fix-milestone, .hourly_milestone{
-    border: 1px solid #dfe1e6;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
     border-radius: 5px;
     border-collapse: collapse;
     width: 100%;
     position: relative;
 }
+.fix-milestone-wrapper.is-locked,
+.fix-milestone-wrapper.is-locked :is(.fix-milestone, .hourly_milestone) {
+    background: var(--fill);
+}
 .fix-milestone-wrapper thead tr {
-    background: #f4f5f7;
-    border-bottom: 1px solid #e4e4e4;
-    background-color: #DFE1E6;
+    border-bottom: 1px solid var(--hairline);
+    background-color: var(--fill);
 }
 .fix-milestone-wrapper th,.fix-milestone-wrapper td{
     text-align: left;
@@ -19,7 +23,7 @@
     font-weight: 500;
     font-size: 16px;
     line-height: 24px;
-    color: #000000;
+    color: var(--ink);
 }
 .fix-milestone-wrapper td {
     font-family: var(--font-ui);
@@ -27,7 +31,7 @@
     font-weight: 400;
     font-size: 13px;
     line-height: 19px;
-    color: #000000;
+    color: var(--ink);
 }
 .fix-milestone th:nth-child(1) , .fix-milestone td:nth-child(1) {
     width: 18px;
@@ -86,7 +90,7 @@
     margin: 0 auto;
 }
 .fix-milestone-wrapper tbody tr{
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid var(--hairline);
 }
 .add_new {
     font-family: var(--font-ui);
@@ -95,7 +99,7 @@
     font-size: 13px;
     line-height: 15px;
     text-decoration-line: underline;
-    color: #2F3990;
+    color: var(--brand);
     background-color: transparent;
     border: none;
 }
@@ -114,16 +118,16 @@
     font-weight: 500;
     font-size: 16px;
     line-height: 24px;
-    color: black;
+    color: var(--ink);
 }
 .wrapper_add_amount {
     padding: 9.5px 0px;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-top: none;
 }
 .warpper_input {
     padding: 9.5px 15px;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-top: none;
 }
 .milestone_name {
@@ -134,14 +138,14 @@
 }
 .milestone-date input.form-control{height: 30px!important;}
 .fix-milestone-wrapper tfoot{
-    border-top: 1px solid #DFE1E6;
+    border-top: 1px solid var(--hairline);
 }
 .hourly_wrapper {
     max-height: 176px;
     overflow: auto;
 }
 .hourly_wrapper_value {
-    border-bottom: 1px solid #dfe1e6;
+    border-bottom: 1px solid var(--hairline);
     padding: 7px 0px 7px 30px;
 }
 .multiple_status {
@@ -152,7 +156,7 @@
     overflow: hidden;
     white-space: nowrap;
     padding: 5px 10px;
-    color: #fff;
+    color: var(--rail-ink-strong);
     font-size: 13px;
     border-radius: 4px;
 }
@@ -164,7 +168,7 @@
     padding: 0px !important;
 }
 .border_left_status {
-    border-left: 1px solid #DFE1E6;
+    border-left: 1px solid var(--hairline);
     padding: 0px !important;
 }
 .clear_status {
@@ -176,33 +180,16 @@
     font-size: 14px;
     -webkit-text-decoration-line: underline;
     text-decoration-line: underline;
-    color: #2F3990;
+    color: var(--brand);
 }
 .hourly_wrapper_value:last-child {
     border-bottom: none;
 }
-/* .milestone-date .dp__main.dp__theme_light {
-    background: #FFFFFF;
-    border: 1px solid #DFE1E6;
-    border-radius: 4px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-} */
 img {
     max-width: 100%;
     width: auto;
     height: auto;
     max-height: 100%;
-}
-.milestone-date .date-img-wrapper {
-    background: #2F3990;
-    height: 30px;
-    width: 32px !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 5px;
 }
 .milestone-date span.date_format {
     margin-left: 5px !important;
@@ -215,10 +202,10 @@ img {
     font-weight: 700;
     font-size: 14px;
     line-height: 21px;
-    color: black;
+    color: var(--ink);
     padding-bottom: 15px;
     padding-top: 30px;
-    border-top: 1px solid #DFE1E6;
+    border-top: 1px solid var(--hairline);
 }
 .status_dot_value{
     width: 120px;
@@ -267,7 +254,7 @@ input[type="number"]::-webkit-outer-spin-button {
     padding-top: 5px;
 }
 .fixMilestone_wrapper_tr.sortable-chosen {
-    background-color: #DFE1E6 !important;
+    background-color: var(--fill) !important;
 }
 .webkit_wrapper_milestone {
     display: -webkit-box;

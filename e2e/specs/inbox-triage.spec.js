@@ -53,7 +53,7 @@ test.describe('inbox keyboard triage', () => {
             for (const screen of ['shell', 'project', 'board', 'list']) localStorage.setItem(`ah.tour.skipped.${screen}`, '1');
             sessionStorage.setItem('ah.gs.dismissed', '1');
         });
-        await page.goto(`/#/${state.companyId}/inbox`);
+        await page.goto(`/#/${state.companyId}/inbox?tab=primary`);
         const mine = page.locator('.ibx__card', { hasText: suffix });
         await expect(mine).toHaveCount(3);
         await expect(page.locator('.ibx__card').first()).toContainText(`Triage Alpha ${suffix}`);

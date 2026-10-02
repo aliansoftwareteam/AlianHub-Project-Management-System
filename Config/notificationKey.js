@@ -50,6 +50,11 @@ const Notification_key = {
   DOC_MENTION:"doc_mention",
   DOC_COMMENT_MENTION:"doc_comment_mention",
   DOC_COMMENT_REPLY:"doc_comment_reply",
+  DOC_COMMENT_ASSIGNED:"doc_comment_assigned",
+  GOAL_TARGET_REACHED:"goal_target_reached",
+  GOAL_REACHED:"goal_reached",
+  DOC_SHARED:"doc_shared",
+  CREDENTIAL_EXPIRING:"credential_expiring",
 }
 const TemplateType = {
  CREATE:'create',
@@ -96,16 +101,32 @@ const DOC_NOTICE_SECTION = Object.freeze({
     Object.freeze({ name: "Docs I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_MENTION }),
     Object.freeze({ name: "Doc comments I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_MENTION }),
     Object.freeze({ name: "Replies to my doc comments", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_REPLY }),
+    Object.freeze({ name: "Doc comments assigned to me", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_ASSIGNED }),
+    Object.freeze({ name: "Docs shared with me", email: false, browser: true, mobile: true, key: Notification_key.DOC_SHARED }),
   ]),
 });
 
-const docNoticeSection = () => ({ ...DOC_NOTICE_SECTION, items: DOC_NOTICE_SECTION.items.map((item) => ({ ...item })) });
+// Added the same way, by Modules/notification/goalNotices.js.
+const GOAL_NOTICE_SECTION = Object.freeze({
+  key: "goals",
+  sectionName: "Goals",
+  items: Object.freeze([
+    Object.freeze({ name: "Targets reached on my goals", email: false, browser: true, mobile: true, key: Notification_key.GOAL_TARGET_REACHED }),
+    Object.freeze({ name: "Goals reached", email: false, browser: true, mobile: true, key: Notification_key.GOAL_REACHED }),
+  ]),
+});
+
+const copyOf = (section) => ({ ...section, items: section.items.map((item) => ({ ...item })) });
+const docNoticeSection = () => copyOf(DOC_NOTICE_SECTION);
+const goalNoticeSection = () => copyOf(GOAL_NOTICE_SECTION);
 
 module.exports = {
     Notification_key,
     COMMENT_NOTICE_ITEMS,
     DOC_NOTICE_SECTION,
     docNoticeSection,
+    GOAL_NOTICE_SECTION,
+    goalNoticeSection,
     TemplateType,
     ChangeTypes
 };

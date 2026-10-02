@@ -1,4 +1,5 @@
 import { customGroupMatches } from "@/views/Projects/composables/customFieldQuery";
+import { inList } from "@/store/ProjectData/listMembership";
 
 const assigneeIds = (task) => {
     const ids = task?.AssigneeUserId;
@@ -46,16 +47,49 @@ export function groupLabel(item) {
 
 export function listSourceTasks({ searched, searchedTasks, storeTasks, sprintId }) {
     if (!searched) return storeTasks || [];
-    return (searchedTasks || []).filter((task) => task.sprintId === sprintId);
+    return (searchedTasks || []).filter((task) => inList(task, sprintId));
 }
 
 const isVisible = (task, showArchived) => (showArchived ? task.deletedStatusKey === 2 : !task.deletedStatusKey);
 
+const timeOf = (value) => {
+    if (!value) return 0;
+    const time = value.seconds ? value.seconds * 1000 : new Date(value).getTime();
+    return Number.isNaN(time) ? 0 : time;
+};
+
+/* A task without the index sorts first, as a missing field does in MongoDB. */
+const indexOf = (index) => (index === null || index === undefined || Number.isNaN(Number(index)) ? -Infinity : Number(index));
+
+const orderKey = (index, createdAt, id) => [indexOf(index), timeOf(createdAt), String(id ?? "")];
+
+function compareKeys(a, b) {
+    for (let at = 0; at < a.length; at += 1) {
+        if (a[at] !== b[at]) return a[at] > b[at] ? 1 : -1;
+    }
+    return 0;
+}
+
+/* The order the server pages a group in (getPaginatedTasks sorts by the group's index, then
+   createdAt, then _id), so rows sit where the next page expects them and ties never shuffle. */
+export const pageOrder = (indexName) => (a, b) => compareKeys(
+    orderKey(a[indexName], a.createdAt, a._id),
+    orderKey(b[indexName], b.createdAt, b._id)
+);
+
+/* How many loaded rows the server has already paged past: the rows up to the last one a page
+   brought. Rows that left the group no longer count, and a row beyond that point (a new task,
+   one a socket event added) is not counted either, so the next page starts where the last ended. */
+export function pagedPast(rows, frontier, indexName) {
+    if (!frontier) return null;
+    const last = orderKey(frontier.index, frontier.createdAt, frontier._id);
+    return (rows || []).filter((row) => compareKeys(orderKey(row[indexName], row.createdAt, row._id), last) <= 0).length;
+}
+
 export function groupRows(tasks, item, showArchived) {
-    const index = (task) => Number(task[item.indexName]) || 0;
     return (tasks || [])
         .filter((task) => isVisible(task, showArchived) && taskInGroup(task, item))
-        .sort((a, b) => index(a) - index(b));
+        .sort(pageOrder(item.indexName));
 }
 
 export const groupCountKey = (item) => `${item?.searchKey}_${item?.searchValue}`;

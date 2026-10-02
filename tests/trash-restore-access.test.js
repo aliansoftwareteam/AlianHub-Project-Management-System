@@ -170,6 +170,66 @@ describe('restoring a list from the trash', () => {
     });
 });
 
+describe('restoring a folder from the trash', () => {
+    const seedFolder = (project, doc = {}) => mockDb.seed(SCHEMA_TYPE.FOLDERS, { _id: oid(), name: 'Folder', projectId: project._id, deletedStatusKey: 1, ...doc });
+
+    it('refuses a member who may neither restore nor delete folders', async () => {
+        seedRules({ ...CAN_DELETE, 'project.folder_delete': false, 'project.folder_restore': false });
+        const res = await restore(MEMBER, 'folders', seedFolder(seedProject())._id);
+        expect(res.statusCode).toBe(403);
+        expect(mockReached).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['restore', { 'project.folder_restore': true, 'project.folder_delete': false }],
+        ['delete', { 'project.folder_restore': false, 'project.folder_delete': true }],
+    ])('lets a member who may only %s folders restore one', async (label, grants) => {
+        seedRules({ ...CAN_DELETE, ...grants });
+        const res = await restore(MEMBER, 'folders', seedFolder(seedProject())._id);
+        expect(res.body).toMatchObject({ reached: 'restore' });
+    });
+
+    it('answers 404 for a folder in a private project the member is not in', async () => {
+        seedRules({ ...CAN_DELETE, 'project.folder_delete': true });
+        const res = await restore(MEMBER, 'folders', seedFolder(seedProject({ isPrivateSpace: true, AssigneeUserId: [OWNER] }))._id);
+        expect(res.statusCode).toBe(404);
+        expect(mockReached).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 to a member for a chat category', async () => {
+        seedRules({ ...CAN_DELETE, 'project.folder_delete': true });
+        const res = await restore(MEMBER, 'folders', seedFolder({ _id: oid() })._id);
+        expect(res.statusCode).toBe(404);
+        expect(mockReached).not.toHaveBeenCalled();
+    });
+});
+
+describe('restoring a chat from the trash', () => {
+    const seedChat = (people) => mockDb.seed(SCHEMA_TYPE.TASKS, { _id: oid(), TaskName: 'Chat', ProjectID: oid(), mainChat: true, AssigneeUserId: people, deletedStatusKey: 1 });
+
+    it('answers 404 to an owner who is not in it', async () => {
+        seedRules({});
+        const res = await restore(OWNER, 'tasks', seedChat([MEMBER, 'a00000000000000000000009'])._id);
+        expect(res.statusCode).toBe(404);
+        expect(mockReached).not.toHaveBeenCalled();
+    });
+
+    it('lets an owner restore a chat they are in, and a task outside any project', async () => {
+        seedRules({});
+        expect((await restore(OWNER, 'tasks', seedChat([OWNER, MEMBER])._id)).body).toMatchObject({ reached: 'restore' });
+        const loose = mockDb.seed(SCHEMA_TYPE.TASKS, { _id: oid(), TaskName: 'Loose', ProjectID: oid(), deletedStatusKey: 1 });
+        expect((await restore(OWNER, 'tasks', loose._id)).body).toMatchObject({ reached: 'restore' });
+    });
+
+    it('answers 404 to an owner for a task in someone else\'s personal list', async () => {
+        seedRules({});
+        const list = seedProject({ isPrivateSpace: true, isPersonal: true, personalOwner: MEMBER, AssigneeUserId: [MEMBER] });
+        const res = await restore(OWNER, 'tasks', seedTask(list, seedSprint(list, { deletedStatusKey: 0 }))._id);
+        expect(res.statusCode).toBe(404);
+        expect(mockReached).not.toHaveBeenCalled();
+    });
+});
+
 describe('the restore records the signed-in user', () => {
     const { restore: restoreHandler } = jest.requireActual('../Modules/Trash/controller');
     const FORGED = { id: OWNER, Employee_Name: 'Somebody else' };

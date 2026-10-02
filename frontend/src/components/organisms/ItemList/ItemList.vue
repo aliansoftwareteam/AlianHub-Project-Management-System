@@ -307,7 +307,7 @@
         @closeSidebar="handleCloseSidebar"
         :componentDetail="{}"
         :customFieldObject="{}"
-        :isCustomField="isCustomField"
+        v-model:isCustomField="isCustomField"
         @handleClose="handleClose()"
     />
 </template>
@@ -336,6 +336,9 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 
 const {isCustomFields} = customField();
 import * as env from '@/config/env';
+import { indexRepairBody, indexRepairRows, plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
+import { childrenWereRead } from "@/store/ProjectData/taskTree";
+import { convertToTaskRequest } from "@/views/Projects/composables/taskPlacement";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../services";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
@@ -699,9 +702,8 @@ function toggleTask(task,e) {
         subObserver[task._id] = null;
     }
 
-    if(task.isExpanded === true && (!task.subtaskArray || task.subtaskArray.length < 25)) {
-        let fetchNew = currentProjectTasks.value?.[props.projectId]?.[props.sprintId].index[`${task._id}_${props.item.searchKey}_${props.item.searchValue}`] === undefined;
-        fetchSubTask(task, fetchNew);
+    if(task.isExpanded === true) {
+        fetchSubTask(task, !childrenWereRead(currentProjectTasks.value?.[props.projectId]?.[props.sprintId], task._id, props.item));
     }
 }
 
@@ -832,24 +834,14 @@ function updateItem(type,e, item) {
             });
         }else if(type === "task" && checkPermission('task.convert_to_task', props.project?.isGlobalPermission) === true) {
             if(e?.added?.element.isParentTask === false){
-                taskClass.convertToTask({
+                taskClass.convertToTask(convertToTaskRequest({
                     companyId: companyId.value,
-                    projectData: {
-                        id:pid
-                    },
-                    taskId : e?.added?.element._id,
-                    parentTaskId:e?.added?.element.ParentTaskId,
-                    sprintObj: props.sprintObject,
-                    oldSprintObj :{
-                        id:props.sprintObject.id,
-                        folderId:null
-                    },
-                    oldProject: {
-                        id : pid,
-                        taskTypeCounts : props.project.taskTypeCounts,
-                        taskStatusData : props.project.taskStatusData
-                    }
-                }).then(() => {
+                    destination: props.project,
+                    sprint: props.sprintObject,
+                    task: e.added.element,
+                    oldSprint: { id: props.sprintObject.id, folderId: null },
+                    source: props.project
+                })).then(() => {
                     commit("projectData/mutateUpdateFirebaseTasks",{
                         snap, 
                         op: "removed",
@@ -1006,7 +998,7 @@ function updateItem(type,e, item) {
                 isFirstWithRecord: (index === 0 && taskDt.length !== 1 && taskDt.length !== 0) ? true : false,
                 indexName: item.indexName,
                 sprintId: findTask.sprintId,
-                relevantKey: item.searchValue,
+                relevantKey: plainGroupValue(item.searchValue),
                 searchKey: item.searchKey,
                 taskKey: findTask.TaskKey,
                 updateData: UpdateData
@@ -1051,7 +1043,7 @@ function fetchSubTask(task, fetchNew = false) {
         userId: userId.value,
         fetchNew: fetchNew,
         projectData: projectData.value,
-        parentId: task.isParentTask ? task._id : ""
+        parentId: String(task._id)
     })
 }
 
@@ -1196,51 +1188,27 @@ const setHeader = (customFieldArray) => {
 }
 
 
-function prepareIndexData () {    
-    // setTimeout(() => {
-    let taskWithoutFilter = []
-    let taskArray = [];
-    let withoutIndexTask = items.value?.filter((data) => {
-        return (data[props.item.indexName] === undefined || data[props.item.indexName] === null) && data.TaskKey !== '--'
-    })
-    if (withoutIndexTask?.length > 0) {
-        withoutIndexTask.map((x) => taskWithoutFilter.push({data: x._id, item: props.item, taskKey: x.TaskKey}))
-        withoutIndexTask.map((x) => taskArray.push(x));
-    }    
-    if (!(taskWithoutFilter.length === 0 && taskArray.length === 0)) {
-        var newObj = {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: taskArray, indexName: items.value[0].indexName};
-        commit("projectData/mutateTaskIndex",newObj)
-        let count = 0;
-        if (taskArray.length !== 1) {
-            isLoading.value = true;
-        }
-        let countFunction = (row) => {
-            if (count >= taskWithoutFilter.length) {
-                isLoading.value = false;
-                return;
-            } else {
-                if (row.taskKey != '--') {
-                    apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, {
-                        taskUpdate : row,
-                        companyId: companyId.value,
-                    }).then(()=>{
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update project history: ", error);
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                } else {
-                    count++;
-                    countFunction(taskWithoutFilter[count]);
-                }
-            }
-        }
-        countFunction(taskWithoutFilter[count])
+function prepareIndexData () {
+    const rows = indexRepairRows(items.value, props.item, checkPermission('task.task_list', projectData.value?.isGlobalPermission));
+    if (!rows.length) return;
+
+    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: props.item.indexName});
+    if (rows.length !== 1) {
+        isLoading.value = true;
     }
-    // }, 2000);
+    const next = (index) => {
+        if (index >= rows.length) {
+            isLoading.value = false;
+            return;
+        }
+        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(rows[index], companyId.value))
+            .then(() => next(index + 1))
+            .catch((error) => {
+                console.error("ERROR in update task index: ", error);
+                next(index + 1);
+            });
+    };
+    next(0);
 }
 const handleClose = () => {
     isCustomField.value = false;

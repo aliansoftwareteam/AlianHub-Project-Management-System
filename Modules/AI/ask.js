@@ -7,7 +7,7 @@ const logger = require('../../Config/loggerConfig');
 const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { FEATURES } = require('../AICore/features');
 const { visibleProjects } = require('../Agents/scope');
-const { pageVisibilityFilter } = require('../Pages/helpers/pageRules');
+const { pageReachFilter } = require('../Pages/helpers/pageRules');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const knowledgeFlag = require('../Knowledge/flag');
 const { askSources } = require('../Knowledge/askSources');
@@ -15,6 +15,7 @@ const { structuredTasks } = require('./askStructured');
 const { gatherForTask } = require('./taskContext');
 const { isNarrowed } = require('../../Config/tokenNarrowing');
 const { aboutAsker } = require('./aiProfile');
+const { askAnswerToken } = require('./shareToken');
 
 // Ask (handoff 13i) — a question box over the workspace.
 //
@@ -101,7 +102,8 @@ const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYP
     const textMatch = orRegex(terms, ['TaskName', 'TaskKey', 'rawDescription']);
     if (textMatch) Object.assign(taskMatch, textMatch);
 
-    const pageMatch = { deletedStatusKey: { $ne: 1 }, ProjectID: { $in: searchIds }, $and: [pageVisibilityFilter(uid)] };
+    const everywhere = !named && !projectId && !tokenProjectIds.length;
+    const pageMatch = { deletedStatusKey: { $ne: 1 }, ...pageReachFilter({ uid, projectIds: searchIds, companyWide: everywhere, namedProjectIds: everywhere ? null : searchIds }) };
     const pageText = orRegex(terms, ['title']);
     if (pageText) pageMatch.$and.push(pageText);
 
@@ -203,84 +205,92 @@ const promptFor = (question, sources, intent, about) => [
     ...sources.map((s) => `[${s.ref}] ${s.kind} · ${s.project || 'no project'} · ${s.title}${s.detail ? ` — ${s.detail}` : ''}`),
 ].join('\n');
 
+/* The reply to one question as `req`'s caller: what the ask route sends, for the handlers that ask on its behalf. */
+const answerQuestion = async (req, { question, mode, projectId, taskId } = {}) => {
+    const companyId = req.headers['companyid'] || '';
+    const uid = req.uid;
+    // Each displayed sentence keeps its English text for older clients; the screen translates the code beside it.
+    if (!companyId || !uid) return { status: false, statusText: 'companyId and an authenticated user are required.', code: 'unauthenticated' };
+    if (!String(question || '').trim()) return { status: false, statusText: 'Ask a question first.', code: 'question_required' };
+
+    const research = mode === 'research';
+    const gathered = taskId
+        ? await gatherForTask(companyId, uid, taskId, tokenProjectIdsOf(req))
+        : await gather(companyId, uid, { question, projectId, limit: research ? MAX_PER_TYPE * 2 : MAX_PER_TYPE, tokenProjectIds: tokenProjectIdsOf(req) });
+    if (!gathered) return { status: false, statusText: 'Task not found.', code: 'task_not_found' };
+    const roleType = await getRoleType(companyId, uid).catch(() => null);
+    const found = gathered.intent ? { intent: gathered.intent } : {};
+
+    // The sources come back whether or not a model is configured: the screen
+    // can then show what it would have searched and ask an admin to connect
+    // one, instead of failing with an error nobody can act on.
+    if (!isAnyProviderConfigured()) {
+        return {
+            status: true,
+            statusText: 'No model configured.',
+            data: {
+                configured: false,
+                answer: '',
+                sources: gathered.sources,
+                scope: { projects: gathered.projects.length, privileged: isPrivileged(roleType) },
+                mode: research ? 'research' : 'ask',
+                ...found,
+            },
+        };
+    }
+
+    if (!gathered.sources.length) {
+        return {
+            status: true,
+            data: {
+                configured: true, answer: '', sources: [], mode: research ? 'research' : 'ask',
+                empty: 'Nothing in the projects you can open matches that. Try naming the project or the task.',
+                emptyCode: 'no_match',
+                scope: { projects: gathered.projects.length, privileged: isPrivileged(roleType) },
+                ...found,
+            },
+        };
+    }
+
+    const about = await aboutOf(req, companyId, uid);
+    const provider = getProvider();
+    const result = await provider.chat({
+        systemPrompt: research ? RESEARCH_SYSTEM : SYSTEM,
+        messages: [{ role: 'user', content: promptFor(gathered.focus ? `${gathered.focus}\n${question}` : question, gathered.sources, gathered.intent, about) }],
+        maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
+        temperature: 0.2,
+        spend: { feature: FEATURES.ASK, companyId, userId: uid },
+    });
+
+    const answer = String(result.content || '').trim();
+    const cited = gathered.sources.filter((s) => answer.includes(`[${s.ref}]`));
+    const shareToken = askAnswerToken({ companyId, uid, question, answer, cited, sources: gathered.sources });
+    return {
+        status: true,
+        statusText: 'OK',
+        data: {
+            configured: true,
+            mode: research ? 'research' : 'ask',
+            answer,
+            cited,
+            sources: gathered.sources,
+            scope: { projects: gathered.projects.length, privileged: isPrivileged(roleType) },
+            usage: { tokens: result.totalTokens, model: result.model },
+            ...(shareToken ? { shareToken } : {}),
+            ...found,
+        },
+    };
+};
+
+const failed = (error) => ({ status: false, statusText: error.message, ...(typeof error.code === 'string' ? { code: error.code } : {}) });
+
 /* POST /api/v1/ai/ask  body: { question, mode?: 'ask'|'research', projectId?, taskId? } */
 const ask = async (req, res) => {
     try {
-        const companyId = req.headers['companyid'] || '';
-        const uid = req.uid;
-        const { question, mode, projectId, taskId } = req.body || {};
-        // Each displayed sentence keeps its English text for older clients; the screen translates the code beside it.
-        if (!companyId || !uid) return res.send({ status: false, statusText: 'companyId and an authenticated user are required.', code: 'unauthenticated' });
-        if (!String(question || '').trim()) return res.send({ status: false, statusText: 'Ask a question first.', code: 'question_required' });
-
-        const research = mode === 'research';
-        const gathered = taskId
-            ? await gatherForTask(companyId, uid, taskId, tokenProjectIdsOf(req))
-            : await gather(companyId, uid, { question, projectId, limit: research ? MAX_PER_TYPE * 2 : MAX_PER_TYPE, tokenProjectIds: tokenProjectIdsOf(req) });
-        if (!gathered) return res.send({ status: false, statusText: 'Task not found.', code: 'task_not_found' });
-        const roleType = await getRoleType(companyId, uid).catch(() => null);
-        const found = gathered.intent ? { intent: gathered.intent } : {};
-
-        // The sources come back whether or not a model is configured: the screen
-        // can then show what it would have searched and ask an admin to connect
-        // one, instead of failing with an error nobody can act on.
-        if (!isAnyProviderConfigured()) {
-            return res.send({
-                status: true,
-                statusText: 'No model configured.',
-                data: {
-                    configured: false,
-                    answer: '',
-                    sources: gathered.sources,
-                    scope: { projects: gathered.projects.length, privileged: isPrivileged(roleType) },
-                    mode: research ? 'research' : 'ask',
-                    ...found,
-                },
-            });
-        }
-
-        if (!gathered.sources.length) {
-            return res.send({
-                status: true,
-                data: {
-                    configured: true, answer: '', sources: [], mode: research ? 'research' : 'ask',
-                    empty: 'Nothing in the projects you can open matches that. Try naming the project or the task.',
-                    emptyCode: 'no_match',
-                    scope: { projects: gathered.projects.length, privileged: isPrivileged(roleType) },
-                    ...found,
-                },
-            });
-        }
-
-        const about = await aboutOf(req, companyId, uid);
-        const provider = getProvider();
-        const result = await provider.chat({
-            systemPrompt: research ? RESEARCH_SYSTEM : SYSTEM,
-            messages: [{ role: 'user', content: promptFor(gathered.focus ? `${gathered.focus}\n${question}` : question, gathered.sources, gathered.intent, about) }],
-            maxTokens: research ? RESEARCH_TOKENS : ASK_TOKENS,
-            temperature: 0.2,
-            spend: { feature: FEATURES.ASK, companyId, userId: uid },
-        });
-
-        const answer = String(result.content || '').trim();
-        const cited = gathered.sources.filter((s) => answer.includes(`[${s.ref}]`));
-        return res.send({
-            status: true,
-            statusText: 'OK',
-            data: {
-                configured: true,
-                mode: research ? 'research' : 'ask',
-                answer,
-                cited,
-                sources: gathered.sources,
-                scope: { projects: gathered.projects.length, privileged: isPrivileged(roleType) },
-                usage: { tokens: result.totalTokens, model: result.model },
-                ...found,
-            },
-        });
+        return res.send(await answerQuestion(req, req.body || {}));
     } catch (error) {
         logger.error(`ai ask: ${error.message}`);
-        return res.send({ status: false, statusText: error.message, ...(typeof error.code === 'string' ? { code: error.code } : {}) });
+        return res.send(failed(error));
     }
 };
 
@@ -316,4 +326,4 @@ const sources = async (req, res) => {
 };
 
 module.exports = { ask, sources, gather, searchTerms, promptFor };
-Object.assign(module.exports, { SYSTEM, RESEARCH_SYSTEM, openProjects, tokenProjectIdsOf, aboutOf, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS });
+Object.assign(module.exports, { SYSTEM, RESEARCH_SYSTEM, openProjects, tokenProjectIdsOf, aboutOf, answerQuestion, failed, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS });

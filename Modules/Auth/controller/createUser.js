@@ -8,6 +8,7 @@ const mongoose = require("mongoose");
 const { importUserNotifications } = require("../../../utils/data");
 const { addAndRemoveUserInMongodbNotificationCount } = require("../../Auth/controller");
 const { toAuthView } = require("../../Users/helpers/userAccessRules");
+const { newAccountNavPreferences } = require("../../Users/helpers/navPreferencesRules");
 const { recordInvitedOwner } = require("../../Company/helpers/recordInvitedOwner");
 const {
     SocialSignInRefusal,
@@ -74,6 +75,7 @@ exports.buildUserDocument = ({ firstName, lastName, email, assignCompany, isInvi
     isActive: true,
     isOnline: false,
     isEmailVerified: Boolean(isInvitation),
+    navPreferences: newAccountNavPreferences(),
 });
 
 exports.addUserMongodbV2 = (data) => new Promise((resolve, reject) => {

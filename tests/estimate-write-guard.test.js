@@ -8,6 +8,7 @@ jest.mock('../Config/permissionGuard', () => ({
     isPrivileged: (r) => r === 1 || r === 2,
 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
+jest.mock('../Modules/PersonalList/ownership', () => ({ ...jest.requireActual('../Modules/PersonalList/ownership'), othersPersonalListIds: jest.fn(async () => []) }));
 jest.mock('../Modules/EstimatedTime/aiTaskEstimator', () => ({ estimateAndPersist: jest.fn(), _internal: {} }));
 jest.mock('../Modules/LogTime/controllerV2/helpers', () => ({ updateRemainingTime: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
@@ -15,6 +16,7 @@ jest.mock('../Modules/EstimatedTime/helpers/planHistory', () => ({ previousPlanO
 
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
+const { othersPersonalListIds } = require('../Modules/PersonalList/ownership');
 const estimates = require('../Modules/EstimatedTime/controller');
 
 const C = '6f0000000000000000000c01';
@@ -121,6 +123,27 @@ describe('PUT /api/v1/estimatedTime', () => {
         mockCrud.mockResolvedValueOnce(null);
         const r = await save(plan({ id: ROW }));
         expect(r.code).toBe(404);
+    });
+
+    it.each([[1, 'an owner'], [2, 'an admin']])('refuses role %s (%s) planning time in someone else\'s personal list, by the project named or by the task\'s own', async (roleType) => {
+        getRoleType.mockResolvedValue(roleType);
+        othersPersonalListIds.mockResolvedValue([P2]);
+        try {
+            const named = await save(plan({ userId: OTHER, projectId: P2 }));
+            expect(named.code).toBe(403);
+            expect(mockCrud).not.toHaveBeenCalled();
+
+            mockCrud.mockImplementation(async (companyId, mongoObj, method) => (method === 'findOne' ? { _id: T1, ProjectID: P2 } : { _id: 'row' }));
+            const mislabelled = await save(plan({ userId: OTHER, projectId: P1 }));
+            expect(mislabelled.code).toBe(403);
+            expect(mockCrud.mock.calls.every(([, , method]) => method === 'findOne')).toBe(true);
+
+            const byId = await save(plan({ userId: OTHER, projectId: P2, id: ROW }));
+            expect(byId.code).toBe(403);
+        } finally {
+            othersPersonalListIds.mockResolvedValue([]);
+            mockCrud.mockImplementation(async (companyId, mongoObj) => ({ _id: 'row', TaskId: mongoObj.data[1].$set.TaskId }));
+        }
     });
 
     it('lets an admin plan anyone\'s time company-wide', async () => {

@@ -1,43 +1,42 @@
 <template>
     <div class="mainConverToSubTask">
-    <Sidebar width="607px"  :top="clientWidth <= 767 ? '0px' : '46px'" className="converted__sidebar">
+    <Sidebar width="607px"  :top="clientWidth <= 767 ? '0px' : '46px'" className="converted__sidebar" :title="sidebarTitle">
             <template #head-left >
-                <div class="blue font-ui screenShotPreview text-ellipsis text-nowrap pr-15px" :class="clientWidth>767 ? 'font-size-18' : 'font-size-16'"  v-if="(props.fromWhich == undefined || props.fromWhich !== 'dashboard')">{{props.isMoveTask === true || props.openMoveSubTask === true ? $t('DuplicateTask.move_task') : isMergeTask === true ? $t('DuplicateTask.mearge_task_into') : isDuplicate === true ? $t('Projects.duplicate_task') : isConvertTask ? $t('ProjectDetails.convert_task') : isCreteTask ? $t('Comments.create_task') : $t('ProjectDetails.convert_subtask')}}</div>
-                <div class="blue font-ui screenShotPreview text-ellipsis text-nowrap pr-15px" :class="clientWidth>767 ? 'font-size-18' : 'font-size-16'" v-else>{{$t('Home.AddtoQueue')}}</div>
+                <div class="blue font-ui screenShotPreview text-ellipsis text-nowrap pr-15px" :class="clientWidth>767 ? 'font-size-18' : 'font-size-16'">{{ sidebarTitle }}</div>
             </template>
             <template #head-right>
-                <button class="outline-primary d-flex align-items-center font-ui" @click="closeSidebar()" :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'" :style="[{padding : clientWidth ? '3px 13.2px' : '3px 5px' , marginRight : clientWidth ? '0px' : '5px'}]">{{$t('Projects.cancel')}}</button>
+                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="closeSidebar()">{{$t('Projects.cancel')}}</button>
                 <template v-if="isDuplicate === true || isCreteTask === true">
-                    <button v-if="Object.keys(selectedSprintData).length > 0 && isDisable === false" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="duplicateTaskButton()">{{isDuplicate ? $t('Projects.duplicate_task') : $t('Comments.create_task')}}</button>
-                    <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isDuplicate ? $t('Projects.duplicate_task') : $t('Comments.create_task')}}</button>
+                    <button v-if="Object.keys(selectedSprintData).length > 0 && isDisable === false" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="duplicateTaskButton()">{{isDuplicate ? $t('Projects.duplicate_task') : $t('Comments.create_task')}}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isDuplicate ? $t('Projects.duplicate_task') : $t('Comments.create_task')}}</button>
                     <template v-if="isDuplicate">
-                        <button v-if="Object.keys(selectedSprintData).length > 0 && isDisable === false" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="duplicateTaskButton(),isRedirect = true">{{$t('ProjectDetails.DUPLICATE_AND_OPEN')}}</button>
-                        <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{$t('ProjectDetails.DUPLICATE_AND_OPEN')}}</button>
+                        <button v-if="Object.keys(selectedSprintData).length > 0 && isDisable === false" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="duplicateTaskButton(),isRedirect = true">{{$t('ProjectDetails.DUPLICATE_AND_OPEN')}}</button>
+                        <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{$t('ProjectDetails.DUPLICATE_AND_OPEN')}}</button>
                     </template>
                 </template>
                 <template v-if="isMoveTask || isConvertTask">
-                    <button v-if="Object.keys(selectedSprintData).length > 0" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="moveTaskButton()">{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
-                    <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMoveTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
+                    <button v-if="Object.keys(selectedSprintData).length > 0" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="moveTaskButton()">{{ placeLabel }}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{ placeLabel }}</button>
                     <template v-if="props.isBulkMove === false">
-                        <button v-if="Object.keys(selectedSprintData).length > 0" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="moveTaskButton(),isRedirect = true">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
-                        <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                        <button v-if="Object.keys(selectedSprintData).length > 0" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="moveTaskButton(),isRedirect = true">{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                        <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isMoveTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
                     </template>
                 </template>
                 <div v-if="isMergeTask || isOpenSubTask || openMoveSubTask">
-                    <button v-if="isTaskSelected" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="callMergeTaskForItem(false)">{{isMergeTask ? $t("ProjectDetails.merge") : openMoveSubTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
-                    <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMergeTask ? $t("ProjectDetails.merge") : openMoveSubTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
-                    <button v-if="isTaskSelected" class="btn-primary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-14'"  :style="[{padding : clientWidth ? '3px 14.4px' : '3px 5px'}]"  @click="callMergeTaskForItem(true),isRedirect = true">{{isMergeTask ? $t('ProjectDetails.MERGE_AND_OPEN') : openMoveSubTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
-                    <button v-else class="btn-secondary font-ui ml-10px"  :class="clientWidth>767 ? 'font-size-16' : 'font-size-11'"  :style="[{padding : clientWidth>767 ? '3px 14.4px' : '3px 3px'}]">{{isMergeTask ? $t('ProjectDetails.MERGE_AND_OPEN') : openMoveSubTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                    <button v-if="isTaskSelected" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="callMergeTaskForItem(false)">{{isMergeTask ? $t("ProjectDetails.merge") : openMoveSubTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isMergeTask ? $t("ProjectDetails.merge") : openMoveSubTask ? $t("ProjectDetails.move") : $t('ProjectDetails.convert')}}</button>
+                    <button v-if="isTaskSelected" type="button" class="ah-btn ah-btn--primary ah-btn--sm ml-10px" @click="callMergeTaskForItem(true),isRedirect = true">{{isMergeTask ? $t('ProjectDetails.MERGE_AND_OPEN') : openMoveSubTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
+                    <button v-else type="button" class="ah-btn ah-btn--secondary ah-btn--sm ml-10px" disabled>{{isMergeTask ? $t('ProjectDetails.MERGE_AND_OPEN') : openMoveSubTask ? $t('ProjectDetails.MOVE_AND_OPEN') : $t('ProjectDetails.CONVERT_AND_OPEN')}}</button>
                 </div>
             </template>
             <template #body>
                 <div :class="[{'duplicatetask__converttask--wrapper': (props.isDuplicate === true || isCreteTask === true)}]">
-                    <DuplicateCompo v-if="props.isDuplicate === true" @selctedItems="selectedItems" :task="task" :selectedProjectData="selectedProjectData" :selectedSprint="selectedSprintData" @assignee="assigneFun" @watcher="watcherFun" @taskName="taskFun" :from="props.isMoveTask ? 'move' : 'duplicate'"/>
-                    <div class="bg-white create__component--wrapper">
+                    <DuplicateCompo v-if="props.isDuplicate === true" @selctedItems="selectedItems" :task="task" :selectedProjectData="selectedProjectData" :selectedSprint="selectedSprintData" @assignee="carryAssignees" @watcher="carryWatchers" @taskName="taskFun" :from="props.isMoveTask ? 'move' : 'duplicate'"/>
+                    <div class="create__component--wrapper">
                         <div v-if="isCreteTask" class="create__task-title form-group d-flex align-items-center border-bottom-mobiledrop">
                             <InputText
                                 v-model="taskData.value"
-                                class="form-control login-input text-capitalize"
+                                class="form-control login-input"
                                 :placeHolder="$t('PlaceHolder.Enter_Task_Name')"
                                 :maxLength="250"
                                 :minLength="3"
@@ -52,8 +51,10 @@
                             <div class="red font-size-12">{{taskData.error}}</div>
                         </div>
                     </div>
-                    <div class="bg-white overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar p15x-20px" :class="{'border-radius-12-px' : clientWidth > 767, 'border-radius-0 ' : clientWidth <= 767 , 'convert__projecttask-wrapper':props.isDuplicate === true || isCreteTask === true }"  :style="[{margin : clientWidth > 767 ? '15px' : '0px' , height : clientWidth <= 767 ?  '100%' : '' , maxHeight :  clientWidth > 767 ? 'calc(100vh - 46px)' : '100%' }]">
+                    <div class="cts-card overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar p15x-20px" :class="{'border-radius-12-px' : clientWidth > 767, 'border-radius-0 ' : clientWidth <= 767 , 'convert__projecttask-wrapper':props.isDuplicate === true || isCreteTask === true }"  :style="[{margin : clientWidth > 767 ? '15px' : '0px' , height : clientWidth <= 767 ?  '100%' : '' , maxHeight :  clientWidth > 767 ? 'calc(100vh - 46px)' : '100%' }]">
                         <span v-if="props.isDuplicate === true || isCreteTask === true" class="font-size-16 font-weight-500 dark-gray mb-20px">{{$t('Projects.location')}}</span>
+                        <p v-if="listPicker && listPicker.note" class="convert__picker-note">{{ listPicker.note }}</p>
+                        <p v-if="losesExtraLists" class="convert__depth-note">{{ $t('TaskLists.convert_note') }}</p>
                         <div :class="[{'duplicate__component-with--convertlist':props.isDuplicate === true || isCreteTask === true,'duplicate_component_only' : props.isDuplicate === true}]">
                             <div class="gray" :class="{'font-size-12' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{$t('Notification.project')}}</div>
                             <div class="d-flex align-items-center justify-content-between project__title-browsewrapper" v-if="isShowProjectList === false" :style="[{paddingTop : clientWidth > 767 ? '7px' : '15px'}]">
@@ -65,10 +66,10 @@
                                     </template>
                                     <span class="text-ellipsis Project-name-sidebar font-weight-500" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{selectedProjectData.ProjectName}}</span>
                                 </div>
-                                <span class="blue text-decoration-underline font-weight-500 cursor-pointer" @click="isShowProjectList = true" :class="{'font-size-14' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{$t('Projects.browse_projects')}}</span>
+                                <button type="button" class="cts-browse" @click="isShowProjectList = true" :class="{'font-size-14' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{$t('Projects.browse_projects')}}</button>
                             </div>
                             <template v-if="isShowProjectList === true">
-                                <InputText :placeHolder="$t('PlaceHolder.search')" v-model="projectSearch" class="input__Search"/>
+                                <InputText :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="projectSearch" class="input__Search"/>
                                 <template v-if="projectDatas.length > 0">
                                     <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar duplicate__convertTask" :style="[{ maxHeight : clientWidth > 767 ? 'calc(100vh - 214px)' : 'calc(100vh - 240px)'}]">
                                         <div v-for="project in projectDatas" :key="project" class="browse__Categotyproject-wrapper">
@@ -85,8 +86,9 @@
                                 </template>
                                 <div v-else>{{$t('ProjectSlider.no_result_found')}}</div>
                             </template>
-                            <div v-if="isShowProjectList === false">
-                                <InputText :placeHolder="$t('PlaceHolder.search')" v-model="taskSearch" class="input__Search"/>
+                            <p v-if="isShowProjectList === false && parentBlocked" class="convert__depth-note">{{ $t('ProjectDetails.convert_subtree_too_deep') }}</p>
+                            <div v-else-if="isShowProjectList === false && !parentRulePending">
+                                <InputText :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="taskSearch" class="input__Search"/>
                                 <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar"  :class="[{'duplicatetask__project--sprintList':props.isDuplicate === true}]" :style="[{maxHeight : clientWidth > 767 ? 'calc(100vh - 241px)' : 'calc(100vh - 275px)'}]">
                                     <template v-if="filterFoldersSprints && Object.keys(filterFoldersSprints).length">
                                         <SideBarSprintFolderData
@@ -103,6 +105,7 @@
                                             @taskSelect="(e) => taskSelctFun(e)"
                                             @expand="selecteFolderIndex = index,sprintClick(subItem)"
                                             :item="item"
+                                            :parentRule="parentRule"
                                         />
                                     </template>
                                     <template v-if="filterSprints && filterSprints.length">
@@ -121,6 +124,7 @@
                                             @taskSelect="(e) => taskSelctFun(e)"
                                             @expand="selectedIndex = index,sprintClick(subItem)"
                                             :item="item"
+                                            :parentRule="parentRule"
                                         />
                                     </template>
                                 </div>
@@ -162,6 +166,8 @@
     import { useToast } from "vue-toast-notification"
     import ConfirmationsInTask from "@/components/atom/ConfirmationsInTask/ConfirmationsInTask.vue"
     import {useHelperFun} from "./helper"
+    import { useParentRule } from "./parentRule";
+    import { canBeParentOf, parentCandidateMatch } from "@/views/Projects/composables/taskDepth";
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import DuplicateCompo from '@/components/atom/DuplicateCompo/DuplicateCompo.vue';
     import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
@@ -170,7 +176,9 @@
     import { taskPlanPermission } from "@/composable/commonFunction";
     import { useI18n } from "vue-i18n";
     import { apiRequest } from '../../../services';
+    import { nestedFolders } from '@/utils/folderTree';
     import * as env from '@/config/env';
+    import { convertToTaskRequest, duplicateTaskRequest, moveTaskRequest } from '@/views/Projects/composables/taskPlacement';
     const { t } = useI18n();
     const props = defineProps({
         closeSideBar: {
@@ -250,9 +258,30 @@
         projectOptions: {
             type: Array,
             default: null
+        },
+        // A plain list picker over the bulk move's project and list browser: its own title, confirm label and
+        // note, and `offers(list)` says which lists may be picked.
+        listPicker: {
+            type: Object,
+            default: null
         }
     });
     const isDisable = computed(() => props.isDisableButton)
+    const placeLabel = computed(() => {
+        if (props.listPicker) return props.listPicker.confirm;
+        return props.isMoveTask ? t('ProjectDetails.move') : t('ProjectDetails.convert');
+    });
+    const losesExtraLists = computed(() => props.isOpenSubTask && !props.isBulkConvert && (props.task?.extraLists || []).length > 0);
+    const sidebarTitle = computed(() => {
+        if (props.listPicker) return props.listPicker.title;
+        if (props.fromWhich === 'dashboard') return t('Home.AddtoQueue');
+        if (props.isMoveTask || props.openMoveSubTask) return t('DuplicateTask.move_task');
+        if (props.isMergeTask) return t('DuplicateTask.mearge_task_into');
+        if (props.isDuplicate) return t('Projects.duplicate_task');
+        if (props.isConvertTask) return t('ProjectDetails.convert_task');
+        if (props.isCreteTask) return t('Comments.create_task');
+        return t('ProjectDetails.convert_subtask');
+    });
     const {changeTaskType, changeStatus, filterSprintData, filterFolderSprintData, oldStatusData, oldTaskTypeData} = useHelperFun();
     const {getUser} = useGetterFunctions()
     const  { checkErrors  } = useValidation();
@@ -285,6 +314,10 @@
         error: "",
     });
     const { checkTaskPerSprintPermisssion } = taskPlanPermission();
+    const { rule: parentRule, pending: parentRulePending, blocked: parentBlocked, load: loadParentRule } = useParentRule(
+        () => props.task,
+        () => (props.isOpenSubTask || props.openMoveSubTask) && !props.isBulkConvert
+    );
 
     const projectDatas = computed(() => {
         if(props.fromWhich !== undefined && props.fromWhich == 'dashboard') {
@@ -299,9 +332,11 @@
     const emit = defineEmits(["isConvertSubtaskOPen","dataToMainComp","createTask","bulkMoveConfirm","bulkConvertConfirm"])
     const projectData = (props.selectedProjectObject == undefined || Object.keys(props.selectedProjectObject).length == 0) ? inject("selectedProject") : '';
     const isSidebarOPen = ref(props.closeSideBar);
-    const selectedProjectData = ref(props.selectedProjectObject == undefined ? projectData.value : props.selectedProjectObject);
+    /* The lists read for a project are written onto it. A list picker reads only the lists it offers, so it browses a copy. */
+    const browsed = (project) => (props.listPicker ? { ...project, sprintsObj: {}, sprintsfolders: {} } : project);
+    const selectedProjectData = ref(browsed(props.selectedProjectObject == undefined ? projectData.value : props.selectedProjectObject));
     const sprints = ref(JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {})));
-    const sprintFolders = ref(JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsfolders || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0))));
+    const sprintFolders = ref(JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders))));
     const isShowProjectList = ref(false);
     const taskSearch = ref("");
     const searchData = ref([]);
@@ -325,9 +360,10 @@
 
     onMounted(() => {
         task.value = props.task;
+        loadParentRule();
         getSprintFolderData(selectedProjectData.value._id).then(() => {
             sprints.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {}))
-            sprintFolders.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsfolders || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)));
+            sprintFolders.value = JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders)));
             if(props.isMoveTask === true){
                 if(filterFoldersSprints.value.length === 0 && filterSprints.value.filter((x) => x.id !== task.value.sprintId)?.length ===0){
                     isShowProjectList.value = true;
@@ -360,10 +396,10 @@
     }
 
     const changeProject =  async(event) => {
-        selectedProjectData.value = event;
+        selectedProjectData.value = browsed(event);
         await getSprintFolderData(selectedProjectData.value._id);
         sprints.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsObj || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)|| {}))
-        sprintFolders.value = JSON.parse(JSON.stringify(Object.values(selectedProjectData.value.sprintsfolders || {}).filter((x)=>x.deletedStatusKey === undefined || x.deletedStatusKey === 0)));
+        sprintFolders.value = JSON.parse(JSON.stringify(nestedFolders(selectedProjectData.value.sprintsfolders)));
         isShowProjectList.value = false;
         selectedSprintData.value = {};
     }
@@ -375,7 +411,7 @@
             findQuery = [
                 {
                     "$match": {
-                        isParentTask : true,
+                        ...((parentRule.value && parentCandidateMatch(parentRule.value.task, parentRule.value.height)) || { isParentTask : true }),
                         deletedStatusKey : 0,
                         objId: {
                             ProjectID: selectedProjectData.value?._id
@@ -403,7 +439,9 @@
         }
         apiRequest('post',`${env.TASK}/find`,{findQuery: findQuery}).then((resp) => {
             if(resp.status === 200){
-                const result = resp.data;
+                const result = parentRule.value
+                    ? resp.data.filter((row) => canBeParentOf(row, parentRule.value.task, parentRule.value.height))
+                    : resp.data;
                 let array = []
                 result.filter((x) => {
                     array.push(x);
@@ -584,32 +622,17 @@
             companyOwnerId: user.companyOwnerId,
         }
         isSpinner.value = true;
-        taskClass.moveTask({
+        taskClass.moveTask(moveTaskRequest({
             companyId: companyId.value,
-            projectData: {
-                id : selectedProjectData.value._id,
-                ProjectCode : selectedProjectData.value.ProjectCode,
-                ProjectName : selectedProjectData.value.ProjectName
-            },
-            sprintObj: selectedSprintData.value,
-            moveTaskId : task.value._id,
-            oldSprintObj : {
-                id : task.value.sprintId,
-                folderId : task.value.folderObjId || null,
-                name : task.value.sprintArray?.name,
-                folderName : task.value.sprintArray?.folderName || ''
-            },
-            oldProject : {
-                id : projectData.value._id,
-                taskTypeCounts : projectData.value.taskTypeCounts,
-                taskStatusData : projectData.value.taskStatusData,
-                ProjectName : projectData.value.ProjectName
-            },
+            destination: selectedProjectData.value,
+            sprint: selectedSprintData.value,
+            task: task.value,
+            source: projectData.value,
             isSubTask : selectedTaskSubTask.value.length > 1 ? true : false,
             assignee : selectedAssigneeId.value,
             watcher : selectedWatcherId.value,
             userData : userData
-        }).then((result) => {
+        })).then((result) => {
             if(result.status === true){
                 isSpinner.value = false;
                 if(route.params?.taskId){
@@ -690,33 +713,19 @@
             Employee_Name: user.Employee_Name,
             companyOwnerId: user.companyOwnerId,
         }
-        taskClass.duplicateTask({
+        taskClass.duplicateTask(duplicateTaskRequest({
             companyId: companyId.value,
-            projectData: {
-                id : selectedProjectData.value._id,
-                ProjectCode : selectedProjectData.value.ProjectCode,
-                ProjectName : selectedProjectData.value.ProjectName
-            },
-            sprintObj: selectedSprintData.value,
-            selectedTaskId : task.value._id,
-            oldProject : {
-                id : projectData.value._id,
-                taskTypeCounts : projectData.value.taskTypeCounts,
-                taskStatusData : projectData.value.taskStatusData,
-                ProjectName : projectData.value.ProjectName
-            },
+            destination: selectedProjectData.value,
+            sprint: selectedSprintData.value,
+            task: task.value,
+            source: projectData.value,
             userData : userData,
             isSubTask : duplicateSubTask.value.length > 0 ?  true : false,
             duplicateData:selectedDuplicatedItems.value,
             assignee : selectedAssigneeId.value,
             watcher : selectedWatcherId.value,
             taskName:duplicateTaskName.value ? duplicateTaskName.value : '',
-            oldSprintObj : {
-                folderId : task.value.folderObjId || null,
-                name : task.value.sprintArray?.name,
-                folderName : task.value.sprintArray?.folderName || ''
-            },
-        }).then((result) => {
+        })).then((result) => {
             if(result.data.status === true){
                 let sprintCount = (task.value.subTasks || 0) + 1;
                 const sprint = {...selectedSprintData.value,tasks: selectedSprintData.value.tasks + sprintCount};
@@ -790,6 +799,14 @@
         duplicateTaskName.value = data;
     }
 
+    function carryAssignees (ids) {
+        selectedAssigneeId.value = ids;
+    }
+
+    function carryWatchers (ids) {
+        selectedWatcherId.value = ids;
+    }
+
     const getDataFromChild = (ele) => {
         emit('dataToMainComp',ele)
     }
@@ -812,24 +829,14 @@
         }
         closeSidebar();
         isSpinner.value = true;
-        taskClass.convertToTask({
+        taskClass.convertToTask(convertToTaskRequest({
             companyId: companyId.value,
-            projectData: {
-                id:selectedProjectData.value._id
-            },
-            taskId : task.value._id,
-            parentTaskId:task.value.ParentTaskId,
-            sprintObj: selectedSprintData.value,
-            oldSprintObj :{
-                id:task.value.sprintId,
-                folderId:task.value.folderObjId || null
-            },
-            oldProject: {
-                id :projectData.value._id,
-                taskTypeCounts : projectData.value.taskTypeCounts,
-                taskStatusData : projectData.value.taskStatusData
-            }
-        }).then((result) => {
+            destination: selectedProjectData.value,
+            sprint: selectedSprintData.value,
+            task: task.value,
+            oldSprint: { id: task.value.sprintId, folderId: task.value.folderObjId || null },
+            source: projectData.value
+        })).then((result) => {
             if(result.status === true){
                 isSpinner.value = false;
                 if(selectedSprintData.value._id !== task.value.sprintId) {
@@ -1052,7 +1059,8 @@
                 .then((results) => {
                     const resolvedPromises = results.filter((result) => result.status === 'fulfilled');
                     if (resolvedPromises.length === 2) {
-                        const [sprintsResult, foldersResult] = resolvedPromises.map((result) => result.value);
+                        const [fetchedSprints, foldersResult] = resolvedPromises.map((result) => result.value);
+                        const sprintsResult = props.listPicker ? (fetchedSprints || []).filter(props.listPicker.offers) : fetchedSprints;
                         const sprintsArray = sprintsResult?.filter(sprint => sprint.projectId === id && !sprint.folderId).map((x) => ({ ...x, id:x._id }));
         
                         const foldersObject = foldersResult?.reduce((acc, folder) => {
@@ -1065,6 +1073,7 @@
                                     deletedStatusKey: folder.deletedStatusKey,
                                     id: folder._id,
                                     _id: folder._id,
+                                    parentFolderId: folder.parentFolderId || null,
                                 };
                             }
                             return acc;
@@ -1180,3 +1189,4 @@
     }
 </script>
 <style scoped src="./style.css"></style>
+<style src="./theme.css"></style>

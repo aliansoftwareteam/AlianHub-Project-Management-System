@@ -55,12 +55,12 @@
                     v-for="d in u.days.filter((x) => visibleDays.includes(x.date))"
                     :key="d.date"
                     class="wl__cell"
-                    :class="{ 'is-pto': d.pto, 'is-today': d.date === today, 'is-drop': dropKey === `${u.userId}|${d.date}`, 'tv-hatch': d.pto }"
+                    :class="{ 'is-pto': isOff(d), 'is-today': d.date === today, 'is-drop': dropKey === `${u.userId}|${d.date}`, 'tv-hatch': isOff(d) }"
                     @dragover.prevent="onDragOver(u, d)"
                     @dragleave="onDragLeave(u, d)"
                     @drop.prevent="onDrop(u, d)"
                 >
-                    <template v-if="d.pto"><span class="wl__pto">{{ $t('Time.pto') }}</span></template>
+                    <template v-if="isOff(d)"><span class="wl__pto">{{ d.pto ? $t('Time.pto') : $t('Time.unavailable') }}</span></template>
                     <template v-else>
                         <div class="wl__fill" :class="{ 'is-over': isOver(d), 'is-tentative': isTentative(d.date) }" :style="{ height: `${fillPct(d)}%` }">
                             <span v-if="value(d)">{{ hLabel(value(d)) }}</span>
@@ -116,6 +116,7 @@ import { formatHm } from '@/composable/useTimer';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
 import AppState from '@/components/molecules/AppState/AppState.vue';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+import { gridWeek, workingDaysOnly } from '@/views/Projects/WorkloadView/workloadUnits';
 
 defineOptions({ name: 'WorkloadTimesheet' });
 
@@ -137,6 +138,7 @@ const projectList = ref([]);
 const mode = ref('estimate');
 const users = ref([]);
 const days = ref([]);
+const answeredWeek = ref(null);
 const loading = ref(false);
 const error = ref('');
 const notice = ref('');
@@ -150,9 +152,10 @@ const endDate = computed(() => start.value.clone().add(11, 'days'));
 const startIso = computed(() => start.value.format('YYYY-MM-DD'));
 const endIso = computed(() => endDate.value.format('YYYY-MM-DD'));
 const rangeLabel = computed(() => `${start.value.format('MMM D')} – ${endDate.value.format(start.value.isSame(endDate.value, 'month') ? 'D' : 'MMM D')}`);
-const visibleDays = computed(() => days.value.filter((d) => ![0, 6].includes(moment(d).day())));
+const selectedProject = computed(() => projectList.value.find((x) => String(x._id) === projectId.value) || null);
+const visibleDays = computed(() => workingDaysOnly(days.value, gridWeek(answeredWeek.value, currentCompany.value, selectedProject.value)));
 const activeProject = computed(() => {
-    const p = projectList.value.find((x) => String(x._id) === projectId.value);
+    const p = selectedProject.value;
     return p ? { color: p.projectIcon && p.projectIcon.type === 'color' ? p.projectIcon.data : '' } : null;
 });
 const timeZone = computed(() => (getUser(uid.value) || {}).timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
@@ -166,13 +169,18 @@ const hLabel = (m) => {
     return `${h >= 10 || Number.isInteger(h) ? Math.round(h) : Math.round(h * 10) / 10}h`;
 };
 const value = (d) => (mode.value === 'estimate' ? d.estimated : d.logged);
+/* The server names time off as PTO to the person and to owners and admins, and as unavailable to anyone else. */
+const isOff = (d) => Boolean(d.pto || d.unavailable);
 const isOver = (d) => (d.capacityMinutes > 0 ? value(d) > d.capacityMinutes : value(d) > 0);
 const fillPct = (d) => (d.capacityMinutes > 0 ? Math.min(100, (value(d) / d.capacityMinutes) * 100) : (value(d) ? 100 : 0));
 const isTentative = (date) => moment(date).isAfter(moment().endOf('isoWeek'));
 const subLabel = (u) => {
     if (u.utilizationPct > 100) return t('Time.pct_period', { pct: u.utilizationPct });
-    const pto = u.days.filter((d) => d.pto && visibleDays.value.includes(d.date));
-    if (pto.length) return t('Time.pto_range', { range: pto.length === 1 ? moment(pto[0].date).format('ddd') : `${moment(pto[0].date).format('ddd')}–${moment(pto[pto.length - 1].date).format('ddd')}` });
+    const off = u.days.filter((d) => isOff(d) && visibleDays.value.includes(d.date));
+    if (off.length) {
+        const range = off.length === 1 ? moment(off[0].date).format('ddd') : `${moment(off[0].date).format('ddd')}–${moment(off[off.length - 1].date).format('ddd')}`;
+        return t(off.every((d) => d.pto) ? 'Time.pto_range' : 'Time.unavailable_range', { range });
+    }
     return t('Time.per_day', { h: u.hoursPerDay });
 };
 const pctAfter = (u, delta) => (u.capacityMinutes > 0 ? Math.round(((u.totalEstimated + delta) / u.capacityMinutes) * 100) : 0);
@@ -187,6 +195,7 @@ const load = async () => {
         if (!body.status) throw new Error(body.statusText || 'load_failed');
         users.value = body.data.users || [];
         days.value = body.data.days || [];
+        answeredWeek.value = body.data.workingDays || null;
     } catch (e) {
         error.value = t('Time.load_failed');
     } finally {
@@ -229,7 +238,7 @@ const onDragStart = (e, u, d, c) => {
     e.dataTransfer.setData('text/plain', c.taskId);
 };
 const onDragOver = (u, d) => {
-    if (!drag.value || d.pto) return;
+    if (!drag.value || isOff(d)) return;
     const key = `${u.userId}|${d.date}`;
     if (dropKey.value === key) return;
     dropKey.value = key;
@@ -248,7 +257,7 @@ const onDrop = (u, d) => {
     const current = drag.value;
     dropKey.value = '';
     drag.value = null;
-    if (!current || d.pto) return;
+    if (!current || isOff(d)) return;
     if (current.fromUser.userId === u.userId && current.fromDay.date === d.date) { hint.value = null; return; }
     move({ ...current, toUser: u, toDay: d });
 };
@@ -256,7 +265,7 @@ const onDrop = (u, d) => {
 const suggestBalance = () => {
     let worst = null;
     users.value.forEach((u) => u.days.forEach((d) => {
-        if (!d.pto && d.chips.length && d.capacityMinutes > 0 && d.estimated > d.capacityMinutes && (!worst || d.estimated - d.capacityMinutes > worst.d.estimated - worst.d.capacityMinutes)) worst = { u, d };
+        if (!isOff(d) && d.chips.length && d.capacityMinutes > 0 && d.estimated > d.capacityMinutes && (!worst || d.estimated - d.capacityMinutes > worst.d.estimated - worst.d.capacityMinutes)) worst = { u, d };
     }));
     if (!worst) { hint.value = { text: t('Time.balance_none') }; return; }
     const chip = [...worst.d.chips].sort((a, b) => b.minutes - a.minutes)[0];
@@ -264,7 +273,7 @@ const suggestBalance = () => {
     users.value.forEach((u) => {
         if (u.userId === worst.u.userId) return;
         const d = u.days.find((x) => x.date === worst.d.date);
-        if (!d || d.pto || d.capacityMinutes <= 0) return;
+        if (!d || isOff(d) || d.capacityMinutes <= 0) return;
         const room = d.capacityMinutes - d.estimated;
         if (room >= chip.minutes && (!target || room > target.room)) target = { u, d, room };
     });
@@ -301,7 +310,7 @@ onMounted(() => {
 .wl__person { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .wl__person .ah-avatar { width: 26px; height: 26px; font-size: 10px; }
 .wl__person-text { min-width: 0; }
-.wl__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl__name { font-size: var(--row-font, 12.5px); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wl__sub { font-size: 11px; color: var(--ink-2); }
 .wl__sub.is-over { color: var(--danger); }
 .wl__cell { position: relative; background: var(--surface); border: 1px solid var(--hairline); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease); }
@@ -316,7 +325,7 @@ onMounted(() => {
 .wl__chip { pointer-events: auto; cursor: grab; font: 500 9.5px/1.2 var(--font-ui); background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wl__chip:active { cursor: grabbing; }
 .wl__chip--more { color: var(--ink-2); font-family: var(--font-mono); }
-.wl__total { display: grid; place-items: center; font: 600 12px/1 var(--font-mono); }
+.wl__total { display: grid; place-items: center; font: 600 var(--row-font, 12px)/1 var(--font-mono); }
 .wl__total small { font: 400 10px/1 var(--font-mono); color: var(--ink-2); }
 .wl__total.is-over { color: var(--danger); }
 .wl__empty { grid-column: 1 / -1; }

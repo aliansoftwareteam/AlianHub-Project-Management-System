@@ -37,7 +37,7 @@
                             <div v-for="(item, index) in chatContent" :key="index" class="chat-content">
                                 <div v-if="item.role === 'user'">
                                     <div class="d-flex align-items-center pb-13px">
-                                        <UserProfile
+                                        <UserProfile decorative
                                             :showDot="false"
                                             class="cursor-pointer mr-10px"
                                             width="30px"
@@ -456,7 +456,7 @@ function renderHtmlFun (data) {
 </script>
 <style>
 .hubai_image_div{
-    background: linear-gradient(270deg, #F241CD 0%, #4B5DEE 100%);
+    background: linear-gradient(270deg, var(--agent) 0%, var(--brand) 100%);
     width: 30px;
     height: 30px;
     border-radius: 15px;
@@ -478,7 +478,7 @@ function renderHtmlFun (data) {
     padding: 20px 0px 20px;
 }
 .chatsend_wrapper{
-    background-color: #FFFFFF;
+    background-color: var(--surface);
     position: fixed;
     display: flex;
     height: max-content;
@@ -493,7 +493,7 @@ function renderHtmlFun (data) {
     display: inline-block;
     width: 15px;
     height: 15px;
-    background-color: #2F3990;
+    background-color: var(--brand);
     border-radius: 50%;
     animation: blink-animation 1s infinite;
 }
@@ -501,13 +501,13 @@ function renderHtmlFun (data) {
 .blinking-div {
     width: 15px;
     height: 15px;
-    background-color: #2F3990;
+    background-color: var(--brand);
     border-radius: 50%;
     animation: blink-animation 1s infinite;
 }
 .hub-ai-sidebar pre {
-    background-color: rgb(13 13 13);
-    color: white;
+    background-color: var(--rail);
+    color: var(--rail-ink-strong);
     font-size: 14px;
     overflow: auto;
     padding: 5px;
@@ -523,13 +523,13 @@ function renderHtmlFun (data) {
     text-align: center;
     width: 30px;
     height: 30px;
-    background: #DFE1E6;
+    background: var(--fill);
     border-radius: 5px;
 }
 .error_class{
     display: block;
-    color: #f93a37;
-    background: #6d504f0d;
+    color: var(--danger-ink);
+    background: var(--danger-bg);
     border: 1px solid transparent;
     height: 70px;
     width: 600px;

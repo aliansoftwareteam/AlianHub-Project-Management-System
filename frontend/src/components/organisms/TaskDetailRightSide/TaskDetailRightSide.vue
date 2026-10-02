@@ -91,7 +91,7 @@
                     </div>
                     <!-- Read-only display — original behaviour for users without permission. -->
                     <div v-else class="d-flex align-items-center">
-                        <UserProfile
+                        <UserProfile decorative
                             :data="{
                                 image: taskLeaderData.Employee_profileImageURL,
                                 title: taskLeaderData.Employee_Name
@@ -238,8 +238,8 @@
                 <template #body>
                     <textarea
                         v-model.trim="estimateReasonText"
-                        class="w-100 border-radius-6-px font-size-14"
-                        style="min-height:90px; resize:vertical; border:1px solid #DFE1E6; outline:none; padding:8px;"
+                        class="w-100 border border-radius-6-px font-size-14"
+                        style="min-height:90px; resize:vertical; outline:none; padding:8px;"
                         :placeholder="$t('TaskPanel.estimate_reason_ph')"
                         @input="estimateReasonError = false"
                     ></textarea>
@@ -292,7 +292,7 @@ import * as env from '@/config/env';
 import { permittedAssignees, scopedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import Modal from '@/components/atom/Modal/Modal.vue';
 import { showUndoToast } from '@/composable/useUndoToast';
-import { assignAgent, fetchRunnableAgents } from '@/views/Ai/useRunnableAgents';
+import { fetchOwnAi, fetchRunnableAgents, pickAgent } from '@/views/Ai/useRunnableAgents';
 import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vue';
 import { useEscapeLayer } from '@/composable/useEscapeLayer';
 import TaskRepeatControl from '@/components/organisms/TaskDetailOverlay/TaskRepeatControl.vue';
@@ -351,21 +351,28 @@ const props = defineProps({
     clientWidth: Number,
 })
 
-const emit = defineEmits(["agent-run"]);
+const emit = defineEmits(["agent-run", "agent-handed"]);
 
 const runnableAgents = ref([]);
 watch(() => props.task?._id, async (taskId) => {
-    const agents = await fetchRunnableAgents(taskId);
+    const agents = (await Promise.all([fetchRunnableAgents(taskId), fetchOwnAi(taskId)])).flat();
     if (taskId === props.task?._id) runnableAgents.value = agents;
 }, { immediate: true });
 
 async function startAgent(option) {
+    const taskId = props.task._id;
     try {
-        await assignAgent(option.agentId, props.task._id);
-        $toast.success(t('TaskPanel.agent_assigned', { name: option.label }), { position: 'top-right' });
-        emit('agent-run');
+        const { handed } = await pickAgent(option, taskId);
+        if (!handed) {
+            $toast.success(t('TaskPanel.agent_assigned', { name: option.label }), { position: 'top-right' });
+            emit('agent-run');
+            return;
+        }
+        $toast.success(t('TaskPanel.agent_handed', { name: option.shownAs }), { position: 'top-right' });
+        if (taskId === props.task?._id) runnableAgents.value = runnableAgents.value.filter((agent) => !agent.connected);
+        emit('agent-handed');
     } catch (error) {
-        $toast.error(error?.response?.data?.statusText || error.message || t('TaskPanel.agent_assign_failed'), { position: 'top-right' });
+        $toast.error(error?.response?.data?.statusText || error.message || t(option.connected ? 'TaskPanel.agent_hand_failed' : 'TaskPanel.agent_assign_failed'), { position: 'top-right' });
     }
 }
 
@@ -462,7 +469,8 @@ const updateAssignee = (event, type, { undoing = false } = {}) =>{
             taskData: props.task,
             employeeName: getUser(event.id).Employee_Name,
             type: ASSIGNEE_OPERATION[type] || "",
-            userData
+            userData,
+            announce: true
         })
         .then(() => {
             delete assigneeInProgress.value[event?.id];
@@ -475,7 +483,6 @@ const updateAssignee = (event, type, { undoing = false } = {}) =>{
         .catch((error) => {
             delete assigneeInProgress.value[event?.id];
             console.error("ERROR in updateAssignee: ", error);
-            $toast.error(t('Toast.Assignee_not_updated'),{position: 'top-right'});
         })
     } catch (error) {
         console.error(error);
@@ -526,7 +533,7 @@ function priorityOption(value) {
     return { value, name: priority.name, statusImage: priority.image };
 }
 
-const updatePriority = async(val, { undoing = false, from = null } = {}) => {
+const updatePriority = (val, { undoing = false, from = null } = {}) => {
     try {
         const userData = getUserData();
         const previousValue = from ? from.value : props.task.Task_Priority;
@@ -539,17 +546,22 @@ const updatePriority = async(val, { undoing = false, from = null } = {}) => {
 
         const priority = getPriority(previousValue) || {};
 
-        let priorityObj = {
-            'statusImage' : await getWasabiImageLink(project.value.CompanyId,priority.image),
+        const taskId = props.task._id;
+        const taskName = props.task.TaskName;
+        const priorityObj = Promise.all([
+            getWasabiImageLink(project.value.CompanyId,priority.image),
+            getWasabiImageLink(project.value.CompanyId,val.statusImage)
+        ]).then(([statusImage, newStatusImage]) => ({
+            'statusImage' : statusImage,
             'priorityName' : priority.name,
-            'taskId': props.task._id,
-            'taskName': props.task.TaskName,
+            'taskId': taskId,
+            'taskName': taskName,
             'userName' : userData.Employee_Name,
-            'newStatusImage' : await getWasabiImageLink(project.value.CompanyId,val.statusImage),
+            'newStatusImage' : newStatusImage,
             'newPriorityName' : val.name
-        }
+        }));
 
-        taskClass.updatePriority({firebaseObj: { Task_Priority: val.value }, projectData: projectData, taskData: props.task, priorityObj, userData})
+        taskClass.updatePriority({firebaseObj: { Task_Priority: val.value }, projectData: projectData, taskData: props.task, priorityObj, userData, announce: true})
         .then(() => {
             if (undoing) return undoneToast();
             if (!previousValue) return $toast.success(t('Toast.Priority_updated_successfully'),{position: 'top-right'});
@@ -560,7 +572,6 @@ const updatePriority = async(val, { undoing = false, from = null } = {}) => {
         })
         .catch((error) => {
             console.error("ERROR in update priority: ", error);
-            $toast.error(t('Toast.Priority_not_updated'),{position: 'top-right'});
         })
     } catch (error) {
         console.error('updatePriority error', error);
@@ -625,7 +636,7 @@ const updateStatus = (oldVal, newval, { undoing = false } = {}) => {
             ProjectName: project.value.ProjectName,
             ProjectCode: project.value.ProjectCode
         }
-        taskClass.updateStatus({ newStatus, prevStatus, projectData: projectData, task: props.task, userData})
+        taskClass.updateStatus({ newStatus, prevStatus, projectData: projectData, task: props.task, userData, announce: true})
         .then(() => {
             if (undoing) return undoneToast();
             showUndoToast({
@@ -633,8 +644,8 @@ const updateStatus = (oldVal, newval, { undoing = false } = {}) => {
                 undo: () => updateStatus(newval, oldVal, { undoing: true })
             });
         })
-        .catch(() => {
-            $toast.error(t('Toast.Status_not_updated'),{position: 'top-right'});
+        .catch((error) => {
+            console.error("ERROR in updateStatus: ", error);
         })
     } catch (error) {
         console.error('updateStatus error', error);
@@ -695,7 +706,8 @@ const updateDueDate = (event) => {
             project: projectData,
             task: props.task,
             obj: notificationObj,
-            userData
+            userData,
+            announce: true
         }).then(() => {
             showUndoToast({
                 message: t('Toast.Due_date_updated_successfully'),
@@ -706,7 +718,6 @@ const updateDueDate = (event) => {
             });
         }).catch((error) => {
             console.error("ERROR in updateDueDate: ", error);
-            $toast.error(t('Toast.Due_date_not_updated'),{position: 'top-right'});
             isSpinner.value = false;
         })
     } catch (error) {
@@ -752,10 +763,10 @@ function restoreDueDate(before, changedTo) {
         },
         task: props.task,
         obj: notificationObj,
-        userData
+        userData,
+        announce: true
     }).then(undoneToast).catch((error) => {
         console.error("ERROR in restoreDueDate: ", error);
-        $toast.error(t('Toast.Due_date_not_updated'),{position: 'top-right'});
     });
 }
 

@@ -3,6 +3,7 @@
         <div class="tv-head">
             <h1 class="tv-title">{{ $t('Time.approvals') }}</h1>
             <span v-if="count" class="ap__count">{{ count }}</span>
+            <TimesheetTabs active="approvals" />
             <nav class="tv-tabs ap__tabs" :aria-label="$t('Time.approval_types')">
                 <button v-for="f in filters" :key="f.key" type="button" class="tv-tab" :class="{ 'is-active': filter === f.key }" @click="filter = f.key">{{ $t(f.label) }}</button>
             </nav>
@@ -11,12 +12,66 @@
         <div v-if="!isManager" class="tv-empty"><span>{{ $t('Time.no_access') }}</span></div>
         <template v-else>
             <p v-if="error" class="tv-error">{{ error }}</p>
-            <p v-else-if="notice" class="tv-ok">{{ notice }}</p>
+            <p v-else-if="notice" class="tv-ok" role="status">{{ notice }}</p>
             <p v-if="proposalsFailed && filter !== 'timesheet' && filter !== 'leave'" class="tv-error">{{ $t('Time.agent_load_failed') }}</p>
 
             <div class="ap__list">
+                <div v-if="visibleSheetIds.length" class="tv-card ap__bulk">
+                    <div class="ap__bulk-pick">
+                        <input
+                            id="ap-select-all"
+                            ref="selectAllBox"
+                            type="checkbox"
+                            class="ah-check"
+                            data-test="ts-select-all"
+                            :checked="allSelected"
+                            :indeterminate.prop="someSelected"
+                            :disabled="!!busy"
+                            @change="toggleAll($event.target.checked)"
+                        />
+                        <label for="ap-select-all" class="ap__bulk-label">{{ $t('Time.bulk_select_all') }}</label>
+                    </div>
+                    <div v-if="selection.length" class="ap__bulk-bar" role="group" :aria-label="$t('Time.bulk_actions')" data-test="ts-bulk-bar">
+                        <span class="ap__bulk-count">{{ $t('Time.bulk_selected', { n: selection.length }) }}</span>
+                        <template v-if="sendingBack">
+                            <input
+                                ref="bulkNoteInput"
+                                v-model="bulkNote"
+                                class="ah-input ap__bulk-note"
+                                :class="{ 'ah-input--error': bulkNoteError }"
+                                data-test="ts-bulk-note"
+                                maxlength="500"
+                                :aria-label="$t('Time.bulk_note_label')"
+                                :aria-invalid="String(!!bulkNoteError)"
+                                :aria-describedby="bulkNoteError ? 'ap-bulk-note-error' : null"
+                                :placeholder="$t('Time.reject_reason_ph')"
+                                @keyup.enter="confirmSendBack"
+                                @keydown.esc="cancelSendBack"
+                            />
+                            <button type="button" class="ah-btn ah-btn--danger" :disabled="!!busy" data-test="ts-bulk-confirm-send-back" @click="confirmSendBack">{{ $t('Time.bulk_send_back') }}</button>
+                            <button type="button" class="ah-btn ah-btn--secondary" :disabled="!!busy" @click="cancelSendBack">{{ $t('Time.cancel') }}</button>
+                            <p v-if="bulkNoteError" id="ap-bulk-note-error" class="ah-field__error ap__bulk-error">{{ bulkNoteError }}</p>
+                        </template>
+                        <template v-else>
+                            <button type="button" class="ah-btn ah-btn--primary" :disabled="!!busy" data-test="ts-bulk-approve" @click="reviewSelection('approve')">
+                                {{ busy === BULK ? $t('Time.approving') : $t('Time.approve') }}
+                            </button>
+                            <button ref="sendBackButton" type="button" class="ah-btn ah-btn--secondary tv-btn-danger-outline" :disabled="!!busy" data-test="ts-bulk-send-back" @click="startSendBack">{{ $t('Time.bulk_send_back') }}</button>
+                        </template>
+                    </div>
+                </div>
                 <article v-for="card in visibleCards" :key="card.key" class="tv-card ap__card" :class="{ 'ap__card--agent': card.kind === 'agent' }">
                     <div class="ap__who">
+                        <input
+                            v-if="card.kind === 'timesheet'"
+                            type="checkbox"
+                            class="ah-check"
+                            data-test="ts-select"
+                            :checked="selection.includes(card.row._id)"
+                            :disabled="!!busy"
+                            :aria-label="$t('Time.bulk_select_one', { name: card.name })"
+                            @change="toggleOne(card.row._id, $event.target.checked)"
+                        />
                         <span v-if="card.kind === 'agent'" class="ah-avatar ah-avatar--agent">◉</span>
                         <span v-else class="ah-avatar" :style="{ background: card.color }">
                             <img v-if="card.avatar" :src="card.avatar" :alt="card.name" />
@@ -27,6 +82,7 @@
                             <div class="ap__sub">{{ card.sub }}</div>
                         </div>
                         <span v-if="card.kind === 'agent'" class="ah-chip ah-chip--agent">{{ $t('Time.agent_tag') }}</span>
+                        <span v-if="card.own" class="ah-chip ah-chip--warn" data-test="own-week" :title="$t('Time.own_week_hint')">{{ $t('Time.own_week') }}</span>
                     </div>
 
                     <div v-if="card.kind === 'timesheet'" class="ap__facts">
@@ -81,7 +137,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, nextTick, onMounted } from 'vue';
+import { ref, computed, inject, nextTick, onMounted, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -90,7 +146,8 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import { formatHm } from '@/composable/useTimer';
-import { isOwnerOrAdmin } from "@/utils/roles";
+import { canApprove } from './approvalAccess';
+import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
 import ProposalWhyDialog from './ProposalWhyDialog.vue';
 import { proposalTitle } from '@/views/Ai/plainLabels';
@@ -117,7 +174,7 @@ const currentUserId = inject('$userId');
 
 const cid = computed(() => (companyId && companyId.value) || '');
 const uid = computed(() => (currentUserId && currentUserId.value) || localStorage.getItem('userId') || '');
-const isManager = computed(() => isOwnerOrAdmin((getters['settings/companyUserDetail'] || {}).roleType));
+const isManager = computed(() => canApprove(getters['settings/companyUserDetail']));
 
 const filters = [
     { key: 'all', label: 'Time.filter_all' },
@@ -158,12 +215,18 @@ const overlapText = (row) => {
     return names.length ? t('Time.leave_overlap', { names: [...new Set(names)].join(', ') }) : '';
 };
 
+// The stored total is the week as first submitted; the split beside it is the week as it stands, so the card shows their sum.
+const weekMinutes = (row) => (row.billableMinutes == null && row.nonBillableMinutes == null
+    ? row.totalMinutes
+    : (Number(row.billableMinutes) || 0) + (Number(row.nonBillableMinutes) || 0));
+const oldestFirst = (list) => list.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
+
 const cards = computed(() => {
     const ts = timesheets.value.map((row) => ({
-        kind: 'timesheet', key: `ts-${row._id}`, row, at: row.submittedAt,
+        kind: 'timesheet', key: `ts-${row._id}`, row, at: row.submittedAt, own: String(row.userId) === String(uid.value),
         name: row.userName || nameOf(row.userId), avatar: row.userAvatar, color: colorFor(row.userId),
         title: t('Time.ts_card_title', { name: row.userName || nameOf(row.userId) }),
-        sub: t('Time.week_of', { date: moment(row.periodStart).format('MMM D'), h: formatHm(row.totalMinutes) }),
+        sub: t('Time.week_of', { date: moment(row.periodStart).format('MMM D'), h: formatHm(weekMinutes(row)) }),
     }));
     const lv = leave.value.map((row) => {
         const days = Number(row.totalDays) || 0;
@@ -180,7 +243,7 @@ const cards = computed(() => {
         kind: 'agent', key: `ag-${row.id}`, row, at: row.createdAt, name: row.agentName, avatar: '', color: 'var(--agent)',
         title: row.summary, sub: `${row.agentName}${row.reversible ? ` · ${t('Time.reversible')}` : ''}`,
     }));
-    return [...ts, ...lv, ...ag].sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
+    return [ts, lv, ag].flatMap(oldestFirst);
 });
 const visibleCards = computed(() => cards.value.filter((c) => filter.value === 'all' || c.kind === filter.value));
 const count = computed(() => cards.value.length);
@@ -227,7 +290,7 @@ const load = async () => {
         loading.value = false;
     }
 };
-const flash = (msg) => { notice.value = msg; setTimeout(() => { if (notice.value === msg) notice.value = ''; }, 3000); };
+const flash = (msg, ms = 3000) => { notice.value = msg; setTimeout(() => { if (notice.value === msg) notice.value = ''; }, ms); };
 const me = () => ({ id: uid.value, name: nameOf(uid.value) });
 
 const decide = async (card, action, reason) => {
@@ -276,6 +339,85 @@ const confirmReject = async (card) => {
         busy.value = '';
     }
 };
+
+const BULK = 'bulk';
+const BULK_REVIEW_MAX = 100;
+const SKIP_REASONS = ['already_reviewed', 'not_allowed', 'not_found'];
+const STILL_WAITING = ['not_allowed', 'failed'];
+const selectedIds = ref([]);
+const sendingBack = ref(false);
+const bulkNote = ref('');
+const bulkNoteError = ref('');
+const selectAllBox = ref(null);
+const bulkNoteInput = ref(null);
+const sendBackButton = ref(null);
+
+const visibleSheetIds = computed(() => visibleCards.value.filter((c) => c.kind === 'timesheet').map((c) => c.row._id));
+const selection = computed(() => visibleSheetIds.value.filter((id) => selectedIds.value.includes(id)));
+const allSelected = computed(() => selection.value.length > 0 && selection.value.length === visibleSheetIds.value.length);
+const someSelected = computed(() => selection.value.length > 0 && !allSelected.value);
+const toggleOne = (id, on) => { selectedIds.value = on ? [...new Set([...selectedIds.value, id])] : selectedIds.value.filter((x) => x !== id); };
+const toggleAll = (on) => { selectedIds.value = on ? [...visibleSheetIds.value] : []; };
+watch(() => selection.value.length, (n) => { if (!n) sendingBack.value = false; });
+
+const bulkSummary = (results) => {
+    const count = (outcome, reason) => results.filter((r) => r.outcome === outcome && (!reason || r.reason === reason)).length;
+    const parts = [];
+    if (count('approved')) parts.push(t('Time.bulk_approved_n', { n: count('approved') }));
+    if (count('sent_back')) parts.push(t('Time.bulk_sent_back_n', { n: count('sent_back') }));
+    [...new Set(results.filter((r) => r.outcome === 'skipped').map((r) => r.reason))].forEach((reason) => {
+        parts.push(t('Time.bulk_skipped_n', { n: count('skipped', reason), reason: t(`Time.bulk_reason_${SKIP_REASONS.includes(reason) ? reason : 'failed'}`) }));
+    });
+    return parts.join(', ');
+};
+const applyBulkResults = (results) => {
+    const gone = results.filter((r) => r.outcome !== 'skipped' || !STILL_WAITING.includes(r.reason)).map((r) => r.id);
+    timesheets.value = timesheets.value.filter((r) => !gone.includes(r._id));
+    selectedIds.value = selectedIds.value.filter((id) => !gone.includes(id));
+};
+const reviewSelection = async (action, reason) => {
+    const ids = [...selection.value];
+    if (busy.value || !ids.length) return;
+    busy.value = BULK;
+    error.value = '';
+    const results = [];
+    try {
+        for (let i = 0; i < ids.length; i += BULK_REVIEW_MAX) {
+            const body = bodyOf(await apiRequest('post', `${env.TIMESHEET_APPROVAL}/bulk-review`, { ids: ids.slice(i, i + BULK_REVIEW_MAX), action, ...(reason ? { reason } : {}) }));
+            if (!body.status) throw new Error(body.statusText);
+            results.push(...((body.data && body.data.results) || []));
+        }
+        sendingBack.value = false;
+        flash(bulkSummary(results), 6000);
+    } catch (e) {
+        error.value = t('Time.action_failed');
+    } finally {
+        applyBulkResults(results);
+        busy.value = '';
+    }
+    await nextTick();
+    if (!selection.value.length && selectAllBox.value) selectAllBox.value.focus();
+};
+const startSendBack = async () => {
+    sendingBack.value = true;
+    bulkNote.value = '';
+    bulkNoteError.value = '';
+    await nextTick();
+    if (bulkNoteInput.value) bulkNoteInput.value.focus();
+};
+const cancelSendBack = async () => {
+    sendingBack.value = false;
+    bulkNoteError.value = '';
+    await nextTick();
+    if (sendBackButton.value) sendBackButton.value.focus();
+};
+const confirmSendBack = () => {
+    const note = bulkNote.value.trim();
+    if (!note) { bulkNoteError.value = t('Time.bulk_note_required'); return; }
+    bulkNoteError.value = '';
+    reviewSelection('reject', note);
+};
+
 const whyKey = ref('');
 const whyButtons = new Map();
 const whyCard = computed(() => cards.value.find((c) => c.key === whyKey.value) || null);
@@ -299,7 +441,7 @@ onMounted(() => { if (isManager.value) load(); });
 <style scoped>
 .ap { max-width: 720px; }
 .ap__count { background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-ui); padding: 4px 7px; border-radius: 9px; }
-.ap__tabs { margin-left: 4px; }
+.ap__tabs { margin-left: auto; }
 .ap__list { display: flex; flex-direction: column; gap: 10px; }
 .ap__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-radius: 14px; }
 .ap__card--agent { border-color: rgba(107, 92, 231, .35); }
@@ -313,4 +455,12 @@ onMounted(() => { if (isManager.value) load(); });
 .ap__warn { padding: 9px 11px; background: var(--warn-bg); border-radius: 8px; font-size: 12px; line-height: 1.45; color: var(--warn-ink); }
 .ap__reason { font-size: 12px; color: var(--ink-2); line-height: 1.45; }
 .ap__reject { display: flex; flex-direction: column; gap: 6px; }
+.ap__bulk { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 6px 14px; border-radius: 14px; }
+.ap__bulk-pick { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+.ap__bulk-label { font-size: 12px; color: var(--ink-2); cursor: pointer; }
+.ap__bulk-bar { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 6px; }
+.ap__bulk-bar .ah-btn { min-height: 40px; }
+.ap__bulk-count { margin-right: auto; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ah-input.ap__bulk-note { flex: 1 1 180px; min-width: 0; }
+.ap__bulk-error { flex-basis: 100%; margin: 0; }
 </style>

@@ -9,13 +9,15 @@ const { Notification_key } = require('../../../Config/notificationKey.js');
 const MENTION_KEY = Notification_key.COMMENTS_IM_MENTIONS_IN;
 
 //   all / notifications / mentions / archive — the tabs of the first Inbox, still served
+//   approval — what waits for the reader's decision: agent proposals and leave requests
 //   primary  — unread, not snoozed, not cleared, and not a watched-only update
 //   other    — the same, for updates that reached the reader only because they watch the item
 //   later    — snoozed rows, until their time comes (or, for "until it changes", new activity)
 //   done     — read rows
 //   cleared  — rows the reader cleared in the last 30 days
-const TABS = Object.freeze(['all', 'notifications', 'mentions', 'archive', 'primary', 'other', 'later', 'done', 'cleared']);
-const INBOX_TABS = Object.freeze(['primary', 'other', 'later', 'done', 'cleared']);
+const APPROVAL_TAB = 'approval';
+const TABS = Object.freeze(['all', 'notifications', 'mentions', 'archive', APPROVAL_TAB, 'primary', 'other', 'later', 'done', 'cleared']);
+const INBOX_TABS = Object.freeze([APPROVAL_TAB, 'primary', 'other', 'later', 'done', 'cleared']);
 const CLEARABLE_TABS = Object.freeze(['primary', 'other', 'later', 'done']);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,12 +48,12 @@ const parseSnooze = (body = {}, now = new Date()) => {
 // scheduler wrote on its due date; everything else from that source is an update.
 const KINDS = Object.freeze(['all', 'mention', 'assigned', 'reminder', 'update', 'approval']);
 const REMINDER_KEY = 'general_reminder';
-const ASSIGNED_KEY = Notification_key.COMMENT_ASSIGNED;
+const ASSIGNED_KEYS = Object.freeze([Notification_key.COMMENT_ASSIGNED, Notification_key.DOC_COMMENT_ASSIGNED]);
 const normalizeKind = (kind) => (KINDS.includes(String(kind)) ? String(kind) : 'all');
 const kindOf = (item = {}) => {
     if (item.sourceType === 'approval') return 'approval';
     if (item.sourceType === 'mention') return 'mention';
-    if (item.key === ASSIGNED_KEY) return 'assigned';
+    if (ASSIGNED_KEYS.includes(item.key)) return 'assigned';
     return item.key === REMINDER_KEY ? 'reminder' : 'update';
 };
 
@@ -224,9 +226,9 @@ const normalizeSkip = (raw) => {
 const planFor = (tab, source = 'all', kind = 'all') => {
     const byKind = (plan) => {
         if (kind === 'mention') return { ...plan, notifications: false, mentions: true };
-        if (kind === 'reminder') return { ...plan, notifications: true, mentions: false, keyOnly: REMINDER_KEY };
-        if (kind === 'assigned') return { ...plan, notifications: true, mentions: false, keyOnly: ASSIGNED_KEY };
-        if (kind === 'update') return { ...plan, notifications: true, mentions: false, keyNot: [REMINDER_KEY, ASSIGNED_KEY] };
+        if (kind === 'reminder') return { ...plan, notifications: true, mentions: false, keyOnly: [REMINDER_KEY] };
+        if (kind === 'assigned') return { ...plan, notifications: true, mentions: false, keyOnly: [...ASSIGNED_KEYS] };
+        if (kind === 'update') return { ...plan, notifications: true, mentions: false, keyNot: [REMINDER_KEY, ...ASSIGNED_KEYS] };
         return plan;
     };
     if (tab === 'notifications') return { notifications: true, mentions: false, read: false };
@@ -267,7 +269,7 @@ const notificationMatch = (userId, { tab, source = 'all', kind = 'all', now = ne
     if (tab === 'other') and.push({ reason: WATCHING });
     if (plan.read === true) and.push({ notSeen: { $nin: [userId] } });
     if (plan.read === false) and.push({ notSeen: { $in: [userId] } });
-    if (plan.keyOnly) and.push({ key: plan.keyOnly });
+    if (plan.keyOnly) and.push({ key: { $in: plan.keyOnly } });
     if (plan.keyNot) and.push({ key: { $nin: plan.keyNot } });
     return { $and: and };
 };
@@ -284,6 +286,7 @@ const mentionMatch = (userId, { tab, source = 'all', kind = 'all', now = new Dat
 
 module.exports = {
     TABS,
+    APPROVAL_TAB,
     INBOX_TABS,
     CLEARABLE_TABS,
     MENTION_KEY,
@@ -297,7 +300,7 @@ module.exports = {
     mentionMatch,
     KINDS,
     REMINDER_KEY,
-    ASSIGNED_KEY,
+    ASSIGNED_KEYS,
     normalizeKind,
     kindOf,
     SORTS,

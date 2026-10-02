@@ -1,4 +1,6 @@
-/* Design tokens — single source of truth for the redesign (handoff turn 12f). */
+/* Design tokens — single source of truth for the redesign (handoff turn 12f).
+   The sizes on :root are the dense look (task 046 B0.3), which is the default; the other looks
+   override them from :root[data-variant] further down. */
 :root {
     --brand: #2F3990;
     --brand-deep: #1e2666;
@@ -39,41 +41,60 @@
     --warn-bg: #fdf1e3;
     --warn-ink: #a4470f;
     --danger: #c1121f;
+    --on-danger: #ffffff;
     --danger-bg: #fdeced;
     --danger-ink: #9c1f2e;
     --agent: #6b5ce7;
     --agent-bg: #eeebfd;
+    /* --agent is a fill (the agent avatar, white on it). Text takes --agent-ink, which reads on --agent-bg and on a surface. */
+    --agent-ink: #5747d6;
 
     --font-ui: "Inter Tight", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, monospace;
 
     --text-display: 700 30px/1.12 var(--font-ui);
-    --text-h1: 600 20px/1.2 var(--font-ui);
-    --text-h2: 600 19px/1.2 var(--font-ui);
-    --text-h3: 600 13.5px/1.3 var(--font-ui);
-    --text-body: 400 13px/1.5 var(--font-ui);
-    --text-small: 400 12.5px/1.5 var(--font-ui);
-    --text-label: 600 10.5px/1.2 var(--font-mono);
-    --text-data: 500 11.5px/1.2 var(--font-mono);
+    /* Each reads the type scale, so a look that sets the scale sets these; a fallback is the classic size. */
+    --text-h1: var(--fw-title, 600) var(--fs-xl, 20px)/var(--lh-tight, 1.2) var(--font-ui);
+    --text-h2: var(--fw-title, 600) var(--fs-xl, 19px)/var(--lh-tight, 1.2) var(--font-ui);
+    --text-h3: var(--fw-title, 600) var(--fs-lg, 13.5px)/var(--lh-snug, 1.3) var(--font-ui);
+    --text-body: 400 var(--fs-md, 13px)/var(--lh-body, 1.5) var(--font-ui);
+    --text-small: 400 var(--fs-sm, 12.5px)/var(--lh-body, 1.5) var(--font-ui);
+    --text-label: 600 var(--fs-xs, 10.5px)/var(--lh-tight, 1.2) var(--font-mono);
+    --text-data: 500 var(--fs-sm, 11.5px)/var(--lh-tight, 1.2) var(--font-mono);
 
-    --sp-1: 4px; --sp-2: 6px; --sp-3: 8px; --sp-4: 10px; --sp-5: 12px;
-    --sp-6: 14px; --sp-7: 16px; --sp-8: 20px; --sp-9: 24px;
+    --fs-2xs: 10px; --fs-xs: 10.5px; --fs-sm: 11.5px; --fs-md: 13px; --fs-lg: 13px; --fs-xl: 17px;
+    --lh-tight: 1.2; --lh-snug: 1.25; --lh-body: 1.4;
+    --fw-strong: 500; --fw-title: 600;
 
-    --r-chip: 6px;
-    --r-input: 8px;
-    --r-card: 12px;
-    --r-modal: 16px;
+    --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 10px;
+    --sp-6: 12px; --sp-7: 14px; --sp-8: 16px; --sp-9: 20px;
+    --cell-pad-x: var(--sp-5);
+    --card-pad-y: var(--sp-5); --card-pad-x: var(--sp-6);
+    --gap-row: var(--sp-2); --gap-stack: var(--sp-5);
+    --page-pad-y: var(--sp-6); --page-pad-x: var(--sp-8);
 
-    --shadow-card: 0 2px 6px rgba(0, 0, 0, .04);
-    --shadow-pop: 0 18px 44px rgba(0, 0, 0, .18);
+    --r-sm: 3px; --r-md: 4px; --r-lg: 6px;
+    --r-chip: var(--r-sm);
+    --r-input: var(--r-md);
+    --r-card: var(--r-lg);
+    --r-modal: 8px;
+
+    --shadow-ink: rgba(0, 0, 0, .04);
+    --shadow-card: none;
+    --shadow-surface: none;
+    --shadow-pop: 0 6px 16px rgba(0, 0, 0, .14);
+    --shadow-panel: none;
     --shadow-modal: 0 30px 80px rgba(0, 0, 0, .35);
+    /* The dimmed page behind a dialog, a drawer or a sheet. */
+    --scrim: rgba(0, 0, 0, .35);
     /* A solid 2px brand ring: the 12% tint it replaced measured about 1.2:1 against white (WCAG 1.4.11 needs 3:1). */
     --focus: 0 0 0 2px var(--brand);
 
     --rail-w: 60px;
     --sidebar-w: 236px;
     --sidebar-w-narrow: 220px;
-    --toolbar-h: 52px;
+    --toolbar-h: 44px;
+    --control-h-sm: 24px; --control-h: 26px; --control-h-lg: 32px;
     --panel-w: 300px;
     --detail-w: 760px;
     --tabbar-h: 56px;
@@ -81,6 +102,45 @@
     --ease: cubic-bezier(.2, .7, .2, 1);
     --t-state: 150ms;
     --t-panel: 240ms;
+
+    /* Row density of the List and the Table: the comfortable sizes. --row-h is a floor, and
+       --hit-min is the smallest a control in a row may get, so no density overrides it. */
+    --row-h: 32px;
+    --cell-pad-y: 4px;
+    --row-font: 13px;
+    --row-lines: 2;
+    --avatar-size: 22px;
+    --avatar-font: 10px;
+    --chip-h: 20px;
+    --chip-font: 11px;
+    --hit-min: 24px;
+    /* How far a child row (a subtask) steps in from its parent's name. */
+    --row-indent: var(--sp-8);
+    /* A text row of a data table is as tall as a List row: the padding that centres one line of row type in it. */
+    --table-pad-y: calc((var(--row-h) - var(--row-font) * var(--lh-body)) / 2);
+    /* The least a task name keeps in a row, however many columns are shown beside it. */
+    --row-name-min: 130px;
+
+    /* A token surface inside a host that keeps light controls (see the color-scheme list below) sets color-scheme: var(--scheme) on itself. */
+    --scheme: light;
+    color-scheme: light;
+}
+
+/* Set on a view root by its saved density. A look sets its comfortable sizes on <html>, so
+   this still wins inside the view whatever the look, and it is denser than the densest of them.
+   Phones keep the comfortable sizes: their rows fold onto two lines and need the height to be tapped. */
+@media (min-width: 768px) {
+    [data-density="compact"] {
+        --row-h: 28px;
+        --cell-pad-y: 2px;
+        --row-font: 12px;
+        --row-lines: 1;
+        --avatar-size: 20px;
+        --avatar-font: 9.5px;
+        --chip-h: 18px;
+        --chip-font: 10.5px;
+        --row-name-min: 110px;
+    }
 }
 
 :root[data-theme="dark"] {
@@ -115,8 +175,14 @@
     --danger-ink: #ff8f98;
     /* Used directly as text (overdue labels, due dates); the light red is 2.8:1 on dark surfaces. */
     --danger: #ff7b85;
+    /* Dark --danger is a light red: white on it is 2.6:1. */
+    --on-danger: #111114;
     --agent-bg: rgba(168, 146, 255, .16);
-    --shadow-card: 0 2px 6px rgba(0, 0, 0, .3);
+    --agent-ink: #b3a4ff;
+    --shadow-ink: rgba(0, 0, 0, .3);
+
+    --scheme: dark;
+    color-scheme: dark;
 }
 
 /* High contrast (Settings → Contrast, or prefers-contrast: more): body text at 7:1 or more, borders at 3:1 or more. */
@@ -147,6 +213,7 @@
     --danger: #a00d18;
     --danger-ink: #7a0f1b;
     --agent: #4a3cc2;
+    --agent-ink: #372b9c;
     --focus: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink);
 }
 
@@ -176,10 +243,237 @@
     --danger: #ff9ea5;
     --danger-ink: #ffb8bd;
     --agent-bg: rgba(201, 189, 255, .2);
+    --agent-ink: #d6cdff;
 }
 
 /* Many controls draw focus as a box-shadow and switch the outline off; here the outline wins. */
 :root.ah-high-contrast :focus-visible { outline: 3px solid var(--ink) !important; outline-offset: 2px !important; }
+
+/* Accent (task 046 B4): picked in Settings and applied as data-accent on <html>. With no attribute
+   the app wears indigo, whose values are the ones on :root and in the dark block. An accent restates
+   the brand family only; --focus reads --brand, and --on-brand stays the theme's. High contrast keeps
+   its own brand, which is tuned to 7:1. The rail is dark in both themes, so --rail-brand is the dark
+   shade and is set once. Each rule also paints that accent's swatch in the picker. */
+[data-accent-swatch="indigo"] { --brand: #2F3990; }
+:root[data-theme="dark"] [data-accent-swatch="indigo"] { --brand: #a892ff; }
+
+:root[data-accent="blue"]:not(.ah-high-contrast),
+[data-accent-swatch="blue"] {
+    --brand: #1a59c7;
+    --brand-deep: #12459c;
+    --brand-tint: rgba(26, 89, 199, .10);
+    --brand-ring: rgba(26, 89, 199, .12);
+    --brand-border: rgba(26, 89, 199, .35);
+    --rail-brand: #7fb2ff;
+}
+:root[data-theme="dark"][data-accent="blue"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="blue"] {
+    --brand: #7fb2ff;
+    --brand-deep: #689fee;
+    --brand-tint: rgba(127, 178, 255, .16);
+    --brand-ring: rgba(127, 178, 255, .22);
+    --brand-border: rgba(127, 178, 255, .35);
+}
+
+:root[data-accent="purple"]:not(.ah-high-contrast),
+[data-accent-swatch="purple"] {
+    --brand: #7b32c8;
+    --brand-deep: #6224a6;
+    --brand-tint: rgba(123, 50, 200, .10);
+    --brand-ring: rgba(123, 50, 200, .12);
+    --brand-border: rgba(123, 50, 200, .35);
+    --rail-brand: #dc8cff;
+}
+:root[data-theme="dark"][data-accent="purple"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="purple"] {
+    --brand: #dc8cff;
+    --brand-deep: #c877ee;
+    --brand-tint: rgba(220, 140, 255, .16);
+    --brand-ring: rgba(220, 140, 255, .22);
+    --brand-border: rgba(220, 140, 255, .35);
+}
+
+:root[data-accent="teal"]:not(.ah-high-contrast),
+[data-accent-swatch="teal"] {
+    --brand: #0b6e73;
+    --brand-deep: #07565a;
+    --brand-tint: rgba(11, 110, 115, .10);
+    --brand-ring: rgba(11, 110, 115, .12);
+    --brand-border: rgba(11, 110, 115, .35);
+    --rail-brand: #48d1c6;
+}
+:root[data-theme="dark"][data-accent="teal"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="teal"] {
+    --brand: #48d1c6;
+    --brand-deep: #35bdb2;
+    --brand-tint: rgba(72, 209, 198, .16);
+    --brand-ring: rgba(72, 209, 198, .22);
+    --brand-border: rgba(72, 209, 198, .35);
+}
+
+:root[data-accent="green"]:not(.ah-high-contrast),
+[data-accent-swatch="green"] {
+    --brand: #186f40;
+    --brand-deep: #115530;
+    --brand-tint: rgba(24, 111, 64, .10);
+    --brand-ring: rgba(24, 111, 64, .12);
+    --brand-border: rgba(24, 111, 64, .35);
+    --rail-brand: #63d690;
+}
+:root[data-theme="dark"][data-accent="green"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="green"] {
+    --brand: #63d690;
+    --brand-deep: #4fc27c;
+    --brand-tint: rgba(99, 214, 144, .16);
+    --brand-ring: rgba(99, 214, 144, .22);
+    --brand-border: rgba(99, 214, 144, .35);
+}
+
+:root[data-accent="orange"]:not(.ah-high-contrast),
+[data-accent-swatch="orange"] {
+    --brand: #a54306;
+    --brand-deep: #843404;
+    --brand-tint: rgba(165, 67, 6, .10);
+    --brand-ring: rgba(165, 67, 6, .12);
+    --brand-border: rgba(165, 67, 6, .35);
+    --rail-brand: #ffa35a;
+}
+:root[data-theme="dark"][data-accent="orange"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="orange"] {
+    --brand: #ffa35a;
+    --brand-deep: #f08f45;
+    --brand-tint: rgba(255, 163, 90, .16);
+    --brand-ring: rgba(255, 163, 90, .22);
+    --brand-border: rgba(255, 163, 90, .35);
+}
+
+:root[data-accent="pink"]:not(.ah-high-contrast),
+[data-accent-swatch="pink"] {
+    --brand: #b3206a;
+    --brand-deep: #901654;
+    --brand-tint: rgba(179, 32, 106, .10);
+    --brand-ring: rgba(179, 32, 106, .12);
+    --brand-border: rgba(179, 32, 106, .35);
+    --rail-brand: #ff8fc0;
+}
+:root[data-theme="dark"][data-accent="pink"]:not(.ah-high-contrast),
+:root[data-theme="dark"] [data-accent-swatch="pink"] {
+    --brand: #ff8fc0;
+    --brand-deep: #f079ad;
+    --brand-tint: rgba(255, 143, 192, .16);
+    --brand-ring: rgba(255, 143, 192, .22);
+    --brand-border: rgba(255, 143, 192, .35);
+}
+
+/* Looks (task 046 B0.2, B0.3): picked in Settings and applied as data-variant on <html>. With no
+   attribute the app wears B, whose values are also the ones on :root, so nothing is repainted
+   on load; the b block stays for a browser that stored it and must equal :root.
+   The row, chip and avatar sizes are a look's comfortable density. */
+:root[data-variant="a"] {
+    --fs-2xs: 10px; --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 14px; --fs-xl: 20px;
+    --lh-tight: 1.2; --lh-snug: 1.3; --lh-body: 1.5;
+    --fw-strong: 600; --fw-title: 600;
+
+    --sp-1: 4px; --sp-2: 6px; --sp-3: 8px; --sp-4: 10px; --sp-5: 12px;
+    --sp-6: 14px; --sp-7: 16px; --sp-8: 20px; --sp-9: 24px;
+    --row-h: 40px; --row-font: var(--fs-md); --hit-min: 24px;
+    --avatar-size: 24px; --avatar-font: 11px; --chip-h: 22px; --chip-font: 11.5px;
+    --cell-pad-y: var(--sp-3); --cell-pad-x: var(--sp-5);
+    --card-pad-y: var(--sp-6); --card-pad-x: var(--sp-7);
+    --gap-row: var(--sp-4); --gap-stack: var(--sp-7);
+    --page-pad-y: var(--sp-8); --page-pad-x: var(--sp-8);
+
+    --r-sm: 6px; --r-md: 8px; --r-lg: 12px;
+    --r-chip: var(--r-sm); --r-input: var(--r-md); --r-card: var(--r-lg); --r-modal: 16px;
+
+    --shadow-card: 0 2px 6px var(--shadow-ink);
+    --shadow-surface: none;
+    --shadow-pop: 0 18px 44px rgba(0, 0, 0, .18);
+    --shadow-panel: -20px 0 60px rgba(0, 0, 0, .12);
+
+    --control-h-sm: 28px; --control-h: 30px; --control-h-lg: 36px;
+    --toolbar-h: 52px;
+}
+
+:root[data-variant="b"] {
+    --fs-2xs: 10px; --fs-xs: 10.5px; --fs-sm: 11.5px; --fs-md: 13px; --fs-lg: 13px; --fs-xl: 17px;
+    --lh-tight: 1.2; --lh-snug: 1.25; --lh-body: 1.4;
+    --fw-strong: 500; --fw-title: 600;
+
+    --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 10px;
+    --sp-6: 12px; --sp-7: 14px; --sp-8: 16px; --sp-9: 20px;
+    --row-h: 32px; --row-font: var(--fs-md); --hit-min: 24px;
+    --avatar-size: 22px; --avatar-font: 10px; --chip-h: 20px; --chip-font: 11px;
+    --cell-pad-y: var(--sp-2); --cell-pad-x: var(--sp-5);
+    --card-pad-y: var(--sp-5); --card-pad-x: var(--sp-6);
+    --gap-row: var(--sp-2); --gap-stack: var(--sp-5);
+    --page-pad-y: var(--sp-6); --page-pad-x: var(--sp-8);
+
+    --r-sm: 3px; --r-md: 4px; --r-lg: 6px;
+    --r-chip: var(--r-sm); --r-input: var(--r-md); --r-card: var(--r-lg); --r-modal: 8px;
+
+    --shadow-card: none;
+    --shadow-surface: none;
+    --shadow-pop: 0 6px 16px rgba(0, 0, 0, .14);
+    --shadow-panel: none;
+
+    --control-h-sm: 24px; --control-h: 26px; --control-h-lg: 32px;
+    --toolbar-h: 44px;
+}
+
+:root[data-variant="c"] {
+    --fs-2xs: 10.5px; --fs-xs: 11.5px; --fs-sm: 13px; --fs-md: 14px; --fs-lg: 16px; --fs-xl: 24px;
+    --lh-tight: 1.25; --lh-snug: 1.4; --lh-body: 1.6;
+    --fw-strong: 600; --fw-title: 700;
+
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 18px;
+    --sp-6: 20px; --sp-7: 24px; --sp-8: 28px; --sp-9: 32px;
+    --row-h: 48px; --row-font: var(--fs-md); --hit-min: 24px;
+    --avatar-size: 28px; --avatar-font: 12px; --chip-h: 24px; --chip-font: 12px;
+    --cell-pad-y: var(--sp-3); --cell-pad-x: var(--sp-4);
+    --card-pad-y: var(--sp-5); --card-pad-x: var(--sp-6);
+    --gap-row: var(--sp-3); --gap-stack: var(--sp-6);
+    --page-pad-y: var(--sp-7); --page-pad-x: var(--sp-8);
+
+    --r-sm: 8px; --r-md: 10px; --r-lg: 16px;
+    --r-chip: var(--r-sm); --r-input: var(--r-md); --r-card: var(--r-lg); --r-modal: 20px;
+
+    --shadow-card: 0 1px 2px var(--shadow-ink), 0 8px 24px var(--shadow-ink);
+    --shadow-surface: var(--shadow-card);
+    --shadow-pop: 0 24px 60px rgba(0, 0, 0, .2);
+    --shadow-panel: -28px 0 80px rgba(0, 0, 0, .16);
+
+    --control-h-sm: 30px; --control-h: 34px; --control-h-lg: 42px;
+    --toolbar-h: 56px;
+}
+
+/* The look before B became the default. The type, radius-step, padding and control tokens did not
+   exist then: `initial` un-sets them, so every rule draws the fallback it carries, which is that look. */
+:root[data-variant="classic"] {
+    --fs-2xs: initial; --fs-xs: initial; --fs-sm: initial; --fs-md: initial; --fs-lg: initial; --fs-xl: initial;
+    --lh-tight: initial; --lh-snug: initial; --lh-body: initial;
+    --fw-strong: initial; --fw-title: initial;
+
+    --sp-1: 4px; --sp-2: 6px; --sp-3: 8px; --sp-4: 10px; --sp-5: 12px;
+    --sp-6: 14px; --sp-7: 16px; --sp-8: 20px; --sp-9: 24px;
+    --row-h: 36px; --row-font: 12.5px; --hit-min: 24px;
+    --avatar-size: 24px; --avatar-font: 11px; --chip-h: 22px; --chip-font: 11.5px;
+    --cell-pad-y: 9px; --cell-pad-x: initial; --table-pad-y: initial;
+    --card-pad-y: initial; --card-pad-x: initial;
+    --gap-row: initial; --gap-stack: initial;
+    --page-pad-y: initial; --page-pad-x: initial;
+
+    --r-sm: initial; --r-md: initial; --r-lg: initial;
+    --r-chip: 6px; --r-input: 8px; --r-card: 12px; --r-modal: 16px;
+
+    --shadow-card: 0 2px 6px var(--shadow-ink);
+    --shadow-surface: initial;
+    --shadow-pop: 0 18px 44px rgba(0, 0, 0, .18);
+    --shadow-panel: initial;
+
+    --control-h-sm: initial; --control-h: initial; --control-h-lg: initial;
+    --toolbar-h: 52px;
+}
 
 html, body, #app {
     font-family: var(--font-ui);
@@ -236,6 +530,18 @@ html, body, #app {
    redesigned views opt in with .ah-page. */
 :root[data-theme="dark"] .ah-app__view { color: #17161c; }
 :root[data-theme="dark"] .ah-app__view .ah-page { color: var(--ink); }
+/* color-scheme is what themes native controls, their picker popups and plain scrollbars. A surface
+   that stays white in dark (a legacy view, a white card) keeps light ones: an
+   unstyled .form-control would otherwise turn into a dark box on white. An iframe keeps light too,
+   or the browser paints an opaque canvas behind a page that set none. */
+:root[data-theme="dark"] .ah-app__view,
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] iframe { color-scheme: light; }
+:root[data-theme="dark"] .ah-app__view .ah-page,
+:root[data-theme="dark"] .ah-app__view .lt--page,
+:root[data-theme="dark"] .ah-app__view .pev,
+:root[data-theme="dark"] .ah-app__view .chg,
+:root[data-theme="dark"] #my-modal .pal-layer { color-scheme: dark; }
 /* Legacy Projects.vue wraps the redesigned List/Board/Table in white panels. Darken them only
    when a redesigned page, or the themed upgrade wall (.upw), is inside; legacy views keep their
    light panels and dark ink. */
@@ -245,6 +551,7 @@ html, body, #app {
 :root[data-theme="dark"] .list-view-body.bg-light-gray:has(.upw) { background: var(--canvas) !important; }
 /* The redesigned calendar still sits in the legacy SprintsList card, which is always white. */
 :root[data-theme="dark"] .ah-page .sprint:has(.cv) { background-color: var(--surface); border-color: var(--hairline); }
+:root[data-theme="dark"] .ah-page .sprint:has(.spr__head) { background-color: var(--surface); border-color: var(--hairline); }
 /* Legacy utility classes inside the redesigned project toolbars (filter trigger, mic, + View). */
 :root[data-theme="dark"] .ph2 .bg-white, :root[data-theme="dark"] .ph2 .btn-white,
 :root[data-theme="dark"] .pft .bg-white, :root[data-theme="dark"] .pft .btn-white { background: var(--surface) !important; color: var(--ink); }
@@ -278,22 +585,22 @@ html, body, #app {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding: 12px 16px;
+    gap: var(--sp-4);
+    padding: var(--card-pad-y, 12px) var(--card-pad-x, 16px);
     border-bottom: 1px solid var(--hairline);
 }
-.ah-card__body { padding: 14px 16px; }
+.ah-card__body { padding: var(--card-pad-y, 14px) var(--card-pad-x, 16px); }
 
 .ah-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    height: 36px;
-    padding: 0 14px;
+    height: var(--control-h-lg, 36px);
+    padding: 0 var(--sp-6);
     border-radius: var(--r-input);
     border: 1px solid transparent;
-    font: 600 13px/1 var(--font-ui);
+    font: 600 var(--fs-md, 13px)/1 var(--font-ui);
     color: var(--ink);
     background: transparent;
     cursor: pointer;
@@ -308,14 +615,14 @@ html, body, #app {
 .ah-btn--secondary { background: var(--surface); border-color: var(--border); }
 .ah-btn--secondary:hover:not(:disabled) { background: var(--surface-hover); }
 .ah-btn--outline { border-color: var(--brand); color: var(--brand); background: var(--brand-tint); }
-.ah-btn--outline:hover:not(:disabled) { background: rgba(47, 57, 144, .16); }
+.ah-btn--outline:hover:not(:disabled) { background: var(--brand-ring, rgba(47, 57, 144, .16)); }
 .ah-btn--ghost { color: var(--ink-2); }
 .ah-btn--ghost:hover:not(:disabled) { background: var(--surface-hover); color: var(--ink); }
-.ah-btn--danger { background: var(--danger); color: #fff; }
-.ah-btn--sm { height: 30px; padding: 0 10px; font-size: 12.5px; }
-.ah-btn--lg { height: 42px; padding: 0 18px; font-size: 14px; }
+.ah-btn--danger { background: var(--danger); color: var(--on-danger, #fff); }
+.ah-btn--sm { height: var(--control-h, 30px); padding: 0 var(--sp-4); font-size: var(--fs-sm, 12.5px); }
+.ah-btn--lg { height: calc(var(--control-h-lg, 36px) + 6px); padding: 0 calc(var(--sp-6) + 4px); font-size: var(--fs-lg, 14px); }
 .ah-btn--block { width: 100%; }
-.ah-btn--dark { background: var(--rail); color: #fff; }
+.ah-btn--dark { background: var(--rail); color: var(--rail-ink-strong, #fff); }
 
 .ah-field { display: flex; flex-direction: column; gap: 6px; }
 .ah-field__label {
@@ -327,13 +634,13 @@ html, body, #app {
 }
 .ah-input {
     width: 100%;
-    height: 38px;
-    padding: 0 12px;
+    height: calc(var(--control-h-lg, 36px) + 2px);
+    padding: 0 var(--sp-5);
     border: 1.5px solid var(--border);
     border-radius: var(--r-input);
     background: var(--surface);
     color: var(--ink);
-    font: 400 13.5px/1 var(--font-ui);
+    font: 400 var(--fs-md, 13.5px)/1 var(--font-ui);
     transition: border-color var(--t-state) var(--ease), box-shadow var(--t-state) var(--ease);
     box-sizing: border-box;
 }
@@ -348,16 +655,22 @@ html, body, #app {
     color: var(--danger-ink);
 }
 .ah-field__hint { font: var(--text-small); color: var(--ink-2); }
-.ah-textarea { min-height: 80px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
+.ah-textarea { min-height: 80px; padding: var(--sp-4) var(--sp-5); line-height: 1.5; resize: vertical; }
+
+/* A dense control is sized for a pointer. On a phone the touch floor is 40px and every look uses the
+   control heights the app had before the dense default; they sit on body so they beat what a look sets on <html>. */
+@media (max-width: 767px) {
+    body { --hit-min: 40px; --control-h-sm: 28px; --control-h: 30px; --control-h-lg: 36px; }
+}
 
 .ah-chip {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    height: 22px;
+    height: var(--chip-h);
     padding: 0 8px;
     border-radius: var(--r-chip);
-    font: 600 11.5px/1 var(--font-ui);
+    font: 600 var(--chip-font)/1 var(--font-ui);
     background: var(--fill);
     color: var(--ink);
     white-space: nowrap;
@@ -366,10 +679,10 @@ html, body, #app {
 .ah-chip--warn { background: var(--warn-bg); color: var(--warn-ink); }
 .ah-chip--danger { background: var(--danger-bg); color: var(--danger-ink); }
 .ah-chip--brand { background: var(--brand-tint); color: var(--brand); }
-.ah-chip--agent { background: var(--agent-bg); color: var(--agent); }
+.ah-chip--agent { background: var(--agent-bg); color: var(--agent-ink); }
 .ah-chip--automation { background: var(--fill); color: var(--ink-2); }
 .ah-chip--mono { font: var(--text-data); }
-.ah-chip--dark { background: var(--rail); color: #fff; }
+.ah-chip--dark { background: var(--rail); color: var(--rail-ink-strong); }
 .ah-chip--sm { height: 18px; font-size: 10.5px; }
 /* Status and tag colours are workspace data, so statusChipStyle() and tagChipStyle() compute the dark-theme text per chip. */
 :root[data-theme="dark"] .ah-status-ink { --status-ink: var(--status-ink-dark); }
@@ -380,10 +693,10 @@ html, body, #app {
 .ah-dot--danger { background: var(--danger); }
 
 .ah-avatar {
-    width: 24px; height: 24px; border-radius: 50%;
+    width: var(--avatar-size); height: var(--avatar-size); border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
     background: var(--brand); color: var(--on-brand);
-    font: 600 11px/1 var(--font-ui);
+    font: 600 var(--avatar-font)/1 var(--font-ui);
     flex: none; overflow: hidden; object-fit: cover;
 }
 .ah-avatar--agent { border-radius: 6px; background: var(--agent); color: #fff; }
@@ -399,6 +712,11 @@ html, body, #app {
     border: 1px solid var(--border);
     color: var(--ink-2);
     background: var(--surface-2);
+}
+/* The key beside an action that has a shortcut. A touch device has no keyboard to press it on. */
+.ah-kbd--hint { flex: none; margin-inline-start: auto; white-space: nowrap; }
+@media (hover: none) {
+    .ah-kbd--hint { display: none; }
 }
 
 .ah-divider { height: 1px; background: var(--hairline); border: 0; margin: 0; }
@@ -428,11 +746,10 @@ html, body, #app {
 }
 .ah-check:focus-visible { outline: none; box-shadow: var(--focus); }
 
-.ah-tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: rgba(0, 0, 0, .05); }
-:root[data-theme="dark"] .ah-tabs { background: rgba(255, 255, 255, .07); }
+.ah-tabs { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r-input); background: var(--track, rgba(0, 0, 0, .05)); }
 .ah-tab {
-    height: 26px; padding: 0 10px; border-radius: 6px; border: 0; background: transparent;
-    font: 600 12px/1 var(--font-ui); color: var(--ink-2); cursor: pointer;
+    height: var(--control-h, 26px); padding: 0 var(--sp-4); border-radius: var(--r-chip); border: 0; background: transparent;
+    font: var(--fw-strong, 600) var(--fs-sm, 12px)/1 var(--font-ui); color: var(--ink-2); cursor: pointer;
     transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease);
 }
 .ah-tab.is-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
@@ -466,11 +783,24 @@ html, body, #app {
     padding: 8px 10px; border-radius: 7px;
     font: 500 13px/1.2 var(--font-ui); color: var(--ink);
     cursor: pointer; text-decoration: none; border: 0; background: transparent; width: 100%; text-align: left;
+    box-sizing: border-box;
 }
 .ah-pop__item:hover { background: var(--surface-hover); color: var(--ink); text-decoration: none; }
 .ah-pop__item.is-active { background: var(--brand-tint); color: var(--brand); }
 .ah-pop__sep { height: 1px; background: var(--hairline); margin: 6px 4px; }
 .ah-pop__label { padding: 8px 10px 4px; }
+
+/* An icon file drawn as a mask (`--mask-icon`, set by maskOf): it shows in the current text
+   colour, not the one baked into the file, so it stays readable in either theme. */
+.ah-mask-icon {
+    display: inline-block;
+    flex: none;
+    width: 14px;
+    height: 14px;
+    background-color: currentColor;
+    -webkit-mask: var(--mask-icon) center / contain no-repeat;
+    mask: var(--mask-icon) center / contain no-repeat;
+}
 
 .ah-toolbar {
     height: var(--toolbar-h);
@@ -482,6 +812,10 @@ html, body, #app {
 }
 .ah-toolbar__title { margin: 0; font: 600 15px/1.2 var(--font-ui); letter-spacing: -.2px; display: flex; align-items: center; gap: 10px; }
 .ah-toolbar__spacer { flex: 1; }
+/* A page that wraps its toolbar on a phone may load before this file; a fixed height here would win and lay the second row over the page. */
+@media (max-width: 767px) {
+    .ah-toolbar { height: auto; min-height: var(--toolbar-h); }
+}
 
 .ah-empty {
     border: 1px dashed var(--border);
@@ -492,9 +826,9 @@ html, body, #app {
     background: var(--surface-2);
 }
 
-.ah-scroll { scrollbar-width: thin; scrollbar-color: rgba(0, 0, 0, .18) transparent; }
+.ah-scroll { scrollbar-width: thin; scrollbar-color: var(--border, rgba(0, 0, 0, .18)) transparent; }
 .ah-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-.ah-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .18); border-radius: 8px; }
+.ah-scroll::-webkit-scrollbar-thumb { background: var(--border, rgba(0, 0, 0, .18)); border-radius: 8px; }
 
 .ah-spin {
     display: inline-block; flex: none;
@@ -505,9 +839,9 @@ html, body, #app {
 }
 @keyframes ah-spin { to { transform: rotate(360deg); } }
 
-.ah-fade-enter-active, .ah-fade-leave-active { transition: opacity var(--t-state) var(--ease); }
+.ah-fade-enter-active, .ah-fade-leave-active { transition: opacity var(--motion-base) var(--ease-out); }
 .ah-fade-enter-from, .ah-fade-leave-to { opacity: 0; }
-.ah-slide-right-enter-active, .ah-slide-right-leave-active { transition: transform var(--t-panel) var(--ease), opacity var(--t-panel) var(--ease); }
+.ah-slide-right-enter-active, .ah-slide-right-leave-active { transition: transform var(--motion-slow) var(--ease-out), opacity var(--motion-slow) var(--ease-out); }
 .ah-slide-right-enter-from, .ah-slide-right-leave-to { transform: translateX(24px); opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -527,6 +861,29 @@ html, body, #app {
         animation-iteration-count: 1 !important;
     }
 }
+
+/* Motion (task 046 B4). The shared overlays (menu, dialog, drawer, toast, tooltip) run on these.
+   --t-state, --t-panel and --ease are the names the screens were first written against; they are
+   re-pointed here so both names keep one clock. */
+:root {
+    --motion-fast: 120ms;
+    --motion-base: 150ms;
+    --motion-slow: 240ms;
+    --ease-out: cubic-bezier(.2, .7, .2, 1);
+    --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+    --t-state: var(--motion-base);
+    --t-panel: var(--motion-slow);
+    --ease: var(--ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+    :root { --motion-fast: .01ms; --motion-base: .01ms; --motion-slow: .01ms; }
+}
+/* Entrances move the standalone translate property, never transform: several overlays already use
+   transform to place themselves, and an animated transform would drop that placement while it runs. */
+@keyframes ah-fade-in { from { opacity: 0; } }
+@keyframes ah-drop-in { from { opacity: 0; translate: 0 -4px; } }
+@keyframes ah-rise-in { from { opacity: 0; translate: 0 8px; } }
+.ah-pop { animation: ah-drop-in var(--motion-fast) var(--ease-out); }
 
 .ah-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 

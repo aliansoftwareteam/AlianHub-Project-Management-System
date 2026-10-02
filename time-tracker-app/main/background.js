@@ -471,6 +471,14 @@ ipcMain.on('estimate:limit', (event, data) => {
   } catch (e) { /* notifications are best-effort */ }
 })
 
+// A capture was refused because the timer was stopped or trimmed somewhere else. The renderer
+// has already ended the session locally; this only tells the person why.
+ipcMain.on('tracker:stopped-elsewhere', (event, data) => {
+  try {
+    showTrackerStoppedAlert({ reason: 'elsewhere', taskName: (data && data.taskName) || (lastTaskCtx && lastTaskCtx.taskName) || '' })
+  } catch (e) { /* best-effort */ }
+})
+
 // AHE-3835 — the renderer reports the actively-tracked task so the stop alert can
 // name it (lock/sleep) and Resume knows what to restart. Read-only: this never
 // changes tracking behaviour.

@@ -33,6 +33,7 @@ const { schema } = require('../utils/mongo-handler/schema');
 const { fieldAppliesToTask, fieldTaskTypes, cleanTaskTypeList } = require('../Modules/CustomField/helpers/fieldTaskTypes');
 const { fieldInsertFrom, fieldUpdateFrom, FieldWriteError } = require('../Modules/CustomField/helpers/fieldWrite');
 const { CID, OWNER, OPEN_PROJECT, OPEN_TASK } = require('./fixtures/taskWriteGuard');
+const { TemplateData } = require('../utils/Tempates/task_type');
 
 const BUG = 2;
 const STORY = 4;
@@ -67,8 +68,17 @@ describe('saving a field with task types', () => {
 
     it('keeps a clean list of task type keys', () => {
         expect(cleanTaskTypeList([BUG, String(STORY), BUG])).toEqual([BUG, STORY]);
-        expect(fieldInsertFrom({ fieldTitle: 'Severity', fieldType: 'dropdown', fieldTaskTypes: [BUG, '4'] }).fieldTaskTypes).toEqual([BUG, STORY]);
+        expect(fieldInsertFrom({ fieldTitle: 'Severity', fieldType: 'dropdown', fieldOptions: [{ id: 'high', label: 'High' }], fieldTaskTypes: [BUG, '4'] }).fieldTaskTypes).toEqual([BUG, STORY]);
         expect(fieldUpdateFrom({ key: '$set', id: SCOPED_FIELD, updateObject: { fieldTaskTypes: [] } }).fieldTaskTypes).toEqual([]);
+    });
+
+    it('accepts the keys a project\'s own task types carry, which are the keys its tasks store', () => {
+        const projectTypes = TemplateData().flatMap((template) => template.taskTypes);
+        const keys = [...new Set(projectTypes.map((type) => type.key))];
+        expect(keys.length).toBeGreaterThan(2);
+        expect(cleanTaskTypeList(keys)).toEqual(keys);
+        expect(fieldInsertFrom({ fieldTitle: 'Severity', fieldType: 'text', fieldTaskTypes: keys }).fieldTaskTypes).toEqual(keys);
+        projectTypes.forEach((type) => expect(fieldAppliesToTask({ fieldTaskTypes: [type.key] }, { TaskTypeKey: type.key })).toBe(true));
     });
 
     it.each([['bug'], [[0]], [[-1]], [[1.5]], [[true]], [[{ key: 2 }]], [Array.from({ length: 101 }, (_, at) => at + 1)]])('refuses %j', (value) => {

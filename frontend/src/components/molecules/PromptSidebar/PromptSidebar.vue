@@ -244,20 +244,20 @@ function parseJsonAiText() {
 </script>
 <style>
 .prompt-body-sidebar{
-    background: #FFFFFF;
+    background: var(--surface);
     margin: 15px;
     width: 893px;
 }
 .dropdown-button{
     border-radius: 5px;
-    border: 1px solid rgb(220, 220, 220);
+    border: 1px solid var(--border);
     height: 29px;
     padding: 5px;
 }
 .prompt_form{
     border-radius: 8px;
-    border: 1px solid #FFFFFF;
-    box-shadow: 0px 2px 12px 3px #00000026;
+    border: 1px solid var(--surface);
+    box-shadow: 0px 2px 12px 3px var(--shadow-ink);
 }
 .generate-button-ai{
     margin-right: 20px;
@@ -272,7 +272,7 @@ function parseJsonAiText() {
 }
 
 .prompt-body-sidebar{
-    background: #FFFFFF;
+    background: var(--surface);
     margin: 15px;
     width: calc(100% - 30px);
 }

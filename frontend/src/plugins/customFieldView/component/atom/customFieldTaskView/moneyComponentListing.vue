@@ -23,9 +23,11 @@
 
 <script setup>
     import { nextTick, ref, watch } from "vue";
+    import { useI18n } from "vue-i18n";
     import ToolTip from "@/components/molecules/ToolTip/ToolTip.vue";
     import useCustomFieldImage from '@/composable/customFieldIcon.js';
     const { getImageData } = useCustomFieldImage();
+    const { t } = useI18n();
     const props = defineProps({
         detail:{
             type:Object,
@@ -132,12 +134,12 @@
         }
     }
     const handleKeyUp = () => {
-        const check = textModel.value.replace(/,/g, '');
+        const check = String(textModel.value ?? '').replace(/,/g, '');
         if(props?.detail?.fieldMinimum || props?.detail?.fieldMaximum){
             if(Number(props?.detail?.fieldMinimum) > Number(check)){
-                error.value = `Must be at least ${props?.detail?.fieldMinimum} ${props?.detail?.fieldTitle}.`
+                error.value = t('CustomField.min_value', { field: props?.detail?.fieldTitle, min: props?.detail?.fieldMinimum });
             }else if(Number(props?.detail?.fieldMaximum) < Number(check)) {
-                error.value = `${props?.detail?.fieldTitle} must be less than or equal to ${props?.detail?.fieldMaximum}.`
+                error.value = t('CustomField.max_value', { field: props?.detail?.fieldTitle, max: props?.detail?.fieldMaximum });
             }else{
                 error.value = '';
             }
@@ -228,4 +230,5 @@
         color: #505050;
         padding-right: 2px;
     }
+    .formkit__content-wrapper .formkit__content-currency { color: var(--ink); }
 </style>

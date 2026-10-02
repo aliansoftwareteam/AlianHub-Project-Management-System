@@ -2,7 +2,7 @@
     <div
         class="mc-msg"
         :class="{ 'is-me': onMySide,'is-cont': continuation, 'is-agent': isAgent, 'is-pending': message.isSending }"
-        :id="message._id || undefined"
+        :id="domId"
         tabindex="-1"
     >
         <MainChatAvatar
@@ -19,7 +19,7 @@
                 <span class="mc-msg-name" :data-test="isAi ? 'ai-author' : undefined">{{ isAi ? $t('AiMention.author') : displayName }}</span>
                 <span v-if="isAi" class="mc-agent-tag mc-ai-for" data-test="ai-for">{{ $t('AiMention.answered_for', { name: askerName }) }}</span>
                 <span v-else-if="isAgent" class="mc-agent-tag">{{ $t('Chat.agent') }}</span>
-                <span class="mc-msg-time">· {{ shortTime }}</span>
+                <span v-if="shortTime" class="mc-msg-time">· {{ shortTime }}</span>
                 <span v-if="message.pinnedMessage" class="mc-msg-pin"><MainChatIcon name="pin" :size="10" />{{ $t('MainChat.pinned') }}</span>
             </div>
             <div v-else-if="message.pinnedMessage" class="mc-msg-meta">
@@ -52,6 +52,7 @@
 
             <div v-if="actionable" class="mc-msg-acts">
                 <button type="button" class="mc-act" @click="$emit('reply', message)">{{ $t('Chat.reply') }}</button>
+                <button v-if="!inThread" type="button" class="mc-act" data-test="reply-in-thread" @click="$emit('thread', message)">{{ $t('MainChat.reply_in_thread') }}</button>
                 <button v-if="isText" type="button" class="mc-act mc-act--task" @click="$emit('make-task', { message, text: plainText })">{{ $t('Chat.make_task') }}</button>
                 <button type="button" class="mc-act" :class="{ 'is-on': message.pinnedMessage }" @click="$emit('save-later', message)">
                     {{ message.pinnedMessage ? $t('Chat.saved_later') : $t('Chat.save_later') }}
@@ -64,6 +65,13 @@
                 compact
                 class="mc-rx"
                 @toggle="(emoji) => $emit('react', { message, emoji })"
+            />
+
+            <MainChatThreadFooter
+                v-if="hasThread"
+                :message="message"
+                :hour12="hour12"
+                @open="$emit('thread', message)"
             />
 
             <div v-if="message.failed" class="mc-failed-note">
@@ -92,7 +100,7 @@
                 </div>
             </span>
 
-            <DropDown mode="menu" :id="`mc_menu_${message._id}`" :zIndex="1300">
+            <DropDown mode="menu" themed :id="`mc_menu_${domId}`" :zIndex="1300">
                 <template #button="{ triggerAttrs }">
                     <button type="button" :title="$t('MainChat.more')" v-bind="triggerAttrs"><MainChatIcon name="more" :size="15" /></button>
                 </template>
@@ -103,13 +111,16 @@
                     <DropDownOption @click="$emit('reply', message)">
                         <span class="mc-menu-item">{{ $t('MainChat.reply') }}</span>
                     </DropDownOption>
+                    <DropDownOption v-if="!inThread" @click="$emit('thread', message)">
+                        <span class="mc-menu-item">{{ $t('MainChat.reply_in_thread') }}</span>
+                    </DropDownOption>
                     <DropDownOption v-if="canEdit" @click="$emit('edit', message)">
                         <span class="mc-menu-item">{{ $t('MainChat.edit') }}</span>
                     </DropDownOption>
                     <DropDownOption @click="$emit('pin', message)">
                         <span class="mc-menu-item">{{ message.pinnedMessage ? $t('MainChat.unpin') : $t('MainChat.pin') }}</span>
                     </DropDownOption>
-                    <DropDownOption @click="$emit('mark-unread', message)">
+                    <DropDownOption v-if="!inThread" @click="$emit('mark-unread', message)">
                         <span class="mc-menu-item">{{ $t('MainChat.mark_unread') }}</span>
                     </DropDownOption>
                     <DropDownOption v-if="message.sent" @click="$emit('remove', message)">
@@ -136,6 +147,7 @@ import ReactionBar from '@/components/atom/ReactionBar/ReactionBar.vue';
 import MainChatAvatar from './MainChatAvatar.vue';
 import MainChatIcon from './MainChatIcon.vue';
 import MainChatMessageBody from './MainChatMessageBody.vue';
+import MainChatThreadFooter from './MainChatThreadFooter.vue';
 import { isAgentComment } from '@/utils/commentSide';
 import { AI_MENTION_NAME, aiAuthorOf } from '@/utils/aiMention';
 
@@ -149,9 +161,11 @@ const props = defineProps({
     senderSrc: { type: String, default: '' },
     askerName: { type: String, default: '' },
     hour12: { type: Boolean, default: true },
+    // Shown in a thread panel: no thread of its own, and an id that cannot clash with the same message in the conversation.
+    inThread: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['reply', 'copy', 'remove', 'retry', 'preview', 'react', 'pin', 'mark-unread', 'edit', 'make-task', 'save-later', 'transcribed']);
+const emit = defineEmits(['reply', 'thread', 'copy', 'remove', 'retry', 'preview', 'react', 'pin', 'mark-unread', 'edit', 'make-task', 'save-later', 'transcribed']);
 
 // Must match the backend allowlist in Modules/Reactions/helpers/reactionRules.js
 const REACTION_EMOJIS = ['👍', '❤️', '😄', '🎉', '😮', '😢', '🚀', '👀'];
@@ -211,6 +225,11 @@ const displayName = computed(() => {
 });
 const isText = computed(() => ['text', 'link'].includes(props.message.type) && !props.message.isDeleted);
 const actionable = computed(() => !props.message.isDeleted && !props.message.isSending);
+const domId = computed(() => {
+    if (!props.message._id) return undefined;
+    return props.inThread ? `thread_${props.message._id}` : String(props.message._id);
+});
+const hasThread = computed(() => !props.inThread && !!props.message._id && Number(props.message.replyCount || 0) > 0);
 const hasReactions = computed(() => Array.isArray(props.message.reactions) && props.message.reactions.length > 0);
 const canEdit = computed(() => onMySide.value &&['text', 'link'].includes(props.message.type));
 const plainText = computed(() => String(props.message.message || '').replace(/<[^>]*>/g, ''));

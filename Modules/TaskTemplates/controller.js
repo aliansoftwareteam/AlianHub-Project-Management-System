@@ -7,11 +7,14 @@ const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo');
 const { HandleHistory } = require('../Tasks/helpers/mongo_helper');
+const { cleanDescription } = require('../Tasks/helpers/cleanRichText');
 const { sessionActor, escapeText } = require('../Tasks/helpers/taskWriteFields');
 const { updateRemainingTime } = require('../LogTime/controllerV2/helpers');
 const { visibleProjectIds } = require('../Agents/scope');
+const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
 const access = require('./access');
 const rules = require('./templateRules');
+const { canNest } = require('../Tasks/helpers/taskTree');
 
 const { OBJECT_ID } = access;
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
@@ -200,11 +203,24 @@ const appliedFieldsOf = (plan) => [
     ...(plan.subtasks.length ? ['subtasks'] : []),
 ];
 
+const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/* Only what the template brings is checked. The task's own values stay as they are, also where a template value is left out. */
+const withStorableFieldValues = async ({ companyId, task, changes }) => {
+    const change = changes.find((entry) => entry.field === 'customFields');
+    if (!change) return { changes, dropped: 0 };
+    const own = task.customField && typeof task.customField === 'object' ? task.customField : {};
+    const brought = Object.fromEntries(Object.entries(change.patch.customField).filter(([id, value]) => !sameJson(own[id], value)));
+    const kept = await storableFieldValues({ companyId, task, customField: brought });
+    const checked = Object.keys(kept.customField).length ? [{ ...change, patch: { customField: { ...own, ...kept.customField } } }] : [];
+    return { changes: changes.flatMap((entry) => (entry === change ? checked : [entry])), dropped: kept.dropped.length };
+};
+
 const writeFields = async ({ companyId, task, projectId, changes, actor, template }) => {
-    const set = Object.assign({}, ...changes.map((change) => change.patch));
+    const set = cleanDescription(Object.assign({}, ...changes.map((change) => change.patch)));
     const taskId = String(task._id);
     const updated = await crud(companyId, SCHEMA_TYPE.TASKS, [{ _id: oid(taskId) }, { $set: set }, { returnDocument: 'after' }], 'findOneAndUpdate');
-    socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task' });
+    socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task', companyId });
     if (Object.prototype.hasOwnProperty.call(set, 'totalEstimatedTime')) {
         Promise.resolve(updateRemainingTime(companyId, taskId)).catch((error) => logger.error(`[taskTemplates] remaining time: ${error && error.message}`));
     }
@@ -262,11 +278,12 @@ exports.applyTemplate = async (req, res) => {
 
         const may = access.keyChecker(companyId, req.uid, projectId);
         const skipped = [];
-        const changes = [];
+        const permitted = [];
         for (const change of plan.changes) {
-            if (await may(rules.FIELD_KEYS[change.field])) changes.push(change);
+            if (await may(rules.FIELD_KEYS[change.field])) permitted.push(change);
             else skipped.push(change.field);
         }
+        const { changes, dropped: droppedFieldValues } = await withStorableFieldValues({ companyId, task, changes: permitted });
         const keep = async (field, list) => {
             if (!list.length) return [];
             if (await may(rules.FIELD_KEYS[field])) return list;
@@ -274,7 +291,9 @@ exports.applyTemplate = async (req, res) => {
             return [];
         };
         const checklist = await keep('checklist', plan.checklist);
-        const subtasks = await keep('subtasks', plan.subtasks);
+        const takesSubtasks = canNest(task).ok;
+        if (!takesSubtasks && plan.subtasks.length) skipped.push('subtasks');
+        const subtasks = takesSubtasks ? await keep('subtasks', plan.subtasks) : [];
 
         const actor = await sessionActor(req);
         if (changes.length) await writeFields({ companyId, task, projectId, changes, actor, template });
@@ -301,6 +320,7 @@ exports.applyTemplate = async (req, res) => {
                 skipped,
                 checklistAdded: checklist.length,
                 subtasksCreated,
+                ...(droppedFieldValues ? { droppedFieldValues } : {}),
             },
         });
     } catch (error) {

@@ -3,6 +3,8 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { useUpdateTasks } from "@/views/Projects/helper.js";
 import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
+import { plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
+import { isAddedRow } from "@/views/Projects/composables/taskHomeMark";
 
 const GAP = 65536;
 
@@ -50,7 +52,10 @@ export function useListDragDrop() {
         return (rows[index - 1][indexName] + rows[index + 1][indexName]) / 2;
     }
 
-    function applyDrag({ event, item, groupType, rows, project }) {
+    /* A task has one place in a group, kept on the task and so by the list it lives in. A row shown
+     * in a list it was added to takes the group it is dropped on, which edits the task, and keeps
+     * its place: a reorder there is refused, and `false` tells the caller so. */
+    function applyDrag({ event, item, groupType, rows, project, listId = "" }) {
         const move = event?.added || event?.moved;
         if (!move?.element?._id) return;
         if (item.value === "NO_DUE_DATE" || item.value === "NEXT") return;
@@ -64,6 +69,7 @@ export function useListDragDrop() {
         if (event.added) {
             updateTaskByGroup(element, item, groupType).catch((error) => console.error("ERROR in list drop: ", error));
         }
+        if (isAddedRow(task, listId)) return event.added ? undefined : false;
         if (item.customFieldId) return;
 
         const tempIndex = nextIndex(rows, index, item.indexName);
@@ -78,7 +84,7 @@ export function useListDragDrop() {
             isFirstWithRecord: index === 0 && rows.length > 1,
             indexName: item.indexName,
             sprintId: task.sprintId,
-            relevantKey: item.searchValue,
+            relevantKey: plainGroupValue(item.searchValue),
             searchKey: item.searchKey,
             taskKey: task.TaskKey,
             updateData

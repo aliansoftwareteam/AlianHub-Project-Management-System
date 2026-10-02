@@ -11,7 +11,14 @@ import { apiRequest } from '../../services';
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { isFavourite } from "@/composable/favourites";
 import { assigneeCondition, assigneeGroups, dueDateBuckets, dueDateCondition, restoreGroupState, sprintToLoad } from "./taskGroups";
-import { customFieldGroups, customFieldIdOf, customGroupUpdate } from "./composables/customFieldQuery";
+import { customFieldGroups, customFieldIdOf, customGroupUpdate, needsProjectRange, numberRangeStages, rangeFromRows } from "./composables/customFieldQuery";
+import { activeMemberIds } from "@/plugins/customFieldView/fieldTypes/people";
+import { flatTasks } from "./composables/projectCustomFields";
+
+/* The bands of a number group are cut from the project's own values; if the range cannot be read, the loaded tasks stand in. */
+const projectNumberRange = (def, projectId) => apiRequest("post", `${env.TASK}/find`, { findQuery: numberRangeStages(def, projectId) })
+    .then((result) => rangeFromRows(result?.data))
+    .catch(() => null);
 
 const projectsList = ref([]);
 const filterdProjects = ref([]);
@@ -541,7 +548,7 @@ export function useUpdateTasks(project) {
                     ProjectName: projectData.value.ProjectName,
                     ProjectCode: projectData.value.ProjectCode
                 }
-                taskClass.updateStatus({ newStatus, prevStatus: prevStatusObj, projectData: project, task: task, userData , isUpdateTask : isUpdateTask})
+                taskClass.updateStatus({ newStatus, prevStatus: prevStatusObj, projectData: project, task: task, userData , isUpdateTask : isUpdateTask, announce: true})
                 .then(() => {
                     $toast.success(t(`Toast.Status_changed_successfully`), {position: "top-right"})
                     resolve();
@@ -557,44 +564,45 @@ export function useUpdateTasks(project) {
     }
     const updatePriority = (task, newPriority,assigneeType,isUpdateTask) => {
         return new Promise((resolve, reject) => {
-            (async () => {  
-                try {
-                    const userData = getUserData();
-    
-                    let updateObj = {
-                        Task_Priority : newPriority.value
-                    }
-    
-                    let project = {
-                        '_id': projectData.value._id ? projectData.value._id : "",
-                        'ProjectName' : projectData.value.ProjectName,
-                        "CompanyId": companyId.value,
-                    }
-    
-                    const priority = getPriority(task.Task_Priority)
-                    let priorityObj = {
-                        'statusImage' : await getWasabiImageLink(projectData.value.CompanyId,priority.image),
-                        'priorityName' : priority.value,
-                        'taskId': task._id,
-                        'taskName': task.TaskName,
-                        'userName' : userData.Employee_Name,
-                        'newStatusImage' : await getWasabiImageLink(projectData.value.CompanyId,newPriority.image),
-                        'newPriorityName' : newPriority.value
-                    }
-    
-                    taskClass.updatePriority({firebaseObj: updateObj, projectData: project, taskData: task, priorityObj, userData, isUpdateTask : isUpdateTask})
-                    .then(() => {
-                        $toast.success(t(`Toast.Task_updated_successfully`), {position: "top-right"})
-                        resolve();
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update priority: ", error);
-                        reject(error);
-                    })
-                } catch (error) {
-                    reject(error);
+            try {
+                const userData = getUserData();
+
+                let updateObj = {
+                    Task_Priority : newPriority.value
                 }
-            })();
+
+                let project = {
+                    '_id': projectData.value._id ? projectData.value._id : "",
+                    'ProjectName' : projectData.value.ProjectName,
+                    "CompanyId": companyId.value,
+                }
+
+                const priority = getPriority(task.Task_Priority)
+                const priorityObj = Promise.all([
+                    getWasabiImageLink(projectData.value.CompanyId,priority.image),
+                    getWasabiImageLink(projectData.value.CompanyId,newPriority.image)
+                ]).then(([statusImage, newStatusImage]) => ({
+                    'statusImage' : statusImage,
+                    'priorityName' : priority.value,
+                    'taskId': task._id,
+                    'taskName': task.TaskName,
+                    'userName' : userData.Employee_Name,
+                    'newStatusImage' : newStatusImage,
+                    'newPriorityName' : newPriority.value
+                }));
+
+                taskClass.updatePriority({firebaseObj: updateObj, projectData: project, taskData: task, priorityObj, userData, isUpdateTask : isUpdateTask, announce: true})
+                .then(() => {
+                    $toast.success(t(`Toast.Task_updated_successfully`), {position: "top-right"})
+                    resolve();
+                })
+                .catch((error) => {
+                    console.error("ERROR in update priority: ", error);
+                    reject(error);
+                })
+            } catch (error) {
+                reject(error);
+            }
         })
     }
     const updateDueDate = (task, newDueDate,assigneeType,isUpdateTask) => {
@@ -656,7 +664,8 @@ export function useUpdateTasks(project) {
                     task: task,
                     obj: notificationObj,
                     userData,
-                    isUpdateTask: isUpdateTask
+                    isUpdateTask: isUpdateTask,
+                    announce: true
                 }
 
                 taskClass.updateDueDate(object).then(() => {
@@ -705,7 +714,8 @@ export function useUpdateTasks(project) {
                     employeeName: employeeName,
                     type: assigneeType ? assigneeType : "replace",
                     userData,
-                    isUpdateTask
+                    isUpdateTask,
+                    announce: true
                 })
                 .then(() => {
                     $toast.success(t(`Toast.Assignee_changed_successfully`), {position: "top-right"})
@@ -773,7 +783,7 @@ export function taskListHelper() {
     const priorities = computed(() => getters["settings/companyPriority"])
     const project = inject('selectedProject');
     const permit = checkPermission("task.show_tasks",project?.value?.isGlobalPermission);
-    function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable}) {
+    function getSprintTasks({projectId, sprintId, item, fetchNew = false, projectData ,indexName,parentId = '',groupType,resetTable,skip,firstPageOnly = false}) {
         return new Promise((resolve, reject) => {
             try {
                 if(permit === null && projectData.isGlobalPermission === false) {
@@ -809,7 +819,9 @@ export function taskListHelper() {
                         userId: userId.value,
                         showAllTasks: projectData.isGlobalPermission === false ? permit : true,
                         indexName: indexName,
-                        parentId : parentId
+                        parentId : parentId,
+                        skip,
+                        firstPageOnly
                     })
                     .then(() => {
                         resolve();
@@ -823,6 +835,18 @@ export function taskListHelper() {
                 console.error("ERROR: ", error);
             }
         })
+    }
+    function getGroupCounts({projectId, sprintId, items, projectData, totals = [], table = false}) {
+        if(permit === null && projectData.isGlobalPermission === false) return Promise.resolve();
+        return dispatch("projectData/refreshGroupCounts", {
+            pid: projectId,
+            sprintId,
+            items,
+            totals,
+            table,
+            userId: userId.value,
+            showAllTasks: projectData.isGlobalPermission === false ? permit : true
+        });
     }
     // FIREBASE
     function getMongoDBUpdate({projectId, sprintId,projectData, groupBy: groupByValue, currentView})
@@ -844,7 +868,7 @@ export function taskListHelper() {
         })
     }
 
-    async function groupBy(type, refetch = false,project,sprintData,groupedTasks,isBoard,lView='list',resetTable=false,fetchTask = true,cb) {
+    async function groupBy(type, refetch = false,project,sprintData,groupedTasks,isBoard,lView='list',resetTable=false,fetchTask = true,cb,{firstPageOnly = false} = {}) {
         try {
             if(!project || !Object.keys(project).length) {
                 cb([])
@@ -892,8 +916,7 @@ export function taskListHelper() {
                 indexKey.value = "assigneeIndex";
 
                 // Groups used to come from a typesense group_by; with search gone they come from the company seats instead.
-                const memberIds = (getters["settings/companyUsers"] || []).filter((member) => member && member.userId && member.isDelete !== true && Number(member.status) !== 3).map((member) => member.userId);
-                arr = assigneeGroups(memberIds, getUser, t("Projects.unassigned"), getters["settings/teams"]);
+                arr = assigneeGroups(activeMemberIds(getters["settings/companyUsers"]), getUser, t("Projects.unassigned"), getters["settings/teams"]);
 
                     sprints.forEach((sprint, index) => {
                         sprint.isExpanded = false;
@@ -941,7 +964,14 @@ export function taskListHelper() {
                 indexKey.value = "groupByStatusIndex";
                 const fieldId = customFieldIdOf(type);
                 const def = (getters["settings/finalCustomFields"] || []).find((field) => String(field?._id) === fieldId);
-                arr = customFieldGroups(def, { t });
+                const people = def?.fieldType === "people"
+                    ? activeMemberIds(getters["settings/companyUsers"]).map((id) => ({ id, name: getUser(id).Employee_Name }))
+                    : [];
+                const range = needsProjectRange(def) ? await projectNumberRange(def, project._id) : null;
+                const loaded = needsProjectRange(def) && !range
+                    ? flatTasks([getters["projectData/tasks"], getters["projectData/tableTasks"]], project._id)
+                    : [];
+                arr = customFieldGroups(def, { t, people, range, tasks: loaded });
 
                 sprints.forEach((sprint, index) => {
                     sprint.isExpanded = false;
@@ -981,7 +1011,7 @@ export function taskListHelper() {
                     let promises = [];
                     openSprint.items.forEach((item) => {
                         promises.push(
-                            getSprintTasks({projectId: project._id, sprintId:openSprint?.id ? openSprint?.id : openSprint?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable})
+                            getSprintTasks({projectId: project._id, sprintId:openSprint?.id ? openSprint?.id : openSprint?._id, item, fetchNew: lView == 'table' ? refetch : true,projectData: project, indexName: item.indexName, groupType: lView,resetTable:resetTable, firstPageOnly})
                         )
                     })
                     Promise.allSettled(promises)
@@ -1072,6 +1102,7 @@ export function taskListHelper() {
         groupBy,
         checkCase,
         getSprintTasks,
+        getGroupCounts,
         getMongoDBUpdate,
         searchMongoDBTasks
     }

@@ -1,8 +1,8 @@
 // A tiny in-memory stand-in for MongoDbCrudOpration: enough of the query
-// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $in/$nin (any element of a stored array)/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push/$addToSet/$pull,
+// language for the agent modules (equality including null as missing, array-element equality, a word-match $text, $nor, $expr with $eq/$ne of two operands, $in/$nin (any element of a stored array)/$eq/$ne/$gt(e)/$lt(e)/$exists/$type/$size/$elemMatch, $set/$inc/$push (with $each and $slice)/$addToSet/$pull,
 // conditional findOneAndUpdate answering the old document unless asked for the new one (null after an upsert insert, as
 // the driver does), updateOne and findOneAndUpdate with upsert and $setOnInsert and a unique _id, findOneAndDelete, deleteOne, deleteMany,
-// bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes)/$group/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
+// insertMany with a unique _id, bulkWrite of insertOne/updateOne/updateMany, sort/skip/limit on find, sort on findOneAndUpdate, $type 'date'/'string'/'objectId' on the stored value, $match/$unwind (a top-level array)/$project (inclusion or exclusion)/$addFields ($toString, $ifNull, $size, $strLenBytes, $convert to a number, $cond with $in)/$group (a field, a compound or a $dateToString '%Y-%m-%d' day _id)/$replaceRoot/$count/$facet/$lookup aggregate with a word-count textScore, declared unique indexes that
 // reject a duplicate save or upsert with E11000, declared text indexes that bound $text to their fields) so a test can assert on what was written.
 
 let seq = 1;
@@ -38,7 +38,22 @@ const TYPE_CHECKS = {
     objectId: (raw) => Boolean(raw) && raw._bsontype === 'ObjectId',
 };
 
+/* $expr comparing two operands with $eq or $ne; a "$field" operand reads the row, and a missing field compares as null. */
+const exprOperand = (doc, operand) => {
+    const value = typeof operand === 'string' && operand.startsWith('$') ? read(doc, operand.slice(1)) : operand;
+    if (value === undefined || value === null) return null;
+    return value instanceof Date ? value.getTime() : hex(value);
+};
+const exprHolds = (doc, expr) => {
+    const [op, operands] = Object.entries(expr)[0];
+    const [left, right] = operands.map((operand) => exprOperand(doc, operand));
+    if (op === '$eq') return left === right;
+    if (op === '$ne') return left !== right;
+    throw new Error(`fakeMongo: unsupported $expr operator ${op}`);
+};
+
 const matches = (doc, filter = {}, textFields) => Object.entries(filter).every(([key, cond]) => {
+    if (key === '$expr') return exprHolds(doc, cond);
     if (key === '$or') return cond.some((f) => matches(doc, f, textFields));
     if (key === '$and') return cond.every((f) => matches(doc, f, textFields));
     if (key === '$nor') return !cond.some((f) => matches(doc, f, textFields));
@@ -51,6 +66,7 @@ const matches = (doc, filter = {}, textFields) => Object.entries(filter).every((
             const want = arg instanceof Date ? arg.getTime() : hex(arg);
             if (op === '$in') return (Array.isArray(value) ? value.map(hex) : [value]).some((v) => arg.map(String).includes(String(v)));
             if (op === '$nin') return !(Array.isArray(value) ? value.map(hex) : [value]).some((v) => arg.map(String).includes(String(v)));
+            if (op === '$eq') return Array.isArray(value) ? value.map(hex).includes(want) : value === want;
             if (op === '$ne') return Array.isArray(value) ? !value.map(hex).includes(want) : value !== want;
             if (op === '$gte') return value >= want;
             if (op === '$gt') return value > want;
@@ -104,7 +120,11 @@ const write = (doc, key, fn, arrayFilters) => {
 const apply = (doc, update = {}, arrayFilters) => {
     Object.entries(update.$set || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = v; }, arrayFilters));
     Object.entries(update.$inc || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = Number(t[l] || 0) + v; }, arrayFilters));
-    Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => { t[l] = [...(t[l] || []), ...(v && Array.isArray(v.$each) ? v.$each : [v])]; }, arrayFilters));
+    Object.entries(update.$push || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
+        const pushed = [...(t[l] || []), ...(v && Array.isArray(v.$each) ? v.$each : [v])];
+        const keep = v && Array.isArray(v.$each) ? v.$slice : undefined;
+        t[l] = Number.isInteger(keep) ? (keep < 0 ? pushed.slice(keep) : pushed.slice(0, keep)) : pushed;
+    }, arrayFilters));
     Object.entries(update.$unset || {}).forEach(([k]) => write(doc, k, (t, l) => { delete t[l]; }));
     Object.entries(update.$addToSet || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
         const list = Array.isArray(t[l]) ? t[l] : [];
@@ -150,7 +170,14 @@ const fieldOf = (doc, ref) => {
     if (ref === '$$ROOT') return doc;
     return typeof ref === 'string' && ref.startsWith('$') ? read(doc, ref.slice(1)) : ref;
 };
-const groupKeyOf = (doc, id) => (id && typeof id === 'object' ? Object.fromEntries(Object.entries(id).map(([k, ref]) => [k, fieldOf(doc, ref)])) : fieldOf(doc, id));
+/* The calendar day a date falls on in a timezone, as $dateToString '%Y-%m-%d' gives it; null for a missing date. */
+const dayKeyOf = (doc, { format, date, timezone = 'UTC' }) => {
+    if (format !== '%Y-%m-%d') throw new Error(`fakeMongo: unsupported $dateToString format ${format}`);
+    const value = fieldOf(doc, date);
+    return value instanceof Date ? new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(value) : null;
+};
+const groupKeyOf = (doc, id) => (id && typeof id === 'object' && id.$dateToString ? dayKeyOf(doc, id.$dateToString) : groupFieldsOf(doc, id));
+const groupFieldsOf = (doc, id) => (id && typeof id === 'object' ? Object.fromEntries(Object.entries(id).map(([k, ref]) => [k, fieldOf(doc, ref)])) : fieldOf(doc, id));
 const ACCUMULATORS = {
     $sum: (prev, v) => (prev || 0) + (typeof v === 'number' ? v : 0),
     $max: (prev, v) => (v == null || (prev != null && sortable(prev) >= sortable(v)) ? prev : v),
@@ -179,12 +206,28 @@ const group = (docs, spec) => {
     return [...out.values()];
 };
 
+const DECIMAL = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
+
 const computed = (doc, value, search, textFields) => {
     if (value && typeof value === 'object' && value.$meta === 'textScore') return textScoreOf(doc, search, textFields);
     if (value && typeof value === 'object' && value.$toString !== undefined) return String(hex(fieldOf(doc, value.$toString)));
     if (value && typeof value === 'object' && Array.isArray(value.$ifNull)) {
         const found = computed(doc, value.$ifNull[0], search, textFields);
         return found == null ? computed(doc, value.$ifNull[1], search, textFields) : found;
+    }
+    if (value && typeof value === 'object' && value.$convert !== undefined) {
+        const { input, onError = null, onNull = null } = value.$convert;
+        const found = computed(doc, input, search, textFields);
+        if (found == null) return onNull;
+        if (typeof found === 'number') return found;
+        return typeof found === 'string' && DECIMAL.test(found) ? Number(found) : onError;
+    }
+    if (value && typeof value === 'object' && Array.isArray(value.$cond)) {
+        const [test, then, otherwise] = value.$cond;
+        return computed(doc, computed(doc, test, search, textFields) ? then : otherwise, search, textFields);
+    }
+    if (value && typeof value === 'object' && Array.isArray(value.$in)) {
+        return value.$in[1].includes(computed(doc, value.$in[0], search, textFields));
     }
     if (value && typeof value === 'object' && value.$size !== undefined) { const list = computed(doc, value.$size, search, textFields); return Array.isArray(list) ? list.length : 0; }
     if (value && typeof value === 'object' && value.$strLenBytes !== undefined) return Buffer.byteLength(String(computed(doc, value.$strLenBytes, search, textFields)));
@@ -245,6 +288,13 @@ const create = ({ mongooseCasting = false } = {}) => {
             if (hit) throw duplicateKey(hit.fields);
             list.push(doc);
             return clone(doc);
+        }
+        if (method === 'insertMany') {
+            const docs = (data[0] || []).map((doc) => ({ ...doc, _id: doc._id ? String(doc._id) : nextId() }));
+            const taken = new Set(list.map((d) => String(d._id)));
+            docs.forEach((doc) => { if (taken.has(doc._id)) throw duplicateKey(['_id']); taken.add(doc._id); });
+            list.push(...docs);
+            return docs.map(clone);
         }
         if (method === 'find') return ordered(list.filter((d) => matches(d, data[0], textFields)), data[2]).map(clone);
         if (method === 'findOne') return clone(list.find((d) => matches(d, data[0], textFields)) || null);
@@ -314,6 +364,8 @@ const create = ({ mongooseCasting = false } = {}) => {
                 if (stage.$limit) return docs.slice(0, stage.$limit);
                 if (stage.$count) return docs.length ? [{ [stage.$count]: docs.length }] : [];
                 if (stage.$facet) return [Object.fromEntries(Object.entries(stage.$facet).map(([name, sub]) => [name, run(docs, sub)]))];
+                if (stage.$unionWith) return [...docs, ...run(rows(stage.$unionWith.coll), stage.$unionWith.pipeline || [])];
+                if (stage.$unset) return docs.map((d) => Object.fromEntries(Object.entries(d).filter(([key]) => ![].concat(stage.$unset).includes(key))));
                 if (stage.$lookup) {
                     const { from, localField, foreignField, as, pipeline: inner = [] } = stage.$lookup;
                     return docs.map((d) => ({ ...d, [as]: run(rows(from).filter((f) => String(hex(read(f, foreignField))) === String(hex(read(d, localField)))), inner) }));

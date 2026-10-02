@@ -5,6 +5,9 @@ const metricsCtrl = require('./metricsController');
 const schedulesCtrl = require('./schedulesController');
 const builderCtrl = require('./builderController');
 const chatCtrl = require('./chatController');
+const projectPolicyCtrl = require('./projectPolicyController');
+const projectManagerCtrl = require('./manager/controller');
+const standingApprovalsCtrl = require('./standingApprovalsController');
 const { agentPerimeter } = require('./guard');
 
 exports.init = (app) => {
@@ -21,6 +24,7 @@ exports.init = (app) => {
     app.get('/api/v2/agents/team/standup', ctrl.myStandup);
     app.get('/api/v2/agents/routable', ctrl.routableTasks);
     app.get('/api/v2/agents/runnable', ctrl.runnableAgents);
+    app.get('/api/v2/agents/connected', projectManagerCtrl.getConnectedAgents);
     app.get('/api/v2/agents/chat/usable', chatCtrl.usableAgents);
     app.post('/api/v2/agents/chat/direct', chatCtrl.openDirect);
     app.get('/api/v2/agents/pipeline', ctrl.pipelineTasks);
@@ -74,6 +78,16 @@ exports.init = (app) => {
     app.delete('/api/v2/agents/account', ctrl.unlinkAccount);
     app.get('/api/v2/agents/policy', ctrl.getPolicy);
     app.put('/api/v2/agents/policy', ctrl.setPolicy);
+    app.get('/api/v2/agents/project-policy/:projectId', projectPolicyCtrl.getProjectPolicy);
+    app.put('/api/v2/agents/project-policy/:projectId', projectPolicyCtrl.putProjectPolicy);
+    app.get('/api/v2/agents/standing-approvals/:projectId', standingApprovalsCtrl.listStanding);
+    app.delete('/api/v2/agents/standing-approvals/:projectId/:id', standingApprovalsCtrl.endStanding);
+    app.get('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.getProjectManager);
+    app.put('/api/v2/agents/project-manager/:projectId', projectManagerCtrl.putProjectManager);
+    app.get('/api/v2/agents/work-queue/held', projectManagerCtrl.getHeldTasks);
+    app.get('/api/v2/agents/work-queue/task/:taskId', projectManagerCtrl.getTaskQueue);
+    app.post('/api/v2/agents/work-queue/task/:taskId/hand-over', projectManagerCtrl.postHandOver);
+    app.post('/api/v2/agents/work-queue/:itemId/take-back', projectManagerCtrl.postTakeBack);
 
     app.get('/api/v2/agents', ctrl.listAgents);
     app.post('/api/v2/agents', ctrl.createAgent);

@@ -154,19 +154,66 @@ describe('the expand toggle reaches groups opened after it was flipped', () => {
     });
 });
 
+describe('progress and the expand toggle reach every level', () => {
+    const leaf = { _id: 'g1', isParentTask: false, ParentTaskId: 's1', ancestors: ['p1', 's1'], subTasks: 0 };
+    const middle = { _id: 's1', isParentTask: false, ParentTaskId: 'p1', ancestors: ['p1'], subTasks: 1, subtaskArray: [leaf] };
+    const plain = { _id: 's2', isParentTask: false, ParentTaskId: 'p1', ancestors: ['p1'], subTasks: 0 };
+    const root = parent({ _id: 'p1', subTasks: 2, subtaskArray: [middle, plain] });
+
+    test('a subtask that has subtasks of its own counts as a parent', () => {
+        expect(P.hasSubtasks(middle)).toBe(true);
+        expect(P.hasSubtasks({ ...middle, subtaskArray: undefined })).toBe(true);
+        expect(P.hasSubtasks(plain)).toBe(false);
+        expect(P.hasSubtasks(leaf)).toBe(false);
+    });
+
+    test('the rows of a group are read with every loaded level, parents before their children', () => {
+        expect(P.treeRows([root, parent({ _id: 'p2', subTasks: 0 })]).map((row) => row._id)).toEqual(['p1', 's1', 'g1', 's2', 'p2']);
+        expect(P.treeRows(null)).toEqual([]);
+    });
+
+    test('a level-two row shows its direct children only', () => {
+        expect(P.subtaskProgress({ ...middle, subtaskArray: undefined }, { total: 1, completed: 1 })).toEqual({ done: 1, total: 1 });
+        const closedLeaf = { ...leaf, statusType: 'close' };
+        expect(P.subtaskProgress({ ...root, subtaskArray: [{ ...middle, subtaskArray: [closedLeaf] }, plain] }, null)).toEqual({ done: 0, total: 2 });
+    });
+
+    test('the aggregate is asked for level-two parents as well, and re-asked when one arrives', () => {
+        const before = P.progressSignature(P.treeRows([parent({ _id: 'p1', subTasks: 2 })]));
+        const after = P.progressSignature(P.treeRows([root]));
+        expect(after).not.toBe(before);
+        expect(after).toContain('s1:1:1');
+    });
+
+    test('the expand toggle opens a level-two parent once its row has arrived', () => {
+        expect(P.pendingExpandIds(P.treeRows([root]), [])).toEqual(['p1', 's1']);
+        expect(P.pendingExpandIds(P.treeRows([root]), ['p1'])).toEqual(['s1']);
+    });
+});
+
 describe('the List view is wired to all of this', () => {
     const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
     const group = read('frontend/src/views/Projects/ListView/ListGroup.vue');
     const row = read('frontend/src/views/Projects/ListView/ListRow.vue');
 
-    test('the expand toggle watches rows as well, and runs immediately', () => {
-        const watcher = group.match(/watch\(\[taskCollapsed, rows\][\s\S]*?\{ immediate: true \}\);/);
-        expect(watcher).not.toBeNull();
-        expect(watcher[0]).toContain('pendingExpandIds(rows.value, autoExpandedIds.value)');
+    test('the expand toggle is applied to rows as they arrive, and runs immediately', () => {
+        const apply = group.match(/function expandArrivedRows\(\) \{[\s\S]*?\n\}/);
+        expect(apply).not.toBeNull();
+        expect(apply[0]).toContain('pendingExpandIds(treeRows.value, autoExpandedIds.value)');
+        expect(group).toMatch(/watch\(rows, expandArrivedRows, \{ immediate: true \}\);/);
+    });
+
+    /* Rows are replaced on every change to a task in the group; collapsing there closed a parent after each edit of a subtask. */
+    test('only the toolbar switch collapses the rows, never a change to the rows', () => {
+        expect(group).not.toMatch(/watch\(\[taskCollapsed, rows\]/);
+        const collapse = group.match(/watch\(taskCollapsed, \(collapsed\) => \{[\s\S]*?\n\}\);/);
+        expect(collapse).not.toBeNull();
+        expect(collapse[0]).toContain('expandedIds.value = [];');
     });
 
     test('each group loads the progress aggregate and hands it to its rows', () => {
-        expect(group).toMatch(/watch\(\(\) => progressSignature\(rows\.value\), loadSubtaskCounts, \{ immediate: true \}\)/);
+        expect(group).toMatch(/watch\(\(\) => progressSignature\(treeRows\.value\), loadSubtaskCounts, \{ immediate: true \}\)/);
+        expect(read('frontend/src/views/Projects/ListView/ListSubtaskRows.vue')).toContain(':progress="tree.progressFor(sub._id)"');
         expect(group).toContain('findQuery: progressQuery(ids)');
         expect(group).toContain(':progress="progressFor(task._id)"');
     });

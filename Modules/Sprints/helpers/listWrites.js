@@ -3,6 +3,8 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprint, sprintIdentities } = require('./sprintVisibility');
+const { ListWriteError } = require('./listWriteError');
+const { folderCascade, folderForList, refuseRestoreUnderHiddenParent, subfoldersFollowing } = require('./folderTree');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const SPRINT_STATUSES = [0, 1, 2, 5];
@@ -10,13 +12,6 @@ const FOLDER_STATUSES = [0, 1, 2];
 const PEOPLE = ['AssigneeUserId', 'watchers'];
 const ONE_PERSON_OPERATORS = ['$addToSet', '$pull'];
 const FOLDER_CASCADE_SKIPS = [1, 2, 5];
-
-class ListWriteError extends Error {
-    constructor(message, statusCode = 400) {
-        super(message);
-        this.statusCode = statusCode;
-    }
-}
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const isPerson = (value) => typeof value === 'string' && value.trim() !== '' && !value.startsWith('$');
@@ -89,8 +84,8 @@ const mayOpenSprint = async (companyId, uid, sprint) => canSeeSprint(sprint, awa
 
 /*
  * Builds the write for PATCH /api/v1/sprint/:id type updateSprint from the stored sprint: a private
- * sprint answers 404 to anyone it is not shared with, a move lands only in a folder of the sprint's
- * own project, and the project the cascades run in is the stored one.
+ * sprint answers 404 to anyone it is not shared with, a move lands only in a live folder of the
+ * sprint's own project, and the project the cascades run in is the stored one.
  */
 const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     const update = sprintUpdateFrom(updateObject);
@@ -100,8 +95,7 @@ const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     if (!(await mayOpenSprint(companyId, uid, sprint))) throw new ListWriteError('Sprint not found.', 404);
     const set = update.$set || {};
     if (set.folderId) {
-        const folder = await findOne(companyId, SCHEMA_TYPE.FOLDERS, { _id: oid(set.folderId), projectId: sprint.projectId }, { name: 1 });
-        if (!folder) throw new ListWriteError('That folder is not in this sprint\'s project.');
+        const folder = await folderForList(companyId, sprint.projectId, set.folderId);
         Object.assign(set, { folderId: oid(set.folderId), folderName: folder.name || '' });
     } else if ('folderId' in set) {
         Object.assign(set, { folderId: null, folderName: '' });
@@ -109,17 +103,21 @@ const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     return { update, projectId: String(sprint.projectId) };
 };
 
-/* The sprints an archive, delete or restore cascades onto are the folder's own, not the ones the client lists. */
-const prepareFolderUpdate = async (companyId, folderId, updateObject) => {
+/* An archive, delete or restore cascades onto the folder's own sprints and those of the subfolders that follow it, not the ones the client lists. */
+const prepareFolderUpdate = async (companyId, folderId, updateObject, { fromTrash = false } = {}) => {
     const update = folderUpdateFrom(updateObject);
     if (!OBJECT_ID.test(String(folderId || ''))) throw new ListWriteError('A valid folder id is required.');
-    const folder = await findOne(companyId, SCHEMA_TYPE.FOLDERS, { _id: oid(folderId) }, { projectId: 1 });
+    const folder = await findOne(companyId, SCHEMA_TYPE.FOLDERS, { _id: oid(folderId) }, { projectId: 1, parentFolderId: 1 });
     if (!folder) return null;
+    const status = update.$set.deletedStatusKey;
+    if (status === 0) await refuseRestoreUnderHiddenParent(companyId, folder);
+    const cascade = folderCascade(status, fromTrash);
+    const subfolders = await subfoldersFollowing(companyId, folder, cascade);
     const sprints = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.SPRINTS,
-        data: [{ folderId: oid(folderId), projectId: folder.projectId, deletedStatusKey: { $nin: FOLDER_CASCADE_SKIPS } }, { _id: 1 }],
+        data: [{ folderId: { $in: [folderId, ...subfolders].map(oid) }, projectId: folder.projectId, deletedStatusKey: { $nin: FOLDER_CASCADE_SKIPS } }, { _id: 1 }],
     }, 'find');
-    return { update, status: update.$set.deletedStatusKey, projectId: String(folder.projectId), sprints: (sprints || []).map((sprint) => String(sprint._id)) };
+    return { update, status, cascade, projectId: String(folder.projectId), sprints: (sprints || []).map((sprint) => String(sprint._id)), subfolders };
 };
 
 module.exports = { ListWriteError, sprintUpdateFrom, sprintWriteKinds, folderUpdateFrom, writtenStatus, prepareSprintUpdate, prepareFolderUpdate };

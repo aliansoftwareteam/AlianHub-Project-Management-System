@@ -7,7 +7,7 @@ export const RECORD_CHIPS = ['tasks', 'projects', 'docs'];
 
 const KINDS_OF_CHIP = { tasks: ['task'], projects: ['project', 'sprint'], docs: ['page'], people: ['person'] };
 
-const ASK_KINDS = new Set(['ask', 'source', 'continue']);
+const ASK_KINDS = new Set(['ask', 'source', 'continue', 'post']);
 
 /* Which rows a chip keeps. Ask AI and its answer stay under every chip so the query can always go to AI. */
 export function chipAllows(chip, kind) {
@@ -59,6 +59,15 @@ export function taskLocation(task, projectName) {
     return [projectName, sprint.folderName || (task && task.folderName), sprint.name || (task && task.sprintName)]
         .filter(Boolean)
         .join(' / ');
+}
+
+/* The home path, then how many other lists the task is in: the count the search sends, of the lists this person can open. */
+export function taskPlace(task, projectName, t) {
+    const home = taskLocation(task, projectName);
+    const count = Number(task && task.otherLists) || 0;
+    if (count <= 0) return home;
+    const lists = t('Palette.more_lists', { n: count }, count);
+    return home ? t('Palette.place_and_lists', { place: home, lists }) : lists;
 }
 
 export function taskPath(cid, task) {

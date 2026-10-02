@@ -24,9 +24,15 @@
                 />
                 <span class="ah-subtasks__key ah-mono">{{ sub.TaskKey }}</span>
                 <button type="button" class="ah-subtasks__name" :title="sub.TaskName" @click="$emit('open', sub)">{{ sub.TaskName }}</button>
+                <span
+                    v-if="childProgress[sub._id]"
+                    class="ah-subtasks__count ah-mono"
+                    role="img"
+                    :title="$t('TaskPanel.subtask_children', childProgress[sub._id])"
+                    :aria-label="$t('TaskPanel.subtask_children', childProgress[sub._id])"
+                >{{ childProgress[sub._id].done }}/{{ childProgress[sub._id].total }}</span>
                 <span v-if="assignee(sub)" class="ah-avatar ah-avatar--sm" :title="assignee(sub).Employee_Name">
-                    <img v-if="assignee(sub).Employee_profileImageURL" :src="assignee(sub).Employee_profileImageURL" :alt="assignee(sub).Employee_Name" />
-                    <template v-else>{{ initials(assignee(sub).Employee_Name) }}</template>
+                    <AvatarImage :src="assignee(sub).Employee_profileImageURL" :alt="assignee(sub).Employee_Name">{{ initials(assignee(sub).Employee_Name) }}</AvatarImage>
                 </span>
                 <span class="ah-subtasks__hours ah-mono">{{ hours(sub.totalEstimatedTime) }}</span>
             </div>
@@ -43,10 +49,14 @@
                 :assigneeOptions="subtaskAssigneeOptions"
                 :considerWidth="false"
                 @cancel="cancelCreate"
+                @submit="$emit('created')"
             />
         </div>
         <p v-if="canCreate" class="ah-subtasks__hint ah-small">
             {{ $t('TaskPanel.subtask_keys_hint') }}
+        </p>
+        <p v-else-if="mayCreate" class="ah-subtasks__hint ah-small">
+            {{ $t('TaskPanel.subtask_depth_limit') }}
         </p>
     </section>
 </template>
@@ -58,9 +68,14 @@ import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 import Skelaton from "@/components/atom/Skelaton/Skelaton.vue";
 import CreateTask from "@/components/atom/CreateTask/CreateTask.vue";
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import taskClass from "@/utils/TaskOperations";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { subtaskCreateAssignees } from "@/utils/assigneeOptions";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
+import { canAddSubtask } from "@/views/Projects/composables/taskDepth";
+import { indexProgress, progressQuery, subtaskProgress } from "@/views/Projects/ListView/subtaskProgress";
 
 defineOptions({ name: "TaskSubtaskList" });
 
@@ -70,7 +85,7 @@ const props = defineProps({
     subtasks: { type: Array, default: () => [] },
     isMainSpinner: { type: Boolean, default: false }
 });
-const emit = defineEmits(["open", "rollup"]);
+const emit = defineEmits(["open", "rollup", "created"]);
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -88,7 +103,8 @@ const subtaskAssigneeOptions = computed(() => subtaskCreateAssignees({
     project: props.project,
     companyUsers: getters["settings/companyUsers"]?.map((x) => x.userId)
 }));
-const canCreate = computed(() => checkPermission("task.sub_task_create", props.project?.isGlobalPermission) === true);
+const mayCreate = computed(() => checkPermission("task.sub_task_create", props.project?.isGlobalPermission) === true);
+const canCreate = computed(() => mayCreate.value && canAddSubtask(props.task));
 const canSetStatus = computed(() => checkPermission("task.task_status", props.project?.isGlobalPermission) === true);
 
 function statusType(sub) {
@@ -126,6 +142,23 @@ const rollupText = computed(() => {
     if (!rollup.value.minutes) return base;
     return `${base} · ${t("TaskPanel.subtasks_hours_rollup", { done: hours(rollup.value.doneMinutes), total: hours(rollup.value.minutes) })}`;
 });
+
+/* The rows come from the panel's own read of the open task, so a child's "2/5" cannot be
+ * counted from them: one aggregate over the children that have subtasks fills it in. */
+const childCounts = ref({});
+function loadChildCounts() {
+    const ids = props.subtasks.filter((sub) => Number(sub?.subTasks) > 0).map((sub) => String(sub._id));
+    if (!ids.length) { childCounts.value = {}; return; }
+    apiRequest("post", `${env.TASK}/find`, { findQuery: progressQuery(ids) })
+        .then((response) => { childCounts.value = indexProgress(response?.data); })
+        .catch((error) => console.error("ERROR in subtask child counts: ", error));
+}
+watch(() => props.subtasks, loadChildCounts, { immediate: true });
+
+const childProgress = computed(() => Object.fromEntries(props.subtasks.map((sub) => [
+    String(sub._id),
+    subtaskProgress({ subTasks: sub.subTasks }, childCounts.value[String(sub._id)])
+])));
 
 function hours(minutes) {
     const total = Number(minutes) || 0;

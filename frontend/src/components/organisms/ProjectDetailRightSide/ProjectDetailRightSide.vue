@@ -1,7 +1,7 @@
 <template>
     <div class="projectRightside overflow-y-auto style-scroll">
-        <div :class="{'border-bottom-mobiledrop' : clientWidth > 767}" :style="[{paddingBottom : clientWidth > 767 ? '5px' : '0px'}]" v-if="checkPermission('project.project_details',projectData?.isGlobalPermission)!== null">
-            <h4 class="black font-ui detailsHead" :class="`${clientWidth > 767 ? 'font-size-14 font-weight-700' : 'font-size-16 font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
+        <div class="projectRightside__details" v-if="checkPermission('project.project_details',projectData?.isGlobalPermission)!== null">
+            <h4 class="font-ui detailsHead" :class="`${clientWidth > 767 ? 'font-size-14 font-weight-700' : 'font-size-16 font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_status_change',projectData?.isGlobalPermission)!== null">
                 <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.status')}}</h4>
                 <ProjectStatus
@@ -10,10 +10,10 @@
                     @update:projectstatus="(val,val1) => updateStatus(val1)"
                 />
             </div>
-             <!-- v-if="checkPermission('project.project_status_change',projectData?.isGlobalPermission)!== null" -->
             <div class="d-flex project-right-side-label" v-if="projectData?.projectCreatedBy">
                 <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('Comment.created_by')}}</h4>
                 <UserProfile
+                    decorative
                     :showDot="false"
                     class="user__profile cursor-pointer mr-10px"
                     :data="{
@@ -25,7 +25,7 @@
                     :thumbnail="'30x30'"
                 />
                 <span 
-                    class="black project-type-name text-ellipsis project-created-by"
+                    class="project-type-name text-ellipsis project-created-by"
                     :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
                     :title="createdByUser?.Employee_Name || 'N/A'">
                     {{ createdByUser?.Employee_Name || 'N/A' }}
@@ -47,7 +47,7 @@
             </div>
             <div class="d-flex project-right-side-label">
                 <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.key')}}</h4>
-                <span class="black projectKeyClass hover__on-projectrightside text-ellipsis cursor-default" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
+                <span class="projectKeyClass hover__on-projectrightside text-ellipsis cursor-default" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
                     :style="[{padding : clientWidth > 767 ? '10px 10px 10px 0' : '10px 0px'}]"
                     :title="projectData.ProjectCode"
                 >{{projectData.ProjectCode ? projectData.ProjectCode : 'N/A'}}</span>
@@ -70,7 +70,7 @@
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_amount',projectData?.isGlobalPermission) !== null">
                 <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.amount')}}</h4>
-                <span class="black project-amount cursor-pointer  hover__on-projectrightside text-ellipsis" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
+                <span class="project-amount cursor-pointer hover__on-projectrightside text-ellipsis" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
                 :style="[{padding : clientWidth > 767 ? '2px' : '10px 0px'}]" :title="projectData?.ProjectCurrency?.symbol + ' ' + (projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0) ">{{projectData?.ProjectCurrency?.symbol}} {{projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0}}</span>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_source',projectData?.isGlobalPermission) !== null">
@@ -102,7 +102,7 @@
                     @enter="updateProposalId"
                 />
                 <span v-else
-                    class="black projectKeyClass hover__on-projectrightside text-ellipsis"
+                    class="projectKeyClass hover__on-projectrightside text-ellipsis"
                     :class="[{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}, canEditDetails ? 'cursor-pointer' : 'cursor-default']"
                     :style="[{padding : clientWidth > 767 ? '10px 10px 10px 0' : '10px 0px'}]"
                     :title="projectData.proposalId || proposalIdHint"
@@ -135,8 +135,8 @@
                     :position="`right`"
                 ></StartEndDate>
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-if="projectData.StartDate">{{convertDateFormat(projectData.StartDate)}}</span>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_start_date')}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-if="projectData.StartDate">{{convertDateFormat(projectData.StartDate)}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_start_date')}}</span>
                 </template>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_end_date',projectData?.isGlobalPermission) !== null">
@@ -155,8 +155,8 @@
                     :position="`right`"
                 ></StartEndDate>
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-if="projectData.EndDate">{{convertDateFormat(projectData.EndDate)}}</span>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_end_date')}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-if="projectData.EndDate">{{convertDateFormat(projectData.EndDate)}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_end_date')}}</span>
                 </template>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_due_date',projectData?.isGlobalPermission) !== null">
@@ -171,10 +171,17 @@
                     :position="`right`"
                 />
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-if="projectData.DueDate">{{convertDateFormat(projectData.DueDate)}}</span>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_due_date')}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-if="projectData.DueDate">{{convertDateFormat(projectData.DueDate)}}</span>
+                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_due_date')}}</span>
                 </template>
             </div>
+            <ProjectWorkingDays
+                :key="workingDaysKey"
+                :project="projectData"
+                :company="currentCompany"
+                :editable="canEditDetails"
+                @update="updateWorkingDays"
+            />
         </div>
         <div class="position-re" v-if="checkPermission('project.project_custom_field',projectData?.isGlobalPermission) !== null">
             <!-- App enabled for this project: existing behavior (feature, or blurred feature + upgrade overlay when the plan doesn't include it). -->
@@ -227,7 +234,7 @@
             @closeSidebar="handleCloseSidebar"
             :componentDetail="componentDetail && Object.keys(componentDetail).length ? componentDetail : {}"
             :customFieldObject="componentDetail && Object.keys(componentDetail).length ? customFieldObject : {}"
-            :isCustomField="isCustomField"
+            v-model:isCustomField="isCustomField"
             @handleClose="handleClose()"
         />
     </div>
@@ -255,6 +262,7 @@ import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import InputText from '@/components/atom/InputText/InputText.vue';
 import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
 import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue';
+import ProjectWorkingDays from '@/components/molecules/WorkingDaysPicker/ProjectWorkingDays.vue';
 import { DEFAULT_SOURCE, checkProposalId, cleanProposalId } from '@/utils/projectSource';
 
 const { checkPermission,checkApps,getAppState } = useCustomComposable();
@@ -293,6 +301,7 @@ const showConfirmModal = ref(false);
 const CustomFieldData = ref(JSON.parse(JSON.stringify(getters["settings/customFields"])));
 const proposalIdValue = ref('');
 const proposalIdEditable = ref(false);
+const workingDaysKey = ref(0);
 
 //computed
 const users = computed(() => getters["users/users"]);
@@ -663,6 +672,21 @@ const updateSkills = (slugs) => {
         $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
     })
 }
+
+const updateWorkingDays = (workingDays) => {
+    const object = { updateObject: { workingDays } };
+    /* A refused save remounts the control, which drops the week it was showing ahead of the answer. */
+    const failed = (err) => {
+        if (err) console.error(err, "Error in Project Working Days Update");
+        workingDaysKey.value += 1;
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+    };
+    apiRequest("put", `${env.PROJECT}/${props.projectData._id}`, object).then((res) => {
+        if (res.status !== 200) return failed();
+        $toast.success(t('Toast.Updated_successfully'), { position: 'top-right' });
+        commit('projectData/projectLocalUpdate', { itemData: { ...props.projectData, ...object.updateObject } });
+    }).catch(failed);
+};
 
 // custom field
 const submitHandler = async (value,detail,id,edit) => {

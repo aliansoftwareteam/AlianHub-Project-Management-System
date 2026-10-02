@@ -3,11 +3,12 @@
 const mongoose = require('mongoose');
 const { visibleTask, TASK_NOT_FOUND } = require('./taskAccess');
 const logger = require('../../Config/loggerConfig');
-const { myCache } = require('../../Config/config');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { memberProfiles } = require('../../utils/companyMembers');
 const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
+const values = require('./taskAiValues');
+const { withTimeout } = require('./withTimeout');
 
 const { FEATURES } = require('../AICore/features');
 const { STATE, isAiOff } = require('../AICore/aiSwitch');
@@ -22,7 +23,6 @@ try {
 const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_COMMENTS = 40;
 const COMMENT_CHAR_CAP = 800;
-const CACHE_TTL_SECONDS = 60 * 60 * 6;
 
 const SYSTEM_PROMPT = [
     'You summarise the discussion thread of a project-management task for a teammate who has not read it.',
@@ -31,10 +31,6 @@ const SYSTEM_PROMPT = [
     'If nothing was decided say so briefly. Never invent facts that are not in the thread.',
     'Return a single JSON object: {"summary": "<text>"}.',
 ].join(' ');
-
-function cacheKey(companyId, taskId, commentCount) {
-    return `taskSummary:${companyId}:${taskId}:${commentCount}`;
-}
 
 function clamp(text, cap) {
     if (typeof text !== 'string') return '';
@@ -46,12 +42,21 @@ function stripMentions(message) {
     return String(message || '').replace(/\[([^\]]+)\]\([0-9a-f]{24}\)/gi, '@$1');
 }
 
+const SUMMARISED = { isDeleted: { $ne: true }, $or: [{ type: 'text' }, { type: 'link' }, { type: { $exists: false } }] };
+
+/* How many comments each thread holds now, by task id: what a kept summary's count is held against. */
+async function commentCounts(companyId, taskIds) {
+    if (!taskIds.length) return {};
+    const forms = taskIds.flatMap((taskId) => [String(taskId), new mongoose.Types.ObjectId(String(taskId))]);
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMMENTS,
+        data: [[{ $match: { taskId: { $in: forms }, ...SUMMARISED } }, { $group: { _id: '$taskId', count: { $sum: 1 } } }]],
+    }, 'aggregate');
+    return (rows || []).reduce((counts, row) => ({ ...counts, [String(row._id)]: (counts[String(row._id)] || 0) + row.count }), {});
+}
+
 async function loadComments(companyId, taskId) {
-    const match = {
-        taskId: taskIdMatch(taskId),
-        isDeleted: { $ne: true },
-        $or: [{ type: 'text' }, { type: 'link' }, { type: { $exists: false } }],
-    };
+    const match = { taskId: taskIdMatch(taskId), ...SUMMARISED };
     const [countRow] = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
         data: [[{ $match: match }, { $count: 'count' }]],
@@ -121,27 +126,37 @@ function parseSummary(content) {
 
 async function askModel(userMessage, spend) {
     const provider = providerFactory.getProvider();
-    const result = await Promise.race([
-        provider.chat({
-            systemPrompt: SYSTEM_PROMPT,
-            messages: [{ role: 'user', content: userMessage }],
-            jsonMode: true,
-            temperature: 0.3,
-            maxTokens: 600,
-            spend,
-        }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('AI summary request timed out')), REQUEST_TIMEOUT_MS)),
-    ]);
+    const result = await withTimeout(provider.chat({
+        systemPrompt: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userMessage }],
+        jsonMode: true,
+        temperature: 0.3,
+        maxTokens: 600,
+        spend,
+    }), REQUEST_TIMEOUT_MS, 'AI summary request timed out');
     return parseSummary(result && result.content);
 }
 
+const keptView = (row, total) => ({
+    summary: row.value || '',
+    commentCount: total,
+    summaryCount: Number(row.basis) || 0,
+    updatedAt: new Date(row.madeAt).toISOString(),
+    madeBy: row.madeBy || '',
+    cached: true,
+    stale: row.basis !== String(total),
+});
+
 /**
- * Summarise a task's comment thread. Cached per task + comment count, so a
- * new comment invalidates naturally and an unchanged thread costs nothing.
+ * Summarise a task's comment thread. The summary is kept in the store with the
+ * comment count it covers, so an unchanged thread never reaches the model twice,
+ * whoever asks and however often the server restarts.
+ * With `keptOnly` the model is never called: the kept summary comes back, marked
+ * `stale` when the thread has moved on, and a thread with none answers `pending`.
  *
- * @returns {Promise<{status:boolean, data?:{summary:string, commentCount:number, updatedAt:string, cached:boolean}, reason?:string}>}
+ * @returns {Promise<{status:boolean, data?:{summary:string, commentCount:number, summaryCount:number, updatedAt:string, cached:boolean, stale:boolean}, reason?:string}>}
  */
-async function summarizeTask({ companyId, uid, taskId, force = false }) {
+async function summarizeTask({ companyId, uid, taskId, force = false, keptOnly = false }) {
     if (!companyId || !taskId || !mongoose.Types.ObjectId.isValid(taskId)) {
         return { status: false, reason: 'taskId is required' };
     }
@@ -157,17 +172,16 @@ async function summarizeTask({ companyId, uid, taskId, force = false }) {
             return { status: true, data: { summary: '', commentCount: 0, updatedAt: new Date().toISOString(), cached: false } };
         }
 
-        const key = cacheKey(companyId, taskId, total);
-        const hit = !force && myCache.get(key);
-        if (hit) return { status: true, data: { ...hit, cached: true } };
+        const row = await values.kept(companyId, taskId, values.SUMMARY);
+        if (row && (keptOnly || (!force && row.basis === String(total)))) return { status: true, data: keptView(row, total) };
+        if (keptOnly) return { status: true, data: { summary: '', commentCount: total, updatedAt: '', cached: false, pending: true } };
 
         const names = await resolveNames(companyId, comments.map((c) => c.userId));
-        const summary = await askModel(buildThread({ task, comments, names }), { feature: FEATURES.TASK_SUMMARY, companyId });
+        const summary = await askModel(buildThread({ task, comments, names }), { feature: FEATURES.TASK_SUMMARY, companyId, userId: uid });
         if (!summary) return { status: false, reason: 'no summary returned' };
 
-        const data = { summary, commentCount: total, updatedAt: new Date().toISOString() };
-        myCache.set(key, data, CACHE_TTL_SECONDS);
-        return { status: true, data: { ...data, cached: false } };
+        const made = await values.keep(companyId, { taskId, kind: values.SUMMARY, value: summary, basis: total, madeBy: uid });
+        return { status: true, data: { ...keptView(made, total), cached: false } };
     } catch (error) {
         logger.error(`AI task summary failed: ${error && error.message ? error.message : error}`);
         if (isAiOff(error)) return { status: false, aiState: error.scope === 'instance' ? STATE.OFF_INSTANCE : STATE.OFF_WORKSPACE, reason: error.message };
@@ -175,4 +189,4 @@ async function summarizeTask({ companyId, uid, taskId, force = false }) {
     }
 }
 
-module.exports = { summarizeTask, _internal: { parseSummary, buildThread, stripMentions } };
+module.exports = { summarizeTask, commentCounts, keptView, _internal: { parseSummary, buildThread, stripMentions } };

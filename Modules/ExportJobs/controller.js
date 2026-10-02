@@ -4,17 +4,17 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
-const { visibleProjectIds } = require('../Agents/scope');
+const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 const { canSeeSprintById, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { pinSessionTenant } = require('../../Config/tenant');
-const { FORMATS, WORKSPACE, validateExportInput, buildFileName, taskToRow, workspaceTaskRow, rowsToCsv } = require('./helpers/exportRules');
+const { FORMATS, WORKSPACE, validateExportInput, buildFileName, treeRows, taskRows, workspaceTaskRow, rowsToCsv } = require('./helpers/exportRules');
 
 // Files stay on the server and only stream back through the download endpoint,
 // so a job's path is never handed to the client.
 const EXPORT_DIR = path.join(process.cwd(), 'wasabiUploadsLocal', 'exports');
 
-const TASK_FIELDS = 'TaskKey TaskName status statusType Task_Priority AssigneeUserId DueDate totalEstimatedTime createdAt updatedAt';
+const TASK_FIELDS = 'TaskKey TaskName ParentTaskId status statusType Task_Priority AssigneeUserId DueDate totalEstimatedTime createdAt updatedAt';
 
 async function projectRows(companyId, job) {
     const filter = {
@@ -32,7 +32,7 @@ async function projectRows(companyId, job) {
         type: SCHEMA_TYPE.TASKS,
         data: [filter, TASK_FIELDS],
     }, 'find');
-    return (tasks || []).map(taskToRow);
+    return taskRows(tasks || []);
 }
 
 /* The job runs detached from the request: a person who lost the owner or admin role since starting it gets nothing. */
@@ -48,7 +48,7 @@ async function workspaceRows(companyId, userId) {
         type: SCHEMA_TYPE.TASKS,
         data: [{ ProjectID: { $in: [...byId.keys()].map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: 1 } }, `ProjectID ${TASK_FIELDS}`],
     }, 'find');
-    return (tasks || []).map((task) => workspaceTaskRow(task, byId.get(String(task.ProjectID))));
+    return treeRows(tasks || []).map(({ task, ...place }) => workspaceTaskRow(task, byId.get(String(task.ProjectID)), place));
 }
 
 async function processJob(companyId, jobId) {
@@ -103,8 +103,8 @@ exports.createExport = async (req, res) => {
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
         }
-        const visible = await visibleProjectIds(companyId, userId);
-        if (!visible.includes(String(projectId))) {
+        const listable = await taskListProjectIds(companyId, userId);
+        if (!listable.includes(String(projectId))) {
             return res.status(404).send({ status: false, statusText: 'Project not found.' });
         }
         if (sprintId && !(await canSeeSprintById(companyId, userId, sprintId))) {

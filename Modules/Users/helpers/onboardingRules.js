@@ -1,8 +1,9 @@
 const ONBOARDING_FLAGS = [
     'dismissed', 'openedProject', 'completedTask', 'loggedTime',
     'reviewedPermissions', 'chosenApps', 'viewedBoard', 'viewedNotifications', 'importedWork',
+    'openedMyWork', 'viewedShortcuts', 'connectAiSkipped',
 ];
-const TOURS = ['shell', 'project', 'board', 'list'];
+const TOURS = ['shell', 'project', 'board', 'list', 'first'];
 
 const refuse = (error) => ({ ok: false, error });
 

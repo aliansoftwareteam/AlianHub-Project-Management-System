@@ -38,8 +38,19 @@
                     >
                         <ShellIcon name="check" :size="13" />{{ $t('Ask.build_tasks_open', { n: workItems.length }) }}
                     </button>
-                    <button ref="docOpener" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" aria-haspopup="dialog" data-test="ask-build-doc" @click="building = 'doc'">
+                    <button v-if="writesDocs" ref="docOpener" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" aria-haspopup="dialog" data-test="ask-build-doc" @click="building = 'doc'">
                         <ShellIcon name="docs" :size="13" />{{ $t('Ask.build_doc_open') }}
+                    </button>
+                    <button
+                        v-if="answer.shareToken"
+                        ref="postOpener"
+                        type="button"
+                        class="ah-btn ah-btn--secondary ah-btn--sm"
+                        aria-haspopup="dialog"
+                        data-test="ask-post-chat"
+                        @click="building = 'post'"
+                    >
+                        <ShellIcon name="chat" :size="13" />{{ $t('Ask.post_to_chat') }}
                     </button>
                     <button
                         ref="opener"
@@ -71,6 +82,14 @@
             @created="docCreated"
             @close="closeBuild"
         />
+        <AskPostToChat
+            v-if="building === 'post'"
+            :question="String(answer.question || '')"
+            :answer="String(answer.answer || '')"
+            :cited="Array.isArray(answer.cited) ? answer.cited : []"
+            :share-token="answer.shareToken"
+            @close="closeBuild"
+        />
     </section>
 </template>
 
@@ -87,7 +106,9 @@ import { showUndoToast } from "@/composable/useUndoToast";
 import AskWhyPanel from "./AskWhyPanel.vue";
 import AskBuildTasks from "./AskBuildTasks.vue";
 import AskBuildDoc from "./AskBuildDoc.vue";
+import AskPostToChat from "./AskPostToChat.vue";
 import { workItemsOf } from "./askComposer";
+import { useDocRights } from "@/components/molecules/Pages/useDocRights";
 import { sourceLink } from "./askWhy";
 import { answerHtml, taskTitleOf } from "./askMarkdown";
 
@@ -102,6 +123,7 @@ const props = defineProps({
 
 const { t } = useI18n();
 const $toast = useToast();
+const { writesDocs } = useDocRights();
 const companyId = inject("$companyId", "");
 const router = getCurrentInstance()?.proxy?.$router || null;
 const linkOf = (source) => sourceLink(source, unref(companyId));
@@ -111,6 +133,7 @@ const opener = ref(null);
 const building = ref("");
 const tasksOpener = ref(null);
 const docOpener = ref(null);
+const postOpener = ref(null);
 const builtDoc = ref(null);
 
 const sources = computed(() => (Array.isArray(props.answer.sources) ? props.answer.sources.filter(Boolean) : []));
@@ -171,7 +194,7 @@ const buildProjectId = computed(() => {
 });
 
 const closeBuild = async () => {
-    const opener = building.value === "tasks" ? tasksOpener.value : docOpener.value;
+    const opener = { tasks: tasksOpener.value, post: postOpener.value }[building.value] || docOpener.value;
     building.value = "";
     await nextTick();
     if (opener) opener.focus();

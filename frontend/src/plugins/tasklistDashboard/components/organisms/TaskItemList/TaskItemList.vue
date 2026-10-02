@@ -218,6 +218,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 
 const {isCustomFields} = customField();
 import * as env from '@/config/env';
+import { indexRepairBody, indexRepairRows } from "@/views/Projects/composables/taskGroupIndex";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../../../services/index";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
@@ -666,51 +667,27 @@ const setHeader = (customFieldArray) => {
 }
 
 
-function prepareIndexData () {    
-    // setTimeout(() => {
-    let taskWithoutFilter = []
-    let taskArray = [];
-    let withoutIndexTask = items.value?.filter((data) => {
-        return (data[props.item.indexName] === undefined || data[props.item.indexName] === null) && data.TaskKey !== '--'
-    })
-    if (withoutIndexTask?.length > 0) {
-        withoutIndexTask.map((x) => taskWithoutFilter.push({data: x._id, item: props.item, taskKey: x.TaskKey}))
-        withoutIndexTask.map((x) => taskArray.push(x));
-    }    
-    if (!(taskWithoutFilter.length === 0 && taskArray.length === 0)) {
-        var newObj = {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: taskArray, indexName: items.value[0].indexName};
-        commit("projectData/mutateTaskIndex",newObj)
-        let count = 0;
-        if (taskArray.length !== 1) {
-            isLoading.value = true;
-        }
-        let countFunction = (row) => {
-            if (count >= taskWithoutFilter.length) {
-                isLoading.value = false;
-                return;
-            } else {
-                if (row.taskKey != '--') {
-                    apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, {
-                        taskUpdate : row,
-                        companyId: companyId.value,
-                    }).then(()=>{
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update project history: ", error);
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                } else {
-                    count++;
-                    countFunction(taskWithoutFilter[count]);
-                }
-            }
-        }
-        countFunction(taskWithoutFilter[count])
+function prepareIndexData () {
+    const rows = indexRepairRows(items.value, props.item, checkPermission('task.task_list', projectData.value?.isGlobalPermission));
+    if (!rows.length) return;
+
+    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: props.item.indexName});
+    if (rows.length !== 1) {
+        isLoading.value = true;
     }
-    // }, 2000);
+    const next = (index) => {
+        if (index >= rows.length) {
+            isLoading.value = false;
+            return;
+        }
+        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(rows[index], companyId.value))
+            .then(() => next(index + 1))
+            .catch((error) => {
+                console.error("ERROR in update task index: ", error);
+                next(index + 1);
+            });
+    };
+    next(0);
 }
 </script>
 

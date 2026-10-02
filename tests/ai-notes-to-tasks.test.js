@@ -171,7 +171,7 @@ beforeEach(() => {
         _id: oid(PRIVATE_PAGE), title: 'Mine', ProjectID: oid(PROJECT_A), visibility: 'private', createdBy: BOB,
         rawText: 'Bob private diary', linkedTasks: [], deletedStatusKey: 0,
     });
-    [ALICE, BOB, DAVE].forEach((userId) => db().seed(SCHEMA_TYPE.COMPANY_USERS, { userId, status: 2 }));
+    [ALICE, BOB, DAVE].forEach((userId) => db().seed(SCHEMA_TYPE.COMPANY_USERS, { userId, status: 2, roleType: 3, isDelete: false }));
     db().seed(SCHEMA_TYPE.COMPANY_USERS, { userId: CAROL, status: 2, isDelete: true });
 });
 

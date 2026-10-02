@@ -17,6 +17,7 @@ jest.mock('../Config/permissionGuard', () => ({
     ROLE_OWNER: 1,
     ROLE_ADMIN: 2,
 }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Agents/scope', () => ({
     visibleProjectIds: jest.fn(async (companyId, uid) => mockState.visible[uid] || []),
     visibleProjects: jest.fn(async (companyId, uid) => (mockState.visible[uid] || []).map((_id) => ({ _id }))),
@@ -568,3 +569,76 @@ describe('the schedules API', () => {
         expect((await call(agentsCtrl.getRun, { uid: OUTSIDER, params: { id: String(run._id) } })).code).toBe(404);
     });
 });
+
+describe('a schedule and a personal list that is someone else\'s', () => {
+    const PERSONAL = '6f00000000000000000000a9';
+    const T_PERSONAL = '6f0000000000000000000709';
+    const valid = { report: 'deadline_watch', every: 'weekdays', at: '08:30', timezone: 'Europe/Berlin' };
+    const pageNote = (run) => (run.report.notes || []).filter((note) => note.startsWith('page:'));
+    const commentNote = (run) => (run.report.notes || []).filter((note) => note.startsWith('comment:'));
+
+    beforeEach(() => {
+        store().seed(SCHEMA_TYPE.PROJECTS, { _id: PERSONAL, ProjectName: 'Personal', isPrivateSpace: true, isPersonal: true, personalOwner: MEMBER, AssigneeUserId: [MEMBER], deletedStatusKey: 0 });
+        store().seed(SCHEMA_TYPE.PROJECTS, { _id: OPEN_PROJECT, ProjectName: 'Launch', deletedStatusKey: 0 });
+        seedTask(T_PERSONAL, PERSONAL, { TaskName: 'Private errand' });
+        seedTask(T_OPEN, OPEN_PROJECT);
+        mockState.visible[MEMBER] = [OPEN_PROJECT, PERSONAL];
+    });
+
+    it.each([
+        ['a page in it', { pageProjectId: PERSONAL }, /cannot open that project/],
+        ['a task in it', { taskId: T_PERSONAL }, /cannot open that task/],
+    ])('is not saved by an owner or admin with %s as the destination', async (_what, deliver, reason) => {
+        seedAgent({ allowedActions: ['task.comment', 'page.draft'] });
+        const created = await call(ctrl.createSchedule, { params: { id: AGENT }, body: { ...valid, deliver } });
+        expect(created.code).toBe(400);
+        expect(created.body.message || created.body.statusText).toMatch(reason);
+        expect(rows(SCHEMA_TYPE.AGENT_SCHEDULES)).toHaveLength(0);
+
+        const existing = seedSchedule({ ownerId: ADMIN, report: 'deadline_watch' });
+        const updated = await call(ctrl.updateSchedule, { params: { id: AGENT, scheduleId: String(existing._id) }, body: { deliver } });
+        expect(updated.code).toBe(400);
+        expect(rows(SCHEMA_TYPE.AGENT_SCHEDULES)[0].deliver).toEqual({ email: false });
+    });
+
+    it('is not saved with an agent whose project list names the personal list either', async () => {
+        seedAgent({ allowedActions: ['page.draft'], projectIds: [PERSONAL] });
+        const created = await call(ctrl.createSchedule, { params: { id: AGENT }, body: { ...valid, deliver: { pageProjectId: PERSONAL } } });
+        expect(created.code).toBe(400);
+    });
+
+    it.each([[[]], [[PERSONAL]]])('drafts no page there when it runs as an owner or admin, and says why in the run (agent projects %j)', async (projectIds) => {
+        seedAgent({ allowedActions: ['page.draft'], projectIds });
+        seedSchedule({ ownerId: ADMIN, report: 'deadline_watch', deliver: { pageProjectId: PERSONAL } });
+        await scheduler.tickCompany(A, { now: NOW });
+        expect(actions.perform).not.toHaveBeenCalled();
+        const [run] = reportRuns();
+        expect(run.report.delivered).toMatchObject({ page: false });
+        expect(pageNote(run)).toEqual(['page: not_visible']);
+        expect(reportText(run)).not.toContain('Private errand');
+    });
+
+    it('posts no comment there when it runs as an owner or admin, and says why in the run', async () => {
+        seedAgent({ allowedActions: ['task.comment'] });
+        seedSchedule({ ownerId: ADMIN, report: 'deadline_watch', deliver: { taskId: T_PERSONAL } });
+        await scheduler.tickCompany(A, { now: NOW });
+        expect(actions.perform).not.toHaveBeenCalled();
+        const [run] = reportRuns();
+        expect(run.report.delivered).toMatchObject({ comment: false });
+        expect(commentNote(run)).toEqual(['comment: not_visible']);
+        expect(reportText(run)).not.toContain('Private errand');
+    });
+
+    it('still saves and delivers for the person the personal list belongs to', async () => {
+        seedAgent({ allowedActions: ['page.draft'] });
+        const created = await call(ctrl.createSchedule, { uid: MEMBER, params: { id: AGENT }, body: { ...valid, deliver: { pageProjectId: PERSONAL } } });
+        expect(created.code).toBe(200);
+        rows(SCHEMA_TYPE.AGENT_SCHEDULES).length = 0;
+
+        seedSchedule({ ownerId: MEMBER, report: 'deadline_watch', deliver: { pageProjectId: PERSONAL } });
+        await scheduler.tickCompany(A, { now: NOW });
+        expect(actions.perform).toHaveBeenCalledWith(expect.objectContaining({ action: 'page.draft', params: expect.objectContaining({ projectId: PERSONAL }) }));
+        expect(reportRuns()[0].report.delivered).toMatchObject({ page: true });
+    });
+});
+

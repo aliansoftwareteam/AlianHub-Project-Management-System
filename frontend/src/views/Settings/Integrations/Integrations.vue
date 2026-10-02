@@ -555,7 +555,7 @@ onMounted(() => {
 .ig__row.is-paused { opacity: .75; }
 .ig__row-main { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
 .ig__mark { width: 30px; height: 30px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--hairline); display: grid; place-items: center; font-size: 15px; flex: none; }
-.ig__mark--hook { font: 600 12px/1 var(--font-mono); color: #fff; border: 0; background: var(--rail); }
+.ig__mark--hook { font: 600 12px/1 var(--font-mono); color: var(--rail-ink-strong); border: 0; background: var(--rail); }
 .ig__mark--hook.is-slack { background: #4a154b; }
 .ig__mark--hook.is-discord { background: #5865f2; }
 .ig__row-text { flex: 1; min-width: 200px; }
@@ -568,8 +568,8 @@ onMounted(() => {
 .ig__logs { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--hairline); padding-top: 10px; }
 .ig__logs-scroll { overflow-x: auto; }
 .ig__logs-table { width: 100%; border-collapse: collapse; font: var(--text-small); }
-.ig__logs-table th { text-align: left; font: var(--text-label); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); padding: 4px 8px; border-bottom: 1px solid var(--hairline); }
-.ig__logs-table td { padding: 6px 8px; border-bottom: 1px solid var(--hairline); color: var(--ink); }
+.ig__logs-table th { text-align: left; font: var(--text-label); text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); padding: 4px var(--cell-pad-x, 8px); border-bottom: 1px solid var(--hairline); }
+.ig__logs-table td { padding: var(--table-pad-y, 6px) var(--cell-pad-x, 8px); font-size: var(--row-font, 12.5px); border-bottom: 1px solid var(--hairline); color: var(--ink); }
 .ig__chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .ig__chip { padding: 6px 11px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); color: var(--ink); font: 400 12px/1 var(--font-ui); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: border-color var(--t-state) var(--ease); }
 .ig__chip:hover, .ig__chip.is-active { border-color: var(--brand); color: var(--brand); }
@@ -577,8 +577,8 @@ onMounted(() => {
 .ig__redirect { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ig__redirect .ah-field__hint { width: 100%; }
 .ig__reqs { margin: 0; padding-left: 18px; font: var(--text-small); color: var(--ink-label); line-height: 1.5; }
-.ig__note { padding: 10px 12px; border-color: rgba(47, 57, 144, .25); font: 400 12px/1.5 var(--font-ui); color: var(--ink); display: flex; align-items: flex-start; gap: 8px; }
-.ig__note-icon { color: var(--agent); flex: none; margin-top: 1px; }
+.ig__note { padding: 10px 12px; border-color: var(--brand-border); font: 400 12px/1.5 var(--font-ui); color: var(--ink); display: flex; align-items: flex-start; gap: 8px; }
+.ig__note-icon { color: var(--agent-ink); flex: none; margin-top: 1px; }
 @media (max-width: 767px) {
     .ig__form-grid { grid-template-columns: 1fr; }
     .ig__head-actions { margin-left: 0; }

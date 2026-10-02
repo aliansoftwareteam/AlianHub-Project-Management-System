@@ -23,6 +23,7 @@
                 <select v-model="form[field.name]" class="ah-input" :data-test="`csf-${field.name}`">
                     <option v-for="o in field.options" :key="o.id" :value="o.id">{{ $t(o.labelKey) }}</option>
                 </select>
+                <span v-if="field.hintKey" class="ah-field__hint">{{ $t(field.hintKey) }}</span>
             </label>
 
             <label v-else-if="field.type === 'count'" class="ah-field">
@@ -73,7 +74,7 @@ const { t } = useI18n();
 const initialOf = (field) => {
     const saved = props.cardData ? props.cardData[field.name] : undefined;
     if (saved !== undefined && saved !== null && saved !== '') return saved;
-    if (field.type === 'choice') return field.options[0].id;
+    if (field.type === 'choice') return field.default ?? field.options[0].id;
     if (field.type === 'count') return field.default;
     return '';
 };
@@ -127,7 +128,7 @@ const save = () => {
 </script>
 
 <style scoped>
-.csf { display: flex; flex-direction: column; gap: 14px; }
+.csf { display: flex; flex-direction: column; gap: var(--sp-6); }
 .csf__text { resize: vertical; min-height: 72px; font-family: inherit; }
-.csf__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.csf__actions { display: flex; justify-content: flex-end; gap: var(--sp-3); }
 </style>

@@ -21,6 +21,7 @@ const NAME = '[^/]+';
 const THUMBNAIL = '(?:-\\d+x\\d+)?';
 const THUMBNAIL_SUFFIX = /-\d+x\d+(\.[^./]+)$/i;
 const ATTACHMENTS_PERMISSION = 'task.task_attachments';
+const CUSTOM_FIELD_PERMISSION = 'task.task_custom_field';
 const LISTING_LIMIT = 20;
 const REFUSAL_CODE = 'STORED_FILE_NOT_AVAILABLE';
 const REFUSAL_TEXT = 'File not found';
@@ -100,6 +101,16 @@ const taskAttachment = async (ctx, [, , folderId], key) => {
     return listedByOpenTask(ctx, listing(key));
 };
 
+/* A file in a custom field is read where the field is shown: by whoever may open the task and see its custom fields. */
+const taskFieldFile = async (ctx, [, , taskId]) => {
+    const task = await taskById(ctx, taskId);
+    if (!task) return NOT_FOUND;
+    if (!(await mayOpenTask(ctx, task))) return NO_ACCESS;
+    if (await privileged(ctx)) return true;
+    const permission = await evaluatePermission(ctx.companyId, ctx.uid, CUSTOM_FIELD_PERMISSION, { projectId: String(task.ProjectID) }).catch(() => null);
+    return isReadable(permission) || NO_ACCESS;
+};
+
 /* Chat spaces are main_chats rows, not projects: the one-to-one space holds direct messages,
  * the others hold channels every company member may list. */
 const chatSpace = (ctx, projectId) => (OBJECT_ID.test(String(projectId || ''))
@@ -154,9 +165,11 @@ const clip = async (ctx, [, companyId, userId], key) => {
 
 const reminderAttachment = async (ctx, [, companyId, userId]) => ownFolder(ctx, companyId, userId) || NO_ACCESS;
 
-/* An image uploaded into a doc is for whoever may read that doc. */
-const docImage = async (ctx, [, pageId]) => {
-    const page = await find(ctx, SCHEMA_TYPE.PAGES, { _id: oid(pageId), deletedStatusKey: 0 }, 'ProjectID visibility createdBy');
+const liveDoc = (ctx, pageId) => find(ctx, SCHEMA_TYPE.PAGES, { _id: oid(pageId), deletedStatusKey: 0 }, 'ProjectID visibility createdBy sharedWith deletedStatusKey');
+
+/* An image uploaded into a doc, and a file on one of its comments, is for whoever may read that doc. */
+const inReadableDoc = async (ctx, [, pageId]) => {
+    const page = await liveDoc(ctx, pageId);
     if (!page) return NOT_FOUND;
     return (await canUsePage(ctx.companyId, page, ctx.uid)) || NO_ACCESS;
 };
@@ -166,6 +179,7 @@ const companyAsset = async () => true;
 
 const LAYOUTS = Object.freeze([
     { type: 'task_attachment', pattern: layout(`Project/${ID}/Sprint/${ID}/Attachment/${NAME}`), allows: taskAttachment },
+    { type: 'task_field_file', pattern: layout(`Project/${ID}/Sprint/${ID}/Field/${ID}/${NAME}`), allows: taskFieldFile },
     { type: 'tracker_screenshot', pattern: layout(`Project/${ID}/Sprint/${ID}/TimeLog/${NAME}/${NAME}`), allows: trackerScreenshot },
     { type: 'channel_comment', pattern: layout(`Project/${ID}/${ID}/default/Comments/${NAME}`), allows: channelComment },
     { type: 'task_comment', pattern: layout(`Project/${ID}/${ID}/${ID}/Comments/${NAME}`), allows: taskComment },
@@ -176,7 +190,8 @@ const LAYOUTS = Object.freeze([
     { type: 'form_upload', pattern: layout(`formAttachment/${ID}/[a-f0-9]{24}${THUMBNAIL}\\.[a-z0-9]{1,8}`), allows: formUpload },
     { type: 'clip', pattern: layout(`Clips/${ID}/${ID}/${NAME}`), allows: clip },
     { type: 'reminder_attachment', pattern: layout(`Reminders/${ID}/${ID}/${NAME}`), allows: reminderAttachment },
-    { type: 'doc_image', pattern: layout(`Pages/${ID}/${NAME}`), allows: docImage },
+    { type: 'doc_image', pattern: layout(`Pages/${ID}/${NAME}`), allows: inReadableDoc },
+    { type: 'doc_comment_file', pattern: layout(`Pages/${ID}/Comments/${NAME}`), allows: inReadableDoc, enforced: true },
     { type: 'company_asset', pattern: layout(`(?:setting/task_type|taskPriorities|companyIcon|ProjectTemplate)/${NAME}`), allows: companyAsset },
 ]);
 
@@ -206,7 +221,7 @@ const judge = async ({ companyId, uid, key, storage = process.env.STORAGE_TYPE }
     const outcome = await found.entry.allows(ctx, found.match, path);
     return outcome === true
         ? { allowed: true, type: found.entry.type }
-        : { allowed: false, type: found.entry.type, reason: typeof outcome === 'string' ? outcome : NO_ACCESS };
+        : { allowed: false, type: found.entry.type, reason: typeof outcome === 'string' ? outcome : NO_ACCESS, enforced: found.entry.enforced === true };
 };
 
 const countReported = (type, reason) => countCategory(`download:${type}:${reason}`);
@@ -227,8 +242,9 @@ function requireStoredFileRead(pickBucketId, pickPath, { storage, skipBucket = (
             verdict = { allowed: false, type: 'error', reason: 'error' };
         }
         if (verdict.allowed) return next();
-        // Report mode exists to learn what enforcing would break for the web app; a token narrowed to some projects was never given the rest.
-        if (mode() === REPORT && !narrowingFor(req.uid)) {
+        // Report mode exists to learn what enforcing would break for the web app; a token narrowed to some projects was never given the rest,
+        // and a layout added with its rule has no earlier files to break.
+        if (mode() === REPORT && !verdict.enforced && !narrowingFor(req.uid)) {
             const count = countReported(verdict.type, verdict.reason);
             logger.warn(`stored-file download would be refused (layout: ${verdict.type}, reason: ${verdict.reason}, reported so far for this layout and reason: ${count})`);
             return next();
@@ -239,9 +255,20 @@ function requireStoredFileRead(pickBucketId, pickPath, { storage, skipBucket = (
 
 module.exports = {
     REFUSAL_CODE,
+    REFUSAL_TEXT,
     LAYOUTS,
     judge,
     layoutOf,
+    isValidKey,
+    keysFor,
+    find,
+    taskById,
+    liveDoc,
+    chatSpace,
+    privileged,
+    mayReadProject,
+    mayOpenTask,
+    openTaskFilesFilter,
     mode,
     refusalCounts,
     requireStoredFileRead,

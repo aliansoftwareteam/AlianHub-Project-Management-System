@@ -3,16 +3,14 @@
         <div class="mb-010 custom-filters-table" :id="`num-${index}`" v-for="(item, index) in inputs" :key="index" >
             <div class="d-flex align-items-center custom-filters-detailwrapper flex-wrap" :class="{'row-gap-filter' : clientWidth > 767}">
                 <div class="mr-010 custom-filters-col" v-if="index == 0">
-                    <span class="where-title" :class="{'font-size-13 text-center' : clientWidth > 767 , 'font-size-18 text-left' : clientWidth <= 767}" :style="{color : clientWidth > 767 ? '#959595' : '#000000' }">
+                    <span class="where-title" :class="{'font-size-13 text-center' : clientWidth > 767 , 'font-size-18 text-left' : clientWidth <= 767}">
                         {{ $t('Filters.where') }}
                     </span>
                 </div>
                 <div class="mr-010 custom-filters-col" v-if="index == 1">
                     <div class="custom-radio position-re" :class="{'d-flex' : clientWidth <= 767}">
                         <input type="radio" :id="'condition'+index" :value="item.condition === '&&' ? '||' : '&&'" v-model="item.condition" :disabled="index !== 1" @change="setAllOptions(item)"/>
-                        <label :for="'condition'+index"  :class="{'font-size-13 text-center' : clientWidth > 767 , 'font-size-18 text-left' : clientWidth <= 767}"
-                            :style="{color : clientWidth > 767 ? '#959595' : '#000000' }"
-                            >{{ item.condition === '&&' ? 'And' : 'Or' }}
+                        <label :for="'condition'+index"  :class="{'font-size-13 text-center' : clientWidth > 767 , 'font-size-18 text-left' : clientWidth <= 767}">{{ item.condition === '&&' ? 'And' : 'Or' }}
                             <img class="mobile_icon_dropdown" src="@/assets/images/svg/drop_down_mobile.svg" alt="dropdown" v-if="clientWidth <= 767">
                         </label>
                         <img src="@/assets/images/svg/toggle_arrow.svg" alt="" width="9" class="up-downarrow position-ab" v-if="clientWidth > 767"/>
@@ -20,22 +18,22 @@
                     </div>
                 </div>
                 <div class="mr-010 custom-filters-col" v-if="index > 1">
-                    <span class="where-title"  :class="{'font-size-13 text-center' : clientWidth > 767 , 'font-size-18 text-left' : clientWidth <= 767}" :style="{color : clientWidth > 767 ? '#959595' : '#000000' }"> 
+                    <span class="where-title"  :class="{'font-size-13 text-center' : clientWidth > 767 , 'font-size-18 text-left' : clientWidth <= 767}"> 
                         {{ item.condition === '&&' ? 'And' : 'Or' }}
                         <span class="remove_icon"  v-if="inputs.length > 1 && clientWidth <= 767" @click="$emit('delete', { item, index })" :class="{'d-flex align-items-center cursor-pointer font-size-16' : clientWidth <= 767 }"> {{$t('Templates.remove')}} </span>
                     </span>
                 </div>
                 <div class="mr-010 custom-filters-col filter-status-fieldwrapper" :class= "{'date_range_bottom': clientWidth < 767 && item?.name.value === 'DueDate'  && dateOption === 'Date range' }">
-                    <CustomDropDown :maxWidth="clientWidth > 767 ? '150px' : '100%'" :zindexCustomDrop="99" :bodyClass="{'filter-status-dropdpown' : true}">
+                    <CustomDropDown themed :maxWidth="clientWidth > 767 ? '150px' : '100%'" :zindexCustomDrop="99" :bodyClass="{'filter-status-dropdpown' : true}">
                         <template #head v-if="clientWidth <= 767">
                             <div class="d-flex align-items-center justify-content-between cancel-title-donewrapper">
-                                <a href="#" class="mr-10px"  @click.stop.prevent="$refs.keyRefs[index].click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <= 767 }" :style="{color : clientWidth <= 767 ? '#646464' : '#2F3990'}">{{$t('Projects.cancel')}}</a>
-                                <h3 class="filter-dropdownmobile-title m-0" :class="{'font-size-20 font-weight-500' : clientWidth <= 767 }" :style="{color : clientWidth <= 767 ? '#090A0A' : ''}">{{ $t('Filters.filtering_field') }}</h3>
+                                <a href="#" class="mr-10px cancel"  @click.stop.prevent="$refs.keyRefs[index].click(), inputName='', isInvalid=false" :class="{'font-size-16' : clientWidth <= 767 }">{{$t('Projects.cancel')}}</a>
+                                <h3 class="filter-dropdownmobile-title m-0" :class="{'font-size-20 font-weight-500' : clientWidth <= 767 }">{{ $t('Filters.filtering_field') }}</h3>
                                 <span class="done" @click="$refs.keyRefs[index].click()">{{$t('Home.Done')}}</span>
                             </div>
                         </template>
                         <template #button>
-                            <div ref="keyRefs" class="text-ellipsis" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767}" :style="{color : clientWidth > 767 ? '#818181' : '#B3B3B3' }" :title="Object.keys(item.name).length > 0 ? keyLabel(item.name) : $t('PlaceHolder.Select')">{{ Object.keys(item.name).length > 0 ? keyLabel(item.name) : $t('PlaceHolder.Select') }}</div>
+                            <div ref="keyRefs" class="text-ellipsis" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767}" :title="Object.keys(item.name).length > 0 ? keyLabel(item.name) : $t('PlaceHolder.Select')">{{ Object.keys(item.name).length > 0 ? keyLabel(item.name) : $t('PlaceHolder.Select') }}</div>
                         </template>
                         <template #options>
                             <div v-if="mainOptions.length > 0">
@@ -43,12 +41,12 @@
                                     <span class="font-size-14 font-weight-400">{{ keyLabel(option) }}</span>
                                 </div>
                             </div>
-                            <div v-else class="font-size-13 gray81">{{$t('Filters.no_data_found')}}</div>
+                            <div v-else class="font-size-13 tf-muted">{{$t('Filters.no_data_found')}}</div>
                         </template>
                     </CustomDropDown>
                 </div>
                 <div class="mr-010 custom-filters-col filter-operator" :class= "{'date_range_bottom': clientWidth < 767 && item?.name.value === 'DueDate'  && dateOption === 'Date range' }" v-if="Object.keys(item.name).length > 0">
-                    <CustomDropDown :maxWidth="clientWidth <= 767 ? '100%' : '101px'" :zindexCustomDrop="99" :bodyClass="{'filter-operation-dropdown' : true}">
+                    <CustomDropDown themed :maxWidth="clientWidth <= 767 ? '100%' : '101px'" :zindexCustomDrop="99" :bodyClass="{'filter-operation-dropdown' : true}">
                         <template #head v-if="clientWidth <= 767" >
                             <div class="d-flex align-items-center justify-content-between cancel-title-donewrapper">
                                 <span class="cancel" @click="$refs.compRef[index].click()"> {{$t('Projects.cancel')}} </span>
@@ -57,7 +55,7 @@
                             </div>
                         </template>
                         <template #button>
-                            <span ref="compRef" class="text-ellipsis d-block select-compRef" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767}" :style="{color : clientWidth > 767 ? '#818181' : '#B3B3B3' }" :title="Object.keys(item.comparison).length > 0 ? $t(`Filters.${item.comparison.name}`) : $t('PlaceHolder.Select')">{{ Object.keys(item.comparison).length > 0 ? `${$t(`Filters.${item.comparison.name}`)}` : `${$t('PlaceHolder.Select')}`}}</span>
+                            <span ref="compRef" class="text-ellipsis d-block select-compRef" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767}" :title="Object.keys(item.comparison).length > 0 ? $t(`Filters.${item.comparison.name}`) : $t('PlaceHolder.Select')">{{ Object.keys(item.comparison).length > 0 ? `${$t(`Filters.${item.comparison.name}`)}` : `${$t('PlaceHolder.Select')}`}}</span>
                         </template>
                         <template #options>
                             <div v-for="(option, i) in item.comparisonsData" :key="i" class="cursor-pointer filter-status-field" @click="$refs.compRef[index].click(), handleSelected('comparison', item, option)">
@@ -67,8 +65,8 @@
                     </CustomDropDown>
                 </div>
                 <div class="mr-010 custom-filters-col d-flex align-items-center" :class= "{'date_range_calendar': clientWidth < 767 && item?.name.value === 'DueDate'  && dateOption === 'Date range' }">
-                    <CustomFieldFilterValue v-if="item.name.type === 'custom'" v-model="item.values" :field="customFieldOf(item.name)" :comparison="item.comparison.value || ''" />
-                    <CustomDropDown v-if="arrayKeys.includes(item?.name.value)" @isVisible="(isOpen) => resetSearchValue(isOpen)" :zindexCustomDrop="99" :style="{marginBottom : clientWidth <= 767 ? item?.name.value === 'DueDate'  && dateOption === 'Date range' ? '0px' : '20px !important' : '0' }"  :maxWidth="clientWidth > 767 ? '211px' : '100%'"  :bodyClass="{'filter-selectall-options' : true}">
+                    <CustomFieldFilterValue v-if="item.name.type === 'custom'" v-model="item.values" :field="customFieldOf(item.name)" :comparison="item.comparison.value || ''" :people="users" />
+                    <CustomDropDown themed v-if="arrayKeys.includes(item?.name.value)" @isVisible="(isOpen) => resetSearchValue(isOpen)" :zindexCustomDrop="99" :style="{marginBottom : clientWidth <= 767 ? item?.name.value === 'DueDate'  && dateOption === 'Date range' ? '0px' : '20px !important' : '0' }"  :maxWidth="clientWidth > 767 ? '211px' : '100%'"  :bodyClass="{'filter-selectall-options' : true}">
                         <template #head v-if="clientWidth <= 767">
                             <div class="d-flex align-items-center justify-content-between cancel-title-donewrapper">
                                 <span class="cancel" @click="$refs.fieldOptionsRef[index].click()"> {{$t('Projects.cancel')}} </span>
@@ -83,7 +81,7 @@
                         </template>
                         <template #button>
                             <div ref="fieldOptionsRef" class="selected-options d-flex align-items-center">
-                                <span class="ml-010" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767 }"  :style="{color : clientWidth > 767 ? '#818181' : '#B3B3B3' }" v-if="item.values.length === 0" > {{$t('PlaceHolder.Select')}} {{$t('Filters.options')}}</span>
+                                <span class="ml-010 tf-muted" :class="{'font-size-13' : clientWidth > 767 , 'font-size-14' : clientWidth <= 767 }"  v-if="item.values.length === 0" > {{$t('PlaceHolder.Select')}} {{$t('Filters.options')}}</span>
 
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'statusKey'">
                                     <span v-for="(option, i) in item.displayData" :key="i">
@@ -158,7 +156,7 @@
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="statusArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)" customClasses=""/>
-                                                <span class="ml-5-px" :class="{'font-size-12 blue' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }" >{{$t('Filters.select_all')}}</span>
+                                                <span class="ml-5-px" :class="{'font-size-12 tf-link' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }" >{{$t('Filters.select_all')}}</span>
                                             </div>
                                             <!-- <img src="@/assets/images/svg/help_icon.svg" alt="" height="14" width="14" @click.stop.prevent=""/> -->
                                         </label>
@@ -167,23 +165,23 @@
                                         </div>
                                         <div class="checkbox-dropdown-wrapper">
                                             <div v-for="(option, i) in statusArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1)" :key="i" class="dropdown-item checkbox-dropdown" :class="{'border-radius-6-px' : clientWidth > 767 , 'border-radius-8-px' : clientWidth <= 767}">
-                                                <label :for="'status'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14 GunPowder">
+                                                <label :for="'status'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14">
                                                     <CheckboxComponent :id="'status'+i" :value="option.key" v-model="item.values" @change="handleChecked(item)" classes="filer-checkbox"/>
                                                     <span class="status_square" :title="option.name" :style="{'background-color': option.textColor , margin:  clientWidth > 767 ? '0px 6px' : '0px 8px 0 13px'}"></span>
-                                                    <span :class="{'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }"   :style="{color : clientWidth > 767 ? '#535358' : '#3B3B3B' }">{{ option.name }}</span>
+                                                    <span :class="{'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }">{{ option.name }}</span>
                                                 </label>
                                             </div>
                                         </div>
-                                        <div v-if="!statusArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                        <div v-if="!statusArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                     </div>
-                                    <div v-else class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                    <div v-else class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                 </div>
                                 <div v-if="item.name.value === 'Task_Priority' && priorities.length" :class="{'width-211-px': clientWidth > 767, 'w-100' : clientWidth <= 767}">
                                     <div v-if="priorities.length">
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="priorities.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px" :class="{'font-size-12 blue' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px" :class="{'font-size-12 tf-link' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
                                             </div>
                                             <!-- <img src="@/assets/images/svg/help_icon.svg" alt="" height="14" width="14" @click.stop.prevent=""/> -->
                                         </label>
@@ -192,25 +190,23 @@
                                         </div>
                                         <div class="checkbox-dropdown-wrapper">
                                             <div v-for="(option, i) in priorities.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1)" :key="i" class="dropdown-item checkbox-dropdown" :class="{'border-radius-6-px' : clientWidth > 767 , 'border-radius-8-px' : clientWidth <= 767}">
-                                                <label :for="'proority'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14 GunPowder">
+                                                <label :for="'proority'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14">
                                                     <CheckboxComponent :id="'proority'+i" :value="option.value" v-model="item.values" @change="handleChecked(item)" classes="filer-checkbox"/>
                                                     <WasabiIamgeCompp v-if="option.statusImage" :data="{url: option.statusImage}" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
-                                                    <span :class="{'ml-5-px': !option.statusImage, 'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767}"
-                                                        :style="{color : clientWidth > 767 ? '#535358' : '#3B3B3B' }"
-                                                    >{{ option.name }}</span>
+                                                    <span :class="{'ml-5-px': !option.statusImage, 'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767}">{{ option.name }}</span>
                                                 </label>
                                             </div>
                                         </div>
-                                        <div v-if="!priorities.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                        <div v-if="!priorities.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                     </div>
-                                    <div v-else class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                    <div v-else class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                 </div>
                                 <div v-if="item.name.value === 'TaskTypeKey' && taskTypeArray.length" :class="{'width-211-px': clientWidth > 767, 'w-100' : clientWidth <= 767}">
                                     <div v-if="taskTypeArray.length">
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="taskTypeArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px" :class="{'font-size-12 blue' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px" :class="{'font-size-12 tf-link' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
                                             </div>
                                             <!-- <img src="@/assets/images/svg/help_icon.svg" alt="" height="14" width="14" @click.stop.prevent=""/> -->
                                         </label>
@@ -219,23 +215,23 @@
                                         </div>
                                         <div class="checkbox-dropdown-wrapper">
                                             <div v-for="(option, i) in taskTypeArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1)" :key="i" class="dropdown-item checkbox-dropdown" :class="{'border-radius-6-px' : clientWidth > 767 , 'border-radius-8-px' : clientWidth <= 767}">
-                                                <label :for="'tasktype'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14 GunPowder">
+                                                <label :for="'tasktype'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14">
                                                     <CheckboxComponent :id="'tasktype'+i" :value="option.key" v-model="item.values" @change="handleChecked(item)"/>
                                                     <TaskTypeIcon v-if="option.taskImage" :taskType="option" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
                                                     <span :class="{'ml-5-px': !option.taskImage, 'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767}">{{ option.name }}</span>
                                                 </label>
                                             </div>
                                         </div>
-                                        <div v-if="!taskTypeArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                        <div v-if="!taskTypeArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                     </div>
-                                    <div v-else class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                    <div v-else class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                 </div>
                                 <div v-if="item.name.value === 'Task_Leader' && users.length" :class="{'width-211-px': clientWidth > 767, 'w-100' : clientWidth <= 767}">
                                     <div v-if="users.length">
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px font-size-12 blue">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px font-size-12 tf-link">{{$t('Filters.select_all')}}</span>
                                             </div>
                                         </label>
                                         <div class="p-10px pb-0px w-100 pt-15px">
@@ -243,25 +239,25 @@
                                         </div>
                                         <div class="checkbox-dropdown-wrapper">
                                             <div v-for="(option, i) in users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1)" :key="i" class="dropdown-item checkbox-dropdown" :class="{'border-radius-6-px' : clientWidth > 767 , 'border-radius-8-px' : clientWidth <= 767}">
-                                                <label :for="'createdby'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14 GunPowder">
+                                                <label :for="'createdby'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14">
                                                     <CheckboxComponent :id="'createdby'+i" :value="option.value" v-model="item.values" @change="handleChecked(item)"/>
                                                     <!-- <img class="user-icon user__option-img" :src="option.image" alt="" /> -->
                                                     <WasabiIamgeCompp v-if="option.image && option?.value !== '$meMode'" class="user-icon user__option-img" :data="{url: option.image}" :userImage="true" :thumbnail="'25x25'"/>
                                                     <WasabiIamgeCompp v-else-if="option?.value === '$meMode' && Object.keys(userDetails)?.length" class="user-icon user__option-img" :thumbnail="'25x25'" :data="{url: userDetails?.Employee_profileImageURL}" :userImage="true" :title="userDetails?.Employee_Name"/>
-                                                    <span  :class="{'font-size-14' : clientWidth > 767 , 'fsize-16' : clientWidth <= 767 }"   :style="{color : clientWidth > 767 ? '#535358' : '#3B3B3B' }">{{ option?.finalValue == '$meMode' ? $t(`dashboardCard.${option.name}`) : option.name }}</span>
+                                                    <span  :class="{'font-size-14' : clientWidth > 767 , 'fsize-16' : clientWidth <= 767 }">{{ option?.finalValue == '$meMode' ? $t(`dashboardCard.${option.name}`) : option.name }}</span>
                                                 </label>
                                             </div>
                                         </div>
-                                        <div v-if="!users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                        <div v-if="!users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                     </div>
-                                    <div v-else class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                    <div v-else class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                 </div>
                                 <div v-if="item.name.value === 'tagsArray'" :class="{'width-250-px': clientWidth > 767, 'w-100' : clientWidth <= 767}">
                                     <div v-if="tagsArray.length"> 
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="tagsArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px" :class="{'font-size-12 blue' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px" :class="{'font-size-12 tf-link' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
                                             </div>
                                             <!-- <img src="@/assets/images/svg/help_icon.svg" alt="" height="14" width="14" @click.stop.prevent=""/> -->
                                         </label>
@@ -276,16 +272,16 @@
                                                 >{{ option.name }}</span>
                                             </label>
                                         </div>
-                                        <div v-if="!tagsArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                        <div v-if="!tagsArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                     </div>
-                                    <div v-else class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                    <div v-else class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                 </div>
                                 <div v-if="item.name.value === 'AssigneeUserId' && users.length" :class="{'width-211-px': clientWidth > 767, 'w-100' : clientWidth <= 767}">
                                     <div v-if="users.length">
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px font-size-12 blue">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px font-size-12 tf-link">{{$t('Filters.select_all')}}</span>
                                             </div>
                                         </label>
                                         <div class="p-10px pb-0px w-100 pt-15px">
@@ -294,25 +290,25 @@
                                         <div class="pt-10px pl-0px pr-0px pb-0px w-100" v-if="teams && teams.length">
                                             <div class="pl-10px"><b>{{ $t('Filters.teams') }}</b></div>
                                             <div v-for="(option, i) in teams.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1)" :key="i" class="dropdown-item checkbox-dropdown" :class="{'border-radius-6-px' : clientWidth > 767 , 'border-radius-8-px' : clientWidth <= 767}">
-                                                <label :for="'createdbyteam'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14 GunPowder">
+                                                <label :for="'createdbyteam'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14">
                                                     <CheckboxComponent :id="'createdbyteam'+i" :value="option.value" v-model="item.values" @change="handleChecked(item)"/>
                                                     <div class="team-default-color" :style="{'background-color': option.teamColor.bgColor}"> <span :style="{'color': option.teamColor.color}">{{ option.name.charAt(0) }}</span></div>
-                                                    <span  :class="{'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }"   :style="{color : clientWidth > 767 ? '#535358' : '#3B3B3B' }">{{ option.finalValue == '$meMode' ? $t(`dashboardCard.${option.name}`) : option.name }}</span>
+                                                    <span  :class="{'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }">{{ option.finalValue == '$meMode' ? $t(`dashboardCard.${option.name}`) : option.name }}</span>
                                                 </label>
                                             </div>
                                         </div>
                                         <div class="checkbox-dropdown-wrapper">
                                             <div v-for="(option, i) in users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1)" :key="i" class="dropdown-item checkbox-dropdown" :class="{'border-radius-6-px' : clientWidth > 767 , 'border-radius-8-px' : clientWidth <= 767}">
-                                                <label :for="'createdby'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14 GunPowder">
+                                                <label :for="'createdby'+i" class="cursor-pointer d-flex align-items-center lebel-items font-size-14">
                                                     <CheckboxComponent :id="'createdby'+i" :value="option.value" v-model="item.values" @change="handleChecked(item)"/>
                                                     <WasabiIamgeCompp class="user-icon user__option-img" :data="{url: option.image}" :userImage="true" :thumbnail="'25x25'"/>
-                                                    <span  :class="{'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }"   :style="{color : clientWidth > 767 ? '#535358' : '#3B3B3B' }">{{ option.finalValue == '$meMode' ? $t(`dashboardCard.${option.name}`) : option.name }}</span>
+                                                    <span  :class="{'font-size-14' : clientWidth > 767 , 'font-size-16' : clientWidth <= 767 }">{{ option.finalValue == '$meMode' ? $t(`dashboardCard.${option.name}`) : option.name }}</span>
                                                 </label>
                                             </div>
                                         </div>
-                                        <div v-if="!users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                        <div v-if="!users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length" class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                     </div>
-                                    <div v-else class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                    <div v-else class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                 </div>
                                 <div v-if="item.name.value === 'DueDate'" :class="{'width-211-px': clientWidth > 767, 'w-100' : clientWidth <= 767}">
                                     <div v-if="dueDateOptions.length">
@@ -324,7 +320,7 @@
                                             </DropDownOption>
                                         </div>
                                     </div>
-                                    <div v-else class="font-size-13 gray81 p-10px">{{$t('Filters.no_data_found')}}</div>
+                                    <div v-else class="font-size-13 tf-muted p-10px">{{$t('Filters.no_data_found')}}</div>
                                 </div>
                             </div>
                         </template>
@@ -521,6 +517,7 @@ const resetFields = (item) => {
         if (item.name.type === 'custom') {
             item.comparisonsData = comparisonsFor(item.name.fieldType);
             item.comparison = item.comparisonsData[0] || {};
+            if (!needsValue(item.comparison.value)) item.values = [true];
             comparison.value = item.comparison;
         } else if (arraykeys.includes(item.name.value)) {
             item.comparisonsData = [

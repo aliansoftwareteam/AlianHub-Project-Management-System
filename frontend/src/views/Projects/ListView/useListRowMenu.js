@@ -8,29 +8,20 @@ import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { sprintOf } from "@/utils/assigneeOptions";
 import { snapshotTasks, undoRequests } from "./bulkUndo.js";
+import { taskMenuRights } from "@/views/Projects/composables/taskMenu";
+import { placedSprint } from "@/views/Projects/composables/taskPlacement";
+import { peopleCarried } from "@/utils/duplicatePeople";
+import { MAX_EXTRA_LISTS, refusalCodeOf, refusalKey } from "@/components/organisms/TaskDetailOverlay/taskLists";
 
 const TOAST = { position: "top-right" };
 const DUPLICATE_PARTS = ["Checklists", "Due Date", "Copy Assignees", "Copy Watchers"];
-
-/* The permissions the task panel's menu and the bulk bar check. Undoing a duplicate trashes
- * the copy, so it needs delete as well. */
-export function rowMenuRights(check, { archived = false } = {}) {
-    const yes = (key) => !archived && check(`task.${key}`) === true;
-    return {
-        archive: yes("task_archive"),
-        delete: yes("task_delete"),
-        move: yes("task_move"),
-        duplicate: yes("task_duplicate"),
-        undoDuplicate: yes("task_delete")
-    };
-}
 
 const projectRef = (project) => ({ id: project?._id, ProjectCode: project?.ProjectCode, ProjectName: project?.ProjectName });
 
 /* Row menu actions through the same /tasks/bulk calls ListBulkBar makes, one task at a time,
  * so history, notifications, sockets and server permission checks are shared. */
 export function useListRowMenu(projectSource, showArchived) {
-    const { getters } = useStore();
+    const { getters, commit } = useStore();
     const { t } = useI18n();
     const $toast = useToast();
     const { getUser } = useGetterFunctions();
@@ -38,8 +29,9 @@ export function useListRowMenu(projectSource, showArchived) {
     const userId = inject("$userId", ref(""));
 
     const project = computed(() => unref(projectSource) || {});
-    const rights = computed(() => rowMenuRights((path) => checkPermission(path, project.value?.isGlobalPermission), { archived: Boolean(unref(showArchived)) }));
+    const rights = computed(() => taskMenuRights((path) => checkPermission(path, project.value?.isGlobalPermission), { archived: Boolean(unref(showArchived)) }));
     const moving = ref(null);
+    const sidebar = ref(null);
     const working = ref(false);
 
     function userData() {
@@ -100,9 +92,33 @@ export function useListRowMenu(projectSource, showArchived) {
         return perform({ action: "bulkArchive" }, { task, message: t("List.row_archived"), undo: undoBulk("bulkArchive", {}, task) });
     }
 
+    /* bulkRestore always returns a task to the open list, so a task deleted out of the
+     * archive is archived again after it. */
     function remove(task) {
         if (!rights.value.delete) return Promise.resolve();
-        return perform({ action: "bulkTrash" }, { task, message: t("List.row_deleted"), undo: undoBulk("bulkTrash", {}, task) });
+        const backToArchive = (result) => [{ action: "bulkRestore", taskIds: updated(result, task) }, { action: "bulkArchive", taskIds: updated(result, task) }];
+        return perform({ action: "bulkTrash" }, {
+            task,
+            message: t("List.row_deleted"),
+            undo: task.deletedStatusKey === 2 ? backToArchive : undoBulk("bulkTrash", {}, task)
+        });
+    }
+
+    function restore(task) {
+        if (!rights.value.restore) return Promise.resolve();
+        return perform({ action: "bulkRestore" }, {
+            task,
+            message: t("List.row_restored"),
+            undo: (result) => [{ action: "bulkArchive", taskIds: updated(result, task) }]
+        });
+    }
+
+    function openSidebar(mode, task) {
+        sidebar.value = { mode, task };
+    }
+
+    function closeSidebar() {
+        sidebar.value = null;
     }
 
     function startMove(task) {
@@ -117,7 +133,7 @@ export function useListRowMenu(projectSource, showArchived) {
         const task = moving.value;
         moving.value = null;
         if (!task || !destination?._id || !sprint?.id) return Promise.resolve();
-        const payload = { sprintObj: sprint, projectData: projectRef(destination) };
+        const payload = { sprintObj: placedSprint(sprint), projectData: projectRef(destination) };
         return perform({ action: "bulkMove", ...payload }, {
             task,
             message: t("List.row_moved", { project: destination.ProjectName || "" }),
@@ -130,25 +146,58 @@ export function useListRowMenu(projectSource, showArchived) {
         const source = project.value;
         const sprint = sprintOf(source, task) || { ...(task.sprintArray || {}), id: task.sprintId };
         const name = t("List.copy_of", { name: task.TaskName || "" });
+        const place = { project: source, sprint, seats: getters["settings/companyUsers"], teams: getters["settings/teams"], rules: getters["settings/rules"] };
         return perform({
             action: "bulkDuplicate",
-            sprintObj: sprint,
+            sprintObj: placedSprint(sprint),
             projectData: projectRef(source),
             oldProject: { id: source._id, ProjectName: source.ProjectName, taskStatusData: source.taskStatusData, taskTypeCounts: source.taskTypeCounts },
             oldSprintObj: { folderId: task.folderObjId || null, name: task.sprintArray?.name || sprint.name || "", folderName: task.sprintArray?.folderName || "" },
             isSubTask: withSubtasks && Number(task.subTasks || 0) > 0,
             duplicateData: DUPLICATE_PARTS,
-            assignee: task.AssigneeUserId || [],
-            watcher: task.watchers || [],
+            assignee: peopleCarried(task.AssigneeUserId, place),
+            watcher: peopleCarried(task.watchers, place),
             taskName: name
         }, {
             task,
             message: t("List.row_duplicated", { name }),
-            undo: (result) => (rights.value.undoDuplicate && result.newTaskIds?.length
+            undo: (result) => (rights.value.delete && result.newTaskIds?.length
                 ? [{ action: "bulkTrash", taskIds: result.newTaskIds.map(String) }]
                 : [])
         });
     }
 
-    return { rights, moving, archive, remove, startMove, cancelMove, confirmMove, duplicate };
+    /* The answer is written to the list on screen as a change from the server, so the row leaves it and its group counts are asked again. */
+    async function changeList(action, task, listId, op) {
+        const response = await apiRequest("patch", env.V2_TASKS, { action, taskId: String(task._id), sprintId: String(listId) });
+        if (response?.data?.status !== true) throw response;
+        const extraLists = (response.data.data?.extraLists || []).map((entry) => ({ projectId: entry.projectId, sprintId: entry.sprintId, addedBy: entry.addedBy, addedAt: entry.addedAt }));
+        const change = { snap: {}, op, pid: String(task.ProjectID), sprintId: String(listId), data: { ...task, extraLists }, updatedFields: { extraLists } };
+        commit("projectData/mutateUpdateFirebaseTasks", change);
+        commit("projectData/mutateTypesenseTableTasks", change);
+    }
+
+    async function addBackToList(task, listId) {
+        try {
+            await changeList("addToList", task, listId, "added");
+            $toast.success(t("TaskLists.added_back"), TOAST);
+        } catch (error) {
+            $toast.error(t(refusalKey(refusalCodeOf(error)), { max: MAX_EXTRA_LISTS }), TOAST);
+        }
+    }
+
+    async function removeFromList(task, listId) {
+        if (!rights.value.removeFromList || !listId || working.value) return;
+        working.value = true;
+        try {
+            await changeList("removeFromList", task, listId, "modified");
+            showUndoToast({ message: t("TaskLists.removed_here"), undo: () => addBackToList(task, listId) });
+        } catch (error) {
+            $toast.error(t(refusalKey(refusalCodeOf(error)), { max: MAX_EXTRA_LISTS }), TOAST);
+        } finally {
+            working.value = false;
+        }
+    }
+
+    return { rights, moving, sidebar, archive, remove, restore, startMove, cancelMove, confirmMove, duplicate, removeFromList, openSidebar, closeSidebar };
 }

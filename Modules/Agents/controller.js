@@ -6,6 +6,7 @@ const registry = require('./registry');
 const runs = require('./runs');
 const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
 const proposals = require('./proposals');
+const standingApprovals = require('./standingApprovals');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
 const access = require('./access');
@@ -64,13 +65,11 @@ const idempotencyKeyOf = (req) => {
     return raw;
 };
 
-const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, hiddenTaskIdsFor, canSeeTaskOf, REFUSAL } = access;
+const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, REFUSAL } = access;
 
-/* The projects the caller may open and, inside them, the tasks a private sprint keeps from them. */
-const readScopeOf = async (companyId, caller) => {
-    const projectIds = await visibleProjectIdsFor(companyId, caller);
-    return { projectIds, hiddenTaskIds: await hiddenTaskIdsFor(companyId, caller, projectIds) };
-};
+/* A run that is someone else's private work is not there for an owner or admin; a member's standing
+ * on a run is decided by the checks each route already makes. */
+const hiddenFromManager = async (companyId, caller, run) => caller.privileged && run.kind !== 'report' && !(await canSeeRun(companyId, caller, run));
 
 const refuseUnlessManager = (res, caller, agentsMessage) => {
     if (!caller.human) return fail(res, agentsMessage, 403);
@@ -409,9 +408,8 @@ exports.getRun = async (req, res) => {
         // A report holds what its owner could read, so only they and owners/admins open it.
         if (run.kind === 'report') {
             if (!caller.privileged && String(run.startedBy || '') !== String(caller.actor.userId || '')) return fail(res, 'Run not found.', 404);
-        } else {
-            if (visible && !visible.includes(String(run.projectId || ''))) return fail(res, 'Run not found.', 404);
-            if (!(await canSeeTaskOf(companyId, caller, run))) return fail(res, 'Run not found.', 404);
+        } else if (!(await canSeeRun(companyId, caller, run))) {
+            return fail(res, 'Run not found.', 404);
         }
         const auditRows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AUDIT_LOGS, data: [{ 'meta.runId': String(run._id) }, {}, { sort: { createdAt: 1 }, limit: 200 }] }, 'find')
             .then((rows) => auditChain.foldRows(companyId, rows)).catch(() => []);
@@ -449,10 +447,11 @@ exports.getRunReplay = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
-        if (!canManageAgents(await callerOf(req, companyId))) return fail(res, 'Owner/admin only.', 403);
+        const caller = await callerOf(req, companyId);
+        if (!canManageAgents(caller)) return fail(res, 'Owner/admin only.', 403);
         if (!OBJECT_ID.test(req.params.id)) return fail(res, 'A valid run id is required.', 400);
         const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: oid(req.params.id) }] }, 'findOne');
-        if (!run) return fail(res, 'Run not found.', 404);
+        if (!run || await hiddenFromManager(companyId, caller, run)) return fail(res, 'Run not found.', 404);
         return res.send({ status: true, statusText: 'Replay fetched.', data: await replaysOf(companyId, run._id, {}, REPLAY_LIMIT) });
     } catch (e) { logger.error(`getRunReplay: ${e.message}`); return fail(res, e.message, 500); }
 };
@@ -502,7 +501,7 @@ exports.stopRun = async (req, res) => {
         const caller = await callerOf(req, companyId);
         if (!caller.human) return fail(res, 'Agents cannot stop runs.', 403);
         const run = await runs.get(companyId, req.params.id);
-        if (!run) return fail(res, 'Run not found.', 404);
+        if (!run || await hiddenFromManager(companyId, caller, run)) return fail(res, 'Run not found.', 404);
         if (!canControlRun(caller, run)) return fail(res, REFUSAL.CONTROL_RUN, 403);
         const out = await runs.stop(companyId, req.params.id, req.uid);
         if (out.error) return fail(res, out.error, out.status || 409);
@@ -517,6 +516,8 @@ exports.revertRun = async (req, res) => {
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid run id are required.');
         const caller = await callerOf(req, companyId);
         if (!caller.human) return fail(res, 'Agents cannot revert runs.', 403);
+        const run = await runs.get(companyId, req.params.id);
+        if (!run || await hiddenFromManager(companyId, caller, run)) return fail(res, 'Run not found.', 404);
         const out = await revert.revertRun(companyId, req.params.id, { actor: caller.actor, isPrivileged: caller.privileged, ip: req.ip || '' });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
         return res.send({ status: true, statusText: 'Run reverted.', data: out });
@@ -606,6 +607,7 @@ exports.createProposal = async (req, res) => {
         if (!canActAsAgent(caller, agentId)) return fail(res, REFUSAL.ACT_AS_AGENT, 403);
         const agent = await runs.getAgent(companyId, agentId);
         if (!agent) return fail(res, 'Agent not found.', 404);
+        if (actor.tokenId && require('./connectors/slackPost').hasSlackChange(b.changes)) return fail(res, 'A Slack message is proposed only by a workspace agent\'s own run, not through a token.', 403);
         const saved = await proposals.create(companyId, { agent, runId: b.runId || actor.runId, taskId: b.taskId, projectId: b.projectId, what: b.what, why: b.why, changes: b.changes, gate: b.gate, priority: b.priority, cost: b.cost });
         return res.send({ status: true, statusText: 'Proposal filed.', data: saved });
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }
@@ -617,13 +619,18 @@ const decide = (fn) => async (req, res) => {
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid proposal id are required.');
         const caller = await callerOf(req, companyId);
         if (!caller.human) return fail(res, 'Agents cannot decide proposals — a person has to.', 403);
-        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, reason: req.body && req.body.reason, ip: req.ip || '' });
+        // One answer for a proposal that is not there and one the caller may not see.
+        const proposal = await proposals.get(companyId, req.params.id);
+        if (!proposal || !(await canSeeProposal(companyId, caller, proposal))) return fail(res, 'Proposal not found.', 404);
+        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
         return res.send({ status: true, statusText: 'Done.', data: out });
     } catch (e) { logger.error(`proposal decision: ${e.message}`); return fail(res, e.message, 500); }
 };
 
-exports.approveProposal = decide(proposals.approve);
+const approveOnceOrAlways = (companyId, id, { always, ...decision }) => (always ? standingApprovals.approveAlways(companyId, id, decision) : proposals.approve(companyId, id, decision));
+
+exports.approveProposal = decide(approveOnceOrAlways);
 exports.declineProposal = decide(proposals.decline);
 exports.undoProposal = decide(proposals.undoApproval);
 

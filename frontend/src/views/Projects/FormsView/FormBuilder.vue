@@ -102,11 +102,13 @@
                     </div>
 
                     <template v-if="view === 'preview'">
+                        <p v-if="hasLogic" class="fb__logic">{{ t('Projects.form_logic_preview_note') }}</p>
                         <div class="fb__grid">
-                            <div v-for="q in visible" :key="q.id" class="fb__cell" :class="spanClass(q)">
-                                <FormField :question="q" :type="typeMeta(q.type)" live />
+                            <div v-for="q in previewShown" :key="q.id" class="fb__cell" :class="spanClass(q)">
+                                <FormField :question="q" :type="typeMeta(q.type)" live @update:answer="answerPreview(q.id, $event)" />
                             </div>
                         </div>
+                        <p class="ah-sr-only" aria-live="polite" data-test="form-logic-live">{{ previewNote }}</p>
                         <button type="button" class="fb__submit" :style="{ background: settings.buttonColor }" disabled>
                             {{ $t('Projects.form_submit') }}
                         </button>
@@ -138,6 +140,8 @@
                                             <span class="fb__map" :class="{ 'is-mapped': !!q.mapTo }">→ {{ chip(q) }}</span>
                                         </div>
                                         <FormField :question="q" :type="typeMeta(q.type)" />
+                                        <p v-if="logic[i].stale" class="fb__logic fb__logic--stale" data-test="form-logic-stale">{{ t('Projects.form_logic_stale') }}</p>
+                                        <p v-else-if="logic[i].rule" class="fb__logic" data-test="form-logic-summary">{{ summarize(logic[i].rule, sources, t) }}</p>
                                     </div>
 
                                     <div v-else class="fb__card">
@@ -194,6 +198,16 @@
                                                 @click="q.span = w"
                                             >{{ $t(`Projects.form_width_${w}`) }}</button>
                                         </div>
+
+                                        <FormLogicEditor
+                                            :rule="q.showWhen"
+                                            :index="i"
+                                            :sources="sources"
+                                            :locked="q.mapTo === 'TaskName'"
+                                            @update:rule="q.showWhen = $event"
+                                        />
+                                        <p v-if="logic[i].stale" class="fb__logic fb__logic--stale" data-test="form-logic-stale">{{ t('Projects.form_logic_stale') }}</p>
+                                        <p v-else-if="logic[i].rule" class="fb__logic" data-test="form-logic-summary">{{ summarize(logic[i].rule, sources, t) }}</p>
 
                                         <div class="fb__card-foot">
                                             <label v-if="typeMeta(q.type).widget !== 'info'" class="ah-check fb__check">
@@ -371,8 +385,12 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useToast } from 'vue-toast-notification';
+import { folderPathLabel } from '@/utils/folderTree';
+import { pruneAnswers, visibleIds } from '@formLogic';
 import FormField from './FormField.vue';
 import FormIcon from './FormIcon.vue';
+import FormLogicEditor from './FormLogicEditor.vue';
+import { ruleState, summarize, withSources } from './formLogicBuilder';
 import FormSubmissions from './FormSubmissions.vue';
 import ConfirmDelete from '@/components/atom/ConfirmDelete/ConfirmDelete.vue';
 import draggable from 'vuedraggable';
@@ -414,6 +432,7 @@ const view = ref('build');
 // button follows along.
 const setView = (tab) => {
     view.value = tab;
+    resetPreview();
     if (props.showSubmissions) emit('update:showSubmissions', false);
 };
 const questions = ref([]);
@@ -444,6 +463,30 @@ const widgets = ref({});
 const typeMeta = (type) => widgets.value[type] || { widget: 'text' };
 
 const visible = computed(() => questions.value.filter((q) => !q.hidden));
+
+const taskFields = ref([]);
+const sources = computed(() => withSources(questions.value, taskFields.value));
+const logic = computed(() => sources.value.map((q, i) => ruleState(q, i, sources.value)));
+const hasLogic = computed(() => logic.value.some((state) => state.rule));
+
+// The preview runs the rules as they would be saved, so it shows what the
+// public page will ask and not what a half-built rule might.
+const previewAnswers = ref({});
+const previewNote = ref('');
+const previewForm = computed(() => sources.value.map((q, i) => ({ ...q, showWhen: logic.value[i].rule })));
+const previewShown = computed(() => {
+    const ids = new Set(visibleIds(previewForm.value, previewAnswers.value));
+    return questions.value.filter((q) => ids.has(q.id));
+});
+const answerPreview = (id, value) => {
+    const before = previewShown.value.length;
+    previewAnswers.value = pruneAnswers(previewForm.value, { ...previewAnswers.value, [id]: value });
+    previewNote.value = previewShown.value.length > before ? t('Projects.form_logic_more') : '';
+};
+function resetPreview() {
+    previewAnswers.value = {};
+    previewNote.value = '';
+}
 
 // Widths come back from the server already resolved, so there is no fallback rule
 // here to drift from the one the public page uses.
@@ -500,7 +543,7 @@ const sprints = computed(() => {
     add(p.sprintsObj);
     for (const fid of Object.keys(p.sprintsfolders || {})) {
         const folder = p.sprintsfolders[fid] || {};
-        add(folder.sprintsObj, folder.name || '');
+        add(folder.sprintsObj, folderPathLabel(p.sprintsfolders, folder));
     }
     return out;
 });
@@ -531,6 +574,7 @@ const hydrate = () => {
     // open-form link is still there after a reload.
     publicUrl.value = props.form.url || '';
     open.value = '';
+    resetPreview();
     baseline.value = JSON.stringify(payload());
 };
 
@@ -539,6 +583,7 @@ const loadCatalogue = async () => {
         const body = (await apiRequest('get', '/api/v2/forms/fields'))?.data;
         groups.value = (body && body.status && body.data && body.data.groups) || [];
         widgets.value = (body && body.status && body.data && body.data.widgets) || {};
+        taskFields.value = (body && body.status && body.data && body.data.task) || [];
     } catch (e) { groups.value = []; }
 };
 
@@ -733,6 +778,7 @@ const payload = () => ({
         options: Array.isArray(q.options) ? q.options : [],
         max: q.max,
         span: q.span,
+        ...(logic.value[i].rule ? { showWhen: logic.value[i].rule } : {}),
         order: i + 1,
     })),
 });
@@ -746,9 +792,14 @@ watch(dirty, (on) => emit('dirty', on));
 const save = async () => {
     if (busy.value || !dirty.value) return true;
     busy.value = true; err.value = '';
+    const dropped = questions.value.filter((q, i) => logic.value[i].stale);
     try {
         const body = (await apiRequest('put', `/api/v2/forms/${props.form._id}`, payload()))?.data;
         if (body && body.status) {
+            if (dropped.length) {
+                dropped.forEach((q) => { delete q.showWhen; });
+                toast.warning(t('Projects.form_logic_dropped', { questions: dropped.map((q) => q.label).join(t('Projects.form_logic_list_join')) }), { position: 'top-right' });
+            }
             baseline.value = JSON.stringify(payload());
             emit('saved', body.data);
             return true;

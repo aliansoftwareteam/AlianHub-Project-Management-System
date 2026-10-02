@@ -37,9 +37,9 @@
                 role="listbox"
                 @click.stop
                 @keydown.esc.prevent="closeDropdown"
-                class="bg-white gray box-shadow-5 custom-drop-down-menu cls-custom-dd"
+                class="box-shadow-5 custom-drop-down-menu cls-custom-dd"
                 :style="[{'z-index':zindexCustomDrop}]"
-                :class="{'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}"
+                :class="{'dd-tokens': themed, 'bg-white gray': !themed, 'drop-down-hide' : !bind, 'desktop-view position-fi' : clientWidth > 767, 'mobile-view position-fi' : clientWidth <= 767, ...bodyClass}"
                 v-if="dropdownVisible"
             >
                 <slot name="head" v-if="clientWidth > 767"></slot>
@@ -67,7 +67,7 @@
                     </div>
                 </div>
                 <div class="search-project-filter w-100vw" :class="props.className" :style="{'max-width' : maxWidth}">
-                    <div class="overflow-y-auto overflow-x-hidden drop-down-options black" :style="{'max-height' : maxHeight}">
+                    <div class="overflow-y-auto overflow-x-hidden drop-down-options" :class="{'black': !themed}" :style="{'max-height' : maxHeight}">
                         <slot name="options">
                         </slot>
                     </div>
@@ -79,8 +79,9 @@
 
 <script setup>
 // PACKAGES
-import {defineProps, nextTick, onMounted, ref, watch, defineEmits} from "vue";
+import {defineProps, nextTick, onBeforeUnmount, onMounted, ref, watch, defineEmits} from "vue";
 import { useCustomComposable } from "@/composable";
+import { followPanelSize, positionPanel } from "./panelPlacement";
 
 // COMPOSABLES
 const {debounce, makeUniqueId} = useCustomComposable();
@@ -121,7 +122,8 @@ const props = defineProps({
     className: {
         type:String,
         default:''
-    }
+    },
+    themed: { type: Boolean, default: true }
 });
 
 const dropdownVisible = ref(false);
@@ -160,6 +162,9 @@ function stopMouseListener() {
     document.removeEventListener("mousemove", listener);
 }
 
+let stopFollowingPanel = () => {};
+onBeforeUnmount(() => stopFollowingPanel());
+
 watch(dropdownVisible, (val) => {
     if(val) {
         startClickListener();
@@ -167,6 +172,7 @@ watch(dropdownVisible, (val) => {
             startMouseListener();
         }
     } else {
+        stopFollowingPanel();
 
         stopClickListener();
         if(props.hover) {
@@ -231,22 +237,13 @@ function buttonClick(flag = false) {
             const element = document.getElementById(dyid.value);
             let childNode = document.getElementById(`dd_${dyid.value}`);
 
-            const {top, left} = element.getBoundingClientRect();
-            const {height, width} = childNode.getBoundingClientRect();
-
-            if(document.documentElement.clientWidth < (left + width + 25)) {
-                const offset = document.documentElement.clientWidth - (left + width + 15);
-                childNode.style.left = left + offset + "px";
-            } else {
-                childNode.style.left = left + "px";
-            }
-
-            if(document.documentElement.clientHeight < (top + height + 25)) {
-                const offset = document.documentElement.clientHeight - (top + height + 15);
-                childNode.style.top = top + offset +"px";
-            } else {
-                childNode.style.top = top + 30 +"px";
-            }
+            const rect = element.getBoundingClientRect();
+            positionPanel(childNode, rect, { belowOffset: rect.top + 30 });
+            stopFollowingPanel();
+            stopFollowingPanel = followPanelSize(childNode, () => {
+                const current = element.getBoundingClientRect();
+                return { rect: current, options: { belowOffset: current.top + 30 } };
+            });
         })
     }
 

@@ -4,8 +4,11 @@ const scope = require('./scope');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { hiddenSprintIds, canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
+const privateWork = require('./privateWork');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+const GATE_OWNER_ADMIN = 'owner_admin';
 
 const sameId = (a, b) => Boolean(a) && Boolean(b) && String(a) === String(b);
 
@@ -60,6 +63,56 @@ const canSeeTaskOf = async (companyId, caller, record) => {
 
 const projectScope = (projectIds) => (projectIds ? { projectId: { $in: projectIds } } : {});
 
+/* Owners and admins read every project, so what is someone else's alone is left out for them by rule;
+ * everyone else's project list already leaves it out, and for them this is null. */
+const privateWorkFor = async (companyId, caller) => (caller.privileged ? privateWork.privateWorkOf(companyId, caller.actor.userId) : null);
+
+/* What a list, a count or a summary of agent records is read through. */
+const readScopeOf = async (companyId, caller) => {
+    const projectIds = await visibleProjectIdsFor(companyId, caller);
+    const [hiddenTaskIds, privateScope] = await Promise.all([hiddenTaskIdsFor(companyId, caller, projectIds), privateWorkFor(companyId, caller)]);
+    return { projectIds, hiddenTaskIds, privateWork: privateScope };
+};
+
+/* The clause every list of proposals is read through, whichever screen asks. */
+const proposalScopeClause = ({ projectIds, hiddenTaskIds, privateWork: privateScope } = {}) => ({
+    ...(Array.isArray(projectIds) ? { projectId: { $in: idForms(projectIds.map(String)) } } : {}),
+    ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
+    ...(privateScope ? privateWork.proposalClause(privateScope) : {}),
+});
+
+const mayDecideProposal = (caller, proposal) => Boolean(caller && caller.human) && (proposal.gate !== GATE_OWNER_ADMIN || Boolean(caller.privileged));
+
+const inOpenProject = async (companyId, caller, record) => {
+    const visible = await visibleProjectIdsFor(companyId, caller);
+    return visible.includes(String(record.projectId || '')) && canSeeTaskOf(companyId, caller, record);
+};
+
+const canSeeRun = async (companyId, caller, run) => (caller.privileged
+    ? privateWork.readsRun(await privateWork.privateWorkOf(companyId, caller.actor.userId), run)
+    : inOpenProject(companyId, caller, run));
+
+/* For the routes that take runs from a store of their own. */
+const readableRuns = async (companyId, caller, runs) => {
+    if (!caller.privileged) return runs;
+    const scope = await privateWork.privateWorkOf(companyId, caller.actor.userId);
+    return runs.filter((run) => privateWork.readsRun(scope, run));
+};
+
+const startedBy = async (companyId, runId) => {
+    if (!runId) return '';
+    const run = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: String(runId) }, 'startedBy'] }, 'findOne').catch(() => null);
+    return String((run && run.startedBy) || '');
+};
+
+/* A proposal is seen by whoever may open its project, and by the person the agent worked for. */
+const canSeeProposal = async (companyId, caller, proposal) => {
+    const uid = String(caller.actor.userId || '');
+    if (caller.privileged) return privateWork.readsProposal(await privateWork.privateWorkOf(companyId, uid), proposal);
+    if (await inOpenProject(companyId, caller, proposal)) return true;
+    return Boolean(uid) && [String(proposal.requestedBy || ''), await startedBy(companyId, proposal.runId)].includes(uid);
+};
+
 const REFUSAL = Object.freeze({
     MANAGE: 'Only an Owner or an Admin can manage agents.',
     CONTROL_RUN: 'Only an Owner, an Admin or the person who started the run can stop it.',
@@ -70,4 +123,6 @@ const REFUSAL = Object.freeze({
 module.exports = {
     privileged, humanActor, callerOf, canManageAgents, canControlRun, canUndoDecision, canActAsAgent,
     visibleProjectIdsFor, agentProjectsFor, hiddenTaskIdsFor, canSeeTaskOf, projectScope, REFUSAL,
+    privateWorkFor, readScopeOf, canSeeRun, readableRuns, canSeeProposal,
+    GATE_OWNER_ADMIN, proposalScopeClause, mayDecideProposal,
 };

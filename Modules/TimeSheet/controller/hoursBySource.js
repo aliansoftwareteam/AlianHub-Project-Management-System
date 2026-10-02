@@ -1,7 +1,7 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { humanHoursFromEntries } = require("../helpers/timelogSourceSplit");
-const { resolveTimeScope } = require("../helpers/timeScope");
+const { resolveTimeScope, withoutHidden } = require("../helpers/timeScope");
 const logger = require("../../../Config/loggerConfig");
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 
@@ -19,6 +19,7 @@ exports.getHoursBySource = async (req, res) => {
         const match = { actorType: { $ne: 'agent' } };
         const scope = await resolveTimeScope(companyId, req.uid);
         if (!scope.companyWide) match.Loggeduser = scope.uid;
+        Object.assign(match, withoutHidden(scope));
         if (Number.isFinite(start) && Number.isFinite(end) && end >= start) {
             match.LogStartTime = { $gte: start, $lte: end };
         }

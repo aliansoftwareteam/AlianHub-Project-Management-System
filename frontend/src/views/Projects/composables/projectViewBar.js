@@ -12,6 +12,23 @@ const label = (entry) => String((entry && entry.name) || '').toLowerCase();
 const byPin = (a, b) => (!(a.isPin) ? 0 : (a.isPin == b.isPin ? 0 : (((!a.isPin && b.isPin) ? 1 : -1))));
 const byName = (a, b) => (label(a) < label(b) ? -1 : (label(b) < label(a) ? 1 : 0));
 
+/* Shared views keep the project's order, pinned ones first. A private view sits right after the
+ * shared view it was made from, so a copy never pushes its source along the bar; one with no
+ * shared view of its own on the same side of the pin line goes last on that side. */
+function arrangeTabs(shared, mine) {
+    const sourceOf = (tab) => shared.find((view) => idOf(view, '_id') === idOf(tab, 'sourceViewId'))
+        || shared.find((view) => idOf(view, '_id') === idOf(tab, '_id'));
+    const side = (pinned) => {
+        const views = shared.filter((view) => Boolean(view.isPin) === pinned);
+        const tabs = mine.filter((tab) => Boolean(tab.isPin) === pinned);
+        return [
+            ...views.flatMap((view) => [view, ...tabs.filter((tab) => sourceOf(tab) === view)]),
+            ...tabs.filter((tab) => !views.includes(sourceOf(tab))),
+        ];
+    };
+    return [...side(true), ...side(false)];
+}
+
 /* Splits a project's views into the tab bar and the embed menu. An entry's id length is what
  * separates the two: a project view carries the 24-character id of the company's view-catalogue
  * row, an embed a 6-character one of its own.
@@ -28,10 +45,10 @@ export function splitProjectViews(projectViews, userTabs = []) {
     const isEmbed = (id) => id.length === VIEW_ID_LENGTH;
 
     return {
-        views: [
-            ...tabs.filter((tab) => isView(idOf(tab, 'id')) && !takenIds.includes(idOf(tab, 'id'))),
-            ...views.filter((item) => isView(idOf(item, '_id'))),
-        ].sort(byPin).filter((item) => !LEGACY_KEY_NAMES.includes(item.keyName)),
+        views: arrangeTabs(
+            views.filter((item) => isView(idOf(item, '_id'))),
+            tabs.filter((tab) => isView(idOf(tab, 'id')) && !takenIds.includes(idOf(tab, 'id'))),
+        ).filter((item) => !LEGACY_KEY_NAMES.includes(item.keyName)),
         embeds: [
             ...views.filter((item) => isEmbed(idOf(item, '_id'))),
             ...tabs.filter((tab) => isEmbed(idOf(tab, 'id'))),

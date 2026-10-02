@@ -10,6 +10,7 @@
                             :project="projectData"
                             :projects="projects"
                             :sprint="headerSprint"
+                            :folders="headerFolders"
                             :agentSummary="agentSummary"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
@@ -57,7 +58,7 @@
                                                     <img v-else class="vertical-middle profile-sm-square mobile-projectlist-icon" :src="projectData.projectIcon.data" alt=""/>
                                                 </template>
                                             </div>
-                                            <DropDown mode="listbox" id="project_avail_views" maxHeight="90vh" :title="$t('Projects.all_views')" :bodyClass="{'viewlist-mobile-dropdown' : true}">
+                                            <DropDown mode="listbox" themed id="project_avail_views" maxHeight="90vh" :title="$t('Projects.all_views')" :bodyClass="{'viewlist-mobile-dropdown' : true}">
                                                 <template #button>
                                                     <div
                                                         class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer h-100"
@@ -65,36 +66,40 @@
                                                     >
                                                         <img :src="publicIcon" v-if="!projectData.isPrivateSpace" class="pr-10px vertical-middle" alt="public-folder"/>
                                                         <span class="font-size-14 text-ellipsis d-inline-block gray81 project__requirement">
-                                                            <img :src="activeTab !== 'EmbedView'
-                                                                    ? projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.keyName)?.icon
-                                                                    : projectComponentsIcons(projectData?.ProjectRequiredComponent?.find(x => x.name === embedViewName)?.type)?.icon" alt="" class="mr-5px">
-                                                            {{activeTab !== 'EmbedView' ? viewLabel(projectData?.ProjectRequiredComponent?.find(x => x.keyName === activeTab)?.name) : embedViewName || "N/A"}}
+                                                            <span v-if="activeTab !== 'EmbedView' && projectComponentsIcons(activeTab)?.icon" class="ah-mask-icon phone-view__icon mr-5px" :style="maskOf(projectComponentsIcons(activeTab).icon)" aria-hidden="true"></span>
+                                                            <img v-else-if="activeTab === 'EmbedView' && icons[selectedEmbedView?.type]" :src="icons[selectedEmbedView.type]" alt="" class="mr-5px">
+                                                            {{activeTab !== 'EmbedView' ? (shownView?.title || viewLabel(shownView?.name)) : embedViewName || "N/A"}}
                                                         </span>
                                                         <img :src="listDropIcon" alt="" :style="[{marginLeft : clientWidth <=375 ? '2px' : '10px'}]"/>
                                                     </div>
                                                 </template>
                                                 <template #options>
                                                     <DropDownOption
-                                                        v-for="view in projectData.ProjectRequiredComponent"
-                                                        :key="view.id"
-                                                        :selected="activeTab === 'EmbedView' ? !view?.keyName && view.name === embedViewName : isActiveView(view)"
+                                                        v-for="view in phoneViews"
+                                                        :key="viewKeyOf(view)"
+                                                        :selected="isPhoneViewActive(view)"
                                                         @click="$refs[projectView].click(),handleView(view),!view?.keyName ? openEmbedView(view) : ''"
                                                     >
                                                         <div class="d-flex align-items-center justify-content-between w-100">
                                                             <div class="viewlistIcon d-flex align-items-center">
-                                                                <span class="d-flex align-items-center justify-content-center border-radius-6-px mr-20px bg-white border-gray view__activeproject-name">
-                                                                    <img :src="view?.keyName ? activeTab === view.keyName ? projectComponentsIcons(view?.keyName)?.activeIcon || '' : projectComponentsIcons(view?.keyName)?.icon || '' : icons?.[view?.type] || ''" alt="" class="mr-0">
+                                                                <span class="d-flex align-items-center justify-content-center border-radius-6-px mr-20px view__activeproject-name">
+                                                                    <span v-if="projectComponentsIcons(view?.keyName)?.icon" class="ah-mask-icon" :style="maskOf(projectComponentsIcons(view.keyName).icon)" aria-hidden="true"></span>
+                                                                    <img v-else-if="icons?.[view?.type]" :src="icons[view.type]" alt="" class="mr-0">
                                                                 </span>
-                                                                <span class="font-size-16 font-weight-500 text-ellipsis d-inline-block gray81 mw-66" @click="handleViewName(view.name)">{{ view.title || $t(`ViewList.${view.name}`) }}</span>
+                                                                <span class="font-size-16 font-weight-500 text-ellipsis d-inline-block mw-66" @click="handleViewName(view.name)">{{ view.title || viewLabel(view.name) }}</span>
+                                                                <span v-if="view.isPrivate" class="phone-view__mark" role="img" :aria-label="$t('Projects.private_view')" :title="$t('Projects.private_view')">
+                                                                    <ShellIcon name="lock" :size="13" />
+                                                                </span>
                                                             </div>
-                                                            <span v-if="view.setAsDefault" class="mobile-defaultview-text font-size-12 font-weight-400 darkblue"><img class="list_make_as_defaultimg" :src="viewDefaultIcon"/>
+                                                            <span v-if="view.setAsDefault" class="mobile-defaultview-text font-size-12 font-weight-400">
+                                                                <ShellIcon name="home" :size="12" />
                                                                 {{ $t('Projects.default_view') }}
                                                             </span>
-                                                            <img class="ml-20px activeTab-tick" v-if="isActiveView(view)" :src="viewDefaultActive"/>
+                                                            <ShellIcon v-if="isPhoneViewActive(view)" name="check" :size="14" class="ml-20px activeTab-tick" />
                                                         </div>
                                                     </DropDownOption>
                                                     <DropDownOption class="position-sti border d-flex justify-content-center addview__dropdown" @click="$refs[projectView].click(), $refs.bottomModals.openAllViews()">
-                                                        <div class="blue font-size-18 font-weight-700">
+                                                        <div class="addview__label font-size-18 font-weight-700">
                                                             + {{ $t('Projects.add_view') }}
                                                         </div>
                                                     </DropDownOption>
@@ -115,12 +120,10 @@
                                         <div class="d-flex view_list_scroll h-100">
                                             <div class="ph2__tablist" role="group" :aria-label="$t('Projects.views_tablist')">
                                                 <ViewsList
-                                                    v-for="(view, index) in (viewsListArray)"
+                                                    v-for="view in viewsListArray"
                                                     :key="viewKeyOf(view)"
-                                                    :id="view.keyName"
                                                     :item="view"
                                                     :active="isActiveView(view)"
-                                                    :firstChild="index === 0"
                                                     :isDeleteDisabled="viewsListArray.length == 1"
                                                     :commentCount="view.keyName === 'Comments' ? myCounts?.[`project_${projectData._id}_comments`] || 0 : 0"
                                                     @click="selectView(view)"
@@ -199,13 +202,13 @@
                                             </div>
                                         </div>
                                         <div class="d-flex align-items-center text-nowrap border-top-radius-10-px cursor-pointer view-list-wrapper h-100">
-                                            <AddViewMenu v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" :projectData="projectData" :activeView="activeTab" tourId="projectviewlist_driver"/>
+                                            <AddViewMenu v-if="checkPermission('project.view_list',projectData.isGlobalPermission) === true" :projectData="projectData" :activeView="activeTab" tourId="projectviewlist_driver" @added="selectView"/>
                                         </div>
                                     </template>
                                 </div>
                             </template>
                             <template #actions>
-                            <NewInProjectMenu :projectData="projectData" />
+                            <NewInProjectMenu ref="newInProject" :projectData="projectData" />
                             <ProjectActionsBar
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -231,7 +234,7 @@
                                 <span>{{ $t('importTaskButton.import_processing') }}</span>
                             </div>
                         </div>
-                        <div :class="[`list-view-body bg-light-gray`,(clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
+                        <div :class="['list-view-body', TOKEN_BODY_TABS.includes(activeTab) ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
                                 {
                                 'd-flex': activeTab !== 'ProjectListView' &&
                                             activeTab !== 'Calendar' &&
@@ -254,6 +257,7 @@
                             ]"
                         >
                             <ProjectFiltersToolbar
+                                :data-density="toolbarDensity"
                                 :activeTab="activeTab"
                                 :projectData="projectData"
                                 :clientWidth="clientWidth"
@@ -265,6 +269,7 @@
                                 v-model:taskDescriptionSearch="taskDescriptionSearch"
                                 :filterUsers="filterUsers"
                                 :doneBy="doneBy"
+                                :agentWorking="agentWorking"
                                 v-model:userSidebar="userSidebar"
                                 v-model:collapsed="collapsed"
                                 :groupBy="shownGroupBy"
@@ -283,6 +288,7 @@
                                 @toggleSearch="toggleSearch"
                                 @manageFilterUsers="manageFilterUsers"
                                 @update:doneBy="setDoneBy"
+                                @update:agentWorking="setAgentWorking"
                                 @changeAssignee="(type, $event) => changeAssignee(type, $event)"
                                 @openAi="openAiSidebar = true"
                                 @openAiAssist="openAiTaskCreator()"
@@ -305,8 +311,15 @@
                             />
                             <!-- AI Assist (AHE-3777): project-level AI task generation, opened from the toolbar. -->
                             <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" :sprints="aiSprints" :activeSprintId="aiActiveSprintId" @done="onAiTasksCreated" />
+                            <FolderEmptyState
+                                v-if="folderWithNoLists"
+                                :project="projectData"
+                                :folders="projectData.sprintsfolders"
+                                :folder="folderWithNoLists"
+                                @create="newInProject?.start('sprint')"
+                            />
                             <component
-                                v-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
+                                v-else-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
                                 :class="[{'showProjectDetailRight':activeTab !== 'ProjectListView' && activeTab !== 'Calendar' && activeTab != 'EmbedViewItem' && activeTab !== 'Workload' && activeTab !== 'ProjectKanban' && activeTab !== 'TableView' && activeTab !== 'Reports' && activeTab !== 'GanttView' && activeTab !== 'RecurringTasks' && activeTab !== 'TimelineView' && activeTab !== 'MindMapView' && activeTab !== 'WhiteboardView' && activeTab !== 'CanvasView' && activeTab !== 'MapView' && activeTab !== 'ProjectDashboard' && activeTab !== 'DocsView' && activeTab !== 'FormsView'}]"
                                 :is="getView(activeTab)"
                                 :data="selectedEmbedView"
@@ -414,6 +427,7 @@
             @tourModalAccept="currentVideoUrl == 0 ? updateTourStatusInUser('isProjectAndNavbarTour') : ''"
             @tourModalClose="closeModal"
             @closeAiSidebar="openAiSidebar = false"
+            @viewAdded="selectView"
         />
     </div>
     <AppState v-else kind="forbidden" />
@@ -425,6 +439,7 @@ import AppState from '@/components/molecules/AppState/AppState.vue';
 import { computed, defineComponent, inject, onMounted, provide, ref, watch, onUnmounted, nextTick } from 'vue';
 import { escapeHtml } from '@/utils/notificationHtml';
 import isEqual from 'lodash/isEqual';
+import { inList } from '@/store/ProjectData/listMembership';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -466,6 +481,8 @@ const CanvasViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "p
 const MapViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-map" */ '@/views/Projects/MapView/MapView.vue'));
 const DashboardViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-dashboard" */ './DashboardView/DashboardView.vue'));
 const DocsViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-docs" */ '@/views/Projects/DocsView/DocsView.vue'));
+/* The tabs whose body is the theme canvas; every other tab keeps the legacy light grey until its view is converted. */
+const TOKEN_BODY_TABS = ['ProjectDetail', 'Comments', 'ActivityLog'];
 const FormsViewComp = defineAsyncComponent(() => import(/* webpackChunkName: "project-forms" */ '@/views/Projects/FormsView/FormsView.vue'));
 import NotFound from '../NotFound.vue';
 
@@ -482,9 +499,11 @@ import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vu
 import ProjectSidebars from './components/ProjectSidebars.vue';
 import ProjectBottomModals from './components/ProjectBottomModals.vue';
 import ProjectEmptyState from './components/ProjectEmptyState.vue';
+import FolderEmptyState from './components/FolderEmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { folderSprintList } from './folderSprints';
+import { folderSprintList, folderWithoutLists, headerLocation, projectSprintList } from './folderSprints';
+import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
 import { useEmbedViews } from './composables/useEmbedViews';
@@ -495,6 +514,8 @@ import { useProjectTree } from './composables/useProjectTree';
 import { splitProjectViews } from './composables/projectViewBar';
 import { useSavedViews } from './composables/useSavedViews';
 import { viewKeyOf } from './composables/savedViewSettings';
+import { maskOf } from '@/utils/iconMask';
+import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { provideViewSettings } from './composables/viewSettingsContext';
 import { VIEW_FILTER_ROWS } from './composables/taskFilterSignal';
 import { useProjectCustomFields } from './composables/projectCustomFields';
@@ -563,12 +584,11 @@ const buildAiSprints = () => {
     // Root-level sprints first, so the common case stays at the top.
     Object.values(project.sprintsObj || {}).forEach((s) => push(s, ''));
 
-    // Then each folder's sprints. Folders are keyed by id, and a deleted folder's
-    // sprints are not offered.
-    Object.values(project.sprintsfolders || {}).forEach((folder) => {
-        if (!isLive(folder)) return;
-        const folderName = folder.name || 'Folder';
-        Object.values(folder.sprintsObj || {}).forEach((s) => push(s, folderName));
+    const folders = project.sprintsfolders || {};
+    Object.values(folders).forEach((folder) => {
+        if (!isLiveFolder(folders, folder)) return;
+        const folderPath = folderPathLabel(folders, folder) || 'Folder';
+        Object.values(folder.sprintsObj || {}).forEach((s) => push(s, folderPath));
     });
 
     return out;
@@ -655,8 +675,6 @@ const filterFavorites = ref(localStorage.getItem('favoriteFilter') == 'true');
 const clientWidth = inject('$clientWidth');
 const route = useRoute();
 const router = useRouter();
-const viewDefaultIcon = require('@/assets/images/svg/list_home_icon.svg');
-const viewDefaultActive = require('@/assets/images/svg/blue_tick.svg');
 
 const companyId = inject('$companyId');
 const { checkPermission, makeUniqueId } = useCustomComposable();
@@ -686,7 +704,7 @@ const { changeAssignee } = useProjectAssignee(projectData);
 const { archive, showSidebar, showSpinner, updateProject } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
 const projectSearch = useProjectSearch(projectData, showArchived, { buildFilterQuery });
-const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy } = projectSearch;
+const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy, agentWorking, setAgentWorking } = projectSearch;
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));
@@ -740,9 +758,16 @@ const savedViews = useSavedViews({
     onSelect: selectView,
 });
 provideViewSettings(savedViews);
+const DENSITY_TABS = ['ProjectListView', 'TableView'];
+const toolbarDensity = computed(() => (DENSITY_TABS.includes(activeTab.value) ? savedViews.density.value : undefined));
 const { activeView, dirty: viewDirty, saving: viewSaving, save: saveView, saveForMe: saveViewForMe, saveAsNew: saveViewAsNew, reset: resetView } = savedViews;
 
 const isActiveView = (view) => (activeView.value ? viewKeyOf(view) === viewKeyOf(activeView.value) : activeTab.value === view.keyName);
+
+/* The phone's view switcher lists what the desktop tab bar and its embed menu list, private views included. */
+const phoneViews = computed(() => [...viewsListArray.value, ...embedViews.value]);
+const isPhoneViewActive = (view) => (activeTab.value === 'EmbedView' ? !view?.keyName && view.name === embedViewName.value : Boolean(view?.keyName) && isActiveView(view));
+const shownView = computed(() => activeView.value || viewsListArray.value.find((view) => view.keyName === activeTab.value));
 
 const settleView = (task, message) => task()
     .then(() => toast.success(t(message), { position: 'top-right' }))
@@ -769,6 +794,13 @@ const CUSTOM_GROUP_ICONS = {
     dropdown: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
     checkbox: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldCheckboxGrey.svg'),
     date: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDateGrey.svg'),
+    people: require('@/assets/images/svg/person.svg'),
+    rating: require('@/assets/images/svg/blankStar.svg'),
+    number: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
+    money: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldMoneyGrey.svg'),
+    progress: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
+    voting: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
+    relationship: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
 };
 const { defs: projectFieldDefs } = useProjectCustomFields(projectData);
 const groupByOptions = computed(() => [
@@ -1047,7 +1079,16 @@ const sprints = ref([]);
 
 // Header (10b): the sprint in view, the star, the agent chip and the "+ Task"
 // request the views listen for.
-const headerSprint = computed(() => (sprints.value.length === 1 && !sprints.value[0]?.isFolder ? sprints.value[0] : null));
+const headerPlace = computed(() => headerLocation({ folders: projectData.value?.sprintsfolders, sprints: sprints.value, folderId: route.params?.folderId }));
+const headerSprint = computed(() => headerPlace.value.sprint);
+const headerFolders = computed(() => headerPlace.value.folders);
+
+/* The task views can only say that no task shows; on the page of a folder that holds no list, the missing thing is a list. */
+const TASK_VIEWS = ['ProjectListView', 'ProjectKanban', 'TableView'];
+const newInProject = ref(null);
+const folderWithNoLists = computed(() => (route.params?.folderId && !route.params?.sprintId && !showArchived.value && !sprintLoading.value && TASK_VIEWS.includes(activeTab.value)
+    ? folderWithoutLists(projectData.value?.sprintsfolders, route.params.folderId)
+    : null));
 const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
@@ -1079,34 +1120,7 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
 
     try {
         if (route.name === 'Projects' || route.name === 'Project') {
-            tmp = project?.sprintsObj && Object.values(project?.sprintsObj).length ? Object.values(project.sprintsObj).filter((x) => checkSprint(x)) : [];
-            Object.values(project.sprintsfolders || {}).forEach((value) => {
-                try {
-                    if (showArchived.value && value?.deletedStatusKey === 2) {
-                        tmp.push({
-                            name: value.name,
-                            id: value.folderId,
-                            isExpanded: false,
-                            items: [],
-                            archivedSprintList: value.sprintsObj || {},
-                            deletedStatusKey: 2,
-                            isFolder: true,
-                        });
-                    } else if (showArchived.value && !value?.deletedStatusKey) {
-                        tmp = [
-                            ...tmp,
-                            ...(Object.values(value?.sprintsObj || {})?.length ? Object.values(value.sprintsObj || {}).filter((x) => checkSprint(x)) : []),
-                        ];
-                    } else if (!showArchived.value && !value?.deletedStatusKey) {
-                        tmp = [
-                            ...tmp,
-                            ...(Object.values(value?.sprintsObj || {})?.length ? Object.values(value?.sprintsObj || {}).filter((x) => checkSprint(x)) : []),
-                        ];
-                    }
-                } catch (error) {
-                    console.error('ERROR: ', error, value);
-                }
-            });
+            tmp = projectSprintList({ project, showArchived: showArchived.value, includeSprint: checkSprint });
         } else if (route.name.includes('ProjectFolder')) {
             tmp = folderSprintList({
                 folders: project.sprintsfolders,
@@ -1137,9 +1151,9 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
     if (searchTask.value) {
         if (getters['projectData/searchedTasks']?.length) {
             if (showArchived.value) {
-                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => y.sprintId === x.id || x.isFolder === true || x.deletedStatusKey === 2).length) || [];
+                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => inList(y, x.id) || x.isFolder === true || x.deletedStatusKey === 2).length) || [];
             } else {
-                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => y.sprintId === x.id || x.isFolder === true).length) || [];
+                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => inList(y, x.id) || x.isFolder === true).length) || [];
             }
         } else {
             tmp = tmp?.filter((x) => x.isFolder || x.deletedStatusKey === 2);
@@ -1350,14 +1364,6 @@ function closeModal() {
 </script>
 <style scoped>
 @import "./style.css";
-
-.show-archived-active {
-    width: 100%;
-    background-color: var(--warn-bg) !important;
-    height: 44px;
-    padding: 0px 20px;
-}
-
 </style>
 <style>
 .viewlist-mobile-dropdown-new .dropdown_option{
@@ -1389,6 +1395,29 @@ function closeModal() {
 .view__activeproject-name{
     width:35px;
     height:35px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--ink-2);
+}
+.phone-view__mark{
+    display: inline-flex;
+    flex: none;
+    margin-left: 8px;
+    color: var(--ink-2);
+}
+.ah-mask-icon.phone-view__icon{
+    width: 12px;
+    height: 12px;
+    vertical-align: middle;
+}
+.mobile-defaultview-text{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--brand);
+}
+.addview__label{
+    color: var(--brand);
 }
 .addview__dropdown{
     border-color: var(--brand);
@@ -1426,9 +1455,6 @@ function closeModal() {
     height: 30px;
     width: 30px;
 }
-.task-filtersearchassignee-wrapper{
-    padding: 14px 20px 14px 20px;
-}
 .board-veiw-main-parent.list-view-body,
 .board-veiw-main-parent .task-filtersearchassignee-wrapper {
     background-color: var(--surface);
@@ -1442,12 +1468,6 @@ function closeModal() {
 }
 .search__in{
     line-height: 19px;
-}
-.current__dropdown{
-   padding: 5px 10px 5px 2.58px;
-}
-.manage__filter-users{
-    height: 30px;
 }
 .saving__avtar-div{
     top: 0px;
@@ -1478,22 +1498,6 @@ function closeModal() {
     font-size: 16px;
     width: 100px;
 }
-.ai_button{
-    height: 30px;
-    background: linear-gradient(270deg, #F241CD 0%, #4B5DEE 100%);
-    border: 0px solid transparent;
-    border-radius: 8px;
-    color: #FFFFFF;
-    box-shadow: 0px 5px 10px 0px #9941F24D;
-    padding: 0px 15px 0px 15px;
-    font-size: 13px;
-}
-.main_ai_image{
-    top: 2px;
-    right: 8px;
-    position: relative;
-}
-
 .progress-container {
   width: 75px;
   height: 75px;
@@ -1518,10 +1522,5 @@ function closeModal() {
 .progress-text {
   position: absolute;
   font-size: 1.3em;
-}
-@media(max-width: 1024px){
-.task-filter-assignee .ai_button.btn{
-    margin-left: 0px;
-  }
 }
 </style>

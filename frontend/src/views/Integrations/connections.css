@@ -47,6 +47,14 @@
 
 .conn__never-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 
+.conn__tabs { margin-left: 8px; }
+
 @media (max-width: 900px) {
-    .conn__grid { grid-template-columns: 1fr; }
+    .conn__grid { grid-template-columns: minmax(0, 1fr); }
+}
+/* .ah-page.conn outranks the shared .ah-page .ah-toolbar whichever stylesheet loads last. */
+@media (max-width: 767px) {
+    .ah-page.conn .ah-toolbar { flex-wrap: wrap; height: auto; min-height: var(--toolbar-h); padding: 8px 16px; row-gap: 8px; }
+    .conn__tabs { order: 1; margin-left: 0; max-width: 100%; }
+    .conn__body { padding: 16px; }
 }

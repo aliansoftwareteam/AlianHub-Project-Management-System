@@ -386,6 +386,8 @@ const sharp = require('sharp');
 const { updateCompanyFun, getCompanyDataFun } = require('../../../Company/controller/updateCompany');
 const { DEFAULT_LIMITS, safeRelativePath } = require('../../../../utils/uploadConfig');
 const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } = require('../../bucketAccess');
+const { uploadScopeRefusal } = require('../../changeScope');
+const { isRowTrackshotKey } = require('../../../../common-storage/taskFileKeys');
 
 const storage = multer.diskStorage({
     destination: function (req, _, cb) {
@@ -422,7 +424,8 @@ const serverUploadRefusal = async (req) => {
     const found = await uploadRefusal(req, bucketId, req.body && req.body.path);
     if (found || bucketId === USER_PROFILES_BUCKET) return found;
     const bucket = await exports.checkBucketInDB(bucketId);
-    return bucket && Object.keys(bucket).length ? null : { code: 400, statusText: 'Invalid bucketId' };
+    if (!(bucket && Object.keys(bucket).length)) return { code: 400, statusText: 'Invalid bucketId' };
+    return uploadScopeRefusal(req, 'server');
 };
 
 exports.upload = multer({
@@ -543,6 +546,10 @@ exports.cleanUpTrackShotCompanyWise = async(companyId) => {
                 let updatedShots = [];
                 
                 for (const shot of ts.trackShots) {
+                    if (!isRowTrackshotKey(ts._id, shot.image)) {
+                        updatedShots.push({ ...shot, deleted: false });
+                        continue;
+                    }
                     try {
                         const filePath = path.join(__dirname, '../../../storage', companyId, shot.image);
                         fs.unlinkSync(filePath);

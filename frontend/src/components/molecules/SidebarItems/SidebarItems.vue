@@ -1,7 +1,7 @@
 <template>
     <div
-        :class="{'bg-light-blue black': selected && highlight, 'bg-light-gray black': selected && !highlight, 'bg-white': !selected, 'bg-blue white': !selected && highlight}"
-        class="sidebar_item_main hover-bg-blue hover-white cursor-pointer d-flex align-items-center justify-content-between mobile-listuser"
+        :class="themed ? ['sb-item', {'is-selected': selected, 'is-highlight': highlight}] : ['hover-bg-blue hover-white', {'bg-light-blue black': selected && highlight, 'bg-light-gray black': selected && !highlight, 'bg-white': !selected, 'bg-blue white': !selected && highlight}]"
+        class="sidebar_item_main cursor-pointer d-flex align-items-center justify-content-between mobile-listuser"
         role="option"
         tabindex="0"
         :aria-selected="selected ? 'true' : 'false'"
@@ -9,12 +9,13 @@
         @keydown.enter.self.prevent="$emit('select', item)"
         @keydown.space.self.prevent="$emit('select', item)"
     >
-        <div class="d-flex align-items-center assignee-userlist text-capitalize">
+        <div class="d-flex align-items-center assignee-userlist">
             <template v-if="item?.teamColor?.color">
                 <span class="team_icon_span cursor-pointer text-center" :style="[{'color': item?.teamColor?.color,'background-color': item?.teamColor?.bgColor, 'padding':'5px'}]">{{item.label.charAt(0)}}</span>
             </template>
             <template v-if="item.image && !imageDisplayForPriority">
                 <UserProfile
+                    decorative
                     :showDot="false"
                     class="cursor-pointer mr-10px"
                     width="2"
@@ -117,7 +118,8 @@ defineProps({
     removeKey: {
         type: Array,
         default: () => []
-    }
+    },
+    themed: { type: Boolean, default: true }
 })
 
 defineEmits(["select", "remove"])

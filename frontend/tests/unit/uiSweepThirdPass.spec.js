@@ -54,9 +54,11 @@ describe('Settings → Templates in dark mode', () => {
 describe('Settings → Time off and SCIM cards', () => {
     const styles = (rel) => { const vue = read(rel); return vue.slice(vue.indexOf('<style')); };
 
-    test('the white cards carry dark ink, so dark mode does not put light text on them', () => {
-        expect(ruleBody(styles('views/Settings/TimeOff/TimeOff.vue'), '.pto-card')).toMatch(/color:\s*#17161c/);
-        expect(ruleBody(styles('views/Settings/Scim/ScimSettings.vue'), '.scim-card')).toMatch(/color:\s*#17161c/);
+    test('the cards are the shared card, so they take the surface and ink of the theme', () => {
+        expect(read('views/Settings/TimeOff/TimeOff.vue')).toMatch(/class="ah-card pto-card"/);
+        expect(read('views/Settings/Scim/ScimSettings.vue')).toMatch(/class="ah-card scim-card"/);
+        expect(ruleBody(styles('views/Settings/TimeOff/TimeOff.vue'), '.pto-card')).not.toMatch(/color/);
+        expect(ruleBody(styles('views/Settings/Scim/ScimSettings.vue'), '.scim-card')).not.toMatch(/color/);
     });
 
     test('hints and empty text drop the 2.6:1 grey', () => {
@@ -240,27 +242,28 @@ describe('timesheets and the milestone report without the permission', () => {
 });
 
 describe('Project and Tracker timesheet bodies', () => {
-    const theme = read('views/Timesheet/legacyTimesheetTheme.css');
+    const sheet = read('views/Timesheet/style.css');
 
-    test.each(['views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue', 'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'])('%s loads the theme bridge', (rel) => {
-        expect(read(rel)).toMatch(/<style src="\.\.\/legacyTimesheetTheme\.css"><\/style>/);
+    test.each(['views/Timesheet/ProjectTimesheet/ProjectTimesheet.vue', 'views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue'])('%s is a themed page and needs no dark bridge', (rel) => {
+        expect(read(rel)).toMatch(/class="ah-page timesheet_view /);
+        expect(read(rel)).not.toMatch(/legacyTimesheetTheme/);
     });
 
-    test('dark mode maps the light utilities, the table fills and the hour strip onto tokens', () => {
-        expect(theme).toMatch(/:root\[data-theme="dark"\] :is\(\.project-timesheet-contain, \.time_tracker__timesheet\) :is\(\.bg-white,[^{]*\.dp__input\) \{\s*background-color: var\(--surface\);/);
-        expect(theme).toMatch(/:is\(\.GunPowder, \.color47\):not\(\.current_date \*\) \{ color: var\(--ink-2\) !important; \}/);
-        expect(theme).toMatch(/\.timesheet_table :is\(thead, tfoot, th:not\(\.current_date\), tfoot td\) \{ background-color: var\(--surface-2\) !important;/);
-        expect(theme).toMatch(/\.time_tracker__timesheet \.time__slot--count \{ color: var\(--ink-2\); \}/);
+    test('the table fills, the filter and the date field read tokens in both themes', () => {
+        expect(ruleBody(sheet, '.timesheet_view .wf_filter, .timesheet_view .timesheet_user_filter')).toMatch(/background-color:\s*var\(--surface\)/);
+        expect(ruleBody(sheet, '.timesheet_view .dp__input')).toMatch(/background-color:\s*var\(--surface\)/);
+        expect(sheet).toMatch(/table\.table\.timesheet_table thead,table\.table\.timesheet_table th \{\s*background: linear-gradient\(var\(--fill\), var\(--fill\)\) var\(--surface-2\)\s*!important;/);
+        expect(read('components/atom/TimesheetView/TrackerTimeSheetView/TimebarComponent.css')).toMatch(/color:\s*var\(--ink-2\)/);
     });
 
     test('the tracker panel takes the canvas, so it no longer stops part way down', () => {
-        expect(ruleBody(theme, '.time_tracker__timesheet .bg-light-gray')).toMatch(/background-color:\s*var\(--canvas\)/);
+        expect(ruleBody(sheet, '.project-timesheet-contain, .time_tracker__timesheet')).toMatch(/background:\s*var\(--canvas\)/);
     });
 
     test('"No records found" is an empty state, not an error', () => {
         expect(read('views/Timesheet/TrackerTimeSheet/TrackerTimesheet.vue')).toMatch(/class="screenShotTime ts-empty mt-50px text-center" v-if="!finalRange\?\.length/);
         expect(read('components/atom/TimesheetView/ProjectTimeSheetView/ProjectTimesheetView.vue')).toMatch(/class="ts-empty text-center mt-15px">\{\{\$t\('UserTimesheet\.no_records_found'\)/);
-        expect(theme).toMatch(/\.project-timesheet-contain \.ts-empty,\s*\.time_tracker__timesheet \.ts-empty \{ color: var\(--ink-2\); \}/);
+        expect(ruleBody(sheet, '.project-timesheet-contain .ts-empty, .time_tracker__timesheet .ts-empty')).toMatch(/color:\s*var\(--ink-2\)/);
     });
 
     test('the week range and the 24-hour strip fit at laptop width', () => {
@@ -296,12 +299,12 @@ describe('Settings → Projects apps column', () => {
         expect(read('components/molecules/AdvanceSearch/style.css')).toMatch(/^\.pal \{[^}]*max-height/m);
     });
 
-    test('apps get their own row as a grid, in dark ink on the white card', () => {
+    test('apps get their own row as a grid, in the ink of the themed card', () => {
         const css = read('components/molecules/ProjectsListingSetting/style.css');
         const last = css.slice(css.lastIndexOf('.project_status_info_area {'));
         expect(ruleBody(last, '.p_erpApp')).toMatch(/flex:\s*1 0 100%/);
         expect(last).toMatch(/\.p_erpApp \.p__erpApp-wrapper \.pls__apps \{ display: grid; grid-template-columns: repeat\(auto-fill, minmax\(220px, 1fr\)\)/);
-        expect(last).toMatch(/\.pls__apps \{ --ink: #17161c;/);
+        expect(css).not.toMatch(/\.pls__apps \{ --ink/);
     });
 });
 

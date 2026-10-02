@@ -67,6 +67,7 @@ const {
     exportJobsSchema,
     importJobsSchema,
     aiFieldJobsSchema,
+    customFieldLinksSchema,
     epicsSchema,
     pagesSchema,
     pageVersionsSchema,
@@ -76,6 +77,11 @@ const {
     publicShareIndexSchema,
     recurringTasksSchema,
     taskTemplatesSchema,
+    viewTemplatesSchema,
+    projectSnapshotsSchema,
+    everythingViewsSchema,
+    goalsSchema,
+    whiteboardsSchema,
     remindersSchema,
     generalRemindersSchema,
     generalReminderQueueSchema,
@@ -100,6 +106,7 @@ const {
     workflowApprovalsSchema,
     workflowDefinitionsSchema,
     agentFindingsSchema,
+    projectFindingsSchema,
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
@@ -109,6 +116,7 @@ const {
     aiReplaysSchema,
     aiAlertsSchema,
     agentProposalsSchema,
+    agentStandingApprovalsSchema,
     agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,
@@ -128,10 +136,13 @@ const {
     auditRedactionsSchema,
     auditChainKeySchema,
     egressAllowlistsSchema,
+    connectorConnectionsSchema,
     instructionPatternsSchema,
     agentSessionsSchema,
     agentSessionEndpointsSchema,
     askThreadsSchema,
+    dashboardCardAnswersSchema,
+    taskAiValuesSchema,
     aiFeedbackSchema,
     aiEvalRunsSchema,
     assignmentRulesSchema,
@@ -273,6 +284,8 @@ exports.checkType = (type) => {
             return importJobsSchema
         case SCHEMA_TYPE.AI_FIELD_JOBS:
             return aiFieldJobsSchema
+        case SCHEMA_TYPE.CUSTOM_FIELD_LINKS:
+            return customFieldLinksSchema
         case SCHEMA_TYPE.EPICS:
             return epicsSchema
         case SCHEMA_TYPE.PAGES:
@@ -291,6 +304,16 @@ exports.checkType = (type) => {
             return recurringTasksSchema
         case SCHEMA_TYPE.TASK_TEMPLATES:
             return taskTemplatesSchema
+        case SCHEMA_TYPE.VIEW_TEMPLATES:
+            return viewTemplatesSchema
+        case SCHEMA_TYPE.PROJECT_SNAPSHOTS:
+            return projectSnapshotsSchema
+        case SCHEMA_TYPE.EVERYTHING_VIEWS:
+            return everythingViewsSchema
+        case SCHEMA_TYPE.GOALS:
+            return goalsSchema
+        case SCHEMA_TYPE.WHITEBOARDS:
+            return whiteboardsSchema
         case SCHEMA_TYPE.REMINDERS:
             return remindersSchema
         case SCHEMA_TYPE.GENERAL_REMINDERS:
@@ -339,6 +362,8 @@ exports.checkType = (type) => {
             return workflowDefinitionsSchema
         case SCHEMA_TYPE.AGENT_FINDINGS:
             return agentFindingsSchema
+        case SCHEMA_TYPE.PROJECT_FINDINGS:
+            return projectFindingsSchema
         case SCHEMA_TYPE.AGENTS:
             return agentsSchema
         case SCHEMA_TYPE.AGENT_RUNS:
@@ -357,6 +382,8 @@ exports.checkType = (type) => {
             return aiAlertsSchema
         case SCHEMA_TYPE.AGENT_PROPOSALS:
             return agentProposalsSchema
+        case SCHEMA_TYPE.AGENT_STANDING_APPROVALS:
+            return agentStandingApprovalsSchema
         case SCHEMA_TYPE.AGENT_SKILLS:
             return agentSkillsSchema
         case SCHEMA_TYPE.CALLS:
@@ -395,6 +422,8 @@ exports.checkType = (type) => {
             return auditChainKeySchema
         case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
             return egressAllowlistsSchema
+        case SCHEMA_TYPE.CONNECTOR_CONNECTIONS:
+            return connectorConnectionsSchema
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
             return instructionPatternsSchema
         case SCHEMA_TYPE.AGENT_SESSIONS:
@@ -403,6 +432,10 @@ exports.checkType = (type) => {
             return agentSessionEndpointsSchema
         case SCHEMA_TYPE.ASK_THREADS:
             return askThreadsSchema
+        case SCHEMA_TYPE.DASHBOARD_CARD_ANSWERS:
+            return dashboardCardAnswersSchema
+        case SCHEMA_TYPE.TASK_AI_VALUES:
+            return taskAiValuesSchema
         case SCHEMA_TYPE.AI_FEEDBACK:
             return aiFeedbackSchema
         case SCHEMA_TYPE.AI_EVAL_RUNS:
@@ -557,6 +590,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.IMPORT_JOBS}`
         case SCHEMA_TYPE.AI_FIELD_JOBS:
                 return `${dbCollections.AI_FIELD_JOBS}`
+        case SCHEMA_TYPE.CUSTOM_FIELD_LINKS:
+                return `${dbCollections.CUSTOM_FIELD_LINKS}`
         case SCHEMA_TYPE.EPICS:
                 return `${dbCollections.EPICS}`
         case SCHEMA_TYPE.PAGES:
@@ -575,6 +610,16 @@ exports.tableType = (type) => {
                 return `${dbCollections.RECURRING_TASKS}`
         case SCHEMA_TYPE.TASK_TEMPLATES:
                 return `${dbCollections.TASK_TEMPLATES}`
+        case SCHEMA_TYPE.VIEW_TEMPLATES:
+                return `${dbCollections.VIEW_TEMPLATES}`
+        case SCHEMA_TYPE.PROJECT_SNAPSHOTS:
+                return `${dbCollections.PROJECT_SNAPSHOTS}`
+        case SCHEMA_TYPE.EVERYTHING_VIEWS:
+                return `${dbCollections.EVERYTHING_VIEWS}`
+        case SCHEMA_TYPE.GOALS:
+                return `${dbCollections.GOALS}`
+        case SCHEMA_TYPE.WHITEBOARDS:
+                return `${dbCollections.WHITEBOARDS}`
         case SCHEMA_TYPE.REMINDERS:
                 return `${dbCollections.REMINDERS}`
         case SCHEMA_TYPE.GENERAL_REMINDERS:
@@ -623,6 +668,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.WORKFLOW_DEFINITIONS}`
         case SCHEMA_TYPE.AGENT_FINDINGS:
                 return `${dbCollections.AGENT_FINDINGS}`
+        case SCHEMA_TYPE.PROJECT_FINDINGS:
+                return `${dbCollections.PROJECT_FINDINGS}`
         case SCHEMA_TYPE.AGENTS:
                 return `${dbCollections.AGENTS}`
         case SCHEMA_TYPE.AGENT_RUNS:
@@ -641,6 +688,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AI_ALERTS}`
         case SCHEMA_TYPE.AGENT_PROPOSALS:
                 return `${dbCollections.AGENT_PROPOSALS}`
+        case SCHEMA_TYPE.AGENT_STANDING_APPROVALS:
+                return `${dbCollections.AGENT_STANDING_APPROVALS}`
         case SCHEMA_TYPE.AGENT_SKILLS:
                 return `${dbCollections.AGENT_SKILLS}`
         case SCHEMA_TYPE.CALLS:
@@ -679,6 +728,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AUDIT_CHAIN_KEY}`
         case SCHEMA_TYPE.EGRESS_ALLOWLISTS:
                 return `${dbCollections.EGRESS_ALLOWLISTS}`
+        case SCHEMA_TYPE.CONNECTOR_CONNECTIONS:
+                return `${dbCollections.CONNECTOR_CONNECTIONS}`
         case SCHEMA_TYPE.INSTRUCTION_PATTERNS:
                 return `${dbCollections.INSTRUCTION_PATTERNS}`
         case SCHEMA_TYPE.AGENT_SESSIONS:
@@ -687,6 +738,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.AGENT_SESSION_ENDPOINTS}`
         case SCHEMA_TYPE.ASK_THREADS:
                 return `${dbCollections.ASK_THREADS}`
+        case SCHEMA_TYPE.DASHBOARD_CARD_ANSWERS:
+                return `${dbCollections.DASHBOARD_CARD_ANSWERS}`
+        case SCHEMA_TYPE.TASK_AI_VALUES:
+                return `${dbCollections.TASK_AI_VALUES}`
         case SCHEMA_TYPE.AI_FEEDBACK:
                 return `${dbCollections.AI_FEEDBACK}`
         case SCHEMA_TYPE.AI_EVAL_RUNS:

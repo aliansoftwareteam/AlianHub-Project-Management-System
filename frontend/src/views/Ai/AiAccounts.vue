@@ -277,15 +277,15 @@
                                             </select>
                                             <p class="acct-note">{{ $t('Accounts.scope_hint') }}</p>
                                         </div>
+                                        <div class="ah-field">
+                                            <label class="ah-field__label" for="tok-expiry">{{ $t('Accounts.field_expiry') }}</label>
+                                            <select id="tok-expiry" v-model.number="tokenForm.expiresInDays" class="ah-input" :class="{ 'ah-input--error': Boolean(expiryError) }" data-test="token-expiry">
+                                                <option v-for="days in expiryChoices" :key="days" :value="days">{{ $t('Accounts.expiry_days', { n: days }) }}</option>
+                                            </select>
+                                            <p v-if="expiryError" class="ah-field__error">{{ expiryError }}</p>
+                                            <p class="acct-note" data-test="token-expiry-hint">{{ $t('Accounts.expiry_hint') }}</p>
+                                        </div>
                                         <template v-if="tokenPolicy.strict">
-                                            <div class="ah-field">
-                                                <label class="ah-field__label" for="tok-expiry">{{ $t('Accounts.field_expiry') }}</label>
-                                                <select id="tok-expiry" v-model.number="tokenForm.expiresInDays" class="ah-input" :class="{ 'ah-input--error': Boolean(expiryError) }" data-test="token-expiry">
-                                                    <option value="">{{ $t('Accounts.expiry_choose') }}</option>
-                                                    <option v-for="days in expiryChoices" :key="days" :value="days">{{ $t('Accounts.expiry_days', { n: days }) }}</option>
-                                                </select>
-                                                <p v-if="expiryError" class="ah-field__error">{{ expiryError }}</p>
-                                            </div>
                                             <div class="ah-field">
                                                 <span class="ah-field__label">{{ $t('Accounts.field_scopes') }}</span>
                                                 <div class="acct-policy">
@@ -300,6 +300,24 @@
                                                 <p v-if="scopeError" class="ah-field__error">{{ scopeError }}</p>
                                             </div>
                                         </template>
+                                        <div v-if="taskGrantOffered || docsGrantOffered" class="ah-field">
+                                            <div class="acct-policy">
+                                                <label v-if="taskGrantOffered" class="acct-policy__row">
+                                                    <input v-model="tokenForm.manageTasks" class="ah-check" type="checkbox" data-test="token-grant-tasks" />
+                                                    <span>
+                                                        {{ $t('Accounts.token_grant_tasks') }}
+                                                        <small>{{ $t('Accounts.token_grant_tasks_effect') }}</small>
+                                                    </span>
+                                                </label>
+                                                <label v-if="docsGrantOffered" class="acct-policy__row">
+                                                    <input v-model="tokenForm.manageDocs" class="ah-check" type="checkbox" data-test="token-grant-docs" />
+                                                    <span>
+                                                        {{ $t('Accounts.token_grant_docs') }}
+                                                        <small>{{ $t('Accounts.token_grant_docs_effect') }}</small>
+                                                    </span>
+                                                </label>
+                                            </div>
+                                        </div>
                                         <div style="display:flex;gap:6px">
                                             <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="mintBusy" @click="onMint">{{ $t('Accounts.create_token') }}</button>
                                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="minting = false">{{ $t('Accounts.cancel') }}</button>
@@ -312,6 +330,7 @@
 
                                     <div style="margin-top:12px">
                                         <p v-if="revokeError" class="ah-field__error" style="margin-bottom:8px">{{ revokeError }}</p>
+                                        <p v-if="renewError" class="ah-field__error" style="margin-bottom:8px" data-test="token-renew-error">{{ renewError }}</p>
                                         <div v-for="tk in tokens" :key="tk._id" class="acct-token" :class="{ 'is-revoked': !tk.active }">
                                             <div class="acct-token__text">
                                                 <div class="acct-token__name">{{ tk.name }}</div>
@@ -322,7 +341,10 @@
                                                     <span v-if="tk.lifetimeState" class="ah-chip ah-chip--mono" :class="tk.lifetimeState === 'capped' ? 'ah-chip--warn' : 'ah-chip--danger'" data-test="token-over-max">{{ lifetimeChip(tk.lifetimeState, tk.lifetimeEndsAt) }}</span>
                                                 </div>
                                             </div>
-                                            <button v-if="tk.active" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="revoking === tk._id" @click="onRevoke(tk)">
+                                            <button v-if="tk.active" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="renewing === tk._id || revoking === tk._id" data-test="token-renew" @click="onRenew(tk)">
+                                                {{ $t('Accounts.renew') }}
+                                            </button>
+                                            <button v-if="tk.active" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" :disabled="revoking === tk._id || renewing === tk._id" @click="onRevoke(tk)">
                                                 {{ $t('Accounts.revoke') }}
                                             </button>
                                             <span v-else class="ah-chip ah-chip--mono">{{ $t('Accounts.revoked') }}</span>
@@ -494,6 +516,7 @@
 <script setup>
 import { computed, inject, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { routeLocationKey } from "vue-router";
 import { useStore } from "vuex";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
@@ -503,7 +526,7 @@ import AccountAttribution from "./AccountAttribution.vue";
 import ConnectedApps from "./ConnectedApps.vue";
 import { oauthAvailable } from "@/views/OAuth/oauthShared";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
-import { EXPIRY_OVER_MAX, TOKEN_SCOPES, expiryChoicesFor, tokenFormProblem } from "./tokenPolicy";
+import { DOCS_GRANT, EXPIRY_OVER_MAX, TASKS_GRANT, TOKEN_SCOPES, canGrantDocs, canGrantTasks, defaultExpiryFor, expiryChoicesFor, grantsOf, tokenFormProblem } from "./tokenPolicy";
 import { reasonOf } from "./useAgents";
 import { skillLabel } from "./plainLabels";
 import { mcpUrlFor } from "./mcpUrl";
@@ -524,7 +547,7 @@ const {
     account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, stepCredentials, stepCredentialPolicy, manifest, runs, peopleHours,
     mode, allowed, isAllowed,
     loadAccount, loadTokens, loadTokensNeedingExpiry, loadStepCredentials, loadManifest, loadRuns, loadPeopleHours,
-    savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken
+    savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken, renewToken
 } = useAccounts();
 
 const oauthOn = ref(false);
@@ -537,7 +560,10 @@ const ruleColumns = [
     { key: "money", items: ["personal_spend", "revoke", "caps", "local_spend"] }
 ];
 
-const tab = ref("modes");
+const TABS = ["modes", "link", "attribution", "rules", "connected"];
+// Injected with a default rather than read through useRoute, which warns where no router is installed. The Inbox notice names the tab.
+const askedTab = String(inject(routeLocationKey, null)?.query?.tab || "");
+const tab = ref(TABS.includes(askedTab) ? askedTab : "modes");
 const draftModes = ref([...MODES]);
 const savingPolicy = ref(false);
 const policySaved = ref(false);
@@ -553,12 +579,14 @@ const scopeError = ref("");
 const minted = ref(null);
 const revoking = ref("");
 const revokeError = ref("");
+const renewing = ref("");
+const renewError = ref("");
 const loading = ref(true);
 const loadError = ref("");
 const copied = ref("");
 
 const form = reactive({ mode: "personal", provider: "claude-code", label: "", email: "" });
-const tokenForm = reactive({ name: "", mode: "personal", provider: "claude-code", projectId: "", expiresInDays: "", scopes: [...TOKEN_SCOPES] });
+const tokenForm = reactive({ name: "", mode: "personal", provider: "claude-code", projectId: "", expiresInDays: defaultExpiryFor(tokenPolicy.value), scopes: [...TOKEN_SCOPES], manageTasks: false, manageDocs: false });
 
 const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
 const privileged = computed(() => isOwnerOrAdmin(companyUser.value.roleType));
@@ -603,6 +631,9 @@ const dayOf = (value) => (value ? new Date(value).toLocaleDateString() : "");
 
 const expiryChoices = computed(() => expiryChoicesFor(tokenPolicy.value));
 
+const taskGrantOffered = computed(() => canGrantTasks(tokenForm, tokenPolicy.value));
+const docsGrantOffered = computed(() => canGrantDocs(tokenForm, tokenPolicy.value));
+
 const isOverMax = (tk) => tk.reason === "over-max-lifetime";
 
 const lifetimeChip = (state, at) => {
@@ -617,6 +648,8 @@ const tokenMeta = (tk) => [
     tk.createdAt ? t("Accounts.created_on", { d: new Date(tk.createdAt).toLocaleDateString() }) : "",
     expiryOf(tk),
     tokenPolicy.value.strict ? scopesOf(tk) : "",
+    (tk.grants || []).includes(TASKS_GRANT) ? t("Accounts.token_grant_tasks_short") : "",
+    (tk.grants || []).includes(DOCS_GRANT) ? t("Accounts.token_grant_docs_short") : "",
     tk.lastUsedAt ? t("Accounts.used_on", { d: new Date(tk.lastUsedAt).toLocaleString() }) : t("Accounts.never_used"),
     tk.agentAccount && tk.agentAccount.mode ? t(`Accounts.mode_${tk.agentAccount.mode}`) : "",
     tk.projectIds && tk.projectIds.length ? t("Accounts.scoped_projects", { n: tk.projectIds.length }) : ""
@@ -768,19 +801,21 @@ const onMint = async () => {
         name: tokenForm.name.trim(),
         mode: tokenForm.mode,
         provider: tokenForm.provider,
-        projectIds: tokenForm.projectId ? [tokenForm.projectId] : []
+        projectIds: tokenForm.projectId ? [tokenForm.projectId] : [],
+        expiresInDays: Number(tokenForm.expiresInDays)
     };
-    if (tokenPolicy.value.strict) {
-        body.expiresInDays = Number(tokenForm.expiresInDays);
-        body.scopes = TOKEN_SCOPES.filter((scope) => tokenForm.scopes.includes(scope));
-    }
+    if (tokenPolicy.value.strict) body.scopes = TOKEN_SCOPES.filter((scope) => tokenForm.scopes.includes(scope));
+    const grants = grantsOf(tokenForm, tokenPolicy.value);
+    if (grants.length) body.grants = grants;
     mintBusy.value = true;
     try {
         minted.value = await mintToken(body);
         minting.value = false;
         tokenForm.name = "";
-        tokenForm.expiresInDays = "";
+        tokenForm.expiresInDays = defaultExpiryFor(tokenPolicy.value);
         tokenForm.scopes = [...TOKEN_SCOPES];
+        tokenForm.manageTasks = false;
+        tokenForm.manageDocs = false;
     } catch (error) {
         if (error.code === EXPIRY_OVER_MAX) expiryError.value = t("Accounts.token_expiry_over_max", { n: error.maxExpiryDays || tokenPolicy.value.maxExpiryDays });
         else mintError.value = error.message;
@@ -799,6 +834,19 @@ const onRevoke = async (tk) => {
         revokeError.value = error.message;
     } finally {
         revoking.value = "";
+    }
+};
+
+const onRenew = async (tk) => {
+    if (!window.confirm(t("Accounts.renew_confirm", { name: tk.name }))) return;
+    renewing.value = tk._id;
+    renewError.value = "";
+    try {
+        minted.value = await renewToken(tk._id);
+    } catch (error) {
+        renewError.value = error.message || t("Accounts.renew_failed");
+    } finally {
+        renewing.value = "";
     }
 };
 
@@ -825,6 +873,7 @@ const load = async () => {
         draftModes.value = [...(policy.value.allowedModes || MODES)];
         if (!allowed.value.includes(form.mode)) form.mode = allowed.value[0] || "personal";
         if (!allowed.value.includes(tokenForm.mode)) tokenForm.mode = allowed.value[0] || "personal";
+        tokenForm.expiresInDays = defaultExpiryFor(tokenPolicy.value);
     } catch (error) {
         loadError.value = reasonOf(error, "Ai.load_failed");
     } finally {

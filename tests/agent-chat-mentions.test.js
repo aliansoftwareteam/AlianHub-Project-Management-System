@@ -66,6 +66,7 @@ jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({
 jest.mock('../utils/companyMembers', () => ({
     memberProfiles: jest.fn(async (companyId, ids) => [...new Set(ids.map(String))].map((id) => ({ _id: id, Employee_Name: { '6f0000000000000000000d01': 'Alice', '6f0000000000000000000d02': 'Bob', '6f0000000000000000000d03': 'Carol' }[id] }))),
 }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Agents/scope', () => ({
     visibleProjects: jest.fn(async (companyId, uid) => [
         { _id: '6a9954186dd786246031e490', ProjectName: 'Web' },
@@ -234,6 +235,27 @@ describe('@agent in a chat channel', () => {
         expect(promptSent()).not.toMatch(/ALP-1|Alpha acquisition plan|SEC-1|merger/);
         const [answer] = agentReplies();
         expect(answer).toBeTruthy();
+        expect(answer.message).not.toMatch(/ALP-1|Alpha acquisition plan/);
+    });
+
+    it('answers a message in a thread inside that thread, under the same limit on what it may use', async () => {
+        mockChat.mockImplementation(async (args) => reply({ reply: args.messages[0].content.slice(0, 4000), changes: [] }));
+        const root = seedMessage({ ...channel, userId: BOB, text: 'Thread on the alpha acquisition' });
+
+        const r = await call(save, ALICE, { body: { data: {
+            parentId: String(root._id), message: `${mention(HELPER)} how is the alpha acquisition going?`, type: 'text', project: false, taskId: 'default',
+            objId: { projectId: CHANNEL_PROJECT, sprintId: CHANNEL },
+        } } });
+        await chatAgents.settled();
+
+        expect(r.code).toBe(200);
+        const [answer] = agentReplies();
+        expect(String(answer.parentId)).toBe(String(root._id));
+        expect(answer).toMatchObject({ actorType: 'agent', agentId: HELPER, taskId: 'default' });
+        expect(answer.hasReply).toBeUndefined();
+        expect(String(answer.sprintId)).toBe(CHANNEL);
+        expect(promptSent()).toContain('Bob: Thread on the alpha acquisition');
+        expect(promptSent()).not.toMatch(/ALP-1|Alpha acquisition plan|SEC-1|merger|We agreed to launch pricing on Friday/);
         expect(answer.message).not.toMatch(/ALP-1|Alpha acquisition plan/);
     });
 

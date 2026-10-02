@@ -1,6 +1,7 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
+import { createRequire } from 'module';
 
 // Components load images with webpack's `require("@/assets/...")`, which Node's
 // require cannot resolve; under test the asset path itself is a fine value.
@@ -13,6 +14,9 @@ const requireAssetsAsUrls = {
         return code.replace(/require\((['"])(@\/assets\/[^'"]+)\1\)/g, '$1$2$1');
     }
 };
+
+const require = createRequire(import.meta.url);
+const clockSkip = process.env.CLOCK_SHIFT_DAYS ? require('../tests/support/clock-skip').frontend : [];
 
 export default defineConfig({
     plugins: [requireAssetsAsUrls, vue()],
@@ -28,14 +32,23 @@ export default defineConfig({
             '@passwordRule': path.resolve(__dirname, '../Modules/Auth/helpers/passwordRule.js'),
             '@viewSettings': path.resolve(__dirname, '../Modules/Project/helpers/viewSettings.js'),
             '@fieldTaskTypes': path.resolve(__dirname, '../Modules/CustomField/helpers/fieldTaskTypes.js'),
-            '@automationTemplates': path.resolve(__dirname, '../Modules/Automations/templates.js')
+            '@datePastFuture': path.resolve(__dirname, '../Modules/CustomField/helpers/datePastFuture.js'),
+            '@fieldTypes': path.resolve(__dirname, '../Modules/CustomField/fieldTypes'),
+            '@automationTemplates': path.resolve(__dirname, '../Modules/Automations/templates.js'),
+            '@workingDays': path.resolve(__dirname, '../Modules/Company/helpers/workingDays.js'),
+            '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js'),
+            '@taskExtraListsRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskExtraListsRules.js'),
+            '@descriptionBlock': path.resolve(__dirname, '../Modules/Tasks/helpers/descriptionBlock.js'),
+            '@richTextAllowlist': path.resolve(__dirname, '../Modules/Tasks/helpers/richTextAllowlist.js'),
+            '@formLogic': path.resolve(__dirname, '../Modules/Forms/helpers/formLogic.js')
         }
     },
     test: {
         environment: 'jsdom',
         globals: true,
         include: ['tests/**/*.spec.js'],
-        setupFiles: ['tests/setup.js'],
+        exclude: [...configDefaults.exclude, ...clockSkip],
+        setupFiles: ['tests/shift-clock.setup.js', 'tests/setup.js'],
         clearMocks: true
     }
 });

@@ -15,11 +15,11 @@
                 tabindex="-1"
                 @keydown.esc.stop="$emit('update:visible', false)"
                 :style="`${width ? `width: ${width}` : ''}; top: ${top}; height: calc(100% - ${top});`"
-                :class="{'hide-side-left':!showSide && left, 'hide-side-right':!showSide && !left,}"
-                class="position-fi bg-white d-flex flex-column sidebar-content z-index-7"
+                :class="[themed ? 'sb-tokens' : 'bg-white', {'hide-side-left':!showSide && left, 'hide-side-right':!showSide && !left}]"
+                class="position-fi d-flex flex-column sidebar-content z-index-7"
                 :id="tourId"
             >
-                <div v-if="!hideHeader" :class="headClass" class="sidebar-head bg-white d-flex align-items-center justify-content-between px-1 blue border-bottom cursor-default">
+                <div v-if="!hideHeader" :class="[headClass, {'bg-white blue': !themed}]" class="sidebar-head d-flex align-items-center justify-content-between px-1 border-bottom cursor-default">
                     <slot name="head">
                         <div class="assignee-headtitle d-block text-ellipsis text-nowrap">
                             <slot name="head-left">
@@ -32,18 +32,19 @@
                         </div>
                         <div class="cursor-pointer d-flex align-items-center text-nowrap">
                             <slot name="head-right">
-                                <button v-if="multiSelect && showClear" class="clear-all outline-primary bg-light-gray black mr-1" :class="{'opacity-5 cursor-default': !value.length, 'opacity-10 cursor-pointer': value.length}" @click="$emit('clear')">{{$t('Filters.clearall')}}</button>
+                                <button v-if="multiSelect && showClear" type="button" class="mr-1" :class="[themed ? 'ah-btn ah-btn--secondary ah-btn--sm' : 'clear-all outline-primary bg-light-gray black', {'opacity-5 cursor-default': !value.length, 'opacity-10 cursor-pointer': value.length}]" @click="$emit('clear')">{{$t('Filters.clearall')}}</button>
                                 <button type="button" class="sidebar-close" :aria-label="$t('Projects.close')" @click="$emit('update:visible', !visible)">
-                                    <img :src="closeBlueImage" alt="" class="cursor-pointer"/>
+                                    <ShellIcon v-if="themed" name="x" :size="15" />
+                                    <img v-else :src="closeBlueImage" alt="" class="cursor-pointer"/>
                                 </button>
                             </slot>
                         </div>
                     </slot>
                 </div>
-                <div class="black sidebar-body bg-white style-scroll" :id="uniqueId" :style="{
+                <div class="sidebar-body style-scroll" :class="{'black bg-white': !themed}" :id="uniqueId" :style="{
                     'height': (hideHeader ? '100%' : '')
                 }">
-                    <div v-if="enableSearch" class="bg-white mobile-list-inputsearch-wrapper border-bottom p-15px">
+                    <div v-if="enableSearch" class="mobile-list-inputsearch-wrapper border-bottom p-15px" :class="{'bg-white': !themed}">
                         <input ref="sidebar_search" type="text" v-model="search" :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" class="form-control listsidebar-search font-size-16" @input="$emit('searchChange', search)">
                     </div>
                     <slot name="body">
@@ -62,6 +63,7 @@
                                         @remove="(item) => updateItem('remove', item)"
                                         :isDefault="isDefault"
                                         :imageDisplayForPriority="imageDisplayForPriority"
+                                        :themed="themed"
                                     />
                                 </template>
                                 <template v-else>
@@ -88,6 +90,7 @@
                                             @select="(item) => updateItem('add', item)"
                                             @remove="(item) => updateItem('remove', item)"
                                             :imageDisplayForPriority="imageDisplayForPriority"
+                                            :themed="themed"
                                         />
                                     </div>
                                     <div v-else :key="'no_result'+index">
@@ -110,10 +113,12 @@
 
 <script setup>
 // PACKAGES
-import { computed, defineComponent, defineProps, defineEmits, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
+import { computed, defineComponent, defineProps, defineEmits, inject, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
+import { routeLocationKey } from "vue-router";
 
 // COMPONENTS
 import SidebarItems from "../SidebarItems/SidebarItems.vue";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 
 // COMPOSABLES
 import { useCustomComposable } from "@/composable";
@@ -244,7 +249,8 @@ const props = defineProps({
     listenKeys: {
         type: Boolean,
         default:false
-    }
+    },
+    themed: { type: Boolean, default: true }
 })
 const showSide = ref(false);
 const search = ref("");
@@ -252,6 +258,12 @@ const sidebar_search = ref(null);
 // eslint-disable-next-line
 const visible = ref(false);
 useEscapeLayer(() => props.visible, () => emit('update:visible', false));
+
+// Injected, not useRoute(), so a sheet mounted without a router still renders.
+const route = inject(routeLocationKey, null);
+watch([() => route?.path, () => route?.query?.task], () => {
+    if (props.visible) emit('update:visible', false);
+});
 // FILTER OPTIONS
 const filteredOptions = ref();
 

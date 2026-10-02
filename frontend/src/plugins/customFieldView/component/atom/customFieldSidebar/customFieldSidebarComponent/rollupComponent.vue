@@ -1,5 +1,5 @@
 <template>
-    <div v-show="tabIndexCheck === 1">
+    <div v-show="tabIndexCheck === 1" data-field-tab="1">
         <CustomFieldInputComponent
             :label="$t('PlaceHolder.field_label')"
             :type="'text'"
@@ -14,16 +14,16 @@
             :label="$t('Description.description')"
             :type="'textarea'"
             :placeholder="$t('PlaceHolder.Enter_Description')"
-            :validations="'required:trim|length:10'"
+            :validations="''"
             :bindValue="props.customFieldObject?.fieldDescription ? props.customFieldObject.fieldDescription : fieldDescription"
             :validationVisibility="'blur'"
-            :className="'custom__field-required'"
             :name="'fieldDescription'"
         />
         <div class="formkit__form-wrapper">
             <label class="formkit-label">{{ $t('CustomField.rollup_function') }}</label>
+            <p class="ah-field__hint">{{ $t('Fields.rollup_help') }}</p>
         </div>
-        <DropDown mode="listbox" :zIndex="10" :id="rollupFunctionUniqueId" :keepSameWidth="true">
+        <DropDown themed mode="listbox" :zIndex="10" :id="rollupFunctionUniqueId" :keepSameWidth="true">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="rollupFunctionUniqueId">
                     <span class="ah-sr-only">{{ $t('CustomField.rollup_function') }}</span>
@@ -48,7 +48,7 @@
             <div class="formkit__form-wrapper">
                 <label class="formkit-label">{{ $t('CustomField.rollup_source_field') }}</label>
             </div>
-            <DropDown mode="listbox" :zIndex="10" :id="rollupSourceUniqueId" :keepSameWidth="true">
+            <DropDown themed mode="listbox" :zIndex="10" :id="rollupSourceUniqueId" :keepSameWidth="true">
                 <template #button>
                     <div class="formkit__form-wrapper" :ref="rollupSourceUniqueId">
                         <span class="ah-sr-only">{{ $t('CustomField.rollup_source_field') }}</span>
@@ -74,7 +74,7 @@
                 </template>
             </DropDown>
         </div>
-        <DropDown mode="listbox" :zIndex="10" v-if="isType">
+        <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                     <div class="custom__field-required">
@@ -174,7 +174,7 @@
 
     // Redirect to the tab where the validation error message is displayed.
     const handleTabComp = (node) => {
-        if(!(node._value.fieldDescription && node._value.fieldTitle)){
+        if(!node._value.fieldTitle){
             tabIndexCheck.value = 1;
             emit('tabIndexUpdate',tabIndexCheck.value)
         }
@@ -187,7 +187,7 @@
         object.rollupFunction = rollupFunction.value;
         object.rollupSourceFieldId = rollupFunction.value === 'count' ? '' : (rollupSourceFieldId.value || '');
         object.fieldTitle = object.fieldTitle.trim();
-        object.fieldDescription = object.fieldDescription.trim();
+        object.fieldDescription = (object.fieldDescription || '').trim();
         if(props.isType === true){
             object.type = type.value;
         }

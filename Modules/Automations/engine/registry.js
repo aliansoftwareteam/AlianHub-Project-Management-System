@@ -4,6 +4,7 @@ const addComment = require('./actions/addComment');
 const createSubtaskAction = require('./actions/createSubtask');
 const runAgent = require('./actions/runAgent');
 const assignTask = require('./actions/assignTask');
+const notify = require('./actions/notify');
 const { COMPARISON_OPS, CHANGE_OPS, LOGICAL_OPS } = require('./expression');
 const { STATUS_TYPES } = require('../helpers/statusConditions');
 const timeTrigger = require('../../Workflows/timeTrigger');
@@ -16,7 +17,7 @@ const workflowEngine = require('../../Workflows/flag');
 // frontend changes. If instead each action needs a hand-written form, the action
 // library stops growing at about a dozen — which is the state the old stub was in.
 
-const ACTIONS = [setStatus, setPriority, addComment, createSubtaskAction, assignTask, runAgent];
+const ACTIONS = [setStatus, setPriority, addComment, createSubtaskAction, assignTask, notify, runAgent];
 const ACTIONS_BY_KEY = new Map(ACTIONS.map((a) => [a.key, a]));
 
 /* Event types the bus can emit today, with whether they carry a field diff.
@@ -32,6 +33,10 @@ const TRIGGERS = [
     { key: 'task.renamed', label: 'Task is renamed', entity: 'task', hasDiff: true },
     { key: 'task.sprint_changed', label: 'Task moves sprint', entity: 'task', hasDiff: true },
     { key: 'task.updated', label: 'Task is updated (any field)', entity: 'task', hasDiff: true },
+    // Neither is a write: engine/dueDateTrigger publishes the first on a schedule,
+    // engine/subtaskTrigger the second when a parent's last open subtask closes.
+    { key: 'task.due_date_passed', label: 'Task due date passes', entity: 'task', hasDiff: false },
+    { key: 'task.subtasks_all_done', label: 'All subtasks of a task are done', entity: 'task', hasDiff: false },
     // Published by Modules/Forms when a public submission is recorded. `actsOn`
     // is the task the submission filed, which is why task actions are usable on
     // a form rule at all — a submission that files no task carries no task, and

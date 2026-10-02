@@ -4,7 +4,7 @@
         class="dmp"
         role="listbox"
         :aria-label="$t('Docs.mention_picker')"
-        :style="{ top: `${position.top}px`, left: `${position.left}px` }"
+        :style="placement"
         @mousedown.prevent
     >
         <template v-for="group in groups" :key="group.type">
@@ -27,7 +27,7 @@
                 </span>
                 <span v-else-if="item.type === 'task'" class="ah-chip ah-chip--mono dmp__key">{{ item.meta }}</span>
                 <span v-else class="dmp__glyph" aria-hidden="true"><ShellIcon name="docs" :size="12" /></span>
-                <span class="dmp__name">{{ item.label }}</span>
+                <span class="dmp__name">{{ item.name ?? item.label }}</span>
             </button>
         </template>
         <div v-if="!flat.length" class="dmp__empty" role="status">{{ loading ? $t('Docs.mention_searching') : $t('Docs.mention_no_results') }}</div>
@@ -66,6 +66,12 @@ const groups = computed(() => [
     { type: 'task', label: 'Docs.mention_tasks', items: tasks.value },
 ].filter((group) => group.items.length));
 const flat = computed(() => groups.value.flatMap((group) => group.items));
+
+/* A `bottom` anchors the list by its foot, for a field with no room below it: the list's height is not known beforehand. */
+const placement = computed(() => ({
+    left: `${props.position.left}px`,
+    ...(props.position.bottom === undefined ? { top: `${props.position.top}px` } : { bottom: `${props.position.bottom}px` }),
+}));
 
 const optionId = (item) => `${listId}-${item.type}-${item.id}`;
 const isActive = (item) => flat.value.indexOf(item) === active.value;

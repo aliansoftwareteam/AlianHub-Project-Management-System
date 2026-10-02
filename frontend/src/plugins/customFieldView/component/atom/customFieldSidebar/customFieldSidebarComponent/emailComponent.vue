@@ -1,5 +1,5 @@
 <template>
-    <div v-show="tabIndexCheck === 1">
+    <div v-show="tabIndexCheck === 1" data-field-tab="1">
         <CustomFieldInputComponent
             :label="$t('PlaceHolder.field_label')"
             :type="'text'"
@@ -14,23 +14,21 @@
             :label="$t('PlaceHolder.placeholder')"
             :type="'text'"
             :placeholder="$t('PlaceHolder.Enter_Placeholder')"
-            :validations="'required:trim'"
+            :validations="''"
             :bindValue="props.customFieldObject?.fieldPlaceholder ? props.customFieldObject.fieldPlaceholder : fieldPlaceholder"
             :validationVisibility="'blur'"
-            :className="'custom__field-required'"
             :name="'fieldPlaceholder'"
         />
         <CustomFieldInputComponent
             :label="$t('Description.description')"
             :type="'textarea'"
             :placeholder="$t('PlaceHolder.Enter_Description')"
-            :validations="'required:trim|length:10'"
+            :validations="''"
             :bindValue="props.customFieldObject?.fieldDescription ? props.customFieldObject.fieldDescription : fieldDescription"
             :validationVisibility="'blur'"
-            :className="'custom__field-required'"
             :name="'fieldDescription'"
         />
-        <DropDown mode="listbox" :zIndex="10" v-if="isType">
+        <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                     <div class="custom__field-required">
@@ -110,7 +108,7 @@
     //function
     // Redirect to the tab where the validation error message is displayed.
     const handleTabComp = (node) => {
-        if(!(node._value.fieldDescription && node._value.fieldTitle && node._value.fieldPlaceholder)){
+        if(!node._value.fieldTitle){
             tabIndexCheck.value = 1;
             emit('tabIndexUpdate',tabIndexCheck.value)
         }else if(node._value.fieldMinimum || node._value.fieldMaximum){
@@ -125,8 +123,8 @@
         object.fieldType = props.componentDetail.cfType;
         object.fieldImage = props.componentDetail.cfIcon;
         object.fieldImageGrey = props.componentDetail.cfIconGrey;
-        object.fieldDescription = object.fieldDescription.trim();
-        object.fieldPlaceholder = object.fieldPlaceholder.trim();
+        object.fieldDescription = (object.fieldDescription || '').trim();
+        object.fieldPlaceholder = (object.fieldPlaceholder || '').trim();
         object.fieldTitle = object.fieldTitle.trim();
         if(props.isType === true){
             object.type = type.value;

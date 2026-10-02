@@ -14,6 +14,7 @@ vi.mock('@/components/organisms/ImportDialog/ImportSourceModals.vue', () => ({
 
 import WorkspaceImportDialog from '@/components/organisms/WorkspaceImport/WorkspaceImportDialog.vue';
 import { IMPORT_CLICKUP, IMPORT_CLICKUP_PREVIEW, IMPORT_CLICKUP_PROJECT } from '@/config/env';
+import { resetProjectTreeCache } from '@/components/molecules/ProjectTree/projectTreeData';
 
 const ROWS = [
     { 'Task Name': 'Plan', 'List Name': 'Backlog' },
@@ -36,8 +37,11 @@ const PREVIEW = {
 
 const PROJECT = { _id: 'p1', ProjectName: 'Web', sprintsObj: { s1: { id: 's1', name: 'Sprint 1' } }, sprintsfolders: { f1: { folderId: 'f1', folderName: 'Q3', sprintsObj: { s2: { id: 's2', name: 'Sprint 2' } } } } };
 
+const reloadFields = vi.fn();
+
 const store = () => createStore({
     modules: {
+        settings: { namespaced: true, actions: { setfinalCustomFields: reloadFields } },
         projectData: { namespaced: true, getters: { projects: () => ({ data: [PROJECT, { _id: 'gone', ProjectName: 'Gone', deletedStatusKey: 1 }] }) } },
         users: { namespaced: true, getters: { users: () => [] } }
     }
@@ -54,10 +58,28 @@ const uploadFile = async (wrapper) => {
     await flushPromises();
 };
 
+const summaryOf = (over = {}) => ({
+    tasks: 2, subtasks: { level2: 1, level3: 0 }, checklistItems: 2, links: 1,
+    comments: { imported: 3, skipped: 0, reason: '', unmatchedAuthors: ['Pat Example'] },
+    fields: { created: ['Stage'], reused: [], asText: [], skipped: [], reason: '', valuesSet: 4, valuesDropped: 1 },
+    tags: { added: ['urgent'], skipped: [] },
+    people: { unmatched: ['ghost@nowhere.test'], cannotOpen: [] },
+    ...over
+});
+
+const TREE = {
+    sprints: [{ _id: 's1', projectId: 'p1', name: 'Sprint 1' }, { _id: 's2', projectId: 'p1', folderId: 'f1', name: 'Sprint 2' }],
+    folders: [{ _id: 'f1', projectId: 'p1', name: 'Q3' }]
+};
+
 beforeEach(() => {
+    resetProjectTreeCache();
+    reloadFields.mockClear();
     permissions.create = true;
     readSheet.mockResolvedValue(ROWS);
     apiRequest.mockImplementation(async (method, url, body) => {
+        if (method === 'get' && url.endsWith('collection=sprints')) return { data: TREE.sprints };
+        if (method === 'get' && url.endsWith('collection=folders')) return { data: TREE.folders };
         if (url === IMPORT_CLICKUP_PREVIEW) return { data: { status: true, data: PREVIEW } };
         if (url === IMPORT_CLICKUP_PROJECT) return { data: { status: true, data: { projectId: `new-${body.listName}`, created: body.rows.length, skipped: 0, unmatchedAssignees: ['ghost@nowhere.test'] } } };
         if (url === IMPORT_CLICKUP) return { data: { status: true, data: { created: body.rows.length, skipped: 0 } } };
@@ -107,6 +129,81 @@ describe('the workspace import dialog', () => {
         expect(wrapper.emitted('close')).toHaveLength(1);
     });
 
+    it('says in the summary which subtasks could not keep the place the file gave them', async () => {
+        apiRequest.mockImplementation(async (method, url, body) => {
+            if (url === IMPORT_CLICKUP_PREVIEW) return { data: { status: true, data: PREVIEW } };
+            const adjusted = body.listName === 'Backlog'
+                ? { tooDeep: 2, parentMissing: 0, cycle: 0, rows: [{ name: 'Too deep', reason: 'TOO_DEEP' }, { name: 'Deeper still', reason: 'TOO_DEEP' }] }
+                : { tooDeep: 1, parentMissing: 1, cycle: 0, rows: [{ name: 'Deepest', reason: 'TOO_DEEP' }, { name: 'Orphan', reason: 'PARENT_MISSING' }] };
+            return { data: { status: true, data: { projectId: `new-${body.listName}`, created: body.rows.length, skipped: 0, adjusted } } };
+        });
+        const wrapper = open({ initialSource: 'clickup' });
+        await uploadFile(wrapper);
+        await wrapper.find('[data-test="wim-next"]').trigger('click');
+        await flushPromises();
+        await wrapper.find('[data-test="wim-run"]').trigger('click');
+        await flushPromises();
+
+        const lines = wrapper.findAll('[data-test="wim-adjusted"] li').map((line) => line.text());
+        expect(lines).toHaveLength(2);
+        expect(lines[0]).toContain('WorkspaceImport.summary_too_deep');
+        expect(lines[0]).toContain('Too deep, Deeper still, Deepest');
+        expect(lines[1]).toContain('WorkspaceImport.summary_parent_missing');
+        expect(lines[1]).toContain('Orphan');
+    });
+
+    it('has no such line when every subtask kept its place', async () => {
+        const wrapper = open({ initialSource: 'clickup' });
+        await uploadFile(wrapper);
+        await wrapper.find('[data-test="wim-next"]').trigger('click');
+        await flushPromises();
+        await wrapper.find('[data-test="wim-run"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="wim-summary"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="wim-adjusted"]').exists()).toBe(false);
+    });
+
+    it('shows before the import what it will bring in, and after it what came in across the lists', async () => {
+        apiRequest.mockImplementation(async (method, url, body) => {
+            if (url === IMPORT_CLICKUP_PREVIEW) return { data: { status: true, data: { ...PREVIEW, plan: summaryOf({ tasks: 3 }) } } };
+            const summary = body.rows.length === 2 ? summaryOf() : summaryOf({ tasks: 1, subtasks: { level2: 0, level3: 0 }, links: 2, fields: { created: [], reused: ['Stage'], asText: [], skipped: [], reason: '', valuesSet: 1, valuesDropped: 0 } });
+            return { data: { status: true, data: { created: body.rows.length, skipped: 0, summary } } };
+        });
+        const wrapper = open({ initialSource: 'clickup', project: PROJECT });
+        await uploadFile(wrapper);
+        await wrapper.find('[data-test="wim-next"]').trigger('click');
+        await flushPromises();
+
+        const cells = (root, kind) => root.find(`[data-kind="${kind}"]`).findAll('td').map((cell) => cell.text());
+        const plan = wrapper.find('[data-test="wim-plan"]');
+        expect(plan.text()).toContain('WorkspaceImport.counts_caption_plan');
+        expect(cells(plan, 'tasks')).toEqual(['3', '']);
+        expect(plan.find('[data-note="note_links"]').text()).toBe('WorkspaceImport.note_links_plan');
+
+        await wrapper.find('[data-test="wim-run"]').trigger('click');
+        await flushPromises();
+        const counts = wrapper.find('[data-test="wim-counts"]');
+        expect(counts.text()).toContain('WorkspaceImport.counts_caption_done');
+        expect(cells(counts, 'tasks')).toEqual(['3', '']);
+        expect(cells(counts, 'links')).toEqual(['3', '']);
+        expect(cells(counts, 'values')).toEqual(['5', 'WorkspaceImport.out_values']);
+        expect(cells(counts, 'people')).toEqual(['', 'WorkspaceImport.out_people_unmatched']);
+        expect(counts.find('[data-note="note_links"]').text()).toBe('WorkspaceImport.note_links_done');
+        expect(reloadFields).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows no counts table for an answer that carries none, and reloads no fields', async () => {
+        const wrapper = open({ initialSource: 'clickup' });
+        await uploadFile(wrapper);
+        await wrapper.find('[data-test="wim-next"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="wim-plan"]').exists()).toBe(false);
+        await wrapper.find('[data-test="wim-run"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="wim-counts"]').exists()).toBe(false);
+        expect(reloadFields).not.toHaveBeenCalled();
+    });
+
     it('imports into a chosen project and list, previewing against that project', async () => {
         const wrapper = open({ initialSource: 'clickup' });
         await uploadFile(wrapper);
@@ -115,10 +212,11 @@ describe('the workspace import dialog', () => {
         const projects = wrapper.find('[data-test="wim-project"]');
         expect(projects.findAll('option').map((o) => o.text())).toEqual(['WorkspaceImport.project_pick', 'Web']);
         await projects.setValue('p1');
+        await flushPromises();
         await wrapper.find('[data-test="wim-sprint"]').setValue('s2');
         await wrapper.find('[data-test="wim-next"]').trigger('click');
         await flushPromises();
-        expect(posted(IMPORT_CLICKUP_PREVIEW)[1]).toEqual({ rows: ROWS, projectId: 'p1' });
+        expect(posted(IMPORT_CLICKUP_PREVIEW)[1]).toEqual({ rows: ROWS, projectId: 'p1', options: { createMissingStatuses: true } });
         await wrapper.find('[data-test="wim-run"]').trigger('click');
         await flushPromises();
         expect(posted(IMPORT_CLICKUP)).toEqual([
@@ -145,7 +243,7 @@ describe('the workspace import dialog', () => {
         expect(wrapper.find('[data-test="wim-project"]').exists()).toBe(false);
         await wrapper.find('[data-test="wim-next"]').trigger('click');
         await flushPromises();
-        expect(posted(IMPORT_CLICKUP_PREVIEW)[1]).toEqual({ rows: ROWS, projectId: 'p1' });
+        expect(posted(IMPORT_CLICKUP_PREVIEW)[1]).toEqual({ rows: ROWS, projectId: 'p1', options: { createMissingStatuses: true } });
     });
 
     it('hands the other sources to their own importer for the chosen project', async () => {
@@ -153,6 +251,7 @@ describe('the workspace import dialog', () => {
         await wrapper.find('[data-source="jira"]').trigger('click');
         expect(step(wrapper)).toBe('WorkspaceImport.step_target');
         await wrapper.find('[data-test="wim-project"]').setValue('p1');
+        await flushPromises();
         await wrapper.find('[data-test="wim-next"]').trigger('click');
         const modals = wrapper.find('.modals-stub');
         expect(modals.attributes('data-source')).toBe('jira');

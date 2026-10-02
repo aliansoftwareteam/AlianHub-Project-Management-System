@@ -16,6 +16,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     }),
 }));
 // Joining a task room is authorised against the task (socket/roomAccess); here every task in the workspace opens.
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Config/projectAccess', () => ({ canReadProject: jest.fn(async () => ({ allowed: true })) }));
 jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ canSeeSprintById: jest.fn(async () => true) }));
 

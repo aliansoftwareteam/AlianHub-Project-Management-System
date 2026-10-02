@@ -7,6 +7,8 @@ const socketEmitter = require('../../../event/socketEventEmitter');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
 const { sprintPlacementOf } = require('../../Tasks/helpers/sprintPlacement');
+const { slotUnder } = require('../../Tasks/helpers/taskTree');
+const { cleanDescription, cleanHtml } = require('../../Tasks/helpers/cleanRichText');
 
 // The only way an action is allowed to touch data.
 //
@@ -60,10 +62,11 @@ const recordAutomationAudit = (companyId, context, entry) => {
     });
 };
 
-const emitAutomationUpdate = (doc, updatedFields, depth) => {
+const emitAutomationUpdate = (companyId, doc, updatedFields, depth) => {
     socketEmitter.emit('update', {
         type: 'update',
         module: 'task',
+        companyId,
         data: doc,
         updatedFields,
         actor: { kind: 'automation', userId: null },
@@ -74,19 +77,20 @@ const emitAutomationUpdate = (doc, updatedFields, depth) => {
 /* Apply a $set to a task and announce it. `context` carries the run and the
  * originating event's depth so the audit row can point back at the rule and the
  * loop guard keeps counting. */
-const updateTask = async (companyId, taskId, set, context = {}, unset = null) => {
+const updateTask = async (companyId, taskId, set, context = {}, unset = null, pull = null) => {
     const _id = oid(taskId);
     if (!_id) throw new DeterministicError(`invalid task id "${taskId}"`);
     if (!set || !Object.keys(set).length) return { changed: false };
+    cleanDescription(set);
 
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ _id }, unset ? { $set: set, $unset: unset } : { $set: set }, { returnDocument: 'after' }],
+        data: [{ _id }, { $set: set, ...(unset ? { $unset: unset } : {}), ...(pull ? { $pull: pull } : {}) }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
 
     if (!updated || !updated._id) throw new DeterministicError(`task ${taskId} not found`);
 
-    emitAutomationUpdate(updated, set, context.depth);
+    emitAutomationUpdate(companyId, updated, set, context.depth);
     recordAutomationAudit(companyId, context, {
         action: context.action || 'automation.task.update',
         entityType: 'task',
@@ -211,6 +215,23 @@ const resolveStatus = async (companyId, projectId, statusName) => {
     };
 };
 
+/* The project's own running key, which the web app's create gives every task and subtask. The task helpers pull in
+ * most of the task domain, so they are required on use; where they cannot assign a key the row keeps the one it was
+ * saved with, so a subtask is never left without one. */
+const projectKeyFor = async (companyId, project, row, taskTypeKey) => {
+    if (!project || !Number.isFinite(Number(project.lastTaskId))) return row.TaskKey;
+    try {
+        const internals = require('../../Tasks/helpers/taskMongo/internals.js');
+        await internals.updateTaskKey({
+            companyId, projectCode: project.ProjectCode || 'TASK', projectId: project._id, taskId: row._id, taskTypeKey, sprintId: row.sprintId || '', isParentTask: false,
+        });
+        const keyed = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: row._id }, { TaskKey: 1 }] }, 'findOne');
+        return (keyed && keyed.TaskKey) || row.TaskKey;
+    } catch (error) {
+        return row.TaskKey;
+    }
+};
+
 /* Create a subtask under a task.
  *
  * A subtask is a normal task row with isParentTask:false and ParentTaskId set,
@@ -222,6 +243,8 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
     const parent = await getTask(companyId, parentTaskId);
     const name = String(title || '').trim();
     if (!name) throw new DeterministicError('subtask title is empty');
+    const slot = await slotUnder(companyId, parent._id);
+    if (!slot.ok) throw new DeterministicError(slot.reason);
 
     // A new subtask starts in the project's OPENING status, never the parent's.
     // Inheriting the parent's status means a QA agent that files findings on a
@@ -245,13 +268,13 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
             _id,
             TaskName: name.slice(0, 200),
             TaskKey: `${parent.TaskKey || 'TASK'}-${Date.now().toString(36).slice(-4)}`,
-            description: String(description || '').slice(0, 4000),
+            description: cleanHtml(String(description || '').slice(0, 4000), 'strict'),
             rawDescription: String(description || '').slice(0, 4000),
             CompanyId: String(companyId),
-            ProjectID: parent.ProjectID,
-            sprintId: parent.sprintId,
-            sprintArray: parent.sprintArray || {},
+            sprintArray: {},
+            ...slot.placement,
             ParentTaskId: String(parentTaskId),
+            ancestors: slot.ancestors,
             isParentTask: false,
             TaskType: parent.TaskType || 'task',
             TaskTypeKey: parent.TaskTypeKey || 1,
@@ -268,7 +291,7 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
         data: [{ _id: oid(parentTaskId) }, { $inc: { subTasks: 1 } }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate').catch(() => {});
 
-    emitAutomationUpdate(saved, { ParentTaskId: String(parentTaskId) }, context.depth);
+    emitAutomationUpdate(companyId, saved, { ParentTaskId: String(parentTaskId) }, context.depth);
     recordAutomationAudit(companyId, context, {
         action: 'automation.task.create_subtask',
         entityType: 'task',
@@ -277,7 +300,9 @@ const createSubtask = async (companyId, parentTaskId, { title, description = '' 
         meta: { runId: context.runId || null, parentTaskId: String(parentTaskId) },
     });
 
-    return { changed: true, subtaskId: String(saved._id), title: name };
+    const key = await projectKeyFor(companyId, project, saved, parent.TaskTypeKey || 1);
+
+    return { changed: true, subtaskId: String(saved._id), key, title: name };
 };
 
 const PRIORITIES = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
@@ -334,7 +359,7 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
             _id,
             TaskName: name.slice(0, 250),
             TaskKey: '--',
-            description: String(description || '').slice(0, 4000),
+            description: cleanHtml(String(description || '').slice(0, 4000), 'strict'),
             rawDescription: String(description || '').slice(0, 4000),
             CompanyId: String(companyId),
             ProjectID: String(project._id),
@@ -364,7 +389,7 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
     });
     const task = await getTask(companyId, saved._id);
 
-    emitAutomationUpdate(task, { created: true }, context.depth);
+    emitAutomationUpdate(companyId, task, { created: true }, context.depth);
     recordAutomationAudit(companyId, context, {
         action: 'automation.task.create',
         entityType: 'task',

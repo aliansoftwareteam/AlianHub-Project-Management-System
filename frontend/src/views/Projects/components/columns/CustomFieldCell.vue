@@ -10,6 +10,17 @@
             :allTasks="allTasks"
             :defs="defs"
         />
+        <component
+            :is="typeUi.value"
+            v-else-if="typeUi"
+            compact
+            :def="def"
+            :value="stored"
+            :editable="editable"
+            :label="def.fieldTitle || ''"
+            v-bind="taskPropFor(type, task)"
+            @change="$emit('change', $event)"
+        />
         <input
             v-else-if="type === 'checkbox'"
             type="checkbox"
@@ -80,8 +91,9 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiFieldMark from "@/components/atom/AiFieldMark/AiFieldMark.vue";
 import { isAiField } from "@/views/Projects/composables/aiFields";
 import ComputedComponentViewColumn from "@/plugins/customFieldView/component/atom/customFieldViewColumn/computedComponentViewColumn.vue";
+import { fieldTypeUi, taskPropFor } from "@/plugins/customFieldView/fieldTypes";
 import {
-    COMPUTED_TYPES, customFieldText, dropdownChoices, fieldAppliesToTask, fieldEditValue, fieldIsChecked, storedEntry
+    COMPUTED_TYPES, customFieldText, dropdownChoices, fieldAppliesToTask, fieldEditValue, fieldIsChecked, storedEntry, storedFieldValue
 } from "@/views/Projects/composables/projectCustomFields";
 
 defineOptions({ name: "CustomFieldCell" });
@@ -103,6 +115,8 @@ const INPUT_TYPES = { number: "text", money: "text", date: "date", email: "email
 const type = computed(() => props.def.fieldType);
 const applies = computed(() => fieldAppliesToTask(props.def, props.task));
 const computedType = computed(() => COMPUTED_TYPES.includes(type.value));
+const typeUi = computed(() => fieldTypeUi(type.value));
+const stored = computed(() => storedFieldValue(props.task, props.def));
 const isAi = computed(() => isAiField(props.def));
 const inputType = computed(() => INPUT_TYPES[type.value] || "text");
 const text = computed(() => customFieldText(props.def, props.task, { allTasks: props.allTasks, dateFormat: dateFormat.value }));

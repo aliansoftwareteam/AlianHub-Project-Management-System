@@ -10,7 +10,8 @@ const composable = vi.hoisted(() => ({
     useCustomComposable: () => ({
         checkPermission: (path) => (path === 'task.task_custom_field' ? access.fieldPermission : true),
         checkApps: (app) => (app === 'CustomFields' ? access.fieldsApp : true)
-    })
+    }),
+    useGetterFunctions: () => ({ getUser: () => null })
 }));
 vi.mock('@/composable', () => composable);
 vi.mock('@/composable/index', () => composable);
@@ -18,7 +19,7 @@ vi.mock('@/composable/index.js', () => composable);
 vi.mock('@/composable/firstRunProgress', () => ({ markFirstRunStep: vi.fn(), FIRST_RUN_STEPS: { BOARD_VIEW: 'board' } }));
 vi.mock('@/views/Projects/helper.js', () => ({
     taskListHelper: () => ({
-        groupBy: (...args) => args[args.length - 1]([{ id: 's1', items: [{ name: 'To do', searchKey: 'statusKey', searchValue: 1 }] }])
+        groupBy: (...args) => args.find((arg) => typeof arg === 'function')([{ id: 's1', items: [{ name: 'To do', searchKey: 'statusKey', searchValue: 1 }] }])
     })
 }));
 vi.mock('@/views/Projects/composables/useTaskEmptyState.js', () => ({ useTaskEmptyState: () => ({ emptyTitleKey: ref('a'), emptyMessageKey: ref('b') }) }));

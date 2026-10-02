@@ -44,8 +44,9 @@
                     </div>
                 </div>
 
-                <ul v-if="errors.length" class="au__errors">
-                    <li v-for="(e, i) in errors" :key="i">{{ e }}</li>
+                <ul v-if="errors.length || shownIssues.length" class="au__errors">
+                    <li v-for="(e, i) in errors" :key="`e${i}`">{{ e }}</li>
+                    <li v-for="(issue, i) in shownIssues" :key="`i${i}`">{{ issue.key ? $t(issue.key, issue.params) : issue.text }}</li>
                 </ul>
 
                 <AutomationAiDraft :key="aiKey" :sentence="sentence" :failed="sentenceFailed" @drafted="applyAiDraft" />
@@ -56,11 +57,11 @@
                     <div class="au__slots">
                         <span class="au__kw">{{ $t('Automations.when') }}</span>
                         <select v-model="draft.trigger.event" class="au__slot" @change="onRuleEdit">
-                            <option v-for="trigger in manifest.triggers" :key="trigger.key" :value="trigger.key">{{ trigger.label }}</option>
+                            <option v-for="trigger in manifest.triggers" :key="trigger.key" :value="trigger.key">{{ triggerLabel(trigger, $t) }}</option>
                         </select>
 
                         <span class="au__kw">{{ $t('Automations.in') }}</span>
-                        <select v-model="scopeChoice" class="au__slot" @change="onScopeChange">
+                        <select v-model="scopeChoice" class="au__slot" data-test="scope-picker" @change="onScopeChange">
                             <option value="all">{{ $t('Automations.all_projects') }}</option>
                             <option v-for="p in projects" :key="p._id" :value="String(p._id)">{{ p.ProjectName || '—' }}</option>
                         </select>
@@ -85,26 +86,35 @@
                         </template>
                         <button type="button" class="au__add" @click="addCondition">{{ $t('Automations.add_condition') }}</button>
                     </div>
+                    <p v-if="triggerHelp" class="ah-small au__help" data-test="trigger-help">{{ $t(triggerHelp) }}</p>
 
                     <div class="au__slots">
                         <template v-for="(s, i) in draft.steps" :key="s.id">
                             <span class="au__kw">{{ i === 0 ? $t('Automations.then') : $t('Parity.and') }}</span>
                             <select v-model="s.action" class="au__slot" @change="resetConfig(s)">
-                                <option v-for="a in manifest.actions" :key="a.key" :value="a.key">{{ a.label }}</option>
+                                <option v-for="a in manifest.actions" :key="a.key" :value="a.key">{{ actionLabel(a, $t) }}</option>
                             </select>
-                            <AssignActionEditor v-if="s.action === 'assign'" v-model="s.config" :trigger="draft.trigger.event" @change="onRuleEdit" />
+                            <AssignActionEditor v-if="s.action === 'assign'" v-model="s.config" :trigger="draft.trigger.event" @change="onEditorChange(s)" />
+                            <NotifyActionEditor v-else-if="s.action === 'notify'" v-model="s.config" @change="onEditorChange(s)" />
                             <template v-else>
                                 <template v-for="(spec, field) in schemaOf(s.action)" :key="field">
-                                    <select v-if="spec.options" v-model="s.config[field]" class="au__slot" @change="onRuleEdit">
+                                    <select v-if="spec.options" v-model="s.config[field]" class="au__slot" :data-test="`step-field-${field}`" @change="onFieldEdit(s, field)">
                                         <option v-for="o in spec.options" :key="o" :value="o">{{ o }}</option>
                                     </select>
-                                    <input v-else v-model="s.config[field]" class="au__slot au__slot--text" :placeholder="spec.label" @change="onRuleEdit" />
+                                    <input v-else v-model="s.config[field]" class="au__slot au__slot--text" :placeholder="spec.label" :data-test="`step-field-${field}`" @change="onFieldEdit(s, field)" />
                                 </template>
                             </template>
                             <button type="button" class="au__x" :title="$t('Automations.remove')" @click="draft.steps.splice(i, 1); onRuleEdit()">×</button>
                         </template>
                         <button type="button" class="au__add" @click="addStep">{{ $t('Automations.add_action') }}</button>
                     </div>
+                    <p v-for="key in actionHelps" :key="key" class="ah-small au__help" data-test="action-help">{{ $t(key) }}</p>
+
+                    <label class="au-assign__turns" data-test="react-to-automation-label">
+                        <input v-model="reactToAutomation" type="checkbox" data-test="react-to-automation" />
+                        {{ $t('Automations.react_to_automation') }}
+                    </label>
+                    <p v-if="reactToAutomation" class="ah-small au__help">{{ $t('Automations.react_to_automation_help') }}</p>
 
                     <p v-if="changeOpWarning" class="au__warn">{{ changeOpWarning }}</p>
 
@@ -117,11 +127,17 @@
                             {{ backtest ? $t('Parity.backtest_result', { n: backtest.matched, days: backtest.windowDays }) : $t('Parity.test_30_days') }}
                         </button>
                     </div>
-                    <p v-if="backtest" class="ah-small">{{ backtest.basis }}</p>
+                    <p v-if="backtest" class="ah-small" data-test="backtest-basis">{{ backtestBasis }}</p>
                     <ul v-if="backtest && backtest.assignments && backtest.assignments.length" class="au__plan-reasons" data-test="backtest-assign">
                         <li v-for="a in backtest.assignments" :key="a.stepId">
                             {{ $t(a.roundRobin ? 'Automations.assign_backtest_turns' : 'Automations.assign_backtest_people', { people: peopleText(a.people, $t) }) }}
                             <template v-if="a.skipped.length"> · {{ skippedText(a.skipped, $t) }}</template>
+                        </li>
+                    </ul>
+                    <ul v-if="backtest && backtest.notifications && backtest.notifications.length" class="au__plan-reasons" data-test="backtest-notify">
+                        <li v-for="n in backtest.notifications" :key="n.stepId">
+                            {{ $t('Automations.notify_backtest_people', { people: peopleText(n.people, $t) }) }}
+                            <template v-if="n.skipped.length"> · {{ skippedText(n.skipped, $t) }}</template>
                         </li>
                     </ul>
 
@@ -144,20 +160,22 @@
                         <p v-if="dryRunError" class="ah-field__error" data-test="dry-run-error">{{ dryRunError }}</p>
 
                         <div v-if="dryRunResult" class="au__plan" data-test="dry-run-result">
-                            <span class="ah-chip" :class="dryRunResult.matched ? 'ah-chip--ok' : 'ah-chip--warn'" data-test="dry-run-verdict">
-                                {{ dryRunResult.matched ? $t('Automations.dry_run_matched') : $t('Automations.dry_run_not_matched') }}
-                            </span>
-                            <ul class="au__plan-reasons">
-                                <li v-for="(reason, i) in dryRunResult.reasons" :key="i">{{ reason }}</li>
+                            <p class="au__plan-head" data-test="dry-run-headline">
+                                <span class="ah-chip" :class="dryRunVerdict.runs ? 'ah-chip--ok' : 'ah-chip--warn'" data-test="dry-run-verdict">{{ $t(dryRunVerdict.titleKey) }}</span>
+                                <span v-if="dryRunVerdict.detailKey">{{ $t(dryRunVerdict.detailKey, dryRunVerdict.detailParams) }}</span>
+                                <span v-else-if="dryRunVerdict.detailText">{{ dryRunVerdict.detailText }}</span>
+                            </p>
+                            <ul v-if="dryRunVerdict.reasons.length || dryRunVerdict.showTrigger" class="au__plan-reasons">
+                                <li v-for="(reason, i) in dryRunVerdict.reasons" :key="i">{{ reason }}</li>
+                                <li v-if="dryRunVerdict.showTrigger" data-test="dry-run-trigger">{{ $t(triggerReasonKey(dryRunResult.trigger), triggerReasonParams(dryRunResult.trigger)) }}</li>
                             </ul>
                             <ol class="au__plan-actions">
-                                <li v-for="step in dryRunResult.actions" :key="step.id" class="au__plan-action" data-test="dry-run-action">
-                                    <span class="ah-mono">{{ step.id }}</span>
-                                    <span>{{ step.label }}</span>
-                                    <span class="ah-chip" :class="step.wouldRun ? 'ah-chip--ok' : ''">
-                                        {{ step.wouldRun ? $t('Automations.dry_run_would_run') : $t('Automations.dry_run_would_not_run') }}
+                                <li v-for="(step, i) in dryRunResult.actions" :key="step.id" class="au__plan-action" data-test="dry-run-action">
+                                    <span data-test="dry-run-step-name">{{ i + 1 }}. {{ stepName(step) }}</span>
+                                    <span class="ah-chip" :class="stepRuns(step) ? 'ah-chip--ok' : ''">
+                                        {{ stepRuns(step) ? $t('Automations.dry_run_would_run') : $t('Automations.dry_run_would_not_run') }}
                                     </span>
-                                    <dl v-if="step.params && Object.keys(step.params).length && !step.assign" class="au__plan-params">
+                                    <dl v-if="step.params && Object.keys(step.params).length && !step.assign && !step.notify" class="au__plan-params">
                                         <template v-for="(value, key) in step.params" :key="key">
                                             <dt>{{ paramLabel(step.action, key) }}</dt>
                                             <dd>{{ shownParam(value) }}</dd>
@@ -167,6 +185,11 @@
                                         <p>{{ step.assign.wouldAssign.length ? $t('Automations.assign_would_assign', { people: peopleText(step.assign.wouldAssign, $t) }) : $t('Automations.assign_would_assign_nobody') }}</p>
                                         <p v-if="step.assign.wouldRemove && step.assign.wouldRemove.length">{{ $t('Automations.assign_would_remove', { people: peopleText(step.assign.wouldRemove, $t) }) }}</p>
                                         <p v-if="step.assign.skipped.length">{{ skippedText(step.assign.skipped, $t) }}</p>
+                                    </div>
+                                    <div v-if="step.notify" class="ah-small au__plan-note" data-test="dry-run-notify">
+                                        <p>{{ step.params.message }}</p>
+                                        <p>{{ step.notify.wouldNotify.length ? $t('Automations.notify_would_notify', { people: peopleText(step.notify.wouldNotify, $t) }) : $t('Automations.notify_would_notify_nobody') }}</p>
+                                        <p v-if="step.notify.skipped.length">{{ skippedText(step.notify.skipped, $t) }}</p>
                                     </div>
                                     <p v-if="step.note" class="ah-small au__plan-note">{{ step.note }}</p>
                                 </li>
@@ -186,12 +209,20 @@
                     @close="showGallery = false"
                 />
                 <p v-if="loading" class="ah-empty">{{ $t('Parity.loading') }}</p>
-                <div v-else-if="!rules.length && !showGallery" class="ah-empty au__empty">
-                    <h2 class="ah-h2">{{ $t('Automations.empty_title') }}</h2>
-                    <p>{{ $t('Automations.empty_sub') }}</p>
-                    <button v-if="canManage" type="button" class="ah-btn ah-btn--primary" @click="startNew">{{ $t('Automations.new') }}</button>
-                    <button v-if="canManage" type="button" class="ah-btn ah-btn--secondary" @click="showGallery = true">{{ $t('AutomationTemplates.open') }}</button>
-                </div>
+                <EmptyState
+                    v-else-if="!rules.length && !showGallery"
+                    class="ah-empty"
+                    data-test="automations-empty"
+                    :heading-level="2"
+                    :title="$t('Automations.empty_title')"
+                    :message="$t('Automations.empty_sub')"
+                    :action-label="$t('Automations.new')"
+                    :action-allowed="canManage"
+                    :sentence="canManage ? $t('EmptyState.say_automation') : ''"
+                    :secondary-label="canManage ? $t('AutomationTemplates.open') : ''"
+                    @action="startNew"
+                    @secondary="showGallery = true"
+                />
 
                 <div v-for="r in rules" :key="r._id" class="au__rule" :class="{ 'au__rule--off': !r.enabled }">
                     <button
@@ -225,15 +256,18 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import RunHistoryDrawer from './RunHistoryDrawer.vue';
 import AutomationAiDraft from './AutomationAiDraft.vue';
 import AutomationTemplateGallery from './AutomationTemplateGallery.vue';
 import { assignPeopleText, assignSkippedText } from './assignText';
 import { choicesFor, refsFor } from './statusChoices';
+import { triggerLabel, actionLabel, fieldLabel, triggerHelpKey, actionHelpKey } from './registryText';
 import { fillTemplate } from '@automationTemplates';
 
 // Loaded on first use: most rules never assign, and the people picker pulls in the shared DropDown.
 const AssignActionEditor = defineAsyncComponent(() => import('./AssignActionEditor.vue'));
+const NotifyActionEditor = defineAsyncComponent(() => import('./NotifyActionEditor.vue'));
 
 // Automations (handoff 13d). You describe the rule in a sentence; the compiled
 // rule sits beside it and either can be edited. The compiler is a deterministic
@@ -259,6 +293,9 @@ const testing = ref(false);
 const building = ref(false);
 const editingId = ref(null);
 const errors = ref([]);
+const issues = ref([]);
+const saveTried = ref(false);
+const touched = reactive(new Set());
 const ambiguities = ref([]);
 const grammar = ref({});
 const sentence = ref('');
@@ -282,6 +319,7 @@ let settledSentence = '';
 const scopeChoice = ref('all');
 const conditions = ref([]);
 const draft = reactive({ trigger: { type: 'event', event: '' }, steps: [] });
+const reactToAutomation = ref(false);
 
 let stepSeq = 0;
 const nextStepId = () => { stepSeq += 1; return `s${stepSeq}`; };
@@ -310,6 +348,12 @@ const { t } = useI18n();
 const canManage = computed(() => [1, 2].includes(Number(getters['settings/companyUserDetail']?.roleType)));
 const activeCount = computed(() => rules.value.filter((r) => r.enabled).length);
 const triggerDef = computed(() => manifest.triggers.find((t) => t.key === draft.trigger.event) || null);
+const triggerHelp = computed(() => triggerHelpKey(draft.trigger.event));
+const actionHelps = computed(() => [...new Set(draft.steps.map((step) => actionHelpKey(step.action)).filter(Boolean))]);
+const backtestBasis = computed(() => {
+    if (!backtest.value) return '';
+    return backtest.value.basisKey ? t(`Automations.backtest_basis_${backtest.value.basisKey}`, { days: backtest.value.windowDays }) : backtest.value.basis;
+});
 
 // The same check the server runs, surfaced while the user is still typing: a
 // "changed to" condition on a trigger with no before/after can never match.
@@ -319,6 +363,49 @@ const changeOpWarning = computed(() => {
     const uses = conditions.value.some((c) => ['changed', 'changedTo', 'changedFrom'].includes(c.op));
     return uses ? `"${t.label}" has no before/after, so a "changed" condition will never match.` : '';
 });
+
+/* What the rule lacks is said for a field the person has been in, or for all of them once they tried to save:
+ * a new rule starts with empty fields, and listing them before anyone typed reads as a failure. */
+const seenConfigs = new Map();
+const fieldKey = (stepId, field) => `${stepId}.${field}`;
+const rememberConfig = (step) => seenConfigs.set(step.id, JSON.stringify(step.config || {}));
+const touch = (step, field) => touched.add(fieldKey(step.id, field));
+const touchChanged = (step) => {
+    const before = JSON.parse(seenConfigs.get(step.id) || '{}');
+    const now = step.config || {};
+    [...new Set([...Object.keys(before), ...Object.keys(now)])]
+        .filter((field) => JSON.stringify(before[field]) !== JSON.stringify(now[field]))
+        .forEach((field) => touch(step, field));
+    rememberConfig(step);
+};
+const forgetFeedback = () => {
+    issues.value = [];
+    saveTried.value = false;
+    touched.clear();
+};
+
+const actionDef = (key) => manifest.actions.find((a) => a.key === key) || null;
+const issueLine = (issue) => {
+    if (issue.code === 'no_steps') return { key: 'Automations.issue_no_steps' };
+    if (issue.step === undefined) return { text: issue.text };
+    const params = {
+        n: issue.step + 1,
+        action: actionLabel(actionDef(issue.action), t) || issue.action,
+        field: fieldLabel(issue.action, issue.field, schemaOf(issue.action), t),
+    };
+    if (issue.code === 'required') return { key: 'Automations.issue_step_required', params };
+    if (issue.code === 'not_an_option') return { key: 'Automations.issue_step_not_an_option', params };
+    return { key: 'Automations.issue_step_other', params: { ...params, reason: issue.text } };
+};
+const isTouched = (issue) => issue.step !== undefined && touched.has(fieldKey(draft.steps[issue.step]?.id, issue.field));
+const shownIssues = computed(() => issues.value.filter((issue) => saveTried.value || isTouched(issue)).map(issueLine));
+
+/* A server that sends the parts gets them worded here; an older one's sentences are shown as they are. */
+const takeFeedback = (data, parseErrors = []) => {
+    const parts = Array.isArray(data.issues);
+    issues.value = parts ? data.issues : [];
+    errors.value = parts ? parseErrors : (data.errors || []);
+};
 
 const emptyValue = (field) => (isStatusField(field) ? [] : '');
 
@@ -353,11 +440,23 @@ const onScopeChange = () => {
 const resetConfig = (step) => {
     step.config = {};
     if (step.action === 'assign') step.config = { mode: 'add', userIds: [] };
+    else if (step.action === 'notify') step.config = { recipients: [], message: '' };
     else {
         Object.entries(schemaOf(step.action)).forEach(([field, spec]) => {
             step.config[field] = spec.options ? spec.options[0] : '';
         });
     }
+    [...touched].filter((key) => key.startsWith(`${step.id}.`)).forEach((key) => touched.delete(key));
+    rememberConfig(step);
+    onRuleEdit();
+};
+
+const onFieldEdit = (step, field) => {
+    touch(step, field);
+    onRuleEdit();
+};
+const onEditorChange = (step) => {
+    touchChanged(step);
     onRuleEdit();
 };
 
@@ -401,6 +500,7 @@ const currentRule = () => ({
         : { allProjects: false, projectIds: [scopeChoice.value] },
     conditions: buildConditions(),
     steps: draft.steps,
+    reactToAutomation: reactToAutomation.value,
 });
 
 const applyRule = (rule) => {
@@ -408,7 +508,10 @@ const applyRule = (rule) => {
     draft.trigger = { type: 'event', event: rule.trigger?.event || draft.trigger.event };
     draft.steps = (rule.steps || []).filter((s) => s.type === 'action')
         .map((s) => ({ id: s.id, type: 'action', action: s.action, config: { ...(s.config || {}) } }));
+    draft.steps.forEach(rememberConfig);
     stepSeq = draft.steps.length;
+    // A rule read from a sentence says nothing about this choice, and must not undo it.
+    if (typeof rule.reactToAutomation === 'boolean') reactToAutomation.value = rule.reactToAutomation;
     conditions.value = loadConditions(rule.conditions);
     scopeChoice.value = rule.scope?.allProjects === false && rule.scope.projectIds?.length ? String(rule.scope.projectIds[0]) : 'all';
 };
@@ -425,14 +528,16 @@ const compileSentence = async () => {
     const asked = sentence.value;
     const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { sentence: asked, scope: currentRule().scope }))?.data;
     if (!body?.status) { errors.value = [body?.statusText || 'Could not read that sentence.']; return; }
-    errors.value = body.data.errors || [];
+    takeFeedback(body.data, body.data.parseErrors || []);
     ambiguities.value = body.data.ambiguities || [];
     grammar.value = body.data.grammar || {};
-    if (errors.value.length) sentenceFailed.value = true;
+    if ((body.data.errors || []).length) sentenceFailed.value = true;
     else clearAiDraft();
     if (body.data.rule) {
         applyRule(body.data.rule);
         sentence.value = body.data.sentence;
+        // The person wrote this rule as a sentence, so what it lacks is theirs to hear about now.
+        issues.value.filter((issue) => issue.step !== undefined && draft.steps[issue.step]).forEach((issue) => touch(draft.steps[issue.step], issue.field));
     }
     settledSentence = body.data.rule ? body.data.sentence : asked;
 };
@@ -443,6 +548,7 @@ const applyAiDraft = ({ rule, sentence: drafted }) => {
     sentence.value = drafted;
     settledSentence = drafted;
     errors.value = [];
+    forgetFeedback();
     ambiguities.value = [];
     backtest.value = null;
     sentenceFailed.value = false;
@@ -454,7 +560,7 @@ const onRuleEdit = async () => {
     sentenceFailed.value = false;
     const body = (await apiRequest('post', env.AUTOMATIONS_COMPILE, { rule: currentRule() }))?.data;
     if (!body?.status) return;
-    errors.value = body.data.errors || [];
+    takeFeedback(body.data);
     sentence.value = body.data.sentence;
     settledSentence = body.data.sentence;
 };
@@ -513,6 +619,33 @@ const runDryRun = async () => {
 };
 
 const paramLabel = (actionKey, key) => schemaOf(actionKey)[key]?.label || key;
+
+const stepName = (step) => actionLabel(actionDef(step.action), t) || step.label;
+const triggerReasonKey = (state) => `Automations.dry_run_trigger_${state.reason}`;
+const triggerReasonParams = (state) => ({ open: state.open, total: state.total });
+
+/* One outcome: conditions that hold on a task the trigger does not reach yet are a rule that would not run now. */
+const dryRunVerdict = computed(() => {
+    const result = dryRunResult.value;
+    if (!result) return null;
+    const reasons = result.reasons || [];
+    const state = result.trigger || null;
+    if (result.matched && state && state.wouldFire === false) {
+        return { runs: false, titleKey: 'Automations.dry_run_not_now', detailKey: triggerReasonKey(state), detailParams: triggerReasonParams(state), reasons, showTrigger: false };
+    }
+    if (!result.matched) {
+        return { runs: false, titleKey: 'Automations.dry_run_not_matched', detailText: reasons[0] || '', reasons: reasons.slice(1), showTrigger: Boolean(state) };
+    }
+    return {
+        runs: true,
+        titleKey: result.rule && result.rule.enabled === false ? 'Automations.dry_run_matched_when_on' : 'Automations.dry_run_matched',
+        detailKey: 'Automations.dry_run_would_do',
+        detailParams: { actions: (result.actions || []).filter((step) => step.wouldRun).map(stepName).join(', ') },
+        reasons,
+        showTrigger: Boolean(state),
+    };
+});
+const stepRuns = (step) => Boolean(step.wouldRun && dryRunVerdict.value && dryRunVerdict.value.runs);
 const peopleText = assignPeopleText;
 const skippedText = assignSkippedText;
 const shownParam = (value) => (value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value ?? ''));
@@ -521,17 +654,22 @@ const resetBuilder = () => {
     resetDryRun();
     clearAiDraft();
     errors.value = [];
+    forgetFeedback();
     ambiguities.value = [];
     backtest.value = null;
     editingId.value = null;
 };
+
+/* The project the page was opened from, while the person can still see it. */
+const openedFromProject = () => (projects.value.some((p) => String(p._id) === props.templateProjectId) ? props.templateProjectId : '');
 
 const startNew = async () => {
     resetBuilder();
     draft.trigger = { type: 'event', event: manifest.triggers[0]?.key || '' };
     draft.steps = [];
     conditions.value = [];
-    scopeChoice.value = 'all';
+    scopeChoice.value = openedFromProject() || 'all';
+    reactToAutomation.value = false;
     sentence.value = '';
     settledSentence = '';
     stepSeq = 0;
@@ -545,6 +683,7 @@ const startNew = async () => {
 /* A template only fills the builder: the person reviews it, and saving stays their step. */
 const startFromTemplate = (template) => {
     resetBuilder();
+    reactToAutomation.value = false;
     applyRule(fillTemplate(template, { projects: projects.value, projectId: galleryProjectId.value, translate: t }));
     sentence.value = '';
     settledSentence = '';
@@ -556,16 +695,18 @@ const startFromTemplate = (template) => {
 const edit = (rule) => {
     resetBuilder();
     editingId.value = rule._id;
+    reactToAutomation.value = false;
     applyRule(rule);
     sentence.value = rule.sentence || '';
     settledSentence = sentence.value;
     building.value = true;
 };
 
-const cancel = () => { building.value = false; errors.value = []; clearAiDraft(); };
+const cancel = () => { building.value = false; errors.value = []; forgetFeedback(); clearAiDraft(); };
 
 const save = async (enabled) => {
     saving.value = true;
+    saveTried.value = true;
     errors.value = [];
     try {
         const body = { ...currentRule(), enabled };
@@ -574,7 +715,8 @@ const save = async (enabled) => {
             : await apiRequest('post', env.AUTOMATIONS_V2, body);
         const data = res?.data;
         if (data && data.status === false) {
-            errors.value = data.errors && data.errors.length ? data.errors : [data.statusText || 'Could not save.'];
+            if (Array.isArray(data.issues) && data.issues.length) issues.value = data.issues;
+            else errors.value = data.errors && data.errors.length ? data.errors : [data.statusText || 'Could not save.'];
             return;
         }
         building.value = false;

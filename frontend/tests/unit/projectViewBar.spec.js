@@ -61,6 +61,39 @@ describe('splitProjectViews', () => {
 
         expect(splitProjectViews(entries).views.map((v) => v.keyName)).toEqual(['GanttView', 'ProjectListView']);
     });
+
+    describe('where a private view sits', () => {
+        const TEMPLATE = '6a97261fb28e840202058570';
+        const titles = (result) => result.views.map((v) => `${v.isPrivate ? 'mine:' : ''}${v.title || v.keyName}`);
+        const mine = (id, extra = {}) => ({ uniqueId: id, id, _id: LIST, keyName: 'ProjectListView', name: 'List', isPrivate: true, projectId: 'p1', ...extra });
+
+        it('follows the shared view it was made from, which keeps its place', () => {
+            const shared = [view('ProjectListView', LIST), view('ProjectListView', TEMPLATE, { title: 'Sprint', sourceViewId: LIST }), view('GanttView', GANTT)];
+            const tabs = [mine('mine000001', { title: 'Sprint', sourceViewId: TEMPLATE })];
+
+            expect(titles(splitProjectViews(shared, tabs))).toEqual(['ProjectListView', 'Sprint', 'mine:Sprint', 'GanttView']);
+        });
+
+        it('falls back to the catalogue row it copies when it names no source', () => {
+            const shared = [view('GanttView', GANTT), view('ProjectListView', LIST)];
+
+            expect(titles(splitProjectViews(shared, [mine('mine000002', { title: 'Old' })]))).toEqual(['GanttView', 'ProjectListView', 'mine:Old']);
+        });
+
+        it('comes after the shared views when the project has no view it was made from', () => {
+            const tabs = [mine('mine000003', { _id: '6a97261fb28e840202058599', keyName: 'Calendar', name: 'Calendar', title: 'Only mine' })];
+
+            expect(titles(splitProjectViews([view('ProjectListView', LIST), view('GanttView', GANTT)], tabs))).toEqual(['ProjectListView', 'GanttView', 'mine:Only mine']);
+        });
+
+        it('moves to the pinned side on its own pin, and stays beside a pinned source', () => {
+            const shared = [view('ProjectListView', LIST), view('GanttView', GANTT, { isPin: true })];
+            const pinnedCopy = mine('mine000004', { title: 'Pinned copy', sourceViewId: LIST, isPin: true });
+            const besideGantt = mine('mine000005', { _id: GANTT, keyName: 'GanttView', name: 'Gantt', title: 'My gantt', sourceViewId: GANTT, isPin: true });
+
+            expect(titles(splitProjectViews(shared, [pinnedCopy, besideGantt]))).toEqual(['GanttView', 'mine:My gantt', 'mine:Pinned copy', 'ProjectListView']);
+        });
+    });
 });
 
 /* A render crash used to reach the user as "Nothing matches your filters", so they went

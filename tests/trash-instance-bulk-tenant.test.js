@@ -18,6 +18,10 @@ jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({
     },
 }));
 jest.mock('../Modules/Tasks/helpers/task_class', () => ({ task: {} }));
+jest.mock('../Modules/Tasks/helpers/taskWritePlacement', () => ({
+    ...jest.requireActual('../Modules/Tasks/helpers/taskWritePlacement'),
+    readableTaskIds: jest.fn(async (companyId, uid, taskIds) => taskIds),
+}));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');

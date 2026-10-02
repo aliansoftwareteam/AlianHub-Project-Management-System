@@ -28,7 +28,17 @@
         <div class="al__body ah-scroll">
             <div v-if="error" class="ah-empty">{{ error }}</div>
             <div v-else-if="busy && !rows.length" class="ah-empty">{{ $t('Audit.loading') }}</div>
-            <div v-else-if="!rows.length" class="ah-empty">{{ $t('Audit.none') }}</div>
+            <EmptyState
+                v-else-if="!rows.length"
+                :illustration="search ? 'search' : 'generic'"
+                data-test="audit-empty"
+                :heading-level="2"
+                :title="search ? $t('Audit.none_match') : $t('Audit.none')"
+                :message="search ? '' : $t('Audit.none_msg')"
+                :action-label="$t('Audit.clear_search')"
+                :action-allowed="Boolean(search)"
+                @action="clearSearch"
+            />
 
             <table v-else class="al__table">
                 <thead>
@@ -111,6 +121,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { apiRequest } from "@/services";
 import { useGetterFunctions } from "@/composable";
 import * as env from "@/config/env";
@@ -213,6 +224,7 @@ const load = async ({ append = false } = {}) => {
 const reload = () => { page.value = 1; load(); };
 const setScope = (key) => { scope.value = key; reload(); };
 const clearProject = () => { projectFilter.value = null; reload(); };
+const clearSearch = () => { search.value = ""; reload(); };
 const loadMore = () => { page.value += 1; load({ append: true }); };
 
 const undo = async (row) => {
@@ -261,8 +273,8 @@ onMounted(load);
 .al__chip-x { border: 0; background: transparent; cursor: pointer; color: inherit; font-size: 14px; line-height: 1; padding: 0 0 0 4px; }
 .al__body { flex: 1; min-height: 0; overflow: auto; padding: 16px 24px 24px; }
 .al__table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-card); overflow: hidden; }
-.al__table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 9px 12px; border-bottom: 1px solid var(--hairline); background: var(--surface-2); }
-.al__table td { padding: 11px 12px; border-bottom: 1px solid var(--hairline); vertical-align: top; font: var(--text-small); color: var(--ink); }
+.al__table th { text-align: left; font: var(--text-label); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: 9px var(--cell-pad-x, 12px); border-bottom: 1px solid var(--hairline); background: var(--surface-2); }
+.al__table td { padding: var(--table-pad-y, 11px) var(--cell-pad-x, 12px); border-bottom: 1px solid var(--hairline); vertical-align: top; font: 400 var(--row-font, 12.5px)/var(--lh-body, 1.5) var(--font-ui); color: var(--ink); }
 .al__row:last-child td { border-bottom: 0; }
 .al__row--undone { opacity: .66; }
 .al__row--refused { background: var(--danger-bg); }
@@ -277,14 +289,23 @@ onMounted(load);
 .al__blocked { color: var(--danger-ink); font-weight: 600; }
 .al__cost { color: var(--ink-2); margin-top: 3px; }
 .al__reason { color: var(--ink-2); }
-.al__meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+.al__meta { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; font-size: var(--fs-sm, 12.5px); }
 .al__run { color: var(--ink-2); }
 .al__more { display: flex; justify-content: center; padding: 14px 0 4px; }
 .al__note { margin: 10px 0 0; color: var(--ink-2); }
 @media (max-width: 900px) {
     .al__table thead { display: none; }
-    .al__table, .al__table tbody, .al__row, .al__table td { display: block; width: 100%; }
+    .al__table, .al__table tbody, .al__row, .al__table td { display: block; width: 100%; box-sizing: border-box; }
     .al__row { border-bottom: 1px solid var(--hairline); padding: 6px 0; }
     .al__table td { border-bottom: 0; padding: 4px 12px; }
+    .al__actor { white-space: normal; flex-wrap: wrap; }
+    .al__event, .al__reason, .al__id { overflow-wrap: anywhere; }
+}
+@media (max-width: 767px) {
+    .al.ah-page .ah-toolbar { padding: 0 16px; gap: 8px; }
+    .al .ah-toolbar__title { white-space: nowrap; }
+    .al__bar { padding: 10px 16px; }
+    .al__body { padding: 12px 16px 20px; }
+    .al__search { flex-basis: 100%; max-width: none; }
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
     <Teleport to="body">
         <div v-if="modelValue" class="wcs__back" @click.self="close">
-            <div ref="dialog" class="ah-card wcs" role="dialog" aria-modal="true" tabindex="-1" :aria-label="$t('WhoCanSee.title')" @keydown.esc.stop="close">
+            <div ref="dialog" class="ah-card wcs" role="dialog" aria-modal="true" tabindex="-1" :aria-label="$t('WhoCanSee.title')">
                 <div class="ah-card__head wcs__head">
                     <h3 class="ah-h3">{{ $t('WhoCanSee.title') }}</h3>
                     <button type="button" class="wcs__icon" :title="$t('WhoCanSee.close')" :aria-label="$t('WhoCanSee.close')" @click="close">
@@ -47,7 +47,7 @@
                             </div>
                             <ul class="wcs__people">
                                 <li v-for="userId in shownPeople(group)" :key="userId" class="wcs__person">
-                                    <UserProfile :data="{ title: nameOf(userId), image: getUser(userId)?.Employee_profileImageURL }" width="24px" :showDot="false" :isBorder="false" thumbnail="30x30" />
+                                    <UserProfile decorative :data="{ title: nameOf(userId), image: getUser(userId)?.Employee_profileImageURL }" width="24px" :showDot="false" :isBorder="false" thumbnail="30x30" />
                                     <span class="wcs__name">{{ nameOf(userId) }}</span>
                                 </li>
                             </ul>
@@ -65,10 +65,12 @@
 </template>
 
 <script setup>
-import { computed, defineEmits, defineProps, nextTick, ref, watch } from 'vue';
+import { computed, defineEmits, defineProps, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import { useGetterFunctions } from '@/composable';
+import { useFocusTrap } from '@/composable/useFocusTrap';
+import { useDialogEscape } from '@/composable/useDialogEscape';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 
@@ -137,10 +139,12 @@ function load() {
         .finally(() => { loading.value = false; });
 }
 
+const isOpen = computed(() => props.modelValue);
+useFocusTrap(dialog, isOpen);
+useDialogEscape(isOpen, close);
+
 watch(() => [props.modelValue, props.kind, props.itemId], ([open]) => {
-    if (!open) return;
-    load();
-    nextTick(() => dialog.value?.focus());
+    if (open) load();
 }, { immediate: true });
 </script>
 

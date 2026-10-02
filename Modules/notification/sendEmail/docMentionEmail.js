@@ -1,5 +1,5 @@
 const config = require('../../../Config/config');
-const { Notification_key: { DOC_MENTION }, TemplateType } = require('../../../Config/notificationKey');
+const { Notification_key: { DOC_MENTION, DOC_SHARED }, TemplateType } = require('../../../Config/notificationKey');
 const { formatNotificationDate } = require('../../../utils/dateHelpers');
 const { subjectText, urlSegment } = require('../../Template/emailText');
 const mainTemplate = require('../../Template/emailTemplate/main-template');
@@ -9,7 +9,12 @@ const SOMEONE = 'Someone';
 const A_DOC = 'a doc';
 const OPEN_DOC = 'Open doc';
 
-const isDocMention = (key) => key === DOC_MENTION;
+const HEADLINES = {
+    [DOC_MENTION]: (who, doc) => `${who} mentioned you in ${doc}`,
+    [DOC_SHARED]: (who, doc) => `${who} shared ${doc} with you`,
+};
+
+const isDocMention = (key) => Object.prototype.hasOwnProperty.call(HEADLINES, key);
 
 const docLink = (companyId, pageId) => `${config.WEBURL}/#/${urlSegment(companyId)}/pages/${urlSegment(pageId)}`;
 
@@ -20,7 +25,7 @@ const docMentionEmail = ({ notification = {} }) => {
     if (!OBJECT_ID.test(pageId)) return null;
     const who = subjectText(notification.User_Employee_Name) || SOMEONE;
     const doc = subjectText(change.pageTitle) || A_DOC;
-    const headline = `${who} mentioned you in ${doc}`;
+    const headline = (HEADLINES[notification.key] || HEADLINES[DOC_MENTION])(who, doc);
     const html = mainTemplate.renderHTML({
         templateHeader: { title: change.pageTitle || A_DOC, description: [] },
         templateBody: [{

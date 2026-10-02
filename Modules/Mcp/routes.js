@@ -7,7 +7,7 @@ const mcpOAuth = require('../../Config/mcpOAuth');
 const protectedResourceMetadata = (env) => (req, res) => res.json({
     resource: mcpOAuth.resource(env),
     authorization_servers: [mcpOAuth.issuer(env)],
-    scopes_supported: [...mcpOAuth.SCOPES],
+    scopes_supported: mcpOAuth.offeredScopes(),
     bearer_methods_supported: ['header'],
     resource_name: 'AlianHub MCP',
 });

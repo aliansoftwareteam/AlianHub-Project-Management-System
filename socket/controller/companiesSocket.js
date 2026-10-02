@@ -3,12 +3,9 @@ const {
     leaveRoom,
     upsertRoom,
     removeRoom,
-    findRoomsByPrefix,
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
-const { onJoin, prefixOfOwnRoom, isCompanyMember } = require('../roomAccess');
-
-const COMPANY_ROOM = 'selected_companies_';
+const { onJoin, prefixOfOwnRoom, isCompanyMember, toCompanyRoom, COMPANY_ROOM } = require('../roomAccess');
 
 exports.companiesSocketHandler = ({ socket, namespace }) => {
     onJoin(socket, 'joinCompaniesRoom',
@@ -37,29 +34,15 @@ function setEventName(type) {
 }
 
 const handleCompaniesChange = (changeData, includeUpdatedFields = false) => {
-    if (changeData.module !== 'companies') return;
-
-    try {
-        const companiesIdentifier = `selected_companies_${changeData.data.data._id}`;
-        // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): O(1) prefix lookup.
-        const relatedRooms = findRoomsByPrefix(companiesIdentifier);
-        if (!relatedRooms.length) return;
-
-        const eventName = setEventName(changeData.type);
-        const emitData = {
-            fullDocument: changeData.data.data,
-            ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
-        };
-
-        relatedRooms.forEach(data => {
-            if (!data.socket.rooms.has(data.roomName)) return;
-            data.namespace.to(data.roomName).emit(eventName, emitData);
-        });
-    } catch (error) {
-        console.error(error);
-    }
+    const company = changeData && changeData.module === 'companies' && changeData.data && changeData.data.data;
+    if (!company || !company._id) return undefined;
+    const eventName = setEventName(changeData.type);
+    const emitData = {
+        fullDocument: company,
+        ...(includeUpdatedFields && { updatedFields: changeData.updatedFields }),
+    };
+    return toCompanyRoom(company._id, (room) => room.namespace.to(room.roomName).emit(eventName, emitData));
 };
 
-// SOCKET-PERFORMANCE-PLAN #2: scoped to the `companies` module only.
 socketEmitter.on('companies:update', changeData => handleCompaniesChange(changeData, true));
 socketEmitter.on('companies:insert', changeData => handleCompaniesChange(changeData, false));

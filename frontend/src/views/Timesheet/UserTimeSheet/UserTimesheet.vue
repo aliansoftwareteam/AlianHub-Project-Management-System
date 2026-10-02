@@ -18,6 +18,7 @@
             <button type="button" :aria-label="$t('Time.next_week')" @click="shiftWeek(1)">›</button>
         </span>
         <span class="ah-chip" :class="statusChip.cls" :title="statusChip.title">{{ statusChip.label }}</span>
+        <ReopenWeek :approval="approval.current" :personName="(getUser(targetUser) || {}).Employee_Name || ''" :range="rangeLabel" @reopened="onReopened" />
         <TimesheetTabs active="mine" />
         <div class="tv-actions">
             <span v-if="timer.running.value" class="ah-chip ah-chip--ok ut2-timer">
@@ -60,10 +61,18 @@
             </div>
             <div v-if="!displayRows.length" class="ut2-empty">
                 <div v-if="loading" class="ah-small">{{ $t('Time.loading') }}</div>
-                <div v-else class="tv-empty">
-                    <span>{{ $t('Time.empty_week') }}</span>
-                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openLog()">{{ $t('Time.log_time') }}</button>
-                </div>
+                <EmptyState
+                    v-else
+                    compact
+                    illustration="time"
+                    data-test="time-empty"
+                    :heading-level="2"
+                    :title="$t('Time.empty_week_title')"
+                    :message="$t('Time.empty_week')"
+                    :action-label="$t('Time.log_time')"
+                    :sentence="$t('EmptyState.say_time')"
+                    @action="openLog()"
+                />
             </div>
             <div v-for="row in displayRows" :key="row.taskId" class="ut2-row">
                 <div class="ut2-task">
@@ -102,6 +111,10 @@
             <span class="ah-dot" :class="previous.dot"></span>
             <span class="ut2-prev">{{ $t('Time.last_week') }} <strong>{{ previous.label }}</strong><span v-if="previous.detail">, {{ previous.detail }}</span><span v-if="previous.hours"> · {{ previous.hours }}</span></span>
         </div>
+        <div v-if="reopening" class="tv-card" data-test="reopen-note">
+            <span class="ah-dot ah-dot--warn"></span>
+            <span>{{ $t('Time.reopened_by', { name: reopening.byName || $t('Time.someone'), date: moment(reopening.at).format('MMM D, HH:mm') }) }}</span>
+        </div>
         <div v-if="underHint" class="tv-card">
             <ShellIcon name="info" :size="13" class="tv-spark" />
             <span class="ut2-hint">{{ underHint.text }}</span>
@@ -120,6 +133,7 @@
 <script setup>
 import { ref, computed, inject, onMounted, watch } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -133,6 +147,8 @@ import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPla
 import AppState from '@/components/molecules/AppState/AppState.vue';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import LogTimeSheet from '@/views/TimeLog/LogTimeSheet.vue';
+import ReopenWeek from './ReopenWeek.vue';
+import { isOwnApproval, lastReopenOf } from '@/views/Approvals/approvalAccess';
 import { isOwnerOrAdmin } from "@/utils/roles";
 
 defineOptions({ name: 'UserTimesheet' });
@@ -216,11 +232,16 @@ const statusChip = computed(() => {
     const doc = approval.value.current;
     const status = statusOf(doc);
     const cls = { submitted: 'ah-chip--warn', approved: 'ah-chip--ok', rejected: 'ah-chip--danger' }[status] || '';
-    const label = t(`Time.status_${status}`);
+    const label = isOwnApproval(doc) ? t('Time.approved_own_week', { name: doc.reviewerName || t('Time.someone') }) : t(`Time.status_${status}`);
     const title = status === 'rejected' && doc.rejectionReason ? t('Time.reason', { reason: doc.rejectionReason }) : '';
     return { cls, label: title ? `${label} · ${doc.rejectionReason}` : label, title };
 });
 const isRejected = computed(() => statusOf(approval.value.current) === 'rejected');
+const reopening = computed(() => lastReopenOf(approval.value.current));
+const onReopened = (doc) => {
+    approval.value = { ...approval.value, current: doc };
+    flash(t('Time.reopened_ok'));
+};
 const canSubmit = computed(() => (isMe.value || isPrivileged.value) && ['draft', 'rejected'].includes(statusOf(approval.value.current)));
 const previous = computed(() => {
     const doc = approval.value.previous;
@@ -228,7 +249,7 @@ const previous = computed(() => {
     const hours = doc ? formatHm(doc.totalMinutes) : '';
     const who = doc && doc.reviewerName;
     if (status === 'submitted') return { dot: 'ah-dot--warn', label: t('Time.status_submitted').toLowerCase(), detail: who ? t('Time.awaiting_named', { name: who }) : t('Time.awaiting_approval'), hours };
-    if (status === 'approved') return { dot: 'ah-dot--ok', label: t('Time.status_approved').toLowerCase(), detail: who ? t('Time.approved_by', { name: who }) : '', hours };
+    if (status === 'approved') return { dot: 'ah-dot--ok', label: t('Time.status_approved').toLowerCase(), detail: who ? t(isOwnApproval(doc) ? 'Time.approved_by_own_week' : 'Time.approved_by', { name: who }) : '', hours };
     if (status === 'rejected') return { dot: 'ah-dot--danger', label: t('Time.status_rejected').toLowerCase(), detail: doc.rejectionReason ? t('Time.reason', { reason: doc.rejectionReason }) : (who ? t('Time.rejected_by', { name: who }) : ''), hours };
     return { dot: 'ut2-dot--none', label: t('Time.not_submitted'), detail: '', hours: '' };
 });
@@ -340,7 +361,7 @@ const stopTimer = async () => {
     busy.value.timer = true;
     try {
         const stopped = await timer.stop();
-        if (stopped) flash(t('Time.logged_ok', { h: formatHm(stopped.minutes), task: stopped.taskName }));
+        if (stopped) flash(stopped.tooShort ? t('TaskPanel.timer_too_short') : t('Time.logged_ok', { h: formatHm(stopped.minutes), task: stopped.taskName }));
         await load();
     } catch (e) {
         error.value = t(timeLogFailureKey(e, 'Time.log_failed'));
@@ -379,21 +400,21 @@ onMounted(() => {
 .ut2-scroll { overflow-x: auto; }
 .ut2-grid { min-width: calc(220px + var(--days) * 70px + 98px); font-size: 12.5px; overflow: hidden; transition: opacity var(--t-state) var(--ease); }
 .ut2-grid.is-loading { opacity: .6; }
-.ut2-row { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(var(--days), 64px) 70px; gap: 6px; padding: 10px 14px; align-items: center; text-align: center; font: 500 12px/1.2 var(--font-mono); border-bottom: 1px solid var(--hairline); }
+.ut2-row { display: grid; grid-template-columns: minmax(220px, 1fr) repeat(var(--days), 64px) 70px; gap: 6px; min-height: var(--row-h); padding: var(--cell-pad-y, 10px) var(--cell-pad-x, 14px); align-items: center; text-align: center; font: 500 var(--row-font, 12px)/1.2 var(--font-mono); border-bottom: 1px solid var(--hairline); }
 .ut2-row:last-child { border-bottom: 0; }
-.ut2-row--head { padding: 9px 14px; font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); }
+.ut2-row--head { min-height: 0; padding: 9px var(--cell-pad-x, 14px); font: var(--text-label); letter-spacing: .06em; color: var(--ink-2); }
 .ut2-row--head .is-today { color: var(--brand); }
 .ut2-row--total { background: var(--surface-2); font-weight: 600; border-bottom: 0; }
-.ut2-row--total .ut2-task { font: 600 12.5px/1.2 var(--font-ui); }
+.ut2-row--total .ut2-task { font: 600 var(--row-font, 12.5px)/1.2 var(--font-ui); }
 .ut2-row--total .is-today { color: var(--brand); }
 .ut2-row .is-empty { color: var(--ink-2); }
 .ut2-row .is-off { opacity: .7; }
-.ut2-task { text-align: left; font: 400 12.5px/1.3 var(--font-ui); display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ut2-task { text-align: left; font: 400 var(--row-font, 12.5px)/1.3 var(--font-ui); display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ut2-task__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ut2-bill { margin-left: auto; flex: none; height: 20px; padding: 0 7px; border-radius: var(--r-chip); border: 1px solid var(--border); background: transparent; color: var(--ink-2); font: 600 10.5px/1 var(--font-ui); cursor: pointer; transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
 .ut2-bill.is-on { background: var(--brand-tint); border-color: transparent; color: var(--brand); }
 .ut2-bill:disabled { opacity: .5; cursor: default; }
-.ut2-cell { height: 30px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease); }
+.ut2-cell { height: var(--control-h, 30px); border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease); }
 .ut2-cell:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--hairline); }
 .ut2-cell:disabled { cursor: default; }
 .ut2-cell.is-empty { color: var(--ink-2); }

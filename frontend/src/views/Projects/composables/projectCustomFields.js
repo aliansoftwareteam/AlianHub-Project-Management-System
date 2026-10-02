@@ -2,13 +2,14 @@ import { computed, unref } from 'vue';
 import { useStore } from 'vuex';
 import moment from 'moment';
 import { useCustomComposable } from '@/composable';
-import { computeCustomFieldValue } from '@/plugins/customFieldView/formulaEngine.js';
+import { computeCustomFieldValue, withRollupSources } from '@/plugins/customFieldView/formulaEngine.js';
 import { fieldAppliesToTask, fieldTaskTypes } from '@fieldTaskTypes';
+import { MODULE_FIELD_TYPES, typeModuleOf } from '@fieldTypes';
 
 export { fieldAppliesToTask, fieldTaskTypes };
 
 export const COMPUTED_TYPES = ['formula', 'rollup'];
-export const FIELD_TYPES = ['text', 'textarea', 'number', 'money', 'date', 'dropdown', 'checkbox', 'email', 'phone', ...COMPUTED_TYPES];
+export const FIELD_TYPES = ['text', 'textarea', 'number', 'money', 'date', 'dropdown', 'checkbox', 'email', 'phone', ...MODULE_FIELD_TYPES, ...COMPUTED_TYPES];
 
 /* The same selection the task panel's custom field section makes (customFieldRender). */
 export function projectFieldDefs(defs, projectId) {
@@ -27,6 +28,8 @@ const rawValue = (task, def, allTasks) => {
     return typeof entry === 'object' ? entry.fieldValue : entry;
 };
 
+export const storedFieldValue = (task, def) => rawValue(task, def, []);
+
 const isBlank = (value) => value === undefined || value === null || value === '' || (Array.isArray(value) && !value.length);
 
 export function dropdownChoices(def, value) {
@@ -35,8 +38,10 @@ export function dropdownChoices(def, value) {
 }
 
 /* One display string per type, '' for nothing, so every view shows a value the same way. */
-export function customFieldText(def, task, { allTasks = [], dateFormat = 'DD/MM/YYYY' } = {}) {
+export function customFieldText(def, task, { allTasks = [], dateFormat = 'DD/MM/YYYY', userName } = {}) {
     const value = rawValue(task, def, allTasks);
+    const type = typeModuleOf(def?.fieldType);
+    if (type) return type.text(value, def, { userName });
     switch (def?.fieldType) {
         case 'checkbox':
             return value === true || value === 'true' ? '✓' : '';
@@ -66,7 +71,9 @@ export function shownFieldValues(columns, task, options = {}) {
             id: column.id,
             label: column.label || column.field.fieldTitle || '',
             text: customFieldText(column.field, task, options),
-            choices: column.field.fieldType === 'dropdown' ? dropdownChoices(column.field, storedEntry(task, column.field)?.fieldValue) : []
+            choices: column.field.fieldType === 'dropdown' ? dropdownChoices(column.field, storedEntry(task, column.field)?.fieldValue) : [],
+            field: column.field,
+            value: rawValue(task, column.field, [])
         }))
         .filter((entry) => entry.text);
 }
@@ -94,6 +101,11 @@ const NUMBER = /^-?\d+(\.\d+)?$/;
 export function customFieldPayload(def, input) {
     const type = def?.fieldType;
     if (COMPUTED_TYPES.includes(type)) return { invalid: true };
+    const typeModule = typeModuleOf(type);
+    if (typeModule) {
+        const { value, error } = typeModule.parse(typeModule.fromInput ? typeModule.fromInput(input) : input, def);
+        return error ? { invalid: true } : { fieldValue: value, _id: def._id };
+    }
     if (type === 'checkbox') return { fieldValue: input === true, _id: def._id };
     if (type === 'dropdown') return { fieldValue: isBlank(input) ? [] : [input], _id: def._id };
     const text = typeof input === 'string' ? input.trim() : input;
@@ -115,7 +127,14 @@ export function customFieldPayload(def, input) {
     return { fieldValue: String(text), _id: def._id };
 }
 
-export const emptyFieldDetail = (def) => ({ fieldValue: def?.fieldType === 'dropdown' ? [] : (def?.fieldType === 'checkbox' ? false : ''), _id: def?._id });
+const emptyValue = (def) => {
+    const type = typeModuleOf(def?.fieldType);
+    if (type) return Array.isArray(type.empty) ? [...type.empty] : type.empty;
+    if (def?.fieldType === 'dropdown') return [];
+    return def?.fieldType === 'checkbox' ? false : '';
+};
+
+export const emptyFieldDetail = (def) => ({ fieldValue: emptyValue(def), _id: def?._id });
 
 /* Values ride on the tasks the view already loaded, so nothing is fetched per row. */
 export function flatTasks(taskMaps, projectId) {
@@ -149,7 +168,9 @@ export function useProjectCustomFields(projectRef, { archived } = {}) {
         && Boolean(getters['settings/selectedCompany']?.planFeature?.customFields)
         && permission.value !== null && permission.value !== undefined);
 
-    const defs = computed(() => (enabled.value ? projectFieldDefs(getters['settings/finalCustomFields'], project.value._id) : []));
+    const defs = computed(() => (enabled.value
+        ? withRollupSources(projectFieldDefs(getters['settings/finalCustomFields'], project.value._id), getters['settings/finalCustomFields'])
+        : []));
     const canEdit = computed(() => enabled.value && permission.value === true && !unref(archived));
     const hasComputed = computed(() => defs.value.some((def) => COMPUTED_TYPES.includes(def.fieldType)));
 

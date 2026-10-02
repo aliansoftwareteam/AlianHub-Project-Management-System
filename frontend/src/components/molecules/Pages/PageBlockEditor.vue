@@ -43,13 +43,15 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import pageContent from '@pageContent';
+import { safeEditorDocument } from '@/utils/editorHtml';
+import { richHtml } from '@/utils/richHtml';
 import { canUseAi } from '@/composable/aiAvailability';
 import AiSelectionPanel from '@/components/molecules/AiSelection/AiSelectionPanel.vue';
 import { createSelectionTools } from '@/components/molecules/AiSelection/selectionTools';
 import { listsOfProject } from '@/utils/aiTargets';
 import { createBlockTools, TASK_LIST_LIMIT } from './blockTools';
 import { initials } from './docsFormat';
-import { decorateMentions, mentionElement, mentionQueryAt } from './docMentions';
+import { decorateMentions, mentionElement, mentionQueryAt, taskMentionItem } from './docMentions';
 import { useMentionLinks } from './useMentionLinks';
 
 const { contentToEditorData, blocksToHtml, emptyEditorData } = pageContent.default || pageContent;
@@ -176,8 +178,7 @@ const mentionSources = {
             .map((page) => ({ type: 'doc', id: String(page._id), label: page.title || t('Docs.untitled') }));
     },
     async tasks(query) {
-        return (await toolContext.searchTasks(query, ''))
-            .map((task) => ({ type: 'task', id: String(task._id), label: [task.TaskKey, task.TaskName].filter(Boolean).join(' '), meta: task.TaskKey || '' }));
+        return (await toolContext.searchTasks(query, '')).map(taskMentionItem);
     },
 };
 
@@ -321,8 +322,11 @@ function selectionTools() {
     return createSelectionTools({ t, onPick: (pick) => selectionPanel.value?.open(pick), canSplit: Boolean(selectionTarget.value) });
 }
 
+/* The stock tools draw a block's stored text as HTML, so a page is held to what its preview shows before it is drawn. */
+const safePage = (data) => safeEditorDocument(data, { inline: richHtml });
+
 function seedData() {
-    return contentToEditorData(props.seed || {});
+    return safePage(contentToEditorData(props.seed || {}));
 }
 
 async function emitChange() {
@@ -359,14 +363,14 @@ async function applyBlocks(payload) {
     } else if (payload.mode === 'prepend') {
         incoming.blocks = [...(incoming.blocks || []), ...(previous.blocks || [])];
     }
-    await editor.value.render(incoming.blocks && incoming.blocks.length ? incoming : emptyEditorData());
+    await editor.value.render(incoming.blocks && incoming.blocks.length ? safePage(incoming) : emptyEditorData());
     await emitChange();
     return previous;
 }
 
 async function restore(data) {
     if (!editor.value || !data) return;
-    await editor.value.render(data.blocks && data.blocks.length ? data : emptyEditorData());
+    await editor.value.render(data.blocks && data.blocks.length ? safePage(data) : emptyEditorData());
     await emitChange();
 }
 

@@ -5,6 +5,7 @@ const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard')
 const { ROLE_GUEST } = require('../../../Config/roleTypes');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { visibilityStage, toObjectIds } = require('../../Tasks/helpers/taskQueryGuard');
+const { ownOrNotPersonal } = require('../../PersonalList/ownership');
 
 // A scheduled run reads as the schedule's owner, exactly as a run that person
 // started would: the task filter their own list applies, narrowed further by the
@@ -27,13 +28,13 @@ const ownerMayRun = async (companyId, agent, ownerId) => {
     return { ok: false, reason: REFUSAL.NOT_ALLOWED };
 };
 
-/* The owner's task filter; {} means every project in the company. */
+/* The owner's task filter; one that names no ProjectID reads every project in the company. */
 const taskScopeFor = async (companyId, ownerId, agent) => {
     const stage = await visibilityStage(companyId, ownerId);
     const scope = stage ? { ...stage.$match } : {};
     const scoped = ((agent && agent.projectIds) || []).map(String);
     if (!scoped.length) return scope;
-    const visible = stage ? stage.$match.ProjectID.$in.map(String) : scoped;
+    const visible = scope.ProjectID ? scope.ProjectID.$in.map(String) : scoped;
     scope.ProjectID = { $in: toObjectIds(visible.filter((id) => scoped.includes(id))) };
     return scope;
 };
@@ -45,11 +46,11 @@ const ownerSeesTask = async (companyId, scope, taskId) => {
     }, 'findOne').catch(() => null);
 };
 
-const ownerSeesProject = async (companyId, scope, projectId) => {
+const ownerSeesProject = async (companyId, ownerId, scope, projectId) => {
     if (!OBJECT_ID.test(String(projectId || ''))) return false;
     if (scope.ProjectID && !scope.ProjectID.$in.map(String).includes(String(projectId))) return false;
     const project = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(projectId), deletedStatusKey: { $ne: 1 } }, { _id: 1 }],
+        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(projectId), deletedStatusKey: { $ne: 1 }, ...ownOrNotPersonal(ownerId) }, { _id: 1 }],
     }, 'findOne').catch(() => null);
     return Boolean(project);
 };

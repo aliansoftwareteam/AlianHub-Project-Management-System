@@ -1,6 +1,6 @@
 <template>
     <div class="dropdown-custom-field">
-        <div v-show="tabIndexCheck === 1">
+        <div v-show="tabIndexCheck === 1" data-field-tab="1">
             <CustomFieldInputComponent
                 :label="$t('PlaceHolder.field_label')"
                 :type="'text'"
@@ -15,23 +15,21 @@
                 :label="$t('PlaceHolder.placeholder')"
                 :type="'text'"
                 :placeholder="$t('PlaceHolder.Enter_Placeholder')"
-                :validations="'required:trim'"
+                :validations="''"
                 :bindValue="props.customFieldObject?.fieldPlaceholder ? props.customFieldObject.fieldPlaceholder : fieldPlaceholder"
                 :validationVisibility="'blur'"
-                :className="'custom__field-required'"
                 :name="'fieldPlaceholder'"
             />
             <CustomFieldInputComponent
                 :label="$t('Description.description')"
                 :type="'textarea'"
                 :placeholder="$t('PlaceHolder.Enter_Description')"
-                :validations="'required:trim|length:10'"
+                :validations="''"
                 :bindValue="props.customFieldObject?.fieldDescription ? props.customFieldObject.fieldDescription : fieldDescription"
                 :validationVisibility="'blur'"
-                :className="'custom__field-required'"
                 :name="'fieldDescription'"
             />
-            <DropDown mode="listbox" :zIndex="10" v-if="isType">
+            <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
                 <template #button>
                     <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                         <div class="custom__field-required">
@@ -59,8 +57,8 @@
                 </template>
             </DropDown>
         </div>
-        <div v-show="tabIndexCheck === 2">
-            <div class="options-area style-scroll">
+        <div v-show="tabIndexCheck === 2" data-field-tab="2">
+            <div class="options-area style-scroll" @keydown.enter="onOptionEnter" @paste="onOptionPaste">
                 <draggable v-model="options" item-key="id" tag="div" handle=".drag-icon">
                     <template #item="{ element, index }">
                         <RowComponent :key="element.id"
@@ -69,7 +67,7 @@
                             @deleteIndex="deleteRow($event)"
                             @editIndex="editRow"
                             :rowIndexs="rowIndexs"
-                            :isedit="props.customFieldObject?.fieldDescription ? true : false"
+                            :isedit="isEdit"
                             :fieldName="{ color: `option_color_${index}`, option: `option_${index}`}"
                             :isDeletable="options.length > 1"
                         />
@@ -77,6 +75,7 @@
                 </draggable>
             </div>
             <a class="blue btn-add-new" @click="addRow">+ {{$t('CustomField.add_another_item')}}</a>
+            <p v-if="!isEdit" class="options-hint">{{$t('CustomField.options_keyboard_hint')}}</p>
             <div class="mt-20px">
                 <h4 class="dark-gray font-size-14 m-0">{{$t('CustomField.predefined_options')}}</h4>
                 <div class="dropdown-main mt-10px">
@@ -88,7 +87,7 @@
                 <span class="font-size-12 gray">{{$t('CustomField.choose_ready_made_list')}}</span>
             </div>
         </div>
-        <div v-show="tabIndexCheck === 3">
+        <div v-show="tabIndexCheck === 3" data-field-tab="3">
             <h4 class="dark-gray font-size-14">{{$t('CustomField.selected_by_default')}}</h4>
             <div class="options-area style-scroll">
                 <div v-for="(row, index) in options" :key="index" class="d-flex mb-20px cursor-pointer">
@@ -112,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { inject, nextTick, ref, watch } from "vue";
 import draggable from 'vuedraggable';
 import { Country } from 'country-state-city';
 import CustomFieldInputComponent from "../../../customFieldSidebar/customFieldSidebarComponent/customFieldInputComponent/customFieldInputComponent.vue";
@@ -183,6 +182,8 @@ const options = ref(props.customFieldObject.fieldOptions ? JSON.parse(JSON.strin
     selected: false
 }]);
 const rowIndexs = ref([]);
+const isEdit = Boolean(props.customFieldObject?._id);
+const saveFieldForm = inject('saveFieldForm', () => {});
 const customFieldTypeUniqueId = ref(makeUniqueId(6));
 const type = ref(props?.customFieldObject?.type ? props?.customFieldObject?.type : 'task');
 
@@ -200,7 +201,7 @@ const addRow = () => {
         selected: false
     }
     
-    if(props.customFieldObject?.fieldDescription){
+    if(isEdit){
         if(options.value.filter((x) => x.label === "").length){
             return;
         }
@@ -219,10 +220,40 @@ const addRow = () => {
     }
 }
 
-// This function is used to delete selected option
 const deleteRow = (index) => {
     options.value.splice(index, 1);
 }
+
+const newRow = (label = "") => ({ id: makeUniqueId(5), color: "#34495E", value: "", label, selected: false });
+const rowOfInput = (target) => options.value.findIndex((row) => `focus${row.id}` === target?.id);
+const focusRow = (row) => nextTick(() => document.getElementById(`focus${row.id}`)?.focus());
+
+/* A new dropdown is typed without leaving the keyboard: Enter moves to the next option, and on an empty one it saves. */
+const onOptionEnter = (event) => {
+    const index = rowOfInput(event.target);
+    if (isEdit || index === -1 || event.isComposing) return;
+    event.preventDefault();
+    const label = String(event.target.value || "").trim();
+    options.value[index].label = label;
+    if (label) {
+        const next = options.value[index + 1];
+        if (!next || next.label) options.value.splice(index + 1, 0, newRow());
+        focusRow(options.value[index + 1]);
+        return;
+    }
+    if (options.value.length > 1) options.value.splice(index, 1);
+    nextTick(saveFieldForm);
+};
+
+const onOptionPaste = (event) => {
+    const index = rowOfInput(event.target);
+    const lines = String(event.clipboardData?.getData("text") || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (isEdit || index === -1 || lines.length < 2) return;
+    event.preventDefault();
+    const rows = lines.map((line) => newRow(line));
+    options.value.splice(index, options.value[index].label ? 0 : 1, ...rows);
+    focusRow(rows[rows.length - 1]);
+};
 
 const selectedObj = (obj) => {
     options.value = [];
@@ -256,7 +287,7 @@ const selectedObj = (obj) => {
 
 // Redirect to the tab where the validation error message is displayed.
 const handleTabComp = (node) => {
-    if (!(node._value.fieldDescription && node._value.fieldTitle && node._value.fieldPlaceholder)) {
+    if(!node._value.fieldTitle){
         tabIndexCheck.value = 1;
         emit('tabIndexUpdate', tabIndexCheck.value)
     } else if (options.value.length) {
@@ -354,3 +385,6 @@ const handleType = (val) => {
 };
 defineExpose({ handleTabComp, handleSubmitComp });
 </script>
+<style scoped>
+.options-hint { margin: 8px 0 0; color: var(--ink-2); font: var(--text-small); }
+</style>

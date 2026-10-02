@@ -180,8 +180,8 @@ import UpgradePlanModal from "@/components/atom/UpgradePlanModal/UpgradePlanModa
 </script>
 <style>
 .disablePlan{
-    background-color: #e7e7e7;
-    border : 1px solid #a29494 !important;
+    background-color: var(--fill);
+    border: 1px solid var(--border) !important;
     pointer-events: none;
 }
 </style>

@@ -17,14 +17,18 @@
                     <template v-else>
                         <button type="button" class="ah-detail__crumb-link" @click="open('project')">{{ projectData.ProjectName }}</button>
                         <template v-if="task.folderObjId && folderName">
+                            <template v-if="parentFolder">
+                                <span class="ah-detail__crumb-sep">›</span>
+                                <button type="button" class="ah-detail__crumb-link" @click="open('parentFolder')">{{ parentFolder.name }}</button>
+                            </template>
                             <span class="ah-detail__crumb-sep">›</span>
                             <button type="button" class="ah-detail__crumb-link" @click="open('folder')">{{ folderName }}</button>
                         </template>
                         <span class="ah-detail__crumb-sep">›</span>
                         <button type="button" class="ah-detail__crumb-link" @click="open('sprint')">{{ sprintName }}</button>
-                        <template v-if="task.isParentTask === false && parentTask">
-                            <span class="ah-detail__crumb-sep">›</span>
-                            <button type="button" class="ah-detail__crumb-link ah-mono" @click="open('parent')">{{ parentTask.TaskKey }}</button>
+                        <template v-if="ancestorChain.length">
+                            <span class="ah-detail__crumb-sep" aria-hidden="true">›</span>
+                            <TaskAncestorTrail :ancestors="ancestorChain" :current="task.TaskName" @open="openAncestor" />
                         </template>
                     </template>
                 </nav>
@@ -88,9 +92,13 @@
         </header>
 
         <TaskAgentStrip v-if="stripRun" :run="stripRun" />
+        <TaskAgentClaim v-if="task._id" :task-id="String(task._id)" :round="claimRound" />
 
         <div class="ah-detail__body">
             <div class="ah-detail__main ah-scroll" ref="mainEl">
+                <nav v-if="isMobile && ancestorChain.length" class="ah-detail__trail-row" :aria-label="$t('TaskPanel.parent_tasks')">
+                    <TaskAncestorTrail :ancestors="ancestorChain" @open="openAncestor" />
+                </nav>
                 <div class="ah-detail__title-row">
                     <Skelaton v-if="isSpinner && !task.TaskName" class="ah-detail__title-skeleton" />
                     <TaskDetailTitle
@@ -167,6 +175,7 @@
                                     @click="runQuickAction(action.id)"
                                 ><ShellIcon :name="action.icon" :size="13" />{{ action.label }}</button>
                             </div>
+                            <p v-if="atDepthLimit" class="ah-detail__depth-note ah-small">{{ $t('TaskPanel.subtask_depth_limit') }}</p>
                         </template>
                     </TaskDetailTab>
                     <TaskSubtaskList
@@ -177,6 +186,7 @@
                         :subtasks="subTasks"
                         :isMainSpinner="isSpinner"
                         @open="(sub) => openSubtask(sub)"
+                        @created="loadTask"
                     />
                     <TaskDetailTab
                         v-else-if="activeTab === 'files' && task._id && projectData._id"
@@ -267,6 +277,7 @@
                     :isMainSpinner="isSpinner"
                     :clientWidth="clientWidth"
                     @agent-run="loadAgentRun"
+                    @agent-handed="claimRound += 1"
                 >
                     <template #status>
                         <button
@@ -287,6 +298,7 @@
                     <span class="ah-detail__prop-label">{{ $t('TaskPanel.sprint') }}</span>
                     <button type="button" class="ah-detail__prop-link" @click="open('sprint')">{{ sprintName || '—' }}</button>
                 </div>
+                <TaskListsRow v-if="projectData._id" :task="task" :project="projectData" :homeName="sprintName" @changed="(extraLists) => reflectOwnUpdate({ extraLists })" />
                 <div class="ah-detail__prop">
                     <span class="ah-detail__prop-label">{{ $t('TaskPanel.type') }}</span>
                     <span>{{ taskTypeName || '—' }}</span>
@@ -324,6 +336,8 @@
                     <button v-else type="button" class="ah-detail__prop-link ah-small" @click="activeTab = 'relations'">{{ $t('TaskPanel.no_relations') }}</button>
                 </div>
 
+                <TaskGoals v-if="task._id" :task-id="task._id" />
+
                 <div class="ah-detail__foot ah-small">
                     <span v-if="task.createdAt">{{ $t('TaskPanel.created_by', { date: formatDay(task.createdAt), name: leaderName }) }}</span>
                     <span v-if="task.watchers?.length"> · {{ $t('TaskPanel.watched_by', { n: task.watchers.length }) }}</span>
@@ -357,7 +371,7 @@ import TaskDetailTab from "@/components/molecules/TaskDetailTab/TaskDetailTab.vu
 import TaskDetailRightSide from "@/components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue";
 import LinkedTasks from "@/components/organisms/LinkedTasks/LinkedTasks.vue";
 import Comments from "@/views/Projects/Comments/Comments.vue";
-import { mentionsAnAgent } from "@/utils/agentMention";
+import { mentionsAnAgent, mentionsOwnAi } from "@/utils/agentMention";
 import ActivityLog from "@/components/templates/ActivityLog/ActivityLog.vue";
 import PagesPanel from "@/components/molecules/Pages/PagesPanel.vue";
 import TagChip from "@/components/atom/TagChip/TagChip.vue";
@@ -370,13 +384,19 @@ import TaskTrackerHandoff from "./TaskTrackerHandoff.vue";
 import { showUndoToast } from "@/composable/useUndoToast";
 import { useEscapeLayer } from "@/composable/useEscapeLayer";
 import TaskSubtaskList from "./TaskSubtaskList.vue";
+import TaskAncestorTrail from "./TaskAncestorTrail.vue";
 import TaskTimerChip from "./TaskTimerChip.vue";
 import TaskTimeSection from "./TaskTimeSection.vue";
 import TaskAgentStrip from "./TaskAgentStrip.vue";
+import TaskAgentClaim from "./TaskAgentClaim.vue";
+import TaskListsRow from "./TaskListsRow.vue";
+import TaskGoals from "./TaskGoals.vue";
 import AiResultPreview from "@/components/molecules/AiPreview/AiResultPreview.vue";
 import { canControlRun } from "@/views/Ai/agentAccess";
 
 import taskClass from "@/utils/TaskOperations";
+import { onInstantEdit } from "@/utils/instantTaskEdit";
+import { ownEditsInFlight } from "@/utils/taskUpdateMarker";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig } from "@/config/publicConfig";
@@ -385,6 +405,7 @@ import { statusChipStyle } from "@/utils/statusChipColors";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { useUpdateTasks } from "@/views/Projects/helper";
 import { openTask, setTaskMeta } from "./useTaskOverlay";
+import { ancestorsOf, canAddSubtask } from "@/views/Projects/composables/taskDepth";
 import { useRoute, useRouter } from "vue-router";
 
 defineOptions({ name: "TaskDetailPanel" });
@@ -420,6 +441,7 @@ const isMobile = computed(() => clientWidth.value <= 767);
 
 const task = ref({});
 const parentTask = ref(null);
+const ancestorChain = ref([]);
 const projectData = ref({});
 // projectSlice, not projectData: this ref holds the whole detail payload (subtasks,
 // sprints), and the helper forwards what it is given straight into the PATCH body.
@@ -481,7 +503,7 @@ const completeHint = computed(() => (isDone.value
 const quickActions = computed(() => {
     const global = projectData.value?.isGlobalPermission;
     const list = [];
-    if (task.value?.isParentTask !== false && checkPermission("task.sub_task_create", global) === true) {
+    if (canAddSubtask(task.value) && checkPermission("task.sub_task_create", global) === true) {
         list.push({ id: "subtask", icon: "plus", label: t("TaskPanel.action_subtask"), hint: "" });
     }
     list.push({ id: "relate", icon: "link", label: t("TaskPanel.action_relate"), hint: t("TaskPanel.action_relate_hint") });
@@ -493,6 +515,8 @@ const quickActions = computed(() => {
     }
     return list;
 });
+const atDepthLimit = computed(() => Boolean(task.value?._id) && !canAddSubtask(task.value)
+    && checkPermission("task.sub_task_create", projectData.value?.isGlobalPermission) === true);
 const statusName = computed(() => task.value?.status?.text || projectData.value?.taskStatusData?.find((s) => s.key === task.value?.statusKey)?.name || "");
 const statusStyle = computed(() => {
     const status = projectData.value?.taskStatusData?.find((s) => s.key === task.value?.statusKey);
@@ -509,6 +533,12 @@ const sprintData = computed(() => {
 });
 const sprintName = computed(() => task.value?.sprintArray?.name || sprintData.value?.name || task.value?.sprintName || "");
 const folderName = computed(() => task.value?.sprintArray?.folderName || sprintData.value?.folderName || task.value?.folderName || "");
+/* The task read answers the task's own folder only; its parent is named when the open project's folders are in the store. */
+const parentFolder = computed(() => {
+    const parentId = projectData.value?.sprintsfolders?.[task.value?.folderObjId]?.parentFolderId;
+    if (!parentId) return null;
+    return ((getters["projectData/folders"] || {})[props.projectId] || []).find((folder) => String(folder._id) === String(parentId)) || null;
+});
 
 const subtaskCompletion = computed(() => {
     const valid = subTasks.value.filter((s) => s && (s.deletedStatusKey === 0 || s.deletedStatusKey === undefined));
@@ -525,7 +555,7 @@ const tabs = computed(() => {
     const list = [];
     if (isMobile.value && canComment.value) list.push({ id: "activity", label: t("TaskPanel.activity") });
     list.push({ id: "description", label: t("TaskPanel.description") });
-    if (task.value?.isParentTask !== false && checkPermission("task.sub_task_create", projectData.value?.isGlobalPermission) !== null) {
+    if (canAddSubtask(task.value) && checkPermission("task.sub_task_create", projectData.value?.isGlobalPermission) !== null) {
         const c = subtaskCompletion.value;
         list.push({ id: "subtasks", label: t("TaskPanel.subtasks"), count: c.total ? `${c.completed}/${c.total}` : "" });
     }
@@ -563,10 +593,15 @@ function projectSlice() {
     };
 }
 
+/* The panel shows its own copy of the task, which the store's row does not reach. */
+const stopFollowingEdits = onInstantEdit((taskId, fields) => {
+    if (String(taskId) === String(props.taskId)) task.value = { ...task.value, ...fields };
+});
+
 /* The actor's own socket room does not echo taskUpdate back, so push the change
    through the same mutations the listener uses and the list rows update at once. */
 function reflectOwnUpdate(updatedFields) {
-    task.value = { ...task.value, ...updatedFields };
+    task.value = { ...task.value, ...updatedFields, ...ownEditsInFlight(props.taskId) };
     const payload = { snap: {}, op: "modified", pid: String(task.value.ProjectID || props.projectId), sprintId: String(task.value.sprintId || props.sprintId), data: { ...task.value }, updatedFields };
     commit("projectData/mutateUpdateFirebaseTasks", payload);
     commit("projectData/mutateMongoUpdatedTask", payload);
@@ -580,7 +615,8 @@ function updateTaskName(val) {
         projectData: projectSlice(),
         taskData: task.value,
         obj: { previousTaskName: task.value.TaskName, userName: user.Employee_Name },
-        userData: userData()
+        userData: userData(),
+        announce: true
     }).then(() => {
         reflectOwnUpdate({ TaskName: val });
         $toast.success(t("Toast.Task_name_updated_successfully"), { position: "top-right" });
@@ -630,14 +666,15 @@ function setStatus(next, current, { undoing = false } = {}) {
         },
         projectData: projectSlice(),
         task: task.value,
-        userData: userData()
+        userData: userData(),
+        announce: true
     }).then(() => {
         reflectOwnUpdate({ status: { text: next.name, key: next.key, type: next.type, value: next.value }, statusType: next.type, statusKey: next.key });
         if (undoing) $toast.success(t("TaskPanel.change_undone"), { position: "top-right" });
         else if (current.key) showUndoToast({ message: t("Toast.Status_updated_successfully"), undo: () => setStatus(current, next, { undoing: true }) });
         else $toast.success(t("Toast.Status_updated_successfully"), { position: "top-right" });
-    }).catch(() => {
-        $toast.error(t("Toast.Status_not_updated"), { position: "top-right" });
+    }).catch((error) => {
+        console.error("ERROR in setStatus: ", error);
     }).finally(() => {
         statusPending.value = false;
     });
@@ -694,21 +731,16 @@ function open(val) {
                 ? { name: "ProjectFolderSprint", params: { ...base, sprintId: props.sprintId, folderId: task.value.folderObjId }, query }
                 : { name: "ProjectSprint", params: { ...base, sprintId: props.sprintId }, query });
             break;
+        case "parentFolder":
+            if (parentFolder.value) {
+                emit("close");
+                router.push({ name: "ProjectFolder", params: { ...base, folderId: parentFolder.value._id }, query });
+            }
+            break;
         case "folder":
             if (task.value.folderObjId) {
                 emit("close");
                 router.push({ name: "ProjectFolder", params: { ...base, folderId: task.value.folderObjId }, query });
-            }
-            break;
-        case "parent":
-            if (parentTask.value) {
-                openTask({
-                    companyId: props.companyId,
-                    projectId: props.projectId,
-                    sprintId: parentTask.value.sprintId || props.sprintId,
-                    folderId: parentTask.value.folderObjId || "",
-                    taskId: parentTask.value._id
-                });
             }
             break;
         case "filesLinks":
@@ -720,6 +752,16 @@ function open(val) {
         default:
             break;
     }
+}
+
+function openAncestor(row) {
+    openTask({
+        companyId: props.companyId,
+        projectId: props.projectId,
+        sprintId: row.sprintId || props.sprintId,
+        folderId: row.folderObjId || "",
+        taskId: row._id
+    });
 }
 
 function openSubtask(sub) {
@@ -797,11 +839,26 @@ function fetchSubtaskCount() {
     }).catch((error) => console.error("ERROR in fetchSubtaskCount: ", error));
 }
 
-function getParentTask() {
-    if (!task.value?.ParentTaskId) { parentTask.value = null; return; }
-    apiRequest("get", `${env.TASK}/${task.value.ParentTaskId}`).then((response) => {
-        if (response?.status === 200 && response?.data) parentTask.value = response.data;
-    }).catch((error) => console.error("error in getting the parent task", error));
+function showAncestors(rows) {
+    ancestorChain.value = rows;
+    parentTask.value = rows.find((row) => String(row._id) === String(task.value.ParentTaskId)) || null;
+}
+
+function loadAncestors() {
+    const parentId = task.value?.ParentTaskId;
+    if (!parentId) { showAncestors([]); return; }
+    const chain = ancestorsOf(task.value);
+    /* A subtask from before the chain was stored names only its parent. */
+    if (!chain.length) {
+        apiRequest("get", `${env.TASK}/${parentId}`).then((response) => {
+            if (response?.status === 200 && response?.data) showAncestors([response.data]);
+        }).catch((error) => console.error("error in getting the parent task", error));
+        return;
+    }
+    apiRequest("post", `${env.TASK}/find`, { findQuery: [{ $match: { _id: { objId: { $in: chain } } } }] }).then((response) => {
+        const byId = new Map((Array.isArray(response?.data) ? response.data : []).map((row) => [String(row._id), row]));
+        showAncestors(chain.map((id) => byId.get(id)).filter(Boolean));
+    }).catch((error) => console.error("error in getting the tasks above", error));
 }
 
 function indexSprintsAndFolders(id, sprintsResult, foldersResult) {
@@ -809,7 +866,7 @@ function indexSprintsAndFolders(id, sprintsResult, foldersResult) {
     const folders = {};
     (foldersResult || []).forEach((folder) => {
         if (folder.projectId !== id) return;
-        folders[folder._id] = { folderId: folder._id, name: folder.name, sprintsObj: {}, deletedStatusKey: folder.deletedStatusKey, legacyId: folder?.legacyId || "", id: folder._id, _id: folder._id };
+        folders[folder._id] = { folderId: folder._id, name: folder.name, sprintsObj: {}, deletedStatusKey: folder.deletedStatusKey, legacyId: folder?.legacyId || "", id: folder._id, _id: folder._id, parentFolderId: folder.parentFolderId || null };
     });
     (sprintsResult || []).forEach((sprint) => {
         if (sprint.projectId !== id) return;
@@ -833,12 +890,12 @@ function loadTask() {
         response.sprintsObj = sprints;
         response.sprintsfolders = folders;
         projectData.value = response;
-        task.value = response.tasks[0] || {};
+        task.value = { ...(response.tasks[0] || {}), ...ownEditsInFlight(props.taskId) };
         subTasks.value = response.subtasks || [];
         isSpinner.value = false;
         commit("projectData/setTaskDetailData", { isSubTaskData: true, data: subTasks.value });
         fetchSubtaskCount();
-        getParentTask();
+        loadAncestors();
         fetchRelations();
         refreshLogged();
         setTaskMeta(props.taskId, { taskKey: task.value.TaskKey, taskName: task.value.TaskName });
@@ -853,7 +910,7 @@ watch(taskDetailGetter, (newVal) => {
     if (!newVal) return;
     const { fullDocument, updatedFields, isSubTaskUpdate } = newVal;
     if (fullDocument && Object.keys(fullDocument).length) {
-        if (!isSubTaskUpdate) task.value = { ...task.value, ...fullDocument };
+        if (!isSubTaskUpdate) task.value = { ...task.value, ...fullDocument, ...ownEditsInFlight(props.taskId) };
         loadTask();
     }
     const deleted = updatedFields?.deletedStatusKey === 1 || updatedFields?.deletedStatusKey === 2;
@@ -991,12 +1048,16 @@ function onCommentInsert(data) {
     if (String(data?.fullDocument?.taskId || "") !== String(props.taskId)) return;
     summaryRef.value?.refresh?.();
     if (mentionsAnAgent(data.fullDocument.message)) loadAgentRun();
+    // The server files the hand-over just after it saves the comment, so the line is read a moment later.
+    if (mentionsOwnAi(data.fullDocument.message)) setTimeout(() => { claimRound.value += 1; }, HAND_OVER_SETTLE_MS);
 }
 
 /* The strip reads the open run on this task; a parent may still hand one in
  * (agentRun) and that wins, since it already knows more than the poll does. */
 const STRIP_STATUS = { running: "running", queued: "running", waiting_approval: "review" };
 const AGENT_RUN_POLL_MS = 15000;
+const HAND_OVER_SETTLE_MS = 1500;
+const claimRound = ref(0);
 const liveRun = ref(null);
 let agentRunPoll = null;
 const SESSION_STRIP_STATUS = { offered: "running", active: "running", completed: "done", failed: "failed", revoked: "failed", unresponsive: "failed" };
@@ -1075,6 +1136,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+    stopFollowingEdits();
     commit("projectData/setTaskDetailData", {});
     commit("projectData/setTaskdetailPayloadId", {});
     ["taskDetail_taskUpdate", "taskDetail_taskDelete", "taskDetail_taskInsert"].forEach((event) => socket?.value?.off?.(event));

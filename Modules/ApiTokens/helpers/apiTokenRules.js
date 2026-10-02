@@ -9,6 +9,8 @@ const MAX_NAME_LENGTH = 80;
 const SCOPES = Object.freeze(['read', 'write']);
 const MIN_EXPIRY_DAYS = 1;
 const MAX_EXPIRY_DAYS = 365;
+const DEFAULT_EXPIRY_DAYS = 30;
+const EXPIRY_NOTICE_DAYS = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const STRICT_GRACE_DAYS = 30;
 const LAST_USED_WRITE_INTERVAL_MS = 5 * 60 * 1000;
@@ -42,6 +44,8 @@ const maxDaysProblem = (raw = process.env.API_TOKEN_MAX_DAYS) => {
 };
 
 const maxExpiryDaysFor = ({ strict = isStrict() } = {}) => (strict ? maxLifetimeDays() : MAX_EXPIRY_DAYS);
+
+const defaultExpiryDays = ({ strict = isStrict() } = {}) => Math.min(DEFAULT_EXPIRY_DAYS, maxExpiryDaysFor({ strict }));
 
 const hasExpiryInput = (expiresInDays) => expiresInDays !== undefined && expiresInDays !== null && expiresInDays !== '';
 
@@ -106,13 +110,16 @@ const timeOf = (value) => {
     return Number.isFinite(ms) ? ms : 0;
 };
 
-/* Only a token that outlives its creation by more than the maximum can be over it,
+/* A renewal issues a new secret, so the lifetime of the one in use runs from then. */
+const issuedAtOf = (tokenDoc) => timeOf(tokenDoc?.renewedAt) || timeOf(tokenDoc?.createdAt);
+
+/* Only a token that outlives its issue by more than the maximum can be over it,
  * so the start of the cap is looked up for those alone. */
 const mayExceedMaxLifetime = (tokenDoc, { strict = isStrict(), maxDays = maxLifetimeDays() } = {}) =>
-    strict && Boolean(tokenDoc?.expiresAt) && timeOf(tokenDoc.expiresAt) > timeOf(tokenDoc.createdAt) + maxDays * DAY_MS;
+    strict && Boolean(tokenDoc?.expiresAt) && timeOf(tokenDoc.expiresAt) > issuedAtOf(tokenDoc) + maxDays * DAY_MS;
 
 /* A token whose expiry is further off than the maximum works for the maximum counted
- * from the later of when the cap first applied and its creation, like the grace for
+ * from the later of when the cap first applied and its issue, like the grace for
  * tokens without an expiry. With the start unknown, a token that expires further off
  * than the maximum from now is over it whenever the cap began, so it counts as stopped. */
 const lifetimeStanding = (tokenDoc, { strict = isStrict(), maxLifetimeSince, now = new Date(), maxDays = maxLifetimeDays() } = {}) => {
@@ -120,9 +127,19 @@ const lifetimeStanding = (tokenDoc, { strict = isStrict(), maxLifetimeSince, now
     if (!maxLifetimeSince) {
         return { state: timeOf(tokenDoc.expiresAt) > now.getTime() + maxDays * DAY_MS ? 'stopped' : 'ok', deadline: null };
     }
-    const deadline = new Date(Math.max(timeOf(maxLifetimeSince), timeOf(tokenDoc.createdAt)) + maxDays * DAY_MS);
+    const deadline = new Date(Math.max(timeOf(maxLifetimeSince), issuedAtOf(tokenDoc)) + maxDays * DAY_MS);
     if (timeOf(tokenDoc.expiresAt) <= deadline.getTime()) return { state: 'ok', deadline: null };
     return { state: now.getTime() < deadline.getTime() ? 'capped' : 'stopped', deadline };
+};
+
+/* Due once the end is within the notice window. A token made to last no longer than the window is left
+ * alone: its owner chose that end moments ago. */
+const expiryNoticeDue = (tokenDoc, now = new Date()) => {
+    const endsAt = timeOf(tokenDoc?.expiresAt);
+    const window = EXPIRY_NOTICE_DAYS * DAY_MS;
+    return tokenDoc?.active !== false && !tokenDoc?.expiryNoticeAt
+        && endsAt > now.getTime() && endsAt <= now.getTime() + window
+        && endsAt - issuedAtOf(tokenDoc) > window;
 };
 
 const lastUsedIsStale = (tokenDoc, now = new Date()) =>
@@ -135,6 +152,8 @@ module.exports = {
     SCOPES,
     MIN_EXPIRY_DAYS,
     MAX_EXPIRY_DAYS,
+    DEFAULT_EXPIRY_DAYS,
+    EXPIRY_NOTICE_DAYS,
     EXPIRY_OVER_MAX,
     STRICT_GRACE_DAYS,
     LAST_USED_WRITE_INTERVAL_MS,
@@ -146,7 +165,9 @@ module.exports = {
     maxLifetimeDays,
     maxDaysProblem,
     maxExpiryDaysFor,
+    defaultExpiryDays,
     validateCreateInput,
+    expiryNoticeDue,
     mayExceedMaxLifetime,
     lifetimeStanding,
     isExpired,

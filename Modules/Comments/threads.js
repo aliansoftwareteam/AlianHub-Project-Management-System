@@ -8,6 +8,8 @@ const { threadOf, canPostToThread } = require('./helpers/threadWriteAccess');
 const { taskIdMatch } = require('./helpers/taskIdMatch');
 const T = require('./helpers/commentThreads');
 const { notifyAssigned } = require('./helpers/threadNotices');
+const { readable } = require('./helpers/chatThreads');
+const { assignedDocComments } = require('../Pages/helpers/pageCommentAssignments');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const isId = (value) => OBJECT_ID.test(String(value || ''));
@@ -43,15 +45,15 @@ exports.listReplies = async (req, res) => {
         const companyId = companyOf(req);
         const { parentId } = req.query;
         if (!isId(parentId)) return refuse(res, 400, 'A valid parent comment id is required.');
-        const parent = await T.findComment(companyId, parentId);
-        if (!T.isTaskComment(parent)) return notFound(res);
+        const parent = await T.findThreadRoot(companyId, parentId);
+        if (!T.canHoldThread(parent)) return notFound(res);
         const access = await commentThreadAccess(companyId, req.uid, threadOf(parent));
         if (!access.allowed) return refuseThread(res, access);
         const replies = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMMENTS,
             data: [{ parentId: oid(parent._id), isDeleted: { $ne: true } }, {}, { sort: { createdAt: 1, _id: 1 } }],
         }, 'find');
-        return res.status(200).json({ status: true, data: replies || [] });
+        return res.status(200).json({ status: true, data: replies || [], root: readable(parent) });
     } catch (error) {
         return failed(res, 'listReplies', error);
     }
@@ -125,7 +127,9 @@ exports.actionItems = async (req, res) => {
 
 const threadKey = (comment) => Object.values(threadOf(comment)).join('|');
 
-/* Open comments assigned to the caller, limited to the tasks they can still open. */
+const assignedAtOf = (row) => new Date(row.assignedAt || 0).getTime();
+
+/* Open comments assigned to the caller, on the tasks they can still open and the docs they can still read. */
 exports.assignedToMe = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -149,11 +153,13 @@ exports.assignedToMe = async (req, res) => {
             data: [{ _id: { $in: taskIds } }, { TaskName: 1, TaskKey: 1 }],
         }, 'find') : [];
         const names = new Map((tasks || []).map((task) => [String(task._id), task]));
-        const data = visible.map((row) => {
+        const onTasks = visible.map((row) => {
             const plain = typeof row.toObject === 'function' ? row.toObject() : row;
             const task = names.get(String(row.taskId)) || {};
             return { ...plain, taskName: task.TaskName || '', taskKey: task.TaskKey || '' };
         });
+        const onDocs = await assignedDocComments(companyId, uid);
+        const data = [...onTasks, ...onDocs].sort((a, b) => assignedAtOf(b) - assignedAtOf(a)).slice(0, MAX_MINE);
         return res.status(200).json({ status: true, data });
     } catch (error) {
         return failed(res, 'assignedToMe', error);

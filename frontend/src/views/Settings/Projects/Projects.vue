@@ -8,7 +8,7 @@
         <div v-if="checkPermission('settings.settings_project_list') != null && checkPermission('project.project_details') != null">
             <div class="lising_mainDiv p-1 position-re">
                 <div class="totalCountActiveClose d-flex justify-content-between position-re">
-                    <input type="text" class="form-control project-search" v-model="searchValue" :placeholder="$t('PlaceHolder.search')"/>
+                    <input type="text" class="ah-input project-search" v-model="searchValue" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')"/>
                     <div class="d-flex">
                         <span class="tab-option" @click="activeTab = 0" :class="{'activeTab': activeTab === 0}">{{$t('Projects.all_project')}} ({{filterActiveProjects && filterActiveProjects.length ? filterActiveProjects.length : 0 }})</span>
                         <span class="tab-option" @click="activeTab = 1" :class="{'activeTab': activeTab === 1}">{{$t('Projects.closed_project')}} ({{filterCloseProject && filterCloseProject.length ? filterCloseProject.length : 0}})</span>
@@ -34,7 +34,7 @@
                 <div class="page_button">
 
                             <div  @click="goToPreviousPage"  :disabled="currentPage === 1">
-                               <span><img @click="goToPreviousPage" src= "@/assets/images/svg/right_arrow.svg" /> {{$t('Projects.previous')}}</span>
+                               <span><i class="ah-mask-icon pg__arrow" :style="maskOf(previousArrow)" aria-hidden="true" @click="goToPreviousPage"></i> {{$t('Projects.previous')}}</span>
                             </div>
                            
                         
@@ -50,7 +50,7 @@
                             </span>
                         </div>
                         <div @click="goToNextPage" :disabled="currentPage === totalPages">
-                            <span>{{$t('Home.Next')}} <img @click="nextPage" src= "@/assets/images/svg/left_arrow.svg" /></span>
+                            <span>{{$t('Home.Next')}} <i class="ah-mask-icon pg__arrow" :style="maskOf(nextArrow)" aria-hidden="true" @click="nextPage"></i></span>
                          </div>
                 </div>
 
@@ -70,7 +70,7 @@
                 <div class="page_button justify-content-center flex-wrap">
 
                             <div  @click="goToPreviousPage"  :disabled="currentPage === 1">
-                               <span class="d-block next_prev_btn"><img @click="goToPreviousPage" src= "@/assets/images/svg/right_arrow.svg" /> {{$t('Projects.previous')}}</span>
+                               <span class="d-block next_prev_btn"><i class="ah-mask-icon pg__arrow" :style="maskOf(previousArrow)" aria-hidden="true" @click="goToPreviousPage"></i> {{$t('Projects.previous')}}</span>
                             </div>
                            
                         
@@ -86,7 +86,7 @@
                             </span>
                         </div>
                         <div @click="goToNextPage" :disabled="currentPage === totalPages">
-                            <span class="d-block next_prev_btn">{{$t('Home.Next')}} <img @click="nextPage" src= "@/assets/images/svg/left_arrow.svg" /></span>
+                            <span class="d-block next_prev_btn">{{$t('Home.Next')}} <i class="ah-mask-icon pg__arrow" :style="maskOf(nextArrow)" aria-hidden="true" @click="nextPage"></i></span>
                          </div>
                 </div>
                 <div :class="[clientWidth > 576 ? 'd-flex' : '','justify-content-between','align-items-center']">
@@ -132,6 +132,7 @@ import ProjectsListingSetting from "@/components/molecules/ProjectsListingSettin
 import { useProjectsHelper } from '@/views/Projects/helper';
 import { useStore } from 'vuex';
 import { useCustomComposable } from "@/composable";
+import { maskOf } from "@/utils/iconMask";
 
 
 const { dispatchProjects} = useProjectsHelper();
@@ -140,6 +141,8 @@ const {getters} = useStore();
 const searchValue = ref("");
 const activeTab = ref(0);
 const noSearch = require("@/assets/images/svg/No-Search-Result.svg")
+const previousArrow = require("@/assets/images/svg/right_arrow.svg")
+const nextArrow = require("@/assets/images/svg/left_arrow.svg")
 const currentPage = ref(1);
 const itemsPerPage = ref(5);
 const setPages = ref([]);

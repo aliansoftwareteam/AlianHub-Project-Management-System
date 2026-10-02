@@ -28,6 +28,7 @@ beforeEach(() => {
     myCache.flushAll();
     mockProvider.configured = true;
     visibleTask.mockResolvedValue({ _id: TASK, TaskName: 'Launch' });
+    MongoDbCrudOpration.mockReset();
     MongoDbCrudOpration
         .mockResolvedValueOnce([{ count: 1 }])
         .mockResolvedValueOnce([{ message: 'Shipping Friday', userId: ME, createdAt: new Date() }]);

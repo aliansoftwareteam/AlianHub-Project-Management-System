@@ -44,9 +44,12 @@ const { removeCache } = require('../../utils/commonFunctions');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { addSprintFun } = require('../Sprints/controller');
 const { HandleHistory } = require('../Tasks/helpers/helper');
+const { cleanDescription, cleanHtml } = require('../Tasks/helpers/cleanRichText');
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { checkProjectPlan, removeProjectCount } = require('../createProject/controller');
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
+const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
+const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
@@ -267,14 +270,16 @@ function safeIsoDate(value) {
 // ─── Company context loading ───────────────────────────────────────────
 
 async function loadCompanyContext(companyId) {
-    const [projectStatusDoc, taskStatusDoc, taskTypeDoc, apps, tabComponents] = await Promise.all([
+    const [projectStatusDoc, taskStatusDoc, taskTypeDoc, apps, tabComponents, currency] = await Promise.all([
         MongoDbCrudOpration(companyId, { type: dbCollections.SETTINGS, data: [{ name: settingsCollectionDocs.PROJECT_STATUS }] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.SETTINGS, data: [{ name: settingsCollectionDocs.TASK_STATUS }] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.SETTINGS, data: [{ name: settingsCollectionDocs.TASK_TYPE }] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.APPS, data: [{}] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.PROJECT_TAB_COMPONENTS, data: [{}] }, 'find'),
+        defaultCurrencyOf(companyId),
     ]);
     return {
+        currency,
         projectStatusSettings: (projectStatusDoc && projectStatusDoc[0]) || { settings: [], totalStatus: 0 },
         taskStatusSettings: (taskStatusDoc && taskStatusDoc[0]) || { settings: [], totalStatus: 0 },
         taskTypeSettings: (taskTypeDoc && taskTypeDoc[0]) || { settings: [], totalStatus: 0 },
@@ -553,14 +558,14 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
         CompanyId: companyId,
         ProjectName: proj.ProjectName,
         ProjectCode: String(projectCode || '').toUpperCase(),
-        ProjectCurrency: { code: 'USD', symbol: '$' },
+        ProjectCurrency: context.currency || {},
         ProjectType: 'Fix',
         ProjectRequiredComponent: projectRequired,
         ProjectRequiredDefaultComponent: defaultRequired,
         LeadUserId: leadIds,
         AssigneeUserId: assignees,
         DueDate: '',
-        description: proj.description || '',
+        description: cleanHtml(String(proj.description || ''), 'strict'),
         // Set by the controller from the user's input, never by the LLM.
         proposalId: proj.proposalId || '',
         proposalIdNumeric: proj.proposalIdNumeric || '',
@@ -708,8 +713,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
     const watchers = Array.from(new Set([...assignees, String(creatorUid || '')].filter(Boolean)));
 
     const blocks = Array.isArray(task.descriptionBlocks) ? task.descriptionBlocks : [];
-    const descriptionBlock = wrapDescriptionBlock(blocks);
-    const rawDescription = blocksToText(blocks);
+    const { descriptionBlock, rawDescription } = cleanDescription({ descriptionBlock: wrapDescriptionBlock(blocks), rawDescription: blocksToText(blocks) });
 
     return {
         _id: id,
@@ -723,6 +727,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         TaskType: taskType ? (taskType.value || taskType.name || 'task') : 'task',
         TaskTypeKey: taskType ? taskType.key : 0,
         ParentTaskId: parentTaskId ? String(parentTaskId) : '',
+        ancestors: parentTaskId ? [String(parentTaskId)] : [],
         // Taken straight from the plan and capped, so a task that was split
         // shows its slice immediately rather than waiting on the background
         // estimator — which never runs for sub-tasks at all.
@@ -816,6 +821,11 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     }
     const docs = [...parentDocs, ...subtaskDocs];
 
+    const fieldDefinitions = new Map();
+    for (const doc of docs) {
+        doc.customField = (await storableFieldValues({ companyId, task: doc, definitions: fieldDefinitions })).customField;
+    }
+
     const typeIncrements = {};
     for (const d of docs) {
         const k = String(d.TaskTypeKey);
@@ -851,7 +861,7 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     }, 'updateOne').catch(() => {});
 
     for (const d of docs) {
-        try { socketEmitter.emit('insert', { type: 'insert', data: d, module: 'task' }); } catch (_e) { /* ignore */ }
+        try { socketEmitter.emit('insert', { type: 'insert', data: d, module: 'task', companyId }); } catch (_e) { /* ignore */ }
     }
 
     // Activity-log entry per created task — mirrors the manual task-create
@@ -1563,6 +1573,7 @@ module.exports = {
     loadSprintNamesForProject,
     normalizePlanColors,
     // Exported for tests / debugging.
+    loadCompanyContext,
     buildProjectDoc,
     mergeStatusList,
     rollback,

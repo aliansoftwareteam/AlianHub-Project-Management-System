@@ -1,5 +1,7 @@
 const mcpOAuth = require('../../Config/mcpOAuth');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
+const { holdsGrant, enabled } = require('./manageFlag');
+const workFlag = require('./workFlag');
 
 const TOOL_SCOPES = Object.freeze({
     'tasks.next': 'tasks:read',
@@ -22,6 +24,14 @@ const scopeForTool = (name) => {
     if (Object.prototype.hasOwnProperty.call(TOOL_SCOPES, name)) return TOOL_SCOPES[name];
     const dataTools = require('./dataTools');
     if (Object.prototype.hasOwnProperty.call(dataTools.SCOPES, name)) return dataTools.SCOPES[name];
+    const screenTools = require('./screenTools');
+    if (Object.prototype.hasOwnProperty.call(screenTools.SCOPES, name)) return screenTools.SCOPES[name];
+    const intentScope = require('./intentTools').scopeOf(name);
+    if (intentScope) return intentScope;
+    const manageTools = require('./manageTools');
+    if (enabled() && Object.prototype.hasOwnProperty.call(manageTools.SCOPES, name)) return manageTools.SCOPES[name];
+    const workTools = require('./workTools');
+    if (workFlag.enabled() && Object.prototype.hasOwnProperty.call(workTools.SCOPES, name)) return workTools.SCOPES[name];
     const sessionTools = require('./sessionTools');
     return sessionTools.owns(name) ? sessionTools.SCOPES[name] : null;
 };
@@ -32,9 +42,11 @@ const scopeForTool = (name) => {
  * tool; an OAuth token must never take that path, where empty would mean everything. */
 const grantedScopes = (tokenDoc) => {
     if (tokenDoc && tokenDoc.oauth) return mcpOAuth.SCOPES.filter((scope) => (tokenDoc.scopes || []).includes(scope));
-    const granted = new Set((tokenDoc?.scopes || []).filter((scope) => mcpOAuth.SCOPES.includes(scope)));
+    const granted = new Set((tokenDoc?.scopes || []).filter((scope) => mcpOAuth.SCOPES.includes(scope) && !mcpOAuth.MANAGE_SCOPES.includes(scope)));
     if (hasScope(tokenDoc, 'read')) mcpOAuth.READ_SCOPES.forEach((scope) => granted.add(scope));
     if (hasScope(tokenDoc, 'write')) mcpOAuth.WRITE_SCOPES.forEach((scope) => granted.add(scope));
+    // Neither read nor write reaches a manage scope: a personal token holds one only as a grant it was created with.
+    mcpOAuth.MANAGE_SCOPES.filter((scope) => holdsGrant(tokenDoc, scope)).forEach((scope) => granted.add(scope));
     return mcpOAuth.SCOPES.filter((scope) => granted.has(scope));
 };
 

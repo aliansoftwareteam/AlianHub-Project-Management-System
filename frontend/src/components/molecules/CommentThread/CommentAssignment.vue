@@ -64,10 +64,12 @@ import DropDownOption from "@/components/molecules/DropDownOption/DropDownOption
 
 defineOptions({ name: "CommentAssignment" });
 
+/* `actions` is how the change is saved: a task comment's by default, a doc comment's when its panel passes its own. */
 const props = defineProps({
     comment: { type: Object, required: true },
     people: { type: Array, default: () => [] },
-    allowAssign: { type: Boolean, default: true }
+    allowAssign: { type: Boolean, default: true },
+    actions: { type: Object, default: () => ({ assign: assignComment, resolve: resolveComment }) }
 });
 
 const { t } = useI18n();
@@ -119,11 +121,11 @@ function pick(id) {
     triggerLabel.value?.click();
     query.value = "";
     if (String(id) === String(current.value.assigneeId || "")) return;
-    run(() => assignComment(props.comment, id));
+    run(() => props.actions.assign(props.comment, id));
 }
 
 function toggleResolved() {
-    run(() => resolveComment(props.comment, !current.value.resolved));
+    run(() => props.actions.resolve(props.comment, !current.value.resolved));
 }
 </script>
 
@@ -135,9 +137,8 @@ function toggleResolved() {
 .cm-assign__action:hover { text-decoration: underline; }
 .cm-assign__action:focus-visible { outline: 2px solid var(--focus, var(--brand)); outline-offset: 1px; }
 .cm-assign__action:disabled { opacity: .6; cursor: default; }
-/* The legacy DropDown panel stays white in dark mode too, so its contents skip the theme tokens. */
-.cm-assign__search { width: 100%; box-sizing: border-box; margin-bottom: 6px; padding: 4px 8px; border: 1px solid #DFE1E6; border-radius: 6px; background: #fff; color: inherit; font: inherit; }
-.cm-assign__search:focus { outline: none; border-color: #2F3990; box-shadow: 0 0 0 2px rgba(47, 57, 144, .25); }
+.cm-assign__search { width: 100%; box-sizing: border-box; margin-bottom: 6px; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--r-input, 6px); background: var(--surface); color: inherit; font: inherit; }
+.cm-assign__search:focus { outline: none; border-color: var(--brand); box-shadow: var(--focus); }
 .cm-assign__option { color: inherit; }
 .cm-assign__empty { margin: 4px 0; color: inherit; opacity: .65; }
 .cm-assign__error { color: var(--danger-ink, var(--danger)); }

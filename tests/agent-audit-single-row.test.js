@@ -12,6 +12,10 @@ jest.mock('../Modules/Tasks/helpers/completionStore', () => ({
     recordWork: jest.fn(async () => null),
 }));
 jest.mock('../Modules/Agents/permissions', () => ({ holderMay: jest.fn(async () => ({ allowed: true, reason: '' })) }));
+jest.mock('../Modules/Tasks/helpers/taskWritePlacement', () => ({
+    ...jest.requireActual('../Modules/Tasks/helpers/taskWritePlacement'),
+    readableTaskIds: jest.fn(async (companyId, uid, ids) => ids.map(String)),
+}));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const actions = require('../Modules/Agents/actions');

@@ -2,7 +2,22 @@
     <ul ref="treeEl" class="pt" role="tree" :aria-label="label" @keydown="onKeydown" @focusin="onFocusin">
         <li v-for="row in rows" :key="row.key" role="none">
             <div role="none" class="pt-row" :class="[`pt-row--l${row.level}`, { 'is-current': row.key === currentKey }]">
+                <SprintRenameInput
+                    v-if="row.key === renamingKey && row.kind === 'sprint'"
+                    :project="openProject"
+                    :sprint="{ id: row.id, name: row.name, folderId: row.folderId || '' }"
+                    :sprints="openSprints"
+                    @done="endRename(row.key)"
+                />
+                <FolderRenameInput
+                    v-else-if="row.key === renamingKey"
+                    :project="openProject"
+                    :folder="{ id: row.id, name: row.name, parentFolderId: row.parentFolderId }"
+                    :folders="openFolders"
+                    @done="endRename(row.key)"
+                />
                 <router-link
+                    v-else
                     role="treeitem"
                     class="pt-row__link"
                     :to="row.to"
@@ -23,6 +38,7 @@
                     </template>
                 </router-link>
                 <FavouriteStar
+                    v-if="row.key !== renamingKey"
                     class="pt-row__star"
                     :type="row.kind"
                     :id="row.id"
@@ -32,6 +48,27 @@
                     :size="12"
                     tabindex="-1"
                     aria-hidden="true"
+                />
+                <FolderRowMenu
+                    v-if="row.kind === 'folder' && row.projectId === openProjectId && row.key !== renamingKey"
+                    :ref="(el) => setMenuRef(row.key, el)"
+                    :project="openProject"
+                    :folder="{ id: row.id, name: row.name, parentFolderId: row.parentFolderId }"
+                    :folders="openFolders"
+                    :sprints="openSprints"
+                    @reveal="expanded[`folder:${$event}`] = true"
+                    @rename="renamingKey = row.key"
+                />
+                <ListMenu
+                    v-if="row.kind === 'sprint' && row.projectId === openProjectId && row.key !== renamingKey"
+                    :ref="(el) => setMenuRef(row.key, el)"
+                    in-tree
+                    :project="openProject"
+                    :sprint="{ id: row.id, name: row.name, folderId: row.folderId || '' }"
+                    :folders="openFolders"
+                    :sprints="openSprints"
+                    @reveal="revealFolder"
+                    @rename="renamingKey = row.key"
                 />
                 <button
                     v-if="row.expandable"
@@ -53,14 +90,19 @@
 
 <script setup>
 import { computed, inject, nextTick, reactive, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import FavouriteStar from "@/components/atom/FavouriteStar/FavouriteStar.vue";
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { projectColor } from "@/components/molecules/Home/homeFormat";
+import { folderIdOf, isLiveFolder } from "@/utils/folderTree";
+import FolderRenameInput from "./FolderRenameInput.vue";
+import FolderRowMenu from "./FolderRowMenu.vue";
+import ListMenu from "@/components/molecules/ListMenu/ListMenu.vue";
+import SprintRenameInput from "./SprintRenameInput.vue";
 import { treeCache, loadProjectTree } from "./projectTreeData";
-import { identitiesOf, projectBranch, visibleRows } from "./projectTreeModel";
+import { folderRowKeys, identitiesOf, projectBranch, treeRoute, visibleRows } from "./projectTreeModel";
 
 defineOptions({ name: "ProjectTree" });
 
@@ -70,6 +112,7 @@ const props = defineProps({
 });
 
 const route = useRoute();
+const router = useRouter();
 const { getters } = useStore();
 const companyId = inject("$companyId");
 const userId = inject("$userId");
@@ -108,6 +151,36 @@ const currentKey = computed(() => {
 
 const colorOf = (id) => projectColor(props.projects.find((project) => String(project._id) === id) || {});
 
+/* Folder and list actions read the project's permission rules, and the store holds those of the open project alone. */
+const openProjectId = computed(() => String(route.params?.id || ""));
+const openProject = computed(() => props.projects.find((project) => String(project._id) === openProjectId.value) || { _id: openProjectId.value });
+const openFolders = computed(() => sourceOf(openProjectId.value)?.folders || []);
+const openSprints = computed(() => sourceOf(openProjectId.value)?.sprints || []);
+
+const menuRefs = {};
+const setMenuRef = (key, el) => {
+    if (el) menuRefs[key] = el;
+    else delete menuRefs[key];
+};
+
+const renamingKey = ref("");
+function endRename(key) {
+    renamingKey.value = "";
+    focusRow(key);
+}
+
+/* A folder that is archived or deleted while someone looks at it, or at a subfolder of it, has no
+   live page left, so they go to the project. Watched rather than told by the row's menu: the row,
+   and the menu with it, is gone by the time the write has answered. */
+const viewedFolderLive = computed(() => {
+    const viewed = String(route.params?.folderId || "");
+    const folder = viewed && openFolders.value.find((item) => folderIdOf(item) === viewed);
+    return folder ? isLiveFolder(openFolders.value, folder) : null;
+});
+watch(viewedFolderLive, (live, was) => {
+    if (was === true && live === false) router.push(treeRoute("project", { cid: companyId?.value, projectId: openProjectId.value }));
+});
+
 function setExpanded(key, open) {
     expanded[key] = open;
     if (open && key.startsWith("project:")) loadProjectTree(key.slice("project:".length));
@@ -117,9 +190,15 @@ function toggle(row) {
     setExpanded(row.key, !row.expanded);
 }
 
-watch(() => [route.params?.id, route.params?.folderId], ([id, folderId]) => {
+function revealFolder(folderId) {
+    folderRowKeys(openFolders.value, folderId).forEach((key) => { expanded[key] = true; });
+}
+
+watch(() => [route.params?.id, route.params?.folderId, openFolders.value.length], ([id, folderId]) => {
     if (id) setExpanded(`project:${id}`, true);
-    if (folderId) expanded[`folder:${folderId}`] = true;
+    if (!folderId) return;
+    expanded[`folder:${folderId}`] = true;
+    folderRowKeys(openFolders.value, folderId).forEach((key) => { expanded[key] = true; });
 }, { immediate: true });
 
 // Until the reader moves, the tab stop follows the current location, which may load after the projects.
@@ -156,7 +235,11 @@ function onKeydown(event) {
     const row = list[at];
     if (!row) return;
 
-    if (MOVES[event.key]) {
+    if ((event.key === "F10" && event.shiftKey) || event.key === "ContextMenu") {
+        if (!menuRefs[row.key]) return;
+        event.preventDefault();
+        menuRefs[row.key].open();
+    } else if (MOVES[event.key]) {
         event.preventDefault();
         focusRow(MOVES[event.key](list, at).key);
     } else if (event.key === "ArrowRight" && row.expandable) {
@@ -173,31 +256,38 @@ function onKeydown(event) {
 
 <style>
 .pt { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+/* A row is a List row less one step, so the tree follows the look. It lists every project, so it
+   takes no density from the open view. */
 .pt-row {
-    position: relative; display: flex; align-items: center; gap: 4px; min-height: 30px;
-    padding: 0 6px 0 0; border-radius: 7px; color: var(--ink);
+    position: relative; display: flex; align-items: center; gap: var(--gap-row, 4px);
+    min-height: max(var(--hit-min), calc(var(--row-h) - var(--sp-2)));
+    padding: 0 var(--sp-2) 0 0; border-radius: var(--r-md, 7px); color: var(--ink);
     transition: background var(--t-state) var(--ease);
 }
 .pt-row:hover { background: var(--surface-hover); }
 .pt-row.is-current { background: var(--brand-tint); }
 .pt-row__link {
-    flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 9px;
-    color: inherit; text-decoration: none; font: 400 13px/1.3 var(--font-ui); border-radius: 7px;
+    flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: center; gap: var(--sp-3);
+    padding: 0 var(--cell-pad-x, 9px);
+    color: inherit; text-decoration: none; border-radius: var(--r-md, 7px);
+    font: 400 var(--fs-md, 13px)/var(--lh-snug, 1.3) var(--font-ui);
 }
 .pt-row__link:hover { color: inherit; text-decoration: none; }
 .pt-row__link:focus-visible { outline: none; box-shadow: var(--focus); }
-.pt-row--l2 .pt-row__link { padding-left: 24px; font-size: 12.5px; color: var(--ink-label); }
-.pt-row--l3 .pt-row__link { padding-left: 38px; font-size: 12.5px; color: var(--ink-label); }
-.pt-row.is-current .pt-row__link { color: var(--brand); font-weight: 600; }
+.pt-row--l2 .pt-row__link, .pt-row--l3 .pt-row__link, .pt-row--l4 .pt-row__link { font-size: var(--row-font); color: var(--ink-label); }
+.pt-row--l2 .pt-row__link { padding-left: var(--sp-9); }
+.pt-row--l3 .pt-row__link { padding-left: calc(var(--sp-9) + var(--sp-6)); }
+.pt-row--l4 .pt-row__link { padding-left: calc(var(--sp-9) + 2 * var(--sp-6)); }
+.pt-row.is-current .pt-row__link { color: var(--brand); font-weight: var(--fw-title, 600); }
 .pt-row__dot { width: 7px; height: 7px; border-radius: 2px; flex: none; }
 .pt-row__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pt-row__count { margin-left: auto; font: 400 11px/1 var(--font-ui); color: var(--ink-2); }
+.pt-row__count { margin-left: auto; font: 400 var(--fs-xs, 11px)/1 var(--font-ui); color: var(--ink-2); }
 .pt-row.is-current .pt-row__count { color: var(--brand); }
 .pt-row__star { visibility: hidden; }
 .pt-row:hover .pt-row__star, .pt-row:focus-within .pt-row__star, .pt-row__star.is-on { visibility: visible; }
 .pt-row__chev {
-    min-width: 24px; min-height: 24px; display: inline-flex; align-items: center; justify-content: center;
-    border: 0; background: transparent; color: var(--ink-2); padding: 2px; cursor: pointer; border-radius: 4px;
+    min-width: var(--hit-min); min-height: var(--hit-min); display: inline-flex; align-items: center; justify-content: center;
+    border: 0; background: transparent; color: var(--ink-2); padding: 0; cursor: pointer; border-radius: var(--r-sm, 4px);
     transition: transform var(--t-state) var(--ease);
 }
 .pt-row__chev.is-open { transform: rotate(180deg); }
