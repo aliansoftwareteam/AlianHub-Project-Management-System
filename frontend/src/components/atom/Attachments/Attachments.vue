@@ -47,7 +47,7 @@
                         <Skelaton style="height: 30px;width: 25px;" class="border-radius-6-px mb-5px" />
                     </div>
                     <label v-else-if="!cloudProviders.length" for="UploadedFile">
-                        <img class="cursor-link cursor-pointer" src="@/assets/images/black_plus.png" />
+                        <img class="cursor-link cursor-pointer" src="@/assets/images/black_plus.png" :alt="$t('Attachments.upload_from_computer')" />
                     </label>
                     <template v-else>
                         <img

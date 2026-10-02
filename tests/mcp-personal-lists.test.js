@@ -118,10 +118,9 @@ beforeEach(() => {
 
 describe.each(PRIVILEGED)('what %s reads over MCP', (_who, uid) => {
     const ownKey = uid === OWNER ? 'OWNER-1' : 'ADMIN-1';
-    const ownChats = uid === OWNER ? ['CHAT-OWNER'] : [];
 
-    it('tasks.search leaves out someone else\'s personal list and the chats they are not in', async () => {
-        expect(keys(await call(uid, 'tasks.search', {}))).toEqual([...ownChats, 'OPEN-1', ownKey].sort());
+    it('tasks.search leaves out someone else\'s personal list and every chat', async () => {
+        expect(keys(await call(uid, 'tasks.search', {}))).toEqual(['OPEN-1', ownKey].sort());
         expect(keys(await call(uid, 'tasks.search', { query: 'THEIRS' }))).toEqual([]);
         expect(keys(await call(uid, 'tasks.search', { projectId: PL_SOMEONE }))).toEqual([]);
     });
@@ -131,8 +130,8 @@ describe.each(PRIVILEGED)('what %s reads over MCP', (_who, uid) => {
         expect((await call(uid, 'tasks.next', { projectId: PL_SOMEONE })).tasks).toEqual([]);
     });
 
-    it('task.get and comments.list answer "not found" for a task in someone else\'s personal list and for a chat they are not in', async () => {
-        for (const t of [fx.theirs, fx.theirsGiven, fx.chatTheirs]) {
+    it('task.get and comments.list answer "not found" for a task in someone else\'s personal list and for a chat, the one they are in included', async () => {
+        for (const t of [fx.theirs, fx.theirsGiven, fx.chatTheirs, fx.chatOwner]) {
             expect(await call(uid, 'task.get', { taskId: t._id })).toEqual({ error: 'task not found' });
             expect(await call(uid, 'comments.list', { taskId: t._id })).toEqual({ error: 'task not found' });
         }
@@ -174,9 +173,10 @@ describe.each(PRIVILEGED)('what %s reads over MCP', (_who, uid) => {
         ['task.status.set', (t) => ({ taskId: t._id, status: 'In progress' })],
         ['comment.create', (t) => ({ taskId: t._id, text: 'x' })],
         ['timelog.create', (t) => ({ taskId: t._id, minutes: 5 })],
-    ])('%s is refused on a task in someone else\'s personal list and on a chat they are not in', async (tool, args) => {
+    ])('%s is refused on a task in someone else\'s personal list and on a chat, the one they are in included', async (tool, args) => {
         await refused(call(uid, tool, args(fx.theirs)));
         await refused(call(uid, tool, args(fx.chatTheirs)));
+        await refused(call(uid, tool, args(fx.chatOwner)));
         expect(actions.perform).not.toHaveBeenCalled();
         await call(uid, tool, args(fx.open));
         expect(actions.perform).toHaveBeenCalledTimes(1);
@@ -199,15 +199,12 @@ describe.each(PRIVILEGED)('what %s reads over MCP', (_who, uid) => {
     it('a delegated session is not taken up on a task they cannot open', async () => {
         expect(await sessionAccess.canOpenTask(C, uid, await sessionAccess.taskOf(C, fx.theirs._id))).toBe(false);
         expect(await sessionAccess.canOpenTask(C, uid, await sessionAccess.taskOf(C, fx.chatTheirs._id))).toBe(false);
+        expect(await sessionAccess.canOpenTask(C, uid, await sessionAccess.taskOf(C, fx.chatOwner._id))).toBe(false);
         expect(await sessionAccess.canOpenTask(C, uid, await sessionAccess.taskOf(C, fx.open._id))).toBe(true);
     });
 });
 
 describe('what stays as it is', () => {
-    it('an owner reads the comments of a chat they are in', async () => {
-        expect((await call(OWNER, 'comments.list', { taskId: fx.chatOwner._id })).comments.map((c) => c.text)).toEqual(['a message to the owner']);
-    });
-
     it('the holder of a personal list reads and writes it', async () => {
         expect(keys(await call(SOMEONE, 'tasks.search', {}))).toEqual(['OPEN-1', 'THEIRS-1', 'THEIRS-2']);
         expect(await call(SOMEONE, 'task.get', { taskId: fx.theirs._id })).toMatchObject({ key: 'THEIRS-1' });
