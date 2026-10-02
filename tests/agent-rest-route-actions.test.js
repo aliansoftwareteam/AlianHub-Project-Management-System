@@ -52,7 +52,7 @@ const REACHED = 'reached its handler';
 const routes = {};
 const register = (method) => (routePath, ...handlers) => { routes[`${method} ${routePath}`] = handlers; };
 const app = { get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: register('USE') };
-['Tasks', 'Sprints', 'Pages', 'Importers'].forEach((name) => require(`../Modules/${name}/routes`).init(app));
+['Tasks', 'Sprints', 'Pages', 'Importers', 'createProject'].forEach((name) => require(`../Modules/${name}/routes`).init(app));
 
 const session = (uid) => ({ uid });
 const agentToken = (uid, extra = {}) => ({ uid, apiToken: { _id: '6f0000000000000000000101', kind: 'agent', name: 'Claude', userId: uid, scopes: ['read', 'write'], ...extra } });
@@ -106,6 +106,7 @@ const NO_ACTION = {
     'approving a drafted doc': ['PUT /api/v2/pages/:id/approve', {}, { id: PAGE }],
     'sharing a doc with someone': ['PUT /api/v2/pages/:id/shares/:userId', { role: 'view' }, { id: PAGE, userId: INSIDER }],
     'ending a share of a doc': ['DELETE /api/v2/pages/:id/shares/:userId', {}, { id: PAGE, userId: INSIDER }],
+    'creating a project': ['POST /api/v1/createproject', { ProjectName: 'New', ProjectCode: 'NEW', AssigneeUserId: [], LeadUserId: [] }],
 };
 
 /* New tasks that carry more than a filed task does. */
@@ -145,7 +146,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task_create', name: 'task_create', isParent: false, parentId: String(taskRules._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'sub_task_create', name: 'sub_task_create', isParent: false, parentId: String(taskRules._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
 });
-afterEach(() => { delete process.env.MCP_TOOLS_MANAGE; });
+afterEach(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK'].forEach((flag) => { delete process.env[flag]; }); });
 
 describe('a token created for an agent, on the write routes beside the task route', () => {
     it.each(Object.keys(NO_ACTION).flatMap((name) => AGENTS_OF.map(([label, uid]) => [name, label, uid])))('%s is refused for the agent of %s, and recorded', async (name, label, uid) => {
@@ -162,6 +163,7 @@ describe('a token created for an agent, on the write routes beside the task rout
 
     it('keeps refusing them whatever a flag or a grant on the token says', async () => {
         process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.MCP_TOOLS_WORK = 'on';
         const granted = agentToken(OWNER, { grants: ['tasks:manage'] });
 
         for (const [route, body, params] of Object.values(NO_ACTION)) {

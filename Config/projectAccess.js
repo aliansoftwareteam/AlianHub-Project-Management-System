@@ -66,6 +66,20 @@ const PROJECT_UPDATE_OPERATORS = ['$set', '$unset', '$push', '$pull', '$addToSet
 
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+/* The create form makes the project's id ahead (its icon is uploaded under it), and the create route pins the
+ * company and the creator itself. The form also sends the list maps and the task counter, empty: a new project
+ * starts with them as the schema has them, whatever is sent. Every other field the server keeps is refused. */
+const NEW_PROJECT_ROUTE_FIELDS = ['_id', 'CompanyId', 'companyId', 'projectCreatedBy'];
+const NEW_PROJECT_STARTING_FIELDS = ['sprintsObj', 'sprintsfolders', 'lastTaskId'];
+const NEW_PROJECT_KEPT_FIELDS = new Set([...SERVER_ONLY_FIELDS, 'deletedStatusKey']
+    .filter((field) => ![...NEW_PROJECT_ROUTE_FIELDS, ...NEW_PROJECT_STARTING_FIELDS].includes(field)));
+
+const fieldOf = (path) => path.split('.')[0];
+
+const fieldKeptFromNewProject = (body) => Object.keys(isPlainObject(body) ? body : {}).map(fieldOf).find((field) => NEW_PROJECT_KEPT_FIELDS.has(field));
+
+const withoutStartingFields = (body) => Object.fromEntries(Object.entries(body).filter(([path]) => !NEW_PROJECT_STARTING_FIELDS.includes(fieldOf(path))));
+
 const projectUpdateError = (body) => {
     const { updateObject, key } = body || {};
     if (key !== undefined && key !== null && key !== '' && !PROJECT_UPDATE_OPERATORS.includes(key)) {
@@ -298,6 +312,8 @@ module.exports = {
     READ,
     WRITE,
     fieldsOf,
+    fieldKeptFromNewProject,
+    withoutStartingFields,
     requireSupportedProjectUpdate,
     permissionsForProjectUpdate,
     canEditProject,
