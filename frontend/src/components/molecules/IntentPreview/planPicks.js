@@ -1,6 +1,7 @@
 // Which parts of a plan the person approving keeps. The server names each part a line stands for by a key,
-// "<kind>:<its place in the stored plan>", and says which part needs which (Modules/Agents/planChoice.js). What is
-// sent back is only those places, so the page can leave parts out and never add or reword one.
+// "<kind>:<its place in the stored plan>", says which part needs which (Modules/Agents/planChoice.js), and which
+// parts this person may not approve (Modules/Agents/planLocks.js). What is sent back is only the places kept, so
+// the page can leave parts out and never add or reword one.
 
 const textOf = (value) => (typeof value === 'string' ? value.trim() : '');
 const linesIn = (preview) => (Array.isArray(preview?.lines) ? preview.lines : []).filter((line) => line && typeof line === 'object');
@@ -10,6 +11,18 @@ const needsIn = (preview) => (preview?.needs && typeof preview.needs === 'object
 const neededBy = (preview, key) => (Array.isArray(needsIn(preview)[key]) ? needsIn(preview)[key] : []);
 
 export const canChoose = (preview) => keysIn(preview).length > 0;
+
+/* The parts this person may not approve, and with them every part that cannot be made without one of those. They
+ * are left out whatever is ticked. */
+export const lockedParts = (preview) => {
+    const known = keysIn(preview);
+    const locked = new Set((Array.isArray(preview?.locked) ? preview.locked : []).filter((key) => known.includes(key)));
+    const lock = (key) => known.filter((other) => !locked.has(other) && neededBy(preview, other).includes(key)).forEach((other) => { locked.add(other); lock(other); });
+    [...locked].forEach(lock);
+    return known.filter((key) => locked.has(key));
+};
+
+const leftOutOf = (preview, leftOut) => new Set([...(Array.isArray(leftOut) ? leftOut : []), ...lockedParts(preview)]);
 
 /* The name a part goes by on the card, by key. */
 export const pickNames = (preview) => new Map(linesIn(preview).flatMap((line) => {
@@ -22,7 +35,7 @@ export const pickNames = (preview) => new Map(linesIn(preview).flatMap((line) =>
 export const toggled = (preview, leftOut, key) => {
     const known = keysIn(preview);
     const out = new Set((Array.isArray(leftOut) ? leftOut : []).filter((held) => known.includes(held)));
-    if (!known.includes(key)) return [...out];
+    if (!known.includes(key) || lockedParts(preview).includes(key)) return [...out];
     const keep = (kept) => {
         if (!out.delete(kept)) return;
         neededBy(preview, kept).forEach(keep);
@@ -40,7 +53,7 @@ export const toggled = (preview, leftOut, key) => {
 /* What goes with the approval: for each kind of part on the card, the places kept. Null while everything is kept. */
 export const chosenParts = (preview, leftOut) => {
     const known = keysIn(preview);
-    const out = new Set(Array.isArray(leftOut) ? leftOut : []);
+    const out = leftOutOf(preview, leftOut);
     if (!known.some((key) => out.has(key))) return null;
     const chosen = {};
     known.forEach((key) => {
