@@ -651,8 +651,11 @@ const ALSO_BY_PEOPLE = {
     'timelog.delete': {
         'removing logged time for good': ['POST /api/v2/deleteManualLogtime', { projectId: P_OPEN, taskId: T_OPEN }],
     },
+    'fields.delete': {
+        'removing a field and its values for good': ['POST /api/v2/custom-fields/:fieldId/delete', {}, { fieldId: FIELD }],
+    },
     'file.delete': {
-        'removing a stored file': ['POST /api/v1/wasabi/deleteFile', { companyId: CID, path: 'Project/x' }],
+        'removing a stored file':['POST /api/v1/wasabi/deleteFile', { companyId: CID, path: 'Project/x' }],
     },
     'dashboard.manage': {
         'changing the dashboard of the person': ['POST /api/v1/dashboard', { cards: [] }],
