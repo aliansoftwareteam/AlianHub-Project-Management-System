@@ -108,9 +108,9 @@ const createdLabel = (p) => {
 .rap-wrapper {
     margin: 6px 0 14px;
     padding: 10px 12px;
-    border: 1px solid #E2E6FA;
+    border: 1px solid var(--border);
     border-radius: 8px;
-    background: #FBFCFF;
+    background: var(--surface-2);
 }
 .rap-head {
     display: flex;
@@ -120,7 +120,7 @@ const createdLabel = (p) => {
 .rap-title {
     font-size: 13px;
     font-weight: 600;
-    color: #1F212A;
+    color: var(--ink);
 }
 .rap-count {
     display: inline-flex;
@@ -129,8 +129,8 @@ const createdLabel = (p) => {
     min-width: 18px;
     height: 18px;
     padding: 0 6px;
-    background: #EEF0FE;
-    color: #6473E8;
+    background: var(--brand-tint);
+    color: var(--brand);
     border-radius: 9px;
     font-size: 11px;
     font-weight: 600;
@@ -140,7 +140,7 @@ const createdLabel = (p) => {
     margin: 4px 0 8px;
     font-size: 11px;
     line-height: 1.4;
-    color: #8A909C;
+    color: var(--ink-2);
 }
 .rap-list {
     display: flex;
@@ -154,21 +154,21 @@ const createdLabel = (p) => {
     align-items: center;
     gap: 8px;
     padding: 7px 10px;
-    background: #fff;
-    border: 1px solid #EDF0F7;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     /* Same green left marker the project sidebar uses for "new" projects. */
-    border-left: 2px solid #3ba510;
+    border-left: 2px solid var(--ok);
     border-radius: 6px;
     cursor: pointer;
     transition: background 0.15s ease, border-color 0.15s ease;
 }
 .rap-row:hover {
-    background: #F6F8FF;
+    background: var(--surface-hover);
 }
 .rap-row-selected {
-    background: #F2F4FE;
-    border-color: #C9D0F8;
-    border-left-color: #3ba510;
+    background: var(--surface-hover);
+    border-color: var(--brand-border);
+    border-left-color: var(--ok);
 }
 /* Dismiss (X) — leftmost in the row, just inside the green marker. Subtle
    grey by default, turns red on hover to read as a "remove" action. */
@@ -183,13 +183,13 @@ const createdLabel = (p) => {
     border: none;
     border-radius: 4px;
     background: transparent;
-    color: #B6BCC9;
+    color: var(--ink-2);
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease;
 }
 .rap-dismiss:hover {
-    background: #FDECEC;
-    color: #E5484D;
+    background: var(--danger-bg);
+    color: var(--danger);
 }
 .rap-icon {
     display: inline-flex;
@@ -201,11 +201,11 @@ const createdLabel = (p) => {
     border-radius: 5px;
     font-size: 11px;
     font-weight: 600;
-    color: #fff;
+    color: var(--on-brand);
     overflow: hidden;
 }
 .rap-icon-fallback {
-    background: #6473E8;
+    background: var(--brand);
 }
 .rap-icon-img {
     object-fit: cover;
@@ -214,7 +214,7 @@ const createdLabel = (p) => {
     flex: 1;
     min-width: 0;
     font-size: 12.5px;
-    color: #1F212A;
+    color: var(--ink);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -222,8 +222,8 @@ const createdLabel = (p) => {
 .rap-new {
     flex-shrink: 0;
     padding: 1px 5px;
-    background: #1CB303;
-    color: #fff;
+    background: var(--ok);
+    color: var(--on-brand);
     font-size: 9px;
     font-weight: 600;
     letter-spacing: 0.3px;
@@ -233,13 +233,13 @@ const createdLabel = (p) => {
 .rap-date {
     flex-shrink: 0;
     font-size: 11px;
-    color: #94A3B8;
+    color: var(--ink-2);
 }
 .rap-checkbox {
     flex-shrink: 0;
     width: 16px;
     height: 16px;
-    accent-color: #6473E8;
+    accent-color: var(--brand);
     /* The whole row is the click target. */
     pointer-events: none;
 }
