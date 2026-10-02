@@ -28,8 +28,9 @@ const setPolicy = async (companyId, { allowedModes, requireCheckBeforeDone }) =>
     const set = {};
     if (modes) set['agentPolicy.allowedModes'] = modes;
     if (requireCheckBeforeDone !== undefined) set['agentPolicy.requireCheckBeforeDone'] = Boolean(requireCheckBeforeDone);
+    const from = await getPolicy(companyId);
     await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, { $set: set }] }, 'updateOne');
-    return { policy: await getPolicy(companyId) };
+    return { from, policy: await getPolicy(companyId) };
 };
 
 const getAccount = async (userId) => {

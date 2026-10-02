@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 import { config, flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 
@@ -28,10 +29,12 @@ const serve = ({ checks = false, onPut = null } = {}) => {
     const held = { allowedModes: [...MODES], requireCheckBeforeDone: checks };
     apiRequest.mockImplementation((method, url, body) => {
         if (method === 'get' && url === '/api/v2/agents/account') return ok({ account: null, policy: { ...held }, summary: {} });
+        if (method === 'get' && url === POLICY_URL) return ok({ ...held });
         if (method === 'put' && url === POLICY_URL) return onPut ? onPut(body) : ok(Object.assign(held, body));
         return ok([]);
     });
     apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { protocolVersion: '', tools: [], never: [] } } });
+    return held;
 };
 
 const store = (roleType) => createStore({
@@ -41,12 +44,20 @@ const store = (roleType) => createStore({
     },
 });
 
-const open = async (roleType, setup) => {
-    serve(setup);
-    const wrapper = mount(AiAccounts, { global: { plugins: [store(roleType)], mocks: { $t: t } } });
+const open = async (roleType, setup, provide = {}) => {
+    const held = serve(setup);
+    const wrapper = mount(AiAccounts, { global: { plugins: [store(roleType)], mocks: { $t: t }, provide } });
     await flushPromises();
+    wrapper.held = held;
     return wrapper;
 };
+const liveSocket = () => {
+    const listeners = {};
+    const socket = { on: vi.fn((event, handler) => { listeners[event] = handler; }), off: vi.fn((event, handler) => { if (listeners[event] === handler) delete listeners[event]; }) };
+    return { listeners, provide: { $socket: ref(socket) } };
+};
+const policyReads = () => apiRequest.mock.calls.filter(([method, url]) => method === 'get' && url === POLICY_URL).length;
+const modeBoxes = (wrapper) => wrapper.findAll('.acct-policy__row input').slice(0, MODES.length).map((input) => input.element.checked);
 
 const card = (wrapper) => wrapper.find('[data-test="workspace-done-check"]');
 const box = (wrapper) => wrapper.find('[data-test="done-check-switch"]');
@@ -116,5 +127,27 @@ describe('the workspace setting that has a person check before Done', () => {
         await flushPromises();
         expect(policyPuts()).toEqual([{ allowedModes: ['personal', 'local'] }]);
         expect(box(wrapper).element.checked).toBe(true);
+    });
+
+    it('follows a change made elsewhere: the switch and the allowed modes are read again, for a member too', async () => {
+        const live = liveSocket();
+        const wrapper = await open(ROLE_MEMBER, {}, live.provide);
+        expect(policyReads()).toBe(0);
+        Object.assign(wrapper.held, { requireCheckBeforeDone: true, allowedModes: ['workspace'] });
+        live.listeners.agentsChanged({ kind: 'policy' });
+        await flushPromises();
+        expect(policyReads()).toBe(1);
+        expect(box(wrapper).element.checked).toBe(true);
+        expect(modeBoxes(wrapper)).toEqual([true, false, false]);
+    });
+
+    it('reads nothing again for a change of another kind, and stops listening when the page closes', async () => {
+        const live = liveSocket();
+        const wrapper = await open(ROLE_OWNER, {}, live.provide);
+        live.listeners.agentsChanged({ kind: 'run' });
+        await flushPromises();
+        expect(policyReads()).toBe(0);
+        wrapper.unmount();
+        expect(live.listeners.agentsChanged).toBeUndefined();
     });
 });
