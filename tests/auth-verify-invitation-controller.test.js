@@ -33,6 +33,7 @@ const OTHER_USER = '6f0000000000000000000002';
 const LINK = 'link-token-abc';
 const INVALID_URL = { status: false, key: 1, statusText: 'Invalid URL.' };
 const CANNOT_ACCEPT = { status: false, statusText: 'This invitation cannot be accepted.' };
+const NOT_JOINED = { status: false, statusText: 'The invitation could not be accepted just now. Try again.' };
 
 const encode = (parts) => Buffer.from(parts, 'binary').toString('base64');
 const blob = (over = {}) => {
@@ -177,15 +178,83 @@ describe('checkPermission', () => {
         expect(mockRecordOwner).toHaveBeenCalledWith(expect.objectContaining({ companyId: COMPANY, userId: USER }));
     });
 
-    it('still accepts when a follow-up step fails, and logs it', async () => {
-        mockRecordOwner.mockRejectedValueOnce(new Error('owner log down'));
-        mockUpdateUser.mockRejectedValueOnce(new Error('user update down'));
+    it('still accepts when the notification settings or the unread count cannot be started, and logs each', async () => {
         mockImportNotifications.mockRejectedValueOnce(new Error('settings down'));
         mockNotificationCount.mockRejectedValueOnce(new Error('count down'));
         const res = await check({ id: blob() });
         expect(res.body).toEqual({ status: true, key: 5, companyId: COMPANY });
         await new Promise((resolve) => setImmediate(resolve));
-        expect(logger.error).toHaveBeenCalledTimes(4);
+        expect(logger.error).toHaveBeenCalledTimes(2);
+        expect(mockUpdateMember).toHaveBeenCalledTimes(1);
+    });
+
+    describe('when the company cannot be put on the account or the new owner cannot be recorded', () => {
+        const seatGivenBack = (userId) => [COMPANY, [
+            { _id: INVITATION, status: 2, userId: USER },
+            { $set: { status: 1, linkId: LINK, userId } },
+        ], 'findOneAndUpdate'];
+        const accountChanges = () => mockUpdateUser.mock.calls.map(([, obj]) => obj.data[1]);
+
+        it('answers a failure, not accepted, and makes the seat wait again with its link', async () => {
+            mockUpdateUser.mockRejectedValueOnce(new Error('user update down at db-host:27017'));
+            const res = await check({ id: blob() });
+            expect(res.statusCode).toBe(500);
+            expect(res.body).toEqual(NOT_JOINED);
+            expect(JSON.stringify(res.body)).not.toContain('db-host');
+            expect(mockUpdateMember).toHaveBeenCalledTimes(2);
+            expect(mockUpdateMember.mock.calls[1]).toEqual(seatGivenBack(USER));
+            expect(accountChanges()).toEqual([{ $addToSet: { AssignCompany: COMPANY } }]);
+            expect(mockRecordOwner).not.toHaveBeenCalled();
+            expect(mockImportNotifications).not.toHaveBeenCalled();
+            expect(mockNotificationCount).not.toHaveBeenCalled();
+            expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('user update down'));
+        });
+
+        it('answers a failure when the account to join is not found', async () => {
+            mockUpdateUser.mockResolvedValueOnce({ data: { matchedCount: 0, modifiedCount: 0 } });
+            const res = await check({ id: blob() });
+            expect(res.statusCode).toBe(500);
+            expect(res.body).toEqual(NOT_JOINED);
+            expect(mockUpdateMember.mock.calls[1]).toEqual(seatGivenBack(USER));
+            expect(mockRecordOwner).not.toHaveBeenCalled();
+        });
+
+        it('takes the company back off the account when recording the owner fails', async () => {
+            mockUpdateUser.mockResolvedValueOnce({ data: { matchedCount: 1, modifiedCount: 1 } });
+            mockRecordOwner.mockRejectedValueOnce(new Error('owner row down'));
+            const res = await check({ id: blob() });
+            expect(res.statusCode).toBe(500);
+            expect(res.body).toEqual(NOT_JOINED);
+            expect(accountChanges()).toEqual([{ $addToSet: { AssignCompany: COMPANY } }, { $pull: { AssignCompany: COMPANY } }]);
+            expect(mockUpdateMember.mock.calls[1]).toEqual(seatGivenBack(USER));
+            expect(mockImportNotifications).not.toHaveBeenCalled();
+        });
+
+        it('leaves the company on an account that already listed it', async () => {
+            mockUpdateUser.mockResolvedValueOnce({ data: { matchedCount: 1, modifiedCount: 0 } });
+            mockRecordOwner.mockRejectedValueOnce(new Error('owner row down'));
+            const res = await check({ id: blob() });
+            expect(res.body).toEqual(NOT_JOINED);
+            expect(accountChanges()).toEqual([{ $addToSet: { AssignCompany: COMPANY } }]);
+        });
+
+        it('gives an invitation that named no account back without one', async () => {
+            seedInvitation({ userId: '', userEmail: 'ada@example.test' });
+            mockUpdateUser.mockRejectedValueOnce(new Error('user update down'));
+            const res = await check({ id: blob() });
+            expect(res.body).toEqual(NOT_JOINED);
+            expect(mockUpdateMember.mock.calls[1]).toEqual(seatGivenBack(''));
+        });
+
+        it('still answers the failure when the seat cannot be given back, and logs that too', async () => {
+            mockUpdateUser.mockRejectedValueOnce(new Error('user update down'));
+            mockUpdateMember.mockImplementationOnce(async (companyId, data) => ({ data: { _id: data[0]._id } }));
+            mockUpdateMember.mockRejectedValueOnce(new Error('seat write down'));
+            const res = await check({ id: blob() });
+            expect(res.statusCode).toBe(500);
+            expect(res.body).toEqual(NOT_JOINED);
+            expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('seat write down'));
+        });
     });
 
     it('accepts an invitation sent to an address with no account yet once a verified account holds it', async () => {
@@ -315,6 +384,18 @@ describe('acceptSignedIn', () => {
         expect(mockUpdateUser.mock.calls[0][1].data[1]).toEqual({ $addToSet: { AssignCompany: COMPANY } });
         expect(mockImportNotifications).toHaveBeenCalledWith(COMPANY, USER);
         expect(mockNotificationCount).toHaveBeenCalledWith(COMPANY, USER, 'Add');
+    });
+
+    it('answers a failure, not accepted, and makes the seat wait again when the company cannot be put on the account', async () => {
+        mockUpdateUser.mockRejectedValueOnce(new Error('user update down'));
+        const res = await accept();
+        expect(res.statusCode).toBe(500);
+        expect(res.body).toEqual(NOT_JOINED);
+        expect(mockUpdateMember.mock.calls[1]).toEqual([COMPANY, [
+            { _id: INVITATION, status: 2, userId: USER },
+            { $set: { status: 1, linkId: LINK, userId: USER } },
+        ], 'findOneAndUpdate']);
+        expect(mockImportNotifications).not.toHaveBeenCalled();
     });
 
     it('does not expire a pending invitation by age', async () => {
