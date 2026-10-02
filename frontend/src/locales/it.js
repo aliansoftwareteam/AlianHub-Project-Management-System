@@ -9066,7 +9066,15 @@ export default {
         "sort_ascending": "{by}, ascending",
         "sort_descending": "{by}, descending",
         "shows_mine": "Only the tasks of the person looking",
-        "fields_not_shown": "{n} field not shown | {n} fields not shown"
+        "fields_not_shown": "{n} field not shown | {n} fields not shown",
+        "due_today": "Today",
+        "due_tomorrow": "Tomorrow",
+        "due_this_week": "This week",
+        "due_next_week": "Next week",
+        "due_next_7_days": "The next 7 days",
+        "due_this_month": "This month",
+        "due_overdue": "Before today",
+        "due_range": "{from} to {to}"
     },
     "Integrations": {
         "title": "Integrations",

@@ -114,6 +114,12 @@ const chosen = (choices, value, fieldName) => {
     return field ? { by: '', field } : null;
 };
 
+const dueLine = (look) => {
+    const kept = setup.lookOf({ due: look.due, dueFrom: look.dueFrom, dueTo: look.dueTo });
+    if (kept.dueFrom) return { kind: 'dueFilter', from: kept.dueFrom, to: kept.dueTo };
+    return kept.due ? { kind: 'dueFilter', when: kept.due } : null;
+};
+
 /* What a view shows, line by line; `planned` are fields of the same plan it shows, which have a name and no id yet. */
 const lookLines = (look, projectId, { named, fieldNames }, planned = []) => {
     const fieldName = (id) => (id && fieldNames.get(`${projectId}:${id.toLowerCase()}`)) || '';
@@ -130,6 +136,7 @@ const lookLines = (look, projectId, { named, fieldNames }, planned = []) => {
         assigneesLine({ AssigneeUserId: look.assigneeIds }, projectId, named),
         statuses.length > 0 && { kind: 'statuses', names: statuses },
         priorities.length > 0 && { kind: 'priorities', values: priorities },
+        dueLine(look),
         textOf(look.search, setup.LOOK_MAX.search) && { kind: 'search', text: textOf(look.search, setup.LOOK_MAX.search) },
         columns.length + planned.length > 0 && { kind: 'columns', names: shown, others: columns.length + planned.length - shown.length },
     ];

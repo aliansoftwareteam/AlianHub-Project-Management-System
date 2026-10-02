@@ -1,3 +1,5 @@
+const { isDeepStrictEqual } = require('util');
+const { DateTime } = require('luxon');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
@@ -30,6 +32,16 @@ const DIRECTIONS = Object.freeze(['asc', 'desc']);
 const PRIORITIES = Object.freeze(['URGENT', 'HIGH', 'MEDIUM', 'LOW']);
 const SUBTASKS = Object.freeze(['collapsed', 'expanded']);
 const LOOK_MAX = Object.freeze({ assignees: 20, statuses: 20, status: 60, search: 200, columns: 30 });
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const IS = Object.freeze({ value: ':=', name: 'Is' });
+const BEFORE = Object.freeze({ value: ':<', name: 'Less_Than' });
+/* The spans the task filter offers for a due date, each with the comparison its row saves (frontend TaskFilter and buildFilterQuery). */
+const DUE = Object.freeze({
+    today: [IS, 'Today'], tomorrow: [IS, 'Tomorrow'], this_week: [IS, 'This week'], next_week: [IS, 'Next week'],
+    next_7_days: [IS, 'Next 7 days'], this_month: [IS, 'This month'], overdue: [BEFORE, 'Today'],
+});
+const DUE_FIELD = Object.freeze({ value: 'DueDate', name: 'due_date', type: 'date', filterOn: 'DueDate' });
+const DATE_RANGE = 'Date range';
 
 const FIELD_ROUTE = '/api/v1/customField';
 const ROUTES = Object.freeze({
@@ -196,6 +208,13 @@ const withdrawFields = async ({ companyId, who, projectId, fieldIds }) => {
 const isGroup = (value) => Object.hasOwn(GROUPS, idOf(value)) || isId(value);
 const isSort = (value) => Object.hasOwn(SORTS, idOf(value)) || isId(value);
 const idsOf = (value, max) => unique(listOf(value).filter(isId).map((id) => idOf(id).toLowerCase())).slice(0, max);
+const isDay = (value) => typeof value === 'string' && ISO_DAY.test(value) && DateTime.fromISO(value).isValid;
+const isSpan = (value) => typeof value === 'string' && Object.hasOwn(DUE, value);
+const isRange = (look) => isDay(look.dueFrom) && isDay(look.dueTo) && look.dueFrom <= look.dueTo;
+const dueOf = (look) => {
+    if (isRange(look)) return { dueFrom: look.dueFrom, dueTo: look.dueTo };
+    return isSpan(look.due) ? { due: look.due } : {};
+};
 
 /* What a caller names for a view, kept to what a saved view holds; a part left out is left to the view's own default. */
 const lookOf = (given) => {
@@ -212,10 +231,20 @@ const lookOf = (given) => {
         ...(assigneeIds.length ? { assigneeIds } : {}),
         ...(statuses.length ? { statuses } : {}),
         ...(priorities.length ? { priorities } : {}),
+        ...dueOf(look),
         ...(search ? { search } : {}),
         ...(SUBTASKS.includes(look.subtasks) ? { subtasks: look.subtasks } : {}),
         ...(showFieldIds.length ? { showFieldIds } : {}),
     };
+};
+
+const dueProblem = (look) => {
+    const ranged = look.dueFrom !== undefined || look.dueTo !== undefined;
+    if (look.due !== undefined && ranged) return 'name due or a range of days (dueFrom and dueTo), not both';
+    if (look.due !== undefined && !isSpan(look.due)) return `due must be one of ${Object.keys(DUE).join(', ')}`;
+    if (!ranged) return '';
+    if (!isDay(look.dueFrom) || !isDay(look.dueTo)) return 'a range of days needs dueFrom and dueTo, each a day as YYYY-MM-DD';
+    return look.dueFrom <= look.dueTo ? '' : 'dueFrom is after dueTo';
 };
 
 const lookProblem = (given) => {
@@ -223,7 +252,7 @@ const lookProblem = (given) => {
     if (look.groupBy !== undefined && !isGroup(look.groupBy)) return `groupBy must be one of ${Object.keys(GROUPS).join(', ')}, or the id of a custom field`;
     if (look.sortBy !== undefined && !isSort(look.sortBy)) return `sortBy must be one of ${Object.keys(SORTS).join(', ')}, or the id of a custom field`;
     if (look.sortDirection !== undefined && look.sortBy === undefined) return 'sortDirection needs sortBy';
-    return '';
+    return dueProblem(look);
 };
 
 const viewNameOf = (value) => lineOf(value, VIEW_NAME_MAX);
@@ -242,6 +271,14 @@ const noSource = (kind) => `this project has no ${kind} view to start from; the 
 /* The row the task filter saves for a field whose values are picked from a list. */
 const filterRow = (field, name, values) => ({ name: { value: field, name, type: 'array', filterOn: field }, comparison: { value: ':', name: 'Is' }, values, condition: '&&' });
 
+/* A day is kept with no zone, so each person's browser reads it as that day where they are. */
+const dueRow = (look) => {
+    if (look.dueFrom) return { name: DUE_FIELD, comparison: IS, values: [DATE_RANGE], condition: '&&', date: [look.dueFrom, look.dueTo].map((day) => `${day}T00:00:00`) };
+    if (!look.due) return null;
+    const [comparison, span] = DUE[look.due];
+    return { name: DUE_FIELD, comparison, values: [span], condition: '&&' };
+};
+
 /* The settings a saved view stores for what was named, fitted to the project as a view template is: a status or a
  * custom field the project does not have is left out, and the answer says which part lost something. */
 const settingsFor = async (companyId, project, look) => {
@@ -259,11 +296,33 @@ const settingsFor = async (companyId, project, look) => {
         filters: [
             keys.length ? filterRow('statusKey', 'status', keys) : null,
             listOf(look.priorities).length ? filterRow('Task_Priority', 'priority', look.priorities) : null,
+            dueRow(look),
         ].filter(Boolean),
         columns: { shown: listOf(look.showFieldIds).map((id) => `cf:${id}`) },
     };
     const fitted = await require('../ViewTemplates/templateStore').fitToProject(companyId, project, { settings: raw });
     return { settings: fitted.settings, leftOut: unique([...fitted.leftOut, ...(keys.length < named.length ? ['filters'] : [])]) };
+};
+
+const filterKey = (row) => JSON.stringify([row.name.filterOn, row.comparison.value, row.values.map(String).sort(), row.date]);
+const tasksShownBy = (settings) => ({
+    me: settings.me, assignees: [...settings.assignees].sort(), search: settings.search.trim().toLowerCase(), doneBy: settings.doneBy,
+    filters: settings.filters.map(filterKey).sort(),
+});
+
+/* The project's own saved view of that kind that already shows what was named and nothing narrower: the same
+ * tasks, and the same grouping when one is named. null when there is none, or the project lacks a status or a field named. */
+const savedViewShowing = async (companyId, project, kind, look) => {
+    const { cleanViewSettings } = require('../Project/helpers/viewSettings');
+    const { isCopyable } = require('../Project/controller/viewSettings');
+    const asked = lookOf(look);
+    const wanted = await settingsFor(companyId, project, asked);
+    if (wanted.leftOut.length) return null;
+    const shows = (view) => {
+        const held = cleanViewSettings(view.settings);
+        return (asked.groupBy === undefined || held.groupBy === wanted.settings.groupBy) && isDeepStrictEqual(tasksShownBy(held), tasksShownBy(wanted.settings));
+    };
+    return viewsOf(project).find((view) => view && view.keyName === VIEW_KINDS[kind] && isCopyable(view) && view.viewStatus !== false && view.isPrivate !== true && shows(view)) || null;
 };
 
 const addressOf = (companyId, made) => {
@@ -323,6 +382,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, lookOf, lookProblem, viewNameOf, sourceView, noSource,
-    FIELD_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX,
+    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
+    FIELD_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };

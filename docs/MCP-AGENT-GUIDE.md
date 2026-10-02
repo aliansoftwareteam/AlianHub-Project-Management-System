@@ -320,7 +320,7 @@ These need `MCP_TOOLS_WORK` and the write scope, and no grant. A field or a view
 { "name": "fields.create", "arguments": { "projectId": "<project id>", "fields": [{ "name": "Budget", "type": "money" }, { "name": "Region", "type": "dropdown", "options": ["North", "South"] }] } }
 ```
 
-`view.create`: add a saved view to one project. Arguments: `projectId`, `name`, `kind` (`list`, `board`, `table`, `calendar` or `workload`; a list when left out), and what the view shows: `groupBy` and `sortBy` (a built-in choice or the id of a custom field), `sortDirection`, `mine`, `assigneeIds`, `statuses` (by name), `priorities`, `search`, `subtasks` and `showFieldIds`. The view starts as a copy of the project's view of that kind, as "duplicate view" does; a project with no view of that kind answers so at once. A status or a field the project does not have is left out, and the result's `leftOut` names the part. The result holds the view's web address when the server has one set.
+`view.create`: add a saved view to one project. Arguments: `projectId`, `name`, `kind` (`list`, `board`, `table`, `calendar` or `workload`; a list when left out), and what the view shows: `groupBy` and `sortBy` (a built-in choice or the id of a custom field), `sortDirection`, `mine`, `assigneeIds`, `statuses` (by name), `priorities`, `search`, `subtasks`, `showFieldIds`, and a due date: `due` (`today`, `tomorrow`, `this_week`, `next_week`, `next_7_days`, `this_month` or `overdue`) or a range of days in `dueFrom` and `dueTo` (`YYYY-MM-DD`). The due date is stored as the row the task filter saves, so a span is counted from the day the view is opened, a day of a range is that day where the person looking is, and `overdue` is "due before today" whatever the status; add `statuses` to leave closed tasks out. The view starts as a copy of the project's view of that kind, as "duplicate view" does; a project with no view of that kind answers so at once. A status or a field the project does not have is left out, and the result's `leftOut` names the part. The result holds the view's web address when the server has one set.
 
 ```json
 { "name": "view.create", "arguments": { "projectId": "<project id>", "name": "My open work", "kind": "board", "groupBy": "priority", "mine": true } }
@@ -476,7 +476,13 @@ A prompt is fixed text too. It reads nothing itself: it tells the agent which to
 | `doc` | `pageId` | The doc |
 | `home`, `everything`, `projects`, `inbox`, `planner`, `docs`, `goals` | nothing | That screen |
 
-`view` is one of `list`, `board`, `calendar`, `gantt`, `table`, `workload`, `dashboard`, `activity`. The workload view opens on the current week; a link cannot carry another week, a grouping or a filter yet.
+`view` is one of `list`, `board`, `calendar`, `gantt`, `table`, `workload`, `dashboard`, `activity`. The workload view opens on the current week; a link cannot carry another week.
+
+A link carries no grouping or filter of its own: the project screen reads them from a saved view, and only the everything screen reads "mine" from its address. So:
+
+- `everything` with `mine: true` opens on the person's own tasks. It takes nothing else.
+- A `project` or a `list` takes `groupBy`, `mine`, `statuses`, `priorities` and `due` (or `dueFrom` and `dueTo`), as `view.create` does, with `view` one of `list`, `board`, `table`, `calendar` or `workload` (a list when left out). When the project has a saved view of that kind that shows exactly those tasks, grouped that way when a grouping is named, the link opens it and `savedView` holds its name. When it has none, the plain link comes back with a `note` that says so, and nothing is saved.
+- Any other screen or view refuses these arguments.
 
 ```json
 { "name": "screen.link", "arguments": { "screen": "project", "projectId": "<project id>", "view": "workload" } }

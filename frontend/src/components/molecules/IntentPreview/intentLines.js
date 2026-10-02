@@ -48,6 +48,7 @@ const FIELD_TYPES = Object.freeze(['text', 'textarea', 'number', 'money', 'date'
 const LAYOUTS = Object.freeze(['list', 'board', 'table', 'calendar', 'workload']);
 const GROUPS = Object.freeze(['status', 'assignee', 'priority', 'due_date']);
 const SORTS = Object.freeze(['due', 'priority', 'created', 'updated', 'name', 'status', 'assignee', 'points', 'estimate']);
+const DUE_SPANS = Object.freeze(['today', 'tomorrow', 'this_week', 'next_week', 'next_7_days', 'this_month', 'overdue']);
 
 const textsOf = (list) => (Array.isArray(list) ? list : []).map(textOf).filter(Boolean);
 
@@ -105,6 +106,12 @@ export const LINE_KINDS = {
     priorities: (t, line) => {
         const known = textsOf(line.values).filter((value) => PRIORITIES.includes(value.toLowerCase())).map((value) => t(`IntentPreview.priority_${value.toLowerCase()}`));
         return known.length ? { label: t('IntentPreview.line_priority'), text: known.join(', ') } : null;
+    },
+    dueFilter: (t, line, locale) => {
+        if (DUE_SPANS.includes(line.when)) return { label: t('IntentPreview.line_due'), text: t(`IntentPreview.due_${line.when}`) };
+        const [from, to] = [textOf(line.from), textOf(line.to)];
+        if (!DAY.test(from) || !DAY.test(to)) return null;
+        return { label: t('IntentPreview.line_due'), text: t('IntentPreview.due_range', { from: dateText(locale, from), to: dateText(locale, to) }) };
     },
     search: (t, line) => (textOf(line.text) ? { label: t('IntentPreview.line_search'), text: textOf(line.text) } : null),
     newStatuses: (t, line) => (textsOf(line.names).length ? { label: t('IntentPreview.line_new_statuses'), text: textsOf(line.names).join(', ') } : null),

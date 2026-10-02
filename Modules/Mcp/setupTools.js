@@ -16,6 +16,7 @@ const RAW_TEXT_MAX = 200;
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const ID = Object.freeze({ type: 'string', pattern: '^[a-fA-F0-9]{24}$' });
+const DAY = Object.freeze({ type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' });
 const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in a line; it is kept in the audit log' } });
 const input = (properties, required) => ({ type: 'object', additionalProperties: false, properties, required });
 const projectTarget = (args) => ({ projectId: str(args.projectId, 40) });
@@ -45,6 +46,9 @@ const LOOK = Object.freeze({
     assigneeIds: { type: 'array', maxItems: setup.LOOK_MAX.assignees, items: ID, description: 'Only tasks of these members' },
     statuses: { type: 'array', maxItems: setup.LOOK_MAX.statuses, items: { type: 'string', minLength: 1, maxLength: setup.LOOK_MAX.status }, description: 'Only tasks in these statuses, by name (see statuses.list)' },
     priorities: { type: 'array', maxItems: setup.PRIORITIES.length, items: { type: 'string', enum: [...setup.PRIORITIES] } },
+    due: { type: 'string', enum: Object.keys(setup.DUE), description: 'Only tasks due in this span, counted from the day the view is opened; overdue is due before today, whatever the status' },
+    dueFrom: { ...DAY, description: 'Only tasks due from this day to dueTo, as YYYY-MM-DD; in place of due' },
+    dueTo: DAY,
     search: { type: 'string', maxLength: setup.LOOK_MAX.search, description: 'Only tasks whose name holds this text' },
     subtasks: { type: 'string', enum: [...setup.SUBTASKS] },
     showFieldIds: { type: 'array', maxItems: setup.LOOK_MAX.columns, items: ID, description: 'Custom fields to show as columns' },
@@ -154,4 +158,4 @@ const TOOLS = [
     },
 ];
 
-module.exports = { TOOLS };
+module.exports = { TOOLS, LOOK };
