@@ -33,7 +33,7 @@
 
 .lang__previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .lang__preview { display: flex; flex-direction: column; gap: 9px; }
-.lang__preview--rtl { border: 1.5px solid rgba(47, 57, 144, .3); }
+.lang__preview--rtl { border: 1.5px solid var(--brand-border); }
 .lang__task {
     display: flex;
     align-items: center;
