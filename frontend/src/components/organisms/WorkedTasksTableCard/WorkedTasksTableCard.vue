@@ -143,12 +143,12 @@ onMounted(load);
 
 <style scoped>
 .wtt { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
-.wtt-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
+.wtt-msg { color: var(--ink-2); font-size: 12px; padding: 10px 0; }
 .wtt-table-wrap { overflow: auto; }
 .wtt-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
-.wtt-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid #eef0f6; position: sticky; top: 0; background: #fff; }
+.wtt-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--hairline); position: sticky; top: 0; background: var(--surface); }
 .wtt-table th.wtt-num { text-align: right; }
-.wtt-table td { padding: 5px 6px; border-bottom: 1px solid #f4f5f9; color: #3a3f52; }
+.wtt-table td { padding: 5px 6px; border-bottom: 1px solid var(--hairline); color: var(--ink-label); }
 .wtt-num { text-align: right; }
 .wtt-user { font-weight: 600; }
 .wtt-proj { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }

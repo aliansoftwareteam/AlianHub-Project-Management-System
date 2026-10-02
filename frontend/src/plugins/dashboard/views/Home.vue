@@ -340,8 +340,8 @@ provide('progress', ref(0));
     top: calc(100% + 6px);
     z-index: 21;
     min-width: 180px;
-    background: #fff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 8px;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
     padding: 4px;
@@ -350,10 +350,10 @@ provide('progress', ref(0));
 .dashboard__settings-item {
     padding: 8px 12px;
     font-size: 13px;
-    color: #3a3f52;
+    color: var(--ink);
     border-radius: 6px;
     cursor: pointer;
     white-space: nowrap;
 }
-.dashboard__settings-item:hover { background: #f5f7fb; color: #2F3990; }
+.dashboard__settings-item:hover { background: var(--surface-hover); color: var(--brand); }
 </style>

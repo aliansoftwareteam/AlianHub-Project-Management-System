@@ -4,19 +4,19 @@
     height: 55px;
     width: 65px;
     border-radius: 5px;
-    background-color: #FFFF;
-    border: 1px solid #DFE1E6;
+    background-color: var(--surface);
+    border: 1px solid var(--hairline);
     align-items: start;
     display: grid;
     justify-items: center;
     align-content: center;
 }
 .disabled::placeholder {
-    color: #cfcfcf !important;
+    color: var(--ink-2) !important;
 }
 .selected__embed{
-    border: 1px solid #2F3990;
-    color: #2F3990;
+    border: 1px solid var(--brand);
+    color: var(--brand);
     font-weight: 500;
     box-shadow: 2px 2px 4px 0px rgba(0, 0, 0, 0.15);
 }

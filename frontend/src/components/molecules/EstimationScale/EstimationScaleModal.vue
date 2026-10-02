@@ -71,14 +71,14 @@ function save() {
 </script>
 
 <style scoped>
-.esc__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.esc__card { background: #fff; border-radius: 10px; width: min(440px, 92vw); padding: 16px 20px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18); }
+.esc__overlay { position: fixed; inset: 0; background: var(--scrim); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.esc__card { background: var(--surface); border-radius: 10px; width: min(440px, 92vw); padding: 16px 20px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18); }
 .esc__head { margin-bottom: 8px; }
-.esc__close { color: #9a9a9a; }
-.esc__close:hover { color: #e84a4a; }
+.esc__close { color: var(--ink-2); }
+.esc__close:hover { color: var(--danger); }
 .esc__hint { margin-bottom: 12px; }
-.esc__select { width: 100%; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; background: #fff; }
+.esc__select { width: 100%; border: 1px solid var(--hairline); border-radius: 6px; padding: 8px; background: var(--surface); }
 .esc__actions { margin-top: 16px; }
 /* .btn_btn forces a navy background !important — keep the Cancel text white. */
-.esc__ghost-btn { color: #fff; }
+.esc__ghost-btn { color: var(--on-brand); }
 </style>
