@@ -10,7 +10,8 @@ const jobs = Object.fromEntries(
         .map((block) => [block.slice(0, block.indexOf(':')), block])
 );
 const count = (text, needle) => text.split(needle).length - 1;
-const shardJobs = () => Object.entries(jobs).filter(([, block]) => block.includes('--shard='));
+const jobsRunning = (command) => Object.entries(jobs).filter(([, block]) => block.includes(command));
+const shardJobs = () => jobsRunning('npm run e2e -- --shard=');
 
 describe('the browser tests in CI', () => {
     test('run in shards that share no database and no server', () => {
@@ -29,18 +30,23 @@ describe('the browser tests in CI', () => {
         expect(block).toContain('e2e/test-results');
     });
 
-    test('build the frontend once and run the API tests once', () => {
-        const [, block] = shardJobs()[0];
-        expect(block).not.toContain('npm run build');
-        expect(block).toContain('actions/download-artifact@v4');
+    test('build the frontend once and run each API test once', () => {
+        expect(jobsRunning('npm run test:integration')).toHaveLength(1);
+        const [, integration] = jobsRunning('npm run test:integration')[0];
         expect(count(WORKFLOW, 'npm run test:integration')).toBe(1);
-        expect(block).not.toContain('npm run test:integration');
+        expect(integration).toContain('npm run test:integration -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}');
+        expect(integration).toContain('name: integration-logs-shard-${{ matrix.shard }}');
+        [integration, shardJobs()[0][1]].forEach((block) => {
+            expect(block).not.toContain('npm run build');
+            expect(block).toContain('actions/download-artifact@v4');
+            expect(block).toContain('image: mongo:7');
+        });
     });
 
     // Tooling and branch rules look for a check called "e2e"; a job with a `name:` reports under that name instead.
     test('report through one check named e2e that fails unless every part passed', () => {
         const [shardId] = shardJobs()[0];
-        const integrationId = Object.keys(jobs).find((id) => jobs[id].includes('npm run test:integration'));
+        const [integrationId] = jobsRunning('npm run test:integration')[0];
         const summary = jobs.e2e;
         expect(summary).not.toMatch(/^ {4}name:/m);
         expect(summary).not.toContain('npm run e2e');

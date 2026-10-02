@@ -129,40 +129,6 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  integration:
-    needs: changes
-    if: needs.changes.outputs.code == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/beta')
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    services:
-      mongo:
-        image: mongo:7
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-    env:
-      E2E_MONGODB_URL: mongodb://127.0.0.1:27017
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run test:integration
-      - if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: integration-logs
-          path: e2e/.state/*.log
-          retention-days: 7
-          include-hidden-files: true
-          if-no-files-found: ignore
-
   e2e-build:
     name: e2e build
     needs: changes
@@ -202,6 +168,49 @@ jobs:
           path: frontend/dist
           retention-days: 1
           if-no-files-found: error
+
+  # One API test reads the built app shell, so these wait for the build as well.
+  integration:
+    name: integration shard (${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: e2e-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      E2E_MONGODB_URL: mongodb://127.0.0.1:27017
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-frontend-dist
+          path: frontend/dist
+      - run: npm run test:integration -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-logs-shard-${{ matrix.shard }}
+          path: e2e/.state/*.log
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: ignore
 
   # Each shard has its own database and its own server. More workers in one job would share one
   # owner and one workspace, which is where tests start to disturb each other.
