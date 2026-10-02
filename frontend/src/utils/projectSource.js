@@ -5,16 +5,20 @@ export const PROJECT_SOURCES = ['upwork', 'fiverr', 'other'];
 export const DEFAULT_SOURCE = 'other';
 
 const UPWORK_ID = /^[0-9a-f]{15,}$/i;
+const SCHEME_AND_HOST = /^.*?:\/\/+[^/]*/;
+const BARE_HOST = /^[^/]*(?:upwork|fiverr)\.com[^/]*/i;
 
 /**
  * Reduce a pasted reference to the id alone: unwrap a URL, drop quotes, the
  * trailing slash and the leading "~". Removing the "~" is what lets an all-digit
- * Upwork reference match the id the bidding side stores.
+ * Upwork reference match the id the bidding side stores. An address is read from
+ * its path alone, so one with no path holds no id.
  */
 export const cleanProposalId = (raw) => {
     let value = String(raw || '').trim().replace(/^["']|["']$/g, '');
     if (value.includes('://') || /upwork\.com|fiverr\.com/i.test(value)) {
-        const segments = value.split(/[?#]/)[0].split('/').filter(Boolean);
+        const address = value.split(/[?#]/)[0];
+        const segments = address.replace(address.includes('://') ? SCHEME_AND_HOST : BARE_HOST, '').split('/').filter(Boolean);
         value = segments.length ? segments[segments.length - 1] : '';
     }
     return value.replace(/\/+$/, '').replace(/^~+/, '').trim().slice(0, 100);
