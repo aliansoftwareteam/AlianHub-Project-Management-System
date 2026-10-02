@@ -72,7 +72,7 @@ exports.generateInvoice = async (req, res) => {
         const { start, end, userArray = [], projectArray = [], currency = 'USD', defaultRate = 0 } = req.body || {};
         const match = { billable: { $ne: false } };
         if (start && end) match.LogStartTime = { $gte: Number(start), $lte: Number(end) };
-        if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray };
+        if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray.map(String) };
         if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: idForms(openProjects(caller, projectArray)) };
         else Object.assign(match, withoutHidden(caller));
         const entries = await MongoDbCrudOpration(companyId, {

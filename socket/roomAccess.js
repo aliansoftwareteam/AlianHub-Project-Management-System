@@ -210,6 +210,9 @@ const mayReceiveList = (identity, change) => sameCompany(identity, change)
 const mayReceiveCompany = (identity, companyId) => Boolean(identity) && identity.companyId === String(companyId || '')
     && stillAllowed(identity, 'seat', () => isCompanyMember(identity, identity.companyId));
 
+/* Owners and admins read a whole company row over HTTP; everyone else reads its member fields. */
+const readsWholeCompany = (identity) => stillAllowed(identity, 'company-row', () => isPrivilegedHere(identity));
+
 /* A send waits for its verdict, so sends go out one after another: two changes to a row reach a room in the
  * order they were made. */
 let sends = Promise.resolve();
@@ -229,7 +232,8 @@ const toSeated = (rooms, companyId, send) => {
         for (const entry of rooms) {
             // eslint-disable-next-line no-await-in-loop
             if (!entry.socket || !(await mayReceiveCompany(entry.socket.identity, id))) continue;
-            if (entry.socket.rooms.has(entry.roomName)) send(entry);
+            // eslint-disable-next-line no-await-in-loop
+            if (entry.socket.rooms.has(entry.roomName)) await send(entry);
         }
     });
 };
@@ -258,6 +262,7 @@ module.exports = {
     mayReceiveComments,
     mayReceiveList,
     mayReceiveCompany,
+    readsWholeCompany,
     toSeated,
     toCompanyRoom,
     COMPANY_ROOM,

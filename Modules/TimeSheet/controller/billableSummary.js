@@ -17,7 +17,7 @@ exports.getBillableSummary = async (req, res) => {
         const match = {};
         const scope = await resolveTimeScope(companyId, req.uid);
         if (!scope.companyWide) match.Loggeduser = scope.uid;
-        else if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray };
+        else if (Array.isArray(userArray) && userArray.length) match.Loggeduser = { $in: userArray.map(String) };
         if (Array.isArray(projectArray) && projectArray.length) match.ProjectId = { $in: idForms(openProjects(scope, projectArray)) };
         else Object.assign(match, withoutHidden(scope));
         if (start && end) match.LogStartTime = { $gte: Number(start), $lte: Number(end) };

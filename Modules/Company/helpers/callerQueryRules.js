@@ -11,22 +11,33 @@ const FORBIDDEN_OPERATORS = Object.freeze([
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
     && [Object.prototype, null].includes(Object.getPrototypeOf(value));
 
-const queryRefusal = (value, forbidden = FORBIDDEN_OPERATORS, depth = 0) => {
+const TOO_DEEP = Symbol('too deep');
+
+/* The first operator of `forbidden` a caller's query holds, at any depth, or TOO_DEEP when it nests past the cap. */
+const forbiddenOperatorIn = (value, forbidden = FORBIDDEN_OPERATORS, depth = 0) => {
     if (!Array.isArray(value) && !isPlainObject(value)) return null;
-    if (depth > MAX_DEPTH) return 'A query cannot be nested this deeply.';
+    if (depth > MAX_DEPTH) return TOO_DEEP;
     if (Array.isArray(value)) {
         for (const item of value) {
-            const reason = queryRefusal(item, forbidden, depth + 1);
-            if (reason) return reason;
+            const hit = forbiddenOperatorIn(item, forbidden, depth + 1);
+            if (hit) return hit;
         }
         return null;
     }
     for (const [key, inner] of Object.entries(value)) {
-        if (forbidden.includes(key)) return `${key} is not allowed in a query.`;
-        const reason = queryRefusal(inner, forbidden, depth + 1);
-        if (reason) return reason;
+        if (forbidden.includes(key)) return key;
+        const hit = forbiddenOperatorIn(inner, forbidden, depth + 1);
+        if (hit) return hit;
     }
     return null;
+};
+
+const NESTED_TOO_DEEPLY = 'A query cannot be nested this deeply.';
+
+const queryRefusal = (value, forbidden = FORBIDDEN_OPERATORS) => {
+    const hit = forbiddenOperatorIn(value, forbidden);
+    if (!hit) return null;
+    return hit === TOO_DEEP ? NESTED_TOO_DEEPLY : `${hit} is not allowed in a query.`;
 };
 
 const badRequest = (res, message) => res.status(400).json({ status: false, statusText: 'Bad Request', message });
@@ -64,7 +75,10 @@ const isItemId = (value) => (typeof value === 'string' && value.length > 0 && va
 module.exports = {
     OBJECT_ID_PATTERN,
     FORBIDDEN_OPERATORS,
+    TOO_DEEP,
+    NESTED_TOO_DEEPLY,
     isPlainObject,
+    forbiddenOperatorIn,
     queryRefusal,
     badRequest,
     limitCallerFilters,
