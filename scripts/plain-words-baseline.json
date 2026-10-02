@@ -1,29 +1,5 @@
 {
   "keys": {
-    "Enforcement.kill_switch": [
-      "setting name"
-    ],
-    "GoogleConnection.problem_google_client_missing": [
-      "setting name"
-    ],
-    "GoogleConnection.problem_secrets_key_invalid": [
-      "setting name"
-    ],
-    "GoogleConnection.problem_secrets_store_off": [
-      "setting name"
-    ],
-    "GoogleConnection.problem_taint_routing_off": [
-      "setting name"
-    ],
-    "Instance.cron_disabled": [
-      "setting name"
-    ],
-    "Knowledge.code_figures_timed_out": [
-      "setting name"
-    ],
-    "Knowledge.vector_index_mismatch": [
-      "setting name"
-    ],
     "Members.close_all_done": [
       "sprint"
     ],
@@ -43,42 +19,6 @@
       "sprint"
     ],
     "Members.start_sprint": [
-      "sprint"
-    ],
-    "Projects.no_burndown_data": [
-      "sprint"
-    ],
-    "Provenance.velocity_line": [
-      "sprint"
-    ],
-    "Providers.unpriced_warning": [
-      "setting name"
-    ],
-    "Settings.sso_env_hint": [
-      "setting name"
-    ],
-    "SlackConnector.problem_secrets_key_invalid": [
-      "setting name"
-    ],
-    "SlackConnector.problem_secrets_store_off": [
-      "setting name"
-    ],
-    "SlackConnector.problem_taint_routing_off": [
-      "setting name"
-    ],
-    "Toast.Sprint closed successfully": [
-      "sprint"
-    ],
-    "ViewListdescription.reports_view": [
-      "sprint"
-    ],
-    "WorkflowBuilder.engine_off_sub": [
-      "setting name"
-    ],
-    "Workflows.engine_off_body": [
-      "setting name"
-    ],
-    "conformationmsg.sprintclosemsg": [
       "sprint"
     ]
   }
