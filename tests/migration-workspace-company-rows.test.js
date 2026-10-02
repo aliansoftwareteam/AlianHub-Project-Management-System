@@ -196,6 +196,20 @@ describe(ID, () => {
         expect(ctx.companies[SECOND_WITHOUT_ROW]).toMatchObject({ ok: true });
     });
 
+    test('a row that appeared after the plan was read is kept, and is no failure', async () => {
+        const crud = mockDbFor(GLOBAL).crud.getMockImplementation();
+        mockDbFor(GLOBAL).crud.mockImplementation(async (db, query, method) => {
+            if (method === 'save') mockDbFor(GLOBAL).seed(SCHEMA_TYPE.COMPANIES, { _id: WITHOUT_ROW, Cst_CompanyName: 'Written meanwhile' });
+            return crud(db, query, method);
+        });
+
+        const outcome = await migration.up(context());
+
+        expect(outcome).toEqual({ written: 0, withoutOwner: 0 });
+        expect(rowOf(WITHOUT_ROW)).toMatchObject({ Cst_CompanyName: 'Written meanwhile' });
+        expect(companyRows()).toHaveLength(2);
+    });
+
     describe('verify', () => {
         test('names a workspace that still has no row, and nothing once it has one', async () => {
             expect(await migration.verify(context())).toEqual([expect.stringContaining(WITHOUT_ROW)]);

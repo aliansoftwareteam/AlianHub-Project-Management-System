@@ -13,7 +13,6 @@ const serviceCtr = require("../service.js");
 const serviceFunctionCtr = require("../serviceFunction.js");
 const config =  require('../../Config/config.js');
 const { dbCollections } = require("../../Config/collections.js");
-const defaultSubscriptionDataRef = require("./defaultSubscriptionData.js")
 const { updateCompanyFun } = require("./controller/updateCompany.js");
 const { updateUserFun } = require("../Users/controller.js");
 const { storeRefferalCode, checkAndStoreRefferalCode } = require("../Affiliate/controller.js");
@@ -25,7 +24,7 @@ const { pinSessionTenant } = require("../../Config/tenant.js");
 const { getRoleType, ROLE_OWNER } = require("../../Config/permissionGuard.js");
 const { escapeHtml } = require('../../utils/escapeHtml');
 const { WORKSPACE_FAILURE, failureReply } = require('./helpers/workspaceFailure');
-const { COUNTRY_NOT_ASKED } = require('./helpers/companyDetails');
+const { NEW_COMPANY_PLAN, companyRowFor } = require('./helpers/companyRow');
 
 const TEAM_SIZES = ["1", "2-15", "16-50", "50+"];
 
@@ -251,7 +250,7 @@ exports.companyValidation = (bodyData, cb) => {
             })
             return;
         }
-        if (!(bodyData && bodyData.companyName)) {
+        if (!(bodyData && typeof bodyData.companyName === "string" && bodyData.companyName.trim())) {
             cb({
                 status: false,
                 statusText: "companyName is required"
@@ -468,14 +467,6 @@ exports.sendMailAfterCompanyCreation = (problems, companyId, req) => {
     });
 };
 
-const NEW_COMPANY_PLAN = () => ({
-    totalProjects: 0,
-    isInactive: false,
-    isFree: true,
-    subscriptionData: { storage: 0, trackers: 0, users: 5 },
-    totalData: { storage: 0, trackers: 0, users: 1 },
-});
-
 const CREATION_TRIES = 3;
 
 // Only the operator's preset route fills the ready-made companies, so a fresh install has none waiting.
@@ -495,32 +486,6 @@ const takeCompany = async () => {
     }, 'findOneAndUpdate');
     return readyCompany && readyCompany._id ? readyCompany : prepareCompanyNow();
 };
-
-const companyRowFor = (companyMongoId, bodyData) => ({
-    type: SCHEMA_TYPE.COMPANIES,
-    data: {
-        userId: bodyData.userId,
-        Cst_CompanyName: bodyData.companyName,
-        Cst_Phone: bodyData.phoneNumber || "",
-        Cst_Country: bodyData.country || COUNTRY_NOT_ASKED,
-        Cst_City: bodyData.city || "",
-        Cst_State: bodyData.state || "",
-        Cst_DialCode: bodyData.countryCodeObj || {},
-        teamSize: bodyData.teamSize ? String(bodyData.teamSize) : "",
-        teamFocus: bodyData.teamFocus ? normaliseFocus(bodyData.teamFocus) : "",
-        Cst_LogTimeDays: bodyData.logtimeDays,
-        totalProjects: bodyData.totalProjects,
-        isInactive: bodyData.isInactive,
-        isFree: bodyData.isFree,
-        subscriptionData: bodyData.subscriptionData,
-        totalData: bodyData.totalData,
-        _id: companyMongoId,
-        companyData: [{ users: 1 }],
-        Cst_stateCode: bodyData.Cst_stateCode,
-        Cst_countryCode: bodyData.Cst_countryCode,
-        planFeature: defaultSubscriptionDataRef.planObj,
-    }
-});
 
 const COMPANY_ROW = "the company row";
 
