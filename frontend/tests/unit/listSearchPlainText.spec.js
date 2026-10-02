@@ -75,16 +75,18 @@ describe('the text a list search sends', () => {
     });
 });
 
-describe('every search the web app sends', () => {
-    const SRC = path.resolve(__dirname, '../../src');
+describe('every search the web app and the desktop tracker send', () => {
+    const ROOT = path.resolve(__dirname, '../../..');
+    const CLIENTS = [path.join(ROOT, 'frontend/src'), path.join(ROOT, 'time-tracker-app/renderer')];
     const sourceFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
         const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) return entry.name === 'locales' ? [] : sourceFiles(full);
-        return /\.(js|vue)$/.test(entry.name) ? [full] : [];
+        if (entry.isDirectory()) return ['locales', 'node_modules'].includes(entry.name) ? [] : sourceFiles(full);
+        return /\.(js|jsx|vue)$/.test(entry.name) ? [full] : [];
     });
-    const senders = sourceFiles(SRC).map((file) => [path.relative(SRC, file), readFileSync(file, 'utf8')]).filter(([, text]) => text.includes('$regex'));
+    const senders = CLIENTS.flatMap(sourceFiles).map((file) => [path.relative(ROOT, file), readFileSync(file, 'utf8')]).filter(([, text]) => text.includes('$regex'));
 
-    it('leaves the typed text as it is: escaping it is the server\'s work, done once', () => {
+    it('leave the typed text as it is: escaping it is the server\'s work, done once', () => {
+        expect(senders.map(([file]) => file)).toContain('time-tracker-app/renderer/components/TrackerSelection/TrackerSelection.jsx');
         expect(senders.length).toBeGreaterThan(5);
         const escapesFirst = senders.filter(([, text]) => text.includes("'\\\\$&'")).map(([file]) => file);
         expect(escapesFirst).toEqual([]);
