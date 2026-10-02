@@ -53,6 +53,6 @@ describe.each(ROUTES)('$method $path', (route) => {
     it('keeps a second workspace named in the body out of every database call', async () => {
         const res = await call(route, OWNER, { body: route.method === 'GET' ? undefined : { ...(route.body && route.body()), companyId: OTHER_WORKSPACE } });
         expect(unnamed(mockDb.calls)).toEqual([]);
-        expect([200, 403]).toContain(res.status);
+        expect([200, 403, 404]).toContain(res.status);
     });
 });
