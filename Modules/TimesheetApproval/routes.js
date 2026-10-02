@@ -1,10 +1,11 @@
 const ctrl = require('./controller');
 const { decidedByPerson } = require('../Agents/personDecides');
+const { agentsRefused } = require('../Agents/guard');
 
 const reviewedByPerson = decidedByPerson('timesheet.review');
 
 exports.init = (app) => {
-    app.post('/api/v2/timesheet-approval/submit', ctrl.submitTimesheet);
+    app.post('/api/v2/timesheet-approval/submit', agentsRefused('timesheet.submit'), ctrl.submitTimesheet);
     app.get('/api/v2/timesheet-approval/status', ctrl.getStatus);
     app.get('/api/v2/timesheet-approval/mine', ctrl.listMine);
     app.get('/api/v2/timesheet-approval/pending', ctrl.listPending);

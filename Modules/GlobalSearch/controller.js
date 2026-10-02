@@ -10,6 +10,8 @@ const { validateSearchInput, truncate, RESULT_LIMIT_PER_TYPE } = require('./help
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 const { listsForViewerOf } = require('../Tasks/helpers/taskExtraLists');
+const { keptFromAgent } = require('../Comments/helpers/agentChatRows');
+const { agentOf } = require('../../Config/agentRequest');
 
 // Regex rather than $text: it works on every existing tenant database and keeps
 // short queries and substring matches predictable.
@@ -76,12 +78,14 @@ exports.globalSearch = async (req, res) => {
         const sprintClause = hidden.length ? { sprintId: { $nin: hidden } } : {};
 
         const rx = { $regex: escapeRegex(String(query).trim()), $options: 'i' };
+        const chatKeptFromCaller = await keptFromAgent(companyId, uid);
+        const noChatRow = agentOf(uid) ? { mainChat: { $ne: true } } : {};
 
         const [tasks, projects, comments, pages] = await Promise.all([
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
-                    { ProjectID: { $in: taskProjectIds }, ...sprintClause, deletedStatusKey: { $ne: 1 }, $or: [{ TaskName: rx }, { TaskKey: rx }] },
+                    { ProjectID: { $in: taskProjectIds }, ...sprintClause, ...noChatRow, deletedStatusKey: { $ne: 1 }, $or: [{ TaskName: rx }, { TaskKey: rx }] },
                     'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey sprintArray updatedAt extraLists',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
                 ],
@@ -97,7 +101,7 @@ exports.globalSearch = async (req, res) => {
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.COMMENTS,
                 data: [
-                    { projectId: { $in: projectIds }, ...sprintClause, isDeleted: { $ne: true }, type: { $in: ['text', 'link'] }, message: rx },
+                    { projectId: { $in: projectIds }, ...sprintClause, ...chatKeptFromCaller, isDeleted: { $ne: true }, type: { $in: ['text', 'link'] }, message: rx },
                     'message taskId projectId sprintId',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { createdAt: -1 } },
                 ],

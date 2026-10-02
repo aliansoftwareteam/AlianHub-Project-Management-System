@@ -259,12 +259,16 @@ const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
  * due, where the work came from, what is attached to it, and the person's own marks on it. */
 const AGENT_PROJECT_FIELDS = new Set([
     'ProjectName', 'Description', 'description', 'descriptionBlock', 'projectIcon', 'DueDate', 'dueDateDeadLine', 'StartDate', 'EndDate',
-    'source', 'proposalId', 'skills', 'attachments', 'customField', 'checklistArray', 'tagsArray', 'favouriteTasks', 'watchers',
+    'source', 'proposalId', 'skills', 'attachments', 'customField', 'checklistArray', 'favouriteTasks', 'watchers',
 ]);
+
+/* An agent puts a tag the project has on a task; the list of tags itself shows on every task of the project. */
+const PROJECT_TAGS_EDIT = 'project.tags.edit';
 
 /* Every other field is a person's to change. These are refused under the name of what they are: where the project
  * sits (the trash, the archive and the way back, its open or closed state), who is on it and which rules it follows,
- * how it is billed, its task types, and the statuses and saved views an agent proposes through its MCP tools. */
+ * how it is billed, its task types, the tags its tasks choose from, and the statuses and saved views an agent
+ * proposes through its MCP tools. */
 const PROJECT_FIELD_ACTIONS = {
     deletedStatusKey: 'project.delete', status: 'project.status.set', statusType: 'project.status.set',
     AssigneeUserId: 'member.remove', LeadUserId: 'member.remove',
@@ -272,6 +276,7 @@ const PROJECT_FIELD_ACTIONS = {
     ProjectType: 'billing.project', ProjectCurrency: 'billing.project', BillingPeriod: 'billing.project',
     taskStatusData: 'project.setup', TemplateTaskStatusId: 'project.setup', projectStatusData: 'project.setup', projectStatusTemplateId: 'project.setup',
     taskTypeCounts: 'task_types.edit', TaskTypeTemplateId: 'task_types.edit',
+    tagsArray: PROJECT_TAGS_EDIT,
     ProjectRequiredComponent: 'view.create', ProjectRequiredDefaultComponent: 'view.create', viewColumn: 'view.create',
 };
 /* A field in neither list is a setting of the project, so one added later is closed to an agent until it is listed. */
@@ -361,4 +366,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };

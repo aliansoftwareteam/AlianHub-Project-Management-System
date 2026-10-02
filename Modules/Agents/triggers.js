@@ -21,10 +21,12 @@ const NOTE_MAX = 2000;
 const plainOf = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : { ...doc });
 
 /* A chat conversation is stored as a task row with mainChat set; no skill works on one. */
+const isWorkTask = (task) => Boolean(task) && task.mainChat !== true && task.deletedStatusKey !== 1;
+
 const workTask = async (companyId, taskId) => {
     if (!OBJECT_ID.test(String(taskId || ''))) return null;
     const task = await tools.getTask(companyId, taskId).catch(() => null);
-    return task && task.mainChat !== true && task.deletedStatusKey !== 1 ? task : null;
+    return isWorkTask(task) ? task : null;
 };
 
 const threadOfTask = (task) => ({ projectId: String(task.ProjectID || ''), sprintId: task.sprintId ? String(task.sprintId) : '', taskId: String(task._id) });
@@ -79,14 +81,17 @@ const launch = async (companyId, { agent, task, trigger, startedBy, note, depth 
 };
 
 /* A saved comment that @names agents starts each one its author may run on that task,
- * with the comment as the brief. Never throws: the comment is already posted. */
-const fromComment = async (companyId, { authorId, taskId, message, depth = 0 }) => {
+ * with the comment as the brief. Never throws: the comment is already posted.
+ * `postedBy` is the agent that posted it on a comment route, which the task's project then answers for (./runStart);
+ * a comment made through an agent's MCP tool has been through that answer already and names none. */
+const fromComment = async (companyId, { authorId, taskId, message, depth = 0, postedBy = null, path = '', ip = '' }) => {
     const mentioned = parseAgentMentionIds(message);
     if (!mentioned.length) return [];
     try {
         const task = await workTask(companyId, taskId);
         if (!task) return [];
         const agents = (await runnableAgents(companyId, authorId, task)).filter((agent) => mentioned.includes(String(agent._id)));
+        if (agents.length && postedBy && !(await require('./runStart').admits(companyId, postedBy, task, { path, ip }))) return [];
         const note = mentionsAsNames(message).trim();
         const out = [];
         for (const agent of agents) {
@@ -100,4 +105,4 @@ const fromComment = async (companyId, { authorId, taskId, message, depth = 0 }) 
     }
 };
 
-module.exports = { TRIGGER, workTask, mayRunOn, runnableAgents, listed, dispatch, launch, fromComment };
+module.exports = { TRIGGER, isWorkTask, workTask, mayRunOn, runnableAgents, listed, dispatch, launch, fromComment };
