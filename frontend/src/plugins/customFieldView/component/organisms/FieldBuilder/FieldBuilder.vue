@@ -293,7 +293,7 @@ const numericFields = computed(() => fields.value.filter((field) => NUMERIC_TYPE
 const slugOf = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 
 const allTokens = ref(false);
-const tokens = computed(() => tokensFrom(scopeNames.value.filter((entry) => entry.fieldId !== draft.value?._id)));
+const tokens = computed(() => tokensFrom(scopeNames.value.filter((entry) => !draft.value?._id || entry.fieldId !== draft.value._id)));
 const visibleTokens = computed(() => (allTokens.value ? tokens.value : tokens.value.slice(0, MAX_TOKENS)));
 
 const isComputed = (field) => COMPUTED_TYPES.includes(field?.fieldType);
