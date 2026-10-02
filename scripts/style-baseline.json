@@ -176,7 +176,7 @@
     "frontend/src/components/molecules/Setting/SettingScreenshotRetention.vue": { "colours": 12, "legacyClasses": 2 },
     "frontend/src/components/molecules/Setting/SettingTaskPriority.vue": { "colours": 0, "legacyClasses": 3 },
     "frontend/src/components/molecules/Setting/SettingTimeReminder.vue": { "colours": 20, "legacyClasses": 4 },
-    "frontend/src/components/molecules/Setting/style.css": { "colours": 54, "legacyClasses": 0 },
+    "frontend/src/components/molecules/Setting/style.css": { "colours": 49, "legacyClasses": 0 },
     "frontend/src/components/molecules/Sidebar/Sidebar.vue": { "colours": 0, "legacyClasses": 17 },
     "frontend/src/components/molecules/Sidebar/style.css": { "colours": 4, "legacyClasses": 0 },
     "frontend/src/components/molecules/SidebarItems/SidebarItems.vue": { "colours": 0, "legacyClasses": 14 },

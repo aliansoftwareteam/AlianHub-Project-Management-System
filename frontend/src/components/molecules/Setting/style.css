@@ -154,7 +154,7 @@ form .inputFieldDiv .con-select.selectExample {
     font-weight: 400;
     font-size: 13px;
     line-height: 19px;
-    color: #818181;
+    color: var(--ink-2);
     max-width: 465px;
     padding: 0px 10px;
     border-radius: 6px;
@@ -206,7 +206,7 @@ input.form-control {
     font-weight: 400;
     font-size: 13px;
     line-height: 19px;
-    color: #818181;
+    color: var(--ink-2);
     max-width: 465px;
     width: 100%;
     padding: 4px 10px;
@@ -386,7 +386,7 @@ h2.task_priority_wrapper_value {
     object-fit: scale-down;
 }
 .img_uploadpriority_wrapper .Upload_img_span{
-    color: #818181;
+    color: var(--ink-2);
     font-family: var(--font-ui);
     font-size: 12px;
     font-style: normal;
@@ -473,7 +473,7 @@ span.font_family_status {
     letter-spacing: 0px;
     text-align: left;
     margin: 0px 0px 0px 5px;
-    color: #818181;
+    color: var(--ink-2);
 }
 
 .addExtentionWrapper {
@@ -1032,7 +1032,7 @@ max-width: 100%;
     margin: 0;
     font-size: 12px;
     line-height: 1.5;
-    color: #8b90a3;
+    color: var(--ink-2);
 }
 
 /* The card rules above keep their light-mode literals; dark mode repaints them from the tokens. */

@@ -21,6 +21,7 @@
             <label class="screenshot-retention-switch" :class="{ disabled: isBusy }">
                 <input
                     type="checkbox"
+                    :aria-label="$t('ScreenshotRetention.toggle_label')"
                     :checked="policy.enabled"
                     :disabled="isBusy"
                     @change="onToggle($event.target.checked)"
@@ -36,6 +37,7 @@
             </div>
             <select
                 class="screenshot-retention-select"
+                :aria-label="$t('ScreenshotRetention.window_label')"
                 :value="policy.maxAgeMonths"
                 :disabled="!policy.enabled || isBusy"
                 @change="onWindowChange(Number($event.target.value))"
