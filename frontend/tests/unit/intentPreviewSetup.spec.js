@@ -43,6 +43,35 @@ describe('the preview card for fields an agent wants to add', () => {
         expect(intentTitle(t, fields)).toBe('add the fields “Budget, Region, Owner”');
     });
 
+    it('lists each first value under the fields, and counts the ones on tasks the person cannot open', () => {
+        mountCard({
+            kind: 'fields',
+            title: 'Budget',
+            lines: [
+                { kind: 'fieldValue', field: 'Budget', task: 'Write release note', value: '120', others: 0 },
+                { kind: 'fieldValue', field: 'Owner', task: 'Write release note', value: 'Mia Member', others: 1 },
+                { kind: 'fieldValue', field: 'Owner', task: 'Write release note', value: '', others: 2 },
+                { kind: 'fieldValue', field: 'Signed', task: '<b>Ship</b>', checked: true },
+                { kind: 'fieldValue', field: 'Signed', task: 'Ship', checked: false },
+                { kind: 'fieldValue', field: 'Region', task: 'Ship', value: '', others: 0 },
+                { kind: 'fieldValue', field: '', task: 'Ship', value: 'x' },
+                { kind: 'fieldValue', field: 'Region', task: '', value: 'x' },
+                { kind: 'fieldValuesHidden', count: 2 },
+                { kind: 'fieldValuesHidden', count: 0 },
+            ],
+        });
+        expect(rows()).toEqual([
+            ['fieldValue', 'Value', 'Budget on “Write release note”: 120'],
+            ['fieldValue', 'Value', 'Owner on “Write release note”: Mia Member and 1 more'],
+            ['fieldValue', 'Value', 'Owner on “Write release note”: 2 people not shown'],
+            ['fieldValue', 'Value', 'Signed on “<b>Ship</b>”: Yes'],
+            ['fieldValue', 'Value', 'Signed on “Ship”: No'],
+            ['fieldValue', 'Value', 'Region on “Ship”: Empty'],
+            ['fieldValuesHidden', 'Value', '2 values on tasks you cannot open'],
+        ]);
+        expect(wrapper.find('b').exists()).toBe(false);
+    });
+
     it('shows a field of a type it does not know by its name alone, and draws a name as text', () => {
         mountCard({ kind: 'fields', title: 'x', lines: [{ kind: 'field', name: '<b>Stage</b>', type: 'hologram', options: [] }, { kind: 'field', name: '', type: 'text' }] });
         expect(rows()).toEqual([['field', 'Field', '<b>Stage</b>']]);
@@ -90,6 +119,15 @@ describe('the preview card for a view an agent wants to add', () => {
             ['group', 'Grouped by', 'Due date'],
             ['sort', 'Sorted by', 'Name, ascending'],
             ['columns', 'Columns', '1 field not shown'],
+        ]);
+    });
+
+    it('says which due dates the view keeps, in words or as a range of days', () => {
+        mountCard({ kind: 'view', title: 'Due', lines: [{ kind: 'dueFilter', when: 'this_week' }, { kind: 'dueFilter', when: 'overdue' }, { kind: 'dueFilter', from: '2026-10-05', to: '2026-10-09' }, { kind: 'dueFilter', when: 'someday' }, { kind: 'dueFilter', from: '2026-10-05' }] });
+        expect(rows()).toEqual([
+            ['dueFilter', 'Due', 'This week'],
+            ['dueFilter', 'Due', 'Before today'],
+            ['dueFilter', 'Due', 'Oct 5, 2026 to Oct 9, 2026'],
         ]);
     });
 });

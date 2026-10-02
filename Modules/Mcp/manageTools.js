@@ -267,7 +267,7 @@ const TOOLS = [
         strict: true,
         batch: true,
         target: () => ({}),
-        description: `Run up to ${BATCH_MAX} write tools in one call, in order. Each operation is checked and applied on its own and reports its own result, so one refusal does not stop or undo the others: nothing here is all-or-nothing. The operations that applied are recorded as one group, which a person can undo together.`,
+        description: `Run up to ${BATCH_MAX} write tools in one call, in order. When every operation is on the same task, each is checked and applied on its own and reports its own result, so one refusal does not stop or undo the others, and the ones that applied are recorded as one group, which a person can undo together. When the operations name more than one task, nothing runs: the changes wait in AlianHub as one proposal that a person approves or declines whole, and the answer says so. Keep such a batch inside one project.`,
         input: input({
             operations: {
                 type: 'array', minItems: 1, maxItems: BATCH_MAX,
