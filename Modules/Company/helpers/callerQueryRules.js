@@ -47,7 +47,6 @@ const badRequest = (res, message) => res.status(400).json({ status: false, statu
 
 const SEARCH_TEXT_TOO_LONG = `Search for at most ${MAX_SEARCH_TEXT} characters.`;
 const SEARCH_TEXT_NOT_TEXT = 'Search text must be plain text.';
-const SPECIAL_CHARACTER = /[.*+?^${}()|[\]\\]/;
 const MATCH_FLAGS = /^[imsxu]*$/;
 const TEXT_MATCH_EXPRESSIONS = Object.freeze(['$regexMatch', '$regexFind', '$regexFindAll']);
 
@@ -58,27 +57,12 @@ class SearchTextRefused extends Error {
     }
 }
 
-/* Text as escapeRegex leaves it: every special character carries its backslash. */
-const isEscapedText = (text) => {
-    for (let at = 0; at < text.length; at += 1) {
-        if (text[at] === '\\') {
-            if (!SPECIAL_CHARACTER.test(text[at + 1] || '')) return false;
-            at += 1;
-        } else if (SPECIAL_CHARACTER.test(text[at])) {
-            return false;
-        }
-    }
-    return true;
-};
-
-/* What a person typed, as the pattern that matches exactly that text. Some clients escape it before they send it,
- * so text that is escaped already is kept; anything else is escaped here, and never run as a pattern. */
+/* What a person typed, as the pattern that matches exactly that text. It is escaped here and nowhere else: a client
+ * sends the text as typed, so a backslash in it is a backslash to find and never the mark of text escaped already. */
 const textPattern = (typed) => {
     if (typeof typed !== 'string') throw new SearchTextRefused(SEARCH_TEXT_NOT_TEXT);
-    const escaped = isEscapedText(typed);
-    const length = escaped ? typed.replace(/\\(.)/gs, '$1').length : typed.length;
-    if (length > MAX_SEARCH_TEXT) throw new SearchTextRefused(SEARCH_TEXT_TOO_LONG);
-    return escaped ? typed : escapeRegex(typed);
+    if (typed.length > MAX_SEARCH_TEXT) throw new SearchTextRefused(SEARCH_TEXT_TOO_LONG);
+    return escapeRegex(typed);
 };
 
 const checkedFlags = (flags) => {

@@ -5,7 +5,7 @@ import { clearFilterSignal } from './taskFilterSignal';
 import { ALL, cleanDoneBy, doneByMatch } from '@/components/molecules/Provenance/doneByQuery';
 import { agentTaskIds } from './agentWork';
 import { agentWorkMatch } from './agentWorkQuery';
-import { searchTextPattern } from '@/utils/searchText';
+import { typedSearchText } from '@/utils/searchText';
 
 const withComparisons = (rows) => rows.map((row) => ({ ...row, comparisonsData: [row.comparison] }));
 
@@ -131,7 +131,7 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
 
         const query_by = {};
         const searchStr = taskSearch.value ? taskSearch.value.toString() : '';
-        const typedText = { $regex: searchTextPattern(searchStr), $options: 'i' };
+        const typedText = { $regex: typedSearchText(searchStr), $options: 'i' };
         const andOr = '$or';
         query_by[andOr] = [];
         if (taskNameSearch.value) {

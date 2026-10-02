@@ -41,6 +41,7 @@ import Embed from '@editorjs/embed';
 import Table from '@editorjs/table';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { typedSearchText } from '@/utils/searchText';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import pageContent from '@pageContent';
 import { safeEditorDocument } from '@/utils/editorHtml';
@@ -105,11 +106,11 @@ const toolContext = {
     get defaultProjectId() { return props.projectId; },
     projects,
     searchTasks(query, projectId) {
-        const escaped = String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const text = typedSearchText(query);
         return findTasks({
             ...(projectId ? { ProjectID: { objId: { $in: [projectId] } } } : {}),
             ...liveFilter,
-            $or: [{ TaskName: { $regex: escaped, $options: 'i' } }, { TaskKey: { $regex: escaped, $options: 'i' } }],
+            $or: [{ TaskName: { $regex: text, $options: 'i' } }, { TaskKey: { $regex: text, $options: 'i' } }],
         }, 8);
     },
     fetchTasks(projectId, statusType) {
