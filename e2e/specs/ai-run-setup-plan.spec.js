@@ -101,6 +101,13 @@ test.describe('a setup plan from a connected AI, approved in part', () => {
             await expect(row.getByRole('status')).toContainText(`${names.kickoff}`);
             await expect(row.getByRole('status')).toContainText('left out too');
             await expect(tickOf(names.brief)).toBeChecked();
+            await expect(row.getByText('Ticked: 1 of 2 statuses, 1 of 2 lists, 2 of 3 first tasks.')).toBeVisible();
+
+            await tick(names.later).check();
+            await expect(tickOf(names.kickoff)).toBeChecked();
+            await expect(row.getByRole('status')).toContainText('is back too');
+            await tick(names.later).uncheck();
+            await expect(tickOf(names.kickoff)).not.toBeChecked();
 
             await row.getByRole('button', { name: /^Approve:/ }).click();
             await expect(row).toHaveCount(0);
