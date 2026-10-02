@@ -40,7 +40,7 @@ const sendReq = (body = {}, over = {}) => ({
     headers: { companyid: COMPANY },
     aud: COMPANY,
     uid: 'u1',
-    body: { email: 'Ada@Example.test', companyName: 'Acme', role: 2, designation: 'Dev', ...body },
+    body: { email: 'Ada@Example.test', companyName: 'Acme', role: 2, designation: 4, ...body },
     ...over,
 });
 const send = async (body, over) => {
@@ -132,6 +132,19 @@ describe('sendInvitationEmail', () => {
             await send({ role: 0 });
             expect(mockUpdateMember.mock.calls[0][1].roleType).toBe(0);
         });
+
+        it.each([['empty', ''], ['words', 'owner']])('refuses a role that is %s before a seat is counted or written', async (_kind, role) => {
+            const res = await send({ role });
+            expect(res.body).toEqual({ status: false, statusText: 'role, fields are required.' });
+            expect(mockUpdateMember).not.toHaveBeenCalled();
+            expect(counterWrites()).toHaveLength(0);
+        });
+
+        it.each([['empty', ''], ['words', 'Dev']])('stores no designation when it is sent %s', async (_kind, designation) => {
+            const res = await send({ designation });
+            expect(res.body.status).toBe(true);
+            expect(mockUpdateMember.mock.calls[0][1].designation).toBe(0);
+        });
     });
 
     describe('an address with no account', () => {
@@ -142,7 +155,7 @@ describe('sendInvitationEmail', () => {
             expect(companyId).toBe(COMPANY);
             expect(method).toBe('save');
             expect(row).toMatchObject({
-                companyId: COMPANY, userId: '', isDelete: false, roleType: 2, status: 1, userEmail: 'ada@example.test', designation: 'Dev',
+                companyId: COMPANY, userId: '', isDelete: false, roleType: 2, status: 1, userEmail: 'ada@example.test', designation: 4,
             });
             expect(row.linkId).toMatch(HEX_TOKEN);
             expect(row.sendInvitationTime).toBeInstanceOf(Date);
@@ -231,13 +244,13 @@ describe('sendInvitationEmail', () => {
             ['a removed member', { status: 2, isDelete: true }],
         ])('renews %s with a fresh token, matching on the address in the same company', async (_name, existing) => {
             mockDb.findOne.mockResolvedValue(existing);
-            const res = await send({ role: 3, designation: 'Lead' });
+            const res = await send({ role: 3, designation: 7 });
             expect(mockUpdateMember).toHaveBeenCalledTimes(1);
             const [companyId, data, method] = mockUpdateMember.mock.calls[0];
             expect(companyId).toBe(COMPANY);
             expect(method).toBe('findOneAndUpdate');
             expect(data[0]).toEqual({ userEmail: 'ada@example.test' });
-            expect(data[1].$set).toMatchObject({ status: 1, roleType: 3, designation: 'Lead', isDelete: false });
+            expect(data[1].$set).toMatchObject({ status: 1, roleType: 3, designation: 7, isDelete: false });
             expect(data[1].$set.linkId).toMatch(HEX_TOKEN);
             expect(data[2]).toEqual({ returnDocument: 'after' });
             expect(res.body.status).toBe(true);
@@ -326,7 +339,7 @@ describe('sendInvitationEmail', () => {
 });
 
 describe('sendInvitationEmailFun', () => {
-    const entry = (over = {}) => ({ email: 'Grace@Example.test', companyId: COMPANY, companyName: 'Acme', role: 2, designation: 'Dev', ...over });
+    const entry = (over = {}) => ({ email: 'Grace@Example.test', companyId: COMPANY, companyName: 'Acme', role: 2, designation: 4, ...over });
 
     it('rejects naming the missing fields, touching nothing', async () => {
         await expect(invitation.sendInvitationEmailFun(entry({ role: undefined, designation: null })))
@@ -502,7 +515,7 @@ describe('importUser', () => {
         await jest.advanceTimersByTimeAsync(10000);
         return res;
     };
-    const entry = (n, companyId = COMPANY) => ({ email: `user${n}@example.test`, companyId, companyName: 'Acme', role: 2, designation: 'Dev' });
+    const entry = (n, companyId = COMPANY) => ({ email: `user${n}@example.test`, companyId, companyName: 'Acme', role: 2, designation: 4 });
 
     beforeEach(() => jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick'] }));
 
