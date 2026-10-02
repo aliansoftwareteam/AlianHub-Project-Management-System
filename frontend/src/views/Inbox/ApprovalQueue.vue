@@ -12,6 +12,7 @@
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ t('Ai.not_reversible') }}</span>
                         </li>
                     </ul>
+                    <p v-if="choiceOf(p)" class="aq__lead" data-test="queue-review-parts">{{ t('Inbox.queue_parts_left_out') }}</p>
                 </li>
             </ol>
             <div class="aq__actions">
@@ -66,7 +67,16 @@
                 <div class="aq__label">{{ t('Inbox.queue_changes_label') }}</div>
                 <ul class="aq__changes">
                     <li v-for="(change, i) in shownChanges(p)" :key="i" class="aq__change">
-                        <IntentPreview v-if="change.preview" class="aq__intent" :preview="change.preview" @open-task="emit('open-task', $event)" />
+                        <IntentPreview
+                            v-if="change.preview"
+                            class="aq__intent"
+                            :preview="change.preview"
+                            :choosable="canPick(p)"
+                            :left-out="leftOut[pickKey(p, i)] || []"
+                            :disabled="busy || reviewing"
+                            @update:left-out="leftOut[pickKey(p, i)] = $event"
+                            @open-task="emit('open-task', $event)"
+                        />
                         <span v-else class="aq__change-label">{{ changeLabel(t, change) }}</span>
                         <span v-if="!change.reversible" class="ah-chip ah-chip--warn" data-test="queue-permanent">{{ t('Ai.not_reversible') }}</span>
                         <button
@@ -204,6 +214,7 @@ import { sendProposalDecision } from '@/composable/agentProposals';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
 import { intentSummary, intentTitle } from '@/components/molecules/IntentPreview/intentLines';
+import { chosenParts } from '@/components/molecules/IntentPreview/planPicks';
 import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
 import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
@@ -277,8 +288,23 @@ const changesOf = (p) => (isEditing(p) ? kept.value : p.changes || []);
 // A batch is read as one card: how many tasks, what changes on them and which tasks, not a line for each change.
 const readChanges = (p) => (p.batch ? [{ preview: p.batch, label: '', reversible: (p.changes || []).every((change) => change.reversible) }] : p.changes || []);
 const shownChanges = (p) => (isEditing(p) ? kept.value : readChanges(p));
+// The parts of a plan the person unticked, by proposal and change. Only their places in the stored plan are sent back.
+const leftOut = reactive({});
+const pickKey = (p, i) => `${p.proposalId}:${i}`;
+const forgetPicks = (p) => Object.keys(leftOut).filter((key) => key.startsWith(`${p.proposalId}:`)).forEach((key) => { delete leftOut[key]; });
+const canPick = (p) => !p.locked && !p.batch && !isEditing(p);
+const choiceOf = (p) => {
+    if (p.batch || isEditing(p)) return null;
+    const parts = {};
+    (p.changes || []).forEach((change, i) => {
+        const chosen = chosenParts(change.preview, leftOut[pickKey(p, i)]);
+        if (chosen) parts[i] = chosen;
+    });
+    return Object.keys(parts).length ? { parts } : null;
+};
 const toggleEdit = (p) => {
     if (isEditing(p)) { editing.value = ''; return; }
+    forgetPicks(p);
     editing.value = p.proposalId;
     kept.value = (p.changes || []).map((change) => ({ ...change }));
 };
@@ -288,6 +314,7 @@ const failuresLine = (unapplied) => (unapplied.length ? t('Ai.applied_with_failu
 const settle = (p, verb, result) => {
     if (!result.ok) { errors[p.proposalId] = result.error; return; }
     delete errors[p.proposalId];
+    forgetPicks(p);
     picked.value = picked.value.filter((id) => id !== p.proposalId);
     emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}) });
 };
@@ -296,7 +323,7 @@ const approve = async (p) => {
     const edited = isEditing(p) && kept.value.length !== (p.changes || []).length;
     busy.value = true;
     summary.value = '';
-    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map(asFiled) } : {});
+    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map(asFiled) } : choiceOf(p) || {});
     busy.value = false;
     if (result.ok) { editing.value = ''; summary.value = failuresLine(result.unapplied); }
     settle(p, 'approve', result);
@@ -370,7 +397,7 @@ const approveReviewed = async () => {
     busy.value = true;
     summary.value = '';
     const byId = new Map(rows.map((p) => [p.proposalId, p]));
-    const results = await decideEach(rows.map((p) => p.proposalId), (id) => send(id, 'approve', {}), (result) => settle(byId.get(result.id), 'approve', result));
+    const results = await decideEach(rows.map((p) => p.proposalId), (id) => send(id, 'approve', choiceOf(byId.get(id)) || {}), (result) => settle(byId.get(result.id), 'approve', result));
     busy.value = false;
     const approved = results.filter((r) => r.ok);
     const failed = results.length - approved.length;

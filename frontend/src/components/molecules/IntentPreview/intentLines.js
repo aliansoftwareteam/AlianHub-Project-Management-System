@@ -217,9 +217,16 @@ const headingOf = (preview) => (preview && Object.hasOwn(HEADINGS, preview.kind)
 
 export const kindLabel = (t, preview) => (headingOf(preview) ? t(headingOf(preview).kind) : '');
 
+/* Which part of a plan a line stands for, or belongs under, so it can be left out (./planPicks.js). */
+const pickOf = (line) => ({
+    ...(typeof line.pick === 'string' ? { pick: line.pick } : {}),
+    ...(typeof line.under === 'string' ? { under: line.under } : {}),
+    ...(Array.isArray(line.picks) ? { picks: line.picks.map((key, at) => ({ key, name: textOf((Array.isArray(line.names) ? line.names : [])[at]) })).filter((pick) => typeof pick.key === 'string' && pick.name) } : {}),
+});
+
 export const linesOf = (t, locale, preview) => (Array.isArray(preview?.lines) ? preview.lines : [])
     .filter((line) => line && typeof line === 'object' && Object.hasOwn(LINE_KINDS, line.kind))
-    .map((line) => ({ kind: line.kind, ...LINE_KINDS[line.kind](t, line, locale) }))
+    .map((line) => ({ kind: line.kind, ...LINE_KINDS[line.kind](t, line, locale), ...pickOf(line) }))
     .filter((line) => line.text || line.open);
 
 /* "create the task “Fix the login bug”", to follow "<agent> wants to"; '' for a preview that cannot be put that way. */
