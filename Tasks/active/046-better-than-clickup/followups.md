@@ -1,8 +1,8 @@
 # 046 — Follow-ups and hand checks
 
-State at build 758, 2026-10-01 21:55 IST. The owner's local server runs build 757, so build 758 (#1353) is merged but not in it yet.
+State at build 766, 2026-10-02 01:10 IST. The owner's local server runs build 766: nothing is merged and not built.
 
-The first part of this file was written at build 720 and has been cleaned of what later PRs fixed. What builds 721 to 757 and the open PRs left is in the second part, "Added at build 758".
+The first part of this file was written at build 720 and has been cleaned of what later PRs fixed. What builds 721 to 758 left is in the second part, "Added at build 758". What builds 759 to 766 left, and what the hand-check sweeps found, is in the third part, "Added at build 766".
 
 How to read this file:
 - **By hand** lines are checks to do in the running app after the next rebuild. Use the QA Sandbox project.
@@ -312,7 +312,7 @@ In the QA Sandbox project and the workspace, all named `[QA 046] …`:
 
 # Added at build 758
 
-What the PRs of builds 721 to 758, and the PRs still open, left or could not verify. One line per item. "In review" marks a PR that is not merged; its checks apply once it is. Access detail is not listed; see the private notes.
+What the PRs of builds 721 to 758 left or could not verify, brought up to date at build 766. One line per item. "In review" marks a PR that is not merged; its checks apply once it is. Access detail is not listed; see the private notes.
 
 Checked by hand on build 754 and not repeated below: Home's empty state, the Goals page and its panel, the dense List and its list menu, Board, Gantt, Calendar, chat and Dashboards in dark, the accent picker, the Docs hub in dark, and doc autosave. The results are in `dogfood-findings.md`.
 
@@ -324,17 +324,17 @@ Checked by hand on build 754 and not repeated below: Home's empty state, the Goa
 - #1311: a Board card with nested subtasks and a comment count; the create form, the WIP popover, the skeleton and the density control; Table sticky columns while scrolling sideways; the Table at 390 px; dark; Classic.
 - #1315: the Total row under its columns in light and dark; a partly loaded group's total after an edit.
 - #1317: the "⋯" beside the list name in the project header at 1440 px; the List heading's expand target, now the name and count only; archive, delete and restore of a list from the tree and the header, with the redirect and the undo toast.
-- #1347 (in review): a task shown in a list it was added to, with its "home" mark; "Remove from this list"; the bulk "Add to another list".
+- #1347: a task shown in a list it was added to, with its "home" mark; "Remove from this list"; the bulk "Add to another list".
 
 **Left**
 - #1265: a list created from the folder row menu is not opened.
 - #1271: changing a task's type still asks for a signed address of the type image.
 - #1275: a parent shows 35 children with no "load more"; the List keeps its own copy of the task menu; AI column fill on the Table does not see nested rows.
 - #1311: the Classic card title sits 5 px further left; the filter toolbar does not go compact on a Board; a row with a two-line AI summary is 44 px in dense.
-- #1315: the Table has no group totals (#1360, in review); a failed save with "Save and add another" starts the next field after the error.
+- #1315: a failed save with "Save and add another" starts the next field after the error.
 - #1317: a list cannot be duplicated (no server action); quick-create does not start in the last-used place; Board and Table headings do not show the list menu.
 - #1334: an agent's undo of a sprint move does not put back an extra-list entry the move pulled; the task "⋯" menu and the row menu have no "Add to another list".
-- #1347 (in review): only rows from the same project are drawn (W3 is running); extra rows do not show under a search or a filter; a Board card stays where it was dropped after a refused reorder; a sprint header's count can be lower than the sum of its groups.
+- #1347: a list's header count can be lower than the sum of its groups, because an added task is shown and not counted. The other three items it left were fixed by #1371.
 
 ## Tasks, subtasks and templates
 **By hand**
@@ -364,15 +364,15 @@ Checked by hand on build 754 and not repeated below: Home's empty state, the Goa
 - #1287: assign and resolve a doc comment (the Home "Assigned comments" card and the Inbox row open the doc at the comment); reactions; a file on a comment (upload, open, remove; Safari may block the open); the mention picker at the foot of the panel; the 500-comment notice.
 - #1319: replace a doc's first text after a few minutes and restore it from History; edit one doc in two tabs and see the conflict banner and "Keep mine as a copy"; go offline, type, come back; close the tab mid-edit and reopen; a mention notice arrives once, after the pause; 390 px and dark.
 - #1304, #1312: older text descriptions and stored doc pages. Behaviour changes to confirm: images in older text descriptions are not drawn, stored imgur embeds become links, and imported attachment links no longer show in the project's Files & Links panel.
-- #1345, #1352 (in review): a doc opened by a named viewer (the "View only" chip, the title, no edit controls, real content); the "Shared with me" view; the Docs hub as a guest; dark and 390 px.
-- #1349 (in review): save a doc with a link, an image, a table, an embed and coloured text; edit a task description; import a CSV with descriptions; run `scripts/rich-text-audit.js` against the local MongoDB (it only reads) and record the counts.
+- #1345, #1352: a doc opened by a named viewer (the "View only" chip, the title, no edit controls, real content); the "Shared with me" view; the Docs hub as a guest; dark and 390 px.
+- #1349: save a doc with a link, an image, a table, an embed and coloured text; edit a task description; import a CSV with descriptions; run `scripts/rich-text-audit.js` against the local MongoDB (it only reads) and record the counts.
 
 **Left**
 - #1287: no index on `pageComments.assigneeId` (needs a migration); a file stays in storage when a save fails; a fast Enter after "@" submits the comment; the Inbox wording for an assigned doc comment.
 - #1319: the quiet timers live in the server process, so a restart loses them and several instances can send a notice twice; a tiny doc can keep junk "rewrite" versions; the `Docs.unsaved` key is unused.
 - #1312: `OldDescription/Description.vue` can be deleted; the Files & Links panel should read `task.links`.
-- #1345 (in review): adding `sharedWith` to the vector index filter makes existing Atlas indexes rebuild.
-- #1349 (in review): image captions and similar short fields are kept as plain text, not cleaned as HTML; the audit script has not run against a real database.
+- #1345: adding `sharedWith` to the vector index filter makes existing Atlas indexes rebuild.
+- #1349: image captions and similar short fields are kept as plain text, not cleaned as HTML; the audit script has not run against a real database.
 
 ## Whiteboard and forms
 **By hand**
@@ -390,8 +390,8 @@ Checked by hand on build 754 and not repeated below: Home's empty state, the Goa
 
 **Left**
 - #1308: list, folder and project archive, a trash restore, a duplicate and the legacy status route do not tell the counter; the ten-minute recount heals them. The recount is unmeasured at 10,000 tasks.
-- #1348 (in review): goal actions are tied to the task-list permission until goals have a key of their own; one mutation check was left unproven.
-- G8, the AI summary on request, is not built.
+- #1348: goal actions are tied to the task-list permission until goals have a key of their own; one mutation check was left unproven.
+- #1363: the goal summary has not been pressed by hand (the button was seen on build 762).
 
 ## Import
 **By hand**
@@ -402,7 +402,7 @@ Checked by hand on build 754 and not repeated below: Home's empty state, the Goa
 - #1288: the cell format of Comments and Checklists in a real export is not documented; people columns match by email only; phone fields get a US default; money has no currency; European number format is dropped.
 - #1331: the preview miscounts a subtask whose parent is in another list; a repeated Task ID attaches subtasks to the last parent; a member without the project-details permission, with "Add missing statuses and tags" ticked, gets a bare 403; dependencies are not imported.
 - #1338: a repeat import is recognised within one project only.
-- #1356 (in review): a first import still lets automations run once per imported task.
+- #1356: a first import still lets automations run once per imported task.
 
 ## AI
 **By hand**
@@ -419,11 +419,11 @@ Checked by hand on build 754 and not repeated below: Home's empty state, the Goa
 **By hand**
 - #1307: the consent screen when a client asks for a manage scope; the person's Withdraw.
 - #1337: the `MCP_TOOLS_WORK` tools through the local endpoint (needs the flag and a new token).
-- #1350 (in review): no screen was seen and the real Slack API was never called. No sample skill ships, so nothing posts until a skill uses `slack.message.post`.
+- #1350: no screen was seen and the real Slack API was never called. No sample skill ships, so nothing posts until a skill uses `slack.message.post`.
 
 **Left**
 - #1337: list and doc-comment writes use the `tasks:write` scope; add `projects:write` and `docs:write`, or reword the consent text. Still missing: watchers, checklists, folders, resolving a doc comment, reactions.
-- #1350 (in review): the signing secret is stored and unused until slice 9; a message is at most 3,000 characters, to public channels, from a list of at most 50.
+- #1350: the signing secret is stored and unused until slice 9; a message is at most 3,000 characters, to public channels, from a list of at most 50.
 
 ## Design, dark mode and phone
 **By hand**
@@ -438,7 +438,7 @@ Checked by hand on build 754 and not repeated below: Home's empty state, the Goa
 - #1322: each accent under Home, the List, the task panel and the Board (blue and orange at least); high contrast keeps its brand; menus, the confirm dialog, the undo toast and the tooltip with reduced motion off and on.
 - #1328: the 18 converted empty states; the "?" shortcut sheet and its search; key hints.
 - #1296, #1325: the screens the two phone sweeps fixed, at 390 px; run the atlas again at 390 px and read its layout block.
-- #1354 (in review): the setup card at 1440 and 390 px, light and dark; the tour's popover position; My Settings opened at the Look section.
+- #1354: the setup card at 1440 and 390 px, light and dark; the tour's popover position; My Settings opened at the Look section.
 
 **Left**
 - #1278: the screenshot check has no baseline. Let the Visual workflow run once on `beta`, run `npm run visual:accept -- <run id>`, look at the pictures, commit `e2e/visual-baseline/`, tune the thresholds, then make "Core screens" required. #1311 changes the Board and Table shots.
@@ -449,18 +449,18 @@ Checked by hand on build 754 and not repeated below: Home's empty state, the Goa
 - #1316, #1318: the phone month grid has chips under 40 px and needs a day or agenda layout; white initials on four of the eight chat avatar colours are under 4.5:1; a chat message body renders a blank line under its text.
 - #1322: about 274 lines in some 70 legacy files hard-code the indigo and do not follow the accent; orange, green and pink sit near the warn, ok and danger colours.
 - #1325: scoped star rules no longer reach dialogs moved to `body`; the Board's 12 px buttons on a phone (check after #1311).
-- #1354 (in review): the sample seeder is unchanged; the legacy tour panel in `ShellPanels.vue`, its store and its locale keys can be removed; its e2e spec was edited and not run locally.
+- #1354: the sample seeder is unchanged; the legacy tour panel in `ShellPanels.vue`, its store and its locale keys can be removed; its e2e spec was edited and not run locally.
 
 ## Speed and the app shell
 **By hand**
 - #1339: set a non-English language and reload: the first paint is in that language; switch language in My Settings and in Language and region; the Arabic preview; on a slow network, English after 5 seconds and then the switch.
-- #1351 (in review): stylesheet order may have changed. Check a chart, the dashboard grid, a date picker, the first task opened, a List with field columns, the field form and both import screens.
+- #1351: stylesheet order may have changed. Check a chart, the dashboard grid, a date picker, the first task opened, a List with field columns, the field form and both import screens.
 - #1306 (in review): the 14 checks in `.claude/test-cases/PWA.md`; push delivery after the worker's scope change; Safari and Firefox.
 
 **Left**
 - #1324: unmeasured: 50,000 tasks, a person who can open only some projects, and the Board and Table modes. Look at sort indexes again near 90,000 tasks over 200 projects.
-- #1351 (in review): the build with the final size budget first runs in CI.
-- #1306 (in review): after #1351, its offline list must add the task panel, custom field, form and language chunks; it needs `beta` merged in and its env doc regenerated.
+- #1351: the build with the final size budget first runs in CI.
+- #1306 (in review): now that #1351 is merged, its offline list must add the task panel, custom field, form and language chunks; it needs `beta` merged in and its env doc regenerated.
 
 ## Timesheets and reports
 **By hand**
@@ -468,27 +468,27 @@ Checked by hand on build 754 and not repeated below: Home's empty state, the Goa
 - #1317: the Approvals tab and the More menu entry as owner and as member; Reopen on an approved week (the owner's week of 2026-09-28 is approved in the local data).
 
 ## Tests, CI and tooling
-- #1323: C3 slice 2 (#1361, in review) should remove the three `skipConsoleGuard` calls and the approvals allowlist entry once #1346 merges. Not reproduced: the List opening empty right after a create.
-- #1336: no convention guard was possible. The follow-up, a CI job that runs the unit suites with the clock moved forward, is in review (#1359).
-- #1297: of 884 routes, 37 are documented in full, 598 are internal and 249 are undocumented. `docs/API.md` and `docs/api/openapi.json` are out of date at build 758 (`npm run api:doc:check`); a cloud run is regenerating them.
+- #1323: C3 slice 2 (#1361, in review) should remove the three `skipConsoleGuard` calls and the approvals allowlist entry now that #1346 is merged. Not reproduced: the List opening empty right after a create.
+- #1336: no convention guard was possible. The follow-up, a CI job that runs the unit suites with the clock moved forward, is merged (#1359).
+- #1297: `docs/API.md` and `docs/api/openapi.json` were regenerated at build 766, with the 38 routes that had no description described. Feature PRs keep adding routes with a one-line entry; the next docs PR runs `npm run api:doc` again.
 - #1342: the doomed CI runs of the afternoon could not be cancelled from the session; the Actions cache is at its 10 GB limit.
 - Local storage has no folder for the main company; after the next rebuild, check where an upload lands.
 - `git` on the owner's Mac has no `user.name` or `user.email`.
 
-## Found by the second benchmark run (#1358, in review; build 754)
-A fix agent is working on the first five.
-- Job 6: duplicating a project fails with a server error when the source project has no currency set.
-- Job 4: the task panel offers two levels of subtasks, not three, and says nothing at the limit.
-- Job 4: "Add subtask" in the panel puts the focus in the List's add row, so the name typed becomes a top-level task.
-- Job 13: a rollup field shows a dash until a subtask's value is saved again.
-- Wording: "sprint" is used for a list in several places; "Enter directory name"; "2 tasks across 1 projects".
-- A timer in an approved week starts, and only Stop refuses it.
-- A new empty list says a task was created.
-- The Approvals card's totals disagree with the timesheet's, and timesheets sit below agent proposals.
-- The quick-create assignee list lacks the person creating the task.
-- Search ranks another project's task above the doc that was asked for.
-- A date field needs a press on Select and stores a time; the people picker stays open after a pick.
-- Job 20, planning a sprint, takes 15 steps; job 3, a message to a task, takes 6 because nothing is remembered.
+## Found by the second benchmark run (#1358; build 754)
+Each line says which PR fixed it, or that it is open. None of the fixes has been measured by a third run.
+- Job 6: duplicating a project fails with a server error when the source project has no currency set. Fixed by #1375 and #1391; a duplicate was made by hand on build 762.
+- Job 4: the task panel offers two levels of subtasks, not three, and says nothing at the limit. Not a defect: the task itself is the first of the three levels, and the panel has a line at the limit.
+- Job 4: "Add subtask" in the panel puts the focus in the List's add row, so the name typed becomes a top-level task. Fixed by #1375; not tried by hand.
+- Job 13: a rollup field shows a dash until a subtask's value is saved again. Fixed by #1375, from at most 500 subtasks; not tried by hand.
+- Wording: "sprint" is used for a list in several places; "Enter directory name"; "2 tasks across 1 projects". Fixed by #1375 (16 strings); 51 more are in review (#1407, task 047). In the other languages the reworded strings hold English until they are translated.
+- A timer in an approved week starts, and only Stop refuses it. Fixed by #1377; not tried by hand.
+- A new empty list says a task was created. Check: #1375 added "List created successfully".
+- The Approvals card's totals disagree with the timesheet's, and timesheets sit below agent proposals. Fixed by #1377.
+- The quick-create assignee list lacks the person creating the task. Fixed by #1379.
+- Search ranks another project's task above the doc that was asked for. Open.
+- A date field needs a press on Select and stores a time; the people picker stays open after a pick. #1379 stores a date-only field as a date and closes a one-person picker. The press on Select stays, because new date fields default to "allow time": an open decision.
+- Job 20, planning a sprint, takes 15 steps; job 3, a message to a task, takes 6 because nothing is remembered. Open in the web app; over MCP a message becomes a task in one call (#1398, task 047).
 - Seen once and probably the script: a two-day drag in the Gantt's Weeks scale snapped back.
 
 ## QA leftovers added on builds 752 and 754
@@ -497,3 +497,58 @@ A fix agent is working on the first five.
 - Items named `[QA bench]` and `[QA bench2]` from the two benchmark runs, in QA Sandbox, and two stray "Child" tasks, QAS-48 and QAS-49.
 - The owner's approved week of 28 September to 4 October was reopened and approved again by the second benchmark run, with 1 h 31 min more on it.
 - 300 "Scale Small" projects with 3,000 tasks inside the Scale Test company; `npm run scale:seed -- --drop` removes them with the rest.
+- From the hand-check sweeps, all named `[QA 046] …` unless said: the goal `hand-check goal`; a Table view, a Whiteboard view and a "Project Details" view on QA Sandbox, named by the app; the note `hand-check note`; the project `copy`; the docs `hand-check doc` (shared with one member as an editor) and one empty "Untitled" doc; the tasks `live add` and `A live`; task `B`, left in Sprint 1; a few comments and chat messages; 38 imported tasks in `list`, and 38 more in the trash from two undone imports.
+
+# Added at build 766
+
+What builds 759 to 766 left or could not verify, and what the Supporter session's sweeps found that is still open. Task 047's slices are included, because they share the screens. Access detail is not listed; see the private notes.
+
+## Defects found by the hand-check sweeps, still open
+- With the network down, an instant edit is not taken back and shows no toast: the offline write queue answers as if it succeeded, and minutes later the rows return to their old value silently (#1372). A refused write is right: it returns in about 300 ms with one toast carrying the server's reason.
+- An import's "update from the file" does not refresh a project page that is already open; the old status stays until a reload. The confirm button still reads "Import N task(s)" when it is updating (#1356).
+- The Add View menu runs off the right edge, further with each view. #1384's clamp places the menu once, before its content has loaded. In review: #1403.
+- One bare avatar request (`/<userId>_<n>_profile.png`) still answers 404 on Home, List, Board, the task panel, chat and Docs. In review: #1389, which also covers the title lost on click-away, panels that outlive their route, and Undo after "Remove from this list". Its avatar change does not reach the People directory, Goals, field values, Workload, Approvals, the mention pickers and three more components.
+- Home's "Open in AI Inbox" link goes to the AI inbox, not to the new "Needs your approval" tab (#1392).
+- "Hand to an agent" stays on a task after the Project manager switch is turned off, until a reload (#1404).
+- Turning the Project manager switch on filled "What needs attention" at once and filed no proposal; the Inbox row "The system, for <project>" was not seen. It may need the daily run (#1396).
+- A timer that is running when its week gets approved loses its tracked time at Stop (#1377 found it; not fixed).
+- Small: the "Not connected yet" strip on Connect your AI has a blank space where an icon would be (#1397); "Save" is lit on a doc that was just reloaded; the List's add-task row stays open after a task is added; the tour's key hint says "Ctrl+K" on a phone; "DONE BY" and "BUDGET" headers touch at 1440 px with every column on; the Table group header reads "To Do 5 5 pts".
+- Read from the code while writing the API reference, not seen in a browser: the save of a project's agent policy sends its live event without the company id, while the project manager's save beside it names it (`Modules/Agents/projectPolicyController.js`). Check that a second open tab sees a policy change without a reload.
+
+## By hand, not done yet
+- Needs a second person: the unread counts on the rail; a doc opened as a view-only reader (#1352).
+- #1371: a task of another project added to a QA Sandbox list: the "From other projects" section at the foot of the List at 1440 and 390 px in light and dark, the Board, the chip on Everything rows, the palette's "+N lists" line, a real drag that snaps back, a search and a filter with an added task, and a live refresh in two browsers. It needs a second sandbox project.
+- #1372: instant priority, assignee, due date and title edits; the Board; counts when grouped by assignee.
+- #1375: "Add subtask" with the List's add row open; a rollup on a parent; the reworded strings on screen.
+- #1377, #1379: a timer start after a hard reload in an approved week; a one-person people field; a date-only field; the quick-create assignee list; a folder restore.
+- #1349: an image, a checklist and coloured text in a doc; rich text in a task description; a CSV import with descriptions; `scripts/rich-text-audit.js` against the local MongoDB (it only reads).
+- #1351: as a first load: a chart, the dashboard grid, the calendar date picker and the field form.
+- #1354: the five-step setup card (the sweep account shows none). #1370: the sample project (this workspace has none).
+- #1367: live updates of a whiteboard note, a custom field value and a goal in two tabs.
+- #1384: `<html lang>` after a language switch.
+- #1391: the company's currency on a goal's money target and on a new project.
+- #1397, #1400: Connect your AI, the Ask tile and the "say it" row on empty screens with no AI set up (AI is set up on this install).
+- #1386: the expiry notice in the Inbox; Renew (nothing was created or renewed).
+- #1387, #1390, #1398, #1402 and the agent side of #1404: they need the MCP flags on and a connected AI, which wait for the owner.
+- #1350, #1362, #1381: no connector screen has been seen and no real Slack or Google call has been made. How the Slack summary demo is started from a screen has not been traced.
+- At 390 px, only the Simple-mode phone bar, Project Details, Connect your AI, the Inbox and the "What next" line were looked at among the new screens.
+
+## Left
+- #1351: the build with the final size budget first ran in CI. The warm-up of the task panel and the field chunks runs when the browser is idle.
+- #1354: the legacy tour panel in `ShellPanels.vue`, its store and its locale keys can be removed.
+- #1356: a first import still lets automations run once per imported task.
+- #1369: a paged search by list was not tested.
+- #1371: the Table does not show rows from other projects; Everything has no list filter; opening a List or a Board makes one more request.
+- #1372: filtered copies of a row follow the server; team assignee counts; a late echo can flicker; a Board drag's place is not taken back on a refusal.
+- #1385: only the open list's room is heard; a server count that lands later than 800 ms is off until the next event.
+- #1370: restoring the sample project brings back its tasks and not its lists, folders and docs (each can be restored on its own); removal goes by the project code `WELCOME`, so a person's own project with that code would go to the trash with it.
+- #1391: ten questions in `Tasks/active/047-ai-run/resources/dead-ends.md` (a default project type, a default template, five more composers, the desktop tracker's owner, storage not set up, no screen to change the default currency).
+- #1359: the moved-clock job runs the unit suites; the integration suites are not in it.
+- #1361 (in review): written on an older base; its backend and e2e checks failed.
+
+## How a batch is checked now
+- The merge queue merges only a PR that is not a draft and whose backend, frontend and e2e checks succeeded. A skipped check is not a pass: #1394 was merged on skipped checks once, and its own run passed afterwards.
+- On every combined branch, before the push: each merged PR's own test files; `tests/permission-task-write-keys.test.js`; the conventions project; `node scripts/env-doc.js --check`; `npm run i18n:check`; and every frontend spec that mentions a changed file.
+- A spec that mounts `App.vue` must mock `@/config/warmChunks`. It failed three batches.
+- A helper is never added as a method of the task write mixins (`Modules/Tasks/helpers/taskMongo/`): every method there is a task action.
+- After a fix is pushed to a queued PR, wait about a minute before restarting the queue runner, or it reads the old failed check.

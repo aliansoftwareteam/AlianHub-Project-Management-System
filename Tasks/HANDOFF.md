@@ -1,138 +1,126 @@
 # Handoff — where to start next session
 
-Updated 2026-10-01 21:55 IST. Read this first, then `Tasks/index.md` and `Tasks/active/046-better-than-clickup/progress.md`. Overwrite this file at the end of every session.
+Updated 2026-10-02 01:10 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
 
 ## State
 
-- **The work in hand is task 046, "the plan to be great next to ClickUp"** (tracker AP-441). In its folder:
-  - `progress.md`: every slice with its PR and build, the decisions of 2026-10-01, and the open decisions for the owner.
-  - `followups.md`: what each PR left and the checks to do by hand.
-  - `dogfood-findings.md`: the hand checks on build 754 and the screens still unchecked.
-  - `task.md`: the plan and decisions 1 to 26. The designs are `design-hierarchy.md`, `design-m3-lists-and-goals.md` and `design-connectors.md`.
-- **`beta` is at build 758** (`14.36.0-beta.758`, #1353). GitHub shows 159 PRs merged on 2026-10-01, in 110 builds (649 to 758).
-- **Live on localhost: build 757** (rebuilt at about 21:50; migrations through 070 applied, none pending). It has both merged batches, #1332 and #1343.
-- **Merged but not built locally: build 758** (#1353, an access fix).
-- Hand-checked so far: builds 752 and 754 by the integrator. The second batch (#1333 to #1341) is being checked on 757 by a second local session.
-- The next free migration number is 071.
-- `docs/API.md` and `docs/api/openapi.json` are out of date (`npm run api:doc:check`). A cloud run is regenerating them.
+- **Two tasks are in hand.**
+  - Task 047, "AI-run" (`Tasks/active/047-ai-run/`): the agent that comes with AlianHub is the person's own Claude or ChatGPT over MCP (decision 30, confirmed by the owner). New agent slots go here.
+  - Task 046, "great next to ClickUp" (`Tasks/active/046-better-than-clickup/`, tracker AP-441): no new parity features; fixes, proof and the held PRs remain.
+  - In each folder, `progress.md` has every slice with its PR and build, the decisions and the open decisions for the owner. In 046, `followups.md` has what each PR left ("Added at build 766" is the newest part) and `dogfood-findings.md` has the hand-check sweeps.
+- **`beta` is at build 766** (`14.36.0-beta.766`, #1405).
+- **Live on localhost: build 766** (rebuilt at 00:56; migrations through 070 applied, none pending). Nothing is merged and not built.
+- Hand-checked: builds 757, 759, 762, 764, 765 and 766, by the Supporter session. Nothing that needs a connected AI has been used by hand: the MCP flags are off locally.
+- The next free migration number is 071. Check the open PRs before taking it.
+- `docs/API.md` and `docs/api/openapi.json` are in sync with build 766 once this docs PR merges.
 
-## Merged since the last handoff (builds 721 to 758)
+## Merged since the last handoff (builds 759 to 766)
 
-| Area | Merged, with the build in brackets |
-|---|---|
-| Nested subtasks | #1240 (722) task panel; #1275 (737) Board, Table, Calendar; #1268 (725) import, rollups, export |
-| Tasks in several lists | #1277 (732) design; #1309 (in 754); #1334 (in 755) |
-| Goals | #1291, #1308, #1310, #1327 (in 754); #1335, #1341 (in 755) |
-| Fields | #1298 (747) relationship, voting; #1320, #1315, #1289 (in 754) |
-| Docs, whiteboard, forms | #1287 (744); #1292 (748); #1319, #1326, #1330, #1300, #1321 (in 754) |
-| Projects and import | #1265 (731); #1282 (743) templates; #1288 (745); #1299, #1331, #1317 (in 754); #1338 (in 755) |
-| AI and MCP | #1266 (734); #1270 (728); #1295, #1302, #1307 (in 754); #1333, #1337, #1340 (in 755) |
-| Design | #1259 (724) dense default; #1272 (729); #1279 (735); #1280 (741); #1284 (742); #1285 (749); #1290 (746); #1293, #1303, #1329, #1311, #1316, #1318, #1322, #1328 (in 754) |
-| Phone and speed | #1296 (752); #1325, #1324 (in 754); #1339 (in 755) |
-| Access (titles in `progress.md`; detail in the private notes) | #1283 (740); #1294 (750); #1263, #1276, #1286, #1313, #1304, #1312 (in 754); #1353 (758) |
-| Fixes | #1255 (723); #1271 (727); #1274 (730); #1269 (736); #1281 (738); #1273 (739) |
-| Tests, CI, docs | #1264 (721); #1267 (726); #1278 (733); #1297 (751); #1314 (753); #1301, #1305 (in 754); #1336 (in 755); #1342 (756); #1323 (757) |
+| Build | PR | What it carried |
+|---|---|---|
+| 759 | #1357, third batch | #1344, #1355, #1345, #1352, #1346, #1347, #1348, #1349, #1350, #1351, #1354 and the calendar dark fix |
+| 760 | #1376 | A draft PR skips the suites until it is marked ready |
+| 761 | #1378, fourth batch | #1356, #1358, #1362, #1365, #1367, #1368, #1369, #1371, #1372, #1374, #1375 |
+| 762 | #1395, fifth batch | #1360, #1363, #1366, #1373, #1377, #1379, #1381, #1382, #1384, #1385, #1388; and 047: #1380, #1383, #1386, #1387, #1390, #1391, #1392, #1393 |
+| 763 | #1394 | 047 AI-4c, a project's policy for agents |
+| 764 | #1399, sixth batch | #1359; and 047: #1396, #1397, #1398 |
+| 765 | #1401, seventh batch | #1370 (the sample project); 047: #1400 |
+| 766 | #1405, eighth batch | 047: #1402, #1404 |
 
-"In 754" means inside the combined PR #1332; "in 755" means inside #1343.
+The access fixes among them are listed by title in 046's `progress.md`; the detail is in the private notes.
 
 ## Open
 
 | PR | What | State |
 |---|---|---|
-| #1357 | The third combined PR: #1344, #1355, #1345, #1352, #1346, #1347, #1348, #1349, #1350, #1351, #1354, the branch `fix/calendar-collapsed-lists-dark`, and #1353, which has since merged alone | Queued; its checks were running |
-| #1356 | An import update moves a status the way a person does | Goes into the fourth batch |
-| #1358 | The second benchmark run, on build 754 | Fourth batch |
-| #1362 | Connector slice 2: an agent run reads an allowed Slack channel. It sits on #1350 | Fourth batch, after #1357 |
-| #1359, #1360, #1361 | From cloud runs: the unit suites with the clock moved forward; Table group totals; the next e2e flows | Read each before queueing; nobody has reviewed them |
-| #1306 | The installable app shell | Green. Held: it merges alone, after its own rebuild and the 14 checks in `.claude/test-cases/PWA.md`. It needs `beta` merged in and its env doc regenerated |
-| #1210 | Colours and legacy classes may only shrink | Held until the visual PRs are in; then its baseline is regenerated once. It adds Rule 5 to `CLAUDE.md` |
-| This PR | Task docs, the beta log, the `api:doc` line in `CLAUDE.md`, this handoff | Its checks |
-
-When #1357 merges, GitHub marks the eleven open PRs inside it merged. Check that each one does, and close with a note any that does not.
+| #1408 | The ninth combined PR: #1406 (047 AI-5 part 2, "Always do this") and #1407 (047 S-3, plain words) | In CI. Its frontend round failed once and was fixed |
+| #1409, #1410 | 047 T-4 (agent work visible) and T-2 (the connected AI as a member) | Drafts. Both are merged into `chore/integrate-batch-10`, which is pushed and has no PR yet. Open it when #1408 merges |
+| #1389 | The Supporter's panel fixes: title saves on blur, panels follow their route, the bare avatar request, Undo on remove | Draft. The Supporter's notes call it final; the coordinator's log did not. Confirm, then batch it |
+| #1403 | The Add View menu stays inside the window | Draft, final by the Supporter's notes. Not in the coordinator's log; batch it |
+| #1361 | A cloud run's e2e flows, batch 2 | Written on an older base; its backend and e2e checks failed. A local agent must bring it up to date |
+| #1364 | A cloud run's API reference catch-up | Replaced by this docs PR. Close it |
+| #1306 | The installable app shell | Held: it merges alone, after its own rebuild and the 14 checks in `.claude/test-cases/PWA.md`. Its offline list must add the chunks #1351 split out |
+| #1210 | Colours and legacy classes may only shrink | Held until the visual PRs are in; then regenerate its baseline once |
+| This PR | Task docs, the beta log, the API reference, this handoff | Draft |
 
 ## Running when this was written
 
-Agents on the PC with no PR yet:
-- Two access fixes, on top of the third batch.
-- Task edits that show at once (`feat/instant-task-edits`).
-- Extra lists through MCP (`feat/mcp-task-lists`).
-- Extra-list rows across projects (`feat/extra-list-rows-across-projects`).
-- Fixes for what the second benchmark run found (`fix/benchmark-run-2-blockers`).
-- This docs PR.
+- No local agent was running. The coordinator held three to five overnight, to keep the weekly plan limit (24% at 01:00, about 2% an hour; extra usage is off).
+- The Supporter session was sweeping build 766 and owed its write-up of the sweeps of batches 4 to 7; that write-up is now in 046's `dogfood-findings.md`.
+- An advisor session answers product and plan questions while the owner is away. It cannot approve money, credentials, permanent deletion, outside messages or loosening security.
+- The six cloud runs each opened a PR: four are merged (#1359, #1360, #1363, #1370), #1361 is open and #1364 is replaced. One duplicate of the moved-clock run could not be stopped from the session; the owner can stop it on claude.ai.
 
-A second local session, the "supporter", hand-checks the second batch on localhost and sets the tracker subtasks of merged PRs to Done. It was told not to push to any PR that is inside #1357.
-
-Six cloud runs were started from the briefs in `Tasks/active/046-better-than-clickup/cloud-briefs.md` (in the main checkout, not committed). Three have opened PRs (#1359, #1360, #1361). Three have not: the goal summary on request (`feat/goal-summary-on-request`), the API reference catch-up (`docs/api-reference-catch-up`) and the sample project (`feat/sample-project-refresh`). The moved-clock run was started twice by mistake; the owner can stop the duplicate. Start a cloud run with no schedule and then run it: a scheduled one that is also run by hand fires twice.
-
-A new session cannot see these agents. Find their work with `gh pr list --base beta` and `git branch -r --sort=-committerdate`, and read each worktree under `.claude/worktrees/` before starting the same work again. The session's scratch folder (the queue scripts, the agent log) is wiped by a restart.
+A new session cannot see other sessions' agents. Find their work with `gh pr list --base beta` and `git branch -r --sort=-committerdate`, and read each worktree under `.claude/worktrees/` before starting the same work again. The session's scratch folder (the queue scripts, the agent log) is wiped by a restart.
 
 ## The combined-PR method
 
-GitHub runs about two CI runs at a time and a run takes about ten minutes of jobs, so 25 open PRs meant hours of queue. The owner chose one combined PR per batch.
+1. Make a branch from `origin/beta`, or from the batch before it, in its own worktree (`chore/integrate-batch-N`).
+2. Merge each PR's head into it with a commit titled `Merge pull request #N from <branch>`. For a stack, merge only the top.
+3. Resolve conflicts by keeping both sides (registries, locales, route lists, events that need both a company and an actor). A defect only the combination shows gets its own commit.
+4. Before the push, run on the combined branch:
+   - each merged PR's own test files, and every frontend spec that mentions a changed file;
+   - `tests/permission-task-write-keys.test.js` and the conventions project;
+   - `node scripts/env-doc.js --check` and `npm run i18n:check`.
+5. Push, open one PR that is not a draft, and queue it. Agents' own PRs stay drafts, so the suites run once.
+6. The queue merges a PR only when it is not a draft and its backend, frontend and e2e checks succeeded. A skipped check is not a pass. A PR that changes only notes is merged by hand.
+7. After the merge: check that each included PR shows as merged, rebuild the local server, check migrations and Home, say which build is live, and give the Supporter the list to sweep. Then `npm run version:log` and `npm run api:doc` in the next docs PR.
 
-1. Make a branch from `origin/beta` in its own worktree (`chore/integrate-046-batch-N`).
-2. Merge each PR's head into it, in order, with a commit titled `Merge pull request #N from <branch>`. For a stack, merge only the top, after checking that it contains its parent's head.
-3. Resolve conflicts by keeping both sides (registries, locales, route lists). A defect that only the combination shows gets its own commit.
-4. Run locally the test files the PRs touch, the convention files and the frontend specs they touch; then `npm run i18n:check` and `node scripts/env-doc.js --check`.
-5. Push and open one PR. CI runs once. Fix what it finds on the branch.
-6. Merge it. Each included PR shows as merged, because its head is now in `beta`. Set the tracker subtasks to Done, run `npm run version:log`, rebuild the local server, and do the hand checks.
-
-An access fix can also be queued alone ahead of the batch. Do not rebuild the local server between two PRs that only work together.
+Push a batch only after the one below it has merged, so its diff is its own. An access fix can be queued alone ahead of a batch.
 
 ## Standing owner rules
 
-- **Eight agents on the PC.** Start the next one only when one finishes. Cloud runs are extra, for work that needs only the repository.
-- **Decisions in two lines.** Put the choice first; do not bury it under a report.
+- **Eight agents on the PC**, plus cloud runs for work that needs only the repository. Start the next one only when one finishes. Pace to the weekly plan limit.
+- **Decisions in two lines.** Put the choice first.
 - **Say what is live.** After every merge and every rebuild, say which build runs on localhost and what is merged but not built.
-- **Credentials are typed by the owner only.** Build up to the sign-in step, then say so. Never type, read or store a key or a password.
-- **Security detail stays out of this repository.** It lives in `~/.claude/projects/-Users-mevil-Alian-Hub/handoff/<date>/`. An access fix pushes its test and its fix together, with neutral titles and text.
+- **Say which task and slice** a piece of work belongs to when it starts, and keep the tracker current.
+- **Credentials are typed by the owner only.** Build up to the sign-in step, then say so.
+- **Security detail stays out of this repository.** An access fix pushes its test and its fix together, with neutral titles and text.
 - **Keep working without asking.** Take product and plan decisions, record them, keep them reversible. Stop only for money, permanent deletion, credentials, messages to outside people, or loosening security.
 - **Work targets `beta`.** One PR per change, no direct pushes, Conventional Commit titles, checks green before a merge.
 - **Done means used.** A slice is done after its main flow is used on the local build. Green CI is not enough.
-- **Keep the tracker current** (AP-441 and its subtasks), and say which task a piece of work belongs to when it starts.
 - **Light load.** An agent runs only the test files it touched, one worker. No full suites, no build, no `npm ci`. Node 20 for everything.
+- **No new feature wave while more than 15 merged builds are unused**, and no more parity features in new slots.
 
 ## Waiting for the owner
 
-The full list is "Open decisions for the owner" in `progress.md`. The ones that block work:
-1. The local `.env` flags for MCP (`MCP_TOOLS_MANAGE`, `MCP_TOOLS_DATA`, `MCP_TOOLS_WORK`) and a new token with the manage grant.
-2. The Slack app and four `.env` lines, once #1350 is merged and on the local build (steps A and B in `design-connectors.md`). The Google client is needed from connector slice 3.
-3. `STORAGE_DOWNLOAD_SCOPE=enforce` and `PERMISSION_ENFORCEMENT_MODE=enforce`: both still undecided.
-4. The Talk to Text price (0.006 a minute) to confirm.
-5. `git config --global user.name` and `user.email` on this Mac.
+The full lists are "Open decisions for the owner" in 046's `progress.md` and "Needs the owner" in 047's. The ones that block work:
+1. Turn on `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` in the local `.env` and connect their Claude with the manage grant. 047's AI-4a, AI-4e and AI-1 wait for it, and so does every hand check of an MCP slice.
+2. A new account, for the newcomer tests (047 S-6).
+3. A second person for two hand checks: unread counts, and a doc as a view-only reader.
+4. The Slack app and its `.env` lines (#1350 is live locally), and a Google client for connector slice 3 (#1381).
+5. Close more than 86 tracker subtasks of merged PRs: an agent cannot set Done.
+6. Stop the duplicate cloud session.
+7. Money: a paid CI plan (recommended: stay on Free), and extra usage on the Claude plan.
+8. Still undecided: `STORAGE_DOWNLOAD_SCOPE=enforce`, `PERMISSION_ENFORCEMENT_MODE=enforce`, the MCP flags on by default (an access review first), the default of new date fields, the Talk to Text price, `git config user.name` and `user.email` on this Mac.
+
+## Private notes
+
+Access findings and their state are in `~/.claude/projects/-Users-mevil-Alian-Hub/handoff/2026-10-01/`. Read that folder before working on any access item. Nothing from it is copied here.
 
 ## Next steps, in order
 
-1. Merge #1357 when green. Check the eleven included PRs show merged; set their tracker subtasks to Done, and those of #1332 and #1343.
-2. Rebuild the local server from `beta` and say which build is live.
-3. Hand-check that build, starting with the list in `dogfood-findings.md`, then the per-PR lists in `followups.md`. Uploads and removals first.
-4. Build the fourth batch: #1356, #1358, #1362, the cloud PRs once read, and whatever the running agents open. Then `npm run version:log` and the next docs PR.
-5. Merge the API reference catch-up when its cloud run opens a PR, or run `npm run api:doc` in the next docs PR.
-6. Merge #1306 alone, after its hand check. Regenerate #1210's baseline and merge it.
-7. Give the screenshot check its baseline: let the Visual workflow run on `beta`, `npm run visual:accept -- <run id>`, look at the pictures, commit `e2e/visual-baseline/`.
-8. Tell the owner when #1350 is live locally, and what #1352 changes for guests.
-9. Open the follow-up task for connector slices 7 to 9, and continue slices 2 to 6.
-10. Next slices: the Shell and task panel on tokens, doc presence, 50,000 tasks measured, removing the legacy stylesheets, and the rest of the second benchmark run's findings (`followups.md`).
-11. Close M1 and M2: update `scorecard.md` from the second benchmark run and ask the owner to sign them off.
+1. Merge #1408 when green; rebuild; say which build is live. Open the tenth combined PR from `chore/integrate-batch-10` (#1409, #1410), add #1389 and #1403 once confirmed final, and merge it.
+2. Close #1364 with a note that this docs PR replaced it.
+3. Give the Supporter the sweep list for batches 9 and 10, and the "By hand, not done yet" list in 046's `followups.md`.
+4. 047, without the owner: T-5, S-2, AI-2 in the web app, AI-3 automations, more plain-words batches, the AI-1 and S-6 sheets as writing.
+5. Fix the open defects from the sweeps (046 `followups.md`, "Added at build 766"): offline instant edits first, then the import update that does not refresh an open page, and the timer that loses its time when its week is approved.
+6. Bring #1361 up to date with a local agent.
+7. When the owner has switched the flags on: AI-4a, AI-4e, then the first AI-1 run.
+8. Merge #1306 alone, after its hand check. Regenerate #1210's baseline and merge it. Give the screenshot check its baseline (`npm run visual:accept -- <run id>`).
+9. A third benchmark run, on a build with the fixes of run 2; update `scorecard.md`; ask the owner to sign off M1 and M2.
 
-## Learned on 2026-10-01
+## Learned on the night of 2026-10-01 to 02
 
-- **The Claude plan has two limits.** The session limit stopped three agents at about 14:58; the weekly limit stopped all 20 at about 17:16 (it resets on 2026-10-03 at 17:30 IST). Agents commit and push early, and a stopped agent is resumed from its transcript.
-- **The machine takes 20 agents if CI runs the suites.** The tool refuses a 21st. Load follows how many agents run tests at once, not the count.
-- **CI is the slow part, not the agents.** Hence the combined PR. A stale run cannot be cancelled from the session; the owner can cancel it in the Actions tab.
-- **A test that mixes the real clock with a pinned date fails on one day.** `beta` went red for everyone at 12:00 UTC (#1314), and another test would have failed from 2026-10-04 (#1336). When one unrelated test fails on every PR, look at the date first.
-- **Combining PRs finds defects no single PR shows.** Twice, one PR used a helper that another PR in the batch had removed or renamed.
-- **A merge of two regenerated files can leave them stale.** `docs/ENV.md` and the API reference are now warnings in a PR and strict in the docs PR (#1305, #1297).
-- **The permission check refused three things** (a bulk tracker write, cancelling workflow runs, one mutation check). None was retried or worked around; tell the owner instead.
-- **The queue runner must treat an advisory check that reports CANCELLED as neutral,** and "not in the queue" is not "merged": a rebuild fired early on that.
-- **The Mac sleeping with the lid closed stalls every agent.** Ask for keep-awake at the start.
-- **In this shell use `/usr/bin/grep`,** and put the test file before `--selectProjects` when calling jest.
-- **A cloud run gets the account's connectors attached.** Its brief must say to use none.
-- **The integrator's log drifts from the clock.** Take merge times from GitHub.
-
-## Earlier handoffs
-
-The handoff written at build 720 held the history back to build 303, the owner decisions recorded since 2026-09-12, the upgrade steps for a deployed instance, the older open items and some fifty lessons. It was cut to keep this file short. Read it with `git show ea651ebae:Tasks/HANDOFF.md`.
+- **A skipped check is not a pass.** #1394 was merged on a draft's skipped suites. Its own run passed afterwards; the queue script was fixed.
+- **A spec that mounts `App.vue` must mock `@/config/warmChunks`.** It failed three batches. A mock whose factory imports the module it mocks hangs.
+- **Never add a helper as a method of the task write mixins** (`Modules/Tasks/helpers/taskMongo/`): every method there is a task action. `tests/permission-task-write-keys.test.js` catches it.
+- **A cloud PR written on an older base must be merged again by a local agent** that knows the day's rules. #1370 needed it; #1361 still does.
+- **A cloud run is started with no schedule and then run.** A scheduled one that is also run by hand fires twice. Its brief must say to use no connector tools.
+- **Small, tight briefs are cheap**, and agents report in at most 30 lines; the detail goes in the PR body.
+- **After a fix push to a queued PR, wait about a minute** before restarting the queue runner, or it reads the old failed check.
+- **Draft PRs skip the suites** (#1376). CI went from a queue of 12 runs to one run per batch of about 14 minutes.
+- **The Claude plan's weekly limit is the real ceiling:** about 2% an hour at three to four agents.
+- Earlier lessons (the two plan limits, the load test, the pinned-clock test, `/usr/bin/grep`, the jest argument order) are in the handoff of build 758: `git show 69a9a70be:Tasks/HANDOFF.md`. The history back to build 303 is in `git show ea651ebae:Tasks/HANDOFF.md`.
 
 ## Handy commands
 
@@ -140,9 +128,9 @@ The handoff written at build 720 held the history back to build 303, the owner d
 npm run nodemon             # backend on :4000 under Node 20
 npm run version:show
 npm run version:log         # after merges, then commit docs/BETA-LOG.md
+npm run api:doc             # after merges that add or change a route
 npm run migrate -- status
-npm run api:doc:check && npm run env:doc:check
+npm run api:doc:check && node scripts/env-doc.js --check && npm run i18n:check
 npx jest <file> --selectProjects unit --maxWorkers=1
 cd frontend && npx vitest run <file> --maxWorkers=1 --minWorkers=1
-npm run i18n:check
 ```
