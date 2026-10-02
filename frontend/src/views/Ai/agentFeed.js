@@ -3,6 +3,7 @@ import { apiRequest } from "@/services";
 import { isBusy, retryAfterMs } from "@/services/busy";
 import * as env from "@/config/env";
 import { shellState } from "@/components/organisms/Shell/shellState";
+import { noteConnectedPaused } from "./useAccounts";
 
 /* The LIVE strip, the rail badge, the AI sidebar and the project pages all read agents from here,
  * so none of them can disagree and none of them sends a request of its own. The server's
@@ -28,8 +29,10 @@ export const openRuns = ref([]);
 export const proposals = ref([]);
 // What connected agents hold, each as { taskId, projectId, name, since }, already kept to the tasks this person can open.
 export const heldTasks = ref([]);
-// A paused agent can still hold a run waiting on a person; the server counts it as paused, not live.
-export const live = computed(() => agents.value.filter((a) => a.status === "running" && a.run));
+const WAITS_ON_A_PERSON = "waiting_approval";
+/* A paused agent can still hold a run waiting on a person; the server counts it as paused, not live. An agent that
+ * is not paused and whose run waits on a person is held too: it does nothing until that person answers. */
+export const live = computed(() => agents.value.filter((a) => a.status === "running" && a.run && a.run.status !== WAITS_ON_A_PERSON));
 export const running = computed(() => live.value.length);
 
 const runHooks = new Set();
@@ -72,6 +75,7 @@ const readTeam = shared(async () => {
     people.value = data.people || [];
     agents.value = data.agents || [];
     shellState.agentsRunning = running.value;
+    noteConnectedPaused(data.connectedPaused);
 });
 
 const readRuns = shared(async () => {

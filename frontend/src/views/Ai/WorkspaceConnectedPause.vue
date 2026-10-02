@@ -6,6 +6,9 @@
         </div>
         <div class="ah-card__body">
             <div class="acct-policy">
+                <p v-if="on" class="acct-paused" role="status" data-test="connected-paused-now">
+                    <span class="ah-chip ah-chip--warn">{{ $t('Ai.connected_paused') }}</span>
+                </p>
                 <label class="acct-policy__row">
                     <input class="ah-check" type="checkbox" data-test="connected-pause-switch" :checked="on" :disabled="!privileged || saving" @change="onToggle" />
                     <span>
@@ -60,3 +63,7 @@ const onToggle = async (event) => {
     }
 };
 </script>
+
+<style scoped>
+.acct-paused { margin: 0 0 var(--sp-4); }
+</style>

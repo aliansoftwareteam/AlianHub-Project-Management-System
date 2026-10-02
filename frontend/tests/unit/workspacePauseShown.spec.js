@@ -129,6 +129,7 @@ describe('the workspace pause of connected agents', () => {
     it('stands above the project\'s own pause on Project Details', async () => {
         world.policy = { connectedPaused: true };
         world.projectPaused = true;
+        await useAccounts().loadPolicy();
         const card = await show(ProjectAgentLimitsCard, { projectId: 'p1' });
         const notes = card.findAll('[role="status"]').map((note) => note.attributes('data-test'));
         expect(notes).toEqual(['workspace-paused-note', 'paused-note']);
