@@ -44,7 +44,7 @@
                                 <span class="ah-avatar ah-avatar--sm ah-avatar--agent mr-10px" aria-hidden="true">{{ agent.name.slice(0, 1).toUpperCase() }}</span>
                                 <span>{{ agent.name }}</span>
                                 <span class="ah-chip ah-chip--agent ah-chip--mono ml-10px">{{ $t('TaskPanel.agent_tag') }}</span>
-                                <span v-if="agent.note" class="comment-input__agent-note font-size-12 ml-10px">{{ agent.note }}</span>
+                                <span v-if="agent.note" class="comment-input__agent-note">{{ agent.note }}</span>
                             </li>
                         </ul>
                     </li>

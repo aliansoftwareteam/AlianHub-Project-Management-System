@@ -1,4 +1,4 @@
-const { test, expect, asRole, skipConsoleGuard } = require('../support/test');
+const { test, expect, asRole } = require('../support/test');
 
 test.describe('tasks & collaboration screens as the owner', () => {
     test.use(asRole('owner'));
@@ -14,7 +14,6 @@ test.describe('tasks & collaboration screens as the owner', () => {
     });
 
     test('a task created for this test opens in the task detail overlay', async ({ page, state, loginAs }) => {
-        skipConsoleGuard('On some runs the task address logs `SyntaxError: "undefined" is not valid JSON` while the panel loads.');
         const owner = await loginAs('owner');
         const { createProject, createTask, uniqueSuffix } = require('../support/fixtures');
         const name = `UI Findable ${uniqueSuffix()}`;
