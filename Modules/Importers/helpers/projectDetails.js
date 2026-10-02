@@ -16,7 +16,7 @@ const updateProject = async (companyId, projectId, update, updatedFields) => {
         data: [{ _id: new mongoose.Types.ObjectId(String(projectId)) }, update, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
     removeCache('UserProjectData:', true);
-    if (updated) socketEmitter.emit('update', { type: 'update', data: updated, updatedFields, module: 'project' });
+    if (updated) socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: updated, updatedFields, module: 'project' });
     return updated;
 };
 

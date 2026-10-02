@@ -104,6 +104,14 @@ describe('PUT /api/v2/trash/:kind/:id/restore', () => {
         expect(res.send).toHaveBeenCalledWith({ status: true, statusText: 'Restored.', data: { kind: 'projects', id: String(ID) } });
     });
 
+    test('projects: the people who may open it are told it is back', async () => {
+        const emit = require('../event/socketEventEmitter');
+        const spy = jest.spyOn(emit, 'emit').mockImplementation(() => true);
+        await ctrl.restore(req({ params: { kind: 'projects', id: String(ID) } }), mockRes());
+        expect(spy).toHaveBeenCalledWith('update', { type: 'update', companyId: COMPANY, data: { _id: String(ID) }, updatedFields: { deletedStatusKey: 0 }, module: 'project' });
+        spy.mockRestore();
+    });
+
     test('lists: delegates to the sprint update with the restore key', async () => {
         MongoDbCrudOpration
             .mockResolvedValueOnce({ _id: ID, name: 'Sprint 1', projectId: PROJECT })
@@ -275,6 +283,18 @@ describe('DELETE /api/v2/sample-data', () => {
             statusText: 'Sample data removed.',
             data: { projects: 0, tasks: 0, folders: 0, lists: 0, docs: 0, fields: 0, goals: 0 },
         });
+    });
+
+    test('tells the people who may open the sample project that it went to the trash', async () => {
+        const emit = require('../event/socketEventEmitter');
+        const spy = jest.spyOn(emit, 'emit').mockImplementation(() => true);
+        seedWorld();
+        await ctrl.removeSampleData(req(), mockRes());
+        const projects = spy.mock.calls.map(([, payload]) => payload).filter((payload) => payload.module === 'project');
+        expect(projects).toHaveLength(1);
+        expect(projects[0]).toMatchObject({ type: 'update', companyId: COMPANY, updatedFields: { deletedStatusKey: rules.TRASHED } });
+        expect(projects[0].data._id).toEqual(expect.any(String));
+        spy.mockRestore();
     });
 
     test('tells other tabs the goals changed only when a goal went', async () => {

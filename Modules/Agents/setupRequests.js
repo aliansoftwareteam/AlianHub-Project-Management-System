@@ -432,7 +432,7 @@ const withdrawView = async ({ companyId, who, projectId, viewId }) => {
     if (!view) return { removed: false };
     const answer = await answerOf('projectUpdate', { companyId, who, params: { id: inProject }, body: { key: '$pull', updateObject: { ProjectRequiredComponent: { _id: view._id } } } });
     if (answer.code !== 200) throw refuse(reasonOf(answer, 'the view was not removed'));
-    socketEmitter.emit('update', { type: 'update', data: await storedProject(companyId, inProject), updatedFields: { ProjectRequiredComponent: 'remove' }, module: 'project' });
+    socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: await storedProject(companyId, inProject), updatedFields: { ProjectRequiredComponent: 'remove' }, module: 'project' });
     return { removed: true, name: view.title || '' };
 };
 

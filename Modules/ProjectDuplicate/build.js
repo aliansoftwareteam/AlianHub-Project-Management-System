@@ -5,6 +5,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { removeCache } = require('../../utils/commonFunctions');
 const { stepProjectCount } = require('../Project/helpers/projectQuota');
 const { recordProjectCreated } = require('../Project/helpers/projectHistory');
+const { announceProject } = require('../Project/helpers/projectEvents');
 const rules = require('./rules');
 const { writeStructure, discard } = require('./structure');
 const { copyTasks } = require('./tasks');
@@ -73,6 +74,7 @@ const buildProject = async ({ companyId, caller, bundle, name, code, include, pl
 
         removeCache('UserProjectData:', true);
         const project = (await liveProject(companyId, made.projectId)) || copy.project;
+        announceProject(companyId, 'insert', project);
         recordProjectCreated({ companyId, project, actorId: caller }).catch(logged('recording the creation'));
         return { project, counts: copy.counts, notes: copy.notes, sharedFields: copy.sharedFields, job };
     } catch (error) {

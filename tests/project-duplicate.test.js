@@ -551,8 +551,11 @@ describe('tasks', () => {
 
     it('never fire the task-created event, a notification or a history line for a copied task', async () => {
         seedTree(launch);
-        await duplicate(launch.id, { include: { tasks: true, assignees: true, dates: true } });
-        expect(socketEmitter.emit).not.toHaveBeenCalled();
+        const res = await duplicate(launch.id, { include: { tasks: true, assignees: true, dates: true } });
+        const announced = socketEmitter.emit.mock.calls.map(([, payload]) => payload);
+        expect(announced.map((payload) => payload.module)).toEqual(['project']);
+        expect(announced[0]).toMatchObject({ type: 'insert', companyId: C });
+        expect(String(announced[0].data._id)).toBe(String(res.body.data.project._id));
         expect(rowsOf(SCHEMA_TYPE.NOTIFICATIONS || 'notifications')).toHaveLength(0);
     });
 
