@@ -12,9 +12,9 @@
         :inputId="`tag`" 
         :width="`80px`"
         />
-        <div class="error position-ab red bg-white font-size-10 error_top" v-if="renameErrorMessage">{{renameErrorMessage}}</div>
+        <div class="error position-ab tag-chip-red tag-chip-bg-white tag-chip-font-size-10 error_top" v-if="renameErrorMessage">{{renameErrorMessage}}</div>
 
-        <div v-if="editStatus && editStatus === 'isColor'" class="d-flex align-items-center mr-5px borderdarkgray border-radius-3-px is__color-status">
+        <div v-if="editStatus && editStatus === 'isColor'" class="d-flex align-items-center mr-5px tag-chip-borderdarkgray border-radius-3-px is__color-status">
         <input
         type="color"
         v-model.trim="tagColor"
@@ -45,7 +45,7 @@
                             </li>
                             <li class="mainDiv justify-content-start" role="menuitem" @click="EditChips('isDelete'),showSidebar = true">
                                 <img :src="deleteimage" class="inner-tagedit-list-item" alt=""/>
-                                <span class="red">{{$t("Projects.delete")}}</span>
+                                <span class="tag-chip-red">{{$t("Projects.delete")}}</span>
                             </li>
                         </ul>
                     </div>
@@ -229,4 +229,19 @@ const EditChips = (key)=>{
 </script>
 <style >
 @import "./style.css";
+</style>
+
+<style scoped>
+.tag-chip-red {
+    color: var(--danger-ink);
+}
+.tag-chip-bg-white {
+    background-color: var(--surface);
+}
+.tag-chip-font-size-10 {
+    font-size: 10px;
+}
+.tag-chip-borderdarkgray {
+    border: 1px solid var(--border);
+}
 </style>

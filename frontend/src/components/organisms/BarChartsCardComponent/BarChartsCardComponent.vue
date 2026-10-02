@@ -12,7 +12,7 @@
         />
     </template>
     <template v-else-if="chartData.length === 0 && !isLoading">
-        <span class="font-size-14">{{ $t('dashboardCard.no_data_found') }}</span>
+        <span class="bar-charts-card-component-font-size-14">{{ $t('dashboardCard.no_data_found') }}</span>
     </template>
 </template>
 
@@ -213,3 +213,9 @@ watch(() => props.filterData, (newValue) => {
     }
 }, { immediate: true, deep: true });
 </script>
+
+<style scoped>
+.bar-charts-card-component-font-size-14 {
+    font-size: 14px;
+}
+</style>
