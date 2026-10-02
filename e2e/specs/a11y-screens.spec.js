@@ -130,6 +130,7 @@ test.describe('accessibility: everyday screens in light and dark, desktop and 39
             await page.goto(url);
             await page.getByRole('button', { name: 'Add View', exact: true }).click({ timeout: 10000 });
             await page.getByRole('button', { name: new RegExp(`^${view}`) }).click({ timeout: 10000 });
+            await expect(page.locator('.v-toast__text')).toBeVisible();
             await expect(page.locator('.v-toast__item')).toHaveCount(0, { timeout: 20000 });
             await auditScreen(page, async () => {
                 await page.goto(url);
