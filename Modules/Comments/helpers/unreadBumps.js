@@ -24,26 +24,28 @@ const companyMemberIds = async (companyId) => idsOf((await MongoDbCrudOpration(c
 }, 'find') || []).map((seat) => seat.userId));
 
 /* The people the comment panels counted as taking part: a sprint channel's members (everyone for a public
- * channel), a direct message's two people, a task's watchers, or a project's watchers. */
+ * channel), a direct message's two people, a task's watchers, or a project's watchers. `closed` marks a thread
+ * that is its members' alone, a private channel or a conversation. */
 const participantsOf = async (companyId, thread, space) => {
     if (thread.taskId === 'default') {
         const channel = isId(thread.sprintId)
             ? await findById(companyId, SCHEMA_TYPE.SPRINTS, thread.sprintId, { private: 1, AssigneeUserId: 1 })
             : null;
         if (!channel) return null;
-        return { userIds: channel.private ? idsOf(channel.AssigneeUserId) : await companyMemberIds(companyId) };
+        return { userIds: channel.private ? idsOf(channel.AssigneeUserId) : await companyMemberIds(companyId), closed: channel.private === true };
     }
     if (isId(thread.taskId)) {
         const task = await findById(companyId, SCHEMA_TYPE.TASKS, thread.taskId, { watchers: 1, AssigneeUserId: 1, mainChat: 1, ParentTaskId: 1 });
         if (!task) return null;
-        return { userIds: idsOf(task.mainChat === true ? task.AssigneeUserId : task.watchers), parentTaskId: task.ParentTaskId };
+        return { userIds: idsOf(task.mainChat === true ? task.AssigneeUserId : task.watchers), parentTaskId: task.ParentTaskId, closed: task.mainChat === true };
     }
     return { userIds: Object.keys(space.watchers || {}) };
 };
 
-/* A project watcher set to all activity hears every thread; one set to ignore hears none of it. */
-const recipientsOf = (prefs, participants, authorId) => {
-    const everything = Object.keys(prefs).filter((uid) => prefs[uid] === 'all_activity');
+/* A project watcher set to all activity hears every thread that is not its members' alone; one set to ignore
+ * hears none of it. */
+const recipientsOf = (prefs, participants, authorId, closed = false) => {
+    const everything = closed ? [] : Object.keys(prefs).filter((uid) => prefs[uid] === 'all_activity');
     const listening = participants.filter((uid) => prefs[uid] !== 'ignore');
     return [...new Set([...everything, ...listening])].filter((uid) => uid !== String(authorId));
 };
@@ -62,7 +64,7 @@ const bumpUnreadCounts = async (companyId, comment, mentionIds = []) => {
 
     const mentioned = idsOf(mentionIds).filter((uid) => uid !== String(comment.userId));
     const prefs = space.watchers && typeof space.watchers === 'object' && !Array.isArray(space.watchers) ? space.watchers : {};
-    const userIds = await activeMemberIds(companyId, recipientsOf(prefs, [...participants.userIds, ...mentioned], comment.userId));
+    const userIds = await activeMemberIds(companyId, recipientsOf(prefs, [...participants.userIds, ...mentioned], comment.userId, participants.closed));
 
     const writes = [];
     if (userIds.length) {

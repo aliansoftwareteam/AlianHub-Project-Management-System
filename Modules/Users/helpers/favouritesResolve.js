@@ -6,6 +6,7 @@ const { visibleProjects } = require('../../Agents/scope');
 const { asObjectIds, canSeeSprint, hiddenSprintIds, sprintIdentities } = require('../../Sprints/helpers/sprintVisibility');
 const { pageReachFilter } = require('../../Pages/helpers/pageRules');
 const { favouriteKey } = require('./favouritesRules');
+const { withoutConversationsOfOthers } = require('../../Comments/helpers/conversationReaders');
 
 const text = (value) => (value === undefined || value === null || value === '' ? undefined : String(value));
 const NOT_DELETED = { deletedStatusKey: { $ne: 1 } };
@@ -27,7 +28,7 @@ const resolveFavourites = async (companyId, uid, entries) => {
         read(companyId, SCHEMA_TYPE.FOLDERS, { _id: { $in: idsOf('folder') }, projectId: { $in: inProjects }, ...NOT_DELETED }, 'name projectId'),
         read(companyId, SCHEMA_TYPE.SPRINTS, { _id: { $in: idsOf('sprint') }, projectId: { $in: inProjects }, ...NOT_DELETED }, 'name projectId folderId private AssigneeUserId'),
         privileged ? [] : hiddenSprintIds(companyId, uid, projectIds),
-        read(companyId, SCHEMA_TYPE.TASKS, { _id: { $in: idsOf('task') }, ProjectID: { $in: inProjects }, ...NOT_DELETED }, 'TaskName TaskKey ProjectID sprintId folderObjId'),
+        read(companyId, SCHEMA_TYPE.TASKS, { _id: { $in: idsOf('task') }, ProjectID: { $in: inProjects }, ...NOT_DELETED, ...withoutConversationsOfOthers(uid) }, 'TaskName TaskKey ProjectID sprintId folderObjId'),
         read(companyId, SCHEMA_TYPE.PAGES, {
             _id: { $in: idsOf('doc') },
             ...NOT_DELETED,

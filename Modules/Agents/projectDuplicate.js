@@ -20,8 +20,8 @@ const ACTION = 'project.duplicate';
 const UNDO_KIND = 'projectCopy';
 const TASKS_MAX = copyRules.INLINE_TASK_LIMIT;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
-const PERSONAL = 'a personal list cannot be copied';
-const NOT_FOUND = 'the project to copy was not found';
+const PERSONAL = 'A personal list cannot be copied.';
+const NOT_FOUND = 'The project to copy was not found.';
 
 const refuse = (message) => new tools.DeterministicError(message);
 const idOf = (value) => (value === undefined || value === null ? '' : String(value));
@@ -42,14 +42,14 @@ const draftOf = (given) => {
 /* '' for a copy that can be asked for; otherwise what is wrong with the request. */
 const problemIn = (given) => {
     const draft = draftOf(given);
-    if (!OBJECT_ID.test(draft.sourceProjectId)) return 'the project to copy needs its id';
-    return draft.name.length < projects.NAME_MIN ? `name needs ${projects.NAME_MIN} to ${projects.NAME_MAX} characters` : '';
+    if (!OBJECT_ID.test(draft.sourceProjectId)) return 'The project to copy must be given by its id.';
+    return draft.name.length < projects.NAME_MIN ? `The name must be ${projects.NAME_MIN} to ${projects.NAME_MAX} characters long.` : '';
 };
 
 /* What stops `uid` from creating a project by hand, or ''. */
 const refusedFor = async (companyId, uid) => {
     const own = await projects.mayCreate(companyId, uid);
-    return own.allowed ? '' : `${own.permission} is not granted`;
+    return own.allowed ? '' : `The permission ${own.permission} is missing.`;
 };
 
 /* The live project, when every one of `people` can open it. */
@@ -74,7 +74,7 @@ const taskCount = async ({ companyId, uid, source }) => {
 };
 
 const tooLarge = (count) => (count > TASKS_MAX
-    ? `this project has ${count} tasks, and a copy an agent asks for takes at most ${TASKS_MAX}; ask for the copy without its tasks, or duplicate the project in AlianHub`
+    ? `This project has ${count} tasks, and a copy an agent asks for can include at most ${TASKS_MAX}. Ask for the copy without its tasks, or ask the person to duplicate the project in AlianHub.`
     : '');
 
 const copyAs = async ({ companyId, who, draft }) => {
@@ -83,7 +83,7 @@ const copyAs = async ({ companyId, who, draft }) => {
         body: { name: draft.name, include: { tasks: draft.tasks === true, assignees: false, dates: draft.dates === true } },
     });
     const made = answer.code === 200 && answer.body && answer.body.status === true && answer.body.data;
-    if (!made || !made.project || !made.project._id) throw refuse(setup.reasonOf(answer, 'the project was not copied'));
+    if (!made || !made.project || !made.project._id) throw refuse(setup.reasonOf(answer, 'The project was not copied. Try again, or tell the person.'));
     return made;
 };
 
@@ -98,19 +98,19 @@ const onlyOn = (project, uid) => project.isPrivateSpace === true && listOf(proje
 const holdPrivate = async ({ companyId, approver, copy, taskIds }) => {
     if (onlyOn(copy, approver.uid)) return;
     const trashed = await projects.withdraw({ companyId, who: approver, projectId: idOf(copy._id), startedWith: taskIds }).then(() => true, () => false);
-    throw refuse(`the copy "${copy.ProjectName || ''}" was not private to the approver, so ${trashed ? 'it was moved to the trash' : 'delete it in AlianHub: it could not be moved to the trash'}`);
+    throw refuse(`The copy "${copy.ProjectName || ''}" was not private to the person approving, so ${trashed ? 'it was moved to the trash.' : 'it could not be moved to the trash. A person can delete it in AlianHub.'}`);
 };
 
 const executors = {
     async [ACTION]({ companyId, actor, params, depth, approvedBy }) {
         const approverId = idOf(approvedBy);
-        if (!approverId) throw refuse('a project is copied only once a person has approved it');
+        if (!approverId) throw refuse('A project is copied only after a person approves it.');
         const problem = problemIn(params);
         if (problem) throw refuse(problem);
         const draft = draftOf(params);
         const requester = whoOf(actor, depth);
         const lacked = await refusedFor(companyId, approverId);
-        if (lacked) throw refuse(`the approver may not create a project: ${lacked}`);
+        if (lacked) throw refuse(`The person approving is not allowed to create a project: ${lacked}`);
         const source = await sourceFor(companyId, [requester.uid, approverId], draft.sourceProjectId);
         if (!source) throw refuse(NOT_FOUND);
         if (source.isPersonal === true) throw refuse(PERSONAL);

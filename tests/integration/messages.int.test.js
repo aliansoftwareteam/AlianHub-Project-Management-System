@@ -190,11 +190,10 @@ describe('messages/inbox — unread comment counts (MSG-05)', () => {
         expect([res.status, res.body.status]).toEqual([403, false]);
     });
 
-    it('MSG-05 answers unsetCommentCounts with the standard envelope', async () => {
+    it('MSG-05 answers unsetCommentCounts for a project that is not there with 404 and the standard envelope', async () => {
         const member = await loginAs('member');
         const res = await member.api.post('/api/v1/unsetCommentCounts', { companyId: member.companyId, projectId: '000000000000000000000000' });
-        expect(res.status).toBe(200);
-        expect(res.body && res.body.status).toBe(true);
+        expect([res.status, res.body && res.body.status]).toEqual([404, false]);
     });
 
     it('MSG-05 answers a missing project with 400', async () => {

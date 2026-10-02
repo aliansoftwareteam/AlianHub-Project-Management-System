@@ -147,7 +147,7 @@ describe('TSK-01 — the task query pipeline allowlist', () => {
     ];
     const INVENTORY = [
         ['desktop deep-link start', [{ $match: { objId: { _id: MY_PROJECT, CompanyId: C } } }, ...lookups]],
-        ['desktop task search', [{ $match: { objId: { CompanyId: C }, AssigneeUserId: { $in: [ME] }, statusType: { $in: ['active'] }, deletedStatusKey: 0, TaskName: { $regex: 'a\\.b', $options: 'i' } } }, { $sort: { _id: -1 } }, { $skip: 20 }, { $limit: 20 }, ...lookups]],
+        ['desktop task search', [{ $match: { objId: { CompanyId: C }, AssigneeUserId: { $in: [ME] }, statusType: { $in: ['active'] }, deletedStatusKey: 0, TaskName: { $regex: 'release notes', $options: 'i' } } }, { $sort: { _id: -1 } }, { $skip: 20 }, { $limit: 20 }, ...lookups]],
         ['desktop home list', [{ $match: { $and: [{ objId: { CompanyId: C } }, { ProjectID: { objId: { $in: [MY_PROJECT] } } }], $or: [{ startDate: { dbDate: { $gte: 1, $lte: 2 } } }, { $and: [{ DueDate: { dbDate: { $gte: 1 } } }] }] } }, ...lookups, { $sort: { DueDate: -1, _id: 1 } }]],
         ['dashboard queue card facet', [{ $facet: { results: [{ $match: { $and: [{ AssigneeUserId: { $in: [ME] } }, { deletedStatusKey: 0 }] } }, { $skip: 0 }, { $limit: 10 }], count: [{ $match: { deletedStatusKey: 0 } }, { $count: 'count' }] } }]],
         ['tasks per sprint count', [{ $match: { objId: { sprintId: SPRINT }, deletedStatusKey: { $in: [0, 2, null] } } }, { $count: 'count' }]],
@@ -181,7 +181,7 @@ describe('TSK-01 — tasks are bound to the projects the caller can see', () => 
         expect(names(res)).toEqual(['mine']);
         expect(visibleProjectIds).toHaveBeenCalledWith(C, ME);
         const [pipeline] = mockRawCalls.find((c) => c.method === 'aggregate').query.data;
-        expect(pipeline[0]).toEqual({ $match: { ProjectID: { $in: [expect.objectContaining({ _bsontype: 'ObjectId' })] } } });
+        expect(pipeline[0]).toEqual({ $match: { ProjectID: { $in: [expect.objectContaining({ _bsontype: 'ObjectId' })] }, $nor: [{ mainChat: true, AssigneeUserId: { $ne: ME } }] } });
         expect(String(pipeline[0].$match.ProjectID.$in[0])).toBe(MY_PROJECT);
     });
 

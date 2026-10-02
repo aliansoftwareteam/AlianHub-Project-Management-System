@@ -748,7 +748,7 @@ exports.renderShare = async (req, res) => {
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
-                    { sprintId: share.entityId, deletedStatusKey: 0, isParentTask: true },
+                    { sprintId: share.entityId, deletedStatusKey: 0, isParentTask: true, mainChat: { $ne: true } },
                     'TaskKey TaskName status Task_Priority',
                     { sort: { updatedAt: -1 }, limit: 300 },
                 ],

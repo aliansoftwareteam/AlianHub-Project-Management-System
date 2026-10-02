@@ -4,6 +4,7 @@ const access = require('../../Agents/access');
 const approverRights = require('../../Agents/approverRights');
 const intentPreview = require('../../Agents/intentPreview');
 const changeLabels = require('../../Agents/changeLabels');
+const proposalText = require('../../Agents/proposalText');
 const standingApprovals = require('../../Agents/standingApprovals');
 const logger = require('../../../Config/loggerConfig');
 
@@ -30,13 +31,13 @@ const toRow = (previews, batches = new Map()) => (proposal, standing) => ({
     sourceId: String(proposal._id),
     proposalId: String(proposal._id),
     kind: 'proposal',
-    agentName: proposal.agentName || 'Agent',
+    agentName: proposalText.nameOf(proposal.agentName) || 'Agent',
     agentId: proposal.agentId ? String(proposal.agentId) : '',
     source: proposal.source || '',
     ...(proposal.finding ? { finding: proposal.finding } : {}),
     requestedBy: proposal.requestedBy ? String(proposal.requestedBy) : '',
-    what: proposal.what || '',
-    why: proposal.why || '',
+    what: proposalText.titleOf(proposal.what, proposal.changes),
+    why: proposalText.reasonOf(proposal.why),
     changes: (Array.isArray(proposal.changes) ? proposal.changes : []).map((change, at) => {
         const preview = (previews.get(String(proposal._id)) || [])[at];
         const asFiled = proposal.source !== SOURCE_MCP && !standing.locked ? { params: change.params || {} } : {};

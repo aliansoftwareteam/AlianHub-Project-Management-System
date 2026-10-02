@@ -23,14 +23,16 @@ export const mutateArrangedRules = (state, payload) => {
         let arrangedRules = {};
         tmpRules = tmpRules.sort((x, b) => x.isParent > b.isParent ? -1 : 1);
 
+        const parentKeyOf = (rule) => rule.key ? rule.key : rule.name.replaceAll(" ", "_").toLowerCase();
+
         tmpRules.forEach((rule) => {
             if(rule.isParent) {
-                arrangedRules[rule.key ? rule.key : rule.name.replaceAll(" ", "_").toLowerCase()] = {
+                arrangedRules[parentKeyOf(rule)] = {
                     ...rule
                 };
             } else {
                 try {
-                    let key = tmpRules.filter((x) => x._id === rule.parentId)[0].key
+                    let key = parentKeyOf(tmpRules.filter((x) => x._id === rule.parentId)[0])
                     arrangedRules[key][rule.key ? rule.key : rule.name.replaceAll("  ", " ").replaceAll(" ", "_").toLowerCase()] = rule;
                 } catch (error) {
                     console.error("ERR: ", error.message);
@@ -501,6 +503,7 @@ export const mutateProjectStatus = (state, payload) => {
         }
     } else if(op === "modified") {
         const index = state.projectStaus.findIndex((type) => type._id === data._id);
+        if (index === -1) return;
         if (isShowSave && isShowSave === true) {
             state.projectStaus[index] = { ...data, isShowSave: true };
         } else {

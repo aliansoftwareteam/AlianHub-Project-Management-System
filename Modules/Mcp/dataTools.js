@@ -47,9 +47,9 @@ const loadProject = async (ctx, vis, projectId) => {
     return project;
 };
 
-const NO_PROJECT = Object.freeze({ error: 'project not found' });
-const NO_TASK = Object.freeze({ error: 'task not found' });
-const NO_PAGE = Object.freeze({ error: 'page not found' });
+const NO_PROJECT = Object.freeze({ error: 'That project was not found. Ask the person which project they mean.' });
+const NO_TASK = Object.freeze({ error: 'That task was not found. Ask the person which task they mean.' });
+const NO_PAGE = Object.freeze({ error: 'That doc was not found. Ask the person which doc they mean.' });
 
 const projectRow = (p) => ({
     projectId: String(p._id),
@@ -119,11 +119,11 @@ const entryProjects = (ctx, vis, args, sheetVisible) => {
 const dayRange = (args) => {
     const from = args.from ? String(args.from) : '';
     const to = args.to ? String(args.to) : '';
-    if ((from && !DAY.test(from)) || (to && !DAY.test(to))) return { error: 'from and to must be YYYY-MM-DD' };
+    if ((from && !DAY.test(from)) || (to && !DAY.test(to))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     const range = {};
     if (from) range.$gte = Date.parse(`${from}T00:00:00Z`) / 1000;
     if (to) range.$lte = Date.parse(`${to}T00:00:00Z`) / 1000 + DAY_SECONDS - 1;
-    if (Object.values(range).some((v) => !Number.isFinite(v))) return { error: 'from and to must be YYYY-MM-DD' };
+    if (Object.values(range).some((v) => !Number.isFinite(v))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     return { range: Object.keys(range).length ? range : null };
 };
 
@@ -133,7 +133,7 @@ const TOOLS = [
     {
         name: 'projects.list',
         action: 'projects.list',
-        description: 'Projects you can open, by name. Use a projectId from here with the other tools.',
+        description: 'Lists the projects the person can open, by name. Use a projectId from here with the other tools. Changes nothing.',
         input: { type: 'object', properties: { query: { type: 'string', description: 'Part of the project name' }, ...LIMIT } },
         visibility: 'filtered',
         paginated: true,
@@ -149,7 +149,7 @@ const TOOLS = [
     {
         name: 'project.get',
         action: 'project.get',
-        description: 'One project: its name, key, whether it is private, its members and how many statuses it has.',
+        description: 'Shows one project: its name, key, whether it is private, its members and how many statuses it has. Changes nothing.',
         input: { type: 'object', properties: PROJECT_ARG, required: ['projectId'] },
         visibility: 'filtered',
         readParams: projectParams,
@@ -166,7 +166,7 @@ const TOOLS = [
     {
         name: 'sprints.list',
         action: 'sprints.list',
-        description: 'The lists of one project. A private list is listed only for the people on it, and for owners and admins.',
+        description: 'Shows the lists of one project. A private list is shown only to the people on it, and to owners and admins. Changes nothing.',
         input: { type: 'object', properties: { ...PROJECT_ARG, ...LIMIT }, required: ['projectId'] },
         visibility: 'filtered',
         paginated: true,
@@ -185,7 +185,7 @@ const TOOLS = [
     {
         name: 'statuses.list',
         action: 'statuses.list',
-        description: 'The statuses a project defines, in board order, with their type (a "close" type means done).',
+        description: 'Shows the statuses a project uses, in board order, with the type of each. A "close" type means the task is done. Changes nothing.',
         input: { type: 'object', properties: PROJECT_ARG, required: ['projectId'] },
         visibility: 'filtered',
         readParams: projectParams,
@@ -200,7 +200,7 @@ const TOOLS = [
     {
         name: 'comments.list',
         action: 'comments.list',
-        description: 'The comment thread of a task you can open, newest first.',
+        description: 'Shows the comments on a task the person can open, newest first. Changes nothing.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, ...LIMIT }, required: ['taskId'] },
         visibility: 'filtered',
         paginated: true,
@@ -220,8 +220,8 @@ const TOOLS = [
     {
         name: 'pages.search',
         action: 'pages.search',
-        description: 'Pages you can open, by title, most recently updated first. Read one with page.get.',
-        input: { type: 'object', properties: { query: { type: 'string', description: 'Part of the page title' }, ...PROJECT_ARG, ...LIMIT } },
+        description: 'Finds docs the person can open, by title, most recently updated first. Read one with page.get. Changes nothing.',
+        input: { type: 'object', properties: { query: { type: 'string', description: 'Part of the doc title' }, ...PROJECT_ARG, ...LIMIT } },
         visibility: 'filtered',
         paginated: true,
         readParams: projectParams,
@@ -242,7 +242,7 @@ const TOOLS = [
     {
         name: 'page.get',
         action: 'page.get',
-        description: 'Read a page you can open, by page id: its title, project and full text.',
+        description: 'Shows one doc the person can open, given its id: its title, project and full text. Changes nothing.',
         input: { type: 'object', properties: { pageId: { type: 'string' } }, required: ['pageId'] },
         visibility: 'filtered',
         readParams: () => ({}),
@@ -256,11 +256,11 @@ const TOOLS = [
     {
         name: 'timesheet.read',
         action: 'timesheet.read',
-        description: 'Time entries, newest first: your own by default. Another person\'s only where the timesheet screens would show them to you.',
+        description: 'Shows time entries, newest first: the person\'s own by default. Someone else\'s are shown only where the web app\'s timesheet screens would show them to the person. Changes nothing.',
         input: {
             type: 'object',
             properties: {
-                userId: { type: 'string', description: 'Whose entries; yours when left out' },
+                userId: { type: 'string', description: 'Whose entries; the person\'s own when left out' },
                 from: { type: 'string', description: 'First day, YYYY-MM-DD (UTC)' },
                 to: { type: 'string', description: 'Last day, YYYY-MM-DD (UTC)' },
                 ...PROJECT_ARG,
@@ -279,7 +279,7 @@ const TOOLS = [
                 if (!sheet.everyone || !isId(target)) {
                     throw await actions.refusal(ctx.companyId, ctx.actor, {
                         action: 'timesheet.read', params: { userId: target }, ip: ctx.ip, entityType: 'user', entityId: target,
-                        reason: `${NOT_VISIBLE}: another person's time entries are not ones the person behind this token can open`,
+                        reason: `${NOT_VISIBLE}: you can read only the person's own time entries here. Ask the person to open the timesheet in AlianHub for someone else's.`,
                     });
                 }
                 sheetVisible = sheet.visible;
@@ -303,7 +303,7 @@ const TOOLS = [
         action: 'comment.create',
         visibility: 'filtered',
         target: (args) => ({ taskId: str(args.taskId, 40) }),
-        description: 'Comment on a task you can open. The text is stored as plain text, as the web app stores it.',
+        description: 'Adds a comment to a task the person can open, at once, and the person can undo it. The text is saved as plain text.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, text: { type: 'string' } }, required: ['taskId', 'text'] },
         params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000) }),
     },
@@ -312,7 +312,7 @@ const TOOLS = [
         action: 'timelog.create',
         visibility: 'filtered',
         target: (args) => ({ taskId: str(args.taskId, 40) }),
-        description: 'Log time you spent on a task you can open, as a finished entry. It is always your own time; a day in an approved timesheet period is refused.',
+        description: 'Logs time the person spent on a task they can open, as a finished entry, at once. It is always the person\'s own time, and time cannot be logged on a day in an approved timesheet period.',
         input: {
             type: 'object',
             properties: {

@@ -23,6 +23,14 @@ const normalizeChangedFields = (updatedFields) => {
     return touched;
 };
 
+/* Two changes to a stored task are nobody's edit of it: a formula or a rollup worked out again after a write, and a
+ * value that went with its deleted field. Each is sent as a task update so the open screens follow, and says what it
+ * is: it is no "task updated" for a webhook, a rule or the search index. */
+const COMPUTED_SOURCE = 'computed';
+const FIELD_REMOVED_SOURCE = 'field_removed';
+const NOT_AN_EDIT = Object.freeze([COMPUTED_SOURCE, FIELD_REMOVED_SOURCE]);
+const isNotAnEdit = (payload) => Boolean(payload) && NOT_AN_EDIT.includes(payload.source);
+
 /* Bounded FIFO of the last-seen state per entity, so a change can be described as
  * from → to. Each consumer gets its own store: the webhook dispatcher remembers
  * what it last *delivered*, the event bus what it last *observed*, and those are
@@ -43,4 +51,4 @@ const createSnapshotStore = ({ max = 5000 } = {}) => {
     };
 };
 
-module.exports = { MONGO_FIELD_OPS, normalizeChangedFields, createSnapshotStore };
+module.exports = { MONGO_FIELD_OPS, normalizeChangedFields, createSnapshotStore, COMPUTED_SOURCE, FIELD_REMOVED_SOURCE, isNotAnEdit };

@@ -8,6 +8,7 @@ const { wordsIn } = require('../../scripts/plain-words');
 const registry = require('../../Modules/Agents/registry');
 const groups = require('../../Modules/Agents/registryGroups');
 const { PTO_STATUS } = require('../../Modules/Pto/helpers/ptoRules');
+const routeWrites = require('../../Modules/Agents/routeWrites');
 
 const ROOT = path.join(__dirname, '..', '..');
 const SERVER_DIRS = ['Modules', 'Config', 'utils', 'middlewares', 'socket', 'event'];
@@ -20,7 +21,7 @@ const QUOTED = new RegExp(String.raw`(['"\`])(${KEY})\1`, 'g');
 /* A file that writes a row: every dotted key it quotes is read. */
 const ROW_WRITER = /\b(recordAudit|recordAuditFromReq|recordAutomationAudit|saveAuditRow|recordRefusal|recordLoopRefusal|auditRefusal|auditTransition)\(|\bagentAudit\b|\baudit\.(record[A-Z]\w*|openAction)\(|idempotency\.once\(|\.\.\.context, action:|\.\.\.forTool\(context\)/;
 /* A route that names what only a person may do: an agent's attempt is recorded under that name. */
-const PERSON_ONLY = new RegExp(String.raw`\b(?:decidedByPerson|setByPerson|agentsRefused)\(\s*(['"\`])(${KEY})\1|\bpersonDecides\([^,()]+,[^,()]+,\s*(['"\`])(${KEY})\3|\bconst [A-Z_]*ACTION[A-Z_]* = (['"\`])(${KEY})\5`, 'g');
+const PERSON_ONLY = new RegExp(String.raw`\b(?:decidedByPerson|setByPerson|agentsRefused|agentsReadAlone)\(\s*(['"\`])(${KEY})\1|\bpersonDecides\([^,()]+,[^,()]+,\s*(['"\`])(${KEY})\3|\bconst [A-Z_]*ACTION[A-Z_]* = (['"\`])(${KEY})\5`, 'g');
 
 const walk = (dir, out = []) => {
     if (!fs.existsSync(dir)) return out;
@@ -103,6 +104,11 @@ describe('the keys the server writes to the audit log', () => {
         const unworded = Object.entries(TEMPLATES).flatMap(([template, keys]) => keys.filter((key) => !worded(key)).map((key) => `${key} (from ${template})`));
         expect(unworded).toEqual([]);
         expect(Object.values(TEMPLATES).filter((keys) => !keys.length)).toEqual([]);
+    });
+
+    it('have words for every name a route records an agent\'s write under', () => {
+        expect(routeWrites.ROUTE_ONLY.filter((key) => !(key in words.ACTIONS))).toEqual([]);
+        expect(routeWrites.ALSO_A_TOOL.filter((key) => !registryKeys.has(key))).toEqual([]);
     });
 
     it('leave nothing listed here that the server no longer holds', () => {

@@ -53,19 +53,7 @@ exports.createReminder = async (req, res) => {
         if ((b.taskId && !isObjectId(b.taskId)) || (b.projectId && !isObjectId(b.projectId))) {
             return fail(res, 400, 'Invalid task or project id');
         }
-        const doc = {
-            _id: new mongoose.Types.ObjectId(),
-            userId: String(userId),
-            companyId: String(companyId),
-            taskId: b.taskId ? new mongoose.Types.ObjectId(b.taskId) : undefined,
-            projectId: b.projectId ? new mongoose.Types.ObjectId(b.projectId) : undefined,
-            reminderText: b.reminderText || '',
-            reminderAt: when,
-            fired: false,
-            createdBy: String(userId),
-            deletedStatusKey: 0,
-        };
-        const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.REMINDERS, data: doc }, 'save');
+        const saved = await helper.createReminder(companyId, userId, { taskId: b.taskId, projectId: b.projectId, reminderAt: when, reminderText: b.reminderText });
         res.send({ status: true, statusText: 'Reminder created', data: saved });
     } catch (error) {
         logger.error(`[reminders] create failed: ${error.message}`);

@@ -21,29 +21,36 @@
             />
 
             <div v-if="fields.length" class="ah-card fb__table">
-                <div class="fb__row fb__row-head">
-                    <span></span>
-                    <span>{{ $t('Fields.col_field') }}</span>
-                    <span>{{ $t('Fields.col_type') }}</span>
-                    <span>{{ $t('Fields.col_shown_in') }}</span>
-                    <span>{{ $t('Fields.col_required') }}</span>
+                <div class="fb__line fb__line--head">
+                    <div class="fb__row fb__row-head">
+                        <span></span>
+                        <span>{{ $t('Fields.col_field') }}</span>
+                        <span>{{ $t('Fields.col_type') }}</span>
+                        <span>{{ $t('Fields.col_shown_in') }}</span>
+                        <span>{{ $t('Fields.col_required') }}</span>
+                    </div>
+                    <span class="fb__line-end"></span>
                 </div>
-                <button
-                    v-for="field in fields"
-                    :key="field._id"
-                    type="button"
-                    class="fb__row"
-                    :class="{ 'is-active': selectedId === field._id, 'is-off': field.isDelete === false }"
-                    @click="selectField(field)"
-                >
-                    <span class="fb__grip" :aria-hidden="true"><ShellIcon name="grip" :size="14" /></span>
-                    <span class="fb__name" :title="field.fieldTitle">{{ field.fieldTitle }}</span>
-                    <span class="ah-chip" :class="{ 'ah-chip--brand': isComputed(field) || isAiField(field) }">{{ isAiField(field) ? $t('Fields.type_ai') : typeLabel(field.fieldType) }}</span>
-                    <span class="fb__shown" :class="{ 'fb__shown--mono': isComputed(field) }">{{ shownIn(field) }}</span>
-                    <span v-if="isComputed(field)" class="fb__req--off">{{ $t('Fields.read_only') }}</span>
-                    <span v-else-if="isRequired(field)" class="fb__req"><ShellIcon name="check" :size="14" /></span>
-                    <span v-else class="fb__req--off">—</span>
-                </button>
+                <div v-for="field in fields" :key="field._id" class="fb__line" :class="{ 'is-active': selectedId === field._id }">
+                    <button
+                        type="button"
+                        class="fb__row"
+                        :class="{ 'is-off': isArchived(field) }"
+                        @click="selectField(field)"
+                    >
+                        <span class="fb__grip" :aria-hidden="true"><ShellIcon name="grip" :size="14" /></span>
+                        <span class="fb__name" :title="field.fieldTitle">{{ field.fieldTitle }}</span>
+                        <span class="ah-chip" :class="{ 'ah-chip--brand': isComputed(field) || isAiField(field) }">{{ isAiField(field) ? $t('Fields.type_ai') : typeLabel(field.fieldType) }}</span>
+                        <span class="fb__shown" :class="{ 'fb__shown--mono': isComputed(field) }" :title="shownIn(field)">{{ shownIn(field) }}</span>
+                        <span v-if="isComputed(field)" class="fb__req--off">{{ $t('Fields.read_only') }}</span>
+                        <span v-else-if="isRequired(field)" class="fb__req"><ShellIcon name="check" :size="14" /></span>
+                        <span v-else class="fb__req--off">—</span>
+                    </button>
+                    <span class="fb__line-end">
+                        <span v-if="isArchived(field)" class="ah-chip ah-chip--sm">{{ $t('Fields.archived') }}</span>
+                        <FieldRowActions v-if="canEdit" :field="field" @removed="onRemoved" />
+                    </span>
+                </div>
             </div>
             <div v-else class="ah-empty">{{ $t('Fields.empty_list') }}</div>
 
@@ -111,20 +118,26 @@
                 </div>
 
                 <template v-if="draft.fieldType === 'formula'">
-                    <textarea
-                        v-model="draft.formulaExpression"
-                        ref="exprRef"
-                        class="fb__expr"
-                        :class="{ 'fb__expr--error': errors.formulaExpression }"
-                        :placeholder="$t('Fields.expression_placeholder')"
-                        spellcheck="false"
-                        dir="ltr"
-                    ></textarea>
-                    <span v-if="errors.formulaExpression" class="ah-field__error">{{ errors.formulaExpression }}</span>
+                    <div class="ah-field">
+                        <label class="ah-field__label" for="fb-expression">{{ $t('Fields.formula_label') }}</label>
+                        <textarea
+                            id="fb-expression"
+                            v-model="draft.formulaExpression"
+                            ref="exprRef"
+                            class="fb__expr"
+                            :class="{ 'fb__expr--error': errors.formulaExpression }"
+                            :placeholder="$t('Fields.expression_placeholder')"
+                            spellcheck="false"
+                            dir="ltr"
+                        ></textarea>
+                        <span v-if="errors.formulaExpression" class="ah-field__error">{{ errors.formulaExpression }}</span>
+                    </div>
 
                     <div class="fb__tokens">
-                        <button v-for="name in visibleNames" :key="name" type="button" class="fb__token" @click="insert('{' + name + '}')">{{ '{' + name + '}' }}</button>
-                        <span v-if="hiddenNameCount" class="fb__token fb__token--more">{{ $t('Fields.more_fields', { count: hiddenNameCount }) }}</span>
+                        <button v-for="token in visibleTokens" :key="token" type="button" class="fb__token" data-formula-token @click="insert(token)">{{ token }}</button>
+                        <button v-if="tokens.length > MAX_TOKENS" type="button" class="fb__token fb__token--more" data-formula-more :aria-expanded="String(allTokens)" @click="allTokens = !allTokens">
+                            {{ allTokens ? $t('Fields.fewer_fields') : $t('Fields.more_fields', { count: tokens.length - MAX_TOKENS }) }}
+                        </button>
                     </div>
                     <div class="fb__tokens">
                         <button v-for="fn in functionNames" :key="fn" type="button" class="fb__token fb__token--fn" @click="insert(fn + '(')">{{ fn }}</button>
@@ -142,7 +155,7 @@
                         <label class="ah-field__label" for="fb-rollup-src">{{ $t('Fields.rollup_source') }}</label>
                         <select id="fb-rollup-src" v-model="draft.rollupSourceFieldId" class="ah-input">
                             <option value="">{{ $t('Fields.rollup_source_count') }}</option>
-                            <option v-for="field in numericFields" :key="field._id" :value="field._id">{{ field.fieldTitle }}</option>
+                            <option v-for="field in numericFields" :key="field._id" :value="field._id">{{ sourceLabel(field) }}</option>
                         </select>
                     </div>
                     <div class="ah-field">
@@ -208,6 +221,8 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import UpgradePlan from "@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue";
 import CustomFieldsSidebarComponent from "../../molecules/customFieldSidebar/customFieldsSidebarComponent/customFieldsSidebarComponent.vue";
 import AiFieldPanel from "./AiFieldPanel.vue";
+import FieldRowActions from "./FieldRowActions.vue";
+import { sampleFrom, tokensFrom } from "@/plugins/customFieldView/formulaTokens";
 import FieldTaskTypesPicker from "../../atom/FieldTaskTypesPicker/FieldTaskTypesPicker.vue";
 import { fieldProjectIds, useTaskTypeOptions } from "@/plugins/customFieldView/taskTypeOptions";
 import { fieldTaskTypes } from "@fieldTaskTypes";
@@ -225,7 +240,7 @@ const userId = inject("$userId");
 
 const COMPUTED_TYPES = ["formula", "rollup"];
 const NUMERIC_TYPES = ["number", "money", "rating", "progress", "formula", "rollup"];
-const MAX_TOKENS = 5;
+const MAX_TOKENS = 8;
 
 const displayFormats = ["money", "number", "text"];
 const rollupFunctions = ["sum", "avg", "count", "min", "max"];
@@ -277,13 +292,16 @@ const numericFields = computed(() => fields.value.filter((field) => NUMERIC_TYPE
 
 const slugOf = (value) => String(value || "").trim().toLowerCase().replace(/\s+/g, "_");
 
-const visibleNames = computed(() => scopeNames.value.slice(0, MAX_TOKENS));
-const hiddenNameCount = computed(() => Math.max(scopeNames.value.length - MAX_TOKENS, 0));
+const allTokens = ref(false);
+const tokens = computed(() => tokensFrom(scopeNames.value.filter((entry) => !draft.value?._id || entry.fieldId !== draft.value._id)));
+const visibleTokens = computed(() => (allTokens.value ? tokens.value : tokens.value.slice(0, MAX_TOKENS)));
 
 const isComputed = (field) => COMPUTED_TYPES.includes(field?.fieldType);
+const isArchived = (field) => field?.isDelete === false;
 const draftUi = computed(() => fieldTypeUi(draft.value?.fieldType));
 const draftNote = computed(() => {
     if (draftUi.value) return t("FieldTypes.builder_note");
+    if (draft.value?.fieldType === "rollup") return t("Fields.rollup_rules");
     return isComputed(draft.value) ? t("Fields.formula_rules") : t("Fields.plain_field_note");
 });
 const isRequired = (field) => Array.isArray(field?.fieldRequired) && field.fieldRequired.length > 0;
@@ -305,7 +323,23 @@ const surfacesOf = (field) => {
     return surfaces.map((surface) => t(`Fields.surface_${surface}`)).join(" · ");
 };
 
-const shownIn = (field) => `${surfacesOf(field)}${scopeOf(field)}`;
+const projectNames = computed(() => new Map((getters["projectData/allProjects"]?.data || []).map((project) => [String(project._id), project.ProjectName])));
+const projectsOf = (field) => {
+    const names = fieldProjectIds(field).map((id) => projectNames.value.get(id)).filter(Boolean);
+    return names.length ? ` · ${names.join(", ")}` : "";
+};
+
+const shownIn = (field) => `${surfacesOf(field)}${scopeOf(field)}${projectsOf(field)}`;
+
+/* Two fields may carry one name; the type and the projects tell them apart. */
+const sameNamed = (field) => fields.value.filter((other) => slugOf(other.fieldTitle) === slugOf(field.fieldTitle)).length > 1;
+const sourceLabel = (field) => (sameNamed(field) ? `${field.fieldTitle} · ${typeLabel(field.fieldType)}${projectsOf(field)}` : field.fieldTitle);
+
+function onRemoved(fieldId) {
+    if (selectedId.value !== fieldId) return;
+    closeDraft();
+    closeLegacy();
+}
 
 // The global type catalogue is empty on a fresh install, and the legacy drawer
 // renders nothing without a cfType, so fall back to the picker's own entry.
@@ -421,8 +455,7 @@ async function insert(snippet) {
 async function loadScope() {
     try {
         const response = await apiRequest("get", env.CUSTOM_FIELD_FORMULA_SCOPE);
-        const names = response?.data?.data?.names || [];
-        scopeNames.value = [...new Set(names.map((entry) => entry.name).filter(Boolean))];
+        scopeNames.value = (response?.data?.data?.names || []).filter((entry) => entry?.name);
     } catch (error) {
         scopeNames.value = [];
     }
@@ -443,9 +476,7 @@ async function checkExpression(sample) {
 async function test() {
     testing.value = true;
     try {
-        const sample = {};
-        scopeNames.value.forEach((name, index) => { sample[name] = index + 1; });
-        const result = await checkExpression(sample);
+        const result = await checkExpression(sampleFrom(scopeNames.value));
         if (!result.status) {
             errors.value = { ...errors.value, formulaExpression: result.message || result.statusText };
             preview.value = { value: null, error: result.message || result.statusText };
@@ -473,6 +504,8 @@ function validate() {
     errors.value = next;
     return !Object.keys(next).length;
 }
+
+const savedText = (changed) => t(changed ? "Toast.Field_Updated_Successfully" : "Toast.Field_Added_Successfully");
 
 function saveFromName(event) {
     if (!event.isComposing && !saving.value) save();
@@ -520,7 +553,8 @@ async function save({ another = false } = {}) {
             if (response?.status !== 200) throw new Error(response?.data?.message || t("Toast.something_went_wrong"));
             commit("settings/mutateFinalCustomFields", { data: { ...created, _id: response?.data?._id || "" }, op: "added" });
         }
-        $toast.success(t("Toast.Field_Updated_Successfully"), { position: "top-right" });
+        $toast.success(savedText(draft.value._id), { position: "top-right" });
+        loadScope();
         if (another) startNew(payload.fieldType);
         else closeDraft();
     } catch (error) {
@@ -561,7 +595,7 @@ async function saveAi({ another = false } = {}) {
             if (response?.status !== 200) throw new Error(response?.data?.message || t("Toast.something_went_wrong"));
             commit("settings/mutateFinalCustomFields", { data: { ...created, _id: response?.data?._id || "" }, op: "added" });
         }
-        $toast.success(t("Toast.Field_Updated_Successfully"), { position: "top-right" });
+        $toast.success(savedText(aiDraft.value._id), { position: "top-right" });
         if (another) startNew("ai");
         else closeDraft();
     } catch (error) {
@@ -583,7 +617,8 @@ async function storeLegacyField(value, isEdit) {
             if (response?.status !== 200) throw new Error(response?.data?.message);
             commit("settings/mutateFinalCustomFields", { data: { ...created, _id: response?.data?._id || "" }, op: "added" });
         }
-        $toast.success(t("Toast.Field_Updated_Successfully"), { position: "top-right" });
+        $toast.success(savedText(isEdit), { position: "top-right" });
+        loadScope();
     } catch (error) {
         $toast.error(error?.message || t("Toast.something_went_wrong"), { position: "top-right" });
     } finally {

@@ -32,6 +32,7 @@
 import { nextTick, onMounted, ref } from "vue";
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { typedSearchText } from '@/utils/searchText';
 import { useCustomComposable } from "@/composable";
 
 defineOptions({ name: 'TaskChipPicker' });
@@ -64,7 +65,7 @@ function searchTasks() {
         return;
     }
     isSearching.value = true;
-    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const text = typedSearchText(query);
     const findQuery = [
         {
             // ProjectID is an ObjectId; aggregate $match skips mongoose casting, so the
@@ -73,8 +74,8 @@ function searchTasks() {
                 ProjectID: { objId: { $in: [props.projectId] } },
                 deletedStatusKey: { $in: [0, undefined] },
                 $or: [
-                    { TaskName: { $regex: escaped, $options: 'i' } },
-                    { TaskKey: { $regex: escaped, $options: 'i' } },
+                    { TaskName: { $regex: text, $options: 'i' } },
+                    { TaskKey: { $regex: text, $options: 'i' } },
                 ],
             }
         },

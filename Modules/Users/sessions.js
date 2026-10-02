@@ -3,6 +3,7 @@ const { dbCollections } = require("../../Config/collections.js");
 const logger = require("../../Config/loggerConfig");
 const { removeCache } = require("../../utils/commonFunctions.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
+const { signedInPersonOnly, signedInPersonReads } = require("../Auth/helpers/accountSecurity");
 
 const TOKEN_TAIL = 6;
 
@@ -25,6 +26,7 @@ const toPublicSession = (s, currentId) => ({
 exports.listOwnSessions = async (req, res) => {
     try {
         if (!req.uid) return res.status(401).json({ status: false, message: "Unauthorized" });
+        if (!(await signedInPersonReads(req, res))) return undefined;
         const sessions = await MongoDbCrudOpration(dbCollections.GLOBAL, {
             type: dbCollections.SESSIONS,
             data: [{ userId: String(req.uid) }]
@@ -42,6 +44,7 @@ exports.listOwnSessions = async (req, res) => {
 exports.deleteOwnSession = async (req, res) => {
     try {
         if (!req.uid) return res.status(401).json({ status: false, message: "Unauthorized" });
+        if (!(await signedInPersonOnly(req, res))) return undefined;
         const id = req.params.sessionId;
         if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ status: false, message: "Session id is invalid" });
         const result = await MongoDbCrudOpration(dbCollections.GLOBAL, {

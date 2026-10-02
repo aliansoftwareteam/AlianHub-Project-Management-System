@@ -18,9 +18,24 @@ const EXTERNAL_STEP = /^external agent step refused: ([a-z_]+)/;
 const APPROVED_PROPOSAL = /^approved proposal [a-f0-9]{24} by (\S+)$/i;
 const STANDING = /^([\s\S]*) \(standing approval [a-f0-9]{24}, made by (\S+)\)$/i;
 const SKILL_FINDING = /^(\S+) finding$/;
+/* Rows written before the server's sentences were reworded still hold "Agents cannot perform ..." and "the task is
+   not one ...", so both wordings are read. A list's sentence names its project too, so the list is asked first. */
 const AGENTS_CANNOT = /^Agents cannot perform ([\s\S]+)$/;
 const STATUS_SET = /^task\.status\.set\("([^"]*)"\)$/;
-const NOT_VISIBLE_KINDS = Object.freeze([["thread", /comment thread/], ["task", /\bthe task\b/], ["project", /\bthe project\b/], ["list", /\bthe list\b/]]);
+const CANNOT_SET = /^You cannot set a task to "([^"]*)"\./;
+const AGENT_REFUSALS = Object.freeze([
+    ["agents_never", /^An agent is never allowed to do this \(/],
+    ["agents_cannot", /^(?:An agent is not allowed to do this|That action is not available to agents) \(/],
+    ["agents_not_in_skills", / is not switched on for this connection\./],
+    ["agents_must_propose", / so it has to be sent as a proposal\.$/],
+    ["agents_cannot_fields", / cannot change [\s\S]+\. Leave that out\.$/],
+]);
+const NOT_VISIBLE_KINDS = Object.freeze([
+    ["thread", /comment thread|open its comments/],
+    ["list", /\b(?:the|that) list\b/],
+    ["task", /\b(?:the|that) task\b/],
+    ["project", /\b(?:the|that) project\b|^project /],
+]);
 
 const worded = (t, namespace, key) => {
     const path = `${namespace}.${labelSlug(key)}`;
@@ -115,6 +130,10 @@ export const plainReason = (t, te, reason, personName = () => "") => {
     if (external) return te(`AuditReasons.external_${external[1]}`) ? t(`AuditReasons.external_${external[1]}`) : t("AuditReasons.external_refused");
     const cannot = AGENTS_CANNOT.exec(text);
     if (cannot) return agentsCannot(t, cannot[1]);
+    const cannotSet = CANNOT_SET.exec(text);
+    if (cannotSet) return t("AuditReasons.agents_cannot_status", { status: cannotSet[1] });
+    const refusal = AGENT_REFUSALS.find(([, pattern]) => pattern.test(text));
+    if (refusal) return t(`AuditReasons.${refusal[0]}`);
     const coded = CODED.exec(text);
     if (coded && CODED_REASONS[coded[1]]) return CODED_REASONS[coded[1]](t, coded[2]);
     return text;
@@ -130,6 +149,23 @@ export const rawReason = (row) => String((row.meta && row.meta.reason) || "");
 export const reasonWords = (t, te, row, personName) => {
     if (row.action === PROPOSAL_DECIDED && !rawReason(row)) return decisionReason(t, row);
     return plainReason(t, te, rawReason(row), personName);
+};
+
+const SEARCH_KEYS_MAX = 25;
+const SEARCHED = Object.freeze({ qEvents: ["AuditEvents"], qActions: ["AuditActions", "AgentActions"], qReasons: ["AuditReasons"] });
+
+/* The keys whose words, in the reader's language, hold what was typed. The server matches rows by them
+   (Modules/Audit/eventWords.js), since a row stores its key and not its words. `messagesOf(namespace)` answers
+   that namespace's words by key. */
+export const searchKeys = (messagesOf, typed) => {
+    const text = String(typed || "").trim().toLowerCase();
+    if (!text) return {};
+    const holding = (namespace) => Object.entries(messagesOf(namespace) || {})
+        .filter(([, words]) => typeof words === "string" && words.toLowerCase().includes(text))
+        .map(([key]) => key);
+    return Object.fromEntries(Object.entries(SEARCHED)
+        .map(([name, namespaces]) => [name, namespaces.flatMap(holding).slice(0, SEARCH_KEYS_MAX).join(",")])
+        .filter(([, keys]) => keys));
 };
 
 /* What the row holds as it was written, for whoever needs the keys and the ids. */

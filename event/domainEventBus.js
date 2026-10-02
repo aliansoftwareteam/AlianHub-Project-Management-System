@@ -5,7 +5,7 @@ const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const logger = require('../Config/loggerConfig');
 const telemetry = require('../Config/telemetry');
 const socketEmitter = require('./socketEventEmitter');
-const { normalizeChangedFields, createSnapshotStore } = require('../utils/entityEvents');
+const { normalizeChangedFields, createSnapshotStore, isNotAnEdit } = require('../utils/entityEvents');
 const actingAgent = require('../Modules/Agents/actingAgent');
 
 // Canonical domain-event bus — stage 1 of the automation engine (ADR 002).
@@ -269,7 +269,8 @@ function onTaskEvent(emitType) {
     return (payload) => {
         try {
             const doc = payload?.data;
-            if (!doc || !doc.CompanyId || !doc._id) return;
+            // A conversation is kept in the tasks collection and sends the same emits; it is no task for a rule.
+            if (!doc || !doc.CompanyId || !doc._id || doc.mainChat === true || isNotAnEdit(payload)) return;
 
             const companyId = String(doc.CompanyId);
             const key = `${companyId}:${String(doc._id)}:${emitType}`;

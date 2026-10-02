@@ -566,8 +566,7 @@ describe('table task events (mutateUpdateFirebaseTableTasks)', () => {
         expect(rows().map((r) => r.id)).toEqual(['b']);
     });
 
-    // splice(-1, 1) drops the last subtask when the removed one is not found
-    it.fails('keeps the other subtasks when the subtask to remove is not in the table', () => {
+    it('keeps the other subtasks when the subtask to remove is not in the table', () => {
         fire('added', { id: 'a', isParentTask: true });
         fire('added', { id: 's1', isParentTask: false, ParentTaskId: 'a' });
         fire('removed', { id: 'ghost', isParentTask: false, ParentTaskId: 'a' });
@@ -721,8 +720,7 @@ describe.each([
         expect(idsOf('p1')).toEqual(['x2']);
     });
 
-    // a new project replaces the whole map, so loading a second project's items forgets the first
-    it.fails('keeps the items of other projects when another project is loaded', () => {
+    it('keeps the items of other projects when another project is loaded', () => {
         run('added', { _id: 'x1', projectId: 'p1' });
         run('added', { _id: 'x2', projectId: 'p2' });
         expect(Object.keys(state[key]).sort()).toEqual(['p1', 'p2']);
@@ -730,8 +728,7 @@ describe.each([
 });
 
 describe('folders edge cases', () => {
-    // no guard for a project with no folders loaded, so findIndex returns undefined and splice runs on undefined
-    it.fails('ignores removing a folder of a project with no folders', () => {
+    it('ignores removing a folder of a project with no folders', () => {
         expect(() => m.mutateFolders(state, { op: 'removed', data: { _id: 'f1', projectId: 'p9' } })).not.toThrow();
     });
 

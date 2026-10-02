@@ -46,6 +46,7 @@ const EVENTS = Object.freeze({
     'goal.update': 'Changed a goal',
     'goal.archive': 'Archived a goal',
     'goal.restore': 'Restored a goal',
+    'custom_field.deleted': 'Deleted a custom field',
     'oauth.grant_created': 'Connected an outside app',
     'oauth.grant_revoked': 'Disconnected an outside app',
     'oauth.grant_narrowed': 'Reduced what an outside app may do',
@@ -136,6 +137,7 @@ const ACTIONS = Object.freeze({
     'workflow.step.skip': 'Skip a workflow step',
     'workflow.step.resume': 'Resume a workflow step',
     'workflow.step.compensate': 'Undo a workflow step',
+    'workflow.run.start': 'Start a workflow',
     'task.delete': 'Delete a task',
     'tasks.unknown': 'Change a task in a way that has no name',
     'tasks.import': 'Import tasks',
@@ -215,6 +217,7 @@ const ACTIONS = Object.freeze({
     'page.approve': 'Approve a doc',
     'page.restore': 'Restore a doc',
     'page.image': 'Add an image to a doc',
+    'timelog.capture': 'Add a screenshot to a timer',
     'share.public': 'Share with a public link',
     'intake.review': 'Review what a form sent in',
     'sprint.scrum': 'Make a list a sprint',
@@ -242,6 +245,7 @@ const ACTIONS = Object.freeze({
     'email.send': 'Send an email',
     'email_in.manage': 'Change how email comes in as tasks',
     'export.workspace': 'Export the workspace',
+    'fields.delete': 'Delete a custom field',
     'file.delete': 'Delete a file',
     'form.manage': 'Make or change a form',
     'notification.send': 'Send a notification',
@@ -264,6 +268,21 @@ const ACTIONS = Object.freeze({
     'workload.move': 'Move planned work',
     'workspace.create': 'Make a workspace',
     'workspace.settings': 'Change the workspace\'s settings',
+    'aifield.apply': 'Apply AI suggestions to a field',
+    'comment.assign': 'Assign a comment',
+    'comment.resolve': 'Resolve a comment',
+    'epic.assign': 'Put a task in an epic',
+    'epic.create': 'Make an epic',
+    'epic.update': 'Change an epic',
+    'project.comment': 'Comment on a project',
+    'project.update': 'Change a project\'s details',
+    'reaction.set': 'React to a comment or a task',
+    'sprint.favourite': 'Star a list',
+    'task.fields.compute': 'Work out the calculated fields of tasks',
+    'task.reorder': 'Change the order of tasks',
+    'time.plan': 'Plan time on a task',
+    'timelog.edit': 'Change logged time',
+    'whiteboard.update': 'Change a whiteboard',
 });
 
 const AGENT_ROWS = Object.freeze(['agent.action', 'agent.action_refused', 'agent.action_undone']);
@@ -281,4 +300,47 @@ const labelOf = (row) => {
     return AGENT_ROWS.includes(row.action) ? actionLabel(tried) || happened : happened;
 };
 
-module.exports = { EVENTS, ACTIONS, AGENT_ROWS, labelOf };
+const TYPED_MAX = 120;
+const SENT_MAX = 60;
+const CODE = /^[a-z][a-z0-9_]*$/;
+const NO_KEYS = Object.freeze({ events: [], actions: [], reasons: [] });
+
+const slugOf = (key) => String(key).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+const sent = (list) => (typeof list === 'string' ? list.split(',') : []).map((slug) => slug.trim()).filter((slug) => CODE.test(slug)).slice(0, SENT_MAX);
+
+const registryLabels = () => {
+    const registry = require('../Agents/registry');
+    return Object.fromEntries(registry.keys().map((key) => [key, String(registry.get(key).label || '')]));
+};
+
+const labelled = (labels, typed, slugs) => Object.keys(labels).filter((key) => labels[key].toLowerCase().includes(typed) || slugs.includes(slugOf(key)));
+
+/* The keys whose words hold what was typed: the English words here, and the keys the reader's own language matched,
+ * which the web app sends as slugs (frontend/src/views/Ai/auditWords.js). A sent slug is only ever compared with a
+ * key held here, and a reason code is letters, digits and underscores, so nothing sent is read as a pattern.
+ * An agent's row is shown by what the agent did, never by the words of its event. */
+const keysFor = (typed, { qEvents, qActions, qReasons } = {}) => {
+    const text = String(typed || '').trim().toLowerCase().slice(0, TYPED_MAX);
+    if (!text) return NO_KEYS;
+    return {
+        events: labelled(EVENTS, text, sent(qEvents)).filter((key) => !AGENT_ROWS.includes(key)),
+        actions: labelled({ ...registryLabels(), ...ACTIONS }, text, sent(qActions)),
+        reasons: sent(qReasons),
+    };
+};
+
+const codeOf = (reason) => String(reason || '').split(':')[0];
+
+const rowHolds = (row, keys) => {
+    const meta = (row && row.meta) || {};
+    return keys.events.includes(row && row.action) || keys.actions.includes(meta.action) || keys.reasons.includes(codeOf(meta.reason));
+};
+
+const clausesFor = (keys) => [
+    ...(keys.events.length ? [{ action: { $in: keys.events } }] : []),
+    ...(keys.actions.length ? [{ 'meta.action': { $in: keys.actions } }] : []),
+    ...(keys.reasons.length ? [{ 'meta.reason': { $regex: `^(${keys.reasons.join('|')})(:|$)` } }] : []),
+];
+
+module.exports = { EVENTS, ACTIONS, AGENT_ROWS, labelOf, keysFor, rowHolds, clausesFor };

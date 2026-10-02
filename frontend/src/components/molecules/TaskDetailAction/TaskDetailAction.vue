@@ -209,7 +209,7 @@
         <ConfirmationSidebar
             v-model="showSidebar"
             :title="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
-            :message="archive ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
+            :message="$t(taskRemovalMessageKey(props.task, archive))"
             :confirmationString="`${archive ? 'archive' : 'delete'}`"
             :acceptButtonClass="archive ? 'btn-primary': 'btn-danger'"
             :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
@@ -249,6 +249,7 @@
 
     import { computed, defineAsyncComponent, defineProps,defineEmits, ref, inject, watch } from 'vue';
     import taskClass from "@/utils/TaskOperations"
+    import { taskRemovalMessageKey } from "@/utils/taskRemovalWords";
     import { apiRequest } from '@/services';
     import { useGetterFunctions, useCustomComposable } from '@/composable';
     const { getUser } = useGetterFunctions();
@@ -495,18 +496,20 @@
                 else {
                     sprint = projectData.value?.sprintsObj[props.task.sprintId];
                 }
-                sprint.tasks = sprint.tasks - (props.task.isParentTask ? ((props.task.subTasks || 0) + 1) : 1)
-                commit("projectData/mutateSprints",{op:'modified',data:{...sprint}});
-                if (deletedStatusKey !== 1 || deletedStatusKey !== 2) {
-                    $toast.success(t(`Toast.Task_${value !== null ? 'restored' : archive.value ? 'archived' : 'deleted'}_successfully`), { position: "top-right" })
+                if (sprint) {
+                    sprint.tasks = sprint.tasks - (props.task.isParentTask ? ((props.task.subTasks || 0) + 1) : 1)
+                    commit("projectData/mutateSprints",{op:'modified',data:{...sprint}});
                 }
+                $toast.success(t(`Toast.Task_${value !== null ? 'restored' : archive.value ? 'archived' : 'deleted'}_successfully`), { position: "top-right" })
             }
             showSpinner.value = false;
             showSidebar.value = false;
-
+            if (res.status && value === null) emit('close');
         })
         .catch((err) => {
             console.error(err);
+            showSpinner.value = false;
+            $toast.error(err?.error?.response?.data?.statusText || t('Toast.something_went_wrong'), { position: "top-right" });
         })
     }
 

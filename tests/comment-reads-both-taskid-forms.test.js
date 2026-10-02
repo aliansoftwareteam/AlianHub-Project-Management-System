@@ -12,6 +12,7 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/config', () => ({ myCache: { get: jest.fn(), set: jest.fn(), del: jest.fn() } }));
 jest.mock('../Modules/AI/taskAccess', () => ({ visibleTask: jest.fn(async () => ({ _id: 'task', TaskName: 'Task' })), TASK_NOT_FOUND: 'task not found' }));
 jest.mock('../Modules/AICore/llmProvider', () => ({ isAnyProviderConfigured: () => true, getProvider: jest.fn() }));
+jest.mock('../Modules/Comments/helpers/threadAccess', () => ({ commentThreadAccess: jest.fn(async () => ({ allowed: true, match: {} })), refuseThread: jest.fn() }));
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const { addCommentCollection } = require('../Modules/Comments/controller');
@@ -97,7 +98,7 @@ describe('a task\'s comments are found whichever form stored the task id', () =>
         const res = respond();
         await getPaginateMediaFiles(mediaRequest(handleType, TASK_SELECTED), res);
         expect(res.status).toHaveBeenCalledWith(200);
-        const [[pipeline]] = onlyCall('aggregate');
+        const [pipeline] = onlyCall('aggregate');
         expect(found(pipeline[0].$match, rowsOfType('audio'))).toEqual(['as-object-id', 'as-text']);
     });
 
@@ -115,7 +116,7 @@ describe("'default' still names the main chat in the media views", () => {
 
     test('media gallery', async () => {
         await getPaginateMediaFiles(mediaRequest('chat', MAIN_CHAT), respond());
-        const [[pipeline]] = onlyCall('aggregate');
+        const [pipeline] = onlyCall('aggregate');
         expect(found(pipeline[0].$match, rowsOfType('audio'))).toEqual(['main-chat']);
     });
 

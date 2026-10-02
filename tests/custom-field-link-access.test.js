@@ -380,7 +380,7 @@ describe('voting', () => {
         const registered = {};
         const record = (method) => (path, ...handlers) => { registered[`${method} ${path}`] = handlers; };
         routes.init({ get: record('GET'), put: record('PUT'), post: record('POST') });
-        expect(registered['POST /api/v2/custom-fields/:fieldId/vote']).toEqual([fieldLinks.vote]);
+        expect(registered['POST /api/v2/custom-fields/:fieldId/vote'].at(-1)).toBe(fieldLinks.vote);
         expect(registered['POST /api/v2/custom-fields/links/resolve']).toEqual([fieldLinks.resolve]);
         const cast = await call(fieldLinks.vote, request(GUEST, { taskId: SOURCE, vote: true }, { fieldId: VOTES }));
         expect(cast).toEqual({ code: 200, body: { status: true, statusText: 'OK', data: { count: 1, voted: true } } });

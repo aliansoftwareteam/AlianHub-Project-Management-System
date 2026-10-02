@@ -44,7 +44,10 @@ const routesOf = (modulePath) => {
     return table;
 };
 
-const sourceFiles = (dir, out = []) => {
+/* The first guard of a route that judges a person: where the route refuses agents, that refusal stands in front of it. */
+const judgesThePerson = (handlers) => handlers.find((handler) => !handler.refusesAs);
+
+const sourceFiles =(dir, out = []) => {
     fs.readdirSync(dir).forEach((name) => {
         const full = path.join(dir, name);
         if (fs.statSync(full).isDirectory()) {
@@ -129,7 +132,7 @@ describe('every task write route and action has a permission mapping', () => {
     });
 
     test.each(Object.entries(TASK_WRITE_ROUTES).filter(([, spec]) => [JUDGED.ACTIONS, JUDGED.ROUTE].includes(spec.judged)))('%s puts its guard in front of the handler', (route, spec) => {
-        const [first] = routesOf(path.join(ROOT, scanned.get(route)).replace(/\.js$/, ''))[route];
+        const first = judgesThePerson(routesOf(path.join(ROOT, scanned.get(route)).replace(/\.js$/, ''))[route]);
         expect(first.taskWrites).toBe(spec.judged === JUDGED.ACTIONS ? spec.actions : spec.entry);
     });
 
@@ -378,7 +381,7 @@ describe.each([
 
 describe('the other task write routes use the same judgement', () => {
     const taskRoutes = routesOf('../Modules/Tasks/routes');
-    const guardOf = (route) => taskRoutes[route][0];
+    const guardOf = (route) => judgesThePerson(taskRoutes[route]);
 
     test.each([
         ['POST /api/v2/tasks/relations', { action: 'add', taskId: LOCKED_TASK, relatedTaskId: OPEN_TASK, type: 'blocks' }, 'task.task_list', true],

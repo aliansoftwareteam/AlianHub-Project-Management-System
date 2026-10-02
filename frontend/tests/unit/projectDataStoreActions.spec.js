@@ -78,8 +78,7 @@ describe('loading projects (setProjects)', () => {
         expect(store.state.projectData.allProjects).toEqual([]);
     });
 
-    // the .catch only logs, so an awaiting caller (Projects.vue) never gets control back
-    it.fails('settles when the projects request fails', async () => {
+    it('settles when the projects request fails', async () => {
         apiRequest.mockRejectedValue(new Error('offline'));
         const outcome = await Promise.race([
             store.dispatch('projectData/setProjects', { roleType: 1 }).then(() => 'settled', () => 'settled'),
@@ -151,8 +150,7 @@ describe('live task rooms (getTasksFromMongoDB)', () => {
         expect(store.state.projectData.mongoUpdatedTask.op).toBe('removed');
     });
 
-    // mutateTypesenseTableTasks has no 'removed' branch, so the delete event upserts the row it should drop
-    it.fails('drops a deleted task from the table too', async () => {
+    it('drops a deleted task from the table too', async () => {
         await join();
         socket.handlers.taskInsert({ fullDocument: parentTask('t1') });
         socket.handlers.taskDelete({ fullDocument: parentTask('t1') });
@@ -419,8 +417,7 @@ describe('tab sync of task pages (tabSyncTaskCommit)', () => {
         expect(store.state.projectData.tasks).toEqual({});
     });
 
-    // `{...'u1'}` spreads a string into {0: 'u', 1: '1'}
-    it.fails('keeps each favouring user as an object with the user id', () => {
+    it('keeps each favouring user as an object with the user id', () => {
         sync({ data: [{ result: [parentTask('t1', { favouriteTasks: ['u1'] })], count: [{ count: 1 }] }] });
         expect(listOf().tasks[0].favouriteTasks).toEqual([{ userId: 'u1' }]);
     });

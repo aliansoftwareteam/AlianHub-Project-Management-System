@@ -37,7 +37,9 @@ exports.getTrackerTimeSheet = async(req,res) => {
                             Loggeduser: "$Loggeduser",
                             trackShots: "$trackShots",
                             LogDescription: "$LogDescription",
-                            logAddType: "$logAddType"
+                            logAddType: "$logAddType",
+                            LogStartTime: "$LogStartTime",
+                            LogEndTime: "$LogEndTime"
                         }
                     }
                 }

@@ -68,14 +68,13 @@ describe('setUsers', () => {
         expect(await store.dispatch('users/setUsers', { cid: 'c1' })).toEqual([]);
     });
 
-    // The empty-result path commits data: [] with op "added", which pushes an empty array as a user.
-    it.fails('shows no users when the company has none', async () => {
+    it('shows no users when the company has none', async () => {
         apiRequestWithoutCompnay.mockResolvedValueOnce({ status: 200, data: [] });
         await store.dispatch('users/setUsers', { cid: 'c1' });
         expect(store.getters['users/users']).toEqual([]);
     });
 
-    it.fails('shows no users after a failed request', async () => {
+    it('shows no users after a failed request', async () => {
         apiRequestWithoutCompnay.mockRejectedValueOnce(new Error('offline'));
         await store.dispatch('users/setUsers', { cid: 'c1' });
         expect(store.getters['users/users']).toEqual([]);

@@ -113,7 +113,7 @@ describe('the flag decides whether the tool exists', () => {
         expect(registry.get(TOOL)).toMatchObject({ risk: 'low', undoable: true, write: true, proposeOnly: true });
         expect(registry.permissionsFor(TOOL)).toEqual([{ key: 'task.task_list', write: false }]);
         expect(actions.rating(TOOL)).toEqual({ write: true, reversible: true, scope: 'workspace', money: false });
-        await expect(actions.perform({ companyId: CID, actor: as(INSIDER).actor, action: TOOL, params: BOARD, reason: 'direct' })).rejects.toThrow(/must be proposed/);
+        await expect(actions.perform({ companyId: CID, actor: as(INSIDER).actor, action: TOOL, params: BOARD, reason: 'direct' })).rejects.toThrow(/has to be sent as a proposal/);
     });
 
     it('offers the cards the editor\'s picker adds with nothing more to fill in, each as the picker adds it', () => {
@@ -141,17 +141,17 @@ describe('asking for a card', () => {
 
     it('says at once what is wrong with the request', async () => {
         const wrong = async (args, why) => expect((await rpc(as(INSIDER), TOOL, args)).rpcError).toMatchObject({ code: -32602, message: expect.stringMatching(why) });
-        await wrong({ card: 'tasks_by_status' }, /one of the two/);
-        await wrong({ ...BOARD, dashboardId: D_MINE }, /one of the two/);
+        await wrong({ card: 'tasks_by_status' }, /not both and not neither/);
+        await wrong({ ...BOARD, dashboardId: D_MINE }, /not both and not neither/);
         await wrong({ newDashboard: 'Board', card: 'burndown' }, /card/);
-        await wrong({ newDashboard: 'Board', card: 'due_soon', period: 'today' }, /takes no period/);
+        await wrong({ newDashboard: 'Board', card: 'due_soon', period: 'today' }, /leave the period out/);
         await wrong({ ...BOARD, period: 'next_year' }, /period/);
         expect(waiting()).toHaveLength(0);
     });
 
     it('answers a dashboard that is not there and one the person cannot open alike, and one that is another person\'s or full', async () => {
         const answer = (dashboardId) => rpc(as(INSIDER), TOOL, { dashboardId, card: 'due_soon' });
-        expect(await answer(MISSING)).toEqual({ ok: false, error: 'that dashboard was not found' });
+        expect(await answer(MISSING)).toEqual({ ok: false, error: 'That dashboard was not found.' });
         expect(await answer(D_HIDDEN)).toEqual(await answer(MISSING));
         expect(await answer(D_SHARED)).toMatchObject({ ok: false, error: expect.stringMatching(/belongs to someone else/) });
         stored(SCHEMA_TYPE.USERDASHBOARD, D_MINE).cards = Array.from({ length: 60 }, (v, at) => ({ ...HELD_CARD, uid: String(200000000 + at) }));
@@ -175,13 +175,13 @@ describe('who may ask for one', () => {
     it('refuses a token kept to some projects, and tells it nothing of a dashboard', async () => {
         const kept = { ...as(INSIDER), projectIds: narrowed(INSIDER, [P_OPEN]).projectIds };
         for (const args of [BOARD, { dashboardId: D_MINE, card: 'due_soon' }, { dashboardId: D_SHARED, card: 'due_soon' }]) {
-            expect(await rpc(kept, TOOL, args)).toMatchObject({ refused: true, reason: expect.stringMatching(/kept to some projects/) });
+            expect(await rpc(kept, TOOL, args)).toMatchObject({ refused: true, reason: expect.stringMatching(/limited to some projects/) });
         }
         expect(waiting()).toHaveLength(0);
     });
 
     it('answers a dashboard of another company as one that is not there', async () => {
-        expect(await rpc(as(INSIDER, { companyId: mockOtherCompany }), TOOL, { dashboardId: D_MINE, card: 'due_soon' })).toEqual({ ok: false, error: 'that dashboard was not found' });
+        expect(await rpc(as(INSIDER, { companyId: mockOtherCompany }), TOOL, { dashboardId: D_MINE, card: 'due_soon' })).toEqual({ ok: false, error: 'That dashboard was not found.' });
         expect(mockElsewhere.store[SCHEMA_TYPE.AGENT_PROPOSALS] || []).toHaveLength(0);
     });
 

@@ -58,8 +58,8 @@ const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 
 const TOOL = 'folder.create';
-const NO_PROJECT = 'not_visible: the project is not one the person behind this token can open';
-const NO_LIST = 'that list was not found in that project';
+const NO_PROJECT = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
+const NO_LIST = 'That list was not found in that project.';
 const F_TOP = '6f0000000000000000000e01';
 const F_SUB = '6f0000000000000000000e02';
 const L_TWIN = '6f0000000000000000000b09';
@@ -145,7 +145,7 @@ describe('a folder is never made before a person has seen it', () => {
         const params = { projectId: P_OPEN, name: 'Launch' };
         expect(await projectPolicy.ask({ companyId: CID, actor: as(INSIDER).actor, action: TOOL, params })).toMatchObject({ decision: 'propose' });
         const call = (given) => actions.perform({ companyId: CID, actor: as(OWNER).actor, action: TOOL, params: given, reason: 'direct' });
-        await expect(call(params)).rejects.toThrow(/must be proposed/);
+        await expect(call(params)).rejects.toThrow(/has to be sent as a proposal/);
         await expect(call({ ...params, __proposal: true })).rejects.toThrow(/waits for a person's approval/);
         expect(foldersNamed('Launch')).toHaveLength(0);
     });
@@ -165,7 +165,7 @@ describe('who may ask for a folder', () => {
         setRule('project_folder_create', true, [3]);
         setRule('project_sprint_create', false, [3]);
         const out = await rpc(as(OUTSIDER), TOOL, PLAN);
-        expect(out.reason).toMatch(/^permission_denied: .*: lists \(project\.project_sprint_create is not granted\)$/);
+        expect(out.reason).toMatch(/^permission_denied: .*: lists \(The permission project\.project_sprint_create is missing\.\)$/);
         expect(audits(TOOL).map((row) => row.meta.ran)).toEqual([false, false]);
         expect(waiting()).toHaveLength(0);
         await filed(as(OUTSIDER), { projectId: P_OPEN, name: 'Launch', moveListIds: [L_TWIN] });
@@ -173,7 +173,7 @@ describe('who may ask for a folder', () => {
 
     it('refuses a guest, and a token that only reads', async () => {
         expect(await rpc(as(GUEST), TOOL, PLAN)).toMatchObject({ refused: true, reason: expect.stringMatching(/^permission_denied: /) });
-        expect(await rpc(readOnly(OWNER), TOOL, PLAN)).toMatchObject({ isError: true, error: 'This token is read-only.' });
+        expect(await rpc(readOnly(OWNER), TOOL, PLAN)).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
         expect(waiting()).toHaveLength(0);
     });
 
@@ -198,11 +198,11 @@ describe('who may ask for a folder', () => {
     it('says what is wrong with a request', async () => {
         const bad = async (over) => (await rpc(as(OWNER), TOOL, { projectId: P_OPEN, name: 'Launch', ...over })).rpcError;
         expect(await bad({ name: '   ' })).toMatchObject({ code: -32602, message: expect.stringMatching(/needs a name/) });
-        expect(await bad({ parentFolderId: F_TOP, subfolders: [{ name: 'Deeper' }] })).toMatchObject({ code: -32602, message: expect.stringMatching(/nest one level/) });
+        expect(await bad({ parentFolderId: F_TOP, subfolders: [{ name: 'Deeper' }] })).toMatchObject({ code: -32602, message: expect.stringMatching(/one level deep/) });
         expect(await bad({ subfolders: Array.from({ length: 6 }, (v, at) => ({ name: `S${at}` })) })).toMatchObject({ code: -32602 });
-        expect(await bad({ subfolders: [{ name: 'Week' }, { name: ' week ' }] })).toMatchObject({ code: -32602, message: expect.stringMatching(/named twice/) });
+        expect(await bad({ subfolders: [{ name: 'Week' }, { name: ' week ' }] })).toMatchObject({ code: -32602, message: expect.stringMatching(/appears twice/) });
         expect(await bad({ moveListIds: [L_TWIN], subfolders: [{ name: 'Week', moveListIds: [L_TWIN] }] })).toMatchObject({ code: -32602, message: expect.stringMatching(/one folder only/) });
-        expect(await bad({ lists: ['Kickoff', 'kickoff'] })).toMatchObject({ code: -32602, message: expect.stringMatching(/named twice/) });
+        expect(await bad({ lists: ['Kickoff', 'kickoff'] })).toMatchObject({ code: -32602, message: expect.stringMatching(/appears twice/) });
         expect(await bad({ delete: true })).toMatchObject({ code: -32602 });
         expect(waiting()).toHaveLength(0);
     });
@@ -253,7 +253,7 @@ describe('approving makes the folder as the web app would, as the person who app
         const out = await approve(await filed(as(INSIDER)), GUEST);
         const { result } = out.applied[0];
         expect(result.parts.map((part) => [part.part, part.ok])).toEqual([['folders', true], ['lists', false], ['moves', false]]);
-        expect(partOf(result, 'lists').items[0].error).toMatch(/approver may not make this part: project\.project_sprint_create/);
+        expect(partOf(result, 'lists').items[0].error).toMatch(/The person approving may not make this part: The permission project\.project_sprint_create is missing/);
         expect(result.notMade.map((entry) => [entry.part, entry.name])).toEqual([['lists', 'Kickoff'], ['lists', 'Inner list'], ['moves', '']]);
         expect(foldersNamed('Launch')).toHaveLength(1);
         expect(listsNamed('Kickoff')).toHaveLength(0);
@@ -262,7 +262,7 @@ describe('approving makes the folder as the web app would, as the person who app
 
     it('leaves where it is a list the approver cannot open, and asks the person behind the token again', async () => {
         const hidden = await approve(await filed(as(INSIDER), { projectId: P_OPEN, name: 'Hidden', moveListIds: [L_SECRET] }), OUTSIDER);
-        expect(partOf(hidden.applied[0].result, 'moves').items).toEqual([{ sprintId: L_SECRET, folder: 'Hidden', made: false, error: NO_LIST }]);
+        expect(partOf(hidden.applied[0].result, 'moves').items).toEqual([{ sprintId: L_SECRET, folder: 'Hidden', made: false, error: 'That list was not found in that project. Check lists.list or ask the person which list they mean.' }]);
         expect(folderOf(L_SECRET)).toBe('');
 
         const id = await filed(as(OUTSIDER), { projectId: P_OPEN, name: 'Later', lists: ['Kickoff'] });
@@ -303,7 +303,7 @@ describe('undo takes back what the plan made', () => {
         await approve(id);
         const byHand = mockDb.seed(SCHEMA_TYPE.SPRINTS, { name: 'By hand', projectId: P_OPEN, folderId: String(foldersNamed('Week one')[0]._id), deletedStatusKey: 0 });
         const out = await undo(id);
-        expect(out.results[0]).toMatchObject({ ok: false, reason: 'the folder "Week one" stays: it holds a list now; the folder "Launch" stays: it holds a folder now' });
+        expect(out.results[0]).toMatchObject({ ok: false, reason: 'The folder "Week one" was kept: it holds a list now; The folder "Launch" was kept: it holds a folder now' });
         expect(foldersNamed('Launch')).toHaveLength(1);
         expect(listsNamed('By hand')).toHaveLength(1);
         expect(listsNamed('Kickoff')).toHaveLength(0);
@@ -319,12 +319,12 @@ describe('undo takes back what the plan made', () => {
         const id = await filed(as(INSIDER), { projectId: P_OPEN, name: 'Launch', lists: ['Kickoff'] });
         await approve(id);
         mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Planned', ProjectID: P_OPEN, sprintId: String(listsNamed('Kickoff')[0]._id), CompanyId: CID, statusKey: 1, deletedStatusKey: 0 });
-        expect((await undo(id)).results[0].reason).toMatch(/^the list "Kickoff" stays: .*tasks.*; the folder "Launch" stays: it holds a list now$/);
+        expect((await undo(id)).results[0].reason).toMatch(/^The list "Kickoff" was kept: .*tasks.*; The folder "Launch" was kept: it holds a list now$/);
 
         const other = await filed(as(INSIDER), { projectId: P_OPEN, name: 'Empty' });
         await approve(other, INSIDER);
         setRule('folder_delete', false, [3]);
-        expect((await undo(other, INSIDER)).results[0]).toMatchObject({ ok: false, reason: 'the folder "Empty" stays: you may not delete a folder in this project' });
+        expect((await undo(other, INSIDER)).results[0]).toMatchObject({ ok: false, reason: 'The folder "Empty" was kept: The person is not allowed to delete a folder in this project.' });
         expect(foldersNamed('Empty')).toHaveLength(1);
     });
 });

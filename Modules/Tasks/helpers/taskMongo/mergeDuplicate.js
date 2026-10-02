@@ -25,6 +25,8 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const { escapeHtml } = require('../../../../utils/escapeHtml');
+const { taskNotFound } = require('../taskWriteFields');
 
 /* The download check judges a task attachment by the task its folder names, and the merged task is
  * soft-deleted, so its files are copied into the kept task's folder. Only the merged task's own folder
@@ -61,6 +63,9 @@ module.exports = {
                     }
                     await MongoDbCrudOpration(companyId,query,"findOne")
                     .then(async (mergeTask) => {
+                        if (!task || !mergeTask) throw taskNotFound();
+                        /* What moves with the merged task goes to the project the kept task is stored in, and its list loses a row in the project it is stored in. */
+                        const keptIn = { ...projectData, id: String(mergeTask.ProjectID) };
                         const movedAttachments = await rehomeMergedAttachments(companyId, task, mergeTask);
                         let deletedObj = {
                             type: SCHEMA_TYPE.TASKS,
@@ -77,8 +82,8 @@ module.exports = {
                             ]
                         }
                         MongoDbCrudOpration(companyId,deletedObj,"findOneAndUpdate").then((result)=>{
-                            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey: result.deletedStatusKey}, module: 'task', companyId });
-                        })
+                            if (result) socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey: result.deletedStatusKey}, module: 'task', companyId });
+                        }).catch((error) => logger.error(`merge, hiding the merged task: ${error && error.message}`));
 
                         let finalAttach = mergeTask.attachments ? mergeTask.attachments : [];
                         finalAttach = finalAttach.concat(movedAttachments);
@@ -140,13 +145,13 @@ module.exports = {
                         removeCommentCount(companyId,task.ProjectID,task.sprintId,task._id,task.ParentTaskId).catch((error) => {
                             logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
                         })
-                        updateHistoryCollection(companyId, task,projectData,mergeTask._id);
-                        updateTimesheetCollection(companyId, task,projectData,mergeTask._id);
-                        updateEstimatedTimeCollection(companyId, task,projectData,mergeTask._id);
+                        updateHistoryCollection(companyId, task,keptIn,mergeTask._id);
+                        updateTimesheetCollection(companyId, task,keptIn,mergeTask._id);
+                        updateEstimatedTimeCollection(companyId, task,keptIn,mergeTask._id);
                         let sprintObj = {
                             id : mergeTask.sprintId
                         }
-                        updateCommentCollection(companyId, task,sprintObj,projectData,mergeTask._id)
+                        updateCommentCollection(companyId, task,sprintObj,keptIn,mergeTask._id)
                         if(task.isParentTask === false){
                             /*When a subtask is merged with another task, at that moment, the parent task of the subtask decreases by one.*/
                             let object = {
@@ -158,14 +163,14 @@ module.exports = {
                                 ]
                             }
                             MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((result)=>{
-                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task', companyId });
-                            })
+                                if (result) socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task', companyId });
+                            }).catch((error) => logger.error(`merge, the parent's count: ${error && error.message}`));
                         }
                         if(mergeTask.sprintId !== task.sprintId || JSON.parse(JSON.stringify(mergeTask)).ProjectID !== JSON.parse(JSON.stringify(task)).ProjectID){
                             const decObj = {
                                 body: {
                                     companyId: companyId,
-                                    projectId: oldProject.id,
+                                    projectId: String(task.ProjectID),
                                     folderId: task?.folderObjId || null,
                                     updateObject :{$inc: { tasks: -1}},
                                 },
@@ -187,7 +192,7 @@ module.exports = {
                         }, 'find').catch(() => []);
                         if(subTaskArray.length){
                             const above = [...ancestorsOf(mergeTask), String(mergeTask._id)].reverse();
-                            const target = { projectData: { ...projectData, id: String(mergeTask.ProjectID) }, sprintObj: mergeTask.sprintArray, oldProject, userData };
+                            const target = { projectData: keptIn, sprintObj: mergeTask.sprintArray, oldProject, userData };
                             for (const stask of subTaskArray) {
                                 try {
                                     const moving = { task: stask, descendants: await loadSubtree(companyId, stask._id, { projection: { ancestors: 1 } }) };
@@ -197,7 +202,7 @@ module.exports = {
                                         if (slot.ok) break;
                                     }
                                     if (!slot || !slot.ok) throw new Error((slot && slot.reason) || 'no parent');
-                                    await mergeSubTask(companyId, stask, mergeTask, projectData, oldProject, slot);
+                                    await mergeSubTask(companyId, stask, mergeTask, keptIn, oldProject, slot);
                                     await carrySubtree(companyId, stask._id, slot.ancestors, target);
                                 } catch (error) {
                                     logger.error(`ERROR IN MERGE SUBTASK ${error}`)
@@ -218,9 +223,13 @@ module.exports = {
                             }else{
                                 historyObj.message = `<b>${userData.Employee_Name}</b> has merged the <b>${sanitizeInput(task.TaskName)}</b> task of <b>(${sanitizeInput(oldProject.ProjectName)}${task.folderObjId ? '/' + task.sprintArray.folderName : ''}/${task.sprintArray.name})</b> sprint in to <b>${sanitizeInput(mergeTask.TaskName)}</b> task <b>(${sanitizeInput(projectData.ProjectName)}${mergeTask.folderObjId ? '/' + mergeTask.sprintArray.folderName : ''}/${mergeTask.sprintArray.name})</b> ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                             }
-                            HandleHistory('task', companyId, projectData.id, mergeTask._id, historyObj, userData);
+                            HandleHistory('task', companyId, keptIn.id, mergeTask._id, historyObj, userData)
+                                .catch((error) => logger.error(`merge history: ${error && error.message}`));
                         }
                     })
+                }).catch((error) => {
+                    logger.error(`ERROR IN MERGE TASK ${error}`);
+                    reject(error);
                 })
 
             } catch (error) {
@@ -236,9 +245,11 @@ module.exports = {
                     data: [{ _id : new mongoose.Types.ObjectId(selectedTaskId)}]
                 }
                 MongoDbCrudOpration(companyId,object,"findOne").then((selectedTask) => {
+                    if (!selectedTask) throw taskNotFound();
                     selectedTask.AssigneeUserId = duplicateData.includes('Copy Assignees') ? assignee : [];
                     selectedTask.watchers = duplicateData.includes('Copy Watchers') ? watcher : [];
                     let obj = {};
+                    const leftList = oldSprintObj || {};
                     let parsedMap = JSON.parse(JSON.stringify(selectedTask))
                     if(JSON.parse(JSON.stringify(selectedTask))?.ProjectID !== projectData.id) {
                         let Ind = oldProject.taskStatusData.findIndex((x) => {return x.key === selectedTask.statusKey});
@@ -247,7 +258,7 @@ module.exports = {
                         let typeData = oldProject.taskTypeCounts[typeInd];
                         obj = {
                             ...parsedMap,
-                            TaskName: taskName!== '' ? taskName : selectedTask._doc.TaskName,
+                            TaskName: taskName ? taskName : selectedTask.TaskName,
                             ProjectID: projectData.id,
                             sprintId: sprintObj.id,
                             sprintArray : sprintObj,
@@ -272,7 +283,7 @@ module.exports = {
                     else{
                         obj = {
                             ...parsedMap,
-                            TaskName: taskName!== '' ? taskName : selectedTask._doc.TaskName,
+                            TaskName: taskName ? taskName : selectedTask.TaskName,
                             ProjectID: selectedTask.ProjectID,
                             sprintId: sprintObj.id,
                             sprintArray : sprintObj,
@@ -386,11 +397,12 @@ module.exports = {
                                     mainChat: false
                                 }
                                 if(JSON.parse(JSON.stringify(selectedTask))?.ProjectID !== projectData.id){
-                                    historyObj.message = `<b>${userData.Employee_Name}</b> has duplicated <b>${sanitizeInput(obj.TaskName)}</b> task from <b>(${sanitizeInput(oldProject.ProjectName)}${oldSprintObj.folderId ? '/' + oldSprintObj.folderName : ''}/${oldSprintObj.name})</b> to <b>(${sanitizeInput(projectData.ProjectName)}${sprintObj.folderId ? '/' + sprintObj.folderName : ''}/${sprintObj.name})</b> project ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
+                                    historyObj.message = `<b>${userData.Employee_Name}</b> has duplicated <b>${sanitizeInput(obj.TaskName)}</b> task from <b>(${sanitizeInput(oldProject.ProjectName)}${leftList.folderId ? '/' + escapeHtml(leftList.folderName) : ''}/${escapeHtml(leftList.name)})</b> to <b>(${sanitizeInput(projectData.ProjectName)}${sprintObj.folderId ? '/' + escapeHtml(sprintObj.folderName) : ''}/${escapeHtml(sprintObj.name)})</b> project ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                                 }else{
-                                    historyObj.message = `<b>${userData.Employee_Name}</b> has duplicated <b>${sanitizeInput(obj.TaskName)}</b> task from <b>(${oldSprintObj.folderId ?  oldSprintObj.folderName + '/' : ''}${oldSprintObj.name})</b> to <b>(${sprintObj.folderId ? sprintObj.folderName + '/'  : ''}${sprintObj.name})</b> sprint ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
+                                    historyObj.message = `<b>${userData.Employee_Name}</b> has duplicated <b>${sanitizeInput(obj.TaskName)}</b> task from <b>(${leftList.folderId ?  escapeHtml(leftList.folderName) + '/' : ''}${escapeHtml(leftList.name)})</b> to <b>(${sprintObj.folderId ? escapeHtml(sprintObj.folderName) + '/'  : ''}${escapeHtml(sprintObj.name)})</b> sprint ${isSubTask === true ? '<b>with all its sub tasks</b>' : ''}.`
                                 }
-                                HandleHistory('task', companyId, projectData.id,taskResult.id, historyObj, userData);
+                                HandleHistory('task', companyId, projectData.id,taskResult.id, historyObj, userData)
+                                    .catch((error) => logger.error(`duplicate history: ${error && error.message}`));
                                 try {
                                     if(duplicateData.includes('Activity')){
                                         addHistoryCollection(companyId, projectData,selectedTask,taskResult,sprintObj).catch((err) => {
@@ -466,8 +478,8 @@ module.exports = {
                             reject(error);
                             logger.error(`${error}ERROR IN CRETE TASK `)
                         })
-                    })
-                })
+                    }).catch(reject)
+                }).catch(reject)
             } catch (error) {
                 logger.error(`${error}ERROR IN DUPLICATE TASK FUNCTIONALITY.`);
                 reject(error);

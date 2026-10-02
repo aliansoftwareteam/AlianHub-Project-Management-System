@@ -13,8 +13,7 @@ const firstOf = (list) => (Array.isArray(list) && list.length ? list[0] : null);
 const groupConditions = (body) => {
     const item = body.item || {};
     const conditions = firstOf(item.mongoConditions) || firstOf(item.conditions) || {};
-    validatePipeline([{ $match: conditions }]);
-    return conditions;
+    return validatePipeline([{ $match: conditions }])[0].$match;
 };
 
 const ownTasksOnly = (body) => !(body.showAllTasks === undefined || body.showAllTasks === true || body.showAllTasks === 2);

@@ -99,7 +99,7 @@
                                 <h3 class="m-0">{{$t('Home.Confirm')}}</h3>
                             </template>
                             <template #body>
-                                <span>{{$t('Filters.are_you_suredelete')}}?</span>
+                                <span>{{$t('Filters.are_you_suredelete')}}</span>
                             </template>
                         </ConfirmModal>
                     </ul>
@@ -115,9 +115,9 @@
                         @updateChecklist="updateChecklist($event)"
                     />
                 </div>
-                <div v-if="permission === true" class="new-checklist-section" @click="addCheckList">
+                <button v-if="permission === true" type="button" class="new-checklist-section" :disabled="adding" :aria-busy="adding ? 'true' : 'false'" @click="addCheckList">
                     <span class="d-flex"><i class="mr-8px font-size-18 font-normal">+</i>{{$t('Checklist.add_checklist')}}</span>
-                </div>
+                </button>
                 <div v-if="isSpinnerAi">
                     <Skelaton v-for="i in 4" :key="i" class="border-radius-5-px m-5px border-bottom px-1 subtask__item-input"/>
                 </div>
@@ -218,7 +218,7 @@ let checklsitType = ref("");
 const isError = ref(false)
 const checkListAi = ref([]);
 const isSpinnerAi = ref(false);
-// Get user details
+const adding = ref(false);
 function getUserData() {
     const user = getUser(userId.value);
     return {
@@ -261,14 +261,13 @@ watch(() => props.isMainSpinner, (newVal) => {
 })
 
 
-// Watch Property
 watch(() => props.data, (newVal, oldVal) => {
     if(JSON.stringify(newVal) === JSON.stringify(oldVal)) {
         return
     }
     var tempArray = [];
     let newItem = {};
-    if(newVal.length > 0){
+    if(newVal?.length > 0){
         newVal.map(item => {
             if(checklistArray.value.length > 0 && checklistArray.value.map(itm=>itm.id).includes(item.id)){
                 var OldItems = checklistArray.value.find(itm => itm.id == item.id)
@@ -281,12 +280,19 @@ watch(() => props.data, (newVal, oldVal) => {
     }
     checklistArray.value = tempArray
     manageCheckList();
-    let find = checklistArray.value.find((x) => x.id === newItem.parentId);
-    if(find && find.isChecked === true && newItem){
+    if(newItem.id && !addsInFlight.has(newItem.id)) untickParentOf(newItem);
+});
+
+/* A new item under a ticked parent unticks that parent, which rewrites the whole checklist. For an item added
+   here that write waits until the item itself is stored, or the two could be stored in the wrong order. */
+const addsInFlight = new Set();
+function untickParentOf(newItem) {
+    const parent = checklistArray.value.find((x) => x.id === newItem.parentId);
+    if(parent && parent.isChecked === true){
         newItem.isChecked = true
         handleChecked(newItem);
     }
-});
+}
 
 // This is the recursive function for rendering checklist items. This is used to manage listing array based on parent and child items
 function manageCheckList () {
@@ -340,8 +346,8 @@ function handleCollapseExpand (obj) {
     });
 }
 
-// This function is used for the create new parent checklist
 const addCheckList = async () => {
+    if(adding.value) return;
     const uniqueId = makeUniqueId(6);
     let dataArray = {
         AssigneeUserId: [],
@@ -361,8 +367,11 @@ const addCheckList = async () => {
         }
         let localUpdateArray = [...new Set([...checklistArray.value || [], ...[dataArray]])];
 
+        adding.value = true;
         taskClass.updateChecklistsv2({localUpdateArray:localUpdateArray,data:dataArray, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'taskchecklistcreate',taskData: props.task}).catch((error) => {
-            console.error("ERROR in delete: ", error.message);
+            console.error("ERROR in add checklist: ", error);
+        }).finally(() => {
+            adding.value = false;
         });
         rowId.value = uniqueId;
         setTimeout(() => {
@@ -381,11 +390,14 @@ const addCheckList = async () => {
         operation: 'push'
     }
 
+    adding.value = true;
     await apiRequest("post", `${env.PROJECTS_CHECKLIST}`, params).then(() => {
         checklistArray.value = [...checklistArray.value, { ...dataArray }];
         manageCheckList();
     }).catch((error) => {
         console.error(`Error in addCheckList hook => ${error}`)
+    }).finally(() => {
+        adding.value = false;
     });
 }
 
@@ -415,8 +427,15 @@ const addItem = async (obj, child = false) => {
         }
         let localUpdateArray = [...new Set([...checklistArray.value, ...strArray])];
 
-        taskClass.updateChecklistsv2({data:strArray,localUpdateArray, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: props.task}).catch((error) => {
-            console.error("ERROR in delete: ", error.message);
+        const lastAdded = strArray[strArray.length - 1];
+        strArray.forEach((row) => addsInFlight.add(row.id));
+        taskClass.updateChecklistsv2({data:strArray,localUpdateArray, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: props.task}).then(() => {
+            const stored = checklistArray.value.find((x) => x.id === lastAdded?.id);
+            if(stored) untickParentOf(stored);
+        }).catch((error) => {
+            console.error("ERROR in add item: ", error);
+        }).finally(() => {
+            strArray.forEach((row) => addsInFlight.delete(row.id));
         });
         checklistArray.value.forEach((x) => {
             if(x.parentId === obj.parentId) {
@@ -518,8 +537,9 @@ async function handleConfirm(val) {
                     extractedData
                 }
 
-                taskClass.updateChecklistsv2({data:obj, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistremove',taskData: props.task}).catch((error) => {
-                    console.error("ERROR in delete: ", error.message);
+                const localUpdateArray = checklistArray.value.filter((row) => !obj.includes(row.id));
+                taskClass.updateChecklistsv2({data:obj, localUpdateArray, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistremove',taskData: props.task}).catch((error) => {
+                    console.error("ERROR in delete: ", error);
                 });
                 return;
             }

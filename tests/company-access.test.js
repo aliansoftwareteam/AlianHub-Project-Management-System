@@ -143,6 +143,45 @@ describe('ACC-06 POST /api/v1/admin/company', () => {
         it('are all of them for a company admin', async () => {
             expect(await readAs(ADMIN)).toEqual(ROW);
         });
+
+        /* The handler as the route runs it once the caller is known: a token and an agent come with more than a session does. */
+        const handled = async (handler, caller, body) => {
+            const answer = MongoDbCrudOpration.getMockImplementation();
+            MongoDbCrudOpration.mockImplementation(async (db, obj, method) => (obj.type === SCHEMA_TYPE.COMPANIES && method === 'find' ? [ROW] : answer(db, obj, method)));
+            const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(sent) { this.body = sent; return this; } };
+            await handler({ headers: { companyid: COMPANY }, body, ...caller }, res);
+            expect(res.statusCode).toBe(200);
+            return res.body;
+        };
+        const NOT_A_SESSION = [
+            ['a personal token', { apiToken: { _id: 'token-1', name: 'A script' } }],
+            ['a token created for an agent', { apiToken: { _id: 'token-2', kind: 'agent', name: 'Claude' } }],
+            ['an agent run', { agentRun: { _id: 'run-1', agentId: 'agent-1' } }],
+            ['a call over MCP', { apiToken: { _id: 'token-3', name: 'Claude' }, mcp: true }],
+        ];
+        const HOLDERS = [['an owner', OWNER], ['an admin', ADMIN]];
+
+        it.each(NOT_A_SESSION.flatMap(([how, caller]) => HOLDERS.map(([who, uid]) => [how, who, { uid, ...caller }])))('are, through %s of %s, the ones the web app reads', async (how, who, caller) => {
+            expect(await handled(ctrl.getCompany, caller, { companyIds: [COMPANY] })).toEqual([{ _id: COMPANY, Cst_CompanyName: 'Acme', planFeature: { ai: true }, workingDays: [1, 2, 3, 4, 5] }]);
+        });
+
+        it.each(NOT_A_SESSION.flatMap(([how, caller]) => HOLDERS.map(([who, uid]) => [how, who, { uid, ...caller }])))('start, through %s of %s, from the ones the web app reads whatever the pipeline projects', async (how, who, caller) => {
+            await handled(ctrl.getCompanyByAggregate, caller, { findQuery: [{ $match: {} }, { $project: { billingDetails: 1, aiProviderKeys: 1 } }] });
+
+            const pipeline = callsOf('aggregate')[0][1].data[0];
+            expect(pipeline[0].$match._id.$in.map(String)).toContain(COMPANY);
+            const [limitedTo, memberRow] = pipeline[1].$replaceWith.$cond;
+            expect(limitedTo.$in[1].map(String)).toEqual(pipeline[0].$match._id.$in.map(String));
+            expect(Object.keys(memberRow)).toEqual([...COMPANY_MEMBER_FIELDS]);
+        });
+
+        it.each(NOT_A_SESSION)('are not every company\'s through %s of the instance owner', async (how, caller) => {
+            const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(sent) { this.body = sent; return this; } };
+            await ctrl.getCompany({ headers: { companyid: COMPANY }, body: { fetchAllCompany: true, companyIds: [] }, uid: OWNER, ...caller }, res);
+
+            expect(res.statusCode).toBe(403);
+            expect(callsOf('find')).toHaveLength(0);
+        });
     });
 
     it('returns nothing for a company whose seat is gone while the account still lists it', async () => {

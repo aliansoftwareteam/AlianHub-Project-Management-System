@@ -4,6 +4,7 @@ import { createStore } from 'vuex';
 import { createMemoryHistory, createRouter } from 'vue-router';
 
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
+vi.mock('@/services', () => ({ apiRequest: vi.fn(async () => ({ data: { status: false } })), apiRequestWithoutCompnay: vi.fn() }));
 vi.mock('@/views/Ai/useLiveAgents', () => ({ useLiveAgents: () => ({ running: { value: 0 }, refresh: vi.fn() }) }));
 vi.mock('@/views/Ai/useAgents', () => ({
     useAgents: () => ({ waiting: { value: 3 }, running: { value: 0 }, spend: { value: { totalUsd: 0, agents: [] } }, pauseAll: vi.fn() }),

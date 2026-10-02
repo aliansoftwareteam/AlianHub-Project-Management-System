@@ -82,6 +82,25 @@ const grantFiler = async (companyId, p, changes) => {
     return { tokenLists: [] };
 };
 
+const LACKS = Object.freeze({ STANDING: 'standing', RIGHT: 'right', SIGHT: 'sight' });
+
+const approvedByRequesterAlone = (change) => Boolean(change) && change.action === dashboards.ACTION;
+
+/* What the approver themselves is asked of one change of a proposal filed over MCP: null when they may approve it;
+ * otherwise { error, lacks }. The approval below and the lists (Agents/approverRights) both ask it here, so a row
+ * is offered as open exactly when its approval would be taken. */
+const approverRefusal = async (companyId, userId, proposal, change) => {
+    const params = change.params || {};
+    const notTheirs = approvedByRequesterAlone(change) ? dashboards.approverRefusal(userId, proposal.requestedBy) : '';
+    if (notTheirs) return { error: notTheirs, lacks: LACKS.STANDING };
+    const own = await holderMayInEach(companyId, { kind: 'human', userId: String(userId) }, change.action, params);
+    if (!own.allowed) return { error: `The approver may not make this change: ${own.reason}`, lacks: LACKS.RIGHT };
+    if (!(await reachable(companyId, { userId: String(userId), projectIds: [] }, targetOf(params, change.action)))) {
+        return { error: 'The approver cannot open what this change touches.', lacks: LACKS.SIGHT };
+    }
+    return null;
+};
+
 /* null when a person may approve this MCP proposal as filed; otherwise { error, status }. `kept` are its changes
  * with the parts of a plan the person left out taken out (Agents/planChoice.js), which is all an approver may change. */
 const refusalFor = async (companyId, p, { decider, isPrivileged, edited, changes: kept }) => {
@@ -95,14 +114,10 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited, changes
     const { tokenLists } = filer;
 
     for (const c of changes) {
-        const notTheirs = c.action === dashboards.ACTION ? dashboards.approverRefusal(decider.userId, p.requestedBy) : '';
-        if (notTheirs) return refused(notTheirs);
+        // eslint-disable-next-line no-await-in-loop
+        const notApprovers = await approverRefusal(companyId, decider.userId, p, c);
+        if (notApprovers) return refused(notApprovers.error);
         const target = targetOf(c.params, c.action);
-        // eslint-disable-next-line no-await-in-loop
-        const own = await holderMayInEach(companyId, { kind: 'human', userId: decider.userId }, c.action, c.params || {});
-        if (!own.allowed) return refused(`The approver may not make this change: ${own.reason}`);
-        // eslint-disable-next-line no-await-in-loop
-        if (!(await reachable(companyId, { userId: decider.userId, projectIds: [] }, target))) return refused('The approver cannot open what this change touches.');
         // eslint-disable-next-line no-await-in-loop
         if (!(await reachable(companyId, { userId: p.requestedBy, projectIds: [] }, target))) return refused('The person behind the token (the requester) can no longer open what this change touches.');
         for (const list of tokenLists) {
@@ -113,4 +128,4 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited, changes
     return null;
 };
 
-module.exports = { refusalFor, targetOf, reachable, liveToken };
+module.exports = { LACKS, refusalFor, approverRefusal, approvedByRequesterAlone, targetOf, reachable, liveToken };

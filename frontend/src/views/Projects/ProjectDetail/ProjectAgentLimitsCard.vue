@@ -38,6 +38,7 @@
                 <p :id="ids.directTasksAbout" class="plim__hint">{{ $t('AgentLimits.direct_tasks_about', { minutes: directMinutes }) }}</p>
             </template>
 
+            <p v-if="workspacePaused" class="plim__note" role="status" data-test="workspace-paused-note">{{ $t('AgentLimits.workspace_paused_note') }}</p>
             <p v-if="saved.paused" class="plim__note" role="status" data-test="paused-note">{{ $t('AgentLimits.paused_note') }}</p>
             <div v-if="canEdit" class="plim__row">
                 <button v-if="saved.paused" type="button" class="plim__button" data-test="resume" :disabled="busy" @click="setPaused(false)">
@@ -62,6 +63,7 @@ import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { useStoredProjectPart } from "@/views/Projects/liveProjects";
+import { useAccounts } from "@/views/Ai/useAccounts";
 
 defineOptions({ name: "ProjectAgentLimitsCard" });
 
@@ -89,6 +91,10 @@ const loading = ref(false);
 const loaded = ref(false);
 const busy = ref(false);
 const error = ref("");
+
+// The policy the card in AI > Accounts sets. The shell's agent feed notes the pause in it, so no request is made here.
+const { policy } = useAccounts();
+const workspacePaused = computed(() => Boolean(policy.value.connectedPaused));
 
 const numbersIn = (span) => Array.from({ length: Math.max(0, span.max - span.min + 1) }, (_, index) => span.min + index);
 const counts = computed(() => numbersIn(range));

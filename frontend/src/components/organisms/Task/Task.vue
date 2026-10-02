@@ -272,7 +272,7 @@
         <ConfirmationSidebar
             v-model="showSidebar"
             :title="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
-            :message="archive ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
+            :message="$t(taskRemovalMessageKey(task, archive))"
             :confirmationString="`${archive ? 'archive' : 'delete'}`"
             :acceptButtonClass="archive ? 'btn-primary': 'btn-danger'"
             :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
@@ -295,6 +295,7 @@ import TaskStatus from '@/components/atom/TaskStatus/TaskStatus.vue';
 import ProjectTaskType from '@/components/atom/TaskTypeSelection/TaskTypeSelection.vue';
 import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
 import ConfirmationSidebar from '@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue';
+import { taskRemovalMessageKey } from '@/utils/taskRemovalWords';
 import CreateTagPopup from '@/components/molecules/TagList/CreateTagPopup.vue';
 import TagChip from '@/components/atom/TagChip/TagChip.vue';
 import ConvertToSubTaskSidebar from '@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue';

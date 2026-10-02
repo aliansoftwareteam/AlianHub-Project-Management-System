@@ -2,9 +2,9 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { initials } from './docsFormat';
 import { taskMentionItem } from './docMentions';
+import { typedSearchText } from '@/utils/searchText';
 
 const TASK_LIMIT = 8;
-const escapeRegex = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /* What the mention picker offers inside a doc comment. `people` returns the people who can read the doc, so nobody
  * else is ever offered; docs and tasks come from the lists the reader can already open. */
@@ -30,12 +30,12 @@ export function docCommentSources({ pageId, people, untitled }) {
                 .map((page) => ({ type: 'doc', id: String(page._id), label: page.title || untitled() }));
         },
         tasks(query) {
-            const escaped = escapeRegex(query.trim());
+            const text = typedSearchText(query.trim());
             return apiRequest('post', `${env.TASK}/find`, {
                 findQuery: [
                     { $match: {
                         deletedStatusKey: { $in: [0, undefined] },
-                        $or: [{ TaskName: { $regex: escaped, $options: 'i' } }, { TaskKey: { $regex: escaped, $options: 'i' } }],
+                        $or: [{ TaskName: { $regex: text, $options: 'i' } }, { TaskKey: { $regex: text, $options: 'i' } }],
                     } },
                     { $project: { TaskName: 1, TaskKey: 1 } },
                     { $sort: { updatedAt: -1 } },

@@ -22,7 +22,7 @@ const MOVES_MAX = 20;
 const TRASHED = 1;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
-const LIST_NOT_FOUND = 'that list was not found in that project';
+const LIST_NOT_FOUND = 'That list was not found in that project.';
 const LIST_CREATE = 'project.project_sprint_create';
 const KEYS = Object.freeze({
     folders: ['project.project_folder_create'],
@@ -66,29 +66,29 @@ const partsOf = (draft) => PARTS.filter((part) => part === 'folders' || foldersI
 const folderProblem = (folder, where) => {
     if (!folder.name) return `${where} needs a name`;
     const lists = listOf(folder.lists);
-    if (lists.length > LISTS_MAX || lists.some((name) => !name)) return `${where} takes at most ${LISTS_MAX} new lists, each with a name`;
-    if (twice(lists)) return `"${twice(lists)}" is named twice in ${where}`;
+    if (lists.length > LISTS_MAX || lists.some((name) => !name)) return `${where} can have at most ${LISTS_MAX} new lists, each with a name.`;
+    if (twice(lists)) return `"${twice(lists)}" appears twice in ${where}.`;
     const moved = listOf(folder.moveListIds);
-    return moved.length > MOVES_MAX || !moved.every(isId) ? `${where} takes at most ${MOVES_MAX} lists to move, each by its id` : '';
+    return moved.length > MOVES_MAX || !moved.every(isId) ? `${where} can move at most ${MOVES_MAX} lists, each given by its id.` : '';
 };
 
 /* '' for a folder that can be asked for; otherwise what is wrong with the request. */
 const folderPlanProblem = (given) => {
     const draft = draftOf(given);
     const subfolders = listOf(draft.subfolders);
-    if (draft.parentFolderId !== undefined && !isId(draft.parentFolderId)) return 'parentFolderId needs a folder id';
-    if (draft.parentFolderId && subfolders.length) return 'folders nest one level, so a subfolder takes no subfolders: name parentFolderId or subfolders, not both';
-    if (subfolders.length > SUBFOLDERS_MAX) return `subfolders takes at most ${SUBFOLDERS_MAX} folders`;
+    if (draft.parentFolderId !== undefined && !isId(draft.parentFolderId)) return 'parentFolderId must be a folder id.';
+    if (draft.parentFolderId && subfolders.length) return 'Folders go one level deep, so a subfolder cannot have subfolders. Give parentFolderId or subfolders, not both.';
+    if (subfolders.length > SUBFOLDERS_MAX) return `subfolders can have at most ${SUBFOLDERS_MAX} folders.`;
     const wrong = foldersIn(draft).map((folder, at) => folderProblem(folder, at ? `subfolders[${at - 1}]` : 'the folder')).find(Boolean);
     if (wrong) return wrong;
-    if (twice(subfolders.map((folder) => folder.name))) return `"${twice(subfolders.map((folder) => folder.name))}" is named twice in subfolders`;
+    if (twice(subfolders.map((folder) => folder.name))) return `"${twice(subfolders.map((folder) => folder.name))}" appears twice in subfolders.`;
     const moved = foldersIn(draft).flatMap((folder) => listOf(folder.moveListIds));
-    return moved.length > new Set(moved).size ? 'a list is moved into one folder only' : '';
+    return moved.length > new Set(moved).size ? 'A list can be moved into one folder only.' : '';
 };
 
 const lacked = async (companyId, uid, projectId, part) => {
     const access = await require('../../Config/projectAccess').canEditProject(companyId, idOf(uid), projectId, KEYS[part]);
-    return access.allowed ? '' : `${access.permission || KEYS[part].flat()[0]} is not granted`;
+    return access.allowed ? '' : `The permission ${access.permission || KEYS[part].flat()[0]} is missing.`;
 };
 
 /* The parts of a folder plan `uid` may not make by hand in the project, each with the reason. */
@@ -106,7 +106,7 @@ const barredParts = async ({ companyId, projectId, requester, approver, draft })
     return Object.fromEntries(partsOf(draft).map((part) => {
         const byApprover = theirs.find((entry) => entry.part === part);
         const byRequester = own.find((entry) => entry.part === part);
-        return [part, (byApprover && `the approver may not make this part: ${byApprover.reason}`) || (byRequester && `${permissions.REASON}: ${byRequester.reason}`) || ''];
+        return [part, (byApprover && `The person approving may not make this part: ${byApprover.reason}`) || (byRequester && `${permissions.REASON}: ${byRequester.reason}`) || ''];
     }));
 };
 
@@ -122,7 +122,7 @@ const parentProblem = (companyId, projectId, parentFolderId) => require('../Spri
 const makeFolder = async ({ companyId, who, projectId, name, parentFolderId }) => {
     const answer = await setup.answerOf('folderCreate', { companyId, who, body: { projectId, folderName: name, ...(parentFolderId ? { parentFolderId } : {}) } });
     const saved = answer.code === 200 && answer.body && answer.body.status === true && answer.body.data;
-    if (!saved || !saved._id) throw refuse(setup.reasonOf(answer, 'the folder was not created'));
+    if (!saved || !saved._id) throw refuse(setup.reasonOf(answer, 'The folder was not created. Try again, or tell the person.'));
     return { folderId: idOf(saved._id), name: saved.name || name };
 };
 
@@ -160,7 +160,7 @@ const carryOut = async (context, draft) => {
     for (const subfolder of listOf(draft.subfolders)) {
         const made = await attempt({ name: subfolder.name, folder: top.name }, '', () => makeFolder({ companyId, who: approver, projectId, name: subfolder.name, parentFolderId: top.folderId }));
         out.folders.push(made);
-        const unmade = made.made ? barred : { lists: `the folder "${subfolder.name}" was not made`, moves: `the folder "${subfolder.name}" was not made` };
+        const unmade = made.made ? barred : { lists: `The folder "${subfolder.name}" was not made.`, moves: `The folder "${subfolder.name}" was not made.` };
         await fill({ ...context, folder: subfolder, into: made, barred: unmade }, out);
     }
     return out;
@@ -183,7 +183,7 @@ const trashFolder = async ({ companyId, who, project, folder }) => {
         body: { type: 'updateFolder', projectId, folderName: folder.name, projectData: { id: projectId, ProjectName: project.ProjectName || '' }, updateObject: { $set: { deletedStatusKey: TRASHED } } },
     });
     if (answer.code === 200 && answer.body && answer.body.status === true) return '';
-    return answer.code === 403 ? 'you may not delete a folder in this project' : setup.reasonOf(answer, 'the folder was not removed');
+    return answer.code === 403 ? 'The person is not allowed to delete a folder in this project.' : setup.reasonOf(answer, 'The folder was not removed.');
 };
 
 const moveBack = async ({ companyId, who, projectId, move }, out) => {
@@ -191,11 +191,11 @@ const moveBack = async ({ companyId, who, projectId, move }, out) => {
     if (isGone(row) || idOf(row.folderId) !== idOf(move.folderId)) return;
     const list = await listFor(companyId, who.uid, projectId, move.sprintId);
     try {
-        if (!list) throw refuse('a list you cannot open stays where it is');
+        if (!list) throw refuse('A list the person cannot open was left where it is.');
         await work().moveList({ companyId, who, projectId, sprintId: move.sprintId, folderId: move.previous });
         out.movedBack.push(list.name || '');
     } catch (error) {
-        out.kept.push(`${list ? `the list "${list.name || ''}"` : 'a list'} was not moved back: ${error.message}`);
+        out.kept.push(`${list ? `The list "${list.name || ''}"` : 'A list'} was not moved back: ${error.message}`);
     }
 };
 
@@ -210,12 +210,12 @@ const withdrawFolder = async ({ companyId, who, made }) => {
     for (const list of [...listOf(made.lists)].reverse()) {
         if (isGone(await storedRow(companyId, SCHEMA_TYPE.SPRINTS, list.sprintId))) continue;
         await work().withdrawList({ companyId, who, projectId, sprintId: list.sprintId })
-            .then(() => out.removed.lists.push(list.name), (error) => out.kept.push(`the list "${list.name}" stays: ${error.message}`));
+            .then(() => out.removed.lists.push(list.name), (error) => out.kept.push(`The list "${list.name}" was kept: ${error.message}`));
     }
     for (const folder of [...listOf(made.folders)].reverse()) {
         if (isGone(await storedRow(companyId, SCHEMA_TYPE.FOLDERS, folder.folderId))) continue;
         const reason = await whyFolderStays(companyId, projectId, folder.folderId) || await trashFolder({ companyId, who, project, folder });
-        if (reason) out.kept.push(`the folder "${folder.name}" stays: ${reason}`);
+        if (reason) out.kept.push(`The folder "${folder.name}" was kept: ${reason}`);
         else out.removed.folders.push(folder.name);
     }
     if (out.kept.length) throw refuse(out.kept.join('; '));
@@ -227,8 +227,8 @@ const isDay = (value) => typeof value === 'string' && ISO_DAY.test(value) && Dat
 /* '' for dates a sprint can take; otherwise what is wrong with them. */
 const sprintProblem = (given) => {
     const asked = objectOf(given);
-    if (!isDay(asked.startDate) || !isDay(asked.endDate)) return 'startDate and endDate each need a day as YYYY-MM-DD';
-    return asked.startDate <= asked.endDate ? '' : 'startDate is after endDate';
+    if (!isDay(asked.startDate) || !isDay(asked.endDate)) return 'startDate and endDate must each be a day written as YYYY-MM-DD.';
+    return asked.startDate <= asked.endDate ? '' : 'startDate comes after endDate.';
 };
 
 /* The first moment of the first day to the last moment of the last, where the person who asked is. */
@@ -241,7 +241,7 @@ const setScrum = async ({ companyId, who, body }, forbidden) => {
     const answer = await setup.answerOf('sprintScrum', { companyId, who, body });
     if (answer.code === 200 && answer.body && answer.body.status === true) return answer.body.data || {};
     if (answer.code === 404) throw refuse(LIST_NOT_FOUND);
-    throw refuse(answer.code === 403 ? `${forbidden}: ${(answer.body && answer.body.permission) || LIST_CREATE} is not granted` : setup.reasonOf(answer, 'the list was not changed'));
+    throw refuse(answer.code === 403 ? `${forbidden}: the permission ${(answer.body && answer.body.permission) || LIST_CREATE} is missing.` : setup.reasonOf(answer, 'The list was not changed. Try again, or tell the person.'));
 };
 
 const sameMoment = (a, b) => (a ? new Date(a).getTime() : null) === (b ? new Date(b).getTime() : null);
@@ -252,17 +252,17 @@ const withdrawSprint = async ({ companyId, who, made }) => {
     if (!list) throw refuse(LIST_NOT_FOUND);
     const name = list.name || '';
     if (list.isScrum !== true || !sameMoment(list.startDate, made.set.startDate) || !sameMoment(list.endDate, made.set.endDate)) {
-        throw refuse(`"${name}" was changed since, so it stays as it is now`);
+        throw refuse(`"${name}" was changed since, so it was kept as it is now.`);
     }
     const { isScrum, startDate, endDate } = made.previous;
-    await setScrum({ companyId, who, body: isScrum ? { sprintId: made.sprintId, isScrum: true, startDate, endDate } : { sprintId: made.sprintId, isScrum: false } }, `you may not change "${name}"`);
+    await setScrum({ companyId, who, body: isScrum ? { sprintId: made.sprintId, isScrum: true, startDate, endDate } : { sprintId: made.sprintId, isScrum: false } }, `The person is not allowed to change "${name}".`);
     return { projectId: made.projectId, sprintId: made.sprintId, name, sprint: isScrum };
 };
 
 const executors = {
     async [FOLDER]({ companyId, actor, params, depth, approvedBy }) {
         const approverId = idOf(approvedBy);
-        if (!approverId) throw refuse('a folder is made only once a person has approved it');
+        if (!approverId) throw refuse('A folder is made only after a person approves it.');
         const problem = folderPlanProblem(params);
         if (problem) throw refuse(problem);
         const project = await storedProject(companyId, params.projectId);
@@ -292,7 +292,7 @@ const executors = {
 
     async [SPRINT]({ companyId, actor, params, depth, approvedBy }) {
         const approverId = idOf(approvedBy);
-        if (!approverId) throw refuse('a list is made a sprint only once a person has approved it');
+        if (!approverId) throw refuse('A list becomes a sprint only after a person approves it.');
         const problem = sprintProblem(params);
         if (problem) throw refuse(problem);
         const projectId = idOf((await storedProject(companyId, params.projectId))._id);
@@ -303,7 +303,7 @@ const executors = {
         if (own) throw refuse(`${permissions.REASON}: ${own}`);
         const sprintId = idOf(list._id);
         const set = boxOf(params, await zoneOf(requester.uid));
-        await setScrum({ companyId, who: approverOf(requester, approverId), body: { sprintId, isScrum: true, ...set } }, 'the approver may not make this list a sprint');
+        await setScrum({ companyId, who: approverOf(requester, approverId), body: { sprintId, isScrum: true, ...set } }, 'The person approving is not allowed to make this list a sprint.');
         const previous = { isScrum: list.isScrum === true, startDate: isoOf(list.startDate), endDate: isoOf(list.endDate) };
         return {
             result: { projectId, sprintId, name: list.name || '', sprint: true, startDate: params.startDate, endDate: params.endDate, wasSprint: previous.isScrum },

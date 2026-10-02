@@ -43,7 +43,8 @@ export default [
         component: () => import(/* webpackChunkName: "Reset_Password" */ '@/views/Authentication/ResetPassword/ResetPassword.vue'),
         meta: {
             title: 'Reset Password',
-            requiresAuth: false
+            requiresAuth: false,
+            withoutWorkspace: true
         }
     },
     {
@@ -52,7 +53,8 @@ export default [
         component: () => import(/* webpackChunkName: "Set_New_Password */ '@/views/Authentication/ResetPassword/SetNewPassword.vue'),
         meta: {
             title: 'Set New Password',
-            requiresAuth: false
+            requiresAuth: false,
+            withoutWorkspace: true
         }
     },
     ...registerRouter,
@@ -62,7 +64,8 @@ export default [
         component: () => import(/* webpackChunkName: "Verify_Email" */ '../../views/Authentication/VerifyEmail/VerifyEmail.vue'),
         meta: {
             title: 'Verify Email',
-            requiresAuth: false
+            requiresAuth: false,
+            withoutWorkspace: true
         }
     },
     {
@@ -104,17 +107,18 @@ export default [
         component: () => import(/* webpackChunkName: "Verify_Email" */ '@/views/Authentication/VerifyInvitation/VerifyInvitation.vue'),
         meta: {
             title: 'Verify Invitation',
-            hideHeader: true
+            hideHeader: true,
+            withoutWorkspace: true
         }
     },
     {
         path: '/invitation',
         name: 'Invitation',
         component: () => import(/* webpackChunkName: "Verify_Email" */ '@/views/Authentication/Invitation/Invitation.vue'),
-        // Open signed in or out: requiresAuth: false would send an invitee who is already signed in home before they could accept.
         meta: {
             title: 'Invitation',
-            hideHeader: true
+            hideHeader: true,
+            withoutWorkspace: true
         }
     }
 ]

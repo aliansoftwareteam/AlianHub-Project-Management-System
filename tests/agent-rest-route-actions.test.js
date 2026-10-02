@@ -36,12 +36,20 @@ jest.mock('../utils/planHelper', () => mockStub());
 jest.mock('../utils/commonFunctions.js', () => mockStub());
 jest.mock('../common-storage/common-server.js', () => mockStub());
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
+/* A brief is refused in front of its upload while the workspace has no AI set up. */
+jest.mock('../Modules/AICore/llmProvider', () => ({ ...jest.requireActual('../Modules/AICore/llmProvider'), isAnyProviderConfigured: () => true }));
 
+const fs = require('fs');
+const path = require('path');
+const express = require('express');
 const { EventEmitter } = require('events');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/accessWorld');
+const { OUTSIDE_EVERY_PROJECT } = require('./fixtures/agentRoutesOutsideProjects');
 const registry = require('../Modules/Agents/registry');
 const registryGroups = require('../Modules/Agents/registryGroups');
+const projectPolicy = require('../Modules/Agents/projectPolicy');
+const projectLimits = require('../Modules/Agents/projectLimits');
 const { agentPerimeter } = require('../Modules/Agents/guard');
 const { schema } = require('../utils/mongo-handler/schema');
 const { FIELD_PERMISSIONS } = require('../Config/projectAccess');
@@ -55,6 +63,7 @@ const { seed, rows } = world.create(mockDb);
 
 const T_OPEN_2 = '6f0000000000000000000d09';
 const P_NOWHERE = '6f0000000000000000000aff';
+const T_NOWHERE = '6f0000000000000000000dff';
 const PAGE = '6f0000000000000000000e01';
 const COMMENT = '6f0000000000000000000e02';
 const FOLDER = '6f0000000000000000000c01';
@@ -62,19 +71,23 @@ const CONNECTION = '6f0000000000000000000c02';
 const REACHED = 'reached its handler';
 
 const routes = {};
-const register = (method) => (routePath, ...handlers) => { routes[`${method} ${routePath}`] = handlers; };
-const app = { get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: register('USE') };
-[
-    'Tasks', 'Sprints', 'Pages', 'Importers', 'createProject', 'CustomField', 'Project', 'projectSetting', 'settings/templates', 'settings/ProjectStatusTemplate',
-    'ProjectDuplicate', 'ProjectSnapshots', 'AIProjectGenerator', 'Automations', 'projectRules', 'ImportSettings', 'PublicShares', 'trackerUserPermission',
-    'settings/Members', 'settings/Roles', 'settings/securityPermissions', 'Milestone', 'Auth', 'Integrations', 'ViewTemplates', 'PersonalList',
-    'Comments', 'MainChats', 'Reactions',
-    'AI', 'EstimatedTime', 'AssignmentRules', 'ProjectTemplates', 'Portfolio', 'Calls', 'TaskTemplates', 'TimeSheet', 'Company', 'ScreenshotRetention', 'Webhooks',
-    'ScheduledReports', 'EmailNotification', 'notification-count', 'notification/notification-middleware', 'notification/prepare-notification-data', 'Forms', 'EmailIn',
-    'Calendar', 'ExportJobs', 'AgentSessions', 'RecurringTasks', 'Pto', 'LogTime', 'storage/wasabi',
-    'UserDashboard', 'GeneralReminders', 'TimesheetApproval',
-    'settings/Designation', 'settings/ProjectSkills', 'settings/commonDateFormate', 'settings/fileExtensions', 'settings/settingCurrency', 'settings/taskPriority',
-].forEach((name) => require(`../Modules/${name}/routes`).init(app));
+const mounted = [];
+/* The same routes on an app of the server's own kind, which the perimeter reads a route's guard from. */
+const served = express();
+const register = (method) => (routePath, ...handlers) => {
+    routes[`${method} ${routePath}`] = handlers.flat();
+    served[method.toLowerCase()](routePath, ...handlers);
+};
+const mount = (prefix, ...handlers) => { if (typeof prefix === 'string') mounted.push([prefix, handlers.flat()]); };
+const app = { get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: mount };
+
+/* Every route file of the server, so a route added later meets the tables below. */
+const routeFilesUnder = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : routeFilesUnder(path.join(dir, entry.name));
+    return entry.name === 'routes.js' ? [path.join(dir, entry.name)] : [];
+});
+const ROUTE_FILES = routeFilesUnder(path.join(__dirname, '..', 'Modules')).sort();
+ROUTE_FILES.forEach((file) => require(file).init(app));
 
 const session = (uid) => ({ uid });
 const agentToken = (uid, extra = {}) => ({ uid, apiToken: { _id: '6f0000000000000000000101', kind: 'agent', name: 'Claude', userId: uid, scopes: ['read', 'write'], ...extra } });
@@ -82,6 +95,12 @@ const personalToken = (uid) => ({ uid, apiToken: { _id: '6f000000000000000000010
 const agentRun = (uid) => ({ uid, agentRun: { _id: '6f0000000000000000000103', agentId: '6f0000000000000000000104', agentName: 'Triage' } });
 
 const pathOf = (route, params = {}) => Object.entries(params).reduce((text, [name, value]) => text.replace(`:${name}`, value), route);
+
+/* What is mounted over a path, run as the server runs it: with the path below the mount. */
+const mountedOver = (url) => mounted.filter(([prefix]) => url === prefix || url.startsWith(`${prefix}/`)).flatMap(([prefix, handlers]) => handlers.map((handler) => (req, res, next) => {
+    Object.assign(req, { url: url.slice(prefix.length) || '/', path: url.slice(prefix.length) || '/' });
+    return handler(req, res, () => { Object.assign(req, { url, path: url }); return next(); });
+}));
 
 /* Runs what stands in front of every route, then every guard of the route, and stops in front of its handler. */
 const through = (route, caller, body = {}, params = {}, query = {}) => new Promise((resolve) => {
@@ -91,9 +110,11 @@ const through = (route, caller, body = {}, params = {}, query = {}) => new Promi
     res.status = (code) => { res.statusCode = code; return res; };
     res.send = (answer) => { res.emit('finish'); resolve({ code: res.statusCode, body: answer }); return res; };
     res.json = res.send;
-    const req = { ...caller, method, originalUrl: url, url, baseUrl: '', route: { path: route.split(' ')[1] }, query, params, headers: { companyid: CID }, aud: CID, ip: '1.1.1.1', body };
-    const guards = [agentPerimeter, ...routes[route].slice(0, -1)];
-    const step = (at) => (at === guards.length ? (res.emit('finish'), resolve(REACHED)) : Promise.resolve(guards[at](req, res, () => step(at + 1))));
+    res.end = () => res.send({});
+    res.setHeader = () => res;
+    const req = { ...caller, app: served, method, originalUrl: url, url, path: url, baseUrl: '', route: { path: route.split(' ')[1] }, query, params, headers: { companyid: CID }, aud: CID, ip: '1.1.1.1', body, get: () => '' };
+    const guards = [agentPerimeter, ...mountedOver(url), ...routes[route].slice(0, -1)];
+    const step = (at) => (at === guards.length ? (res.emit('finish'), resolve(REACHED)) : Promise.resolve().then(() => guards[at](req, res, () => step(at + 1))).catch((error) => resolve({ code: 500, body: { statusText: String(error && error.message) } })));
     step(0);
 }).then(async (result) => { await settle(); return result; });
 
@@ -184,7 +205,7 @@ describe('a token created for an agent, on the write routes beside the task rout
         const answer = await through(route, agentToken(uid), body, params);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: pathOf(route, params), onBehalfOf: uid });
         expect(audits('agent.action')).toHaveLength(0);
@@ -225,12 +246,8 @@ describe('the backlog of a project, which is made the first time it is read', ()
         expect(agentAudits()).toHaveLength(0);
     });
 
-    it.each([['a token created for an agent', agentToken], ['an agent run', agentRun]])('is not made by %s, and that is recorded', async (label, as) => {
-        const answer = await read(as(OWNER));
-
-        expect(answer.code).toBe(403);
-        expect(audits('agent.action_refused')).toHaveLength(1);
-        expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, action: 'sprint.create', path: BACKLOG, onBehalfOf: OWNER });
+    it('has the agent\'s part in front of the project\'s own guard; what an agent is answered is in sprint-backlog-read-by-agent', () => {
+        expect(routes[BACKLOG][0].refusesAs).toBe('sprint.create');
     });
 
     it('is made for a person, signed in or through a personal token', async () => {
@@ -264,16 +281,44 @@ describe('a task filed by an agent through the create route', () => {
         const answer = await through(CREATE, agentToken(uid), BEYOND_FILING[name]);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform task\.add/);
+        expect(answer.body.statusText).toMatch(/^That action is not available to agents \(task\.add\)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: CREATE, onBehalfOf: uid });
+    });
+
+    const withoutAuditId = (answer) => (answer === REACHED ? answer : { code: answer.code, body: { ...answer.body, auditId: undefined } });
+    const countedIn = () => rows(SCHEMA_TYPE.AGENT_WORK_MARKS).map((mark) => mark.scope);
+
+    /* [what the project its person cannot open holds agents to, how it is set] */
+    const HELD_TO = [
+        ['nothing', () => {}],
+        ['a pause', () => { projectRow(P_PRIVATE).agentLimits = { paused: true }; }],
+        ['proposing every change', () => { projectRow(P_PRIVATE).agentPolicy = { connected: projectPolicy.CONNECTED.PROPOSE_ALL }; }],
+    ];
+
+    it.each(HELD_TO)('under a task its person cannot open is answered as one under a task that does not exist, where that task\'s project holds agents to %s', async (label, set) => {
+        set();
+        const under = (parent) => through(CREATE, agentToken(OUTSIDER), newTask({ ...opening, ParentTaskId: parent, isParentTask: false }));
+
+        const hidden = await under(T_PRIVATE);
+        const missing = await under(T_NOWHERE);
+
+        expect(withoutAuditId(hidden)).toEqual(withoutAuditId(missing));
+        expect(countedIn().filter((scope) => scope.includes(P_PRIVATE))).toEqual([]);
+    });
+
+    it.each(HELD_TO)('into a project its person cannot open is answered as one into a project that does not exist, where that project holds agents to %s', async (label, set) => {
+        set();
+        const into = (projectId) => through(CREATE, agentToken(OUTSIDER), newTask({ sprintId: L_PRIVATE }, projectId));
+
+        expect(withoutAuditId(await into(P_PRIVATE))).toEqual(withoutAuditId(await into(P_NOWHERE)));
+        expect(countedIn().filter((scope) => scope.includes(P_PRIVATE))).toEqual([]);
     });
 
     it.each([
         ['a member outside it', OUTSIDER],
         ['a guest', GUEST],
     ])('into a project %s cannot open is answered as one into a project that does not exist', async (label, uid) => {
-        const withoutAuditId = (answer) => (answer === REACHED ? answer : { code: answer.code, body: { ...answer.body, auditId: undefined } });
         for (const data of [{}, opening, { ...opening, TaskType: 'task', TaskTypeKey: 1 }]) {
             const hidden = await through(CREATE, agentToken(uid), newTask({ ...data, sprintId: L_PRIVATE }, P_PRIVATE));
             const missing = await through(CREATE, agentToken(uid), newTask({ ...data, sprintId: L_PRIVATE }, P_NOWHERE));
@@ -310,7 +355,7 @@ describe('everyone else on those routes', () => {
     ])('%s is judged by the rules of the role alone', async (label, caller) => {
         for (const [route, body, params] of Object.values(NO_ACTION)) {
             const answer = await through(route, caller, body, params);
-            if (answer !== REACHED) expect(JSON.stringify(answer.body)).not.toMatch(/Agents cannot/);
+            if (answer !== REACHED) expect(JSON.stringify(answer.body)).not.toMatch(/An agent is n(?:ot|ever) allowed|not available to agents/);
         }
         for (const body of Object.values(BEYOND_FILING)) {
             expect(await through(CREATE, caller, body)).toBe(REACHED);
@@ -397,7 +442,7 @@ const PROPOSED_ON_THE_WEB = {
         'adding an automation': ['POST /api/v2/automations', rule],
         'changing an automation': ['PUT /api/v2/automations/:id', rule, { id: RULE }, 'automation.update'],
         'switching an automation on or off': ['PATCH /api/v2/automations/:id/enabled', { enabled: true }, { id: RULE }, 'automation.enable'],
-        'removing an automation': ['DELETE /api/v2/automations/:id', {}, { id: RULE }, 'project.delete'],
+        'removing an automation': ['DELETE /api/v2/automations/:id', {}, { id: RULE }, 'automation.delete'],
         'adding an automation the earlier way': ['POST /api/v1/automations', rule],
         'changing an automation the earlier way': ['PUT /api/v1/automations/:id', rule, { id: RULE }, 'automation.update'],
         'running an automation over the tasks it matches': ['POST /api/v1/automations/:id/apply', {}, { id: RULE }, 'automation.apply'],
@@ -520,6 +565,7 @@ const ALSO_BY_PEOPLE = {
         'having meeting notes written': ['POST /api/v1/ai/meeting-notes', { transcript: 'Some text' }],
         'having a conversation summarised': ['POST /api/v1/ai/chat-summary', { projectId: P_OPEN, taskId: T_OPEN }],
         'having tasks proposed from notes': ['POST /api/v1/ai/notes-to-tasks/propose', {}],
+        'having a task researched': ['POST /api/v1/ai/task-research', { taskId: T_OPEN }],
         'asking the AI about a conversation': ['POST /api/v1/ai/chat-ask', { projectId: P_OPEN, taskId: T_OPEN }],
         'having a field filled for a few tasks': ['POST /api/v2/custom-fields/:fieldId/ai/preview', {}, { fieldId: FIELD }],
         'having a field filled for many tasks': ['POST /api/v2/custom-fields/:fieldId/ai/jobs', {}, { fieldId: FIELD }],
@@ -529,6 +575,9 @@ const ALSO_BY_PEOPLE = {
         'having a project template drafted': ['POST /api/v1/project/template/custom/ai-generate', {}],
         'having a portfolio summarised': ['POST /api/v1/portfolio/summary', {}],
         'saving the notes of a call': ['POST /api/v2/calls/notes', {}],
+    },
+    'aifield.apply': {
+        'writing what the AI suggested for a field onto tasks': ['POST /api/v2/custom-fields/:fieldId/ai/apply', { proposalIds: [] }, { fieldId: FIELD }],
     },
     'ai.answer.post': {
         'posting an answer of the AI in a conversation': ['POST /api/v1/ai/ask/post', {}],
@@ -651,8 +700,11 @@ const ALSO_BY_PEOPLE = {
     'timelog.delete': {
         'removing logged time for good': ['POST /api/v2/deleteManualLogtime', { projectId: P_OPEN, taskId: T_OPEN }],
     },
+    'fields.delete': {
+        'removing a field and its values for good': ['POST /api/v2/custom-fields/:fieldId/delete', {}, { fieldId: FIELD }],
+    },
     'file.delete': {
-        'removing a stored file': ['POST /api/v1/wasabi/deleteFile', { companyId: CID, path: 'Project/x' }],
+        'removing a stored file':['POST /api/v1/wasabi/deleteFile', { companyId: CID, path: 'Project/x' }],
     },
     'dashboard.manage': {
         'changing the dashboard of the person': ['POST /api/v1/dashboard', { cards: [] }],
@@ -666,6 +718,10 @@ const ALSO_BY_PEOPLE = {
         'changing a reminder': ['PATCH /api/v1/general-reminders/:id', { title: 'Renamed' }, { id: TEMPLATE }],
         'sending a reminder now': ['POST /api/v1/general-reminders/:id/run-now', {}, { id: TEMPLATE }],
         'sending every reminder that is due': ['POST /api/v1/general-reminders/run-due', {}],
+        'setting a reminder that names no task': ['POST /api/v1/reminders', { reminderText: 'Lunch', reminderAt: '2026-11-02T09:00:00.000Z' }],
+        'changing a task reminder': ['PATCH /api/v1/reminders/:id', { reminderText: 'Renamed' }, { id: TEMPLATE }],
+        'sending a task reminder now': ['POST /api/v1/reminders/:id/run-now', {}, { id: TEMPLATE }],
+        'sending every task reminder that is due': ['POST /api/v1/reminders/run-due', {}],
     },
     'timesheet.submit': {
         'submitting the timesheet of the person': ['POST /api/v2/timesheet-approval/submit', { weekStart: '2026-09-28' }],
@@ -707,7 +763,7 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
         const answer = await through(route, as(OWNER), body, params);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents|You cannot set a task to)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, action: recordedAs, path: pathOf(route, params), onBehalfOf: OWNER });
         expect(audits('agent.action')).toHaveLength(0);
@@ -717,7 +773,7 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
         const answer = await through(route, as(OWNER), body, params);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, action: recordedAs, path: pathOf(route, params), onBehalfOf: OWNER });
         expect(audits('agent.action')).toHaveLength(0);
@@ -732,7 +788,7 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
     ])('%s is not stopped as an agent on any of those either', async (label, caller) => {
         for (const [, route, body, params] of ALSO_HELD) {
             const answer = await through(route, caller, body, params);
-            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/Agents cannot/)]);
+            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/An agent is n(?:ot|ever) allowed|not available to agents/)]);
         }
         expect(agentAudits()).toHaveLength(0);
     });
@@ -781,30 +837,30 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
     ])('%s is not stopped as an agent on any of them', async (label, caller) => {
         for (const [, route, body, params] of HELD_FOR_PEOPLE) {
             const answer = await through(route, caller, body, params);
-            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/Agents cannot/)]);
+            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/An agent is n(?:ot|ever) allowed|not available to agents/)]);
         }
         expect(agentAudits()).toHaveLength(0);
     });
 
-    it.each(Object.entries(AGENTS_MAY_CHANGE))('%s of a project is still an agent\'s to change as its person may', async (path, value) => {
+    it.each(Object.entries(AGENTS_MAY_CHANGE))('%s of a project is still an agent\'s to change as its person may, and the change is recorded', async (path, value) => {
         expect(await through(UPDATE, agentToken(OWNER), { updateObject: { [path]: value } }, inProject)).toBe(REACHED);
-        expect(agentAudits()).toHaveLength(0);
+        expect(agentAudits().map((row) => [row.action, row.meta.action])).toEqual([['agent.action', 'project.update']]);
     });
 
     it.each([
         ['adding an item', { operation: 'push', checklistItem: { id: 'item-1', name: 'Sign the contract', isChecked: false } }],
         ['renaming an item', { operation: 'update', key: 'name', checklistItem: { id: 'item-1', name: 'Sign it' } }],
         ['ticking an item', { operation: 'update', key: 'isChecked', checklistItem: [{ id: 'item-1', name: 'Sign it', isChecked: true }] }],
-    ])('%s of the checklist of a project, on its own route, is still an agent\'s as its person may', async (label, body) => {
+    ])('%s of the checklist of a project, on its own route, is still an agent\'s as its person may, and the change is recorded', async (label, body) => {
         expect(await through('POST /api/v1/project/checklist', agentToken(OWNER), { id: P_OPEN, ...body })).toBe(REACHED);
-        expect(agentAudits()).toHaveLength(0);
+        expect(agentAudits().map((row) => [row.action, row.meta.action])).toEqual([['agent.action', 'project.update']]);
     });
 
     it('takes no other field of a project from an agent', async () => {
         const held = [];
         for (const field of PROJECT_FIELDS) {
             const answer = await through(UPDATE, agentToken(OWNER), { updateObject: { [field]: 1 } }, inProject);
-            if (answer !== REACHED && /^Agents cannot perform | cannot be changed\.$/.test(answer.body.statusText)) held.push(field);
+            if (answer !== REACHED && /^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)| cannot be changed\.$/.test(answer.body.statusText)) held.push(field);
         }
 
         expect(PROJECT_FIELDS.filter((field) => !held.includes(field)).sort()).toEqual(Object.keys(AGENTS_MAY_CHANGE).map(fieldOf).sort());
@@ -892,6 +948,7 @@ const TASK_THREADS = {
     'reacting to a task': [REACTIONS, { targetType: 'task', targetId: T_OPEN, emoji: '+1' }],
 };
 
+const POSTS_IN_A_CHANNEL = ['writing in a channel', 'writing in the channel of a list', 'replying in a channel, another thread named'];
 const CHAT = 'chat:read';
 const withChat = (uid) => agentToken(uid, { grants: [CHAT] });
 const on = (table) => Object.entries(table).map(([name, [route, body, query]]) => [name, route, body, query]);
@@ -916,7 +973,7 @@ describe('chat on the web app\'s own routes', () => {
 
         for (const caller of [agentToken(OWNER), agentToken(INSIDER), withChat(OWNER), withChat(INSIDER), agentRun(OWNER)]) {
             const answer = await chatRoute(route, caller, body, query);
-            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'Agents cannot perform chat.direct']);
+            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'An agent is not allowed to do this (chat.direct). The person has to do it in AlianHub.']);
         }
         expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(Array(5).fill('chat.direct'));
         expect(audits('agent.action')).toHaveLength(0);
@@ -927,17 +984,28 @@ describe('chat on the web app\'s own routes', () => {
 
         for (const caller of [agentToken(OWNER), agentToken(INSIDER), agentToken(OWNER, { grants: ['tasks:manage'] }), agentRun(OWNER)]) {
             const answer = await chatRoute(route, caller, body, query);
-            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'Agents cannot perform chat.channel']);
+            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'An agent is not allowed to do this (chat.channel). The person has to do it in AlianHub.']);
         }
         expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(Array(4).fill('chat.channel'));
     });
 
-    it.each(on(CHANNEL_MESSAGES))('%s goes on to the rule of the person for an agent whose token was given chat', async (name, route, body, query) => {
+    it.each(on(CHANNEL_MESSAGES).filter(([name]) => !POSTS_IN_A_CHANNEL.includes(name)))('%s goes on to the rule of the person for an agent whose token was given chat', async (name, route, body, query) => {
         process.env.MCP_TOOLS_DATA = 'on';
 
         expect(await chatRoute(route, withChat(OWNER), body, query)).toBe(REACHED);
         expect(await chatRoute(route, withChat(INSIDER), body, query)).toBe(REACHED);
-        expect(agentAudits()).toHaveLength(0);
+        expect(audits('agent.action_refused')).toHaveLength(0);
+    });
+
+    it.each(on(CHANNEL_MESSAGES).filter(([name]) => POSTS_IN_A_CHANNEL.includes(name)))('%s waits for a person, as every change of a connected agent that cannot be undone does', async (name, route, body, query) => {
+        process.env.MCP_TOOLS_DATA = 'on';
+
+        for (const caller of [withChat(OWNER), withChat(INSIDER)]) {
+            const answer = await chatRoute(route, caller, body, query);
+            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, expect.stringContaining(projectPolicy.REASON.NOT_UNDOABLE)]);
+        }
+        expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(['chat.post', 'chat.post']);
+        expect(audits('agent.action')).toHaveLength(0);
     });
 
     it.each(on(CHANNEL_MESSAGES))('%s is refused for that token too while the read tools are off', async (name, route, body, query) => {
@@ -955,7 +1023,7 @@ describe('chat on the web app\'s own routes', () => {
     it.each(on(TASK_THREADS))('%s stays an agent\'s as its person may', async (name, route, body, query) => {
         expect(await chatRoute(route, agentToken(OWNER), body, query)).toBe(REACHED);
         expect(await chatRoute(route, agentToken(INSIDER), body, query)).toBe(REACHED);
-        expect(agentAudits()).toHaveLength(0);
+        expect(audits('agent.action_refused')).toHaveLength(0);
     });
 
     it.each([
@@ -1024,5 +1092,202 @@ describe('the chat rule where a thread is judged, for what an agent\'s request r
 
         expect(seen).toEqual(mark);
         expect(agentOf(OWNER)).toBeNull();
+    });
+});
+
+const EPIC = '6f0000000000000000000e21';
+const TIMER = '6f0000000000000000000e22';
+const VOTES = '6f0000000000000000000e23';
+const onBoard = { projectId: P_OPEN, sprintId: L_OPEN };
+const dropped = { taskId: T_OPEN, projectId: P_OPEN, sprintId: L_OPEN, isFirst: true, isFirstWithRecord: false, relevantIndex: 1, indexName: 'groupByStatusIndex', relevantKey: 1, searchKey: 'statusKey', taskKey: 'OPN-1', updateData: {} };
+
+/* [route, body, params, the action the project's rule for agents is asked of]: every write the web app's routes leave
+ * to an agent as its person may. */
+const ASKED_THE_PROJECT = {
+    'filing a task': [CREATE, newTask({}), {}, 'task.create'],
+    'drafting a doc': ['POST /api/v2/pages', { title: 'Notes', projectId: P_OPEN }, {}, 'page.draft'],
+    'commenting on a task': [COMMENTS, { data: { ...onTask, message: 'Hello' } }, {}, 'task.comment'],
+    'commenting on a project': [COMMENTS, { data: { projectId: P_OPEN, project: true, message: 'Hello' } }, {}, 'project.comment'],
+    'editing a comment on a task': ['PUT /api/v1/comments', { id: TASK_MESSAGE, data: { message: 'Edited' } }, {}, 'comment.update'],
+    'assigning a comment on a task': ['POST /api/v1/comments/assign', { id: TASK_MESSAGE, assigneeId: INSIDER }, {}, 'comment.assign'],
+    'resolving a comment on a task': ['POST /api/v1/comments/resolve', { id: TASK_MESSAGE }, {}, 'comment.resolve'],
+    'reacting to a comment on a task': [REACTIONS, { targetType: 'comment', targetId: TASK_MESSAGE, emoji: '+1' }, {}, 'reaction.set'],
+    'reacting to a task': [REACTIONS, { targetType: 'task', targetId: T_OPEN, emoji: '+1' }, {}, 'reaction.set'],
+    'logging time on a task': ['POST /api/v2/manualLogtime', { ticketId: T_OPEN, projectId: P_OPEN, isEdit: false }, {}, 'timelog.create'],
+    'changing the time logged on a task': ['POST /api/v2/manualLogtime', { ticketId: T_OPEN, projectId: P_OPEN, isEdit: true, timeSheetId: TIMER }, {}, 'timelog.edit'],
+    'starting a timer': ['POST /api/v2/timeTracker/start', { taskId: T_OPEN, projectId: P_OPEN }, {}, 'timelog.start'],
+    'starting a timer, the later way': ['POST /api/v3/timeTracker/start', { taskId: T_OPEN, projectId: P_OPEN }, {}, 'timelog.start'],
+    'stopping a timer': ['POST /api/v2/timetracker/end', { timeSheetId: TIMER }, {}, 'timelog.stop'],
+    'taking idle time off a running timer': ['POST /api/v2/timetracker/trim', { timeSheetId: TIMER, minutes: 5 }, {}, 'timelog.edit'],
+    'planning time on a task': ['PUT /api/v1/estimatedTime', { userId: OWNER, taskId: T_OPEN, projectId: P_OPEN, date: '2026-10-05', minutes: 60 }, {}, 'time.plan'],
+    'adding an epic': ['POST /api/v2/epics', { projectId: P_OPEN, name: 'Launch' }, {}, 'epic.create'],
+    'changing an epic': ['PUT /api/v2/epics/:id', { name: 'Renamed' }, { id: EPIC }, 'epic.update'],
+    'putting a task in an epic': ['POST /api/v2/epics/assign', { taskId: T_OPEN, epicId: EPIC }, {}, 'epic.assign'],
+    'renaming a project': [UPDATE, { updateObject: { ProjectName: 'Renamed' } }, inProject, 'project.update'],
+    'adding an item to the checklist of a project': ['POST /api/v1/project/checklist', { id: P_OPEN, operation: 'push', checklistItem: { id: 'item-1', name: 'Sign the contract', isChecked: false } }, {}, 'project.update'],
+    'drawing on the whiteboard of a list': ['PATCH /api/v2/whiteboards/:projectId/:sprintId', { revision: 0, upsert: [] }, onBoard, 'whiteboard.update'],
+    'putting back an earlier whiteboard': ['POST /api/v2/whiteboards/:projectId/:sprintId/restore', { revision: 1 }, onBoard, 'whiteboard.update'],
+    'voting on a task': ['POST /api/v2/custom-fields/:fieldId/vote', { taskId: T_OPEN, vote: true }, { fieldId: VOTES }, 'task.field.set'],
+    'moving a task up or down its column': ['POST /api/v1/taskIndex', dropped, {}, 'task.reorder'],
+    'giving a task its place in a column the first time the column is shown': ['POST /api/v1/updateTaskIndexOnload', { taskUpdate: { data: T_OPEN, item: { indexName: 'groupByStatusIndex', searchKey: 'statusKey', searchValue: 1 } } }, {}, 'task.reorder'],
+    'counting the tasks of an epic again': ['POST /api/v2/epics/:id/recount', {}, { id: EPIC }, 'epic.update'],
+    'working out the computed fields of a task': ['POST /api/v2/custom-fields/compute', { taskIds: [T_OPEN] }, {}, 'task.fields.compute'],
+    'starring a list': ['PUT /api/v1/project/sprint/:id', { key: '$addToSet', updateObject: { favouriteTasks: { userId: OWNER } } }, { id: L_OPEN }, 'sprint.favourite'],
+};
+
+const asked = Object.entries(ASKED_THE_PROJECT).map(([name, [route, body, params, action]]) => [name, route, body, params, action]);
+const projectRow = (id) => rows(SCHEMA_TYPE.PROJECTS).find((row) => String(row._id) === String(id));
+const seedWork = () => {
+    seedChat();
+    mockDb.seed(SCHEMA_TYPE.EPICS, { _id: EPIC, name: 'Launch', ProjectID: P_OPEN, deletedStatusKey: 0 });
+    mockDb.seed(SCHEMA_TYPE.TIMESHEET, { _id: TIMER, TicketID: T_OPEN, ProjectId: P_OPEN, Loggeduser: OWNER, startTimeTracker: 1 });
+};
+
+describe('what a route leaves to an agent as its person may, in a project with a rule for agents', () => {
+    beforeEach(seedWork);
+
+    it.each(asked)('%s goes through for an agent, and is recorded under the name of the change', async (name, route, body, params, action) => {
+        expect(await through(route, agentToken(OWNER), body, params)).toBe(REACHED);
+
+        expect(audits('agent.action_refused')).toHaveLength(0);
+        expect(audits('agent.action')).toHaveLength(1);
+        expect(audits('agent.action')[0].meta).toMatchObject({ action, state: 'applied', reason: 'via REST', onBehalfOf: OWNER });
+    });
+
+    it.each(asked)('%s is refused for every agent while agents are paused in the project, and recorded', async (name, route, body, params, action) => {
+        projectRow(P_OPEN).agentLimits = { paused: true };
+
+        for (const caller of [agentToken(OWNER), agentRun(OWNER)]) {
+            const answer = await through(route, caller, body, params);
+            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, projectLimits.REASON.PAUSED]);
+        }
+        expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual([action, action]);
+        expect(audits('agent.action')).toHaveLength(0);
+    });
+
+    it.each(asked)('%s waits for a person where the project has connected agents propose every change', async (name, route, body, params, action) => {
+        projectRow(P_OPEN).agentPolicy = { connected: projectPolicy.CONNECTED.PROPOSE_ALL };
+
+        const answer = await through(route, agentToken(OWNER), body, params);
+
+        expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, expect.stringContaining(projectPolicy.REASON.PROPOSE_ALL)]);
+        expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual([action]);
+        expect(await through(route, agentRun(OWNER), body, params)).toBe(REACHED);
+    });
+
+    it('counts the tasks a connected agent changes through them, and holds a change to one task more', async () => {
+        projectRow(P_OPEN).agentLimits = { directTasks: 1 };
+        const comment = (taskId) => through(COMMENTS, agentToken(OWNER), { data: { ...onTask, taskId, message: 'Hello' } });
+
+        expect(await comment(T_OPEN)).toBe(REACHED);
+        expect(await comment(T_OPEN_2)).toMatchObject({ code: 403, body: { statusText: expect.stringContaining('already changed 1 task') } });
+        expect(await comment(T_OPEN)).toBe(REACHED);
+        expect(await through(REACTIONS, agentToken(OWNER), { targetType: 'task', targetId: T_OPEN_2, emoji: '+1' })).toMatchObject({ code: 403 });
+    });
+
+    it.each([
+        ['a signed-in owner', session(OWNER)],
+        ['a personal token of an owner', personalToken(OWNER)],
+    ])('%s reaches every one of them whatever the project holds agents to, and nothing is recorded as an agent\'s', async (label, caller) => {
+        projectRow(P_OPEN).agentLimits = { paused: true, directTasks: 1 };
+        projectRow(P_OPEN).agentPolicy = { connected: projectPolicy.CONNECTED.PROPOSE_ALL };
+
+        for (const [, route, body, params] of asked) {
+            expect([route, await through(route, caller, body, params)]).toEqual([route, REACHED]);
+        }
+        expect(agentAudits()).toHaveLength(0);
+    });
+});
+
+describe('every write route of the server, for a token created for an agent', () => {
+    const WRITES = Object.keys(routes).filter((route) => !route.startsWith('GET ')).sort();
+    const namedIn = (route) => [...route.matchAll(/:([A-Za-z_]+)/g)].map((match) => match[1]);
+    const paramsOf = (route) => Object.fromEntries(namedIn(route).map((name) => [name, { projectId: P_OPEN, pid: P_OPEN, taskId: T_OPEN, tid: T_OPEN, sprintId: L_OPEN }[name] || TEMPLATE]));
+    const askedRoutes = [...new Set(asked.map(([, route]) => route))];
+    const outside = Object.values(OUTSIDE_EVERY_PROJECT).flat();
+    const heldForPeople = (answer) => answer !== REACHED && answer.code === 403 && /^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/.test(String(answer.body && answer.body.statusText));
+
+    it('is held for people, asks the project\'s rule, or is listed with why it changes nothing in a project', async () => {
+        const unlisted = [];
+        const listedThoughHeld = [];
+        for (const route of WRITES) {
+            seed();
+            const held = heldForPeople(await through(route, agentToken(OWNER), {}, paramsOf(route)));
+            if (!held && !askedRoutes.includes(route) && !outside.includes(route)) unlisted.push(route);
+            if (held && outside.includes(route)) listedThoughHeld.push(route);
+        }
+
+        expect(WRITES.length).toBeGreaterThan(500);
+        if (process.env.UNLISTED_OUT) fs.writeFileSync(process.env.UNLISTED_OUT, unlisted.join('\n'));
+        expect(unlisted).toEqual([]);
+        expect(listedThoughHeld).toEqual([]);
+    });
+
+    it('lists no route twice, and none the server does not have', () => {
+        expect([...askedRoutes, ...outside].filter((route) => !routes[route])).toEqual([]);
+        expect(outside.filter((route, at) => outside.indexOf(route) !== at || askedRoutes.includes(route))).toEqual([]);
+    });
+});
+
+describe('what stands in front of a route, in its order', () => {
+    const refusalAt = (route) => routes[route].slice(0, -1).findIndex((guard) => guard.refusesAs);
+
+    it('has the refusal of an agent first wherever a route refuses agents', () => {
+        expect(Object.keys(routes).filter((route) => refusalAt(route) > 0)).toEqual([]);
+        expect(Object.keys(routes).filter((route) => refusalAt(route) === 0).length).toBeGreaterThan(200);
+    });
+
+    it.each([
+        ['importing rows as tasks', 'task_create'],
+        ['creating the tasks an answer of the AI lists', 'task_create'],
+    ])('%s is refused as an agent\'s, and recorded, for an agent whose person does not hold the right either', async (name, right) => {
+        const [route, body, params] = NO_ACTION[name] || ALSO_BY_PEOPLE['tasks.import'][name];
+        rows(SCHEMA_TYPE.RULES).filter((rule) => rule.key === right).forEach((rule) => { rule.roles = []; });
+
+        const answer = await through(route, agentToken(INSIDER), body, params);
+
+        expect([answer.code, answer.body.statusText]).toEqual([403, 'That action is not available to agents (tasks.import).']);
+        expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(['tasks.import']);
+    });
+});
+
+describe('a removal, which no agent makes on any route', () => {
+    const REMOVALS = Object.keys(routes).filter((route) => route.startsWith('DELETE ')).sort();
+    const namedByTheRoute = (route) => (routes[route].find((guard) => guard.refusesAs) || {}).refusesAs;
+    const ids = (route) => Object.fromEntries([...route.matchAll(/:([A-Za-z_]+)/g)].map((match) => [match[1], TEMPLATE]));
+
+    it('is refused on every route that removes something', async () => {
+        expect(REMOVALS.length).toBeGreaterThan(50);
+        for (const route of REMOVALS) {
+            for (const caller of [agentToken(OWNER), agentRun(OWNER)]) {
+                expect([route, (await through(route, caller, {}, ids(route))).code]).toEqual([route, 403]);
+            }
+        }
+    });
+
+    it.each(REMOVALS.filter(namedByTheRoute))('%s is recorded under the name its own route gives it', async (route) => {
+        const answer = await through(route, agentToken(OWNER), {}, ids(route));
+
+        expect(answer.body.statusText).toBe(`An agent is not allowed to do this (${namedByTheRoute(route)}). The person has to do it in AlianHub.`);
+        expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual([namedByTheRoute(route)]);
+    });
+
+    it.each([
+        ['DELETE /api/v2/epics/:id', 'project.delete'],
+        ['DELETE /api/v1/recurring-tasks/:id', 'task.delete'],
+    ])('%s, whose route names none, is recorded as %s', async (route, action) => {
+        await through(route, agentToken(OWNER), {}, ids(route));
+
+        expect(REMOVALS.filter(namedByTheRoute).length).toBeGreaterThan(8);
+        expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual([action]);
+    });
+
+    it('is refused below a router mounted on the app too', async () => {
+        const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json() { return this; } };
+        let passed = false;
+
+        await agentPerimeter({ ...agentToken(OWNER), app: served, method: 'DELETE', originalUrl: `/scim/v2/Users/${TEMPLATE}`, headers: { companyid: CID }, body: {} }, res, () => { passed = true; });
+
+        expect([passed, res.statusCode]).toEqual([false, 403]);
     });
 });

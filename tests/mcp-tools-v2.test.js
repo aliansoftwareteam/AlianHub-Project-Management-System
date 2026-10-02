@@ -163,7 +163,7 @@ describe('names in results', () => {
             priorityName: 'High', taskType: { key: 2, name: 'Bug' }, assignees: [{ id: USER, name: 'Mevil B' }, { id: MATE, name: 'Asha K' }],
         });
         const hidden = seedTask({ sprintId: PRIVATE_SPRINT });
-        expect(await tools.call(ctxFor(), 'task.get', { taskId: hidden._id })).toEqual({ error: 'task not found' });
+        expect(await tools.call(ctxFor(), 'task.get', { taskId: hidden._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
     });
 
     it('gives docs.read a ref and the page\'s project name', async () => {
@@ -310,7 +310,7 @@ describe('destructive calls open a proposal', () => {
         const t = seedTask();
         irreversible('task.comment');
         const oauth = ctxFor({ token: { oauth: true, scopes: ['tasks:read', 'tasks:write'] }, oauth: { clientId: 'cli', grantId: 'g1', scopes: ['tasks:write'] } });
-        await expect(tools.call(oauth, 'task.comment', { taskId: t._id, body: 'x' })).rejects.toMatchObject({ refused: true, message: expect.stringMatching(/personal access token/) });
+        await expect(tools.call(oauth, 'task.comment', { taskId: t._id, body: 'x' })).rejects.toMatchObject({ refused: true, message: expect.stringMatching(/cannot ask for it/) });
         expect(proposals.create).not.toHaveBeenCalled();
         expect(actions.perform).not.toHaveBeenCalled();
     });

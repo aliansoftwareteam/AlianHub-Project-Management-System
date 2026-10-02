@@ -47,7 +47,8 @@ let adminReport;
 let memberReport;
 let adminSchedule;
 beforeEach(() => {
-    [R, S, SCHEMA_TYPE.TASKS, SCHEMA_TYPE.TIMESHEET, SCHEMA_TYPE.BILLING_RATES].forEach((t) => { mockDb.store[t] = []; });
+    [R, S, SCHEMA_TYPE.TASKS, SCHEMA_TYPE.TIMESHEET, SCHEMA_TYPE.BILLING_RATES, SCHEMA_TYPE.COMPANY_USERS].forEach((t) => { mockDb.store[t] = []; });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false, userEmail: 'me@example.com' });
     SendEmail.mockClear();
     adminReport = mockDb.seed(R, { name: 'Admin report', ...config, createdBy: ADMIN, deletedStatusKey: 0 });
     memberReport = mockDb.seed(R, { name: 'Member report', ...config, createdBy: MEMBER, deletedStatusKey: 0 });

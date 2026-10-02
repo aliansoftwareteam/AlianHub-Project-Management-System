@@ -178,7 +178,7 @@ const REFUSAL = Object.freeze({
     CONTROL_RUN: 'Only an Owner, an Admin or the person who started the run can stop it.',
     UNDO_DECISION: 'Only an Owner, an Admin or the person who decided the proposal can undo it.',
     ACT_AS_AGENT: 'Only the agent itself can file a proposal in its name.',
-    DECIDE_PERSON: 'Agents cannot decide proposals — a person has to.',
+    DECIDE_PERSON: 'An agent cannot decide a proposal. A person has to decide it in AlianHub.',
     DECIDE_MEMBER: 'A proposal is decided by a member of the workspace.',
 });
 

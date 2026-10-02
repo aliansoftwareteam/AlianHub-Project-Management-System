@@ -7,6 +7,7 @@ const reportRules = require('../CustomReports/helpers/reportRules');
 const access = require('../CustomReports/helpers/reportAccess');
 const customReports = require('../CustomReports/controller');
 const R = require('./helpers/scheduleRules');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 
 // The prod cron calls runScheduledReportsForAllCompanies; POST /run-due runs the
 // same path for one company. SendEmail fails gracefully when mail is not
@@ -50,6 +51,26 @@ const mayEmailFinancial = async (companyId, schedule, report) => {
     return reportOwner && scheduleOwner;
 };
 
+const OUTSIDE_ADDRESS = 'A report is emailed to members of this workspace. An owner or admin can add an address outside it.';
+
+const memberAddresses = async (companyId) => new Set(((await MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.COMPANY_USERS, data: [{ ...ACTIVE_SEAT }, { userEmail: 1 }],
+}, 'find')) || []).map((seat) => String(seat.userEmail || '').trim().toLowerCase()).filter(Boolean));
+
+const outsideAddresses = async (companyId, recipients) => {
+    const members = await memberAddresses(companyId);
+    return recipients.filter((address) => !members.has(address));
+};
+
+/* The screen takes typed addresses, so who typed them decides what is sent: an owner or admin may name anyone,
+ * for as long as they are one; everyone else reaches the people who hold a seat on the day the report runs. */
+const recipientsNow = async (companyId, schedule) => {
+    const recipients = R.cleanRecipients(schedule.recipients || []);
+    if (await access.isPrivilegedUser(companyId, schedule.recipientsBy || schedule.createdBy)) return recipients;
+    const outside = new Set(await outsideAddresses(companyId, recipients));
+    return recipients.filter((address) => !outside.has(address));
+};
+
 const deliver = async (companyId, schedule) => {
     const reportId = oidOrNull(schedule.savedReportId);
     const report = reportId ? await MongoDbCrudOpration(companyId, {
@@ -57,14 +78,16 @@ const deliver = async (companyId, schedule) => {
     }, 'findOne') : null;
     if (!report || report.deletedStatusKey === 1) return { sent: false, reason: 'report-missing' };
     if (!(await mayEmailFinancial(companyId, schedule, report))) return { sent: false, reason: 'restricted' };
+    const recipients = await recipientsNow(companyId, schedule);
+    if (!recipients.length) return { sent: false, reason: 'no-recipients', recipients: 0 };
     const { rows, total, config } = await runSavedReport(companyId, report);
     const html = R.reportEmailHtml({
         name: report.name, rows, total,
         dimensionLabel: DIM_LABELS[config && config.dimension] || (config && config.dimension) || 'Group',
         metricLabel: METRIC_LABELS[config && config.metric] || (config && config.metric) || 'Value',
     });
-    const sent = await sendOne(R.reportEmailSubject(report.name), html, schedule.recipients || []);
-    return { sent, recipients: (schedule.recipients || []).length };
+    const sent = await sendOne(R.reportEmailSubject(report.name), html, recipients);
+    return { sent, recipients: recipients.length };
 };
 
 const runDueForCompany = async (companyId, now = new Date()) => {
@@ -132,8 +155,9 @@ exports.createSchedule = async (req, res) => {
         if (!report || report.deletedStatusKey === 1) return reply(res, 404, 'Saved report not found.');
         if (!access.canManage(caller, report)) return reply(res, 403, 'You can only schedule reports you manage.');
         if (access.isFinancialConfig(report) && !caller.privileged) return res.status(403).json(access.RESTRICTED_BODY);
+        if (!caller.privileged && (await outsideAddresses(caller.companyId, check.value.recipients)).length) return reply(res, 400, OUTSIDE_ADDRESS);
         const now = new Date();
-        const data = { ...check.value, lastRunAt: null, nextRunAt: R.computeNextRun(check.value.cadence, now), createdBy: caller.uid, deletedStatusKey: 0 };
+        const data = { ...check.value, lastRunAt: null, nextRunAt: R.computeNextRun(check.value.cadence, now), createdBy: caller.uid, recipientsBy: caller.uid, deletedStatusKey: 0 };
         const saved = await MongoDbCrudOpration(caller.companyId, { type: SCHEMA_TYPE.REPORT_SCHEDULES, data }, 'save');
         removeCache(`report_schedules:${caller.companyId}`);
         return res.status(201).json({ status: true, statusText: 'Schedule created.', data: saved });
@@ -178,7 +202,9 @@ exports.updateSchedule = async (req, res) => {
         if (req.body.recipients !== undefined) {
             const rec = R.cleanRecipients(req.body.recipients);
             if (!rec.length) return reply(res, 400, 'at least one valid recipient email is required');
+            if (!caller.privileged && (await outsideAddresses(caller.companyId, rec)).length) return reply(res, 400, OUTSIDE_ADDRESS);
             set.recipients = rec;
+            set.recipientsBy = caller.uid;
         }
         if (req.body.cadence !== undefined && R.CADENCES.includes(req.body.cadence)) {
             set.cadence = req.body.cadence;

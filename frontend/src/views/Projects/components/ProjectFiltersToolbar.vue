@@ -13,6 +13,7 @@
                         :placeHolder="$t('PlaceHolder.search')"
                         :aria-label="$t('PlaceHolder.search')"
                         class="pft__input"
+                        :maxlength="SEARCH_TEXT_MAX"
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
@@ -237,6 +238,7 @@ import { ref, computed, defineProps, defineEmits, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { canUseAi } from "@/composable/aiAvailability";
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import { SEARCH_TEXT_MAX } from '@/utils/searchText';
 import { useRoute } from 'vue-router';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
