@@ -206,6 +206,7 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { hourCycleOption } from "@/utils/clockText";
 import AiSidebar from "./AiSidebar.vue";
 import { reasonOf } from "./useAgents";
 import { declineReasonText } from "./episodeText";
@@ -249,7 +250,7 @@ const usdText = (usd) => t("AiQuality.usd", { n: Number(usd || 0).toFixed(2) });
 const listText = (list) => (list && list.length ? list.join(", ") : t("AiQuality.held_out_nothing"));
 const whenText = (at) => {
     const date = at ? new Date(at) : null;
-    return date && !Number.isNaN(date.getTime()) ? date.toLocaleString(locale?.value || undefined, { dateStyle: "medium", timeStyle: "short" }) : "";
+    return date && !Number.isNaN(date.getTime()) ? date.toLocaleString(locale?.value || undefined, { dateStyle: "medium", timeStyle: "short", ...hourCycleOption() }) : "";
 };
 
 const load = async () => {

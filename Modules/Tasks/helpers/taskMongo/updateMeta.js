@@ -234,7 +234,7 @@ module.exports = {
                     } else if(operation === "remove") {
                         const removedName = storedFileName(storedTask, data);
                         historyObj = {
-                            message: `<b>${escapeHtml(removedName)}</b> removed from <b>${escapeText(taskData.TaskName)}</b>&apos;s attchments.`,
+                            message: `<b>${escapeHtml(removedName)}</b> removed from <b>${escapeText(taskData.TaskName)}</b>&apos;s attachments.`,
                             key: "Task_Attachment_Remove",
                             sprintId: taskData.sprintId,
                         }

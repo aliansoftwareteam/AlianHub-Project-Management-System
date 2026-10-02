@@ -1,3 +1,5 @@
+import { hourCycleOption } from '@/utils/clockText';
+
 /* The server stores a goal's colour as #rrggbb, so the choices are values, not tokens. */
 export const GOAL_COLORS = ['#2F3990', '#2f9e7e', '#d98324', '#6b5ce7', '#0EA5E9', '#EC4899', '#14B8A6', '#F97316'];
 
@@ -38,7 +40,7 @@ export function formatDay(day, locale) {
 
 export function formatWhen(stamp, locale) {
     const date = new Date(stamp);
-    return stamp && !Number.isNaN(date.getTime()) ? formatter(Intl.DateTimeFormat, locale, { dateStyle: 'medium', timeStyle: 'short' }).format(date) : '';
+    return stamp && !Number.isNaN(date.getTime()) ? formatter(Intl.DateTimeFormat, locale, { dateStyle: 'medium', timeStyle: 'short', ...hourCycleOption() }).format(date) : '';
 }
 
 export function periodLabel(goal, t, locale) {

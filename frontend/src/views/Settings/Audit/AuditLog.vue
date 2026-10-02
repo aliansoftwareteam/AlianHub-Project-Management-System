@@ -52,7 +52,7 @@
                 <tbody>
                     <tr v-for="row in rows" :key="row._id" class="al__row" :class="{ 'al__row--undone': row.meta && row.meta.undoneAt, 'al__row--refused': isRefusal(row) }">
                         <td class="al__time">
-                            <span class="ah-mono">{{ time(row.createdAt) }}</span>
+                            <span class="ah-mono">{{ recentClockText(row.createdAt) }}</span>
                             <span
                                 v-if="showsIntegrity(row)"
                                 class="ah-chip ah-chip--sm al__integrity"
@@ -92,7 +92,7 @@
                             <div class="al__meta">
                                 <span v-if="row.meta && row.meta.runId" class="ah-mono al__run">{{ $t('Audit.run_n', { n: String(row.meta.runId).slice(-4) }) }}</span>
                                 <span v-if="row.meta && row.meta.tainted" class="ah-chip ah-chip--warn" :title="taintTitle(row)" data-test="tainted">{{ $t('Audit.tainted') }}</span>
-                                <span v-if="row.meta && row.meta.undoneAt" class="ah-chip ah-chip--warn">{{ $t('Audit.undone_at', { t: time(row.meta.undoneAt) }) }}</span>
+                                <span v-if="row.meta && row.meta.undoneAt" class="ah-chip ah-chip--warn">{{ $t('Audit.undone_at', { t: recentClockText(row.meta.undoneAt) }) }}</span>
                                 <template v-else-if="row.meta && row.meta.undoable && !['project_not_visible', 'target_not_visible'].includes(row.undoReason)">
                                     <button
                                         type="button"
@@ -102,7 +102,7 @@
                                         @click="undo(row)"
                                     >{{ undoingId === row._id ? $t('Audit.undoing') : $t('Audit.undo') }}</button>
                                     <span v-if="row.undoable === false" class="ah-small">{{ $t('Audit.undo_window_passed') }}</span>
-                                    <span v-else-if="row.undoUntil" class="ah-small">{{ $t('Audit.undo_until', { t: deadline(row.undoUntil) }) }}</span>
+                                    <span v-else-if="row.undoUntil" class="ah-small">{{ $t('Audit.undo_until', { t: dayClockText(row.undoUntil) }) }}</span>
                                 </template>
                                 <span v-else-if="isRefusal(row)" class="ah-small">{{ $t('Audit.nothing_ran') }}</span>
                             </div>
@@ -127,6 +127,7 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
+import { dayClockText, recentClockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { apiRequest } from "@/services";
@@ -198,8 +199,6 @@ const showsHashedIds = (row) => Boolean(chainOn.value && row.chain && typeof row
 const integrityKey = (row) => (row.integrity.state === "broken" && row.integrity.brokenAt == null ? "Audit.integrity_broken_row" : "Audit.integrity_" + row.integrity.state);
 const integrityLabel = (row) => t(integrityKey(row), { seq: row.integrity.brokenAt });
 const integrityHint = (row) => t(integrityKey(row) + "_hint", { seq: row.integrity.brokenAt });
-const time = (at) => (at ? moment(at).format(moment(at).isSame(moment(), "day") ? "HH:mm" : "D MMM HH:mm") : "");
-const deadline = (at) => (at ? moment(at).format("D MMM HH:mm") : "");
 
 const wordsOf = (namespace) => Object.fromEntries(Object.entries(tm(namespace) || {}).map(([key, message]) => [key, rt(message)]));
 

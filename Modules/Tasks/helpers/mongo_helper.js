@@ -22,7 +22,7 @@ const SPRINT_PLAN_CHECK_TTL_SECONDS = 30;
 const { updateCommentCollection, addCommentCollection } = require('../../Comments/controller');
 // BUG-033 / #87 — self-healing reconciliation for sprint task counts.
 const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcileTaskCount');
-const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED } = require('./taskTree');
+const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED, LEFT_BECAUSE } = require('./taskTree');
 const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
 const { withDescriptionBlock } = require('./descriptionBlock');
 const { withoutImportMark } = require('./importMark');
@@ -220,7 +220,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                 ]
             }
             MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate").then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId, leftBecause: LEFT_BECAUSE.SUBTASK });
                 let obj = {
                     isParentTask: false,
                     ParentTaskId: task._id,
@@ -421,7 +421,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate"),
                 extraLists.afterHomeMove(companyId, moveTask, { projectId: projectData.id, sprintId: sprintObj.id }),
             ]).then(([result, extras]) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId, leftBecause: LEFT_BECAUSE.MOVED });
                 let obj = {};
                 let unsetObj = {}
                 if (JSON.parse(JSON.stringify(moveTask.ProjectID)) !== JSON.parse(JSON.stringify(projectData.id))) {
@@ -754,7 +754,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
             }
             MongoDbCrudOpration(companyId,queryObj,"findOneAndUpdate").then((result) => {
                 socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj, module: 'task', companyId });
-                resolve({ status: true, statusText: "Sub Task merged Succesfully" });
+                resolve({ status: true, statusText: "Sub Task merged Successfully" });
                 let mergeId = slot.parent._id;
                 let incObj = {
                     type: SCHEMA_TYPE.TASKS,

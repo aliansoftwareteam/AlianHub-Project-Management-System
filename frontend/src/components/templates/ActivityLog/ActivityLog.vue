@@ -45,7 +45,6 @@
 </template>
 <script setup>
 import { defineComponent,defineProps,inject,ref,onMounted, watch, computed } from "vue";
-import moment from "moment";
 import { useGetterFunctions } from '@/composable/index';
 import ActivityContent from "@/components/molecules/ActivityLogContent/ActivityContent.vue";
 import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
@@ -153,9 +152,6 @@ function commonGetQuery(loadMore = false) {
 
             res.forEach((element) => {
                 let dataObject = { ...element };
-                dataObject.displayDate = dataObject.createdAt == undefined 
-                    ? moment(new Date()).format('ddd, MMM DD, YYYY hh:mm:ss A') 
-                    : moment(new Date(dataObject?.createdAt)).format('ddd, MMM DD, YYYY hh:mm:ss A');
                 const user = getUser(dataObject.UserId);
                 dataObject.userData = {
                     image: user.Employee_profileImageURL ? user.Employee_profileImageURL : defaultpic,

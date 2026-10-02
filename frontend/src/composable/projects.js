@@ -1,16 +1,11 @@
-import moment from 'moment';
-import { useConvertDate, useGetterFunctions } from "@/composable";
-import { inject } from "vue";
 import * as env from '@/config/env';
 import { computed } from "vue";
 import { useStore } from "vuex";
 import { apiRequest } from "@/services";
 import { i18n } from "@/locales/main";
+import { clockText, fullText } from "@/utils/clockText";
 const t = i18n.global.t;
-const { convertDateFormat } = useConvertDate();
 export function useProjects() {
-	const { getUser } = useGetterFunctions()
-	const uid = inject("$userId");
 	const { getters } = useStore();
 
 	/**
@@ -39,34 +34,8 @@ export function useProjects() {
 			}
 		})
 	}
-	function userTimeFormat() {
-		const user = getUser(uid.value);
-		return user ? (user.timeFormat || "12") : "24";
-	}
-	function getDateType(seconds) {
-		try {
-			let timeformat = userTimeFormat();
-			if (timeformat == "12") {
-				return moment(new Date(seconds)).format("hh:mm A");
-			} else {
-				return moment(new Date(seconds)).format("HH:mm");
-			}
-		} catch (error) {
-			console.error("Error", error)
-		}
-	}
-	function getDateAndTime(seconds) {
-		try {
-			let timeformat = userTimeFormat();
-			if (timeformat == "12") {
-				return `${convertDateFormat(seconds, '', { showDayName: false })}, ${moment(new Date(seconds)).format(`hh:mm A`)}`;
-			} else {
-				return `${convertDateFormat(seconds, '', { showDayName: false })}, ${moment(new Date(seconds)).format(`HH:mm`)}`;
-			}
-		} catch (error) {
-			console.error("Error", error)
-		}
-	}
+	const getDateType = clockText;
+	const getDateAndTime = fullText;
 
 	function checkProjectPlan(requestFor) {
 		const currentCompany = computed(() => getters['settings/selectedCompany']);

@@ -3,6 +3,7 @@ import { apiRequest } from "../../services";
 import Store from '@/store/index'
 import Swal from '@/utils/lazySwal';
 import { instantEdit, tellViews } from '@/utils/instantTaskEdit';
+import { holdOwnLeave } from '@/utils/taskUpdateMarker';
 
 const actorOf = (userData) => ({
     "Employee_Name": userData.Employee_Name,
@@ -16,6 +17,11 @@ const patchTask = (body, statusText) => apiRequest("patch", env.V2_TASKS, body).
 }, (error) => {
     throw {status: false, error};
 });
+
+const leaving = (taskId, body) => {
+    const answered = holdOwnLeave(taskId);
+    return apiRequest("patch", "/api/v2/tasks", body).finally(answered);
+};
 
 /* A write shown before it is sent: in the store's row, and in each view that keeps its own copy of the task. */
 const showInViews = (pid, sprintId, data, updatedFields) => {
@@ -616,7 +622,7 @@ class Task {
     convertToSubTask({companyId, projectData, sprintId, selectedTaskId,taskId,oldProject,isSubTask,userData}) {
         return new Promise((resolve,reject) => {
             try {
-                apiRequest("patch", "/api/v2/tasks", {action: "convertToSubTask", companyId, projectData, sprintId, selectedTaskId,taskId,oldProject,isSubTask,userData})
+                leaving(selectedTaskId, {action: "convertToSubTask", companyId, projectData, sprintId, selectedTaskId,taskId,oldProject,isSubTask,userData})
                 .then((response) => {
                     if (response.data.status) {
                         resolve({status: true, statusText: "converted",data:response.data.data});
@@ -636,7 +642,7 @@ class Task {
     moveTask({companyId, projectData, sprintObj, moveTaskId,oldSprintObj,oldProject,isSubTask,assignee,watcher,userData}) {
         return new Promise((resolve,reject) => {
             try {
-                apiRequest("patch", "/api/v2/tasks", {action: "moveTask", companyId, projectData, sprintObj, moveTaskId, oldSprintObj,oldProject,isSubTask,assignee,watcher,userData})
+                leaving(moveTaskId, {action: "moveTask", companyId, projectData, sprintObj, moveTaskId, oldSprintObj,oldProject,isSubTask,assignee,watcher,userData})
                 .then((response) => {
                     if (response.data.status) {
                         resolve({status: true, statusText: "moved",data:response.data.data});
@@ -656,7 +662,7 @@ class Task {
     convertToList({companyId, projectData, taskId, userData, folderData, sprintObj,isSubTask}) {
         return new Promise((resolve,reject) => {
             try {
-                apiRequest("patch", "/api/v2/tasks", {action: "convertToList", companyId, projectData, taskId, userData, folderData, sprintObj,isSubTask})
+                leaving(taskId, {action: "convertToList", companyId, projectData, taskId, userData, folderData, sprintObj,isSubTask})
                 .then((response) => {
                     if (response.data.status) {
                         Store.commit('projectData/mutateSprints', {op: "added", data: response.data.data});
@@ -761,7 +767,7 @@ class Task {
     convertToTask({companyId, projectData, taskId, sprintObj,parentTaskId,oldSprintObj,oldProject}) {
         return new Promise((resolve,reject) => {
             try {
-                apiRequest("patch", "/api/v2/tasks", {action: "convertToTask", companyId, projectData, taskId, sprintObj,parentTaskId,oldSprintObj,oldProject})
+                leaving(taskId, {action: "convertToTask", companyId, projectData, taskId, sprintObj,parentTaskId,oldSprintObj,oldProject})
                 .then((response) => {
                     if (response.data.status) {
                         resolve({status: true, statusText: "convertToTask"});

@@ -41,7 +41,7 @@ exports.mailVerificationLink = (userId, email, token) => new Promise((resolve, r
             if(result.status) {
                 resolve({
                     status: true,
-                    statusText: 'Verification email sent sucessfully.'
+                    statusText: 'Verification email sent successfully.'
                 });
             } else {
                 reject({

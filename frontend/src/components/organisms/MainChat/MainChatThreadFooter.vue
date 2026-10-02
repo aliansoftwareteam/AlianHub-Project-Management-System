@@ -24,7 +24,7 @@
 <script setup>
 import { computed, defineProps, defineEmits } from 'vue';
 import { useI18n } from 'vue-i18n';
-import moment from 'moment';
+import { recentText } from '@/utils/clockText';
 import { useGetterFunctions } from '@/composable';
 import MainChatAvatar from './MainChatAvatar.vue';
 
@@ -32,7 +32,6 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const props = defineProps({
     message: { type: Object, required: true },
-    hour12: { type: Boolean, default: true },
 });
 
 defineEmits(['open']);
@@ -55,9 +54,6 @@ const repliers = computed(() => (Array.isArray(props.message.replierIds) ? props
 }));
 
 const lastReply = computed(() => {
-    const at = moment(props.message.lastReplyAt || '');
-    if (!props.message.lastReplyAt || !at.isValid()) return '';
-    if (at.isSame(moment(), 'day')) return at.format(props.hour12 ? 'h:mm A' : 'HH:mm');
-    return at.toDate().toLocaleDateString([], { day: 'numeric', month: 'short' });
+    return recentText(props.message.lastReplyAt);
 });
 </script>
