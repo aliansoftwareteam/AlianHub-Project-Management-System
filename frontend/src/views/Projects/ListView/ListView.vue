@@ -77,8 +77,8 @@
                         </span>
                     </div>
 
-                    <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
-                        <div v-if="groupedTasks.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__sprint-bar">
+                    <section v-for="sprint in shownSprints" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
+                        <div v-if="shownSprints.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__sprint-bar">
                         <button type="button" class="lv2__sprint-head" :aria-expanded="!!sprint.isExpanded" @click="toggleSprints(sprint?.id)">
                             <span class="lv2__caret lv2__caret--sprint" aria-hidden="true">{{ sprint.isExpanded ? '▼' : '►' }}</span>
                             <span class="lv2__sprint-name">{{ sprint.name }}</span>
@@ -179,7 +179,7 @@ import { useCustomComposable } from '@/composable';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useProjectAgentActivity } from './useProjectAgentActivity.js';
 import * as listGroups from './listGroups.js';
-import { groupCountsFor, groupLabel, listSourceTasks } from './listFilter.js';
+import { archiveViewLists, groupCountsFor, groupLabel, listSourceTasks } from './listFilter.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useListRowEdit } from './useListInlineEdit.js';
@@ -333,6 +333,8 @@ function groupCounts(sprint) {
 function sprintCount(sprint) {
     return searchedTask.value ? searchedRows(sprint).length : (sprint.tasks || 0);
 }
+
+const shownSprints = computed(() => archiveViewLists(groupedTasks.value, { archiveView: Boolean(showArchived.value), rowsOf: sprintCount }));
 
 function groupCount(sprint, item) {
     return listGroups.groupCount(groupCounts(sprint), item);

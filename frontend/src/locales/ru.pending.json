@@ -7464,6 +7464,8 @@
     "Projects.anonymous": "Anonymous",
     "Projects.archive_task": "Archive task",
     "Projects.archived": "Archived",
+    "Projects.archived_list_tasks": "{n} task | {n} tasks",
+    "Projects.archived_list_tasks_hint": "Tasks in this list that you can open",
     "Projects.archived_lists": "Archived lists",
     "Projects.archived_notice": "Project is currently archived",
     "Projects.archived_only": "Archived projects",

@@ -14,6 +14,7 @@ const { toast, sprintActions, rights } = vi.hoisted(() => ({
 }));
 
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
+vi.mock('@/services', () => ({ apiRequest: vi.fn(() => Promise.resolve({ data: [] })) }));
 vi.mock('@/views/Projects/sprintActions', () => sprintActions);
 vi.mock('@/composable', () => ({
     useCustomComposable: () => ({ checkPermission: (key) => (key === 'project.sprint_restore' ? rights.restore : true) })

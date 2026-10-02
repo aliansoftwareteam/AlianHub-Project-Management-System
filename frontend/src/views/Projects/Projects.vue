@@ -519,7 +519,7 @@ import FolderGoneState from './components/FolderGoneState.vue';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { archivedListsOf, folderIsGone, folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
+import { archivedListsIn, folderIsGone, folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
 import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
@@ -1103,7 +1103,7 @@ const headerFolders = computed(() => headerPlace.value.folders);
 /* The task views can only say that no task shows; on the page of a folder that holds no list, the missing thing is a list. */
 const TASK_VIEWS = ['ProjectListView', 'ProjectKanban', 'TableView'];
 const newInProject = ref(null);
-const archivedLists = computed(() => archivedListsOf(projectData.value)
+const archivedLists = computed(() => archivedListsIn(getters['projectData/projects']?.data, projectData.value?._id)
     .filter((list) => isOwnerOrAdmin(companyUserDetail.value?.roleType) || !list.private || list.AssigneeUserId?.includes(userId.value)));
 const folderGone = computed(() => !sprintLoading.value && folderIsGone(getters['projectData/folders']?.[projectData.value?._id], route.params?.folderId));
 const openProjectOfGoneFolder = () => router.replace({ name: 'Project', params: { cid: route.params?.cid, id: projectData.value?._id }, query: { tab: route.query?.tab } });
