@@ -129,7 +129,7 @@ const forget = (proposalId) => myCache.del(proposalKey(proposalId));
 
 /* The task custom-field update path the web app uses: the same payload preparation, actor and stored task,
  * then the same handler, which emits the change and records the history, here marked as filled by AI. */
-async function writeFill({ companyId, uid, definition, config, taskId, fieldValue, hash, trigger }) {
+async function writeFill({ companyId, uid, definition, config, taskId, fieldValue, hash, trigger, origin = null }) {
     const { prepareTaskRequest, TASK_ACTION_FIELDS } = require('../../Tasks/helpers/taskWriteFields');
     const { taskMongo } = require('../../Tasks/helpers/task_class_Mongo');
     const fieldId = String(definition._id);
@@ -144,18 +144,18 @@ async function writeFill({ companyId, uid, definition, config, taskId, fieldValu
         type: SCHEMA_TYPE.TASKS,
         data: [{ _id: new mongoose.Types.ObjectId(String(taskId)) }, { $set: { [`aiFieldFills.${fieldId}`]: { at: new Date(), by: String(uid), template: config.template, hash, trigger } } }],
     }, 'updateOne');
-    await taskMongo.updateTaskCustomField({ ...payload, filledByAi: true });
+    await taskMongo.updateTaskCustomField({ ...payload, filledByAi: true, eventOrigin: origin });
 }
 
 /* The value is left as it was; the marker lets the task say the fill did not fit until a later fill replaces it. */
-async function markFailed({ companyId, definition, taskId, reason, trigger }) {
+async function markFailed({ companyId, definition, taskId, reason, trigger, origin = null }) {
     const path = `aiFieldFills.${String(definition._id)}.failed`;
     const failed = { at: new Date(), reason, trigger };
     const task = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
         data: [{ _id: new mongoose.Types.ObjectId(String(taskId)) }, { $set: { [path]: failed } }, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
-    if (task) socketEmitter.emit('update', { type: 'update', data: task, updatedFields: { [path]: failed }, module: 'task', companyId });
+    if (task) socketEmitter.emit('update', { type: 'update', data: task, updatedFields: { [path]: failed }, module: 'task', companyId, ...(origin && origin.actor ? { actor: origin.actor, depth: origin.depth } : {}), ...(origin && origin.narrowing ? { narrowing: origin.narrowing } : {}) });
 }
 
 const refusedProposal = (taskId, reason) => ({ taskId: String(taskId), proposalId: null, text: '', fieldValue: null, empty: true, reason });
@@ -212,19 +212,20 @@ async function applyProposals({ companyId, uid, fieldId, proposalIds }) {
     return { applied, refused };
 }
 
-/* Propose and write in one go, for a job the person already confirmed from its preview or for an auto-refill. */
-async function fillTask({ companyId, uid, definition, config, taskId, trigger, unlessHash = null }) {
+/* Propose and write in one go, for a job the person already confirmed from its preview or for an auto-refill.
+ * `origin` is whose change an auto-refill follows and how deep in a chain: the fill's own event says the same. */
+async function fillTask({ companyId, uid, definition, config, taskId, trigger, unlessHash = null, origin = null }) {
     const { task, reason } = await editableTask({ companyId, uid, definition, taskId });
     if (!task) return { outcome: 'skipped', reason };
     const parts = await readParts({ companyId, task, reads: config.reads });
     if (unlessHash && hashOf(parts) === unlessHash) return { outcome: 'unchanged' };
     const answer = await propose({ companyId, uid, definition, config, task, parts });
     if (answer.invalid) {
-        await markFailed({ companyId, definition, taskId, reason: answer.reason, trigger });
+        await markFailed({ companyId, definition, taskId, reason: answer.reason, trigger, origin });
         return { outcome: 'failed', reason: answer.reason };
     }
     if (answer.empty) return { outcome: 'empty', reason: answer.reason };
-    await writeFill({ companyId, uid, definition, config, taskId, fieldValue: answer.fieldValue, hash: answer.hash, trigger });
+    await writeFill({ companyId, uid, definition, config, taskId, fieldValue: answer.fieldValue, hash: answer.hash, trigger, origin });
     return { outcome: 'filled' };
 }
 

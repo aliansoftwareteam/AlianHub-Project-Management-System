@@ -2,6 +2,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const logger = require('../../../Config/loggerConfig');
 const telemetry = require('../../../Config/telemetry');
+const writerLimits = require('../../../event/writerLimits');
 const { getAction } = require('./registry');
 const { evaluate } = require('./expression');
 const { render } = require('./template');
@@ -119,7 +120,7 @@ async function runOnce(companyId, run, rule, envelope, keepAlive = null) {
         const startedAt = Date.now();
         try {
             const attributes = { 'automation.run.id': context.runId, 'automation.rule.id': context.ruleId, 'automation.step.action': step.action || null, 'tenant.id': String(companyId) };
-            const { output, stop } = await telemetry.withTrace(context.traceId, () => telemetry.withSpan(`automation.step ${step.type}`, attributes, () => executeStep(step, { companyId, envelope, outputs, context })));
+            const { output, stop } = await telemetry.withTrace(context.traceId, () => telemetry.withSpan(`automation.step ${step.type}`, attributes, () => writerLimits.judgedAfter(envelope, () => executeStep(step, { companyId, envelope, outputs, context }))));
             if (step.id) outputs[step.id] = output;
             recorded[i] = { id: step.id || `s${i + 1}`, type: step.type, action: step.action || null, output, durationMs: Date.now() - startedAt };
 

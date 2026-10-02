@@ -60,7 +60,7 @@ const sync = async (envelope) => {
 
     const parent = await setFlag(companyId, parentId, { $ne: true }, true);
     if (!parent || !closedJustNow(envelope)) return null;
-    return domainEventBus.publishTaskEvent({ companyId, type: EVENT, doc: parent, actor: envelope.actor, depth: envelope.depth });
+    return domainEventBus.publishTaskEvent({ companyId, type: EVENT, doc: parent, actor: envelope.actor, depth: envelope.depth, narrowing: envelope.narrowing || null });
 };
 
 /* The bus drops what a listener returns, so a failure is logged here rather than left unhandled. */
