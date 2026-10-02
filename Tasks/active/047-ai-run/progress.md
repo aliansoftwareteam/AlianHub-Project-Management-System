@@ -1,6 +1,6 @@
 # Progress: 047, AI-run
 
-State at build 803 (`14.36.0-beta.803`), 2026-10-02 19:00 IST. Tracker: AP-441.
+State at build 806 (`14.36.0-beta.806`), 2026-10-02 21:00 IST. Tracker: AP-441.
 
 How to read a line: `[x]` is merged into `beta`, with its PR and build number. "Inside build 762" means the PR reached `beta` inside a combined PR:
 
@@ -15,7 +15,8 @@ How to read a line: `[x]` is merged into `beta`, with its PR and build number. "
 | 777 | #1449, the fifteenth | 790 | #1484, the nineteenth |
 | 781 | #1463, the sixteenth | 794 | #1488, the twentieth |
 | 786 | #1457, the seventeenth | 802 | #1500, the twenty-first |
-| | | 803 | #1509, the twenty-second |
+| 805 | #1524, a side batch | 803 | #1509, the twenty-second |
+| 806 | #1525, the twenty-third | | |
 
 Build 763 is #1394 alone. Build 768 is the docs PR #1411. "In review (#n)" has an open PR. "Needs the owner" waits for a step only the owner can take.
 
@@ -74,7 +75,7 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] S-2 A connected agent sets up an existing project from one plan: `project.setup` (#1420, inside build 771)
 - [x] S-2 A connected agent proposes a new project with its setup: `project.create` (#1433, inside build 772)
 - [x] S-2 The person picks the parts of a plan, a plan can hold rules and first tasks, and the browser test of the whole flow (#1496, inside build 802). The card after a first look in a browser (#1508, inside build 803)
-- [ ] S-2 A plan filed on the web route is stored, checked and shown as one filed over MCP, and a part only an owner or admin approves is shown locked. In review (#1515)
+- [x] S-2 A plan filed on the web route is stored, checked and shown as one filed over MCP, and a part only an owner or admin approves is shown locked (#1515, inside build 806)
 - [x] A project made or changed shows without a reload (#1466, inside build 790). Lists and folders follow live (#1482, inside build 794)
 - [x] T-2 The connected AI as a named member (#1410, inside build 769)
 - [x] T-4 Agent work visible in List, Table and Board, with a filter (#1409, inside build 769). "Group by who is working" is not built
@@ -106,9 +107,11 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 
 **Proof and hand checks, 2026-10-02**
 - [x] The ninth hand check, build 782: the eighth's six defects are fixed; nine new ones, answered by #1497 and #1498 (inside build 802)
-- [x] The tenth hand check, builds 792 to 802: thirteen defects. In review: #1517 (the task panel follows its own writes, search takes text as text, confirms say what happens) and #1519 (computed fields stay fresh, a field can be archived or deleted, dark mode)
+- [x] The tenth hand check, builds 792 to 802: thirteen defects, answered by #1517 (the task panel follows its own writes, search takes text as text, confirms say what happens) and #1519 (computed fields stay fresh, a field can be archived or deleted, dark mode), both inside build 806. Checked by hand on build 806: a new checklist shows at once, and so does its removal
+- [ ] The eleventh hand check, build 806: running
 - [x] Browser tests for the AI-run screens, core flows, two people, narrow and dark, accessibility (#1416, #1438, #1439, #1440, #1448, #1451, #1473, #1489)
-- [x] Three independent reads of the combined access rules (batches 20, 21 with 22, and 23). What they found is fixed in #1511 (in review), #1515 (in review) and `fix/batch-23-review`
+- [x] Three independent reads of the combined access rules (batches 20, 21 with 22, and 23). What they found is fixed in #1511, #1515 and `fix/batch-23-review` (all inside build 806)
+- [ ] A fourth read, of #1521 (a thing read by its id answers only to a person who can open it): fifteen findings, six of them steps back for ordinary use. The PR is held until they are fixed
 - [x] A user guide for working with your own AI app: `docs/guide/agents/` (#1490, build 799)
 
 **Later, optional (with a server key)**
@@ -119,12 +122,11 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 ## What is left
 
 **Can be done without the owner**
-- Merge batch 23 (`chore/integrate-batch-23`: #1510, #1511, #1513, #1515, #1516, #1517, #1519, #1520) after the fixes to its review, and the side batch (`chore/integrate-batch-22b`: #1504, #1505, #1507, #1512, #1514, #1518). Then #1521.
-- A hand check of build 803 and of batch 23 on the local build.
-- Revise the benchmark sheet's table against build 803: folders, a sprint, a rollup field, a dashboard card and a copy of a project now have tools.
-- T-4: group by who is working. T-2: "@" for a connected AI in chat.
-- S-2: a status or a field the approver's role may not make is still answered "not made" after the approval; the AI Inbox has no part ticks.
-- After a plan is approved, the list view can show the old status groups until a reload; a live Inbox refresh blanks the list. In progress (`fix/stale-views-after-live-changes`).
+- #1521 (private lists and reads by id): fix what its review found, then merge it as batch 24.
+- The eleventh hand check of build 806, and fixes for what it finds.
+- In progress on 2026-10-02 evening: T-4 "group by who is working"; the last plain-words batch (S-3); S-2, a part the approver's role may not make is shown locked before approval, and the AI Inbox gets part ticks; three server leftovers (work started on a timer inside a request, the kinds of file the speech upload takes, one browser test that pauses agents for its neighbours).
+- Revise the benchmark sheet's table against today's tools (a cloud session is writing it).
+- T-2: "@" for a connected AI in chat.
 - The benchmark gaps still open that have no slice: a reply in a task's comment thread, a doc's versions, a timesheet's submit and approve.
 
 **Needs the owner**
@@ -230,9 +232,20 @@ Each is reversible. The PR is named so the choice can be found.
 - The report tab still says "Sprint": it opens the Scrum sprint report (#1497).
 - A list emptied by deleting its tasks reads like a new list (#1498).
 
+### Choices to review, builds 804 to 806
+
+Each is reversible. The PR is named so the choice can be found.
+- Delete takes a field and its values away for good, as the dialog says; Archive hides the field and keeps the values. A field that a rollup or a formula reads cannot be deleted. A connected agent cannot delete a field (#1519).
+- A run that waits on a person no longer shows in the LIVE strip; it is in the Inbox under "Needs your approval". `{priority}` is no longer offered as a formula name (#1519).
+- A part of a setup plan that only an owner or admin approves is shown locked on the card, is not counted, and a re-tick does not bring it back (#1515).
+- A person named in a write (an assignee, a follower, a member of a rule) must be a member who can open the thing; account routes need a signed-in session, not a token (#1510, #1516).
+- A conversation is found only by the people in it (#1513).
+- A workflow run and an upload started by an agent ask the same rules as any other change by an agent (#1520).
+- A workspace made on the sign-up page gets its company row; migration 071 repairs older ones and wrote nothing here (#1504).
+
 ## Last step
 
-Batches 14 to 22 and twenty-two single PRs reached `beta` on 2026-10-02 between 11:30 and 18:41 IST (builds 773 to 803). The local server answers build 803. The browser tests of `beta` were red from 14:08 to 18:41; batch 22 carried the fixes. Batch 23 and a side batch are assembled and not yet pull requests. This docs PR ticks the lines above, regenerates the beta log and the API reference, and rewrites the handoff.
+Builds 804 to 806 reached `beta` on 2026-10-02 between 19:05 and 20:33 IST: the docs PR #1522, a side batch (#1524: the workspace rows repair with migration 071, bugs the new unit tests found, tests and the first-hour guide) and the twenty-third batch (#1525: nine PRs and the fixes to its own review). The local server answers build 806; migration 071 wrote nothing on the local database. #1521 is assembled as batch 24 and held: its review reported before it had a pull request, as the rule now is. This docs PR ticks the lines above and regenerates the beta log and the API reference.
 
 ## Blockers
 
@@ -277,3 +290,8 @@ Batches 14 to 22 and twenty-two single PRs reached `beta` on 2026-10-02 between 
 - About 15:25 the usage limit stopped every agent; it reset at 17:00 and each was resumed from its worktree.
 - A second read (batches 21 and 22) found ten gaps, four of them in the setup plan when it is filed on the web route. A third read (batch 23) found eight, three of them new with the refresh of computed fields; it reported before the batch had a pull request.
 - 18:41: the twenty-second batch merged (build 803) with the fixes that made the browser tests pass. Five of the failures were real, small faults that show only on a slow machine.
+- 19:05 to 19:21: the docs PR (#1522, build 804) and a side batch (#1524, build 805) merged. The side batch's first run failed on lint: a byte order mark typed into a test. Lint is now part of the checks every batch gets before its pull request.
+- 20:33: the twenty-third batch merged (#1525, build 806). Its first run found two tests that held only on their own branch: a fixture project that did not exist once people named in a rule must be members, and two buttons with one name on the field row.
+- The connection dropped from about 19:50 to 20:30; two agents stalled and were resumed.
+- A fourth read, of #1521, found fifteen things before the PR had a pull request: an unread badge that would stick, doc notices lost for a person a doc is shared with, a comparison that never matches on a real database (the test database hid it), a person unable to correct their own time, and about 175 database reads for one Inbox page. The PR went back to its author.
+- 20:50: seven local agents and five cloud sessions at work; the usage window stood at 23% and the week at 62%.

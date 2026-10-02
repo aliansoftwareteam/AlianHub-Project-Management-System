@@ -8,7 +8,7 @@ const R = require('./helpers/emailInRules');
 const { pinSessionTenant } = require('../../Config/tenant');
 const { canEditProject, canReadProject, keepVisibleProjectIds } = require('../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
-const { sprintIdentities, canSeeSprint, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
+const { sprintIdentities, canSeeSprint, hiddenSprintFilter, hiddenAmong } = require('../Sprints/helpers/sprintVisibility');
 const { actingUser } = require('../Sprints/helpers/actingUser');
 const { activeMemberIds } = require('../notification/activeMembers');
 const { peopleWhoOpen, keptOnProject } = require('../../Config/projectPeople');
@@ -158,14 +158,24 @@ exports.createInbox = async (req, res) => {
     } catch (e) { logger.error(`createInbox: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
-/* The filter of an inbox this person may change: their own, or any of the workspace's for an owner or admin, in a
- * project they can still open. */
+/* The filter of an inbox this person may change: their own, whatever became of their place on its project, so
+ * it is always theirs to switch off; or, for an owner or admin, any of a project they can open. */
 const manageableInbox = async (companyId, uid, id) => {
     if (!oid(id)) return null;
     const filter = { _id: oid(id), companyId: String(companyId), deletedStatusKey: { $ne: 1 } };
     if (!isPrivileged(await getRoleType(companyId, uid))) filter.createdBy = String(uid);
-    const inbox = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [filter, { _id: 1, ProjectID: 1 }] }, 'findOne');
-    return inbox && (await canReadProject(companyId, String(uid), String(inbox.ProjectID))).allowed ? filter : null;
+    const inbox = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [filter, { _id: 1, ProjectID: 1, createdBy: 1 }] }, 'findOne');
+    if (!inbox) return null;
+    return String(inbox.createdBy) === String(uid) || (await canReadProject(companyId, String(uid), String(inbox.ProjectID))).allowed ? filter : null;
+};
+
+/* A mail is filed in the name of the inbox's maker, so it is filed while they can still open that project and
+ * that list. An inbox made before makers were kept has nobody to ask. */
+const makerStillFiles = async (inbox) => {
+    const maker = String(inbox.createdBy || '');
+    if (!maker) return true;
+    if (!(await canReadProject(inbox.companyId, maker, String(inbox.ProjectID))).allowed) return false;
+    return !inbox.sprintId || isPrivileged(await getRoleType(inbox.companyId, maker)) || !(await hiddenAmong(inbox.companyId, maker, [String(inbox.sprintId)])).length;
 };
 
 // GET /api/v1/email-in/inboxes?projectId=
@@ -180,7 +190,8 @@ exports.listInboxes = async (req, res) => {
         const openable = new Set(await keepVisibleProjectIds(companyId, req.uid, rows.map((row) => String(row.ProjectID))));
         const privileged = isPrivileged(await getRoleType(companyId, req.uid));
         const closed = new Set(((await hiddenSprintFilter(companyId, req.uid, [...openable])).sprintId || { $nin: [] }).$nin.map(String));
-        const shown = rows.filter((row) => openable.has(String(row.ProjectID)) && !closed.has(String(row.sprintId)))
+        const own = (row) => String(row.createdBy) === String(req.uid);
+        const shown = rows.filter((row) => own(row) || (openable.has(String(row.ProjectID)) && !closed.has(String(row.sprintId))))
             .map((row) => ({ ...withAddress(row), canManage: privileged || String(row.createdBy) === String(req.uid) }));
         return res.send({ status: true, data: shown });
     } catch (e) { logger.error(`listInboxes: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
@@ -230,7 +241,7 @@ exports.receiveEmail = async (req, res) => {
         const token = String(req.params.token || '').toLowerCase();
         if (!R.isInboxToken(token)) return res.status(400).json({ status: false, statusText: 'Invalid inbox token.' });
         const inbox = await MongoDbCrudOpration(GLOBAL, { type: SCHEMA_TYPE.EMAIL_INBOXES, data: [{ token }] }, 'findOne');
-        if (!inbox || inbox.deletedStatusKey === 1 || inbox.enabled === false) {
+        if (!inbox || inbox.deletedStatusKey === 1 || inbox.enabled === false || !(await makerStillFiles(inbox))) {
             return res.status(404).json({ status: false, statusText: 'Inbox not found.' });
         }
         const parsed = R.parseInbound(req.body || {});

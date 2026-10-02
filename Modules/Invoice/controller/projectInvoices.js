@@ -183,7 +183,9 @@ exports.getInvoice = async (req, res) => {
             data: {
                 invoice,
                 trace: {
-                    tasks: taskIds.map((taskId) => openTasks[taskId] || { _id: taskId }).map((t) => ({ _id: String(t._id), key: t.TaskKey || '', name: t.TaskName || '', done: String(t.statusType || '') === billing.DONE_STATUS_TYPE })),
+                    tasks: taskIds.map((taskId) => (openTasks[taskId]
+                        ? { _id: taskId, key: openTasks[taskId].TaskKey || '', name: openTasks[taskId].TaskName || '', done: String(openTasks[taskId].statusType || '') === billing.DONE_STATUS_TYPE }
+                        : { _id: taskId, key: '', name: '', done: false, hidden: true })),
                     timelogs: (timelogs || []).map((l) => ({
                         _id: String(l._id),
                         taskId: String(l.TicketID || ''),

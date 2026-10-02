@@ -16,7 +16,7 @@ const world = require('./fixtures/accessWorld');
 const { getClientView, buildClientPayload } = require('../Modules/Milestone/controller/clientView');
 
 const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, T_SECRET, OPENS } = world;
-const { seed } = world.create(mockDb);
+const { seed, setRule } = world.create(mockDb);
 
 const EVERYONE = [['the owner', OWNER], ['an admin', ADMIN], ['a member on the private list', INSIDER], ['a member', OUTSIDER], ['a guest', GUEST]];
 
@@ -38,6 +38,12 @@ describe('what a client view says is waiting on the client', () => {
         await getClientView(verified({ uid, headers: { companyid: CID }, query: { projectId: P_OPEN }, params: {}, body: {} }), res);
 
         expect(waiting(res.body.data)).toEqual(OPENS[uid].includes(T_SECRET) ? ['Open task', 'Secret task'] : ['Open task']);
+    });
+
+    it('names them for a client whose role does not list tasks, since the view is the project\'s own', async () => {
+        setRule('task_list', null);
+        expect(waiting(await buildClientPayload(CID, P_OPEN, GUEST))).toEqual(['Open task']);
+        expect(waiting(await buildClientPayload(CID, P_OPEN, INSIDER))).toEqual(['Open task', 'Secret task']);
     });
 
     it('names on a public link no task of a private list', async () => {

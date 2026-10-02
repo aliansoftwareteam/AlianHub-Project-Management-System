@@ -6,6 +6,8 @@ const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } =
 const { ownSessionRefusal } = require('./controllerV2/sessionUser');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const mongoose = require('mongoose');
 
 /* Anyone who can open the task may log time on it; the task's project is read off the stored task. */
 const onAVisibleTask = requireProjectAccess({
@@ -15,6 +17,25 @@ const onAVisibleTask = requireProjectAccess({
         direct: (req) => req.body && req.body.projectId,
     }),
 });
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+/* A time entry stays its person's to correct and to delete after they can no longer open its task: the week it
+ * sits in is still theirs to put right. It opens that entry on its own task, and nothing else. */
+const ownEntryOr = (guard) => async (req, res, next) => {
+    try {
+        const body = req.body || {};
+        const companyId = String(req.headers['companyid'] || '');
+        const names = OBJECT_ID.test(String(body.timeSheetId || '')) && OBJECT_ID.test(companyId) && body.isEdit !== false;
+        const entry = names
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [{ _id: new mongoose.Types.ObjectId(String(body.timeSheetId)) }, { Loggeduser: 1, TicketID: 1 }] }, 'findOne')
+            : null;
+        const own = Boolean(entry) && String(entry.Loggeduser) === String(req.uid) && (!body.ticketId || String(entry.TicketID) === String(body.ticketId));
+        return own ? next() : guard(req, res, next);
+    } catch (error) {
+        return guard(req, res, next);
+    }
+};
 
 /* The storage engine writes to the bucket named in the body, while the middleware only verified the companyid header. */
 const captureRefusal = async (req) => {
@@ -164,7 +185,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/manualLogtime', onAVisibleTask, logged, ctrlV2.manualLogTime);
+    app.post('/api/v2/manualLogtime', ownEntryOr(onAVisibleTask), logged, ctrlV2.manualLogTime);
 
 
       /**
@@ -271,7 +292,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/deleteManualLogtime', agentsRefused('timelog.delete'), onAVisibleTask, ctrlV2.deleteManualLogtime);
+    app.post('/api/v2/deleteManualLogtime', agentsRefused('timelog.delete'), ownEntryOr(onAVisibleTask), ctrlV2.deleteManualLogtime);
 
         /**
      * @swagger

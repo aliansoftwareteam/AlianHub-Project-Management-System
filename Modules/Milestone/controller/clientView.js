@@ -7,7 +7,8 @@ const { buildClientView } = require('../helpers/clientProjection');
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const billing = require('./billing');
 const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
-const { readableTaskIds } = require('../../Tasks/helpers/taskWritePlacement');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
+const { hiddenAmong: hiddenListsAmong } = require('../../Sprints/helpers/sprintVisibility');
 
 // Client view (handoff 19d). The ONE place the guest payload is assembled.
 //
@@ -64,18 +65,24 @@ const collectUpdates = (ctx) => {
         .slice(0, 12);
 };
 
-/* A sign-off request names a task: to a signed-in person the ones they can open, and on a public link, which
- * anyone holding it reads, none that sits in a private list. */
+/* A sign-off request names a task of the project the view is of. To a signed-in person it names the ones outside
+ * the private lists they are not on: the view is the project's own, so the role's task list is not asked. On a
+ * public link, which anyone holding it reads, it names none that sits in a private list. */
 const tasksNamedTo = async (companyId, viewer, taskIds) => {
     if (!taskIds.length) return [];
-    if (viewer) return readableTaskIds(companyId, String(viewer), taskIds);
     const tasks = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { sprintId: 1 }] }, 'find') || [];
     const lists = [...new Set(tasks.map((task) => String(task.sprintId || '')).filter(isObjectIdString))];
-    const closed = lists.length
-        ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: { $in: lists.map((id) => new mongoose.Types.ObjectId(id)) }, private: true }, { _id: 1 }] }, 'find') || []
-        : [];
-    const closedIds = new Set(closed.map((list) => String(list._id)));
-    return tasks.filter((task) => !closedIds.has(String(task.sprintId || ''))).map((task) => String(task._id));
+    const closed = new Set(viewer ? await closedTo(companyId, String(viewer), lists) : await privateAmong(companyId, lists));
+    return tasks.filter((task) => !closed.has(String(task.sprintId || ''))).map((task) => String(task._id));
+};
+
+/* Owners and admins read past a list's privacy. */
+const closedTo = async (companyId, viewer, lists) => (isPrivileged(await getRoleType(companyId, viewer)) ? [] : hiddenListsAmong(companyId, viewer, lists));
+
+const privateAmong = async (companyId, lists) => {
+    if (!lists.length) return [];
+    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: { $in: lists.map((id) => new mongoose.Types.ObjectId(id)) }, private: true }, { _id: 1 }] }, 'find') || [];
+    return rows.map((list) => String(list._id));
 };
 
 /**

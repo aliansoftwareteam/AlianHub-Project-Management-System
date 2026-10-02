@@ -9,7 +9,6 @@ jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () 
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
-jest.mock('../Modules/notification-count/controller', () => ({ updateUnReadCommentsCountFun: jest.fn(async () => ({ status: true })) }));
 jest.mock('../Modules/Inbox/helpers/approvalQueue', () => ({ readQueue: jest.fn(async () => []), readApplied: jest.fn(async () => []), waitingCount: () => 0 }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -83,7 +82,9 @@ const noticesOf = (names) => [...names.map((name) => `notice of ${name}`), 'noti
 const mentionsOf = (names) => names.map((name) => `mention in ${name}`).sort();
 
 const inInbox = async (uid) => {
-    const { data } = await answered(inbox.list, { uid, query: { tab: 'all', limit: '50' } });
+    const answer = await answered(inbox.list, { uid, query: { tab: 'all', limit: '50' } });
+    if (!answer.data) throw new Error(JSON.stringify(answer));
+    const { data } = answer;
     const of = (sourceType) => data.items.filter((item) => item.sourceType === sourceType);
     return { notices: of('notification').map((item) => item.message).sort(), mentions: of('mention').map((item) => item.message).sort(), named: data.items.filter((item) => item.taskName).map((item) => item.message).sort(), hasMore: data.hasMore };
 };
@@ -132,5 +133,45 @@ describe('the notices and mentions a person reads', () => {
         const names = await opened(OUTSIDER);
         expect(names).toEqual(['the channel of a list']);
         expect(await inInbox(OUTSIDER)).toMatchObject({ notices: noticesOf(names), mentions: mentionsOf(names) });
+    });
+
+    it('still shows a person the notices of a doc shared with them, whatever project the doc is filed in', async () => {
+        mockDb.seed(SCHEMA_TYPE.NOTIFICATIONS, {
+            key: 'doc_comment_mention', type: 'docs', changeType: 'doc_comment', changeData: { pageId: 'page-1' }, message: 'notice of a shared page', projectId: P_PRIVATE,
+            userId: OWNER, receiverID: OUTSIDER, assigneeUsers: [OUTSIDER], notSeen: [OUTSIDER], notificationType: 'push', companyId: CID, createdAt: new Date(Date.UTC(2026, 8, 20, 8)),
+        });
+        expect((await inInbox(OUTSIDER)).notices).toContain('notice of a shared page');
+        expect((await inBell(OUTSIDER)).notices).toContain('notice of a shared page');
+    });
+
+    it('are judged by where the task is today, not by the place written on the row', async () => {
+        mockDb.seed(SCHEMA_TYPE.NOTIFICATIONS, {
+            key: 'task_reminder', type: 'tasks', message: 'reminder of a task of a private list', projectId: P_OPEN, taskId: T_SECRET,
+            userId: OUTSIDER, receiverID: OUTSIDER, assigneeUsers: [OUTSIDER], notSeen: [OUTSIDER], notificationType: 'push', companyId: CID, createdAt: new Date(Date.UTC(2026, 8, 20, 7)),
+        });
+        expect((await inInbox(OUTSIDER)).notices).not.toContain('reminder of a task of a private list');
+        expect((await inInbox(INSIDER)).notices).toContain('notice of a task');
+
+        rows(SCHEMA_TYPE.TASKS).find((task) => String(task._id) === T_OPEN).sprintId = L_SECRET;
+        const moved = await inInbox(OUTSIDER);
+        expect([moved.notices.includes('notice of a task'), moved.mentions.includes('mention in a task')]).toEqual([false, false]);
+        expect(moved.hasMore).toBe(false);
+        expect((await inBell(OUTSIDER)).notices).not.toContain('notice of a task');
+        expect((await inInbox(INSIDER)).notices).toContain('notice of a task');
+    });
+
+    it('are counted on the unread badge as the list shows them', async () => {
+        const counters = mockDb.seed('userId', { userId: OUTSIDER, notification_counts: 9, mention_counts: 9 });
+        const names = await opened(OUTSIDER);
+        const { data } = await answered(inbox.counts, { uid: OUTSIDER });
+        const stored = mockDb.store.userId.find((row) => String(row._id) === String(counters._id));
+
+        expect(data.primary).toBe(noticesOf(names).length + mentionsOf(names).length);
+        expect([stored.notification_counts, stored.mention_counts]).toEqual([noticesOf(names).length, mentionsOf(names).length]);
+
+        await answered(inbox.markAllRead, { uid: OUTSIDER, body: { tab: 'primary' } });
+        await answered(inbox.counts, { uid: OUTSIDER });
+        const after = mockDb.store.userId.find((row) => String(row._id) === String(counters._id));
+        expect([after.notification_counts || 0, after.mention_counts || 0]).toEqual([0, 0]);
     });
 });

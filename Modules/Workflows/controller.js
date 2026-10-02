@@ -281,10 +281,10 @@ exports.listRuns = async (req, res) => {
         const rows = (await store.listRuns(ctx.companyId, req.query || {})) || [];
         if (ctx.caller.privileged) return ok(res, 'Runs fetched.', await access.readableRuns(ctx.companyId, ctx.caller, rows));
         const visible = await access.visibleProjectIdsFor(ctx.companyId, ctx.caller);
-        const mine = [];
-        for (const run of rows) {
-            if (await readByMember(ctx.companyId, ctx.caller, visible, run)) mine.push(run);
-        }
+        const uid = String(ctx.caller.actor.userId);
+        const openTasks = new Set(await readableTaskIds(ctx.companyId, uid, rows.map((run) => run.taskId)));
+        const mine = rows.filter((run) => String(run.startedBy || '') === uid
+            || (run.projectId && visible && visible.includes(String(run.projectId)) && (!OBJECT_ID.test(String(run.taskId || '')) || openTasks.has(String(run.taskId)))));
         return ok(res, 'Runs fetched.', mine);
     } catch (error) {
         logger.error(`[workflow-api] listRuns: ${error.message}`);

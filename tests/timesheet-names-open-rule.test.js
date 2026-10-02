@@ -89,7 +89,8 @@ describe('time and plans kept against a task', () => {
     it.each(EVERYONE.filter(([, uid]) => uid !== GUEST))('are named behind an invoice line for %s only where they can open the task', async (who, uid) => {
         const { data } = await answered(getInvoice, { uid, params: { id: INVOICE } });
         expect(data.trace.tasks.map((task) => [task._id, task.name]).sort()).toEqual(Object.keys(PLACES).map((taskId) => [taskId, OPENS[uid].includes(taskId) ? PLACES[taskId][1] : '']).sort());
-        expect(data.trace.tasks.filter((task) => !task.name).every((task) => task.key === '' && task.done === false)).toBe(true);
+        expect(data.trace.tasks.filter((task) => !task.name).every((task) => task.key === '' && task.done === false && task.hidden === true)).toBe(true);
+        expect(data.trace.tasks.filter((task) => task.name).every((task) => task.hidden === undefined)).toBe(true);
     });
 
     it.each(EVERYONE.filter(([, uid]) => uid !== GUEST))('behind an invoice line are, for %s, the time rows of the project of the invoice, with a note only where they can open the task', async (who, uid) => {

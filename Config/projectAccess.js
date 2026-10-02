@@ -7,6 +7,7 @@ const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { allowsProject } = require('./tokenNarrowing');
 const { PRIVATE_PROJECTS, seesEveryPrivateProject } = require('./rulePermissions');
 const { PROJECT_AGENT_FIELDS } = require('./projectAgentFields');
+const { sprintIdentities } = require('../Modules/Sprints/helpers/sprintVisibility');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TEAM_PREFIX = 'tId_';
@@ -201,6 +202,46 @@ const decideProjectAccess = async (companyId, uid, projectId, { mode = WRITE, pe
     return { allowed: true };
 };
 
+const PROJECT_ACCESS_FIELDS = Object.freeze({ isPrivateSpace: 1, AssigneeUserId: 1, isPersonal: 1, personalOwner: 1 });
+
+/* What a read of many projects is judged by, read once for the person: their role, their own id and teams, and
+ * whether their role lists every private project. */
+const readStanding = async (companyId, uid) => {
+    const roleType = await getRoleType(String(companyId || ''), String(uid || ''));
+    const privileged = isPrivileged(roleType);
+    return {
+        uid: String(uid || ''),
+        roleType,
+        privileged,
+        identities: new Set(roleType === null || privileged ? [String(uid)] : await sprintIdentities(companyId, uid)),
+        everyPrivate: privileged || (roleType !== null && seesEveryPrivateProject(await evaluatePermission(companyId, uid, PRIVATE_PROJECTS))),
+    };
+};
+
+/* decideProjectAccess for a read, on a project row already read with PROJECT_ACCESS_FIELDS. */
+const opensProjectRow = (project, standing) => {
+    if (standing.roleType === null || !allowsProject(standing.uid, project._id)) return false;
+    if (project.isPersonal === true) return String(project.personalOwner) === standing.uid;
+    if (standing.privileged || project.isPrivateSpace !== true || standing.everyPrivate) return true;
+    return (project.AssigneeUserId || []).map(String).some((id) => standing.identities.has(id));
+};
+
+/* canReadProject for many projects in one read: `open` holds the rows the person can open, by id, and `found` the
+ * ids that have a project behind them at all. */
+const readableProjects = async (companyId, uid, projectIds, fields = {}) => {
+    const ids = [...new Set((projectIds || []).map(String))].filter((id) => OBJECT_ID.test(id));
+    const standing = await readStanding(companyId, uid);
+    const rows = ids.length ? await MongoDbCrudOpration(String(companyId), {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }, { ...fields, ...PROJECT_ACCESS_FIELDS }],
+    }, 'find') || [] : [];
+    return {
+        standing,
+        found: new Set(rows.map((row) => String(row._id))),
+        open: new Map(rows.filter((row) => opensProjectRow(row, standing)).map((row) => [String(row._id), row])),
+    };
+};
+
 const canEditProject = (companyId, uid, projectId, permissions = []) => decideProjectAccess(companyId, uid, projectId, { mode: WRITE, permissions });
 
 const canReadProject = (companyId, uid, projectId) => decideProjectAccess(companyId, uid, projectId, { mode: READ });
@@ -331,6 +372,10 @@ module.exports = {
     permissionsForProjectUpdate,
     canEditProject,
     canReadProject,
+    readStanding,
+    opensProjectRow,
+    readableProjects,
+    PROJECT_ACCESS_FIELDS,
     keepVisibleProjectIds,
     projectIdsFrom,
     requireProjectAccess,

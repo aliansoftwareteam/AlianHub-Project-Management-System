@@ -15,6 +15,7 @@ const verified = require('./fixtures/verifiedRequest');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/accessWorld');
 const inboxes = require('../Modules/EmailIn/controller');
+const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
 
 const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, L_OPEN, L_SECRET, L_PRIVATE, L_PERSONAL } = world;
 const { seed, rows } = world.create(mockDb);
@@ -34,6 +35,7 @@ const answered = async (handler, req) => {
     return res.body;
 };
 const kept = () => rows(SCHEMA_TYPE.EMAIL_INBOXES);
+const tokenOf = (listId) => `${'a'.repeat(8)}${listId}`;
 const inboxOf = (listId) => kept().find((row) => String(row.sprintId) === listId);
 
 const seedRows = () => {
@@ -41,7 +43,7 @@ const seedRows = () => {
     const parent = rows(SCHEMA_TYPE.RULES).find((rule) => rule.isParent);
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task_create', name: 'task_create', isParent: false, parentId: String(parent._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
     PLACES.forEach(([ProjectID, sprintId]) => mockDb.seed(SCHEMA_TYPE.EMAIL_INBOXES, {
-        token: `token-${sprintId}`, companyId: CID, name: `Inbox of ${sprintId}`, ProjectID, sprintId, sprintArray: { id: sprintId, name: 'List' }, enabled: true, createdBy: INSIDER, deletedStatusKey: 0,
+        token: tokenOf(sprintId), companyId: CID, name: `Inbox of ${sprintId}`, ProjectID, sprintId, sprintArray: { id: sprintId, name: 'List' }, enabled: true, createdBy: INSIDER, deletedStatusKey: 0,
     }));
 };
 
@@ -86,5 +88,24 @@ describe('an email inbox that turns mail into tasks', () => {
             expect([sprintId, (await answered(inboxes.deleteInbox, { uid, params: { id } })).status]).toEqual([sprintId, manages]);
             expect(inboxOf(sprintId).deletedStatusKey).toBe(manages ? 1 : 0);
         }
+    });
+
+    it('stays its maker\'s to switch off and to remove after they lose the project, and files nothing in their name meanwhile', async () => {
+        const id = String(inboxOf(L_PRIVATE)._id);
+        const mail = (listId) => answered(inboxes.receiveEmail, { params: { token: tokenOf(listId) }, body: { from: 'someone@example.test', subject: 'Printer is down', text: 'Since this morning.' } });
+        taskMongo.create.mockResolvedValue({ status: true, data: { _id: 'new-task' } });
+        await mail(L_PRIVATE);
+        expect(taskMongo.create).toHaveBeenCalledTimes(1);
+
+        rows(SCHEMA_TYPE.PROJECTS).find((project) => String(project._id) === P_PRIVATE).AssigneeUserId = [];
+        expect(await mail(L_PRIVATE)).toMatchObject({ status: false, statusText: 'Inbox not found.' });
+        expect(taskMongo.create).toHaveBeenCalledTimes(1);
+        await mail(L_OPEN);
+        expect(taskMongo.create).toHaveBeenCalledTimes(2);
+
+        expect((await answered(inboxes.listInboxes, { uid: INSIDER })).data.map((row) => String(row.sprintId))).toContain(L_PRIVATE);
+        expect((await answered(inboxes.updateInbox, { uid: INSIDER, params: { id }, body: { enabled: false } })).status).toBe(true);
+        expect((await answered(inboxes.deleteInbox, { uid: INSIDER, params: { id } })).status).toBe(true);
+        expect(inboxOf(L_PRIVATE).deletedStatusKey).toBe(1);
     });
 });

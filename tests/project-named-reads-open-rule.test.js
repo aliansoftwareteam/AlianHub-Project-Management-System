@@ -82,6 +82,19 @@ describe('the milestones of a project', () => {
     });
 });
 
+describe('whether the workspace has a weekly milestone', () => {
+    it.each(EVERYONE)('is answered to %s as a yes or a no, with nothing of the milestone', async (who, uid) => {
+        mockDb.seed(SCHEMA_TYPE.MILESTONE, { projectId: P_PRIVATE, milestoneName: 'Weekly retainer', billingPeriod: 'Weekly', amount: 900 });
+        const { body } = await call('../Modules/Milestone/routes', 'GET /api/v1/milestone/:id', { uid, params: { id: 'Weekly' } });
+        expect(body).toEqual({ billingPeriod: 'Weekly' });
+    });
+
+    it('is a no when there is none', async () => {
+        const { body } = await call('../Modules/Milestone/routes', 'GET /api/v1/milestone/:id', { uid: OUTSIDER, params: { id: 'Weekly' } });
+        expect(body).toEqual({});
+    });
+});
+
 describe('the repeats set on the tasks of a project', () => {
     it.each(EVERYONE)('are listed for %s without those of a private list they are not on', async (who, uid) => {
         const { body } = await call('../Modules/RecurringTasks/routes', 'GET /api/v1/recurring-tasks/project/:pid', { uid, params: { pid: P_OPEN } });

@@ -1,13 +1,12 @@
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
-const { getRoleType, isPrivileged, evaluatePermission } = require('../../../Config/permissionGuard');
-const { PRIVATE_PROJECTS, seesEveryPrivateProject } = require('../../../Config/rulePermissions');
-const { allowsProject } = require('../../../Config/tokenNarrowing');
+const { myCache } = require('../../../Config/config');
+const { readStanding, opensProjectRow, PROJECT_ACCESS_FIELDS } = require('../../../Config/projectAccess');
 const { agentOf } = require('../../../Config/agentRequest');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
-const { sprintIdentities, hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
-const { keepTaskListProjectIds } = require('../../Tasks/helpers/taskListProjects');
-const { CHANNEL_THREAD } = require('./conversation');
+const { hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
+const { readableTasks, TASK_READ_FIELDS } = require('../../Tasks/helpers/taskReadAccess');
+const { DOC_NOTICE_SECTION } = require('../../../Config/notificationKey');
 const { mentionsKeptFromAgent, noticesKeptFromAgent, withoutKept } = require('./agentChatRows');
 const { keptFromCaller } = require('./conversationRows');
 
@@ -16,56 +15,73 @@ const { keptFromCaller } = require('./conversationRows');
 // (./threadAccess), said as a clause for the query: a page, a count and a "there is more" never tell of a row that
 // is kept.
 
-const PROJECT_FIELDS = { isPrivateSpace: 1, AssigneeUserId: 1, isPersonal: 1, personalOwner: 1 };
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const SCOPE_TTL_SECONDS = 10;
 
-const opensProject = (project, uid, { privileged, everyPrivate, identities }) => {
-    if (!allowsProject(uid, project._id)) return false;
-    if (project.isPersonal === true) return String(project.personalOwner) === String(uid);
-    if (privileged || project.isPrivateSpace !== true || everyPrivate) return true;
-    return (project.AssigneeUserId || []).map(String).some((id) => identities.has(id));
+const find = async (companyId, type, filter, fields) => (await MongoDbCrudOpration(companyId, { type, data: [filter, fields] }, 'find')) || [];
+const idsOf = (rows) => rows.map((row) => String(row._id));
+
+/* The tasks the person's own rows name. A row is judged by where its task is today, and a row may carry no list at
+ * all, so the task itself is asked. A list's channel is told of with the list as its taskId: that names no task. */
+const tasksNamedTo = async (companyId, uid) => {
+    const [ofNotices, ofMentions] = await Promise.all([
+        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.NOTIFICATIONS, data: ['taskId', { receiverID: uid }] }, 'distinct'),
+        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.MENTIONS, data: ['taskId', { mentionIds: uid }] }, 'distinct'),
+    ]);
+    return [...new Set([...(ofNotices || []), ...(ofMentions || [])].map(String))].filter((id) => OBJECT_ID.test(id));
 };
 
-/* Rows name their place by projectId, sprintId and taskId. A list's channel is told of with the list as its taskId,
- * so a row is of a task only when the two differ. */
-const placesKeptFrom = async (companyId, uid) => {
-    const roleType = await getRoleType(companyId, uid);
-    const privileged = isPrivileged(roleType);
-    const [projects, identities, everyPrivate] = await Promise.all([
-        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{}, PROJECT_FIELDS] }, 'find'),
-        sprintIdentities(companyId, uid),
-        privileged ? true : evaluatePermission(companyId, uid, PRIVATE_PROJECTS).then(seesEveryPrivateProject),
-    ]);
-    const standing = { privileged, everyPrivate, identities: new Set(identities) };
-    const ids = (rows) => rows.map((project) => String(project._id));
-    const open = ids((projects || []).filter((project) => roleType !== null && opensProject(project, uid, standing)));
-    const closed = ids((projects || []).filter((project) => !open.includes(String(project._id))));
-    if (privileged) return closed.length ? [{ projectId: { $in: idForms(closed) } }] : [];
-
-    const [lists, withTasks] = await Promise.all([hiddenSprintIds(companyId, uid, open), keepTaskListProjectIds(companyId, uid, open)]);
-    const withoutTasks = open.filter((id) => !withTasks.includes(id));
-    return [
-        ...(closed.length ? [{ projectId: { $in: idForms(closed) } }] : []),
-        ...(lists.length ? [{ sprintId: { $in: idForms(lists) } }] : []),
-        ...(withoutTasks.length ? [{ projectId: { $in: idForms(withoutTasks) }, taskId: { $nin: [null, '', CHANNEL_THREAD] }, $expr: { $ne: ['$taskId', '$sprintId'] } }] : []),
-    ];
+const closedTasksOf = async (companyId, uid) => {
+    const named = await tasksNamedTo(companyId, uid);
+    if (!named.length) return [];
+    const tasks = await find(companyId, SCHEMA_TYPE.TASKS, { _id: { $in: idForms(named).filter((id) => typeof id !== 'string') } }, TASK_READ_FIELDS);
+    const open = new Set(idsOf(await readableTasks(companyId, uid, tasks)));
+    return idsOf(tasks).filter((id) => !open.has(id));
 };
 
-const keptFromReader = async (companyId, uid, keptFromAgent) => {
-    const [chat, places] = await Promise.all([
-        agentOf(uid) ? keptFromAgent(companyId, uid) : keptFromCaller(companyId, uid),
-        placesKeptFrom(String(companyId), String(uid)),
+/* What is kept from the person, as plain ids: the projects they cannot open, the private lists they are not on, and
+ * the tasks their rows name that they cannot open. Read once for a request and kept a few seconds, since the inbox
+ * asks for its counts and its page one after the other. */
+const scopeOf = async (companyId, uid) => {
+    const key = `readerRows:${companyId}:${uid}`;
+    const kept = myCache.get(key);
+    if (kept) return kept;
+    const standing = await readStanding(companyId, uid);
+    const projects = await find(companyId, SCHEMA_TYPE.PROJECTS, {}, PROJECT_ACCESS_FIELDS);
+    const open = idsOf(projects.filter((project) => opensProjectRow(project, standing)));
+    const [closedLists, closedTasks] = await Promise.all([
+        standing.privileged ? [] : hiddenSprintIds(companyId, uid, open).then((lists) => lists.map(String)),
+        closedTasksOf(companyId, uid),
     ]);
-    const kept = [...(chat.$nor || []), ...places];
+    const scope = { closedProjects: idsOf(projects).filter((id) => !open.includes(id)), closedLists, closedTasks };
+    myCache.set(key, scope, SCOPE_TTL_SECONDS);
+    return scope;
+};
+
+/* A doc is opened by its own sharing, whatever project it is filed in, so a doc's notice is not judged by the project. */
+const placesKept = ({ closedProjects, closedLists, closedTasks }) => [
+    ...(closedProjects.length ? [{ projectId: { $in: idForms(closedProjects) }, type: { $ne: DOC_NOTICE_SECTION.key } }] : []),
+    ...(closedLists.length ? [{ sprintId: { $in: idForms(closedLists) } }] : []),
+    ...(closedTasks.length ? [{ taskId: { $in: idForms(closedTasks) } }] : []),
+];
+
+const keptFromReader = async (companyId, uid, keptFromAgent, scope) => {
+    const chat = await (agentOf(uid) ? keptFromAgent(companyId, uid) : keptFromCaller(companyId, uid));
+    const kept = [...(chat.$nor || []), ...placesKept(scope)];
     return kept.length ? { $nor: kept } : {};
 };
 
-const mentionsKeptFromReader = (companyId, uid) => keptFromReader(companyId, uid, mentionsKeptFromAgent);
-const noticesKeptFromReader = (companyId, uid) => keptFromReader(companyId, uid, noticesKeptFromAgent);
+const mentionsKeptFromReader = async (companyId, uid) => keptFromReader(companyId, uid, mentionsKeptFromAgent, await scopeOf(String(companyId), String(uid)));
+const noticesKeptFromReader = async (companyId, uid) => keptFromReader(companyId, uid, noticesKeptFromAgent, await scopeOf(String(companyId), String(uid)));
 
-/* Both clauses for a request that reads or changes the person's notices and mentions, named as the inbox names its rows. */
+/* Both clauses for a request that reads or changes the person's notices and mentions, named as the inbox names its
+ * rows, and the tasks they are kept from, for a screen that names tasks beside its rows. */
 const inboxRowsKeptFromReader = async (companyId, uid) => {
-    const [notification, mention] = await Promise.all([noticesKeptFromReader(companyId, uid), mentionsKeptFromReader(companyId, uid)]);
-    return { notification, mention };
+    const scope = await scopeOf(String(companyId), String(uid));
+    const notification = await keptFromReader(companyId, uid, noticesKeptFromAgent, scope);
+    /* A person's two clauses are one and the same; an agent's differ by what marks a chat row in each collection. */
+    const mention = agentOf(uid) ? await keptFromReader(companyId, uid, mentionsKeptFromAgent, scope) : notification;
+    return { notification, mention, closedTasks: scope.closedTasks };
 };
 
 module.exports = { mentionsKeptFromReader, noticesKeptFromReader, inboxRowsKeptFromReader, withoutKept };
