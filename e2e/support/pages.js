@@ -59,6 +59,9 @@ function watchApiAnswers(page) {
 /* The first screen has asked for what it needs. Live connections can keep the network busy, so the wait is capped. */
 const firstScreenSettled = (page) => page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
+/* Screens and empty states fade in, and axe reads a half-faded colour as low contrast. */
+const fadesFinished = (page) => page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {}))));
+
 const taskPanel = (page) => page.getByRole('dialog', { name: 'Task detail' });
 
 const listRow = (page, taskName) => page.getByRole('row').filter({ has: page.getByRole('button', { name: taskName, exact: true }) });
@@ -70,4 +73,4 @@ async function chooseFromRowMenu(page, row, taskName, item) {
     await page.getByRole('menu', { name: `More actions for ${taskName}`, exact: true }).getByRole('menuitem', { name: item, exact: true }).click();
 }
 
-module.exports = { chooseFromRowMenu, firstScreenSettled, listRow, saveStorageState, settingsNav, signInThroughForm, skipFirstRun, taskPanel, watchApiAnswers };
+module.exports = { chooseFromRowMenu, fadesFinished, firstScreenSettled, listRow, saveStorageState, settingsNav, signInThroughForm, skipFirstRun, taskPanel, watchApiAnswers };
