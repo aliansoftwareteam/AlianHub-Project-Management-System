@@ -287,6 +287,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { sendProposalDecision } from '@/composable/agentProposals';
+import { dropProjects, showProjects } from '@/composable/approvedProjects';
 import { decideOne } from './approvalQueue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
@@ -327,7 +328,8 @@ const route = useRoute();
 const router = useRouter();
 const { t, locale } = useI18n();
 const $toast = useToast();
-const { getters } = useStore();
+const store = useStore();
+const { getters } = store;
 const { changeText } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 const { openRoute } = useHelper();
@@ -824,15 +826,17 @@ const undoApprovals = async (ids) => {
         const result = await decideOne(sendProposalDecision, id, 'undo', {}, t('Inbox.action_failed'));
         if (!result.ok) refused.push(result.error);
         else if (result.left.length) refused.push(t('Inbox.queue_undo_left', { why: result.left[0] }));
+        if (result.ok) dropProjects(store, result.trashedProjects);
     }
     busy.value = false;
     if (refused.length) $toast.error(refused[0], { position: 'top-right' });
     else $toast.success(t('Inbox.queue_undone'), { position: 'top-right' });
     loadCounts();
 };
-const onQueueDecided = ({ id, verb, undo: canUndo }) => {
+const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects }) => {
     queue.value = queue.value.filter((p) => p.proposalId !== id);
     loadCounts();
+    showProjects(store, madeProjects);
     if (verb !== 'approve') { showUndo(t('Inbox.queue_declined')); return; }
     // Approvals made while the bar is still up share one Undo, so approving several is undone together.
     const approved = [...(undo.value?.approved || []), id];

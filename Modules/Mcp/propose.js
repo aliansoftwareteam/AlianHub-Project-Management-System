@@ -1,6 +1,7 @@
 const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const permissions = require('../Agents/permissions');
+const { toolLabel } = require('../Agents/changeLabels');
 const manageFlag = require('./manageFlag');
 
 const SOURCE = 'mcp';
@@ -74,7 +75,7 @@ const fileable = async (ctx, tool, params) => {
     if (!holder.allowed) await refuse(holder.reason);
 };
 
-const changeOf = (tool, params) => ({ action: tool.action, params, label: `${tool.name} via MCP`, rating: actions.rating(tool.action) });
+const changeOf = (tool, params) => ({ action: tool.action, params, label: toolLabel(tool.name), rating: actions.rating(tool.action) });
 
 const file = async (ctx, proposal) => {
     // Loaded on first use: it pulls in the agent engine, which listing tools never needs.

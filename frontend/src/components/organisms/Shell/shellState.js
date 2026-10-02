@@ -44,7 +44,6 @@ export const shellState = reactive({
     clips: false,
     reminders: false,
     talkToText: false,
-    tour: false,
     tourAsked: false,
     moreOpen: false,
     profileOpen: false,
