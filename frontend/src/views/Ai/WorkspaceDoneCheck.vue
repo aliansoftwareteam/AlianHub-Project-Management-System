@@ -21,8 +21,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, inject, onBeforeUnmount, ref, watch } from "vue";
 import { useAccounts } from "./useAccounts";
+import { AGENTS_CHANGED_EVENT, POLICY_CHANGE } from "./agentFeed";
 
 defineOptions({ name: "WorkspaceDoneCheck" });
 
@@ -30,7 +31,8 @@ const props = defineProps({
     privileged: { type: Boolean, default: false }
 });
 
-const { policy, saveCheckBeforeDone } = useAccounts();
+const { policy, loadPolicy, saveCheckBeforeDone } = useAccounts();
+const socket = inject("$socket", null);
 
 const saving = ref(false);
 const saved = ref(false);
@@ -58,4 +60,11 @@ const onToggle = async (event) => {
         box.checked = on.value;
     }
 };
+
+const onAgentsChanged = (change) => { if (change?.kind === POLICY_CHANGE && !saving.value) loadPolicy().catch(() => {}); };
+watch(() => socket?.value, (next, previous) => {
+    previous?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
+    next?.on?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
+}, { immediate: true });
+onBeforeUnmount(() => socket?.value?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged));
 </script>
