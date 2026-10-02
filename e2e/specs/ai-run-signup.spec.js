@@ -5,7 +5,8 @@ const { PASSWORD, assertOk, uniqueSuffix } = require('../support/fixtures');
 const { resolveMongoUrl } = require('../support/env');
 const { skipFirstRun } = require('../support/pages');
 
-test.describe.configure({ timeout: 30000 });
+// The suite's server has no ready-made company, so the workspace is set up while the person waits.
+test.describe.configure({ timeout: 60000 });
 
 /* Sign-up through the real pages: the account is made by the API (mail is not delivered in the suite, so the
  * address is marked verified the way tests/integration/invitation-signed-in-accept.int.test.js does), then the
@@ -26,9 +27,7 @@ async function registerAccount(state, { firstName, lastName }) {
 test.describe('sign-up', () => {
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
-    // In CI the page is still on the last sign-up step 20 s after "Skip — start blank"; not yet known whether the
-    // workspace is slow to be made there or the step needs more than this test gives it.
-    test.fixme('ends on Connect your AI, and Skip for now lands on Home', async ({ page, state }) => {
+    test('ends on Connect your AI, and Skip for now lands on Home', async ({ page, state }) => {
         const email = await registerAccount(state, { firstName: 'Sia', lastName: 'Signup' });
 
         await page.goto('/#/login');
@@ -40,7 +39,8 @@ test.describe('sign-up', () => {
         await page.getByRole('button', { name: 'Continue', exact: true }).click();
         await page.getByRole('button', { name: 'Skip — start blank' }).click();
 
-        await expect(page).toHaveURL(/#\/[0-9a-f]{24}\/welcome\/connect-ai/, { timeout: 20000 });
+        await expect(page.getByRole('status').filter({ hasText: /workspace/ })).toBeVisible();
+        await expect(page).toHaveURL(/#\/[0-9a-f]{24}\/welcome\/connect-ai/, { timeout: 40000 });
         await expect(page.getByRole('heading', { level: 1, name: 'Connect your AI' })).toBeVisible();
         await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
 

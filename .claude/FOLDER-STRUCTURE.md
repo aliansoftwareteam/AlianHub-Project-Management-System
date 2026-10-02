@@ -217,6 +217,8 @@ AlianHub-Project-Management-System/
 **Rule:** PascalCase folder names, camelCase files
 **Never put:** Global utilities (use utils/ instead), configuration (use Config/)
 
+**Agents and MCP:** `Modules/Agents/` holds what an agent may do (registry, project rule, proposals, undo, audit). `Modules/Mcp/` holds the MCP server and its tools. See [AGENTS-AND-MCP.md](AGENTS-AND-MCP.md).
+
 ### frontend/
 **Purpose:** Vue.js single-page application
 **Build output:** frontend/dist/ (created by `npm run build`)

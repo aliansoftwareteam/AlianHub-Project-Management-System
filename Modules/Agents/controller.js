@@ -588,6 +588,20 @@ exports.putRoutingPolicy = async (req, res) => {
     } catch (e) { logger.error(`putRoutingPolicy: ${e.message}`); return fail(res, e.message, 500); }
 };
 
+/* What the AI Inbox page draws a proposal from, beside the proposal itself: for a person, the one card of a batch
+ * (the same the Inbox queue shows, naming only the tasks that person can read), and which changes came with no words of their own. */
+const asCards = async (companyId, caller, listed) => {
+    const batches = caller.human
+        ? await require('./intentPreview').forBatches(companyId, caller.actor.userId, listed).catch((e) => { logger.error(`proposal cards: ${e.message}`); return new Map(); })
+        : new Map();
+    const { markOf } = require('./changeLabels');
+    return listed.map((p) => ({
+        ...p,
+        changes: (Array.isArray(p.changes) ? p.changes : []).map((change) => ({ ...change, ...markOf(change) })),
+        ...(batches.has(String(p._id)) ? { batch: batches.get(String(p._id)) } : {}),
+    }));
+};
+
 /* GET /api/v2/agents/proposals?status=pending&bucket=primary|later&agentId= */
 exports.listProposals = async (req, res) => {
     try {
@@ -598,7 +612,7 @@ exports.listProposals = async (req, res) => {
         const readScope = await readScopeOf(companyId, caller);
         // An agent reads what waits; whether a row is a person's to decide is said to a person.
         const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope, viewer: caller.human ? caller : null });
-        return res.send({ status: true, statusText: 'Proposals fetched.', data: out.proposals, counts: out.counts });
+        return res.send({ status: true, statusText: 'Proposals fetched.', data: await asCards(companyId, caller, out.proposals), counts: out.counts });
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
 

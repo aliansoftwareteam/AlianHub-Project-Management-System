@@ -1,4 +1,4 @@
-/* Task 047, T-5: how many agents work in a project at once, and "Pause all", on the project's detail screen. */
+/* Task 047, T-5: how many agents work in a project at once, how many tasks an agent changes on its own, and "Pause all", on the project's detail screen. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import fs from 'node:fs';
@@ -19,9 +19,11 @@ const DETAIL = fs.readFileSync(path.resolve(__dirname, '../../src/views/Projects
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
 const refused = (statusText) => Promise.reject(Object.assign(new Error('Request failed'), { response: { status: 403, data: { status: false, statusText } } }));
 const answer = (over = {}) => ({
-    limits: { atOnce: 3, paused: false },
-    defaults: { atOnce: 3, paused: false },
+    limits: { atOnce: 3, paused: false, directTasks: 10 },
+    defaults: { atOnce: 3, paused: false, directTasks: 10 },
     atOnceRange: { min: 1, max: 20 },
+    directTasksRange: { min: 1, max: 100 },
+    directTasksMinutes: 10,
     canEdit: true,
     ...over,
 });
@@ -35,6 +37,7 @@ const mountCard = async (data = answer(), onPut = null) => {
     return wrapper;
 };
 const select = (wrapper) => wrapper.find('[data-test="at-once"]');
+const directTasks = (wrapper) => wrapper.find('[data-test="direct-tasks"]');
 const pauseButton = (wrapper) => wrapper.find('[data-test="pause"]');
 const resumeButton = (wrapper) => wrapper.find('[data-test="resume"]');
 
@@ -42,7 +45,7 @@ describe('ProjectAgentLimitsCard', () => {
     beforeEach(() => { apiRequest.mockReset(); toast.success.mockReset(); });
 
     it('shows the limit the project holds, with every number the server allows', async () => {
-        const wrapper = await mountCard(answer({ limits: { atOnce: 5, paused: false } }));
+        const wrapper = await mountCard(answer({ limits: { atOnce: 5, paused: false, directTasks: 10 } }));
         expect(apiRequest).toHaveBeenCalledWith('get', URL, undefined);
         expect(select(wrapper).element.value).toBe('5');
         expect(select(wrapper).findAll('option').map((option) => option.element.value)).toEqual(Array.from({ length: 20 }, (_, index) => String(index + 1)));
@@ -60,6 +63,31 @@ describe('ProjectAgentLimitsCard', () => {
         expect(toast.success).toHaveBeenCalledWith('AgentLimits.saved', expect.anything());
     });
 
+    it('shows how many tasks an agent changes on its own, with every number the server allows, and saves the one chosen', async () => {
+        const wrapper = await mountCard(answer({ limits: { atOnce: 3, paused: false, directTasks: 25 } }));
+        expect(directTasks(wrapper).element.value).toBe('25');
+        expect(directTasks(wrapper).findAll('option').map((option) => option.element.value)).toEqual(Array.from({ length: 100 }, (_, index) => String(index + 1)));
+        expect(wrapper.find(`label[for="${directTasks(wrapper).attributes('id')}"]`).text()).toBe('AgentLimits.direct_tasks_label');
+        expect(wrapper.find(`#${directTasks(wrapper).attributes('aria-describedby')}`).text()).toBe('AgentLimits.direct_tasks_about');
+        await directTasks(wrapper).setValue('40');
+        await flushPromises();
+        expect(apiRequest).toHaveBeenLastCalledWith('put', URL, { directTasks: 40 });
+        expect(directTasks(wrapper).element.value).toBe('40');
+        expect(select(wrapper).element.value).toBe('3');
+        expect(toast.success).toHaveBeenCalledWith('AgentLimits.saved', expect.anything());
+    });
+
+    it('puts the old count back when the server refuses it, and leaves it out when the server names no range for it', async () => {
+        const wrapper = await mountCard(answer(), () => refused('directTasks must be a whole number from 1 to 100.'));
+        await directTasks(wrapper).setValue('99');
+        await flushPromises();
+        expect(directTasks(wrapper).element.value).toBe('10');
+        expect(wrapper.find('[data-test="error"]').text()).toBe('directTasks must be a whole number from 1 to 100.');
+        const older = await mountCard(answer({ directTasksRange: undefined }));
+        expect(directTasks(older).exists()).toBe(false);
+        expect(select(older).exists()).toBe(true);
+    });
+
     it('pauses all agents with one button, says so on the card, and offers to resume', async () => {
         const wrapper = await mountCard();
         await pauseButton(wrapper).trigger('click');
@@ -75,9 +103,10 @@ describe('ProjectAgentLimitsCard', () => {
     });
 
     it('a person who cannot change them reads both, with no control to use', async () => {
-        const wrapper = await mountCard(answer({ limits: { atOnce: 4, paused: true }, canEdit: false }));
+        const wrapper = await mountCard(answer({ limits: { atOnce: 4, paused: true, directTasks: 10 }, canEdit: false }));
         expect(select(wrapper).element.disabled).toBe(true);
         expect(select(wrapper).element.value).toBe('4');
+        expect(directTasks(wrapper).element.disabled).toBe(true);
         expect(wrapper.find('[data-test="paused-note"]').exists()).toBe(true);
         expect(pauseButton(wrapper).exists()).toBe(false);
         expect(resumeButton(wrapper).exists()).toBe(false);

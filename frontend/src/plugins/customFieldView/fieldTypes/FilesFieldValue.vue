@@ -123,7 +123,7 @@ const listShown = computed(() => !props.compact || open.value);
 
 const chipLabel = computed(() => {
     if (!files.value.length) return t("List.cell_set", { field: props.label });
-    const value = t("FieldTypes.files_count", { n: files.value.length });
+    const value = t("FieldTypes.files_count", { n: files.value.length }, files.value.length);
     return t(props.editable ? "List.cell_change" : "List.cell_value", { field: props.label, value });
 });
 

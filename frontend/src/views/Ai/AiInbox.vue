@@ -90,7 +90,7 @@
                             <span v-if="waitingDaysOf(p)" class="ah-chip ah-chip--warn" data-test="proposal-waiting">{{ t('Ai.waiting_days', { n: waitingDaysOf(p) }, waitingDaysOf(p)) }}</span>
                             <span class="ai-item__time ah-mono">{{ shortTime(p.createdAt) }}</span>
                         </div>
-                        <div class="ai-item__what">{{ proposalTitle(t, p) }}</div>
+                        <div class="ai-item__what">{{ titleOf(p) }}</div>
                         <div class="ai-item__why">{{ p.why }}</div>
                     </button>
                 </div>
@@ -130,16 +130,20 @@
                         <span v-if="selectedSkillSource">· <span data-test="proposal-skill-source">{{ selectedSkillSource }}</span></span>
                         <span>· {{ shortTime(selected.createdAt) }}</span>
                     </div>
-                    <h2 class="ai-detail__what">{{ proposalTitle(t, selected) }}</h2>
+                    <h2 class="ai-detail__what">{{ titleOf(selected) }}</h2>
 
                     <div class="ah-label">{{ $t('Ai.why') }}</div>
                     <p class="ai-detail__why">{{ selected.why }}</p>
 
                     <div class="ah-label">{{ changesLabel }}</div>
-                    <template v-for="(change, i) in editable" :key="i">
+                    <div v-if="selected.batch" class="ai-batch">
+                        <IntentPreview :preview="selected.batch" @open-task="openBatchTask" />
+                        <span v-if="!allReversible" class="ah-chip ah-chip--warn ai-batch__mark" data-test="batch-permanent">{{ $t('Ai.not_reversible') }}</span>
+                    </div>
+                    <template v-for="(change, i) in selected.batch ? [] : editable" :key="i">
                         <div class="ai-change">
                             <ShellIcon :name="change.reversible ? 'check' : 'alert'" :size="14" :class="change.reversible ? 'ah-muted' : ''" />
-                            <span class="ai-change__label">{{ change.label }}</span>
+                            <span class="ai-change__label">{{ changeLabel(t, change) }}</span>
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ $t('Ai.not_reversible') }}</span>
                             <button v-if="editing" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="editable.splice(i, 1)">{{ $t('Ai.drop') }}</button>
                         </div>
@@ -165,7 +169,7 @@
 
                     <div v-if="selected.status === 'pending' && canDecide && !declining" class="ai-actions">
                         <button type="button" class="ah-btn ah-btn--primary" :disabled="busy || !editable.length" @click="onApprove">{{ $t('Ai.approve') }}</button>
-                        <button type="button" class="ah-btn ah-btn--secondary" :disabled="busy" @click="editing = !editing">
+                        <button v-if="!selected.batch" type="button" class="ah-btn ah-btn--secondary" :disabled="busy" data-test="edit-then-approve" @click="editing = !editing">
                             {{ editing ? $t('Ai.done_editing') : $t('Ai.edit_then_approve') }}
                         </button>
                         <button type="button" class="ah-btn ah-btn--ghost" :disabled="busy" data-test="decline" @click="openDecline">{{ $t('Ai.decline') }}</button>
@@ -198,14 +202,20 @@
 
 <script setup>
 import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vue';
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiFeedback from "@/components/molecules/AiFeedback/AiFeedback.vue";
+import IntentPreview from "@/components/molecules/IntentPreview/IntentPreview.vue";
+import { intentSummary } from "@/components/molecules/IntentPreview/intentLines";
+import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
+import { dropProjects, showProjects } from "@/composable/approvedProjects";
+import { madeProjectIds, trashedProjectIds } from "@/composable/approvedProjectIds";
 import AiSidebar from "./AiSidebar.vue";
 import WorkflowApprovalRow from "./WorkflowApprovalRow.vue";
 import SlackPostPreview from "./SlackPostPreview.vue";
@@ -219,6 +229,7 @@ import { taintSourcesLine, taintSourcesOf } from "./taintText";
 import { skillSourceLabel } from "./skillSourceText";
 import { proposalTitle, sortProposals, waitingDaysOf } from "./plainLabels";
 import { useAgentAccess } from "./agentAccess";
+import { changeLabel } from "./agentActionLabels";
 
 defineOptions({ name: "AiInboxPage" });
 
@@ -226,6 +237,8 @@ const GATE_OWNER_ADMIN = "owner_admin";
 const LOCKED_BY_RIGHTS = "own_rights";
 
 const { t, te } = useI18n();
+const store = useStore();
+const companyId = inject("$companyId", null);
 const { canManage, userId, mayUndo } = useAgentAccess();
 const $toast = useToast();
 const { proposals, counts, loadProposals, loadSummary, decide } = useAgents();
@@ -280,6 +293,10 @@ const taintLine = (marker) => taintSourcesLine(t, taintSourcesOf(marker));
 const selectedSkillSource = computed(() => skillSourceLabel(t, selected.value?.skillSource));
 const sortedProposals = computed(() => sortProposals(proposals.value, sortOrder.value));
 const gateChip = (gate) => t(gate === GATE_OWNER_ADMIN ? "Ai.gate_chip_owner_admin" : "Ai.gate_chip");
+// A connected agent's batch is filed under a count of changes; its card says how many tasks and what changes on them.
+const titleOf = (p) => intentSummary(t, p.batch) || proposalTitle(t, p);
+const allReversible = computed(() => editable.value.length > 0 && editable.value.every((c) => c.reversible));
+const openBatchTask = (task) => openTask({ companyId: companyId?.value, projectId: task.projectId, sprintId: task.sprintId, folderId: task.folderId || "", taskId: task.taskId });
 
 const tabs = computed(() => [
     { key: "pending", label: "Ai.waiting", count: counts.value.waiting || 0 },
@@ -299,7 +316,7 @@ const slackDeliveryOf = (change) => (selected.value?.delivery || [])[editable.va
 
 const changesLabel = computed(() => {
     const list = editable.value;
-    const all = list.length && list.every((c) => c.reversible);
+    const all = allReversible.value;
     const unit = list.length === 1 ? t("Ai.action_one") : t("Ai.action_other");
     return t("Ai.what_changes", { n: list.length, unit, note: all ? t("Ai.all_reversible") : t("Ai.some_permanent") });
 });
@@ -383,6 +400,7 @@ const onApprove = async () => {
         const changed = editable.value.length !== original.length;
         const out = await decide(selected.value._id, "approve", changed ? { changes: editable.value } : {});
         const unapplied = (out?.applied || []).filter((a) => !a.ok);
+        showProjects(store, madeProjectIds(out));
         const id = await afterDecision(unapplied.length ? "" : t("Ai.applied"));
         if (unapplied.length) $toast.error(t("Ai.applied_with_failures", { n: unapplied.length, error: unapplied[0].error || "" }), { position: "top-right" });
         if (out?.undoUntil && mayUndo({ decidedBy: out.decidedBy || userId.value })) {
@@ -422,7 +440,7 @@ const onUndo = async () => {
     undo.value = null;
     if (!id) return;
     try {
-        await decide(id, "undo", {});
+        dropProjects(store, trashedProjectIds(await decide(id, "undo", {})));
         await Promise.all([reload(), loadSummary().catch(() => {})]);
         $toast.success(t("Ai.undone"), { position: "top-right" });
     } catch (e) {
@@ -458,4 +476,6 @@ onMounted(() => Promise.all([reload(), loadApprovals(), route?.query?.report ? o
 .ai-decline__skip { border: 0; background: transparent; color: var(--ink-2); font: var(--text-small); cursor: pointer; text-decoration: underline; padding: 0 4px; }
 .ai-detail__feedback { margin-top: 12px; }
 .ai-locked { margin-top: 14px; }
+.ai-batch { display: flex; flex-direction: column; gap: 6px; margin-bottom: 7px; min-width: 0; }
+.ai-batch__mark { align-self: flex-start; }
 </style>

@@ -1,8 +1,5 @@
 {
   "keys": {
-    "Channel.confirm_delete_channel": [
-      "setting name"
-    ],
     "Enforcement.kill_switch": [
       "setting name"
     ],
@@ -71,12 +68,6 @@
     ],
     "Toast.Sprint closed successfully": [
       "sprint"
-    ],
-    "Upgrades.You_have_reached_the_free_plan_limit": [
-      "setting name"
-    ],
-    "Upgrades.require_upgrade_message": [
-      "setting name"
     ],
     "ViewListdescription.reports_view": [
       "sprint"

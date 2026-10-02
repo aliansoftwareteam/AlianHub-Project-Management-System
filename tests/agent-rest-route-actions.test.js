@@ -308,6 +308,12 @@ const PROPOSED_ON_THE_WEB = {
         'changing a field': fieldUpdate({ fieldTitle: 'Renamed' }),
         'removing a field': fieldUpdate({ isDelete: true }),
     },
+    'folder.create': {
+        'adding a folder': ['POST /api/v1/folder', { projectId: P_OPEN, name: 'Design' }],
+    },
+    'list.sprint.set': {
+        'making a list a sprint': ['POST /api/v2/sprints/scrum', { projectId: P_OPEN, sprintId: L_OPEN }, {}, 'sprint.scrum'],
+    },
     'view.create': {
         'adding a saved view': ['POST /api/v1/project/:id/views', { sourceViewId: 'view-1', title: 'Mine', settings: {} }, inProject],
         'changing a saved view': ['PUT /api/v1/project/:id/view-settings', { viewId: 'view-1', settings: {} }, inProject],

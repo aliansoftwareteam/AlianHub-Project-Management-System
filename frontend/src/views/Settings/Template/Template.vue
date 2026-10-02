@@ -41,7 +41,7 @@
                         <div class="tp__name">{{ tpl.TemplateName }}</div>
                         <div class="ah-small tp__desc">{{ tpl.Description }}</div>
                     </div>
-                    <span class="ah-mono tp__mono">{{ $t('Settings.statuses_count', { n: (tpl.taskStatusData || []).length }) }}<br>{{ $t('Settings.task_types_count', { n: (tpl.TemplateTaskType || []).length }) }}</span>
+                    <span class="ah-mono tp__mono">{{ $t('Settings.statuses_count', { n: (tpl.taskStatusData || []).length }, (tpl.taskStatusData || []).length) }}<br>{{ $t('Settings.task_types_count', { n: (tpl.TemplateTaskType || []).length }, (tpl.TemplateTaskType || []).length) }}</span>
                     <span class="ah-mono tp__mono">{{ viewsCount(tpl) }}</span>
                     <span class="ah-small">{{ categoryType === 'basicData' ? companyName : $t('Settings.built_in') }}</span>
                     <span class="tp__action">{{ $t('Settings.view') }}</span>

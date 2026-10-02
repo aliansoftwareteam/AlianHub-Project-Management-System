@@ -120,14 +120,20 @@
                     </div>
                 </article>
 
-                <div v-if="filter === 'agent' && !agentProposals.length && !proposalsFailed" class="tv-empty">
-                    <strong>{{ $t('Time.agent_section') }}</strong>
-                    <span>{{ $t('Time.agent_empty') }}</span>
-                </div>
-                <div v-else-if="!visibleCards.length && !loading" class="tv-empty">
-                    <strong>{{ $t('Time.queue_empty_title') }}</strong>
-                    <span>{{ $t('Time.queue_empty') }}</span>
-                </div>
+                <EmptyState
+                    v-if="filter === 'agent' && !agentProposals.length && !proposalsFailed"
+                    illustration="inbox"
+                    data-test="approvals-empty-agent"
+                    :title="$t('Time.agent_section')"
+                    :message="$t('Time.agent_empty')"
+                />
+                <EmptyState
+                    v-else-if="!visibleCards.length && !loading"
+                    illustration="inbox"
+                    data-test="approvals-empty"
+                    :title="$t('Time.queue_empty_title')"
+                    :message="$t('Time.queue_empty')"
+                />
                 <div v-else-if="loading && !visibleCards.length" class="ah-small">{{ $t('Time.loading') }}</div>
             </div>
         </template>
@@ -136,6 +142,7 @@
 </template>
 
 <script setup>
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import { ref, computed, inject, nextTick, onMounted, watch } from 'vue';
 import { useStore } from 'vuex';
@@ -149,8 +156,11 @@ import { formatHm } from '@/composable/useTimer';
 import { canApprove } from './approvalAccess';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
+import { showProjects } from '@/composable/approvedProjects';
+import { madeProjectIds } from '@/composable/approvedProjectIds';
 import ProposalWhyDialog from './ProposalWhyDialog.vue';
 import { proposalTitle } from '@/views/Ai/plainLabels';
+import { changeLabel } from '@/views/Ai/agentActionLabels';
 
 /**
  * @typedef {Object} AgentProposal
@@ -165,7 +175,8 @@ import { proposalTitle } from '@/views/Ai/plainLabels';
 
 defineOptions({ name: 'ApprovalsQueue' });
 
-const { getters } = useStore();
+const store = useStore();
+const { getters } = store;
 const router = useRouter();
 const { t } = useI18n();
 const { getUser } = useGetterFunctions();
@@ -256,7 +267,7 @@ const toAgentProposal = (p) => {
     return {
         id: String(p._id), agentName: p.agentName || '', summary: proposalTitle(t, p), detail: p.why || '',
         reversible: changes.length > 0 && changes.every((c) => c && c.reversible), createdAt: p.createdAt,
-        changes: changes.filter(Boolean).map((c) => ({ label: c.label || c.action || '', reversible: Boolean(c.reversible) })),
+        changes: changes.filter(Boolean).map((c) => ({ label: changeLabel(t, c) || c.action || '', reversible: Boolean(c.reversible) })),
     };
 };
 const loadProposals = async () => {
@@ -305,6 +316,7 @@ const decide = async (card, action, reason) => {
     } else {
         const body = bodyOf(await sendProposalDecision(card.row.id, action === 'approve' ? 'approve' : 'decline', reason ? { reason } : {}));
         if (!body.status) throw new Error(body.statusText);
+        showProjects(store, madeProjectIds(body.data));
         agentProposals.value = agentProposals.value.filter((r) => r.id !== card.row.id);
     }
 };

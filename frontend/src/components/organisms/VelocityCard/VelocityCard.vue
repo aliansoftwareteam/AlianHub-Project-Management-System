@@ -2,7 +2,7 @@
     <div class="dc-body vel">
         <div class="dc-metric">
             <span class="dc-num" data-test="velocity-average">{{ scale.average }}</span>
-            <span class="dc-sub">{{ scale.forecast.ok ? $t('Dash.velocity_next', { low: scale.forecast.low, high: scale.forecast.high }) : $t('Dash.velocity_avg', { n: rows.length }) }}</span>
+            <span class="dc-sub">{{ scale.forecast.ok ? $t('Dash.velocity_next', { low: scale.forecast.low, high: scale.forecast.high }) : $t('Dash.velocity_avg', { n: rows.length }, rows.length) }}</span>
         </div>
 
         <div class="rp-bars vel__bars">
@@ -81,7 +81,7 @@ const load = async () => {
         const data = await fetchVelocity(projectId.value, sprintCount.value);
         rows.value = Array.isArray(data.sprints) ? data.sprints : [];
         const skipped = Number(data.skipped) || 0;
-        meta.note = skipped ? t('Reports.velocity_skipped', { n: skipped }) : t('Reports.last_n_sprints', { n: rows.value.length });
+        meta.note = skipped ? t('Reports.velocity_skipped', { n: skipped }) : t('Reports.last_n_sprints', { n: rows.value.length }, rows.value.length);
         meta.emptyText = t('Dash.velocity_no_sprints');
         meta.state = rows.value.length ? 'ready' : 'empty';
     } catch (e) {

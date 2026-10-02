@@ -67,7 +67,7 @@
                 <ul class="aq__changes">
                     <li v-for="(change, i) in shownChanges(p)" :key="i" class="aq__change">
                         <IntentPreview v-if="change.preview" class="aq__intent" :preview="change.preview" @open-task="emit('open-task', $event)" />
-                        <span v-else class="aq__change-label">{{ change.label }}</span>
+                        <span v-else class="aq__change-label">{{ changeLabel(t, change) }}</span>
                         <span v-if="!change.reversible" class="ah-chip ah-chip--warn" data-test="queue-permanent">{{ t('Ai.not_reversible') }}</span>
                         <button
                             v-if="isEditing(p)"
@@ -135,7 +135,7 @@
                     data-test="queue-always-panel"
                 >
                     <div class="aq__label">{{ t('Inbox.always_title') }}</div>
-                    <p class="aq__lead">{{ t('Inbox.always_body', { agent: whoOf(p), kind: p.alwaysKind }) }}</p>
+                    <p class="aq__lead">{{ t('Inbox.always_body', { agent: whoOf(p), kind: alwaysKindOf(p) }) }}</p>
                     <p class="aq__lead">{{ t('Inbox.always_limits', { days: STANDING_DAYS }) }}</p>
                     <div class="aq__actions">
                         <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" data-test="queue-always-confirm" @click="approveAlways(p)">{{ t('Inbox.always_confirm') }}</button>
@@ -218,6 +218,7 @@ import { intentSummary, intentTitle } from '@/components/molecules/IntentPreview
 import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
 import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
+import { agentActionLabel, changeLabel } from '@/views/Ai/agentActionLabels';
 import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
 import { decideEach, decideOne } from './approvalQueue';
 
@@ -263,7 +264,8 @@ const onlyPreview = (p) => (p.source === SOURCE_MCP && (p.changes || []).length 
 /* A change the project's rules filed is worded here from the facts it carries; its stored text is the fallback. */
 const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || intentTitle(t, p.batch || onlyPreview(p)) || proposalTitle(t, p);
 const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || p.why;
-const changeText = (change) => intentSummary(t, change.preview) || change.label;
+const changeText = (change) => intentSummary(t, change.preview) || changeLabel(t, change);
+const alwaysKindOf = (p) => agentActionLabel(t, p.changes?.[0]?.action, p.alwaysKind);
 // The preview is the server's reading of a change for this viewer, never part of the change sent back.
 const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'preview'));
 const whoOf = (p) => {
@@ -301,7 +303,7 @@ const settle = (p, verb, result) => {
     if (!result.ok) { errors[p.proposalId] = result.error; return; }
     delete errors[p.proposalId];
     picked.value = picked.value.filter((id) => id !== p.proposalId);
-    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo) });
+    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}) });
 };
 
 const approve = async (p) => {
