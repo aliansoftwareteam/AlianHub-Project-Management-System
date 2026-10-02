@@ -35,6 +35,8 @@ const socketEmitter = require('../event/socketEventEmitter');
 const domainEventBus = require('../event/domainEventBus');
 const registry = require('../Modules/Automations/engine/registry');
 const runner = require('../Modules/Automations/engine/runner');
+const toolCall = require('../Modules/Workflows/stepTypes/toolCall');
+const agentRequest = require('../Config/agentRequest');
 const matcher = require('../Modules/Automations/engine/matcher');
 const engine = require('../Modules/Automations/engine');
 const formEvent = require('../Modules/Automations/engine/formEvent');
@@ -151,6 +153,41 @@ describe('a listener on the event bus', () => {
         expect(heard.map(({ envelope }) => envelope)).toEqual([expect.objectContaining({ actor: { kind: 'agent', userId: PERSON }, depth: 3, narrowing: TOKENS_LIMITS })]);
     });
 
+    it('keeps the limits when a later write of the same depth in the window names none', async () => {
+        insideARequest(() => changePriority('HIGH'));
+        socketEmitter.emit('update', {
+            type: 'update', module: 'task', companyId: C, data: task({ Task_Priority: 'HIGH', TaskName: 'Renamed' }), updatedFields: { TaskName: 'Renamed' },
+            actor: { kind: 'agent', userId: PERSON }, depth: 1,
+        });
+        await settle();
+
+        expect(heard.map(({ envelope }) => envelope)).toEqual([expect.objectContaining({ actor: { kind: 'agent', userId: PERSON }, depth: 1, narrowing: TOKENS_LIMITS })]);
+    });
+
+    it('publishes a person\'s change taken into the window as the deeper writer\'s, limits included', async () => {
+        insideARequest(() => changePriority('HIGH'));
+        asThePerson(() => socketEmitter.emit('update', { type: 'update', module: 'task', companyId: C, data: task({ Task_Priority: 'HIGH', TaskName: 'By hand' }), updatedFields: { TaskName: 'By hand' } }));
+        await settle();
+
+        expect(heard.map(({ envelope }) => envelope)).toEqual([expect.objectContaining({ actor: { kind: 'agent', userId: PERSON }, depth: 1, narrowing: TOKENS_LIMITS, changedFields: expect.arrayContaining(['Task_Priority', 'TaskName']) })]);
+    });
+
+    it('gives a waiting change with no trace one of its own, not the trace of the request that sends it on', async () => {
+        changePriority('HIGH');
+        const traceId = traceOf(() => changePriority('URGENT'));
+
+        expect(heard).toHaveLength(1);
+        expect(heard[0].envelope.traceId).toMatch(/^[0-9a-f]{32}$/);
+        expect(heard[0].envelope.traceId).not.toBe(traceId);
+    });
+
+    it('is told of a comment as the agent\'s, one step deeper than what the agent answered', () => {
+        domainEventBus.listenForComments();
+        insideARequest(() => socketEmitter.emit('insert', { type: 'insert', module: 'comments', companyId: C, data: { _id: PAGE, projectId: IN_REACH, sprintId: LIST, taskId: TASK } }), 2);
+
+        expect(heard.map(({ envelope }) => envelope)).toEqual([expect.objectContaining({ type: 'comment.created', actor: { kind: 'agent', userId: PERSON }, depth: 3, narrowing: TOKENS_LIMITS })]);
+    });
+
     it('is told of no limits where the change came from a person or from a token held to no project', async () => {
         asThePerson(() => changePriority('HIGH'));
         await settle();
@@ -229,6 +266,34 @@ describe('a rule the change wakes', () => {
         expect(steps.map(({ actor, depth }) => ({ actor, depth }))).toEqual([{ actor: { kind: 'agent', userId: PERSON }, depth: 2 }]);
     });
 
+    it('does not run a step where the limits its event names cannot be read', async () => {
+        const rule = seedRule();
+        const run = { _id: 'run-2', cursor: 0, steps: [], outputs: {} };
+        const unreadable = { id: 'evt-2', companyId: C, type: 'task.priority_changed', depth: 0, actor: { kind: 'agent', userId: PERSON }, entity: { kind: 'task', id: TASK }, data: task(), narrowing: { userId: PERSON, projectIds: 'every' } };
+
+        await expect(runner.runOnce(C, run, rule, unreadable)).rejects.toMatchObject({ deterministic: true });
+        expect(steps).toEqual([]);
+    });
+
+    it('is run by the queue under none of the request the job happens to be picked up in', async () => {
+        const rule = seedRule();
+        const envelope = { id: 'evt-3', companyId: C, type: 'task.priority_changed', depth: 0, actor: { kind: 'user', userId: PERSON }, entity: { kind: 'task', id: TASK }, data: task() };
+        const run = mockDb.seed(SCHEMA_TYPE.AUTOMATION_RUNS, { _id: new ObjectId(), ruleId: String(rule._id), status: 'queued', cursor: 0, attempts: 0, steps: [], outputs: {}, envelope });
+
+        await insideARequest(() => engine.enqueueWorkflowRun({ companyId: C, runId: String(run._id), ruleId: String(rule._id) }));
+
+        expect(steps).toHaveLength(1);
+        expect(steps[0]).toMatchObject({ narrowedTo: null, agent: null, mark: null, request: null, workspace: C });
+    });
+
+    it('is run as a workflow tool step under no bystander\'s project list, agent rule or mark', async () => {
+        const run = { _id: 'wf-1', entity: { kind: 'task', id: TASK, data: task() }, startedBy: PERSON };
+        await insideARequest(() => toolCall.execute({ companyId: C, run, step: { stepId: 't1', config: { tool: 'probe', params: {} } } }));
+
+        expect(steps).toHaveLength(1);
+        expect(steps[0]).toMatchObject({ makerOpensElsewhere: true, narrowedTo: null, agent: null, mark: null });
+    });
+
     it('is not woken by an agent\'s change unless it asked to hear automated changes', async () => {
         seedRule({ reactToAutomation: false });
         insideARequest(() => changePriority('HIGH'));
@@ -267,6 +332,10 @@ describe('a rule the change wakes', () => {
             expect.objectContaining({ ok: false, code: runs.LOOP_DEPTH_EXCEEDED }),
         ]);
     });
+});
+
+describe('the person\'s own rule asked from inside their agent\'s request', () => {
+    it('is one helper under both of its names', () => expect(agentRequest.outside).toBe(agentRequest.asThePerson));
 });
 
 describe('a screen that is sent the change', () => {

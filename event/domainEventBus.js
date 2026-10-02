@@ -109,10 +109,6 @@ const originOf = (payload) => {
 /* Present only where the change came from a token held to some projects (./writerLimits). */
 const narrowingOf = (narrowing) => (narrowing ? { narrowing } : {});
 
-/* An event of a change made here and now reads the token's limits here; one that follows an earlier change (a
- * listener publishing on, a field filled again) is handed the limits of that change. */
-const limitsOf = (narrowing) => (narrowing === undefined ? writerLimits.ofThisRequest() : narrowing);
-
 const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, depth, traceId, narrowing }) => ({
     id: ulid(),
     companyId: String(companyId),
@@ -299,7 +295,7 @@ function onTaskEvent(emitType) {
             const key = `${companyId}:${String(doc._id)}:${emitType}`;
             const changedNow = normalizeChangedFields(payload?.updatedFields);
             const { actor, depth } = originOf(payload);
-            const narrowing = limitsOf(payload.narrowing);
+            const narrowing = writerLimits.handedOrHere(payload.narrowing);
 
             const existing = pending.get(key);
             if (supersedesPending(existing, doc, changedNow)) {
@@ -313,16 +309,18 @@ function onTaskEvent(emitType) {
                 open.doc = doc;
                 changedNow.forEach((field) => open.changed.add(field));
                 // The loop guard only holds if a merged envelope is never shallower than
-                // an emit it absorbed, so the deepest emit's actor and depth win, and its limits with them.
+                // an emit it absorbed, so the deepest emit's actor and depth win. Limits once named stay: an
+                // emit of the same write that names none (a counter, an index) must not lift them. A person's
+                // change absorbed in the window is published as the deeper writer's, limits included.
                 if (depth >= open.depth) {
                     open.actor = actor;
                     open.depth = depth;
-                    open.narrowing = narrowing;
                 }
+                open.narrowing = open.narrowing || narrowing;
                 return;
             }
 
-            const entry = { companyId, doc, changed: new Set(changedNow), emitType, actor, depth, narrowing, traceId: telemetry.traceIdNow() };
+            const entry = { companyId, doc, changed: new Set(changedNow), emitType, actor, depth, narrowing, traceId: telemetry.traceIdNow() || telemetry.newTraceId() };
             entry.timer = setTimeout(() => {
                 if (pending.get(key) !== entry) return;
                 pending.delete(key);
@@ -336,7 +334,7 @@ function onTaskEvent(emitType) {
 }
 
 function publishEntityEvent(input) {
-    const envelope = buildEntityEnvelope({ ...input, narrowing: limitsOf(input.narrowing) });
+    const envelope = buildEntityEnvelope({ ...input, narrowing: writerLimits.handedOrHere(input.narrowing) });
     publish(envelope);
     return envelope;
 }
@@ -344,7 +342,7 @@ function publishEntityEvent(input) {
 /* A task event no write emitted: one derived from stored state, such as a due date
  * passing or the last open subtask closing. `doc` is the stored task. */
 function publishTaskEvent({ companyId, type, doc, actor, depth, narrowing }) {
-    const envelope = buildEnvelope({ companyId, type, doc, changedFields: [], previous: null, actor: resolveActor({ actor }), depth, narrowing: limitsOf(narrowing) });
+    const envelope = buildEnvelope({ companyId, type, doc, changedFields: [], previous: null, actor: resolveActor({ actor }), depth, narrowing: writerLimits.handedOrHere(narrowing) });
     publish(envelope);
     return envelope;
 }
@@ -358,13 +356,16 @@ function onEntityEmit(kind, emitType, classify, trim) {
             const doc = payload?.data;
             if (!payload?.companyId || !doc || !doc._id) return;
             const data = trim(doc);
+            const { actor, depth } = originOf(payload);
             publishEntityEvent({
                 companyId: payload.companyId,
                 type: classify(emitType, doc),
                 entity: { kind, id: data._id },
                 scope: { projectId: data.ProjectID || data.projectId, sprintId: data.sprintId },
                 data,
-                actor: payload.actor,
+                actor,
+                depth,
+                narrowing: payload.narrowing,
             });
         } catch (error) {
             logger.error(`${LOG_PREFIX} ${kind} event handling failed: ${failureText(error)}`);

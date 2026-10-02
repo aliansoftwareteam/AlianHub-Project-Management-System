@@ -156,7 +156,7 @@ const taskDataOf = (task) => ({
 });
 
 /* The normal assignee path, so history, watchers, notifications and sockets behave as for a person. */
-const changeAssignee = ({ companyId, project, task, userId, name, type, userData, eventActor, eventDepth }) => require('../Tasks/helpers/task_class_Mongo').taskMongo.updateAssignee({
+const changeAssignee = ({ companyId, project, task, userId, name, type, userData, eventActor, eventDepth, eventNarrowing }) => require('../Tasks/helpers/task_class_Mongo').taskMongo.updateAssignee({
     firebaseObj: { AssigneeUserId: userId },
     projectData: projectDataOf(companyId, project, task),
     taskData: taskDataOf(task),
@@ -166,6 +166,7 @@ const changeAssignee = ({ companyId, project, task, userId, name, type, userData
     isUpdateTask: true,
     eventActor,
     eventDepth,
+    eventNarrowing,
 });
 
 async function eligibleCandidates(companyId, task, entries) {
@@ -195,7 +196,7 @@ async function pickWithModel(companyId, input, candidates) {
  * rules, a trigger the rules switched off, or while AI is off or no model is configured — not even the fallback,
  * which answers "the model matched nobody" and is not a replacement for the model.
  */
-async function decide({ companyId, taskId, trigger = 'create', depth = 0 }) {
+async function decide({ companyId, taskId, trigger = 'create', depth = 0, narrowing = null }) {
     const task = await readTask(companyId, taskId);
     if (!task || task.mainChat === true || !task.ProjectID) return skip('no_task');
     if (hasAssignee(task)) return skip('assigned');
@@ -253,6 +254,7 @@ async function decide({ companyId, taskId, trigger = 'create', depth = 0 }) {
                 userData: { id: rules.updatedBy || fields.userId, Employee_Name: ACTOR_NAME },
                 eventActor: RULE_ACTOR,
                 eventDepth: (Number(depth) || 0) + 1,
+                eventNarrowing: narrowing,
             });
             state = 'applied';
         }
@@ -277,7 +279,7 @@ const queued = new Set();
 const running = new Set();
 
 /* A few decisions per company at a time, so a bulk import cannot hold every model slot. */
-function enqueue(companyId, taskId, trigger, depth) {
+function enqueue(companyId, taskId, trigger, depth, narrowing) {
     const key = `${companyId}:${taskId}`;
     if (queued.has(key)) return;
     const lane = lanes.get(companyId) || { active: 0, waiting: [] };
@@ -289,7 +291,7 @@ function enqueue(companyId, taskId, trigger, depth) {
     queued.add(key);
     const begin = () => {
         lane.active += 1;
-        const job = decide({ companyId, taskId, trigger, depth })
+        const job = decide({ companyId, taskId, trigger, depth, narrowing })
             .catch((error) => logger.error(`${LOG_PREFIX} task ${taskId} in company ${companyId}: ${failureText(error)}`))
             .finally(() => {
                 queued.delete(key);
@@ -312,7 +314,7 @@ function onEvent(envelope) {
         const assignees = envelope.data && Array.isArray(envelope.data.AssigneeUserId) ? envelope.data.AssigneeUserId : [];
         const depth = Number(envelope.depth) || 0;
         if (assignees.length || depth >= domainEventBus.MAX_DEPTH) return;
-        enqueue(String(envelope.companyId), String(envelope.entity.id), trigger, depth);
+        enqueue(String(envelope.companyId), String(envelope.entity.id), trigger, depth, envelope.narrowing || null);
     } catch (error) {
         logger.error(`${LOG_PREFIX} event handling failed: ${failureText(error)}`);
     }
