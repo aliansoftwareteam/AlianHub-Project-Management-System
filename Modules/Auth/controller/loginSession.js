@@ -22,6 +22,7 @@ const twoFactorRules = require('../helpers/twoFactorRules');
 const { pinSessionTenant } = require('../../../Config/tenant');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { requestAddress } = require('../../../utils/requestAddress');
+const { signedInPersonOnly } = require('../helpers/accountSecurity');
 exports.manageAttempt = (req, res) => {
     helperCtr.manageResetAttempt(req.ip, req.body, (mRes) => {
         if (!mRes.status) {
@@ -229,14 +230,14 @@ exports.loginAuthTracker = async (req, res) => {
     }
 }
 
-
-/**
- * Change Password
- * @param {Object} req 
- * @param {Object} res 
- */
-
-exports.logout = (req, res) => {
+exports.logout = async (req, res) => {
+    try {
+        if (!(await signedInPersonOnly(req, res))) return;
+    } catch (error) {
+        logger.error(`logout: ${error.message || error}`);
+        res.status(400).json({ message: 'Could not sign out.' });
+        return;
+    }
     sesstionCtr.removeSession(req, async(data) => {
         if (!data.status) {
             res.status(400).json({

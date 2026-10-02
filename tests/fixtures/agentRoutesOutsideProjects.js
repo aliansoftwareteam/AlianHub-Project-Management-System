@@ -28,7 +28,6 @@ const OUTSIDE_EVERY_PROJECT = {
     ],
     'keeps the person\'s own notes, marks, saved views and settings': [
         'PATCH /api/v1/clips/:id', 'POST /api/v1/clips', 'PATCH /api/v1/notes/:id', 'POST /api/v1/notes', 'PATCH /api/v2/calls/notes/:id',
-        'PATCH /api/v1/reminders/:id', 'POST /api/v1/reminders', 'POST /api/v1/reminders/:id/run-now', 'POST /api/v1/reminders/run-due',
         'POST /api/v1/advance/filter/create', 'PUT /api/v1/advance/filter/update', 'POST /api/v1/project/filter/create', 'PUT /api/v1/project/filter/update',
         'POST /api/v1/task/filter/create', 'PUT /api/v1/task/filter/update', 'POST /api/v2/tasks/everything/views', 'PATCH /api/v2/tasks/everything/views/:id',
         'POST /api/v1/reports/custom', 'POST /api/v1/reports/custom/:id/duplicate', 'POST /api/v1/reports/custom/from-template', 'PUT /api/v1/reports/custom/:id',

@@ -43,6 +43,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: AUTHOR, status: 2 });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ASSIGNEE, status: 2 });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: INVITED, status: 1 });
+    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: '6f0000000000000000000d01', ProjectName: 'Launch', isPrivateSpace: false, AssigneeUserId: [] });
 });
 
 describe('MSG-07 assignedTo must be an active company member', () => {

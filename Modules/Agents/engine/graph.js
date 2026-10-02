@@ -13,6 +13,7 @@ const runs = require('../runs');
 const spendGuard = require('../spendGuard');
 const revisions = require('../revisions');
 const taint = require('../taint');
+const proposalText = require('../proposalText');
 const { FEATURES } = require('../../AICore/features');
 const { failureOf } = require('../../AICore/providerError');
 const providerContext = require('../../AICore/providerContext');
@@ -66,7 +67,7 @@ const State = Annotation.Root({
 
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
 const slugOf = (run) => run.skill || 'qa-review';
-const titleOf = (task) => task.TaskKey || task.TaskName;
+const titleOf = (task) => task.TaskKey || task.TaskName || 'a task';
 const wantsMemory = (slug) => { const skill = skillIndex.getSkill(slug); return !(skill && skill.usesMemory === false); };
 
 /* Memory is an optimisation: losing it costs context, failing the run over it costs the run. */
@@ -222,7 +223,7 @@ async function propose(state, config) {
     if (!(await runs.isRunning(companyId, run._id))) return { abandoned: true };
     const what = Number(agent.autonomy) < policy.REVIEW_LEVEL && !Array.isArray(result.changes)
         ? `File ${result.findings.length - state.alreadyTracked} QA finding(s) on ${titleOf(task)}`
-        : `${run.skill}: ${toPropose.length} change(s) on ${titleOf(task)}`;
+        : proposalText.joined([run.skill, `${toPropose.length} change(s) on ${titleOf(task)}`]);
     // What the grounding check removed is part of the record a person reviews.
     const dropped = Array.isArray(result.dropped) && result.dropped.length
         ? `Dropped as unsupported by the data: ${result.dropped.map((d) => `"${String(d.text || d.title).slice(0, 80)}" (${d.reason})`).join('; ')}` : '';

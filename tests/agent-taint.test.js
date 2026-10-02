@@ -167,7 +167,7 @@ describe('routing — a tainted run proposes its risky and out-of-project writes
 
     it('a low-risk write outside the run\'s own project is proposed, naming the taint', () => {
         const out = on({ params: { taskId: 't2', projectId: 'p2' }, task: { _id: 't2', ProjectID: 'p2' } });
-        expect(out).toEqual({ decision: 'propose', reason: 'task.comment writes outside the run\'s project; the run read external content (fetch example.com)', rating: safe });
+        expect(out).toEqual({ decision: 'propose', reason: 'task.comment changes something outside the project this run is for; the run read external content (fetch example.com)', rating: safe });
     });
 
     it('an untainted run is unchanged: the same actions act or propose with today\'s reasons', () => {
@@ -177,9 +177,9 @@ describe('routing — a tainted run proposes its risky and out-of-project writes
     });
 
     it('a refusal stays a refusal', () => {
-        expect(on({ action: 'project.delete' })).toMatchObject({ decision: 'refuse', reason: 'project.delete is on the never-list' });
-        expect(on({ agent: agent({ allowedActions: ['task.get'] }) })).toMatchObject({ decision: 'refuse', reason: 'task.comment is outside this agent\'s allowed actions' });
-        expect(on({ params: { taskId: 't3', projectId: 'p3' }, task: { _id: 't3', ProjectID: 'p3' } })).toMatchObject({ decision: 'refuse', reason: 'project p3 is outside this agent\'s projects' });
+        expect(on({ action: 'project.delete' })).toMatchObject({ decision: 'refuse', reason: 'An agent is never allowed to do this (project.delete). The person has to do it in AlianHub.' });
+        expect(on({ agent: agent({ allowedActions: ['task.get'] }) })).toMatchObject({ decision: 'refuse', reason: 'This connection is not allowed to use task.comment. Ask the person to allow it in AlianHub.' });
+        expect(on({ params: { taskId: 't3', projectId: 'p3' }, task: { _id: 't3', ProjectID: 'p3' } })).toMatchObject({ decision: 'refuse', reason: 'This connection is limited to some projects, and project p3 is not one of them. Ask the person to widen it in AlianHub.' });
         expect(on({ action: 'task.status.set', params: { taskId: 't1', status: { statusType: 'close', name: 'Done' } } })).toMatchObject({ decision: 'refuse' });
     });
 

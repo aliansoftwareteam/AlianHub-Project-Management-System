@@ -58,10 +58,12 @@
                             <input class="ah-input ig-mono" :value="webhookUrl(ib.token)" readonly @focus="$event.target.select()" />
                             <button class="ig-mini" @click="copy(webhookUrl(ib.token))">{{ $t('IntegrationsHub.copy') }}</button>
                         </div>
-                        <div class="ig-inbox-actions">
-                            <button class="ig-mini" @click="toggle(ib)">{{ ib.enabled ? $t('IntegrationsHub.pause') : $t('IntegrationsHub.resume') }}</button>
-                            <button class="ig-mini del" @click="remove(ib)">{{ $t('IntegrationsHub.delete') }}</button>
+                        <div v-if="ib.canManage" class="ig-inbox-actions">
+                            <button class="ig-mini" data-test="inbox-toggle" @click="toggle(ib)">{{ ib.enabled ? $t('IntegrationsHub.pause') : $t('IntegrationsHub.resume') }}</button>
+                            <button class="ig-mini del" data-test="inbox-remove" @click="remove(ib)">{{ $t('IntegrationsHub.delete') }}</button>
                         </div>
+                        <p v-else class="ig-note" data-test="inbox-readonly">{{ $t('IntegrationsHub.email_change_by') }}</p>
+                        <p v-if="inboxErrors[ib._id]" class="ig-note ig-error" role="alert" data-test="inbox-error">{{ inboxErrors[ib._id] }}</p>
                     </div>
 
                     <details class="ig-help">
@@ -315,6 +317,7 @@ const activeCat = computed(() => cats.find((c) => c.key === active.value) || cat
 
 const projects = ref([]);
 const inboxes = ref([]);
+const inboxErrors = reactive({});
 const newProjectId = ref('');
 const feeds = ref([]);
 const feedLinks = reactive({});
@@ -372,12 +375,19 @@ const createInbox = async () => {
         await loadInboxes();
     } catch (e) { /* surfaced via reload */ } finally { busy.value = false; }
 };
-const toggle = async (ib) => {
-    try { await apiRequest('put', `${env.EMAIL_IN}/inboxes/${ib._id}`, { enabled: !ib.enabled }); await loadInboxes(); } catch (e) { /* noop */ }
+const REFUSED = [403, 404];
+const changeInbox = async (ib, method, body) => {
+    delete inboxErrors[ib._id];
+    try {
+        const res = await apiRequest(method, `${env.EMAIL_IN}/inboxes/${ib._id}`, body);
+        if (res?.data?.status === false) inboxErrors[ib._id] = t('IntegrationsHub.email_change_failed');
+        else await loadInboxes();
+    } catch (e) {
+        inboxErrors[ib._id] = t(REFUSED.includes(e?.response?.status) ? 'IntegrationsHub.email_change_refused' : 'IntegrationsHub.email_change_failed');
+    }
 };
-const remove = async (ib) => {
-    try { await apiRequest('delete', `${env.EMAIL_IN}/inboxes/${ib._id}`); await loadInboxes(); } catch (e) { /* noop */ }
-};
+const toggle = (ib) => changeInbox(ib, 'put', { enabled: !ib.enabled });
+const remove = (ib) => changeInbox(ib, 'delete');
 const copy = (text) => { if (text) navigator.clipboard.writeText(text); };
 
 const loadFeeds = async () => {
@@ -517,6 +527,7 @@ onMounted(() => { loadProjects(); loadInboxes(); loadFeeds(); loadRules(); loadC
 .ig-create .ig-lbl { margin-top: 0; }
 .ig-mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; background: var(--surface-2); }
 .ig-note { font-size: 12px; color: var(--ink-2); margin: 10px 0 0; }
+.ig-note.ig-error { color: var(--danger-ink); }
 .ig-empty { color: var(--ink-2); font-size: 13px; padding: 8px 2px 16px; }
 .ig-inbox.off { opacity: .7; }
 .ig-inbox-top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }

@@ -62,6 +62,7 @@ const seedNames = ({ taskName = 'Plan task', projectName = 'Parity', memberName 
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: projectName, CompanyId: CID });
     mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, TaskName: taskName, ProjectID: PROJECT, CompanyId: CID, sprintId: SPRINT, folderObjId: FOLDER });
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: 'Olivia Owner' });
+    [[OWNER, 1], [MEMBER, 3]].forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: MEMBER, Employee_Name: memberName });
 };
 

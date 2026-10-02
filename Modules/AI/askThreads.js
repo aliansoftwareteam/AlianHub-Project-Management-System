@@ -117,7 +117,7 @@ const openSources = async (companyId, uid, cites) => {
     const [tasks, pages] = await Promise.all([
         taskIds.length ? MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: { $in: objectIds(taskIds) }, deletedStatusKey: { $ne: 1 }, ProjectID: { $in: projectIds }, ...(await hiddenSprintFilter(companyId, uid, projectIds)) }, 'TaskName ProjectID', { lean: true }],
+            data: [{ _id: { $in: objectIds(taskIds) }, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, ProjectID: { $in: projectIds }, ...(await hiddenSprintFilter(companyId, uid, projectIds)) }, 'TaskName ProjectID', { lean: true }],
         }, 'find') : [],
         pageIds.length ? MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,

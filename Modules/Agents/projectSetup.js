@@ -25,7 +25,7 @@ const STATUS_NAME_MAX = setup.LOOK_MAX.status;
 const CLOSING_TYPES = Object.freeze(['done', 'close']);
 const NEW_STATUS_COLOURS = Object.freeze(['#6473e8', '#ff9600', '#9b59b6', '#00a3bf', '#e8590c', '#2f9e44']);
 const LIST_CREATE = 'project.project_sprint_create';
-const ADMIN_ONLY = 'the company does not have this status yet, and only an owner or an admin adds one';
+const ADMIN_ONLY = 'This status does not exist in the company yet, and only an owner or an admin can add one.';
 
 const work = () => require('./workRequests');
 const planWork = () => require('./planWork');
@@ -251,7 +251,7 @@ const carryOut = async ({ companyId, who, approvedBy, projectId, plan, asked = {
     const approver = approvedBy ? await refusedParts(companyId, approvedBy, projectId, plan) : [];
     const barred = (part) => {
         const byApprover = approver.find((entry) => entry.part === part);
-        if (byApprover) return `the approver may not make this part: ${byApprover.reason}`;
+        if (byApprover) return `The person approving may not make this part: ${byApprover.reason}`;
         const byRequester = requester.find((entry) => entry.part === part);
         return byRequester ? `${permissions.REASON}: ${byRequester.reason}` : '';
     };

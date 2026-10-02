@@ -128,11 +128,9 @@ const world2 = () => { seed(); pauseEveryProject(); };
 
 const EPIC = '6f0000000000000000000e21';
 const AGENT = '6f0000000000000000000e24';
-const REMINDER = '6f0000000000000000000e25';
 const FORMULA = '6f0000000000000000000e26';
 const seedEpic = () => mockDb.seed(SCHEMA_TYPE.EPICS, { _id: EPIC, name: 'Launch', ProjectID: P_OPEN, deletedStatusKey: 0, taskCount: 0 });
 const seedAgent = () => mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: AGENT, name: 'Triage', account: 'workspace', projectIds: [], skills: [], deletedStatusKey: 0 });
-const seedReminder = () => mockDb.seed(SCHEMA_TYPE.REMINDERS, { _id: REMINDER, userId: OWNER, taskId: T_OPEN, projectId: P_OPEN, title: 'Look again', reminderAt: new Date(Date.now() - 60000), fired: false, deletedStatusKey: 0 });
 const seedFormula = () => mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: FORMULA, fieldTitle: 'Twice', fieldType: 'formula', formulaExpression: '1 + 1', projectId: [P_OPEN], global: true, isDelete: false });
 const TASK_WRITE = [{ _id: T_OPEN }, { $set: { TaskName: 'Changed' } }];
 const INTO_TASKS = [[{ $match: {} }, { $merge: { into: 'tasks' } }]];
@@ -150,10 +148,6 @@ const AS_THE_ROUTE_TAKES_IT = {
     'POST /api/v1/timesheet': [[{}, { queryeta: INTO_TASKS[0] }], [{}, { queryeta: INTO_TASKS }]],
     'POST /api/v1/task/find': [[{}, { query: TASK_WRITE, method: 'updateOne' }], [{}, { query: INTO_TASKS, method: 'aggregate' }]],
     'POST /api/v1/tabSyncTask': [[{}, { pid: P_OPEN, sprintId: L_OPEN, istableTask: false }]],
-    'POST /api/v1/reminders': [[{}, { taskId: T_OPEN, projectId: P_OPEN, title: 'Look again', reminderAt: '2030-01-01T10:00:00.000Z' }]],
-    'PATCH /api/v1/reminders/:id': [[{ id: REMINDER }, { title: 'Later', reminderAt: '2030-01-02T10:00:00.000Z' }, seedReminder]],
-    'POST /api/v1/reminders/:id/run-now': [[{ id: REMINDER }, {}, seedReminder]],
-    'POST /api/v1/reminders/run-due': [[{}, { companyId: CID, userId: OWNER }, seedReminder]],
     'POST /api/v1/reports/custom': [[{}, { name: 'By status', dimension: 'status', measure: 'count', filters: { projectIds: [P_OPEN] } }]],
     'POST /api/v1/reports/custom/run': [[{}, { dimension: 'status', measure: 'count', filters: { projectIds: [P_OPEN] } }]],
     'POST /api/v1/reports/custom/from-template': [[{}, { templateId: 'tasks-by-status', key: 'tasks-by-status' }]],

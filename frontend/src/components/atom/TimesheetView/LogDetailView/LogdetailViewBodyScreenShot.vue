@@ -1,32 +1,32 @@
 <template>
     <div class="d-flex timelogtimeDetail justify-content-between  bg-white" v-if="!isUser">
         <div class="d-flex align-items-center">
-                <span class="startEndHours black font-weight-500">{{dataObj.time}}</span>
+                <span class="startEndHours logdetail-view-body-screen-shot-black logdetail-view-body-screen-shot-font-weight-500">{{dataObj.time}}</span>
                 <img v-if="dataObj.startTimeTracker && !checkDateDiff(dataObj.startTimeTracker)" class="ml-20px" src="@/assets/images/svg/time_tracker.svg">
             </div>
             <div class="d-flex align-items-center">
                 <img v-if="dataObj.logAddType" src="@/assets/images/svg/green_dot.svg" class="active_inactivedot p0x-15px" alt="greenDot">
                 <img v-else src="@/assets/images/svg/Purple_dot.svg" class="active_inactivedot p0x-15px" alt="purpleDot">
-                <span class="totalHours font-weight-500 black font-ui">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(dataObj.duration,'update') ? convertedTimeString(dataObj.duration,'update') : '00:00' }) }}</span>
+                <span class="totalHours logdetail-view-body-screen-shot-font-weight-500 logdetail-view-body-screen-shot-black font-ui">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(dataObj.duration,'update') ? convertedTimeString(dataObj.duration,'update') : '00:00' }) }}</span>
         </div>
     </div>
     <div class="d-flex timelogtimeDetail justify-content-between bg-white text-ellipsis mb-10px" v-if="isUser">
         <div class="d-flex align-items-center text-ellipsis w-65">
-            <div class="startEndHours d-flex align-items-center text-ellipsis w-100 cursor-default start__hours-lineheight"><span class="start__EndHours-taskname black font-weight-500 font-size-16 text-ellipsis d-inline-block mw-82" :title="dataSub.taskName">{{ dataSub.taskName }}  | </span><span class="font-size-13 GunPowder font-weight-400 start__EndHours-taskkey text-ellipsis pl-5px" :title="dataSub.taskKey"> {{ dataSub.taskKey }}</span></div>
+            <div class="startEndHours d-flex align-items-center text-ellipsis w-100 cursor-default start__hours-lineheight"><span class="start__EndHours-taskname logdetail-view-body-screen-shot-black logdetail-view-body-screen-shot-font-weight-500 logdetail-view-body-screen-shot-font-size-16 text-ellipsis d-inline-block mw-82" :title="dataSub.taskName">{{ dataSub.taskName }}  | </span><span class="logdetail-view-body-screen-shot-font-size-13 logdetail-view-body-screen-shot-GunPowder logdetail-view-body-screen-shot-font-weight-400 start__EndHours-taskkey text-ellipsis pl-5px" :title="dataSub.taskKey"> {{ dataSub.taskKey }}</span></div>
         </div>
         <div class="d-flex align-items-center justify-content-end w-35">
             <img v-if="dataObj.logAddType" src="@/assets/images/svg/green_dot.svg" class="active_inactivedot p0x-15px" alt="greenDot">
             <img v-else src="@/assets/images/svg/Purple_dot.svg" class="active_inactivedot p0x-15px" alt="purpleDot">
-            <span class="totalHours font-weight-500 black font-ui converted__timestring">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(dataObj.duration,'update') ? convertedTimeString(dataObj.duration,'update') : '00:00' }) }}</span>
+            <span class="totalHours logdetail-view-body-screen-shot-font-weight-500 logdetail-view-body-screen-shot-black font-ui converted__timestring">{{ $t('TimeTracker.hours_value', { time: convertedTimeString(dataObj.duration,'update') ? convertedTimeString(dataObj.duration,'update') : '00:00' }) }}</span>
         </div>
     </div>
     <div class="d-flex timelogtimeDetail justify-content-between bg-white pt-0" v-if="isUser">
-        <p class="black font-weight-500 m-0">{{dataObj.time}}</p>
+        <p class="logdetail-view-body-screen-shot-black logdetail-view-body-screen-shot-font-weight-500 m-0">{{dataObj.time}}</p>
         <img v-if="dataObj.startTimeTracker && !checkDateDiff(dataObj.startTimeTracker)" class="ml-20px" src="@/assets/images/svg/time_tracker.svg">
     </div>
     <div class="commentMain position-re">
         <div class="cooment_titledesc-wrapper bg-white">
-            <p class="commentDetail font-ui GunPowder text-ellipsis font-size-16 font-weight-400 start__hours-lineheight">{{dataObj.discription}}</p>
+            <p class="commentDetail font-ui logdetail-view-body-screen-shot-GunPowder text-ellipsis logdetail-view-body-screen-shot-font-size-16 logdetail-view-body-screen-shot-font-weight-400 start__hours-lineheight">{{dataObj.discription}}</p>
         </div>
         <div class="d-flex mainImageDiv flex-wrap" v-if="dataObj.trackShotArray !== undefined && dataObj.trackShotArray">
             <div class="timelogImage bg-white position-re overflow-hidden" v-for="(trackDetail,ind) in dataObj.trackShotArray" v-bind:key="ind">
@@ -38,14 +38,14 @@
                     <WasabiImage v-else class="border-radius-10-px" :data="{url: trackDetail.image}" @click="previewScreenShot(trackDetail)"/>
                 </div>
                 <div class="timecheckbox d-flex align-items-center justify-content-between">
-                    <span class="timedispalyImg font-size-13 GunPowder" v-if="trackDetail.screenShotTime">{{trackDetail.screenShotTime._seconds ? getDateType(parseInt(trackDetail.screenShotTime._seconds * 1000)) : getDateType(parseInt(trackDetail.screenShotTime))}}</span>
+                    <span class="timedispalyImg logdetail-view-body-screen-shot-font-size-13 logdetail-view-body-screen-shot-GunPowder" v-if="trackDetail.screenShotTime">{{trackDetail.screenShotTime._seconds ? getDateType(parseInt(trackDetail.screenShotTime._seconds * 1000)) : getDateType(parseInt(trackDetail.screenShotTime))}}</span>
                     <span v-if="trackDetail.strokes !== undefined"><ScreenShotActivityBar :data="trackDetail" :widthData="57" :heightData="3"/></span>
                 </div>
             </div>
             <div class="timelogImage bg-white position-re overflow-hidden" v-if="dataObj.logAddType == 0">
                 <img src="@/assets/images/logDetailDefault.png" class="innerImageTimelog default-image-sidebar" alt="timelogImage"/>
                 <div class="timecheckbox d-flex align-items-center">
-                    <span class="timedispalyImg font-size-13 GunPowder">{{dataObj.time}}</span>
+                    <span class="timedispalyImg logdetail-view-body-screen-shot-font-size-13 logdetail-view-body-screen-shot-GunPowder">{{dataObj.time}}</span>
                 </div>
             </div>
         </div>
@@ -134,6 +134,27 @@
         }
     }
 </script>
+<style scoped>
+.logdetail-view-body-screen-shot-font-size-13 {
+    font-size: 13px;
+}
+.logdetail-view-body-screen-shot-font-size-16 {
+    font-size: 16px;
+}
+.logdetail-view-body-screen-shot-font-weight-400 {
+    font-weight: 400 !important;
+}
+.logdetail-view-body-screen-shot-font-weight-500 {
+    font-weight: 500 !important;
+}
+.logdetail-view-body-screen-shot-GunPowder {
+    color: var(--ink-2);
+}
+.logdetail-view-body-screen-shot-black {
+    color: var(--ink);
+}
+</style>
+
 <style scoped>
 .start__hours-lineheight{
     line-height: 24px !important;

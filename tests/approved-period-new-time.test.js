@@ -27,6 +27,8 @@ jest.mock('../Config/config', () => ({ myCache: { get: jest.fn(), set: jest.fn()
 jest.mock('../event/socketEventEmitter.js', () => ({ emit: jest.fn() }));
 jest.mock('../common-storage/common-server.js', () => ({ handleFileUploadForTrackerSS: jest.fn(), handleuploadMainFileForbase64Thumbnail: jest.fn() }));
 jest.mock('../common-storage/common-wasabi.js', () => ({ handleFileUploadForTrackerSS: jest.fn(), handleuploadMainFileForbase64Thumbnail: jest.fn() }));
+// Which task a timer may start on has its own suite (tracker-start-access); these cases are about the timer row.
+jest.mock('../Modules/LogTime/controllerV2/sessionUser', () => ({ ...jest.requireActual('../Modules/LogTime/controllerV2/sessionUser'), trackedTask: jest.fn(async () => ({})) }));
 
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
@@ -42,6 +44,7 @@ const OTHER = '6f0000000000000000000002';
 const P1 = '6f0000000000000000000b01';
 const ENTRY = '6f0000000000000000000e01';
 const MEMBER = 3;
+const ADMIN = 2;
 
 const LOCKED_DAY = '2026-03-02';
 const OPEN_DAY = '2026-03-10';
@@ -118,6 +121,7 @@ beforeEach(() => {
         if (type === 'company_users' && method === 'find') return data[0].userId.$in.map((userId) => ({ userId }));
         if (type === 'timesheet_approval' && method === 'findOne') return approvalMatching(data[0]);
         if (type === 'timesheets' && method === 'findOne') return stored;
+        if (type === 'projects' && method === 'findOne') return { _id: P1, isPrivateSpace: false, AssigneeUserId: [] };
         if (method === 'save') return { _id: 'new', id: 'new', ...data };
         if (method === 'findOneAndUpdate') return { _id: ENTRY };
         if (method === 'deleteOne') return { deletedCount: 1 };
@@ -136,7 +140,7 @@ describe('a new manual entry in an approved period', () => {
     });
 
     it('is checked against the person the time is for, not the caller', async () => {
-        evaluatePermission.mockImplementation(async (_c, _u, key) => (key === 'sheet_settings.user_timesheet' ? 2 : 0));
+        getRoleType.mockImplementation(async (_c, uid) => (String(uid) === ME ? ADMIN : MEMBER));
         approvals = [approvedPeriod(OTHER, '2026-03-01T12:00:00Z', '2026-03-07T12:00:00Z')];
 
         expectRefusedAsLocked(await call(manualLogTime, logBody({ userId: OTHER })));

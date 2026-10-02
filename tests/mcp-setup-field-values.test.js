@@ -162,7 +162,7 @@ describe('a value that cannot be set is refused before anybody is asked', () => 
 
     it('a task that is missing, in another project, or one the person cannot open: all answer alike', async () => {
         for (const [uid, taskId] of [[OWNER, MISSING], [OWNER, T_PRIVATE], [OUTSIDER, T_SECRET], [GUEST, T_SECRET]]) {
-            await refusedAtOnce(as(uid), one({ taskId, field: 'Note', value: 'x' }), /values\[0\]: that task was not found in this project/);
+            await refusedAtOnce(as(uid), one({ taskId, field: 'Note', value: 'x' }), /values\[0\]: That task was not found in this project/);
         }
         await refusedAtOnce({ ...as(INSIDER), projectIds: narrowed(INSIDER, [MISSING]).projectIds }, one({ taskId: T_OPEN, field: 'Note', value: 'x' }), /not_visible/);
     });
@@ -205,14 +205,14 @@ describe('approving sets a value only where both people may', () => {
         setRule('task_custom_field', false, [3, 0]);
         const out = await approve(id, OUTSIDER);
         expect(out.error).toBeUndefined();
-        expect(valuesOf(out)).toEqual([[T_OPEN, 'Note', false, expect.stringMatching(/approver may not/)]]);
+        expect(valuesOf(out)).toEqual([[T_OPEN, 'Note', false, expect.stringMatching(/person approving may not/)]]);
         expect(valueOn(T_OPEN, 'Note')).toBeUndefined();
     });
 
     it('an approver who cannot open the task\'s list gets the field and no value, and is not told the task is there', async () => {
         const id = await filed(as(INSIDER), { ...args, values: [{ taskId: T_SECRET, field: 'Note', value: 'ok' }, { taskId: T_OPEN, field: 'Note', value: 'ok' }] });
         const out = await approve(id, OUTSIDER);
-        expect(valuesOf(out)).toEqual([[T_SECRET, 'Note', false, 'that task was not found in this project'], [T_OPEN, 'Note', true, '']]);
+        expect(valuesOf(out)).toEqual([[T_SECRET, 'Note', false, 'That task was not found in this project. Check the id.'], [T_OPEN, 'Note', true, '']]);
         expect(valueOn(T_SECRET, 'Note')).toBeUndefined();
         expect(valueOn(T_OPEN, 'Note').fieldValue).toBe('ok');
     });

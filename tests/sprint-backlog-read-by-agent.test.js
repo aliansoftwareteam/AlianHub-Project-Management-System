@@ -65,7 +65,7 @@ describe('the backlog of a project that has none yet', () => {
     it.each([['a token created for an agent', agentToken(OWNER)], ['an agent run', agentRun(OWNER)]])('is not made for %s, and that is recorded as a list it may not add', async (_who, caller) => {
         const answer = await read(caller);
 
-        expect(answer).toMatchObject({ code: 403, body: { status: false, statusText: 'Agents cannot perform sprint.create' } });
+        expect(answer).toMatchObject({ code: 403, body: { status: false, statusText: expect.stringContaining('(sprint.create)') } });
         expect(addSprintFun).not.toHaveBeenCalled();
         expect(backlogs()).toHaveLength(0);
         expect(refusals().map((row) => [row.meta.action, row.meta.path, row.meta.onBehalfOf])).toEqual([['sprint.create', BACKLOG, OWNER]]);

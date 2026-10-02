@@ -225,7 +225,7 @@ describe('starting a workflow', () => {
     it.each([['an agent\'s token', AGENT], ['an agent run', AGENT_RUN_CALLER]])('is refused to %s by the route, and the attempt is recorded as the agent\'s', async (_who, caller) => {
         const out = await send(START, caller, {}, saved());
 
-        expect(out).toMatchObject({ code: 403, body: { status: false, statusText: 'Agents cannot perform workflow.run.start' } });
+        expect(out).toMatchObject({ code: 403, body: { status: false, statusText: expect.stringContaining('(workflow.run.start)') } });
         expect(runs()).toHaveLength(0);
         expect(refusals().map((row) => [row.meta.action, row.meta.onBehalfOf, row.meta.path])).toEqual([['workflow.run.start', OWNER, START]]);
     });

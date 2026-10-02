@@ -53,6 +53,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.COMPANIES, { _id: C, knowledgeIndexer: { mode: 'on' } });
     ['page', 'comment', 'transcript'].forEach((sourceType) => mockDb.seed(SCHEMA_TYPE.KNOWLEDGE_INDEX_STATE, { companyId: C, sourceType, status: 'complete', lastSeenOnAt: new Date() }));
     mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'One', isPrivateSpace: false, AssigneeUserId: [], deletedStatusKey: 0 });
+    [HOST, GUEST].forEach((userId) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType: 3, status: 2, isDelete: false }));
     generateMeetingNotes.mockResolvedValue({ status: true, data: { summary: 'Agreed to repaint the lighthouse.', actionItems: [{ id: 'ai_1', title: 'Order white paint', owner: 'Ann' }] } });
 });
 

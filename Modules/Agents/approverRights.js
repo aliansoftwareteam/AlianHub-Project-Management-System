@@ -63,13 +63,16 @@ const asksWhoeverApproves = (proposal) => proposal.source === SOURCE_MCP
 
 /* What a list shows of a waiting proposal for the person reading it. An owner or an admin holds every right, so
  * their rights are not read: what can still stop their approval is a task or a list that is gone, which the approve
- * route answers, and a change asked for someone else, which is read here. They may decline either way. */
+ * route answers, and a change asked for someone else, which is read here. They may decline either way. A plan is
+ * a person's to approve while it holds a part they may approve (./planLocks.js). */
 const standingOf = async (companyId, caller, proposal) => {
     if (!access.decidesProposals(caller)) return { locked: true, lockedWhy: WHY.SEAT, mayDecline: false };
     const privileged = Boolean(caller.privileged);
     if (privileged && !asksWhoeverApproves(proposal)) return OPEN;
     const uid = String(caller.actor.userId);
-    const refusal = await approveRefusal(companyId, { userId: uid, privileged }, proposal);
+    const person = { userId: uid, privileged };
+    const open = await require('./planLocks').withoutLocked(companyId, person, proposal.changes);
+    const refusal = open ? await approveRefusal(companyId, person, proposal, open) : held(REFUSAL.OWNER_ADMIN, WHY.OWNER_ADMIN);
     if (!refusal) return OPEN;
     return { locked: true, lockedWhy: refusal.why, mayDecline: privileged || await access.isOwnProposal(companyId, uid, proposal) };
 };

@@ -13,15 +13,15 @@
                     <span v-if="line.text" data-test="intent-more">{{ line.text }}</span>
                 </dd>
                 <dd v-else-if="choosing && line.picks?.length" class="ipv__text ipv__picks">
-                    <label v-for="pick in line.picks" :key="pick.key" class="ipv__pick" :class="{ 'is-out': isOut(pick.key) }">
-                        <input type="checkbox" class="ah-check" data-test="intent-pick" :data-pick="pick.key" :checked="!isOut(pick.key)" :disabled="disabled" @change="toggle(pick.key)" />
-                        <span>{{ pick.name }}</span>
+                    <label v-for="pick in line.picks" :key="pick.key" class="ipv__pick" :class="{ 'is-out': isOut(pick.key), 'is-locked': isLocked(pick.key) }">
+                        <input type="checkbox" class="ah-check" data-test="intent-pick" :data-pick="pick.key" :checked="!isOut(pick.key)" :disabled="disabled || isLocked(pick.key)" @change="toggle(pick.key)" />
+                        <span>{{ pick.name }} <span v-if="needsOwner(pick.key)" class="ipv__locked" data-test="intent-pick-locked">{{ t('IntentPreview.pick_locked') }}</span></span>
                     </label>
                 </dd>
                 <dd v-else-if="choosing && line.pick" class="ipv__text">
-                    <label class="ipv__pick">
-                        <input type="checkbox" class="ah-check" data-test="intent-pick" :data-pick="line.pick" :checked="!isOut(line.pick)" :disabled="disabled" @change="toggle(line.pick)" />
-                        <span>{{ line.text }}</span>
+                    <label class="ipv__pick" :class="{ 'is-locked': isLocked(line.pick) }">
+                        <input type="checkbox" class="ah-check" data-test="intent-pick" :data-pick="line.pick" :checked="!isOut(line.pick)" :disabled="disabled || isLocked(line.pick)" @change="toggle(line.pick)" />
+                        <span>{{ line.text }} <span v-if="needsOwner(line.pick)" class="ipv__locked" data-test="intent-pick-locked">{{ t('IntentPreview.pick_locked') }}</span></span>
                     </label>
                 </dd>
                 <dd v-else class="ipv__text">{{ line.text }}</dd>
@@ -37,7 +37,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { kindLabel, linesOf, titleOf } from './intentLines';
-import { canChoose, pickNames, toggled } from './planPicks';
+import { canChoose, lockedParts, pickNames, toggled } from './planPicks';
 
 defineOptions({ name: 'IntentPreview' });
 
@@ -58,9 +58,13 @@ const lines = computed(() => linesOf(t, locale.value, props.preview));
 const choosing = computed(() => props.choosable && canChoose(props.preview));
 const went = ref('');
 
-const isOut = (key) => choosing.value && Boolean(key) && props.leftOut.includes(key);
+const locked = computed(() => lockedParts(props.preview));
+const isLocked = (key) => choosing.value && locked.value.includes(key);
+const needsOwner = (key) => isLocked(key) && props.preview.locked.includes(key);
+const isOut = (key) => choosing.value && Boolean(key) && (props.leftOut.includes(key) || locked.value.includes(key));
 
 const toggle = (key) => {
+    if (isLocked(key)) return;
     const next = toggled(props.preview, props.leftOut, key);
     const leaving = next.includes(key);
     const moved = (leaving ? next.filter((held) => !props.leftOut.includes(held)) : props.leftOut.filter((held) => !next.includes(held))).filter((held) => held !== key);
@@ -89,6 +93,9 @@ const toggle = (key) => {
 .ipv__pick .ah-check { flex: none; margin-top: 2px; }
 .ipv__pick span { min-width: 0; overflow-wrap: anywhere; }
 .ipv__line.is-out .ipv__text, .ipv__pick.is-out { color: var(--ink-2); text-decoration: line-through; }
+.ipv__pick.is-locked { cursor: default; }
+/* An inline block of its own keeps the line through a part that is left out off the reason beside it. */
+.ipv__locked { display: inline-block; width: 100%; color: var(--ink-2); font-size: var(--fs-sm, 11.5px); line-height: 1.45; }
 .ipv__hint { margin: 0; color: var(--ink-2); font-size: var(--fs-sm, 11.5px); line-height: 1.45; }
 .ipv__went { color: var(--ink); }
 @media (max-width: 480px) {

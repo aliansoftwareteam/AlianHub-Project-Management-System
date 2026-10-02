@@ -3,11 +3,13 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { trackshotKey } = require('../../../common-storage/taskFileKeys');
 const { storedFileExists } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
+const { canReadTask } = require('../../Tasks/helpers/taskReadAccess');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 const NOT_YOUR_TIME = 'You can only track your own time.';
 const NOT_THIS_TIMER = 'A capture is stored in the folder of the timer it belongs to.';
 const NOT_RUNNING = 'This timer is no longer running.';
+const NO_SUCH_TASK = 'Task not found.';
 const ALREADY_STORED = 'A capture is already stored under this name.';
 /* The desktop tracker ends its own session on this code, so it is kept apart from every other refusal. */
 const TIMER_NOT_RUNNING = 'timer_not_running';
@@ -26,6 +28,20 @@ async function trackerUser(req, res) {
     const claimed = [].concat((req.body && req.body.userId) || []).map(String).filter(Boolean);
     if (claimed.some((id) => id !== actor.id)) return refuse(res, 403, NOT_YOUR_TIME);
     return actor;
+}
+
+/* A timer runs on a task its person can open, in the project that task is stored in: starting one
+ * also stamps the task's and the project's activity. */
+async function trackedTask(req, res, companyId, uid) {
+    const { taskId, projectId } = req.body || {};
+    if (typeof taskId !== 'string' || typeof projectId !== 'string' || !OBJECT_ID.test(taskId) || !OBJECT_ID.test(projectId)) return refuse(res, 404, NO_SUCH_TASK);
+    const task = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ _id: taskId }, { ProjectID: 1, sprintId: 1, mainChat: 1 }],
+    }, 'findOne');
+    const inProject = task && task.mainChat !== true && String(task.ProjectID) === projectId;
+    if (!inProject || !(await canReadTask(companyId, uid, task))) return refuse(res, 404, NO_SUCH_TASK);
+    return task;
 }
 
 const isRunning = (session) => session.startTimeTracker !== undefined && session.startTimeTracker !== null;
@@ -65,4 +81,4 @@ async function ownSessionRefusal(req, companyId) {
     return refusal;
 }
 
-module.exports = { TIMER_NOT_RUNNING, trackerUser, ownSessionRefusal, refuse };
+module.exports = { TIMER_NOT_RUNNING, trackerUser, trackedTask, ownSessionRefusal, refuse };

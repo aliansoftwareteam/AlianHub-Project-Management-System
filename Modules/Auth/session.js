@@ -6,6 +6,7 @@ const { removeCache } = require('../../utils/commonFunctions');
 const { dbCollections } = require("../../Config/collections.js");
 const { newSessionCredentials } = require("./helpers/refreshSession");
 const { sessionCacheKey } = require("./helpers/refreshTokenRules");
+const { signedInPersonOnly } = require("./helpers/accountSecurity");
 
 
 /**
@@ -216,11 +217,12 @@ const respondDeleted = (res, userId) => (resData) => {
     res.status(200).json(resData);
 };
 
-exports.deleteAllSession = (req, res) => {
+exports.deleteAllSession = async (req, res) => {
     try {
         if (!req.uid) {
             return res.status(401).json({ status: false, message: "Unauthorized" });
         }
+        if (!(await signedInPersonOnly(req, res))) return undefined;
         exports.deleteSessionFun(String(req.uid), respondDeleted(res, String(req.uid)));
     } catch (error) {
         res.status(400).json({status: false, message: error.message ? error.message : error});
@@ -247,6 +249,7 @@ exports.deleteUserSpecificSession = async (req, res) => {
         if (!req.uid) {
             return res.status(401).json({ status: false, message: "Unauthorized" });
         }
+        if (!(await signedInPersonOnly(req, res))) return undefined;
         if (!(req.params && req.params.id)) {
             res.status(400).json({status: false, message: "User id is required"});
             return;

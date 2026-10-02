@@ -61,8 +61,8 @@ const web = asPerson(routeTable(require('../Modules/Goals/routes').init));
 const READS = ['goals.list', 'goal.get'];
 const WRITES = ['goal.target.set', 'goal.target.sources.add', 'goal.target.sources.remove'];
 const NAMES = [...READS, ...WRITES];
-const NO_GOAL = { error: 'goal not found' };
-const OUTSIDE_TOKEN = 'not_visible: a token kept to some projects cannot write outside them';
+const NO_GOAL = { error: 'That goal was not found. Ask the person which goal they mean.' };
+const OUTSIDE_TOKEN = 'not_visible: this connection is limited to some projects, so it cannot make changes outside them. Ask the person to widen it in AlianHub.';
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const goalsNow = () => JSON.stringify(mockDb.store[SCHEMA_TYPE.GOALS]);
 const storedGoal = (id) => mockDb.store[SCHEMA_TYPE.GOALS].find((row) => String(row._id) === String(id));
@@ -176,9 +176,9 @@ describe('goals.list', () => {
 
     it('needs the read scope, and stays inside the actions an agent was given', async () => {
         expect(namesOf(await rpc(readOnly(OUTSIDER), 'goals.list', {}))).toEqual(['Company goal', 'Ship the open work']);
-        expect(await rpc(outside(OUTSIDER, ['tasks:read', 'tasks:write']), 'goals.list', {})).toMatchObject({ isError: true, error: 'This token lacks the projects:read scope.' });
+        expect(await rpc(outside(OUTSIDER, ['tasks:read', 'tasks:write']), 'goals.list', {})).toMatchObject({ isError: true, error: 'This connection was not given the projects:read permission. Ask the person to connect you again and allow it.' });
         expect(namesOf(await rpc(outside(OUTSIDER, ['projects:read']), 'goals.list', {}))).toEqual(['Company goal', 'Ship the open work']);
-        expect(await rpc(ctx(OUTSIDER, { allowedActions: ['tasks.search'] }), 'goals.list', {})).toMatchObject({ refused: true, reason: expect.stringMatching(/not in this agent's skills/) });
+        expect(await rpc(ctx(OUTSIDER, { allowedActions: ['tasks.search'] }), 'goals.list', {})).toMatchObject({ refused: true, reason: expect.stringMatching(/is not switched on for this connection/) });
     });
 });
 
@@ -313,9 +313,9 @@ describe('goal.target.set', () => {
 
     it('needs the write scope: a read-only token and an OAuth token without it are refused', async () => {
         const before = goalsNow();
-        expect(await rpc(readOnly(INSIDER), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This token is read-only.' });
-        expect(await rpc(outside(INSIDER, ['projects:read']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This token lacks the tasks:write scope.' });
-        expect(await rpc(ctx(INSIDER, { allowedActions: ['goals.list'] }), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ refused: true, reason: expect.stringMatching(/not in this agent's skills/) });
+        expect(await rpc(readOnly(INSIDER), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
+        expect(await rpc(outside(INSIDER, ['projects:read']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This connection was not given the tasks:write permission. Ask the person to connect you again and allow it.' });
+        expect(await rpc(ctx(INSIDER, { allowedActions: ['goals.list'] }), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ refused: true, reason: expect.stringMatching(/is not switched on for this connection/) });
         expect(goalsNow()).toBe(before);
     });
 

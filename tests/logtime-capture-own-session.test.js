@@ -214,7 +214,7 @@ describe.each(['v2', 'v3', 'v4'])('a %s tracker capture sent with a token', (ver
         const res = await capture(version, timeSheetId, filePath, 'timesheets', { 'x-token-kind': 'agent' });
 
         expect(res.status).toBe(403);
-        expect(await res.json()).toMatchObject({ status: false, statusText: 'Agents cannot perform timelog.capture' });
+        expect(await res.json()).toMatchObject({ status: false, statusText: expect.stringContaining('(timelog.capture)') });
         expect(mockDb.updates).toHaveLength(0);
         expect(mockUploads).toHaveLength(0);
         expect(storedFile(filePath)).toBe(false);

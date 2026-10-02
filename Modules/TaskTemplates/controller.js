@@ -38,7 +38,7 @@ const liveTemplate = (companyId, id) => (OBJECT_ID.test(String(id || ''))
     : Promise.resolve(null));
 
 const storedTask = (companyId, id) => (OBJECT_ID.test(String(id || ''))
-    ? crud(companyId, SCHEMA_TYPE.TASKS, [{ _id: oid(id) }], 'findOne')
+    ? crud(companyId, SCHEMA_TYPE.TASKS, [{ _id: oid(id), mainChat: { $ne: true } }], 'findOne')
     : Promise.resolve(null));
 
 const present = (row, { projectId = '', canManage = false, projectName = '' } = {}) => ({

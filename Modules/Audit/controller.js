@@ -8,7 +8,7 @@ const chain = require('./chain');
 const { AMENDED_ACTION } = require('./helpers/chainRules');
 const outsideActors = require('./outsideActors');
 const entityNames = require('./entityNames');
-const { labelOf } = require('./eventWords');
+const { labelOf, keysFor, rowHolds, clausesFor } = require('./eventWords');
 const { VIA_EXTERNAL } = require('../Agents/actor');
 const { pinSessionTenant } = require('../../Config/tenant');
 
@@ -92,6 +92,7 @@ const auditMatch = (q) => {
             { actorName: { $regex: term, $options: 'i' } },
             { 'meta.action': { $regex: term, $options: 'i' } },
             { 'meta.reason': { $regex: term, $options: 'i' } },
+            ...clausesFor(keysFor(q.q, q)),
         ] }];
     }
     if (q.from || q.to) {
@@ -113,7 +114,8 @@ const matchesFolded = (row, q) => {
     if (q.undone === 'true' && meta.undoneAt == null) return false;
     if (q.q) {
         const pattern = new RegExp(searchTerm(q.q), 'i');
-        if (![row.entityName, row.actorName, meta.action, meta.reason].some((v) => typeof v === 'string' && pattern.test(v))) return false;
+        const stored = [row.entityName, row.actorName, meta.action, meta.reason].some((v) => typeof v === 'string' && pattern.test(v));
+        if (!stored && !rowHolds(row, keysFor(q.q, q))) return false;
     }
     return true;
 };
@@ -215,7 +217,7 @@ const auditCsvLine = (r, withIntegrity) => {
     return csvRow([
         r.createdAt ? new Date(r.createdAt).toISOString() : '', m.actorType || 'human',
         outside ? outsideActors.csvLabel(outside) : r.actorName || '', outside ? outside.clientName || outside.clientId : m.agentName || '', m.runId || '',
-        m.action || r.action, labelOf(r), r.entityName || r.entityId || '', m.reason || '', (m.cost && m.cost.usd) || '', m.undoneAt ? new Date(m.undoneAt).toISOString() : '',
+        m.action || r.action, labelOf(r), r.entityName || r.entityLabel || r.entityId || '', m.reason || '', (m.cost && m.cost.usd) || '', m.undoneAt ? new Date(m.undoneAt).toISOString() : '',
         ...(withIntegrity ? [integrityCell(r.integrity)] : []),
     ]);
 };
@@ -245,7 +247,7 @@ exports.exportAuditCsv = async (req, res) => {
         let pending = [];
         const flush = async () => {
             if (!pending.length) return;
-            const named = await outsideActors.nameRows(companyId, pending);
+            const named = await entityNames.nameRows(companyId, req.uid, await outsideActors.nameRows(companyId, pending));
             pending = [];
             res.write(`\n${named.map((row) => auditCsvLine(row, withIntegrity)).join('\n')}`);
         };

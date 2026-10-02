@@ -4,6 +4,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { removeCache } = require('../../utils/commonFunctions');
 const { tenantOf } = require('../../Config/tenant');
 const { ROLE_OWNER, getRoleType, isPrivileged, evaluatePermission, isWritable } = require('../../Config/permissionGuard');
+const { templatesProblem } = require('./templateWrite');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const forbidden = (res, statusText) => res.status(403).send({ status: false, statusText });
@@ -358,7 +359,12 @@ exports.importTemplate = async (req, res) => {
         if (!(Array.isArray(templates) && templates.length)) {
             return res.json({ status: false, statusText: 'template is required.' });
         }
-        importData.importSettingTemplate(companyId, templates, (data) => res.json(data));
+        const problem = templatesProblem(templates);
+        if (problem) return res.status(400).json({ status: false, statusText: problem, message: problem });
+        importData.importSettingTemplate(companyId, templates, (data) => {
+            removeCache(`project_template_${companyId}`);
+            res.json(data);
+        });
     } catch (error) {
         logger.error(`Import template error: ${error.message}`);
         return failed(res, error);

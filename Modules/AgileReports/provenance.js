@@ -9,7 +9,7 @@ const rollup = require('../Tasks/helpers/provenanceRollup');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
-const SCOPE_FILTER = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true };
+const SCOPE_FILTER = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true, mainChat: { $ne: true } };
 const TASK_FIELDS = '_id TaskKey TaskName statusType points sprintId ProjectID completion';
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };

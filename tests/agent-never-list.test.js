@@ -41,7 +41,7 @@ describe('registering a never-listed key', () => {
 describe('evaluate refuses never-listed keys before consulting the table', () => {
     it.each(['project.delete', 'billing.charge', 'deploy.production', 'status.set("Done")'])('%s is refused with never_listed', (key) => {
         expect(registry.evaluate(key, {}, { allowedActions: [key] })).toEqual({
-            allowed: false, code: 'never_listed', reason: `Agents cannot perform ${key} (never_listed)`, action: null,
+            allowed: false, code: 'never_listed', reason: `An agent is never allowed to do this (never_listed). The person has to do it in AlianHub.`, action: null,
         });
     });
 

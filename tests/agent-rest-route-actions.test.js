@@ -205,7 +205,7 @@ describe('a token created for an agent, on the write routes beside the task rout
         const answer = await through(route, agentToken(uid), body, params);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: pathOf(route, params), onBehalfOf: uid });
         expect(audits('agent.action')).toHaveLength(0);
@@ -281,7 +281,7 @@ describe('a task filed by an agent through the create route', () => {
         const answer = await through(CREATE, agentToken(uid), BEYOND_FILING[name]);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform task\.add/);
+        expect(answer.body.statusText).toMatch(/^That action is not available to agents \(task\.add\)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: CREATE, onBehalfOf: uid });
     });
@@ -355,7 +355,7 @@ describe('everyone else on those routes', () => {
     ])('%s is judged by the rules of the role alone', async (label, caller) => {
         for (const [route, body, params] of Object.values(NO_ACTION)) {
             const answer = await through(route, caller, body, params);
-            if (answer !== REACHED) expect(JSON.stringify(answer.body)).not.toMatch(/Agents cannot/);
+            if (answer !== REACHED) expect(JSON.stringify(answer.body)).not.toMatch(/An agent is n(?:ot|ever) allowed|not available to agents/);
         }
         for (const body of Object.values(BEYOND_FILING)) {
             expect(await through(CREATE, caller, body)).toBe(REACHED);
@@ -715,6 +715,10 @@ const ALSO_BY_PEOPLE = {
         'changing a reminder': ['PATCH /api/v1/general-reminders/:id', { title: 'Renamed' }, { id: TEMPLATE }],
         'sending a reminder now': ['POST /api/v1/general-reminders/:id/run-now', {}, { id: TEMPLATE }],
         'sending every reminder that is due': ['POST /api/v1/general-reminders/run-due', {}],
+        'setting a reminder that names no task': ['POST /api/v1/reminders', { reminderText: 'Lunch', reminderAt: '2026-11-02T09:00:00.000Z' }],
+        'changing a task reminder': ['PATCH /api/v1/reminders/:id', { reminderText: 'Renamed' }, { id: TEMPLATE }],
+        'sending a task reminder now': ['POST /api/v1/reminders/:id/run-now', {}, { id: TEMPLATE }],
+        'sending every task reminder that is due': ['POST /api/v1/reminders/run-due', {}],
     },
     'timesheet.submit': {
         'submitting the timesheet of the person': ['POST /api/v2/timesheet-approval/submit', { weekStart: '2026-09-28' }],
@@ -756,7 +760,7 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
         const answer = await through(route, as(OWNER), body, params);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents|You cannot set a task to)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, action: recordedAs, path: pathOf(route, params), onBehalfOf: OWNER });
         expect(audits('agent.action')).toHaveLength(0);
@@ -766,7 +770,7 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
         const answer = await through(route, as(OWNER), body, params);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, action: recordedAs, path: pathOf(route, params), onBehalfOf: OWNER });
         expect(audits('agent.action')).toHaveLength(0);
@@ -781,7 +785,7 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
     ])('%s is not stopped as an agent on any of those either', async (label, caller) => {
         for (const [, route, body, params] of ALSO_HELD) {
             const answer = await through(route, caller, body, params);
-            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/Agents cannot/)]);
+            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/An agent is n(?:ot|ever) allowed|not available to agents/)]);
         }
         expect(agentAudits()).toHaveLength(0);
     });
@@ -830,7 +834,7 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
     ])('%s is not stopped as an agent on any of them', async (label, caller) => {
         for (const [, route, body, params] of HELD_FOR_PEOPLE) {
             const answer = await through(route, caller, body, params);
-            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/Agents cannot/)]);
+            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/An agent is n(?:ot|ever) allowed|not available to agents/)]);
         }
         expect(agentAudits()).toHaveLength(0);
     });
@@ -853,7 +857,7 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
         const held = [];
         for (const field of PROJECT_FIELDS) {
             const answer = await through(UPDATE, agentToken(OWNER), { updateObject: { [field]: 1 } }, inProject);
-            if (answer !== REACHED && /^Agents cannot perform | cannot be changed\.$/.test(answer.body.statusText)) held.push(field);
+            if (answer !== REACHED && /^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)| cannot be changed\.$/.test(answer.body.statusText)) held.push(field);
         }
 
         expect(PROJECT_FIELDS.filter((field) => !held.includes(field)).sort()).toEqual(Object.keys(AGENTS_MAY_CHANGE).map(fieldOf).sort());
@@ -966,7 +970,7 @@ describe('chat on the web app\'s own routes', () => {
 
         for (const caller of [agentToken(OWNER), agentToken(INSIDER), withChat(OWNER), withChat(INSIDER), agentRun(OWNER)]) {
             const answer = await chatRoute(route, caller, body, query);
-            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'Agents cannot perform chat.direct']);
+            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'An agent is not allowed to do this (chat.direct). The person has to do it in AlianHub.']);
         }
         expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(Array(5).fill('chat.direct'));
         expect(audits('agent.action')).toHaveLength(0);
@@ -977,7 +981,7 @@ describe('chat on the web app\'s own routes', () => {
 
         for (const caller of [agentToken(OWNER), agentToken(INSIDER), agentToken(OWNER, { grants: ['tasks:manage'] }), agentRun(OWNER)]) {
             const answer = await chatRoute(route, caller, body, query);
-            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'Agents cannot perform chat.channel']);
+            expect([answer.code, answer.body && answer.body.statusText]).toEqual([403, 'An agent is not allowed to do this (chat.channel). The person has to do it in AlianHub.']);
         }
         expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(Array(4).fill('chat.channel'));
     });
@@ -1198,7 +1202,7 @@ describe('every write route of the server, for a token created for an agent', ()
     const paramsOf = (route) => Object.fromEntries(namedIn(route).map((name) => [name, { projectId: P_OPEN, pid: P_OPEN, taskId: T_OPEN, tid: T_OPEN, sprintId: L_OPEN }[name] || TEMPLATE]));
     const askedRoutes = [...new Set(asked.map(([, route]) => route))];
     const outside = Object.values(OUTSIDE_EVERY_PROJECT).flat();
-    const heldForPeople = (answer) => answer !== REACHED && answer.code === 403 && /^Agents cannot perform /.test(String(answer.body && answer.body.statusText));
+    const heldForPeople = (answer) => answer !== REACHED && answer.code === 403 && /^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/.test(String(answer.body && answer.body.statusText));
 
     it('is held for people, asks the project\'s rule, or is listed with why it changes nothing in a project', async () => {
         const unlisted = [];
@@ -1239,7 +1243,7 @@ describe('what stands in front of a route, in its order', () => {
 
         const answer = await through(route, agentToken(INSIDER), body, params);
 
-        expect([answer.code, answer.body.statusText]).toEqual([403, 'Agents cannot perform tasks.import']);
+        expect([answer.code, answer.body.statusText]).toEqual([403, 'That action is not available to agents (tasks.import).']);
         expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual(['tasks.import']);
     });
 });
@@ -1261,7 +1265,7 @@ describe('a removal, which no agent makes on any route', () => {
     it.each(REMOVALS.filter(namedByTheRoute))('%s is recorded under the name its own route gives it', async (route) => {
         const answer = await through(route, agentToken(OWNER), {}, ids(route));
 
-        expect(answer.body.statusText).toBe(`Agents cannot perform ${namedByTheRoute(route)}`);
+        expect(answer.body.statusText).toBe(`An agent is not allowed to do this (${namedByTheRoute(route)}). The person has to do it in AlianHub.`);
         expect(audits('agent.action_refused').map((row) => row.meta.action)).toEqual([namedByTheRoute(route)]);
     });
 

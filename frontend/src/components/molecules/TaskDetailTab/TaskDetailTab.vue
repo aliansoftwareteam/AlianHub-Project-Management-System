@@ -154,6 +154,7 @@ import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { canUseAi } from '@/composable/aiAvailability';
 import taskClass from '@/utils/TaskOperations';
+import { tellViews } from '@/utils/instantTaskEdit';
 import { customFieldPayload } from '@/views/Projects/composables/projectCustomFields';
 import { fieldTypeCatalogue } from '@/plugins/customFieldView/fieldTypes';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
@@ -649,6 +650,7 @@ const submitFieldValue = (def, input) => {
     }).catch((err) => {
         console.error('Error in updating the custom field',err);
         commit('projectData/mutateUpdateFirebaseTasks', {snap: null, op: 'modified', pid: props.task.ProjectID || '', sprintId: props.task?.sprintId || '', data: {...props.task, customField}, updatedFields: {customField}});
+        tellViews(props.task._id, {customField});
         $toast.error(err?.error?.response?.data?.statusText || t('Toast.something_went_wrong'), {position: 'top-right' });
     });
 };
