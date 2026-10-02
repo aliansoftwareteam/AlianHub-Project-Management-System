@@ -317,6 +317,8 @@ span.lv2__status { cursor: inherit; }
 .lv2__status.is-done .lv2__status-dot { background: var(--lv2-status); }
 button.lv2__status:hover .lv2__status-dot { background: color-mix(in srgb, var(--lv2-status) 25%, transparent); }
 button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status); }
+button.lv2__status-chip { border: 0; cursor: pointer; }
+button.lv2__status-chip:focus-visible { outline: none; box-shadow: var(--focus); }
 
 .lv2__cell-picker { display: inline-flex; }
 .lv2__cell-btn {

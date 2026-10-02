@@ -144,6 +144,7 @@ const { t } = useI18n();
     }
 </script>
 <style>
+.imageColorPickerDiv button { background: transparent; border: 0; padding: 0; }
 .project__graphic-img{
     width: 64px; 
     height: 64px; 

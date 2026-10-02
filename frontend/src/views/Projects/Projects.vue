@@ -237,7 +237,7 @@
                                 <span>{{ $t('importTaskButton.import_processing') }}</span>
                             </div>
                         </div>
-                        <div :class="['list-view-body', TOKEN_BODY_TABS.includes(activeTab) ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
+                        <div :class="['list-view-body', bodyOnTokens ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
                                 {
                                 'd-flex': activeTab !== 'ProjectListView' &&
                                             activeTab !== 'Calendar' &&
@@ -1105,6 +1105,8 @@ const openProjectOfGoneFolder = () => router.replace({ name: 'Project', params: 
 const folderWithNoLists = computed(() => (route.params?.folderId && !route.params?.sprintId && !showArchived.value && !sprintLoading.value && TASK_VIEWS.includes(activeTab.value)
     ? folderWithoutLists(projectData.value?.sprintsfolders, route.params.folderId)
     : null));
+/* An empty state is drawn in theme ink, and it replaces the view: a legacy view still needs the light body. */
+const bodyOnTokens = computed(() => TOKEN_BODY_TABS.includes(activeTab.value) || Boolean(folderGone.value || folderWithNoLists.value || searchFailed.value));
 const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.

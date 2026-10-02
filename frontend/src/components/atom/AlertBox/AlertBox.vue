@@ -1,7 +1,7 @@
 <template>
     <Teleport to="body">
         <div v-if="visible" class="alert-modal-overlay">
-            <div class="alert-box w-500px bg-white border-radius-10-px overflow-hidden box-shadow-6 text-center">
+            <div class="alert-box w-500px border-radius-10-px overflow-hidden box-shadow-6 text-center">
                 <div :class="headerClass" class="position-re d-flex align-items-center justify-content-center">
                     <div class="error-icon-container position-re d-flex justify-content-center w-100">
                         <div :class="bgColorShadow"
@@ -127,6 +127,11 @@ const handleAction = (confirmed) => {
 </script>
 
 <style scoped>
+.alert-box {
+    background: var(--surface);
+    color: var(--ink);
+    color-scheme: var(--scheme);
+}
 .alert-box-font-size-14 {
     font-size: 14px;
 }
