@@ -50,7 +50,7 @@ const server = require('../Modules/Mcp/server');
 
 mongoHelper.getTotalSprintCount = async () => true;
 
-const { CID, OWNER, MEMBER, OTHER, TOKEN, P_OPEN, P_PRIVATE, P_DEST, S_OPEN, S_DEST, S_PRIVATE, TASKS_GRANT, PLAIN_SCOPES, CLIENT, GRANT_ID, settle, ctx, olderToken, outside } = world;
+const { CID, OWNER, MEMBER, OTHER, TOKEN, P_OPEN, P_PRIVATE, P_DEST, S_OPEN, S_DEST, S_PRIVATE, TASKS_GRANT, PLAIN_SCOPES, CLIENT, GRANT_ID, settle, ctx, outside } = world;
 const { seed, stored, rows, audits, rpcThrough, seedGrant } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const store = persistence.useInMemory();
@@ -325,10 +325,9 @@ describe('"Always do this" and a batch', () => {
 });
 
 describe('what the agent is told', () => {
-    it('the tool says a batch on more than one task waits, and so do the instructions of a connection that has the tool', async () => {
+    it('the tool says a batch on more than one task waits, and the instructions already say what to do with a change that waits', async () => {
         const listed = (await server.handleRpc(ctx(OWNER), { jsonrpc: '2.0', id: 1, method: 'tools/list' })).result.tools.find((tool) => tool.name === 'tasks.batch');
         expect(listed.description).toMatch(/more than one task, nothing runs[\s\S]*one proposal that a person approves or declines whole/);
-        expect(instructions.forCaller(ctx(OWNER))).toContain('A batch on several tasks waits.');
-        expect(instructions.forCaller(olderToken(OWNER))).not.toContain('A batch on several tasks');
+        expect(instructions.forCaller(ctx(OWNER))).toMatch(/When a tool answers that a change is waiting[\s\S]*tell the person, and do not try another way/);
     });
 });
