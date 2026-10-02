@@ -130,7 +130,7 @@ describe('a list changed elsewhere in the open project', () => {
     it('moved into a folder sits under it, and the tasks already loaded follow', async () => {
         const task = { _id: 't1', sprintId: 's1', sprintArray: { id: 's1', name: 'Backlog' }, subtaskArray: [{ _id: 't2', sprintArray: {} }] };
         mountHost({ tasks: { p1: { s1: { tasks: [task] } } } });
-        server['p1:sprints'] = [sprint({ folderId: 'f1', folderName: 'Design' })];
+        server['p1:sprints'] = [sprint({ folderId: 'f1' })];
         listChanged('p1');
         await gathered();
         expect(branch().sprints).toEqual([]);
