@@ -56,6 +56,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { useOtherProjectRules } from "@/composable/otherProjectRules";
+import { showUndoToast } from "@/composable/useUndoToast";
 import { MAX_EXTRA_LISTS, STALE_CODES, addTargets, canAddLists, canRemoveEntry, offersList, refusalCodeOf, refusalKey, signatureOf, storedEntries } from "./taskLists";
 
 const ConvertToSubTaskSidebar = defineAsyncComponent(() => import("@/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue"));
@@ -135,7 +136,7 @@ function openPicker() {
     picking.value = true;
 }
 
-async function write(action, sprintId, doneKey, listName) {
+async function write(action, sprintId, doneKey, listName, undo = null) {
     if (busy.value) return;
     busy.value = true;
     try {
@@ -145,7 +146,9 @@ async function write(action, sprintId, doneKey, listName) {
         reading += 1;
         show(lists);
         emit("changed", lists.map((entry) => ({ projectId: entry.projectId, sprintId: entry.sprintId, addedBy: entry.addedBy, addedAt: entry.addedAt })));
-        $toast.success(t(doneKey, { list: listName }), { position: "top-right" });
+        const message = t(doneKey, { list: listName });
+        if (undo) showUndoToast({ message, undo });
+        else $toast.success(message, { position: "top-right" });
     } catch (error) {
         const code = refusalCodeOf(error);
         $toast.error(t(refusalKey(code), { max: MAX_EXTRA_LISTS }), { position: "top-right" });
@@ -161,7 +164,8 @@ function add({ sprint } = {}) {
 }
 
 function remove(entry) {
-    write("removeFromList", entry.sprintId, "TaskLists.removed", entry.name || "");
+    const name = entry.name || "";
+    write("removeFromList", entry.sprintId, "TaskLists.removed", name, () => write("addToList", entry.sprintId, "TaskLists.added", name));
 }
 
 watch(signature, sync, { immediate: true });
