@@ -92,6 +92,15 @@ describe('the preview card for a view an agent wants to add', () => {
             ['columns', 'Columns', '1 field not shown'],
         ]);
     });
+
+    it('says which due dates the view keeps, in words or as a range of days', () => {
+        mountCard({ kind: 'view', title: 'Due', lines: [{ kind: 'dueFilter', when: 'this_week' }, { kind: 'dueFilter', when: 'overdue' }, { kind: 'dueFilter', from: '2026-10-05', to: '2026-10-09' }, { kind: 'dueFilter', when: 'someday' }, { kind: 'dueFilter', from: '2026-10-05' }] });
+        expect(rows()).toEqual([
+            ['dueFilter', 'Due', 'This week'],
+            ['dueFilter', 'Due', 'Before today'],
+            ['dueFilter', 'Due', 'Oct 5, 2026 to Oct 9, 2026'],
+        ]);
+    });
 });
 
 describe('the preview card for a whole project setup an agent wants to make', () => {

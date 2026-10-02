@@ -101,6 +101,17 @@ describe('a waiting view carries its preview', () => {
         propose('bare', [change('view.create', { projectId: P_OPEN, name: 'Plain', kind: 'list', look: { groupBy: 'priority' } })]);
         expect((await previewOf(OWNER, 'bare')).lines).toEqual([{ kind: 'place', project: 'Open', list: '' }, { kind: 'layout', value: 'list' }, { kind: 'group', by: 'priority', field: '' }]);
     });
+
+    it('says which due dates it keeps: a named span, or a range of days', async () => {
+        propose('week', [change('view.create', { projectId: P_OPEN, name: 'Mine this week', kind: 'list', look: { mine: true, due: 'this_week' } })]);
+        propose('range', [change('view.create', { projectId: P_OPEN, name: 'Launch week', kind: 'list', look: { dueFrom: '2026-10-05', dueTo: '2026-10-09' } })]);
+        propose('odd', [change('view.create', { projectId: P_OPEN, name: 'Odd', kind: 'list', look: { due: 'someday', dueFrom: { $gt: '' }, dueTo: '2026-10-09' } })]);
+        const place = { kind: 'place', project: 'Open', list: '' };
+        const layout = { kind: 'layout', value: 'list' };
+        expect((await previewOf(OWNER, 'week')).lines).toEqual([place, layout, { kind: 'mine' }, { kind: 'dueFilter', when: 'this_week' }]);
+        expect((await previewOf(OWNER, 'range')).lines).toEqual([place, layout, { kind: 'dueFilter', from: '2026-10-05', to: '2026-10-09' }]);
+        expect((await previewOf(OWNER, 'odd')).lines).toEqual([place, layout]);
+    });
 });
 
 describe('for someone who cannot open the project', () => {
