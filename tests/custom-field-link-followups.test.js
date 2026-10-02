@@ -18,6 +18,7 @@ const { customFieldLinksSchema, taskSchema } = require('../utils/mongo-handler/c
 const { realModelStore } = require('./fixtures/realModelStore');
 const { castVote, withLinkConditions } = require('../Modules/CustomField/helpers/fieldLinks');
 const { changeVote, storeTally, removeLinksOfTasks } = require('../Modules/CustomField/helpers/fieldLinkStore');
+const { getTabSyncTasks } = require('../Modules/Tasks/controller/getTabSyncTasks');
 
 mockDb.uniqueFromSchema(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, customFieldLinksSchema);
 
@@ -241,5 +242,29 @@ describe('"has a value" in a query that keeps to some projects', () => {
     it('takes the fewest projects any required part of the query names', async () => {
         const { ids } = await answered({ $and: [{ ProjectID: { $in: [project(OPEN_PROJECT), project(OTHER_PROJECT)] } }, { $and: [{ ProjectID: project(OTHER_PROJECT) }] }, set] });
         expect(ids).toEqual([ELSEWHERE]);
+    });
+});
+
+describe('a list grouped by a relationship field, read again when its tab comes back', () => {
+    const group = (is) => ({ indexName: 'groupByStatusIndex', searchKey: `customField.${CLIENT}.fieldValue`, searchValue: is, conditions: [{ _id: { fieldLinks: { field: CLIENT, is } } }] });
+    const tabReturn = async (is) => {
+        mockDb.calls.length = 0;
+        const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(sent) { this.body = sent; return this; } };
+        await getTabSyncTasks({ uid: OWNER, headers: { companyid: CID }, body: { pid: OPEN_PROJECT, sprintId: SPRINT, istableTask: false, tabLeaveTime: 0, userId: OWNER, item: group(is) } }, res);
+        const facet = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.TASKS && call.method === 'aggregate')
+            .flatMap((call) => call.data[0]).find((stage) => stage.$facet).$facet;
+        const [operator, ids] = Object.entries(facet.count[0].$match.$and[1]._id)[0];
+        const read = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.CUSTOM_FIELD_LINKS && call.method === 'find').map((call) => call.data[0]);
+        return { code: res.statusCode, operator, ids: Array.isArray(ids) ? ids.map(String) : ids, read };
+    };
+
+    it('asks the database for the tasks that hold a link, read from this project alone', async () => {
+        const { code, operator, ids, read } = await tabReturn('set');
+        expect({ code, operator, ids }).toEqual({ code: 200, operator: '$in', ids: [FIRST, MOVED] });
+        expect(read).toEqual([{ fieldId: CLIENT, kind: 'relationship', 'ids.0': { $exists: true }, taskId: { $in: [FIRST, SECOND, MOVED] } }]);
+    });
+
+    it('asks for every other task in the group with no value', async () => {
+        expect(await tabReturn('empty')).toMatchObject({ code: 200, operator: '$nin', ids: [FIRST, MOVED] });
     });
 });

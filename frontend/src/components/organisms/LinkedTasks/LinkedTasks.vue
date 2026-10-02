@@ -359,10 +359,9 @@ function removeRelation(item) {
     border-radius: 4px;
     font: 600 9.5px/1.4 var(--font-mono);
     letter-spacing: .04em;
-    background: rgba(0, 0, 0, .07);
+    background: var(--track);
     color: var(--ink-label);
 }
-:root[data-theme="dark"] .lt__type { background: rgba(255, 255, 255, .1); }
 .lt__type--danger { background: var(--danger-bg); color: var(--danger-ink); }
 .lt__type--warn { background: var(--warn-bg); color: var(--warn-ink); }
 .lt__type--brand { background: var(--brand-tint); color: var(--brand); }

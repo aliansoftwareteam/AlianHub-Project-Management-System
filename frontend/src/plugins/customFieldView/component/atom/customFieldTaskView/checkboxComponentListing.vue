@@ -69,7 +69,7 @@
 </script>
 <style>
     .main-checkbox-component input.custom-field__checkbox[type=checkbox]{
-        border: 1px solid #8f8f8f;
+        border: 1px solid var(--border);
     }
     .main-checkbox-component input.custom-field__checkbox[type=checkbox]:before{
         border: none;

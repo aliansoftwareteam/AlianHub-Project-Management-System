@@ -1,6 +1,6 @@
 <template>
-    <div role="rowgroup">
-        <div class="tv2__group" role="row">
+    <div :role="drawn ? 'rowgroup' : 'presentation'">
+        <div v-if="drawn" class="tv2__group" role="row">
             <span role="cell" :aria-colspan="columnCount" class="tv2__group-cell">
                 <label v-if="canGroupSelect && groupTaskIds.length" class="tv2__group-select" @click.stop>
                     <input
@@ -69,6 +69,7 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { taskInGroup } from "@/views/Projects/ListView/listFilter";
+import { drawsGroup } from "@/views/Projects/composables/agentWorkQuery";
 import { useTaskSelection } from "@/composable/useTaskSelection.js";
 import { statusChipStyle } from "@/utils/statusChipColors";
 import { groupTotalsOf, isPartialGroup, loadedTotals, totalCellText, totalColumnsOf } from "@/views/Projects/composables/groupTotals";
@@ -125,6 +126,9 @@ const storeTasks = computed(() => {
 const tasks = computed(() => storeTasks.value
     .filter((task) => !task?.deletedStatusKey && !parentIdOf(task) && taskInGroup(task, props.data))
     .sort((a, b) => (props.globalSortKey ? 0 : a[props.data.indexName] - b[props.data.indexName])));
+
+/* The group stays mounted while it is not drawn: it is this component that reads the group's rows. */
+const drawn = computed(() => drawsGroup(props.data, tasks.value.length));
 
 const subtasks = useSubtaskTree({
     project,

@@ -101,6 +101,8 @@ import { useProjectCustomFields } from '@/views/Projects/composables/projectCust
 import { useListRowMenu } from '@/views/Projects/ListView/useListRowMenu.js';
 import { useListInlineEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
 import { useGroupSource } from '@/views/Projects/composables/groupSource';
+import { AGENT_WORK_GROUP } from '@viewSettings';
+import { drawsGroup } from '@/views/Projects/composables/agentWorkQuery';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
@@ -120,7 +122,7 @@ defineEmits(['change']);
 
 // --- Store & Injected State ---
 const { getters } = useStore();
-const { groupBy } = taskListHelper();
+const { groupBy, getGroupCounts } = taskListHelper();
 const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
@@ -219,7 +221,7 @@ const processedBoardData = computed(() => {
                 tasksForGroup.sort((a, b) => a.groupByPriorityIndex - b.groupByPriorityIndex);
                 break;
             default:
-                tasksForGroup = filteredSourceTasks.filter(task => (group.customFieldId ? taskInGroup(task, group) : task[group.searchKey] === group.searchValue));
+                tasksForGroup = filteredSourceTasks.filter(task => (group.customFieldId || group.agentWork ? taskInGroup(task, group) : task[group.searchKey] === group.searchValue));
                 break;
         }
         tasksForGroup = sortTasks(tasksForGroup, boardSort.sort.value, sortContext.value);
@@ -246,7 +248,7 @@ const processedBoardData = computed(() => {
             disabled: group.dropDisabled || (group.searchKey === "DueDate" && ["Next", "Overdue", "No Due Date"].includes(group.name)),
             totalTaskCounts: dataKeys || {},
         };
-    });
+    }).filter((column) => drawsGroup(column, column.tasksArray.length));
 });
 
 /* A search or a filter is matched against this project's own data, which says nothing of a task that lives elsewhere. */
@@ -272,6 +274,11 @@ useGroupSource(project, () => props.grouped, () => {
     if (!props.sprints?.length) return;
     groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
         internalGroupedTasks.value = resp;
+        /* A task an agent took or let go moved between columns the board had already counted. */
+        if (props.grouped === AGENT_WORK_GROUP && resp[0]?.items?.length) {
+            getGroupCounts({ projectId: project.value._id, sprintId: resp[0].id, items: resp[0].items, projectData: project.value })
+                .catch((error) => console.error("ERROR in board column counts: ", error));
+        }
     }, { firstPageOnly: true });
 });
 

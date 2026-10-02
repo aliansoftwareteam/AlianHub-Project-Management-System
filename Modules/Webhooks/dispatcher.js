@@ -1,3 +1,4 @@
+const { AsyncResource } = require('async_hooks');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { memberProfiles } = require('../../utils/companyMembers');
@@ -229,6 +230,10 @@ function deliverPending(key, entry) {
     });
 }
 
+/* A delivery is made for the hook's owner, and a window is opened by whichever request wrote first: bound here, where
+ * no request is running, the delivery and its retry run under no token's project list, no agent's mark and no request. */
+const deliverOutsideAnyRequest = AsyncResource.bind(deliverPending);
+
 function onTaskEvent(type) {
     return (payload) => {
         try {
@@ -245,7 +250,7 @@ function onTaskEvent(type) {
             if (supersedesPending(existing, doc, changedNow)) {
                 clearTimeout(existing.timer);
                 pending.delete(key);
-                deliverPending(key, existing);
+                deliverOutsideAnyRequest(key, existing);
             }
             const open = pending.get(key);
             if (open) {
@@ -259,7 +264,7 @@ function onTaskEvent(type) {
             entry.timer = setTimeout(() => {
                 if (pending.get(key) !== entry) return;
                 pending.delete(key);
-                deliverPending(key, entry);
+                deliverOutsideAnyRequest(key, entry);
             }, DEBOUNCE_MS);
             pending.set(key, entry);
         } catch (error) {

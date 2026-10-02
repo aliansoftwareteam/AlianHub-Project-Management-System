@@ -134,6 +134,7 @@ import { groupTotalsOf, totalCellText, totalColumnsOf } from "@/views/Projects/c
 import { listColumnClass } from "@/views/Projects/composables/viewColumns";
 import { MANUAL, sortTasks } from "@/views/Projects/composables/viewSort";
 import { groupTakesTask, putFrom } from "@/views/Projects/composables/customFieldQuery";
+import { namesAgent } from "@/views/Projects/composables/agentWorkQuery";
 
 defineOptions({ name: "ListGroup" });
 
@@ -168,8 +169,10 @@ const subtaskFor = ref("");
 
 const sprintId = computed(() => props.sprint?.id || props.sprint?._id);
 provide("viewedList", computed(() => ({ sprintId: sprintId.value, projectId: props.project?._id })));
+/* A task made under an agent's name would land in the group of the tasks no agent holds. */
 const canCreate = computed(() => !showArchived.value
     && !searchedTask.value
+    && !namesAgent(props.item)
     && checkPermission("task.task_create", props.project?.isGlobalPermission) === true
     && checkPermission("task.task_list", props.project?.isGlobalPermission) === true);
 const canSelect = computed(() => !showArchived.value && checkPermission("task.task_status", props.project?.isGlobalPermission) === true);

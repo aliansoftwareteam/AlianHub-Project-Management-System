@@ -77,14 +77,14 @@ function onError(e) {
   .progress-bar-container {
     width: 100%;
     height: 4px;
-    background: #f0f0f0;
+    background: var(--track);
     position: relative;
     border-radius: 4px;
     overflow: hidden;
   }
   .process-bar {
     height: 100%;
-    background: #2196f3;
+    background: var(--brand);
     transition: width 0.2s;
   }
 </style>

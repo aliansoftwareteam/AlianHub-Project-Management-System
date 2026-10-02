@@ -535,8 +535,7 @@ import { maskOf } from '@/utils/iconMask';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { provideViewSettings } from './composables/viewSettingsContext';
 import { VIEW_FILTER_ROWS } from './composables/taskFilterSignal';
-import { useProjectCustomFields } from './composables/projectCustomFields';
-import { customGroupOptions } from './composables/customFieldQuery';
+import { useGroupByOptions } from './composables/groupByOptions';
 
 import { useProjectsHelper } from './helper';
 import { isOwnerOrAdmin } from "@/utils/roles";
@@ -801,12 +800,12 @@ const icons = ref({
     Youtube: require('@/assets/images/svg/Youtube.svg'),
     Figma: require('@/assets/images/svg/figma.svg'),
 });
-const BUILT_IN_GROUPS = [
-    { label: 'status', image: require('@/assets/images/groupbySattus.png'), id: 0 },
-    { label: 'assignee', image: require('@/assets/images/svg/person.svg'), id: 1 },
-    { label: 'priority', image: require('@/assets/images/groupbyFlag.png'), id: 2 },
-    { label: 'due_date', image: require('@/assets/images/calendar_month.png'), id: 3 },
-];
+const BUILT_IN_GROUP_ICONS = {
+    status: require('@/assets/images/groupbySattus.png'),
+    assignee: require('@/assets/images/svg/person.svg'),
+    priority: require('@/assets/images/groupbyFlag.png'),
+    due_date: require('@/assets/images/calendar_month.png'),
+};
 const CUSTOM_GROUP_ICONS = {
     dropdown: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
     checkbox: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldCheckboxGrey.svg'),
@@ -819,13 +818,9 @@ const CUSTOM_GROUP_ICONS = {
     voting: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
     relationship: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
 };
-const { defs: projectFieldDefs } = useProjectCustomFields(projectData);
-const groupByOptions = computed(() => [
-    ...BUILT_IN_GROUPS,
-    ...customGroupOptions(projectFieldDefs.value).map((option) => ({ ...option, image: CUSTOM_GROUP_ICONS[option.fieldType] })),
-]);
-/* A view saved on a field that was deleted, or that this person cannot see, groups by status. */
-const shownGroupBy = computed(() => (groupByOptions.value.some((option) => option.id === groupBy.value) ? groupBy.value : 0));
+const groupChoices = useGroupByOptions(projectData);
+const groupByOptions = computed(() => groupChoices.options.value.map((option) => ({ ...option, image: BUILT_IN_GROUP_ICONS[option.label] || CUSTOM_GROUP_ICONS[option.fieldType] })));
+const shownGroupBy = computed(() => groupChoices.shown(groupBy.value));
 
 const projectDetailPermission = computed(() => checkPermission('project.project_details', projectData.value.isGlobalPermission, { gettersVal: getters }));
 
