@@ -1,8 +1,9 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { MongoClient, ObjectId } = require('mongodb');
 const { createApiClient } = require('./api');
-const { STATE_DIR } = require('./env');
+const { STATE_DIR, resolveMongoUrl } = require('./env');
 
 const PASSWORD = 'E2e-Passw0rd!';
 const STATE_FILE = path.join(STATE_DIR, 'run.json');
@@ -44,6 +45,57 @@ async function setupOwner(baseURL) {
     return { role: 'owner', roleType: ROLES.owner.roleType, email, userId: String(data.userId), companyId: String(data.companyId) };
 }
 
+/* The stored invitation, with the link token the Members screen puts in the address it copies. */
+async function sendInvitation({ ownerApi, companyId, role, email }) {
+    const invite = await ownerApi.post('/api/v2/sendInvitationEmail', {
+        email, companyId, companyName: COMPANY_NAME, role: ROLES[role].roleType, designation: 0,
+    });
+    const inviteRow = invite.body && invite.body.data;
+    if (invite.status !== 200 || !inviteRow || !inviteRow._id) {
+        throw new Error(`invite ${email} failed (${invite.status}): ${JSON.stringify(invite.body).slice(0, 500)}`);
+    }
+    return inviteRow;
+}
+
+const invitationPath = (companyId, inviteRow) => `/#/invitation?companyId=${companyId}-${inviteRow._id}&token=${encodeURIComponent(inviteRow.linkId)}`;
+
+/* The link mailed to an invited address that already has an account (Modules/Auth/controller/sendInvitation.js). */
+const mailedInvitationPath = ({ userId, companyId, invitation }) => {
+    const blob = Buffer.from(`userId=${userId}&companyId=${companyId}&docId=${invitation._id}&linkId=${invitation.linkId}`).toString('base64');
+    return `/#/verify-invitation?id=${encodeURIComponent(blob)}`;
+};
+
+async function inGlobalDatabase(read) {
+    const client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
+    await client.connect();
+    try {
+        return await read(client.db('global'));
+    } finally {
+        await client.close();
+    }
+}
+
+/* The workspace's own row, which the rest of the app reads its name, plan and details from. */
+const readCompanyRow = (companyId) => inGlobalDatabase((global) => global.collection('companies').findOne({ _id: new ObjectId(String(companyId)) }));
+
+/* An account made outside any invitation. Mail is not delivered in the suite, so the address is marked
+ * verified the way tests/integration/invitation-signed-in-accept.int.test.js does. */
+async function registerVerifiedAccount(baseURL, { firstName, lastName, email }) {
+    const created = assertOk(await createApiClient({ baseURL }).post('/api/v2/createUser', { firstName, lastName, email, password: PASSWORD }), `register ${email}`);
+    const userId = String(created.statusText._id);
+    await inGlobalDatabase((global) => global.collection('users').updateOne({ _id: new ObjectId(userId) }, { $set: { isEmailVerified: true } }));
+    return userId;
+}
+
+/* A workspace of the account's own, made the way the last sign-up step makes one. */
+async function createWorkspace(baseURL, { email, name }) {
+    const session = await login(baseURL, email);
+    const made = assertOk(await createApiClient({ baseURL, accessToken: session.accessToken }).post('/api/v2/company/create', {
+        companyName: name, teamSize: '2-15', teamFocus: '', seedSampleProject: false, logtimeDays: 8, eventId: `ev_${uniqueSuffix()}`,
+    }), `workspace for ${email}`);
+    return String(made.companyId);
+}
+
 /* Invite acceptance without mail, through the same calls the /invitation page makes
  * (frontend/src/views/Authentication/Invitation/Invitation.vue): the owner sends the
  * invite, which stores the company_users row even when the mail cannot be delivered and
@@ -51,13 +103,7 @@ async function setupOwner(baseURL) {
  * then, signed in as the invitee, the row is linked and activated (status 2). */
 async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstName, lastName, navMode = 'full' }) {
     const { roleType } = ROLES[role];
-    const invite = await ownerApi.post('/api/v2/sendInvitationEmail', {
-        email, companyId, companyName: COMPANY_NAME, role: roleType, designation: 0,
-    });
-    const inviteRow = invite.body && invite.body.data;
-    if (invite.status !== 200 || !inviteRow || !inviteRow._id) {
-        throw new Error(`invite ${email} failed (${invite.status}): ${JSON.stringify(invite.body).slice(0, 500)}`);
-    }
+    const inviteRow = await sendInvitation({ ownerApi, companyId, role, email });
 
     const anon = createApiClient({ baseURL });
     const created = await anon.post('/api/v2/createUser', {
@@ -282,16 +328,22 @@ module.exports = {
     createList,
     createProject,
     createTask,
+    createWorkspace,
     emailFor,
     findTasksByName,
     firstSprint,
+    invitationPath,
     inviteMember,
     listFolders,
     listSprints,
     login,
     loginAs,
+    mailedInvitationPath,
+    readCompanyRow,
     readState,
     readTask,
+    registerVerifiedAccount,
+    sendInvitation,
     storageStatePath,
     uniqueSuffix,
     writeState,
