@@ -13,7 +13,7 @@ import Company from '@/components/molecules/CreateCompany/Company.vue';
 const SRC = path.resolve(__dirname, '../../src');
 const read = (rel) => fs.readFileSync(path.join(SRC, rel), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 const rules = (css) => [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, body]) => ({ selector: selector.trim(), body }));
-const WHITE = /#fff\b|#ffffff\b|\bwhite\b|rgba?\(\s*255\s*,\s*255\s*,\s*255/i;
+const WHITE = /#fff\b|#ffffff\b|(?<![-\w])white(?![-\w])|rgba?\(\s*255\s*,\s*255\s*,\s*255/i;
 
 describe.each([
     ['Notepad', 'components/molecules/Notepad/panel.css', ['.np__htitle', '.np__htitleinput', '.np__hbtn']],
