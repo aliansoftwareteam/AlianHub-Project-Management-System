@@ -248,9 +248,6 @@ exports.deleteReminder = async (req, res) => {
 exports.runDueForCompany = async (req, res) => {
     try {
         const companyId = req.headers['companyid'];
-        if (!isPrivileged(await getRoleType(companyId, req.uid))) {
-            return fail(res, 403, 'Only an owner or admin can run due reminders');
-        }
         const result = await helper.processDueForCompany(companyId);
         res.send({ status: true, statusText: 'Processed due reminders', data: result });
     } catch (error) {

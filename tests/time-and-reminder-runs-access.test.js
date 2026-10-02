@@ -18,7 +18,6 @@ jest.mock('../Modules/PersonalList/ownership', () => ({ othersPersonalListIds: j
 const mongoose = require('mongoose');
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
-const generalReminders = require('../Modules/GeneralReminders/controller');
 const timeReminders = require('../Modules/TimeSheet/controller/timeReminders');
 const timesheetExport = require('../Modules/TimeSheet/controller/timesheetExport');
 
@@ -30,15 +29,25 @@ const OTHER = 'a00000000000000000000004';
 const GUEST = 'a00000000000000000000005';
 const oid = () => new mongoose.Types.ObjectId().toString();
 
-const call = async (handler, { uid = MEMBER, body = {} } = {}) => {
+const call = async (handlers, { uid = MEMBER, body = {} } = {}) => {
     const res = { statusCode: 200, body: undefined, headers: {} };
     res.status = jest.fn((code) => { res.statusCode = code; return res; });
     res.json = jest.fn((payload) => { res.body = payload; return res; });
     res.send = res.json;
     res.setHeader = (name, value) => { res.headers[name] = value; };
-    await handler(verified({ uid, params: {}, body, query: {}, headers: { companyid: C } }), res);
+    const req = verified({ uid, params: {}, body, query: {}, headers: { companyid: C } });
+    for (const handler of [].concat(handlers)) {
+        let passed = false;
+        // eslint-disable-next-line no-await-in-loop
+        await handler(req, res, () => { passed = true; });
+        if (!passed) break;
+    }
     return res;
 };
+
+const routed = {};
+require('../Modules/GeneralReminders/routes').init(new Proxy({}, { get: (target, method) => (path, ...handlers) => { routed[`${String(method).toUpperCase()} ${path}`] = handlers; } }));
+const RUN_DUE = routed['POST /api/v1/general-reminders/run-due'];
 
 let open;
 let hidden;
@@ -60,13 +69,13 @@ beforeEach(() => {
 
 describe('running every due reminder of the workspace is for owners and admins', () => {
     it.each([['the owner', OWNER], ['an admin', ADMIN]])('runs them for %s', async (_label, uid) => {
-        const res = await call(generalReminders.runDueForCompany, { uid });
+        const res = await call(RUN_DUE, { uid });
         expect(res.body).toMatchObject({ status: true });
         expect(mockProcessDue).toHaveBeenCalledWith(C);
     });
 
     it.each([['a member', MEMBER], ['a guest', GUEST]])('answers 403 to %s', async (_label, uid) => {
-        const res = await call(generalReminders.runDueForCompany, { uid });
+        const res = await call(RUN_DUE, { uid });
         expect(res.statusCode).toBe(403);
         expect(mockProcessDue).not.toHaveBeenCalled();
     });
