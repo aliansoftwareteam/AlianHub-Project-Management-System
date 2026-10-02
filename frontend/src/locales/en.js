@@ -7296,6 +7296,7 @@ export default {
     },
     Milestone: {
         home_link: "Home",
+        status_colour: "Milestone status colour",
         toggle_rows: "Show or hide the rows under {name}",
         public_project: "Public project",
         no_filter: "No filter",

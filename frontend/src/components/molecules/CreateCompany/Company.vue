@@ -13,7 +13,7 @@
                             <WasabiIamgeCompp v-else class="companyimg" :companyId="item._id" :data="{url:item.Cst_profileImage}"/>
                             </span>
                         </div>
-                        <span class="black">{{ item.Cst_CompanyName }}</span>
+                        <span class="company__name">{{ item.Cst_CompanyName }}</span>
                     </li>
                     <CreatecompnayinsideViewComponent @visibleClick="visibleClick" />
                     <SpinnerComp :is-spinner="isSpinner"/>

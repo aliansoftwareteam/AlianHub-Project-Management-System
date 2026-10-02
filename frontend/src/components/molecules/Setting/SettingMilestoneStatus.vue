@@ -12,7 +12,7 @@
                                 class="vs-component vs-con-input-label vs-input inputx inputx_milestone_status vs-input-primary">
                                 <div class="vs-con-input">
                                     <div class="color_picker">
-                                        <input type="color" v-model="formData.colorvalue"
+                                        <input type="color" v-model="formData.colorvalue" :aria-label="$t('Milestone.status_colour')"
                                             class="vs-inputx vs-input--input normal hasValue cursor-pointer"/>
                                     </div>
                                     <InputText type="text" class="vs-inputx vs-input--input normal milestone__value-input" 

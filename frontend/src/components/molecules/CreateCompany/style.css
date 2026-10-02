@@ -27,6 +27,8 @@ ul {
     margin: 0;
 }
 
+ul.imageUplaod li .company__name { color: var(--ink); }
+
 ul.imageUplaod li {
     display: inline-block;
     max-width: 150px;
@@ -122,6 +124,8 @@ ul.imageUplaod li:last-child {
     /* margin-right: 0 !important; */
 }
 
+
+ul.imageUplaod li .company__name { color: var(--ink); }
 
 ul.imageUplaod li {
     display: inline-block;

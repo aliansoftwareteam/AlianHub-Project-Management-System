@@ -114,7 +114,7 @@
     "frontend/src/components/molecules/ConvertToSubTaskSidebar/ConvertToSubTaskSidebar.vue": { "colours": 0, "legacyClasses": 23 },
     "frontend/src/components/molecules/CountryPhoneNumberDropdown/PhoneCountry.vue": { "colours": 0, "legacyClasses": 1 },
     "frontend/src/components/molecules/CountryPhoneNumberDropdown/style.css": { "colours": 3, "legacyClasses": 0 },
-    "frontend/src/components/molecules/CreateCompany/Company.vue": { "colours": 0, "legacyClasses": 2 },
+    "frontend/src/components/molecules/CreateCompany/Company.vue": { "colours": 0, "legacyClasses": 1 },
     "frontend/src/components/molecules/CreateCompany/style.css": { "colours": 3, "legacyClasses": 0 },
     "frontend/src/components/molecules/DashBoardCard/DashBoardCard.vue": { "colours": 13, "legacyClasses": 2 },
     "frontend/src/components/molecules/DocsPreviewer/DocsPreviewer.vue": { "colours": 2, "legacyClasses": 0 },

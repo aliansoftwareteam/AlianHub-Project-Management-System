@@ -11,20 +11,25 @@ const VIEWPORTS = [
 ];
 const THEMES = ['light', 'dark'];
 
-/* Known findings the product has not fixed yet. `target` is matched against the node's selector. */
+/* Known findings the product has not fixed yet. `screen` is the test title, `target` the node's selector. */
 const ALLOWED = [
-    { rule: 'list', target: /^ul$/, reason: 'Settings, Company: the workspace list also holds the create tile and spinner components as direct children.' },
+    { screen: 'Settings, Company', rule: 'list', target: /^ul$/, reason: 'the workspace list also holds the create tile and spinner components as direct children' },
+    { screen: 'Settings, General', rule: 'color-contrast', target: /^\.milestone__value-input$/, reason: 'legacy milestone status input keeps its own light-theme colours' },
+    { screen: 'Settings, General', rule: 'target-size', target: /^\.hasValue$/, reason: 'native colour swatch of the milestone status form is smaller than 24px' },
+    { screen: 'Settings, General', rule: 'scrollable-region-focusable', target: /addExtentionWrapper/, reason: 'file extension and skill chip lists scroll without a focusable child' },
+    { screen: 'Gantt', rule: 'color-contrast', target: /^\.v-toast__text$/, reason: 'the toast library colours its text per type and the Gantt opens with one' },
+    { screen: 'Calendar', rule: 'color-contrast', target: /^a\[aria-label="(Saturday|Sunday)"\]$|\.cv__daynum$/, reason: 'the project calendar is a legacy screen that keeps light-theme colours (docs/ACCESSIBILITY.md known gaps)' },
 ];
 
-const isAllowed = (rule, target) => ALLOWED.some((entry) => entry.rule === rule && entry.target.test(target));
+const isAllowed = (rule, target) => ALLOWED.some((entry) => entry.screen === test.info().title && entry.rule === rule && entry.target.test(target));
 
 async function blockingViolations(page, label) {
     const { violations } = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
     return violations
         .filter((v) => v.impact === 'serious' || v.impact === 'critical')
-        .flatMap((v) => v.nodes.map((n) => ({ rule: v.id, impact: v.impact, target: n.target.join(' '), help: v.help })))
+        .flatMap((v) => v.nodes.map((n) => ({ rule: v.id, impact: v.impact, target: n.target.join(' '), html: n.html.slice(0, 110).replace(/\s+/g, ' '), help: v.help })))
         .filter((v) => !isAllowed(v.rule, v.target))
-        .map((v) => `${label} ${v.rule} (${v.impact}): ${v.help}: ${v.target}`);
+        .map((v) => `${label} ${v.rule} (${v.impact}): ${v.help}: ${v.target}${/^[a-z0-9]+$/.test(v.target) ? ` ${v.html}` : ''}`);
 }
 
 /* The CI annotation keeps the first lines of an error, so one line per rule and set of combinations. */

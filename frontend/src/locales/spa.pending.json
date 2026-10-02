@@ -6173,6 +6173,7 @@
     "Milestone.refund_amount": "Refund Amount",
     "Milestone.refund_details": "Refund details",
     "Milestone.status_actions": "Actions for {name}",
+    "Milestone.status_colour": "Milestone status colour",
     "Milestone.status_history": "Status history",
     "Milestone.time_logged_by_member": "Time logged by each member",
     "Milestone.toggle_rows": "Show or hide the rows under {name}",

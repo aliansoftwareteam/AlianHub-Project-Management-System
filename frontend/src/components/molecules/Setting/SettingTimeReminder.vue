@@ -21,6 +21,7 @@
             <label class="time-reminder-switch" :class="{ disabled: isBusy }">
                 <input
                     type="checkbox"
+                    :aria-label="$t('TimeReminder.toggle_label')"
                     :checked="settings.enabled"
                     :disabled="isBusy"
                     @change="onToggle($event.target.checked)"

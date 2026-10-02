@@ -6630,6 +6630,7 @@
     "Milestone.released": "Released",
     "Milestone.start_date": "Start Date",
     "Milestone.status_actions": "Actions for {name}",
+    "Milestone.status_colour": "Milestone status colour",
     "Milestone.status_date": "Status Date",
     "Milestone.status_history": "Status history",
     "Milestone.time_logged_by_member": "Time logged by each member",
