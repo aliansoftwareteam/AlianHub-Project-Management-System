@@ -57,7 +57,7 @@ const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 
 const TOOL = 'proposal.get';
-const NOT_FOUND = { error: 'proposal not found' };
+const NOT_FOUND = { error: 'That proposal was not found. Check the proposalId.' };
 const PEOPLE = [OWNER, INSIDER, OUTSIDER, GUEST];
 const READS = ['tasks:read', 'projects:read'];
 
@@ -138,7 +138,7 @@ describe('the tool exists with the read tools', () => {
 
     it('refuses a connection that may not read tasks, or that is kept away from the tool', async () => {
         const id = filedByApp(OWNER);
-        expect(await state(outside(OWNER, ['projects:read']), id)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:read scope/) });
+        expect(await state(outside(OWNER, ['projects:read']), id)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:read permission/) });
         expect((await state(as(OWNER, { allowedActions: ['tasks.next'] }), MISSING)).refused).toBe(true);
     });
 });

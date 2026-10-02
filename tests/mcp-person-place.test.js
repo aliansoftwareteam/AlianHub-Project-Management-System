@@ -93,7 +93,7 @@ describe('the tool exists with the read tools', () => {
     it('answers a connection that only reads, and refuses one that may not read projects', async () => {
         visit(OWNER, 'project', P_OPEN, 2);
         expect((await where(readOnly(OWNER))).place).toMatchObject({ kind: 'project' });
-        expect(await where(outside(OWNER, ['tasks:read']))).toMatchObject({ isError: true, error: expect.stringMatching(/projects:read scope/) });
+        expect(await where(outside(OWNER, ['tasks:read']))).toMatchObject({ isError: true, error: expect.stringMatching(/projects:read permission/) });
         expect((await where(ctx(OWNER, { allowedActions: ['tasks.next'] }))).refused).toBe(true);
     });
 });

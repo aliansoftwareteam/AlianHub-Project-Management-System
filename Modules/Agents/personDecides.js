@@ -21,7 +21,7 @@ const personDecides = async (req, res, action, refusal = SESSION_ONLY) => {
     if (isSignedInSession(req)) return true;
     const actor = req.agentActor || await resolveActor(req);
     req.agentActor = actor;
-    if (isAgent(actor)) await refuse(req, res, actor, { action, reason: `Agents cannot perform ${action}`, params: {} });
+    if (isAgent(actor)) await refuse(req, res, actor, { action, reason: `An agent is not allowed to do this (${action}). The person has to do it in AlianHub.`, params: {} });
     else res.status(403).json({ status: false, message: refusal, statusText: refusal });
     return false;
 };

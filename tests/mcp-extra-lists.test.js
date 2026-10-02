@@ -65,9 +65,9 @@ const PATCH = 'PATCH /api/v2/tasks';
 const L_OPEN_2 = '6f0000000000000000000b05';
 const L_SCRUM = '6f0000000000000000000b06';
 const HOME_ROWS = [T_OPEN, T_OPEN_2, T_TWIN];
-const TASK_NOT_OPEN = 'not_visible: the task is not one the person behind this token can open';
-const PROJECT_NOT_OPEN = 'not_visible: the project is not one the person behind this token can open';
-const LIST_NOT_OPEN = 'not_visible: the sprint is not one the person behind this token can open in that project';
+const TASK_NOT_OPEN = 'not_visible: that task was not found, or the person cannot open it. Ask the person which task they mean.';
+const PROJECT_NOT_OPEN = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
+const LIST_NOT_OPEN = 'not_visible: that list was not found in that project, or the person cannot open it. Ask the person which list they mean.';
 const PEOPLE = [['an owner', OWNER], ['an admin', ADMIN], ['a member on the private work', INSIDER], ['a member outside it', OUTSIDER], ['a guest', GUEST]];
 const PROJECT_OF = { [L_OPEN]: P_OPEN, [L_OPEN_2]: P_OPEN, [L_SCRUM]: P_OPEN, [L_SECRET]: P_OPEN, [L_PRIVATE]: P_PRIVATE, [L_PERSONAL]: P_PERSONAL };
 
@@ -208,9 +208,9 @@ describe('task.lists.add', () => {
 
     it('needs the write scope', async () => {
         const before = tasksNow();
-        expect(await rpc(readOnly(OWNER), 'task.lists.add', into(T_OPEN, L_OPEN_2))).toMatchObject({ isError: true, error: 'This token is read-only.' });
-        expect(await rpc(outside(OWNER, ['tasks:read']), 'task.lists.add', into(T_OPEN, L_OPEN_2))).toMatchObject({ isError: true, error: 'This token lacks the tasks:write scope.' });
-        expect(await rpc(outside(OWNER, ['tasks:write']), 'task.lists.list', { taskId: T_OPEN })).toMatchObject({ isError: true, error: 'This token lacks the tasks:read scope.' });
+        expect(await rpc(readOnly(OWNER), 'task.lists.add', into(T_OPEN, L_OPEN_2))).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
+        expect(await rpc(outside(OWNER, ['tasks:read']), 'task.lists.add', into(T_OPEN, L_OPEN_2))).toMatchObject({ isError: true, error: 'This connection was not given the tasks:write permission. Ask the person to connect you again and allow it.' });
+        expect(await rpc(outside(OWNER, ['tasks:write']), 'task.lists.list', { taskId: T_OPEN })).toMatchObject({ isError: true, error: 'This connection was not given the tasks:read permission. Ask the person to connect you again and allow it.' });
         expect(tasksNow()).toBe(before);
     });
 
@@ -310,7 +310,7 @@ describe('task.lists.list', () => {
         place(T_PRIVATE, [L_OPEN]);
         place(T_SECRET, [L_OPEN]);
         const missing = await rpc(ctx(OWNER), 'task.lists.list', { taskId: MISSING });
-        expect(missing).toEqual({ error: 'task not found' });
+        expect(missing).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         for (const uid of [OUTSIDER, GUEST]) {
             for (const taskId of [T_SECRET, T_PRIVATE, T_PERSONAL]) expect(await rpc(ctx(uid), 'task.lists.list', { taskId })).toEqual(missing);
         }
@@ -323,7 +323,7 @@ describe('task.lists.list', () => {
         const out = await rpc(narrowed(INSIDER, [P_OPEN]), 'task.lists.list', { taskId: T_OPEN });
         expect(out.lists.map((row) => row.sprintId)).toEqual([L_OPEN_2, L_SECRET]);
         expect(JSON.stringify(out)).not.toMatch(`${L_PRIVATE}|${P_PRIVATE}`);
-        expect(await rpc(narrowed(INSIDER, [P_PRIVATE]), 'task.lists.list', { taskId: T_OPEN })).toEqual({ error: 'task not found' });
+        expect(await rpc(narrowed(INSIDER, [P_PRIVATE]), 'task.lists.list', { taskId: T_OPEN })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
     });
 });
 
@@ -371,7 +371,7 @@ describe('tasks.search by list', () => {
     it('narrows the other filters and refuses what is not a list id', async () => {
         expect(await found(ctx(OWNER), { sprintId: L_OPEN, query: 'private' })).toEqual([T_PRIVATE]);
         expect(await found(ctx(OWNER), { sprintId: L_OPEN, projectId: P_PRIVATE })).toEqual([T_PRIVATE]);
-        expect(await rpc(ctx(OWNER), 'tasks.search', { sprintId: 'the open list' })).toMatchObject({ error: 'sprintId must be a list id' });
+        expect(await rpc(ctx(OWNER), 'tasks.search', { sprintId: 'the open list' })).toMatchObject({ error: 'sprintId must be the id of a list (see lists.list).' });
     });
 
     it('reads the same for a caller whose token manages tasks', async () => {

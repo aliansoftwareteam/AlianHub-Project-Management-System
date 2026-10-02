@@ -39,7 +39,7 @@ const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const find = (database, type, filter, fields, options) => MongoDbCrudOpration(database, { type, data: [filter, fields || null, options] }, 'find');
 
 const ID = Object.freeze({ type: 'string', pattern: '^[a-fA-F0-9]{24}$' });
-const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in a line; it is kept in the audit log' } });
+const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in one line. It is kept in the record of changes.' } });
 const taskTarget = (args) => ({ taskId: str(args.taskId, 40) });
 const input = (properties, required) => ({ type: 'object', additionalProperties: false, properties, required });
 
@@ -53,8 +53,8 @@ const CREATE_OPTIONS = Object.freeze({
     description: { type: 'string', maxLength: DESCRIPTION_MAX, description: 'Plain text' },
     assigneeIds: { type: 'array', items: ID, maxItems: ASSIGNEES_MAX, description: 'Active members who can open the project (see members.list)' },
     priority: { type: 'string', enum: [...PRIORITIES] },
-    dueDate: { type: 'string', maxLength: 40, description: 'YYYY-MM-DD or an ISO date and time' },
-    startDate: { type: 'string', maxLength: 40, description: 'YYYY-MM-DD or an ISO date and time' },
+    dueDate: { type: 'string', maxLength: 40, description: 'YYYY-MM-DD, or a date and time' },
+    startDate: { type: 'string', maxLength: 40, description: 'YYYY-MM-DD, or a date and time' },
     status: { type: 'string', minLength: 1, maxLength: 60, description: 'A status of the project, by name (see statuses.list); the opening status when left out' },
     taskType: { type: 'string', minLength: 1, maxLength: 60, description: 'A task type of the project, by name' },
     estimateMinutes: { type: 'integer', minimum: 0, maximum: ESTIMATE_MAX_MINUTES },
@@ -124,16 +124,16 @@ const dayStart = (day) => (DAY.test(String(day)) && Number.isFinite(Date.parse(`
 const searchFilter = (args) => {
     const filter = {};
     if (args.assigneeId !== undefined && args.assigneeId !== '') {
-        if (!isId(args.assigneeId)) return { error: 'assigneeId must be a member id' };
+        if (!isId(args.assigneeId)) return { error: 'assigneeId must be the id of a member (see members.list).' };
         filter.AssigneeUserId = String(args.assigneeId);
     }
     if (args.sprintId !== undefined && args.sprintId !== '') {
-        if (!isId(args.sprintId)) return { error: 'sprintId must be a list id' };
+        if (!isId(args.sprintId)) return { error: 'sprintId must be the id of a list (see sprints.list).' };
         filter.sprintId = { $in: idForms(String(args.sprintId)) };
     }
     const from = args.dueFrom ? dayStart(args.dueFrom) : undefined;
     const to = args.dueTo ? dayStart(args.dueTo) : undefined;
-    if (from === null || to === null) return { error: 'dueFrom and dueTo must be YYYY-MM-DD' };
+    if (from === null || to === null) return { error: 'dueFrom and dueTo must be written YYYY-MM-DD.' };
     if (from !== undefined || to !== undefined) {
         filter.DueDate = { ...(from !== undefined ? { $gte: new Date(from) } : {}), ...(to !== undefined ? { $lte: new Date(to + DAY_MS - 1) } : {}) };
     }
@@ -144,7 +144,7 @@ const TOOLS = [
     {
         name: 'fields.list',
         action: 'fields.list',
-        description: 'The custom fields tasks in one project carry: id, title, type, the options of a dropdown and the task types the field is for (none means every type). Set one with task.field.set.',
+        description: 'Shows the custom fields the tasks in one project carry: id, title, type, the options of a dropdown and the task types the field is for (none means every type). Set one with task.field.set. Changes nothing.',
         input: input({ projectId: ID }, ['projectId']),
         visibility: 'filtered',
         grant: GRANT,
@@ -161,7 +161,7 @@ const TOOLS = [
     {
         name: 'subtasks.list',
         action: 'subtasks.list',
-        description: 'The direct subtasks of a task you can open, oldest first, each with its own subtask count and the chain of tasks above it.',
+        description: 'Shows the direct subtasks of a task the person can open, oldest first, each with its own subtask count and the chain of tasks above it. Changes nothing.',
         input: input({ taskId: ID, limit: { type: 'integer', minimum: 1, maximum: cursor.PAGE_MAX } }, ['taskId']),
         visibility: 'filtered',
         grant: GRANT,
@@ -181,7 +181,7 @@ const TOOLS = [
     {
         name: 'members.list',
         action: 'members.list',
-        description: 'Active members of the workspace by name: id, name and role. With a projectId each row also says whether that person can open the project, which task.assign requires.',
+        description: 'Lists the active members of the workspace by name: id, name and role. With a projectId each row also says whether that person can open the project, which task.assign needs. Changes nothing.',
         input: input({ query: { type: 'string', maxLength: 120, description: 'Part of the name' }, projectId: ID, limit: { type: 'integer', minimum: 1, maximum: cursor.PAGE_MAX } }, []),
         visibility: 'filtered',
         grant: GRANT,
@@ -217,7 +217,7 @@ const TOOLS = [
     {
         name: 'task.history',
         action: 'task.history',
-        description: 'The activity log of a task you can open, newest first: who changed what, and when, as the task panel shows it.',
+        description: 'Shows the activity log of a task the person can open, newest first: who changed what, and when, as the task panel shows it. Changes nothing.',
         input: input({ taskId: ID, limit: { type: 'integer', minimum: 1, maximum: cursor.PAGE_MAX } }, ['taskId']),
         visibility: 'filtered',
         grant: GRANT,
@@ -237,7 +237,7 @@ const TOOLS = [
     {
         name: 'task.links.list',
         action: 'task.links.list',
-        description: 'The pull requests, branches, documents and other links attached to a task you can open.',
+        description: 'Shows the pull requests, branches, docs and other links attached to a task the person can open. Changes nothing.',
         input: input({ taskId: ID }, ['taskId']),
         visibility: 'filtered',
         grant: GRANT,
@@ -255,7 +255,7 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Change the text of a comment an agent wrote for you on a task. A comment a person wrote, or one on another task, is refused.',
+        description: 'Changes the text of a comment an agent wrote for the person on a task, at once. You cannot change a comment a person wrote, or one on another task.',
         input: input({ taskId: ID, commentId: ID, text: { type: 'string', minLength: 1, maxLength: 20000 }, ...REASON }, ['taskId', 'commentId', 'text']),
         params: (args) => ({ taskId: str(args.taskId, 40), commentId: str(args.commentId, 40), body: str(args.text, 20000) }),
     },
@@ -267,7 +267,7 @@ const TOOLS = [
         strict: true,
         batch: true,
         target: () => ({}),
-        description: `Run up to ${BATCH_MAX} write tools in one call, in order. When every operation is on the same task, each is checked and applied on its own and reports its own result, so one refusal does not stop or undo the others, and the ones that applied are recorded as one group, which a person can undo together. When the operations name more than one task, nothing runs: the changes wait in AlianHub as one proposal that a person approves or declines whole, and the answer says so. A link names both of its tasks, and each new task, subtask or doc counts as a task of its own. Keep such a batch inside one project.`,
+        description: `Runs up to ${BATCH_MAX} change tools in one call, in order. When every step is on the same task, each is applied on its own and reports its own result, so one refusal does not stop or undo the others, and a person can undo the ones that applied together. When the steps name more than one task, nothing runs yet: the changes wait in AlianHub as one proposal that a person approves or declines whole. A link counts both of its tasks, and each new task, subtask or doc counts as a task of its own. Keep such a batch inside one project.`,
         input: input({
             operations: {
                 type: 'array', minItems: 1, maxItems: BATCH_MAX,
@@ -289,7 +289,7 @@ const TOOLS = [
             ...(args.parentPageId !== undefined ? { pageId: str(args.parentPageId, 40) } : {}),
             ...(args.taskId !== undefined ? { taskId: str(args.taskId, 40) } : {}),
         }),
-        description: 'Create a doc in a project, or one for the whole workspace when no project is named. The text is plain text or simple Markdown (headings, lists, paragraphs). It is marked as an agent\'s draft until a person approves it.',
+        description: 'Creates a doc in a project, or one for the whole workspace when no project is named. The text is plain text or simple Markdown (headings, lists, paragraphs). It stays a draft marked as an agent\'s until a person approves it.',
         input: input({
             title: { type: 'string', minLength: 1, maxLength: pageRequests.TITLE_MAX },
             text: { type: 'string', maxLength: pageRequests.TEXT_MAX },
@@ -313,7 +313,7 @@ const TOOLS = [
         grant: DOCS_GRANT,
         strict: true,
         target: (args) => ({ pageId: str(args.pageId, 40) }),
-        description: 'Change a doc\'s title, its text, or both. The text replaces the body and is plain text or simple Markdown. The state it replaces is kept in the doc\'s version history.',
+        description: 'Changes a doc\'s title, its text, or both, at once. The text replaces the body and is plain text or simple Markdown. The old version is kept in the doc\'s version history.',
         input: input({ pageId: ID, title: { type: 'string', minLength: 1, maxLength: pageRequests.TITLE_MAX }, text: { type: 'string', maxLength: pageRequests.TEXT_MAX }, ...REASON }, ['pageId']),
         check: (args) => (args.title === undefined && args.text === undefined ? 'name a title or a text to change' : ''),
         params: (args) => ({ pageId: str(args.pageId, 40), ...(args.title !== undefined ? { title: args.title } : {}), ...(args.text !== undefined ? { text: args.text } : {}) }),
@@ -325,14 +325,14 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Change a task\'s title, description, priority, due date, start date or estimate. One call may set several; a field you leave out is not touched.',
+        description: 'Changes a task\'s title, description, priority, due date, start date or estimate at once, and the person can undo it. One call may change several; a detail you leave out is not touched.',
         input: input({
             taskId: ID,
             title: { type: 'string', minLength: 1, maxLength: TITLE_MAX },
             description: { type: 'string', maxLength: DESCRIPTION_MAX, description: 'Plain text; it replaces the description' },
             priority: { type: 'string', enum: [...PRIORITIES] },
-            dueDate: { type: ['string', 'null'], maxLength: 40, description: 'YYYY-MM-DD or an ISO date and time; null clears it' },
-            startDate: { type: 'string', maxLength: 40, description: 'YYYY-MM-DD or an ISO date and time' },
+            dueDate: { type: ['string', 'null'], maxLength: 40, description: 'YYYY-MM-DD, or a date and time; null clears it' },
+            startDate: { type: 'string', maxLength: 40, description: 'YYYY-MM-DD, or a date and time' },
             estimateMinutes: { type: 'integer', minimum: 0, maximum: ESTIMATE_MAX_MINUTES },
             ...REASON,
         }, ['taskId']),
@@ -346,7 +346,7 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Set, add or remove a task\'s assignees. Each person added must be an active member who can open the task\'s project; find ids with members.list.',
+        description: 'Sets, adds or removes a task\'s assignees at once. Each person added must be an active member who can open the task\'s project; find ids with members.list.',
         input: input({
             taskId: ID,
             mode: { type: 'string', enum: [...ASSIGN_MODES], description: 'set replaces the list (an empty list unassigns everyone); add and remove change it' },
@@ -362,7 +362,7 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Set one custom field on a task. The value is in the field\'s own type (see fields.list): text, a number, true or false, a day, an option id or label, a list of member ids; null clears it.',
+        description: 'Sets one custom field on a task at once. The value is in the field\'s own type (see fields.list): text, a number, true or false, a day, an option id or label, or a list of member ids; null clears it.',
         input: input({ taskId: ID, fieldId: ID, value: { description: 'The value in the field\'s type; null clears it' }, ...REASON }, ['taskId', 'fieldId', 'value']),
         params: (args) => ({ taskId: str(args.taskId, 40), fieldId: str(args.fieldId, 40), value: args.value }),
     },
@@ -373,7 +373,7 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: (args) => ({ taskId: str(args.taskId, 40), projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
-        description: 'Move a top-level task, with its subtasks, to another list: in its own project or in another project you can move tasks into. In another project it takes the status and task type of the same name there, and keeps the assignees who can open that project; its subtasks take the same assignees, as in the web app\'s move. A subtask moves with its parent. A move cannot be undone, so it waits for a person\'s approval.',
+        description: 'Moves a top-level task, with its subtasks, to another list: in its own project, or in another project the person can move tasks into. In another project it takes the status and task type of the same name there, and keeps the assignees who can open that project. A subtask moves with its parent. A move cannot be undone, so it waits for a person\'s approval.',
         input: input({ taskId: ID, projectId: { ...ID, description: 'The project of the list to move to' }, sprintId: { ...ID, description: 'The list to move to (see sprints.list)' }, ...REASON }, ['taskId', 'projectId', 'sprintId']),
         params: (args) => ({ taskId: str(args.taskId, 40), projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
     },
@@ -384,7 +384,7 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Archive a task; its subtasks are archived with it. Nothing is deleted, and task.restore brings it back. A task that has subtasks waits for a person\'s approval.',
+        description: 'Archives a task, and its subtasks with it. Nothing is deleted, and task.restore brings it back. A task with no subtasks is archived at once. A task that has subtasks waits for a person\'s approval.',
         input: input({ taskId: ID, ...REASON }, ['taskId']),
         params: (args) => ({ taskId: str(args.taskId, 40) }),
     },
@@ -395,7 +395,7 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Restore an archived task, with the subtasks archived along with it. A task whose subtasks come back with it waits for a person\'s approval.',
+        description: 'Restores an archived task, with the subtasks archived along with it. A task with no subtasks comes back at once. A task whose subtasks come back with it waits for a person\'s approval.',
         input: input({ taskId: ID, ...REASON }, ['taskId']),
         params: (args) => ({ taskId: str(args.taskId, 40) }),
     },
@@ -413,7 +413,7 @@ const VARIANTS = Object.freeze({
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Set a task to any status its project defines (see statuses.list), a done or closed one included. A close is recorded as made for you through this agent, and the work stays marked unchecked until a person checks it. A project may hold a close for a person\'s approval, or leave it to a person: the answer says which.',
+        description: 'Sets a task to any status its project uses (see statuses.list), a done or closed one included. A close is recorded as made for the person through this agent, and stays unchecked until a person checks it. A project may hold a close for a person\'s approval, or leave it to a person: the answer says which.',
         input: input({ taskId: ID, status: { type: 'string', minLength: 1, maxLength: 60 }, ...REASON }, ['taskId', 'status']),
         params: (args) => ({ taskId: str(args.taskId, 40), status: { name: str(args.status, 60) } }),
     },
@@ -425,7 +425,7 @@ const VARIANTS = Object.freeze({
         grant: GRANT,
         strict: true,
         target: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
-        description: 'Create a task in a project, with as much of it as you know in the one call: description, assignees, priority, dates, status, task type, estimate and links. Left out, it lands in the project\'s first list, in its opening status, unassigned.',
+        description: 'Creates a task in a project at once, with as much as you know in one call: description, assignees, priority, dates, status, task type, estimate and links. Left out, it goes in the project\'s first list, in its opening status, unassigned.',
         input: input({ projectId: ID, title: { type: 'string', minLength: 1, maxLength: TITLE_MAX }, sprintId: { ...ID, description: 'The list to create it in' }, ...CREATE_OPTIONS, ...REASON }, ['projectId', 'title']),
         params: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40), title: str(args.title, TITLE_MAX), fields: createdFields(args) }),
     },
@@ -437,7 +437,7 @@ const VARIANTS = Object.freeze({
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Create a subtask under a task, with as much of it as you know in the one call: description, assignees, priority, dates, status, task type, estimate and links. Subtasks nest three levels deep at most.',
+        description: 'Creates a subtask under a task at once, with as much as you know in one call: description, assignees, priority, dates, status, task type, estimate and links. Subtasks nest three levels deep at most.',
         input: input({ taskId: ID, title: { type: 'string', minLength: 1, maxLength: TITLE_MAX }, ...CREATE_OPTIONS, ...REASON }, ['taskId', 'title']),
         params: (args) => ({ taskId: str(args.taskId, 40), title: str(args.title, TITLE_MAX), fields: createdFields(args) }),
     },
@@ -448,7 +448,7 @@ const VARIANTS = Object.freeze({
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: `Post a comment. Use it to report findings, ask a question, or leave a PR link with context. ${MENTIONS}`,
+        description: `Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link. ${MENTIONS}`,
         input: input({ taskId: ID, body: { type: 'string', minLength: 1, maxLength: 20000 }, ...REASON }, ['taskId', 'body']),
         params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.body, 20000), notifyMentions: true }),
     },
@@ -459,7 +459,7 @@ const VARIANTS = Object.freeze({
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: `Comment on a task you can open. The text is stored as plain text, as the web app stores it. ${MENTIONS}`,
+        description: `Adds a comment to a task the person can open, at once, and the person can undo it. The text is saved as plain text. ${MENTIONS}`,
         input: input({ taskId: ID, text: { type: 'string', minLength: 1, maxLength: 20000 }, ...REASON }, ['taskId', 'text']),
         params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000), notifyMentions: true }),
     },

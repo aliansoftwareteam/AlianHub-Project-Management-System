@@ -3,7 +3,7 @@
   "actions": [
     {
       "key": "tasks.next",
-      "label": "Next assigned task",
+      "label": "See the next task assigned",
       "risk": "low",
       "undoable": false,
       "write": false,
@@ -12,7 +12,7 @@
     },
     {
       "key": "tasks.search",
-      "label": "Search own tasks",
+      "label": "Search tasks",
       "risk": "low",
       "undoable": false,
       "write": false,
@@ -21,7 +21,7 @@
     },
     {
       "key": "task.get",
-      "label": "Read a task brief",
+      "label": "Read a task",
       "risk": "low",
       "undoable": false,
       "write": false,
@@ -39,7 +39,7 @@
     },
     {
       "key": "task.status.set",
-      "label": "Set status (In progress / In review only)",
+      "label": "Set the status",
       "risk": "low",
       "undoable": true,
       "write": true,
@@ -49,7 +49,7 @@
     },
     {
       "key": "task.link",
-      "label": "Attach a PR, branch or doc",
+      "label": "Add a link to a task",
       "risk": "low",
       "undoable": true,
       "write": true,
@@ -67,7 +67,7 @@
     },
     {
       "key": "task.update",
-      "label": "Update task fields",
+      "label": "Change a task's details",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -101,7 +101,7 @@
     },
     {
       "key": "aifield.fill",
-      "label": "Fill an AI field on a task",
+      "label": "Fill in an AI field",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -110,7 +110,7 @@
     },
     {
       "key": "task.sprint.move",
-      "label": "Move a task between sprints",
+      "label": "Move a task to another list",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -128,7 +128,7 @@
     },
     {
       "key": "task.create",
-      "label": "File a task (opening status, unassigned)",
+      "label": "Create a task",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -165,7 +165,7 @@
     },
     {
       "key": "page.draft",
-      "label": "Draft a page (stays a draft until approved)",
+      "label": "Draft a doc",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -174,7 +174,7 @@
     },
     {
       "key": "chat.post",
-      "label": "Post in a channel",
+      "label": "Post in a chat channel",
       "risk": "low",
       "undoable": false,
       "write": true,
@@ -195,7 +195,7 @@
     },
     {
       "key": "deploy.staging",
-      "label": "Propose a staging deploy",
+      "label": "Ask to publish to the test site",
       "risk": "high",
       "undoable": false,
       "write": true,
@@ -233,7 +233,7 @@
     },
     {
       "key": "sprints.list",
-      "label": "List a project's sprints",
+      "label": "List a project's lists",
       "risk": "low",
       "undoable": false,
       "write": false,
@@ -260,7 +260,7 @@
     },
     {
       "key": "pages.search",
-      "label": "Search pages",
+      "label": "Search docs",
       "risk": "low",
       "undoable": false,
       "write": false,
@@ -269,7 +269,7 @@
     },
     {
       "key": "page.get",
-      "label": "Read a page",
+      "label": "Read a doc",
       "risk": "low",
       "undoable": false,
       "write": false,
@@ -299,7 +299,7 @@
     },
     {
       "key": "timelog.create",
-      "label": "Log time on a task (own time)",
+      "label": "Log time on a task",
       "risk": "low",
       "undoable": true,
       "write": true,
@@ -335,7 +335,7 @@
     },
     {
       "key": "task.edit",
-      "label": "Edit a task's title, description, priority, dates or estimate",
+      "label": "Edit a task",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -364,7 +364,7 @@
     },
     {
       "key": "task.assignees.set",
-      "label": "Set, add or remove a task's assignees",
+      "label": "Change who a task is assigned to",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -373,7 +373,7 @@
     },
     {
       "key": "task.field.set",
-      "label": "Set a custom field on a task",
+      "label": "Fill in a custom field on a task",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -382,7 +382,7 @@
     },
     {
       "key": "task.move",
-      "label": "Move a task with its subtasks to another list or project",
+      "label": "Move a task to another list or project",
       "risk": "high",
       "undoable": false,
       "write": true,
@@ -392,7 +392,7 @@
     },
     {
       "key": "task.archive",
-      "label": "Archive a task with its subtasks",
+      "label": "Archive a task",
       "risk": "high",
       "undoable": true,
       "write": true,
@@ -434,7 +434,7 @@
     },
     {
       "key": "task.status.change",
-      "label": "Set any status of the task's project, Done included",
+      "label": "Set the status, including Done",
       "risk": "high",
       "undoable": true,
       "write": true,
@@ -525,7 +525,7 @@
     },
     {
       "key": "tasks.batch",
-      "label": "Record a batch of task changes as one group",
+      "label": "Make several changes together",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -538,7 +538,7 @@
     },
     {
       "key": "page.create",
-      "label": "Create a doc (a draft until a person approves it)",
+      "label": "Create a doc",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -550,7 +550,7 @@
     },
     {
       "key": "page.update",
-      "label": "Change a doc's title or body",
+      "label": "Change a doc",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -699,7 +699,7 @@
     },
     {
       "key": "page.comment.assign",
-      "label": "Assign a doc comment thread",
+      "label": "Assign a doc comment",
       "risk": "low",
       "undoable": true,
       "write": true,
@@ -729,7 +729,7 @@
     },
     {
       "key": "goal.target.set",
-      "label": "Report the value of a goal's target",
+      "label": "Update a goal's target",
       "risk": "medium",
       "undoable": true,
       "write": true,
@@ -800,7 +800,7 @@
     },
     {
       "key": "slack.message.post",
-      "label": "Propose a Slack message",
+      "label": "Ask to send a Slack message",
       "risk": "high",
       "undoable": false,
       "write": true,
