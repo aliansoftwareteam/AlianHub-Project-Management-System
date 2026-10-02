@@ -1,11 +1,11 @@
 # 046 progress
 
-State at build 766 (`14.36.0-beta.766`), 2026-10-02 01:10 IST. Tracker: AP-441.
+State at build 766 (`14.36.0-beta.766`), 2026-10-02 01:10 IST, with the fix PRs of builds 769 to 772 added at 11:15. Tracker: AP-441.
 
 How to read a line:
 - `[x]` is merged into `beta`, with its PR and build number.
 - "inside build 754" means the PR reached `beta` inside the combined PR #1332; "inside build 755" means inside #1343. GitHub shows each of those PRs as merged; `docs/BETA-LOG.md` has one row per build, so they have no row of their own.
-- The later combined PRs read the same way: build 759 is #1357, 761 is #1378, 762 is #1395, 764 is #1399, 765 is #1401 and 766 is #1405.
+- The later combined PRs read the same way: build 759 is #1357, 761 is #1378, 762 is #1395, 764 is #1399, 765 is #1401, 766 is #1405, 769 is #1412, 771 is #1428 and 772 is #1434.
 - "In review (#n)" has an open PR.
 - "Running" has an agent or a cloud run at work and no PR yet. "Not started" has neither.
 
@@ -254,9 +254,12 @@ Titles only; see the private notes.
 - [x] #1384 (inside build 762): sweep 1: popover clamp, `<html lang>`, the import table and rows at 390 px, the whiteboard note's place
 - [x] #1385 (inside build 762): a group a task moves into updates its count, and so do the list header and the sidebar
 - [x] #1388 (inside build 762): calendar sprint lanes, the doc share list and switch, a real placeholder for a new doc title
-- [ ] In review (#1389): the title saves on blur, panels follow their route, no bare avatar request, Undo on "Remove from this list"
-- [ ] In review (#1403): the Add View menu stays inside the window. #1384's clamp ran before the menu had its content.
-- The defects still open after the sixth sweep are in `followups.md`, under "Added at build 766".
+- [x] #1389 (inside build 769): the title saves on blur, panels follow their route, no bare avatar request, Undo on "Remove from this list". Seen by hand on build 769, except the avatar on the Table
+- [x] #1403 (inside build 769): the Add View menu stays inside the window. On build 769 the menu was still off screen at 1024 px; #1432 goes at the cause
+- [x] #1418 (inside build 771): sweep 3: an edit made offline is kept and sent later, the import button says what it will do, Home's approval link, "Hand to an agent" follows its switch, the icon on "Not connected yet"
+- [x] #1422 (inside build 771): a timer running when its week is approved keeps its time
+- [x] #1432 (inside build 772): sweep 7: menus stay inside the window, every avatar loads through one component, two agents with one name are told apart, plain words on the Projects page
+- Not seen on a build yet: #1418, #1422 and #1432. The defects still open are in `followups.md`, under "Added at build 766", where the fixed ones are marked.
 
 **Tooling**
 - [x] #1264 (build 721): `docs/ENV.md` regenerated
@@ -265,7 +268,7 @@ Titles only; see the private notes.
 - [x] #1365 (inside build 761): the 046 progress, decisions and builds 721 to 758
 - [x] #1376 (build 760): a draft pull request skips the suites until it is marked ready
 - [x] #1383 (inside build 762): each group of agent registry entries in its own file
-- [ ] The API reference caught up with the routes: in the docs PR of 2026-10-02, which describes 38 routes and regenerates both files. The cloud PR #1364 did part of it on an older base and is replaced by that PR; close it.
+- [x] #1411 (build 768): the API reference caught up with the routes: 38 routes described and both files regenerated. The cloud PR #1364 did part of it on an older base and is replaced; it is still open, close it.
 
 ## Decisions taken on 2026-10-01 and the night after
 These follow decisions 1 to 26 in `task.md`. The integrator took them under the owner's "make your own decisions"; the ones marked "owner" are the owner's own. Each is its own slice, flag or setting, so each can be overruled.
@@ -346,7 +349,7 @@ How the work runs:
 18. CI is on GitHub Free (20 jobs at once). A Team plan would give 60 for money; the recommendation is to stay on Free now that drafts skip the suites.
 19. The Claude plan: the weekly limit was at 24% at 01:00 IST and rises about 2% an hour at three to four agents; extra usage is off. Pace, or turn extra usage on (money).
 20. Two hand checks need a second person: the unread counts in a second account, and a doc opened as a view-only reader.
-21. A timer that is running when its week gets approved loses its tracked time at Stop (#1377 found it). The coordinator may fix it; say if it should wait.
+21. A timer that is running when its week gets approved lost its tracked time at Stop (#1377 found it). Fixed in #1422 (inside build 771): the stop is refused, the timer is kept and the person is told why. Left to decide: whether a kept timer goes on counting or is held paused, and whether it gets a "discard".
 
 ## Log
 - 2026-10-01: the owner confirmed the plan with the recommended definition of "great" and asked to start M1. Wave 1 started at about 12:25: A1.1, A1.3, A1.4, A1.5, B0 (atlas and variants), B1.1, B1.2, C1.1.
@@ -402,3 +405,4 @@ How the work runs:
 - 2026-10-02 00:34: #1401 merged, build 765 (the sample project, #1370, and Home's "What next", #1400). Its first backend round failed: a convention test caught that a helper added as a method of the task write mixins had become a task action. It was moved to its own module before the merge. Local build 765 at 00:38.
 - 2026-10-02 00:52: #1405 merged, build 766 (task 047). Local build 766 at 00:56.
 - 2026-10-02 01:10: `beta` is at build 766. Since build 758, GitHub shows 57 more PRs merged, six of them the combined PRs, in eight builds (759 to 766). The Supporter session swept builds 757, 759, 762, 764, 765 and 766 by hand; the results are in `dogfood-findings.md`.
+- 2026-10-02 08:47 to 11:02: builds 767 to 772. From this task: #1389 and #1403 (inside build 769), #1418 and #1422 (inside build 771), #1432 (inside build 772). The Supporter swept build 769. The rest of those builds is task 047; see its `progress.md`. The local server answered build 772 at 11:15.
