@@ -152,15 +152,27 @@ describe('PUT /api/v1/project/:id saves a working-days override', () => {
         await put(OWNER, project, { updateObject: { workingDays: SUN_TO_THU } });
         expect(removeCache).toHaveBeenCalledWith('UserProjectData:', true);
         expect(emitted).toHaveLength(1);
-        expect(emitted[0]).toMatchObject({ type: 'update', module: 'project', updatedFields: { workingDays: SUN_TO_THU } });
+        expect(emitted[0]).toMatchObject({ type: 'update', module: 'project', companyId: C, updatedFields: { workingDays: SUN_TO_THU } });
         expect(emitted[0].data).toMatchObject({ _id: String(project._id), workingDays: SUN_TO_THU });
     });
 
-    it('stays quiet for an update that leaves the working days alone', async () => {
+    it('announces any other saved change once, naming the company and what was saved', async () => {
         seedRules({});
         const project = seedProject();
         const res = await put(OWNER, project, { updateObject: { ProjectName: 'Relaunch' } });
         expect(res.statusCode).toBe(200);
-        expect(emitted).toHaveLength(0);
+        expect(emitted).toHaveLength(1);
+        expect(emitted[0]).toMatchObject({ type: 'update', module: 'project', companyId: C, updatedFields: { ProjectName: 'Relaunch' } });
+        expect(emitted[0].data).toMatchObject({ _id: String(project._id), ProjectName: 'Relaunch' });
+    });
+
+    it('announces a change made with another operator by the fields it touched, without guessing their new value', async () => {
+        seedRules({});
+        const project = seedProject();
+        const res = await put(OWNER, project, { key: '$addToSet', updateObject: { AssigneeUserId: OWNER } });
+        expect(res.statusCode).toBe(200);
+        expect(emitted).toHaveLength(1);
+        expect(Object.keys(emitted[0].updatedFields)).toEqual(['AssigneeUserId']);
+        expect(emitted[0].data).toMatchObject({ _id: String(project._id), ProjectName: 'Launch' });
     });
 });

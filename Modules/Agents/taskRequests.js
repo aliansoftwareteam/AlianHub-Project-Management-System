@@ -518,6 +518,7 @@ const executors = {
 
         const held = task.customField && task.customField[fieldId] !== undefined ? task.customField[fieldId] : null;
         await asRoute(companyId, who, 'updateTaskCustomField', { companyId, taskId: idOf(task._id), customFieldId: fieldId, updateDetail: { fieldValue: read.value, _id: fieldId } });
+        await require('./computedFields').recompute({ companyId, who, taskIds: [idOf(task._id)] });
         return { result: { fieldId, title: definition.fieldTitle || '' }, undo: { kind: 'update', taskId: idOf(task._id), previous: { [`customField.${fieldId}`]: held } }, entityId: task._id, entityName: task.TaskName };
     },
 

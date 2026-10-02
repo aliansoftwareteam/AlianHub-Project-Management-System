@@ -106,6 +106,22 @@ export const mutateProjects = (state, payload) => {
     })
 }
 
+/* For a project read again from the server, which has already answered that this person may open it. The lists
+   and folders the tree folded into the stored copy stay: the row's own are a legacy copy no list write keeps up. */
+export const replaceProject = (state, project) => {
+    const projects = state.allProjects?.data || [];
+    const index = projects.findIndex((x) => String(x._id) === String(project._id));
+    if(index === -1) return;
+    const { id, isExpanded, sprintsObj, sprintsfolders } = projects[index];
+    projects[index] = { ...project, id: id ?? project._id, isExpanded, sprintsObj, sprintsfolders };
+}
+
+/* What the limits route answered for a project, so the header chip does not wait for `projectChanged` after a save here. */
+export const noteAgentLimits = (state, { projectId, limits }) => {
+    const project = (state.allProjects?.data || []).find((x) => String(x._id) === String(projectId));
+    if(project) project.agentLimits = { ...project.agentLimits, ...limits };
+}
+
 export const mutateCurrentProjectTasks = (state, payload) => {
     if(JSON.stringify(state.currentProjectTasks) !== JSON.stringify(payload)) {
         state.currentProjectTasks = payload;

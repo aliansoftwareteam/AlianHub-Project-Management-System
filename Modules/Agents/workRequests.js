@@ -355,6 +355,7 @@ const executors = {
     ...require('./projectDuplicate').executors,
     ...require('./listSetup').executors,
     ...require('./automationRequests').executors,
+    ...require('./dashboardRequests').executors,
 };
 
 module.exports = {

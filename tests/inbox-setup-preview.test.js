@@ -66,7 +66,7 @@ describe('waiting fields carry their preview', () => {
     });
 
     it('takes a name, a type and an option only as text, and leaves out what is not', async () => {
-        propose('odd', [change('fields.create', { projectId: P_OPEN, definitions: [{ name: { $ne: 1 }, type: 'text' }, { name: 'Stage', type: 'formula', options: [{ label: 'x' }, 'Lead'] }, null] })]);
+        propose('odd', [change('fields.create', { projectId: P_OPEN, definitions: [{ name: { $ne: 1 }, type: 'text' }, { name: 'Stage', type: 'gallery', options: [{ label: 'x' }, 'Lead'] }, null] })]);
         expect(await previewOf(OWNER, 'odd')).toEqual({
             kind: 'fields', title: 'Stage',
             lines: [{ kind: 'place', project: 'Open', list: '' }, { kind: 'field', name: 'Stage', type: '', options: ['Lead'] }],

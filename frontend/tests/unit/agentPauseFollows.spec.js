@@ -1,9 +1,10 @@
 /* Hand check, build 772: the header chip "Agents paused" came only after a reload and stayed after "Resume
-   agents". The project list is read once at start and no project event reaches a browser, so the chip follows
-   the save in this browser, and the agents signal in every other one. */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, nextTick, ref } from 'vue';
+   agents". One thing carries the pause now: the stored project. The card writes what it saved there at once,
+   and `projectChanged` brings it to every other browser that may open the project. */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { computed, defineComponent, h, ref } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
+import { createStore, useStore } from 'vuex';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -11,179 +12,192 @@ const { apiRequest, toast } = vi.hoisted(() => ({ apiRequest: vi.fn(), toast: { 
 
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
+vi.mock('@/composable/index.js', () => ({ useCustomComposable: () => ({ checkPermission: () => 0 }) }));
 
 import ProjectAgentLimitsCard from '@/views/Projects/ProjectDetail/ProjectAgentLimitsCard.vue';
-import { agentsPausedIn, forgetAgentPauses, useAgentPause } from '@/views/Projects/composables/agentPause';
+import * as mutations from '@/store/ProjectData/mutations';
+import { GATHER_MS, PROJECT_CHANGED_EVENT, READ_GAP_MS, useLiveProjects } from '@/views/Projects/liveProjects';
 
-const PROJECTS = fs.readFileSync(path.resolve(__dirname, '../../src/views/Projects/Projects.vue'), 'utf8');
-const urlOf = (projectId) => `/api/v2/agents/project-limits/${projectId}`;
+const read = (file) => fs.readFileSync(path.resolve(__dirname, '../../src', file), 'utf8');
+const PROJECTS = read('views/Projects/Projects.vue');
+const CARD = read('views/Projects/ProjectDetail/ProjectAgentLimitsCard.vue');
+const FEED = read('views/Ai/agentFeed.js');
+const COMPANY = 'c1';
+const LIMITS = '/api/v2/agents/project-limits/p1';
+const PROJECT = '/api/v1/project/p1';
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
-const answer = (limits = {}) => ({ limits: { atOnce: 3, paused: false, ...limits }, defaults: { atOnce: 3, paused: false }, atOnceRange: { min: 1, max: 20 }, canEdit: true });
+const answer = (limits) => ({ limits, defaults: { atOnce: 3, paused: false, directTasks: 10 }, atOnceRange: { min: 1, max: 20 }, directTasksRange: { min: 1, max: 100 }, directTasksMinutes: 10, canEdit: true });
 
 const liveSocket = () => {
     const handlers = new Map();
     return {
         on: vi.fn((event, handler) => handlers.set(event, handler)),
         off: vi.fn((event, handler) => { if (handlers.get(event) === handler) handlers.delete(event); }),
-        tell: (event, payload) => handlers.get(event)?.(payload),
-        listens: (event) => handlers.has(event),
+        tell: (payload) => handlers.get(PROJECT_CHANGED_EVENT)?.(payload),
+        hears: (event) => handlers.has(event),
     };
 };
 
-const serve = (held) => apiRequest.mockImplementation((type, url, body) => {
-    const projectId = url.split('/').pop();
-    if (type === 'put') Object.assign(held[projectId], body);
-    return ok(answer(held[projectId]));
+/* The server of one project: the limits route answers and saves its limits, the project route its row. */
+let held;
+let refuseSaves;
+const serve = () => apiRequest.mockImplementation((type, url, body) => {
+    if (url === PROJECT) return Promise.resolve({ data: { _id: 'p1', ProjectName: 'Alpha', statusType: 'active', agentLimits: { ...held, updatedBy: 'u1' } } });
+    if (type === 'put' && refuseSaves) return Promise.reject(Object.assign(new Error('no'), { response: { data: { statusText: 'Owner/admin only.' } } }));
+    if (type === 'put') Object.assign(held, body);
+    return ok(answer({ ...held }));
 });
-const readsOf = (projectId) => apiRequest.mock.calls.filter(([type, url]) => type === 'get' && url === urlOf(projectId)).length;
+const asked = (type, url) => apiRequest.mock.calls.filter(([calledType, calledUrl]) => calledType === type && calledUrl === url).length;
 
-const mountCard = async (socket) => {
-    const wrapper = mount(ProjectAgentLimitsCard, { props: { projectId: 'p1' }, global: { provide: { $socket: ref(socket || liveSocket()) } } });
+let socket;
+let wrapper;
+
+/* One browser: the shell that follows `projectChanged`, the header chip as the project page computes it, and the card when it is open. */
+const openBrowser = async ({ card = true } = {}) => {
+    const store = createStore({
+        modules: {
+            projectData: {
+                namespaced: true,
+                state: () => ({ allProjects: { data: [{ _id: 'p1', id: 'p1', ProjectName: 'Alpha', statusType: 'active', agentLimits: { atOnce: 3, paused: false, directTasks: 10 } }] } }),
+                getters: { allProjects: (state) => state.allProjects },
+                mutations,
+            },
+        },
+    });
+    socket = liveSocket();
+    const Page = defineComponent({
+        setup() {
+            useLiveProjects(ref(socket), ref(COMPANY));
+            const { getters } = useStore();
+            const projectData = computed(() => getters['projectData/allProjects'].data.find((project) => project._id === 'p1'));
+            return () => h('div', [
+                h('i', { 'data-test': 'chip', 'data-paused': String(projectData.value?.agentLimits?.paused === true) }),
+                card ? h(ProjectAgentLimitsCard, { projectId: 'p1' }) : null,
+            ]);
+        },
+    });
+    wrapper = mount(Page, { global: { plugins: [store], mocks: { $t: (key) => key } } });
     await flushPromises();
     return wrapper;
 };
-
-const mountHeader = (project, socket) => mount(defineComponent({
-    setup() {
-        const { agentsPaused } = useAgentPause(project, socket);
-        return () => h('i', { 'data-paused': String(agentsPaused.value) });
-    },
-}));
-const shown = (wrapper) => wrapper.attributes('data-paused');
+const chip = () => wrapper.find('[data-test="chip"]').attributes('data-paused');
+const someoneSaved = async (limits) => {
+    Object.assign(held, limits);
+    socket.tell({ kind: 'changed', companyId: COMPANY, projectId: 'p1' });
+    await vi.advanceTimersByTimeAsync(Math.max(GATHER_MS, READ_GAP_MS));
+    await flushPromises();
+};
 
 beforeEach(() => {
+    vi.useFakeTimers();
     apiRequest.mockReset();
-    forgetAgentPauses();
+    held = { atOnce: 3, paused: false, directTasks: 10 };
+    refuseSaves = false;
+    serve();
+});
+
+afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    vi.useRealTimers();
 });
 
 describe('in the browser that saved', () => {
-    it('the pause is known the moment the card saves it, and gone the moment agents are resumed', async () => {
-        const held = { p1: { paused: false } };
-        serve(held);
-        const asLoaded = { _id: 'p1', agentLimits: { atOnce: 3, paused: false } };
-        const header = mountHeader(ref(asLoaded), ref(liveSocket()));
-        const card = await mountCard();
-        expect(shown(header)).toBe('false');
+    it('the chip shows the pause the moment the card saves it, and goes the moment agents are resumed', async () => {
+        await openBrowser();
+        expect(chip()).toBe('false');
 
-        await card.find('[data-test="pause"]').trigger('click');
+        await wrapper.find('[data-test="pause"]').trigger('click');
         await flushPromises();
-        expect(agentsPausedIn(asLoaded)).toBe(true);
-        expect(shown(header)).toBe('true');
+        expect(chip()).toBe('true');
+        expect(asked('get', PROJECT)).toBe(0);
 
-        await card.find('[data-test="resume"]').trigger('click');
+        await wrapper.find('[data-test="resume"]').trigger('click');
         await flushPromises();
-        expect(agentsPausedIn({ _id: 'p1', agentLimits: { paused: true } })).toBe(false);
-        expect(shown(header)).toBe('false');
+        expect(chip()).toBe('false');
+    });
+
+    it('one save costs one read when its own change comes back: the project, and not the limits again', async () => {
+        await openBrowser();
+        await wrapper.find('[data-test="pause"]').trigger('click');
+        await flushPromises();
+        const limitsReads = asked('get', LIMITS);
+
+        await someoneSaved({});
+        expect(asked('get', PROJECT)).toBe(1);
+        expect(asked('get', LIMITS)).toBe(limitsReads);
+        expect(asked('put', LIMITS)).toBe(1);
+        expect(chip()).toBe('true');
     });
 
     it('a save that is refused changes nothing', async () => {
-        apiRequest.mockImplementation((type) => (type === 'get' ? ok(answer()) : Promise.reject(Object.assign(new Error('no'), { response: { data: { statusText: 'Owner/admin only.' } } }))));
-        const card = await mountCard();
-        await card.find('[data-test="pause"]').trigger('click');
+        refuseSaves = true;
+        await openBrowser();
+        await wrapper.find('[data-test="pause"]').trigger('click');
         await flushPromises();
-        expect(agentsPausedIn({ _id: 'p1', agentLimits: { paused: false } })).toBe(false);
-    });
-
-    it('a project nobody changed says what it was loaded with', () => {
-        expect(agentsPausedIn({ _id: 'p2', agentLimits: { paused: true } })).toBe(true);
-        expect(agentsPausedIn({ _id: 'p3' })).toBe(false);
-        expect(agentsPausedIn(null)).toBe(false);
+        expect(chip()).toBe('false');
     });
 });
 
-describe('in every other open browser', () => {
-    it('the header reads the open project again when the agents signal says limits changed, and only then', async () => {
-        const held = { p1: { paused: true } };
-        serve(held);
-        const socket = liveSocket();
-        const header = mountHeader(ref({ _id: 'p1', agentLimits: { paused: false } }), ref(socket));
-        await flushPromises();
-        expect(apiRequest).not.toHaveBeenCalled();
+describe('in every other browser that may open the project', () => {
+    it('the chip follows a pause and a resume made elsewhere, for one read of the project each', async () => {
+        await openBrowser({ card: false });
+        await someoneSaved({ paused: true });
+        expect(chip()).toBe('true');
+        expect(asked('get', PROJECT)).toBe(1);
+        expect(asked('get', LIMITS)).toBe(0);
 
-        socket.tell('agentsChanged', { kind: 'run' });
-        socket.tell('agentsChanged', { kind: 'claim' });
-        await flushPromises();
-        expect(apiRequest).not.toHaveBeenCalled();
-
-        socket.tell('agentsChanged', { kind: 'limits' });
-        await flushPromises();
-        expect(readsOf('p1')).toBe(1);
-        expect(shown(header)).toBe('true');
-
-        held.p1.paused = false;
-        socket.tell('agentsChanged', { kind: 'limits' });
-        await flushPromises();
-        expect(shown(header)).toBe('false');
+        await someoneSaved({ paused: false });
+        expect(chip()).toBe('false');
+        expect(asked('get', PROJECT)).toBe(2);
     });
 
-    it('a project opened after such a signal is read once, since the signal names no project', async () => {
-        const held = { p1: { paused: false }, p2: { paused: true } };
-        serve(held);
-        const socket = liveSocket();
-        const project = ref({ _id: 'p1', agentLimits: { paused: false } });
-        const header = mountHeader(project, ref(socket));
-        socket.tell('agentsChanged', { kind: 'limits' });
-        await flushPromises();
+    it('the open card follows too: it shows Resume after someone else paused, for one read of the limits', async () => {
+        await openBrowser();
+        expect(wrapper.find('[data-test="pause"]').exists()).toBe(true);
+        const before = asked('get', LIMITS);
 
-        project.value = { _id: 'p2', agentLimits: { paused: false } };
-        await nextTick();
-        await flushPromises();
-        expect(readsOf('p2')).toBe(1);
-        expect(shown(header)).toBe('true');
-
-        project.value = { _id: 'p1', agentLimits: { paused: false } };
-        await nextTick();
-        await flushPromises();
-        project.value = { _id: 'p2', agentLimits: { paused: false } };
-        await nextTick();
-        await flushPromises();
-        expect(readsOf('p1')).toBe(1);
-        expect(readsOf('p2')).toBe(1);
+        await someoneSaved({ paused: true });
+        expect(wrapper.find('[data-test="resume"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="paused-note"]').exists()).toBe(true);
+        expect(asked('get', LIMITS)).toBe(before + 1);
     });
 
-    it('believes the latest read when a pause and a resume follow each other and the first answer lands last', async () => {
-        const landings = [];
-        apiRequest.mockImplementation(() => new Promise((resolve) => { landings.push(resolve); }));
-        const socket = liveSocket();
-        const header = mountHeader(ref({ _id: 'p1', agentLimits: { paused: false } }), ref(socket));
-        socket.tell('agentsChanged', { kind: 'limits' });
-        socket.tell('agentsChanged', { kind: 'limits' });
-        landings[1]({ data: { status: true, data: answer({ paused: false }) } });
-        landings[0]({ data: { status: true, data: answer({ paused: true }) } });
-        await flushPromises();
-        expect(shown(header)).toBe('false');
+    it('a change to the project that leaves its limits alone costs the card nothing', async () => {
+        await openBrowser();
+        const before = asked('get', LIMITS);
+        await someoneSaved({});
+        expect(asked('get', PROJECT)).toBe(1);
+        expect(asked('get', LIMITS)).toBe(before);
     });
 
-    it('keeps what it shows when the read fails, and stops listening when the page closes', async () => {
-        apiRequest.mockImplementation(() => Promise.reject(new Error('offline')));
-        const socket = liveSocket();
-        const header = mountHeader(ref({ _id: 'p1', agentLimits: { paused: true } }), ref(socket));
-        socket.tell('agentsChanged', { kind: 'limits' });
-        await flushPromises();
-        expect(shown(header)).toBe('true');
-        header.unmount();
-        expect(socket.listens('agentsChanged')).toBe(false);
+    it('a pause and a resume close together cost one read and show how it ended', async () => {
+        await openBrowser({ card: false });
+        socket.tell({ kind: 'changed', companyId: COMPANY, projectId: 'p1' });
+        await someoneSaved({ paused: false });
+        expect(asked('get', PROJECT)).toBe(1);
+        expect(chip()).toBe('false');
     });
 
-    it('the card follows too: it shows Resume after someone else paused', async () => {
-        const held = { p1: { paused: false } };
-        serve(held);
-        const socket = liveSocket();
-        const card = await mountCard(socket);
-        expect(card.find('[data-test="pause"]').exists()).toBe(true);
-
-        held.p1.paused = true;
-        socket.tell('agentsChanged', { kind: 'limits' });
-        await flushPromises();
-        expect(card.find('[data-test="resume"]').exists()).toBe(true);
-        expect(card.find('[data-test="paused-note"]').exists()).toBe(true);
+    it('stops listening when the page closes', async () => {
+        await openBrowser();
+        expect(socket.hears(PROJECT_CHANGED_EVENT)).toBe(true);
+        wrapper.unmount();
+        wrapper = null;
+        expect(socket.hears(PROJECT_CHANGED_EVENT)).toBe(false);
     });
 });
 
-describe('the project page', () => {
-    it('hands the header the live state, not only what the project was loaded with', () => {
-        expect(PROJECTS).toMatch(/:agentsPaused="agentsPaused"/);
-        expect(PROJECTS).toMatch(/const \{ agentsPaused \} = useAgentPause\(projectData, socket\)/);
-        expect(PROJECTS).not.toMatch(/:agentsPaused="projectData\?\.agentLimits/);
+describe('one mechanism', () => {
+    it('the project page hands the header what the stored project says', () => {
+        expect(PROJECTS).toMatch(/:agentsPaused="projectData\?\.agentLimits\?\.paused === true"/);
+        expect(PROJECTS).not.toMatch(/useAgentPause/);
+    });
+
+    it('the card listens to no signal of its own, and the agents signal has no kind for limits', () => {
+        expect(CARD).not.toMatch(/\$socket|agentsChanged|AGENTS_CHANGED_EVENT/);
+        expect(CARD).toMatch(/useStoredProjectPart\(\(\) => props\.projectId, "agentLimits", saved, follow\)/);
+        expect(FEED).not.toMatch(/LIMITS_CHANGE/);
+        expect(fs.existsSync(path.resolve(__dirname, '../../src/views/Projects/composables/agentPause.js'))).toBe(false);
     });
 });
