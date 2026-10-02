@@ -64,7 +64,7 @@ const CHAT_SCOPE = 'chat:read';
 /* The connection most of this file speaks through creates tasks and reads chat; `tasksOnly` holds the first alone. */
 const ctx = (uid, over = {}) => world.ctx(uid, { token: { _id: TOKEN, userId: uid, scopes: ['read', 'write'], grants: [TASKS_GRANT, CHAT_SCOPE], active: true }, ...over });
 const tasksOnly = (uid) => withGrants(uid, [TASKS_GRANT]);
-const NEEDS_CHAT = { ok: false, error: expect.stringMatching(/does not hold the chat:read scope/) };
+const NEEDS_CHAT = { ok: false, error: expect.stringMatching(/is not allowed to read chat \(it needs chat:read\)/) };
 const TEAM_SPACE = '6f0000000000000000000c11';
 const C_OPEN = '6f0000000000000000000c21';
 const C_SECRET = '6f0000000000000000000c22';

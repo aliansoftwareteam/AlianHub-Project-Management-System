@@ -348,7 +348,7 @@ describe('the project\'s rule for agents is asked for a claim, as for any write'
         const { itemId } = await orphanItem();
         project(P_OPEN).agentPolicy = { done: 'approval', connected: 'propose_all' };
         const out = await claim(caller(), itemId);
-        expect(out).toMatchObject({ refused: true, reason: expect.stringContaining('this project has connected agents propose every change') });
+        expect(out).toMatchObject({ refused: true, reason: expect.stringContaining('in this project a connected agent has to ask a person before every change') });
         expect(rowOf(itemId).claim).toBeUndefined();
         expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toEqual([]);
         expect(audits('queue.claim', 'applied')).toEqual([]);

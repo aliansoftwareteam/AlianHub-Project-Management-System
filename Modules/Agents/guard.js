@@ -303,7 +303,7 @@ const chatGuard = (threadOf) => withActor(async (req, res, next, actor) => {
     const kind = named && typeof named === 'object' ? await conversationOf(companyId, named) : named;
     const held = kind === DIRECT || (kind === CHANNEL && !holdsChat(req.apiToken));
     if (!held) return next();
-    return refuse(req, res, actor, { action: CHAT_REFUSED[kind], reason: `Agents cannot perform ${CHAT_REFUSED[kind]}`, params: {} });
+    return refuse(req, res, actor, { action: CHAT_REFUSED[kind], reason: `An agent is not allowed to do this (${CHAT_REFUSED[kind]}). The person has to do it in AlianHub.`, params: {} });
 });
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

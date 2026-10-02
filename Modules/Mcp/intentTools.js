@@ -34,7 +34,7 @@ const PLACE_KINDS = Object.freeze(['task', 'sprint', 'project']);
 const NO_MESSAGE = Object.freeze({ ok: false, error: 'That message was not found. Check the id.' });
 const NO_TEXT = Object.freeze({ ok: false, error: 'That message has no text to make a task from.' });
 const NEEDS_PLACE = Object.freeze({ ok: false, error: 'That message is not in a project. Ask the person which project and list the task goes in, then name them as projectId and sprintId.' });
-const NEEDS_CHAT = Object.freeze({ ok: false, error: `That message is in a chat channel, and this connection does not hold the ${CHAT_SCOPE} scope, so it was not read. A comment on a task can be made into a task without it.` });
+const NEEDS_CHAT = Object.freeze({ ok: false, error: `That message is in a chat channel, and this connection is not allowed to read chat (it needs ${CHAT_SCOPE}), so it was not read. Ask the person to allow chat for this connection. A comment on a task can be made into a task without it.` });
 const LINK_LABEL = 'The message this task came from';
 
 const isId = (v) => OBJECT_ID.test(String(v || ''));
@@ -204,7 +204,7 @@ const TOOLS = [
         strict: true,
         target: CREATE.target,
         description: 'Makes a task from a comment on a task the person can read, or from a message in a chat channel they can read. '
-            + `A channel message is read only by a connection that also holds the ${CHAT_SCOPE} scope, and a direct message never. `
+            + `A channel message is read only when this connection is also allowed to read chat (${CHAT_SCOPE}), and a direct message is never read. `
             + 'The task\'s description is the text of the message, with a link back to it, and its title is the first line unless you give one. '
             + 'Left out, the place is the list the message\'s channel belongs to, or the list of the task the comment is on; a channel that belongs to no list needs a project named. '
             + 'It takes the details a new task takes: assignees, priority, dates, status, task type and estimate. '

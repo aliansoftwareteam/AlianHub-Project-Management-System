@@ -33,14 +33,14 @@ const STATUS_ACTIONS = new Set(['task.status.set', 'task.status.change']);
 const CREATE_ACTIONS = new Set(['task.add', 'subtask.add']);
 
 const REASON = Object.freeze({
-    WORKSPACE_CHECK: 'this workspace has a person check an agent\'s work before it is closed, so a person closes this task',
-    NEVER: 'this project has people close its tasks, so a person closes this task',
-    APPROVAL: 'this project has a person approve an agent\'s close',
-    PROPOSE_ALL: 'this project has connected agents propose every change',
+    WORKSPACE_CHECK: 'in this workspace a person checks an agent\'s work before a task is closed, so a person closes this task',
+    NEVER: 'in this project only people close tasks, so a person closes this task',
+    APPROVAL: 'in this project a person has to approve it before an agent closes a task',
+    PROPOSE_ALL: 'in this project a connected agent has to ask a person before every change',
     PROPOSE_ONLY: 'an agent never makes this kind of change on its own',
     NOT_UNDOABLE: 'this change cannot be undone',
-    WITH_SUBTASKS: 'this change takes the task\'s subtasks with it, which is more than one task',
-    CONNECTED_PAUSED: 'connected agents are paused in this workspace, so no connected agent takes work or changes anything until an owner or admin resumes them',
+    WITH_SUBTASKS: 'this change also changes the task\'s subtasks, so it is more than one task',
+    CONNECTED_PAUSED: 'connected agents are paused in this workspace, so nothing can be taken or changed until an owner or an admin resumes them',
 });
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
