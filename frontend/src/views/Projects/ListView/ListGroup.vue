@@ -168,8 +168,11 @@ const subtaskFor = ref("");
 
 const sprintId = computed(() => props.sprint?.id || props.sprint?._id);
 provide("viewedList", computed(() => ({ sprintId: sprintId.value, projectId: props.project?._id })));
+/* A task made under an agent's name would land in the group of the tasks no agent holds. */
+const heldByAgent = computed(() => Boolean(props.item.agentWork && !props.item.noAgent));
 const canCreate = computed(() => !showArchived.value
     && !searchedTask.value
+    && !heldByAgent.value
     && checkPermission("task.task_create", props.project?.isGlobalPermission) === true
     && checkPermission("task.task_list", props.project?.isGlobalPermission) === true);
 const canSelect = computed(() => !showArchived.value && checkPermission("task.task_status", props.project?.isGlobalPermission) === true);

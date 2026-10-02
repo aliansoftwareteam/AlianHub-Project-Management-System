@@ -9,6 +9,7 @@ const BUDGETS = {
     'list.scrollFps': { limit: 50, unit: 'fps', atLeast: true },
     'api.listFirstPage': { limit: 300, unit: 'ms' },
     'api.listOpen': { limit: 300, unit: 'ms' },
+    'api.listByAgentWork': { limit: 300, unit: 'ms' },
     'everything.firstRows': { limit: 1500, unit: 'ms' },
     'everything.groupedFirstRows': { limit: 1500, unit: 'ms' },
     'everything.byProjectFirstRows': { limit: 1500, unit: 'ms' },
