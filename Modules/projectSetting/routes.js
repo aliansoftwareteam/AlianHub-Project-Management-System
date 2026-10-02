@@ -4,8 +4,10 @@ const autoArchive = require('./autoArchive');
 const estimationScale = require('./estimationScale');
 const wipLimit = require('./wipLimit');
 const { READ, requireProjectAccess, DETAILS } = require('../../Config/projectAccess');
+const { agentsRefused } = require('../Agents/guard');
 
 const editsProjectSettings = requireProjectAccess({ projectIds: (req) => req.body && req.body.projectId, permissions: () => [DETAILS] });
+const statusesByPeople = agentsRefused('project.setup');
 
 exports.init = (app) => {
      /**
@@ -100,11 +102,11 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v1/projectSetting/taskStatus', editsProjectSettings, ctrl.changeTaskStatus);
+    app.post('/api/v1/projectSetting/taskStatus', statusesByPeople, editsProjectSettings, ctrl.changeTaskStatus);
     // Under the /taskStatus prefix on purpose: setMiddleware guards that prefix,
     // so this write is behind the same JWT + company audience check as every
     // other task-status change rather than needing a new entry in that list.
-    app.post('/api/v1/projectSetting/taskStatus/wipLimit', editsProjectSettings, wipLimit.setWipLimit);
+    app.post('/api/v1/projectSetting/taskStatus/wipLimit', statusesByPeople, editsProjectSettings, wipLimit.setWipLimit);
     app.post('/api/v1/projectSetting/migrateSprintsFun', requireInstanceAdmin, ctrl.migrateSprintsFun);
 
     // Per-project auto-archive rule (completed tasks archive after N days —
