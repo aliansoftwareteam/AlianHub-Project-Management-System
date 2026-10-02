@@ -1,7 +1,7 @@
 <template>
   <div class="agile-report">
     <div class="agile-report__bar">
-      <span class="agile-report__label">{{ $t('Reports.cfd_last_days', { days }) }}</span>
+      <span class="agile-report__label">{{ $t('Reports.cfd_last_days', { days }, days) }}</span>
       <button class="agile-report__pdf" :disabled="!hasData" @click="exportPdf">{{ $t('Reports.export_pdf') }}</button>
     </div>
     <div v-if="loading" class="agile-report__msg">{{ $t('Reports.loading') }}</div>

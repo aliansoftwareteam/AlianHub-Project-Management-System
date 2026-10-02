@@ -3,7 +3,7 @@
         <td class="evr__td evr__td--name" :style="indent">
             <span class="evr__td-title">
                 <button type="button" class="evr__name" :title="task.TaskName" @click.stop="$emit('open', task)">{{ task.TaskName }}</button>
-                <span v-if="task.subTasks" class="evr__subs" :title="$t('Everything.subtasks_n', { n: task.subTasks })">{{ task.subTasks }}</span>
+                <span v-if="task.subTasks" class="evr__subs" :title="$t('Everything.subtasks_n', { n: task.subTasks }, task.subTasks)">{{ task.subTasks }}</span>
                 <slot name="lists"><TaskListChips :task="task" /></slot>
             </span>
         </td>

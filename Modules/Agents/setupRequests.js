@@ -7,6 +7,7 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const tools = require('../Automations/engine/tools');
 const { storedProject, whoOf } = require('./taskRequests');
 const { runAs } = require('./actingAgent');
+const computed = require('./computedFields');
 
 // Custom fields and saved views an agent adds to a project the way a person adds them: through the route the web
 // app calls, its guards and its handler in the order a request meets them, as the person behind the agent. So who
@@ -14,6 +15,7 @@ const { runAs } = require('./actingAgent');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const FIELD_TYPES = Object.freeze(['text', 'textarea', 'number', 'money', 'date', 'dropdown', 'checkbox', 'email', 'phone', 'url', 'people', 'rating', 'progress']);
+const CREATE_TYPES = Object.freeze([...FIELD_TYPES, ...computed.TYPES]);
 const FIELDS_MAX = 10;
 const FIELD_NAME_MAX = 80;
 const OPTIONS_MAX = 30;
@@ -52,10 +54,19 @@ const FIELD_ROUTE = '/api/v1/customField';
 const ROUTES = Object.freeze({
     fieldInsert: { routes: () => require('../CustomField/routes'), method: 'post', path: FIELD_ROUTE },
     fieldUpdate: { routes: () => require('../CustomField/routes'), method: 'put', path: FIELD_ROUTE },
+    fieldCompute: { routes: () => require('../CustomField/routes'), method: 'post', path: '/api/v2/custom-fields/compute' },
     viewCreate: { routes: () => require('../Project/routes'), method: 'post', path: '/api/v1/project/:id/views' },
     projectUpdate: { routes: () => require('../Project/routes'), method: 'put', path: '/api/v1/project/:id' },
     projectCreate: { routes: () => require('../createProject/routes'), method: 'post', path: '/api/v1/createproject' },
     statusInsert: { routes: () => require('../settings/templates/routes'), method: 'put', path: '/api/v1/setting/taskStatus' },
+    folderCreate: { routes: () => require('../Sprints/routes'), method: 'post', path: '/api/v1/folder' },
+    folderUpdate: { routes: () => require('../Sprints/routes'), method: 'patch', path: '/api/v1/folder/:id' },
+    sprintScrum: { routes: () => require('../Sprints/routes'), method: 'post', path: '/api/v2/sprints/scrum' },
+    projectDuplicate: { routes: () => require('../ProjectDuplicate/routes'), method: 'post', path: '/api/v2/projects/:id/duplicate' },
+    dashboardRead: { routes: () => require('../UserDashboard/routes'), method: 'get', path: '/api/v1/dashboards/:id' },
+    dashboardCreate: { routes: () => require('../UserDashboard/routes'), method: 'post', path: '/api/v1/dashboards' },
+    dashboardCards: { routes: () => require('../UserDashboard/routes'), method: 'put', path: '/api/v1/dashboards/:id/cards' },
+    dashboardDelete: { routes: () => require('../UserDashboard/routes'), method: 'delete', path: '/api/v1/dashboards/:id' },
 });
 
 const refuse = (message) => new tools.DeterministicError(message);
@@ -80,14 +91,15 @@ const chainOf = (name) => {
     return chains.get(name);
 };
 
-/* What that route answers to `who`, with the status it set and no HTTP around it. */
-const answerOf = (name, { companyId, who, params = {}, body = {} }) => runAs(who.mark, () => new Promise((resolve, reject) => {
+/* What that route answers to `who`, with the status it set and no HTTP around it. `set` is what the server itself
+ * puts on the request, which no client can send. */
+const answerOf = (name, { companyId, who, params = {}, body = {}, set = {} }) => runAs(who.mark, () => new Promise((resolve, reject) => {
     const chain = chainOf(name);
     const res = { statusCode: 200 };
     res.status = (code) => { res.statusCode = code; return res; };
     res.json = (sent) => { resolve({ code: res.statusCode, body: sent }); return res; };
     res.send = res.json;
-    const req = { uid: who.uid, aud: String(companyId), headers: { companyid: String(companyId) }, params, query: {}, body };
+    const req = { ...set, uid: who.uid, aud: String(companyId), headers: { companyid: String(companyId) }, params, query: {}, body };
     const step = (at) => Promise.resolve().then(() => chain[at](req, res, () => step(at + 1))).catch(reject);
     step(0);
 }));
@@ -106,19 +118,25 @@ const optionsOf = (given) => {
     return labels.filter((label, at) => labels.findIndex((other) => lower(other) === lower(label)) === at).slice(0, OPTIONS_MAX);
 };
 
-/* What a caller names for one field, kept as plain text: its name, one of the types the field form offers, and a dropdown's options. */
+/* What a caller names for one field, kept as plain text: its name, one of the types the field form offers, a dropdown's
+ * options, and what a rollup or a formula works out. */
 const draftOf = (given) => {
     const field = given && typeof given === 'object' ? given : {};
-    const type = FIELD_TYPES.includes(field.type) ? field.type : '';
+    const type = CREATE_TYPES.includes(field.type) ? field.type : '';
     const note = lineOf(field.description, NOTE_MAX);
-    return { name: lineOf(field.name, FIELD_NAME_MAX), type, ...(type === 'dropdown' ? { options: optionsOf(field.options) } : {}), ...(note ? { description: note } : {}) };
+    return {
+        name: lineOf(field.name, FIELD_NAME_MAX), type,
+        ...(type === 'dropdown' ? { options: optionsOf(field.options) } : {}),
+        ...computed.partOf(field, type, (name) => lineOf(name, FIELD_NAME_MAX)),
+        ...(note ? { description: note } : {}),
+    };
 };
 
 const draftProblem = (draft) => {
     if (!draft.name) return 'needs a name';
-    if (!draft.type) return `needs a type: one of ${FIELD_TYPES.join(', ')}`;
+    if (!draft.type) return `needs a type, which is one of ${CREATE_TYPES.join(', ')}`;
     if (draft.type === 'dropdown' && !draft.options.length) return 'is a dropdown, which needs at least one option';
-    return '';
+    return computed.problemOf(draft);
 };
 
 const draftsOf = (given) => listOf(given).map(draftOf);
@@ -134,13 +152,14 @@ const draftsProblem = (given) => {
 };
 
 /* The definition the field form saves for a field of one project. */
-const definitionOf = (draft, { projectId, uid }) => {
+const definitionOf = (draft, { projectId, uid, sourceId }) => {
     const { fieldDefinitionFrom, newOption } = require('../Importers/helpers/clickupFields');
     return fieldDefinitionFrom({
         fieldTitle: draft.name,
         fieldType: draft.type,
         fieldDescription: draft.description || draft.name,
         ...(draft.type === 'dropdown' ? { fieldOptions: draft.options.map(newOption) } : {}),
+        ...computed.settingsOf(draft, sourceId),
     }, { projectId, userId: uid });
 };
 
@@ -150,8 +169,14 @@ const fieldsOfProject = async (companyId, projectId) => {
     return (rows || []).filter((definition) => isTaskFieldOf(definition, projectId));
 };
 
-const saveField = async ({ companyId, who, projectId, draft }) => {
-    const answer = await answerOf('fieldInsert', { companyId, who, body: { type: 'save', updateObject: definitionOf(draft, { projectId, uid: who.uid }) } });
+const heldField = (definition) => ({ name: definition.fieldTitle || '', type: definition.fieldType || '', fieldId: idOf(definition._id) });
+const fieldNamed = (fields, name) => (name ? fields.find((field) => sameName(field.name, name)) : undefined);
+
+const saveField = async ({ companyId, who, projectId, draft, source }) => {
+    const unreadable = computed.sourceProblem(draft, source);
+    if (unreadable) return { name: draft.name, type: draft.type, made: false, error: unreadable };
+    const updateObject = definitionOf(draft, { projectId, uid: who.uid, sourceId: source ? source.fieldId : '' });
+    const answer = await answerOf('fieldInsert', { companyId, who, body: { type: 'save', updateObject } });
     const saved = answer.code === 200 && answer.body && answer.body._id;
     return saved
         ? { name: draft.name, type: draft.type, fieldId: idOf(answer.body._id), made: true }
@@ -164,15 +189,32 @@ const createFields = async ({ companyId, who, projectId, definitions }) => {
     const inProject = idOf(project._id);
     const problem = draftsProblem(definitions);
     if (problem) throw refuse(problem);
-    const held = await fieldsOfProject(companyId, inProject);
+    const known = (await fieldsOfProject(companyId, inProject)).map(heldField);
+    const drafts = draftsOf(definitions);
     const fields = [];
-    for (const draft of draftsOf(definitions)) {
-        const existing = held.find((definition) => sameName(definition.fieldTitle, draft.name));
-        fields.push(existing
-            ? { name: existing.fieldTitle, type: existing.fieldType, fieldId: idOf(existing._id), made: false }
-            : await saveField({ companyId, who, projectId: inProject, draft }));
+    for (const at of computed.saveOrder(drafts, sameName)) {
+        const draft = drafts[at];
+        const existing = fieldNamed(known, draft.name);
+        fields[at] = existing
+            ? { ...existing, made: false }
+            : await saveField({ companyId, who, projectId: inProject, draft, source: fieldNamed(known, draft.source) });
+        if (fields[at].made) known.push(fields[at]);
     }
     return { project, projectId: inProject, fields };
+};
+
+/* What stops the first rollup or formula that the field form would not save once the call is approved, or ''. */
+const draftsMisfit = async ({ companyId, projectId, definitions }) => {
+    const drafts = draftsOf(definitions);
+    if (!drafts.some((draft) => computed.isComputed(draft.type))) return '';
+    const held = (await fieldsOfProject(companyId, projectId)).map(heldField);
+    for (const [at, draft] of drafts.entries()) {
+        if (fieldNamed(held, draft.name)) continue;
+        const others = drafts.filter((other) => other !== draft);
+        const reason = computed.sourceProblem(draft, fieldNamed([...held, ...others], draft.source)) || await computed.formulaMisfit(companyId, draft);
+        if (reason) return `fields[${at}] (${draft.name}) ${reason}`;
+    }
+    return '';
 };
 
 const isPart = (value) => (typeof value === 'string' && value.length <= VALUE_TEXT_MAX) || (typeof value === 'number' && Number.isFinite(value));
@@ -257,9 +299,11 @@ const holdsValues = async (companyId, projectId, fieldId) => Boolean(await Mongo
     data: [{ ProjectID: { $in: idForms(projectId) }, [`customField.${fieldId}`]: { $exists: true }, deletedStatusKey: { $ne: 1 } }, { _id: 1 }],
 }, 'findOne'));
 
+/* The number a task stores for a rollup or a formula was worked out, not typed, so it holds no field back. */
 const whyKept = async (companyId, projectId, field) => {
     const elsewhere = field.global === true || [].concat(field.projectId || []).map(String).some((id) => id !== projectId);
     if (elsewhere) return 'it is on other projects now';
+    if (computed.isComputed(field.fieldType)) return '';
     return await holdsValues(companyId, projectId, idOf(field._id)) ? 'it holds a value on a task' : '';
 };
 
@@ -432,7 +476,7 @@ const withdrawView = async ({ companyId, who, projectId, viewId }) => {
     if (!view) return { removed: false };
     const answer = await answerOf('projectUpdate', { companyId, who, params: { id: inProject }, body: { key: '$pull', updateObject: { ProjectRequiredComponent: { _id: view._id } } } });
     if (answer.code !== 200) throw refuse(reasonOf(answer, 'The view was not removed. Try again, or tell the person.'));
-    socketEmitter.emit('update', { type: 'update', data: await storedProject(companyId, inProject), updatedFields: { ProjectRequiredComponent: 'remove' }, module: 'project' });
+    socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: await storedProject(companyId, inProject), updatedFields: { ProjectRequiredComponent: 'remove' }, module: 'project' });
     return { removed: true, name: view.title || '' };
 };
 
@@ -467,6 +511,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, valuesOf, valuesProblem, valuesMisfit, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
-    FIELD_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
+    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
+    FIELD_TYPES, CREATE_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };

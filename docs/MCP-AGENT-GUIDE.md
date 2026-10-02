@@ -2,26 +2,49 @@
 
 An AI agent you run yourself, such as Claude on your own plan, can work in AlianHub through the MCP endpoint at `<your AlianHub URL>/mcp`. It acts as the person whose token it carries: it sees what that person can open in the web app and changes what that person's role lets them change. Nothing here gives an agent more than its person has.
 
+This guide is written from the code in `Modules/Mcp/`, `Modules/OAuthServer/` and `Modules/Agents/registry/`. For the person who connects an app and wants plain steps, see `docs/CONNECT-YOUR-AI.md`.
+
 Every id below is a placeholder.
+
+## For the person who runs the server
+
+Everything below is off until you switch it on. Each setting is read on every call, so a value you set takes effect without rebuilding anything; restart the server after you edit `.env`.
+
+| Setting | Default | What it turns on |
+|---|---|---|
+| `MCP_OAUTH` | off | Connecting Claude or ChatGPT by address, with a consent screen. `on`, `true`, `1` and `yes` mean `both` (apps and personal tokens work). `only` refuses personal tokens. Needs `MCP_OAUTH_ISSUER` or `APIURL` to be an `https` origin (plain `http` only on `localhost` outside production), or the server does not start. |
+| `MCP_TOOLS_DATA` | off | The data tools: the projects, lists, statuses, comments, docs and timesheet reads, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `proposal.get`, and reading chat. It is also the only setting that offers the `chat:read` permission |
+| `MCP_TOOLS_MANAGE` | off | The task management tools and the doc writing tools, and the `tasks:manage` and `docs:manage` permissions. A token or app gets them only by asking for them by name |
+| `MCP_TOOLS_WORK` | off | Tags, links between tasks, lists, doc comments, goals, fields, saved views, project setup, new projects, automations, dashboard cards and the work queue. They need no manage permission |
+| `MCP_TOOLS_V2` | off | Names next to ids, paged lists, tool annotations, and an approval for any call rated as one that cannot be undone or that reaches the whole workspace |
+| `AGENT_PERFORMANCE_READ` | off | `performance.read` |
+| `AGENT_TAINT_ROUTING` | off | A connected app's write that reaches past one task waits for a person. See "What happens to a write" |
+| `EXTERNAL_AGENT_SESSIONS` | off | Delegating a task to a connected app, and the tools `session.activity`, `session.complete` and `session.fail` |
+| `MCP_OAUTH_DCR` | off | Lets an app register itself. With it off, an owner or admin adds the app under Settings, Agent clients, or the app names itself by a client ID metadata document |
+| `MCP_CURSOR_SECRET` | derived | The key that signs list cursors while `MCP_TOOLS_V2` is on. At least 32 characters and not equal to `JWT_SECRET` |
+| `WEBURL` or `APIURL` | none | Where `screen.link` builds its addresses. With neither set, `screen.link` says it cannot give a link |
+
+The lifetimes and limits of connected apps are set by `MCP_OAUTH_ACCESS_TOKEN_MINUTES` (15), `MCP_OAUTH_REFRESH_TOKEN_DAYS` (30), `MCP_OAUTH_GRANT_MAX_DAYS` (90), `MCP_OAUTH_RATE_LIMIT_PER_MIN` (30), `MCP_OAUTH_CLIENT_METADATA_CACHE_SECONDS` (300) and `MCP_OAUTH_TOKEN_SECRET`. The numbers in brackets are the defaults. `.env.example` explains each one.
+
+A tool's setting decides whether the server offers it. The person's token decides whether that person may use it. The Connect your AI page names each of `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` that is off.
+
+An owner or admin controls the rest from inside AlianHub:
+
+- Settings, Agent clients: which apps may connect, and the most each may be given.
+- A project's detail screen: "Agents in this project" and "Agents working at the same time", including "Pause all agents".
+- AI, Audit log: every change an agent made, with Undo while the undo window is open (24 hours by default; the setting is "Undo window (hours)" under Instance settings, AI agents).
 
 ## What decides which tools an agent has
 
 Three things, in this order.
 
-1. **What the server offers.** The base tools are always offered. The rest are switched on by the person who runs the server:
-
-   | Setting | Adds |
-   |---|---|
-   | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `chat.channels.list`, `chat.messages.list`, `proposal.get` |
-   | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
-   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, `automation.catalogue`, `automation.create`, `project.setup`, `project.create`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
-   | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
+1. **What the server offers.** The first group below is always offered. Every other group needs its setting from the table above.
 
 2. **What the token was created with.** A token has scopes (read, write) and may have grants:
 
    | Grant | Gives |
    |---|---|
-   | `tasks:manage` | `task.update`, `task.assign`, `task.field.set`, `task.move`, `task.archive`, `task.restore`, `tasks.batch`, `comment.update`, the reads `fields.list`, `subtasks.list`, `members.list`, `task.history`, `task.links.list`, and the fuller forms of `tasks.search`, `task.get`, `task.create`, `subtask.create`, `task.comment` and `task.status.set` |
+   | `tasks:manage` | The tools of the "Manage" group that change tasks or read for planning, `task.from_message`, and the fuller forms of `tasks.search`, `task.get`, `task.create`, `subtask.create`, `task.comment`, `comment.create` and `task.status.set` |
    | `docs:manage` | `page.create`, `page.update` |
    | `chat:read` | `chat.channels.list`, `chat.messages.list` |
 
@@ -32,30 +55,166 @@ Three things, in this order.
 An agent connected through OAuth (`MCP_OAUTH`) is held to the scopes its connection names. It can hold each grant as the scope of the same name, `tasks:manage`, `docs:manage` or `chat:read`, and only when all three of these are true:
 
 - **The app asked for it** when it sent the person to sign in.
-- **The person ticked it** on the consent screen. Each starts unticked, with a sentence saying what it allows (for `chat:read`, "Read messages in channels you are in"); everything else the app asked for is granted together as before.
+- **The person ticked it** on the consent screen. Each starts unticked, with a sentence saying what it allows (for `chat:read`, "Read messages in channels you are in"); everything else the app asked for is granted together.
 - **An owner or admin approved it for that app by name** under Settings, Agent clients. Approving an app without choosing permissions never includes any of them, and an app an admin registered without a list of permissions cannot be given them at all; register it again naming them.
 
 `chat:read` is listed and can be asked for only while `MCP_TOOLS_DATA` is on. It is not one of the scopes an app gets when it asks for none, and `tasks:read` does not include it: an app connected before it existed reads no chat until its person connects it again and ticks it.
 
-The `MCP_TOOLS_WORK` tools take the plain scopes: `projects:read` for `tags.list`, `lists.list`, `goals.list` and `goal.get`, `tasks:read` for `task.relations.list` and `task.lists.list`, `docs:read` for `page.comments.list`, and `tasks:write` for each of their writes.
+The write scope never stands in for a manage scope, and a manage scope never stands in for the write scope: closing a task through `task.status.set` takes both `tasks:write` and `tasks:manage`.
 
-An app connected before these scopes existed, and any connection where one of the three is missing, lists and runs exactly what it did before. The write scope never stands in for a manage scope, and a manage scope never stands in for the write scope: closing a task through `task.status.set` takes both `tasks:write` and `tasks:manage`.
+Taking it back works at each level and takes effect on the app's next call: an owner or admin removes the permission from the app, or revokes the app, under Settings, Agent clients; the person withdraws the one permission, or revokes the whole connection, under AI, Accounts, Connected apps.
 
-Taking it back works at each level and takes effect on the app's next call: an owner or admin removes the permission from the app, or revokes the app, under Settings, Agent clients; the person withdraws the one permission, or revokes the whole connection, under Accounts, Connected apps.
+## Every tool, by group
+
+80 tools in all. How to read the tables:
+
+- **Permission** is the scope an OAuth app needs. A personal token with the read scope holds every `*:read` scope, and one with the write scope holds every `*:write` scope, except the manage and chat permissions, which a token holds only as grants.
+- **What it does** says how a call ends with the settings at their defaults (`MCP_TOOLS_V2` and `AGENT_TAINT_ROUTING` off, a project on "Act on single tasks, propose anything wider"):
+  - **Reads**: nothing changes.
+  - **At once**: the change is made and recorded in the audit log. Where the result says `undoable: true`, a person can undo it.
+  - **Waits**: the call changes nothing. It files a request in the AI Inbox, answers `pending: true` and a `proposalId`, and a person approves or declines it.
+- A list tool takes `limit` and, with `MCP_TOOLS_V2` on, a `cursor`. Its page size is 25 unless noted, and at most 100.
+- Every write also takes an optional `reason` (at most 500 characters) that goes into the audit log.
+
+### Always offered (11 tools)
+
+| Tool | Permission | What it does | Limits |
+|---|---|---|---|
+| `tasks.next` | `tasks:read` | Reads. The tasks assigned to you, most urgent first | `projectId` optional; the first 5 (paged with `MCP_TOOLS_V2`) |
+| `tasks.search` | `tasks:read` | Reads. Tasks you can open, by text, status or project. With `tasks:manage` it also filters by assignee, list and due date | `limit` 10 by default, at most 50 |
+| `task.get` | `tasks:read` | Reads. One task as a brief | Needs `taskId` |
+| `task.comment` | `tasks:write` | At once. A comment on a task. With `tasks:manage` a member can be named with `@[Their Name](their member id)` | Needs `taskId`, `body` |
+| `task.status.set` | `tasks:write` (and `tasks:manage` for the full form) | At once for In progress or In review. With `tasks:manage`, any status of the project; a close follows the project's rule and by default waits | Done is never available without `tasks:manage` |
+| `task.link` | `tasks:write` | At once. Attaches a pull request, branch or document link | Needs `taskId`, `url`; `kind` is `pr`, `branch`, `doc` or `url` |
+| `task.create` | `tasks:write` | At once. A task with a title, description, list and priority, unassigned, in the opening status. With `tasks:manage` also assignees, dates, status, type, estimate and links | Title 250 characters, description 20000, at most 20 assignees and 10 links |
+| `subtask.create` | `tasks:write` | At once. A subtask under a task | Three levels deep at most |
+| `timelog.start` | `time:write` | At once. Starts your timer on a task | Your own time only |
+| `timelog.stop` | `time:write` | At once. Stops the running timer and writes the entry | Your own time only |
+| `docs.read` | `docs:read` | Reads. A doc linked from a task, by page id | Text up to 40000 characters |
+
+### Performance numbers, `AGENT_PERFORMANCE_READ` (1 tool)
+
+| Tool | Permission | What it does | Limits |
+|---|---|---|---|
+| `performance.read` | `time:read` | Reads. Logged time, estimate against actual, velocity and cumulative flow | Up to 5 projects, a range of at most 120 days; needs `from` and `to` |
+
+### Data tools, `MCP_TOOLS_DATA` (18 tools)
+
+| Tool | Permission | What it does | Limits |
+|---|---|---|---|
+| `projects.list` | `projects:read` | Reads. Projects you can open | `query`, `limit` |
+| `project.get` | `projects:read` | Reads. One project: key, privacy, members, number of statuses | Needs `projectId` |
+| `sprints.list` | `projects:read` | Reads. The lists of one project. A private list is listed only for its people and for owners and admins | Needs `projectId` |
+| `statuses.list` | `projects:read` | Reads. A project's statuses in board order | Needs `projectId` |
+| `comments.list` | `tasks:read` | Reads. A task's comments, newest first | Needs `taskId` |
+| `pages.search` | `docs:read` | Reads. Docs you can open, by title | `query`, `projectId`, `limit` |
+| `page.get` | `docs:read` | Reads. One doc with its full text | Text up to 40000 characters |
+| `timesheet.read` | `time:read` | Reads. Time entries, yours by default; another person's only where the timesheet screens show them to you | `userId`, `from`, `to`, `projectId`, `limit` |
+| `comment.create` | `tasks:write` | At once. A comment on a task, stored as plain text | Needs `taskId`, `text` |
+| `timelog.create` | `time:write` | At once. A finished time entry of your own. A day in an approved timesheet period is refused | Needs `taskId`, `minutes` |
+| `screen.link` | `projects:read` | Reads. The web address of a place in AlianHub | See "Show me" below |
+| `person.place` | `projects:read` | Reads. The project, list or task the person last opened | No arguments; "fresh" for 60 minutes |
+| `person.me` | `projects:read` | Reads. Who the connection acts for: id, name, role, time zone, today's date | No arguments |
+| `workdays.get` | `projects:read` | Reads. The working days of the workspace or of one project | `projectId` optional; no list of public holidays |
+| `task.fields.list` | `tasks:read` | Reads. A task's custom fields and what each holds | Text over 2000 characters is cut |
+| `proposal.get` | `tasks:read` | Reads. What became of a change that waited for a person | Only a proposal this same connection filed |
+| `chat.channels.list` | `chat:read` | Reads. Chat channels the person can open. Direct messages are never listed | `query`; at most 200 channels |
+| `chat.messages.list` | `chat:read` | Reads. Recent messages of one channel (`channelId`) or one task's comment thread (`taskId`) | 20 by default, at most 50; text cut at 2000 characters |
+
+### Manage tools, `MCP_TOOLS_MANAGE` (16 tools)
+
+These need the `tasks:manage` permission, except `page.create` and `page.update`, which need `docs:manage`. `task.from_message` also needs `MCP_TOOLS_DATA`.
+
+| Tool | Permission | What it does | Limits |
+|---|---|---|---|
+| `fields.list` | `tasks:manage` | Reads. A project's custom fields with type and options | Needs `projectId` |
+| `subtasks.list` | `tasks:manage` | Reads. The direct subtasks of a task | Needs `taskId` |
+| `members.list` | `tasks:manage` | Reads. Active members by name, with role; with `projectId`, whether each can open the project | `query`, `limit` |
+| `task.history` | `tasks:manage` | Reads. The task's activity log, newest first | `limit` |
+| `task.links.list` | `tasks:manage` | Reads. Pull requests, branches, documents attached to a task | Needs `taskId` |
+| `task.update` | `tasks:manage` | At once. Title, description, priority, due date, start date, estimate | A field left out is not touched |
+| `task.assign` | `tasks:manage` | At once. `set`, `add` or `remove` assignees | At most 20; each must be an active member who can open the project |
+| `task.field.set` | `tasks:manage` | At once. One custom field of a task; `null` clears it | A field not used for the task's type is refused |
+| `task.move` | `tasks:manage` | At once, and it cannot be undone. With `MCP_TOOLS_V2` on it waits. A top-level task with its subtasks, to another list or project | A subtask cannot be moved alone |
+| `task.archive` | `tasks:manage` | At once. Archives a task with its subtasks | Nothing is deleted |
+| `task.restore` | `tasks:manage` | At once. Brings an archived task back | |
+| `comment.update` | `tasks:manage` | At once. Changes a comment an agent wrote for you | A person's comment is refused |
+| `tasks.batch` | `tasks:manage` | At once when every operation names the same task. Waits, as one request, when the operations name more than one task | Up to 25 operations; a waiting batch stays inside one project |
+| `task.from_message` | `tasks:manage` | At once. A task made from a chat message or a task comment you can read | Needs `messageId`; a direct message needs `projectId` |
+| `page.create` | `docs:manage` | At once. A doc, marked as an agent's draft until a person approves it | Plain text or simple Markdown |
+| `page.update` | `docs:manage` | At once. A doc's title or text. The old text is kept in the version history | Plain text or simple Markdown |
+
+The grant also gives fuller forms of tools in the first group, which are the same names with more arguments: `tasks.search`, `task.get`, `task.create`, `subtask.create`, `task.comment`, `comment.create` and `task.status.set`.
+
+### Work tools, `MCP_TOOLS_WORK` (32 tools)
+
+None of these needs a grant. A read takes the read scope and a write takes the write scope.
+
+| Tool | Permission | What it does | Limits |
+|---|---|---|---|
+| `tags.list` | `projects:read` | Reads. A project's tags | Needs `projectId` |
+| `task.relations.list` | `tasks:read` | Reads. Tasks a task is linked to, and how | Only tasks you can open |
+| `task.lists.list` | `tasks:read` | Reads. Lists a task was added to beside its home list | Only lists you can open |
+| `lists.list` | `projects:read` | Reads. A project's lists and folders | Needs `projectId` |
+| `page.comments.list` | `docs:read` | Reads. A doc's comments, oldest first | `limit` at most 100 |
+| `goals.list` | `projects:read` | Reads. The goals you can read, with progress and targets | `mine`, `archived`, `limit` |
+| `goal.get` | `projects:read` | Reads. One goal | Needs `goalId` |
+| `automation.catalogue` | `projects:read` | Reads. What a rule can be made of | No arguments |
+| `queue.list` | `tasks:read` | Reads. Work waiting for an agent in projects whose project manager is switched on | At most 25 items; `projectId` optional |
+| `task.tags.add` | `tasks:write` | At once. Puts a project tag on a task | Tag by id or name |
+| `task.tags.remove` | `tasks:write` | At once. Takes a tag off | |
+| `task.relation.add` | `tasks:write` | At once. Links two tasks: `blocks`, `blocked_by`, `duplicates`, `duplicated_by`, `relates_to` | One link per pair |
+| `task.relation.remove` | `tasks:write` | At once. Removes the link on both tasks | |
+| `task.lists.add` | `tasks:write` | At once. Adds a top-level task to another list | Not a Scrum sprint, backlog or personal list; at most 10 lists per task |
+| `task.lists.remove` | `tasks:write` | At once. Takes a task out of an added list | The home list never changes |
+| `list.create` | `tasks:write` | At once. A list at the top level or in a folder | Name at most 100 characters |
+| `list.rename` | `tasks:write` | At once. Renames a list | An archived list is refused |
+| `list.move` | `tasks:write` | At once. Moves a list into a folder or to the top level | Its own project only |
+| `page.comment.create` | `tasks:write` | At once. A comment on a doc | At most 10000 characters |
+| `page.comment.reply` | `tasks:write` | At once. A reply in a doc comment thread | |
+| `page.comment.assign` | `tasks:write` | At once. Gives a doc comment thread to a member, or clears it | |
+| `goal.target.set` | `tasks:write` | At once. The value of a target set by hand | A target counted from tasks is refused |
+| `goal.target.sources.add` | `tasks:write` | At once. Counts one more list or task toward a target | `kind` is `list` or `task` |
+| `goal.target.sources.remove` | `tasks:write` | At once. Stops counting one | |
+| `queue.claim` | `tasks:write` | At once. Takes one queue item for 30 minutes | A claim gives no extra rights |
+| `queue.release` | `tasks:write` | At once. Gives an item back | |
+| `fields.create` | `tasks:write` | Waits, always. Up to 10 custom fields, a rollup or a formula among them, with up to 50 first values | Field names 80 characters |
+| `view.create` | `tasks:write` | Waits, always. A saved view | Name 60 characters |
+| `project.setup` | `tasks:write` | Waits, always. Statuses, lists, fields and views for an existing project | Up to 10 statuses, 10 lists, 10 fields, 5 views |
+| `project.create` | `tasks:write` | Waits, always. A new project, with or without a plan | Name 3 to 100 characters, description up to 2000 |
+| `automation.create` | `tasks:write` | Waits, always, for an owner or admin. One automation rule for one project | Six step kinds; see "Automations" |
+| `dashboard.card.add` | `tasks:write` | Waits, always, for the dashboard's owner. One card on a dashboard they own, or on a new private one | Eight kinds of card; see "Dashboards" |
+
+### Delegated sessions, `EXTERNAL_AGENT_SESSIONS` (3 tools)
+
+| Tool | Permission | What it does | Limits |
+|---|---|---|---|
+| `session.activity` | `tasks:write` | Writes the session record only. Reports what the app is doing on a delegated task | Text up to 4000 characters, 60 a minute; the first call within ten seconds, with its handle |
+| `session.complete` | `tasks:write` | Closes the session as done, with a short summary | |
+| `session.fail` | `tasks:write` | Closes the session as failed, with a reason | |
+
+### Stricter settings
+
+The "At once" rows above change when a stricter setting is on. Nothing here makes an agent able to do more.
+
+- A project set to "Propose everything" files every connected agent write in that project. For an app, the call is filed only when the tool is covered by a manage permission the app holds, and refused otherwise.
+- With `AGENT_TAINT_ROUTING` on, an app's write that reaches past one task (a new task, a move, an archive, a link, a list change, a doc comment, a doc, a goal change) waits when the app holds the manage permission the tool needs, and is refused when it does not.
+- With `MCP_TOOLS_V2` on, `task.move`, `goal.target.set`, `goal.target.sources.add` and `goal.target.sources.remove` wait.
+- A close (a done status) follows the project's "Agents and Done" rule, whatever the settings above say.
 
 ## Connect your AI
 
 Sign-up ends on a step called **Connect your AI**, and the same page stays under AI, Connect your AI. It can be skipped; the setup card on Home offers it again.
 
 - **Claude and ChatGPT** connect by address. The page shows the address (`<your AlianHub URL>/mcp`) only while `MCP_OAUTH` is on; with it off the page says so and points to the token instead.
-- **Claude Code and other tools** connect with a token, made on the AI accounts page as described below. With `MCP_OAUTH=only` tokens are refused, and the page says that instead.
+- **Claude Code and other tools** connect with a token, made under AI, Accounts, My account, as described below. With `MCP_OAUTH=only` tokens are refused, and the page says that instead.
 - The page lists what an agent can do on this install, and names each of `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` that is off.
 - The page says **Connected** once the person's own agent has made a call: an agent token of theirs, or an app they connected, that has a last-used time in this workspace. It reads `GET /api/v2/api-tokens/ai-connection`, which answers for the signed-in person only and returns no token, hash or prefix. Another person's connection never counts.
 - An agent works while its app is open or running on a schedule. AI that runs inside AlianHub with nobody's app open (the Ask card, AI fields, agents on a schedule) needs a model key on the server; that key is optional.
 
 ## Creating a token
 
-In the web app, open the AI accounts page, choose **My account**, then **New token**.
+In the web app, open AI, then Accounts, choose **My account**, then **New token**.
 
 - Give it a name, and choose the project it is limited to, or all your projects.
 - Tick **Let this agent manage tasks** to create it with `tasks:manage`, and **Let this agent write docs** to create it with `docs:manage`. The boxes are shown only while `MCP_TOOLS_MANAGE` is on. Tick **Let this agent read chat** to create it with `chat:read`; that box is shown only while `MCP_TOOLS_DATA` is on. Leave both unticked for an agent that should only read, comment, set an in-progress status and file tasks, and, where `MCP_TOOLS_WORK` is on, tag and link tasks, create, rename and move lists and comment on docs.
@@ -74,7 +233,7 @@ Revoke a token on the same screen. A revoked or expired token stops working on i
 - It is checked first: the scope, the grant, the arguments against the tool's schema (an unknown argument, a wrong type or an out-of-range value is refused), and whether the person can open the task, the project, the list or the doc it names.
 - It runs through the same server code the web app's own actions use, so the activity log, the notifications and the counters are the ones a person's change produces. The activity log names the agent and the person it acted for: "Claude, for Priya Shah has changed Status as Done". The line is stored as an agent's, so the task's activity and the project's activity log mark it and can be narrowed to changes made by an agent. An automation rule does not answer the change unless the rule was set to react to changes made by automations and agents.
 - It is recorded in the agent audit log with what it replaced. Where the result says `undoable: true`, a person can undo it from that log within the workspace's undo window.
-- With `MCP_TOOLS_V2` on, a call that cannot be undone (`task.move`) is not run. It is filed as a proposal in the Inbox, and the result says `pending: true`. A person who can open the same task and holds the same permission approves or declines it.
+- With `MCP_TOOLS_V2` on, a call rated as one that cannot be undone or that reaches the whole workspace (`task.move`, `goal.target.set`, `goal.target.sources.add` and `goal.target.sources.remove`) is not run. It is filed as a proposal in the Inbox, and the result says `pending: true`. A person who can open the same task and holds the same permission approves or declines it.
 - For an app connected through OAuth, with `AGENT_TAINT_ROUTING` on, a write that reaches past one task (`task.create`, `task.move`, `task.archive`, `task.restore`, `page.create`, `page.update`) is filed the same way when the connection holds the manage scope the tool needs, and refused when it does not. Approval asks the connection again: it must still be live and still hold that scope, the app must still be approved for it in the workspace, and the person must still have a seat and be able to open what the change touches. A proposal filed by a connection that has since been revoked or narrowed cannot be approved.
 - The `MCP_TOOLS_WORK` writes follow the same rule without needing a manage scope to run. Under `AGENT_TAINT_ROUTING`, a tag stays on one task and runs. A link between tasks, a list change, adding a task to another list or taking it out, and a doc comment reach past one task: each is refused for a connection without the manage scope, and filed for a person when the connection holds `tasks:manage` (links and lists) or `docs:manage` (doc comments), with approval asking that scope again. A change to a goal reaches everyone the goal is shared with: it is refused without `tasks:manage` and filed with it.
 - A goal belongs to no project. A token kept to some projects reads a goal only when the goal counts tasks and every list and task it counts is in those projects, and it changes no goal.
@@ -208,13 +367,15 @@ An owner or admin sets two things per project, on the project's detail screen un
 | Connected agents | `single_task` (default) | Nothing extra is held: the rules under "What happens to a write" decide |
 | | `propose_all` | Every write in the project is filed as a proposal |
 
+On the same screen, under "Agents working at the same time", an owner or admin sets how many agents may work in the project at once (1 to 20, 3 by default) and can choose **Pause all agents**. While agents are paused, no agent takes work or changes anything in that project, and every agent write there is refused, until someone chooses **Resume agents**. People carry on as usual.
+
 A task created already in a done status counts as a close. A write that reaches two projects (a move, a link between tasks) follows the stricter of the two. The workspace's "a person checks before Done" switch always wins over the project. An app connected through OAuth files a proposal only for a tool its manage scope covers, so a held call of any other tool (a comment, a link, a timer) is refused, as is every held call of an app with no manage scope. An agent's token on the web app's own routes cannot file one either, so there a held write is refused and the MCP tool is the way to propose it.
 
 ### Changing a task
 
 These need `tasks:manage`, except where a plain form is described.
 
-`task.status.set`: without the grant, an in-progress or in-review status only; a person closes the task. With it, any status the task's project defines, a done or closed one included. A close made this way is recorded as closed for the person through the agent, and the work stays marked unchecked until a person checks it. Whether it applies at once is the project's choice (see "A project's own policy" below): by default the close is filed as a proposal and a person approves it. Where the workspace's agent policy has a person check an agent's work before it is closed, the close is refused and a person closes the task, whatever the project says.
+`task.status.set`: without the grant, an in-progress or in-review status only; a person closes the task. With it, any status the task's project defines, a done or closed one included. A close made this way is recorded as closed for the person through the agent, and the work stays marked unchecked until a person checks it. Whether it applies at once is the project's choice (see "A project's own policy" above): by default the close is filed as a proposal and a person approves it. Where the workspace's agent policy has a person check an agent's work before it is closed, the close is refused and a person closes the task, whatever the project says.
 
 ```json
 { "name": "task.status.set", "arguments": { "taskId": "<task id>", "status": "Done", "reason": "Pull request merged" } }
@@ -250,7 +411,7 @@ These need `tasks:manage`, except where a plain form is described.
 { "name": "task.archive", "arguments": { "taskId": "<task id>", "reason": "Superseded" } }
 ```
 
-`tasks.batch`: up to 25 write tools in one call, run in order. Each operation is checked and applied on its own and reports its own result, so one refusal neither stops nor undoes the others: a batch is not all-or-nothing. The operations that applied are recorded as one group that a person can undo together. An operation cannot use the id of a task an earlier operation created; make those calls separately.
+`tasks.batch`: up to 25 write tools in one call, run in order. When every operation names the same task, each is checked and applied on its own and reports its own result, so one refusal neither stops nor undoes the others: that batch is not all-or-nothing. The operations that applied are recorded as one group that a person can undo together. When the operations name more than one task, nothing runs: the changes are filed as one request that waits in the AI Inbox for a person to approve or decline whole, and the result says `pending: true`. A waiting batch stays inside one project; send one batch for each project. An operation cannot use the id of a task an earlier operation created; make those calls separately.
 
 ```json
 { "name": "tasks.batch", "arguments": { "reason": "Friday tidy", "operations": [
@@ -332,6 +493,17 @@ The fields and their first values can be one approval: add `values`, up to 50, e
 - `values` is for a connection that may use `task.field.set` itself: the tool is on (`MCP_TOOLS_MANAGE`) and the connection holds `tasks:manage`. Any other connection is refused, and nothing is filed.
 - The call is refused at once, and nothing is filed, when a task is not one of that project that the person can open, when a field name is neither in the call nor in the project, when a value is not one the field takes, or when the person may not edit custom fields on a task.
 - The Inbox card lists each value under the fields, on its task by name. A value on a task the person looking cannot open is counted, not named.
+
+`fields.create` also takes the two types AlianHub works out, as the field form makes them. Neither takes a value.
+
+- `rollup`: a number worked out for each task from the subtasks under it, on every level. Give `function` (`sum`, `avg`, `count`, `min`, `max`) and `source`, the name of the number field it reads: a field of the same call or one the project already has, of type `number`, `money`, `rating`, `progress`, `formula` or `rollup`. `count` with no `source` counts the subtasks.
+- `formula`: a number worked out from the task's own number fields. Give `expression`: numbers, fields by name in braces, `+ - * /`, brackets, and `SUM`, `AVG`, `MIN`, `MAX`, `COUNT`, `ROUND`, `IF`, as in `{Price} - {Cost}`.
+
+```json
+{ "name": "fields.create", "arguments": { "projectId": "<project id>", "fields": [{ "name": "Cost total", "type": "rollup", "function": "sum", "source": "Cost" }] } }
+```
+
+A rollup of a field that is not there or is not a number, and a formula that cannot be read or that closes a circle with another formula, are answered at once and nothing is filed. The Inbox card says in words what each works out. A rollup has its number on each task as soon as it is approved; a formula has it on a task once a field value of that task is next saved. Read the number with `task.fields.list`. `project.setup` and `project.create` take the other types only.
 - Approved, the fields are made first, then each value is set as `task.field.set` sets it, and only on a live task of the project that the person behind the token and the approver can both open and may both edit the fields of. A value that is not set does not stop the others: `values` in the result says, for each, `set` or the reason.
 - Undo puts each value back to what the task held, then takes the fields away as above. A value on a task the person undoing cannot open stays, and so does the field that holds it.
 
@@ -369,7 +541,7 @@ What happens to a new project:
 - The proposal is listed for the person whose agent asked and for owners and admins.
 - Undo moves the project to the trash through the project's own route, as the person undoing, who must be allowed to delete it; a person restores it from the trash. A project that holds a task or a doc by then stays: the undo is refused and says why. Nothing is deleted for good.
 
-Undo, from the Inbox or the agent audit log: a view an agent added is removed, and nothing else. Each field it made is switched off, as the field form's own switch does, only while it is still that project's alone and no task holds a value in it. A field that holds a value, or that someone has since put on another project, stays, and the undo names it and says why.
+Undo, from the Inbox or the agent audit log: a view an agent added is removed, and nothing else. Each field it made is switched off, as the field form's own switch does, only while it is still that project's alone and no task holds a value in it; a rollup or a formula is switched off whatever number its tasks store, since nobody typed it. A field that holds a value, or that someone has since put on another project, stays, and the undo names it and says why.
 
 
 ### Automations
@@ -389,6 +561,20 @@ What is refused, with the reason: a step that runs an agent; any step outside th
 The Inbox shows the approver the project, what starts the rule, the rule in a sentence, each step, and whether it starts switched on. For an owner or an admin it also shows how many tasks of the last 30 days the rule matches, with up to three of them, counted the way the Automations page counts and only over what that person can open. Approving saves the rule through the Automations page's own create route as the person who approved: the rule is theirs, not the agent's and not the token's, and anything that page would refuse is refused.
 
 Undo, from the Inbox or the agent audit log: the rule is deleted, as the Automations page deletes it, whether it is on or off. A rule someone has edited since stays, and the undo says so; switch it off or delete it on the Automations page.
+
+### Dashboards
+
+`dashboard.card.add` needs `MCP_TOOLS_WORK` and the write scope, and no grant; an outside client's call is filed only when its connection holds `tasks:manage`. A dashboard is changed by its owner alone, so a call never adds a card: it is filed for the person the agent works for, and only that person can approve it. A token kept to some projects cannot use it, since a dashboard belongs to no project.
+
+Arguments: `dashboardId` (a dashboard the person owns) or `newDashboard` (the name of a new dashboard, made private to them), `card`, `period` and `reason`. The cards are the ones the dashboard editor adds with nothing more to fill in: `due_soon`, `my_time`, `project_pulse`, `logged_vs_estimate`, `free_capacity`, `at_risk`, `tasks_by_status` and `agent_spend`. `my_time`, `project_pulse`, `logged_vs_estimate` and `tasks_by_status` cover a span of time and take `period`: `auto`, `today`, `this_week`, `last_week`, `this_month`, `last_month` or `last_30_days`; left out, the card starts on the span the editor gives it. A card that first asks for a project, a list or a question (burndown, velocity, ask a question) is added in AlianHub, as is sharing a dashboard.
+
+```json
+{ "name": "dashboard.card.add", "arguments": { "newDashboard": "Team overview", "card": "tasks_by_status", "period": "this_week" } }
+```
+
+A dashboard that is not there and one the person cannot open are answered alike, as not found; one that belongs to someone else, or already holds 60 cards, is answered at once, and nothing is filed. The Inbox shows the dashboard by name and the card in the editor's words, to a viewer who can open the dashboard. Approving runs the dashboard editor's own routes as that person: the card goes under the cards already there, and it shows each viewer only the work they may see.
+
+Undo, by the dashboard's owner: the card is removed. A dashboard the change made is deleted with it while that card is all it holds; one that has gained a card since, or was there before, stays.
 
 ### Comments, links and time
 
@@ -558,13 +744,13 @@ The answer is `{ "userId": "...", "name": "...", "role": "member", "timeZone": "
 
 The answer is `{ "of": "workspace", "workingDays": ["Monday", ...], "dayNumbers": [1, 2, 3, 4, 5], "daysOff": ["Sunday", "Saturday"], "holidays": null, "note": "..." }`. `of` is `project` when the project has its own week, and `dayNumbers` count from 0 for Sunday. AlianHub keeps no list of public holidays, so `holidays` is always null, and a person's time off is not read here. A project the person cannot open answers `{ "error": "project not found" }`, as a missing one does.
 
-**A task's fields.** `task.fields.list` answers the custom fields of one task with what each holds. It needs `MCP_TOOLS_DATA`, the right to read tasks, and a role that is shown custom fields in the task's project.
+**A task's fields.** `task.fields.list` answers the custom fields of one task with what each holds. It needs `MCP_TOOLS_DATA`, the right to read tasks, and a role that is shown custom fields in the task's project. A formula or a rollup answers the number AlianHub last stored, with `computed: true` and `computedAt`, when it was worked out: when a rollup is made or changed, and each time a person or `task.field.set` saves a field value on the task or on a subtask under it. A subtask added, moved or removed since is not in the number yet, and before the first time both are null.
 
 ```json
 { "name": "task.fields.list", "arguments": { "taskId": "<task id>" } }
 ```
 
-The answer is `{ "taskId", "projectId", "about": "...", "fields": [{ "fieldId", "title", "type", "value" }] }`, by field name. `value` is text, a number, true or false, an ISO date, the labels of the options chosen, or `[{ "id", "name" }]` for people; null when the field is empty. A text longer than 2,000 characters is cut and carries `"cut": true`. A formula or rollup field carries `"computed": true` and the number AlianHub stored for it. A field whose value is kept beside the task (votes, linked tasks) is named with `"notReadHere": true` and no value. A field that is switched off, that belongs to another project, or that is for another task type is left out. A task the person cannot open answers `{ "error": "task not found" }`, as a missing one does.
+The answer is `{ "taskId", "projectId", "about": "...", "fields": [{ "fieldId", "title", "type", "value" }] }`, by field name. `value` is text, a number, true or false, an ISO date, the labels of the options chosen, or `[{ "id", "name" }]` for people; null when the field is empty. A text longer than 2,000 characters is cut and carries `"cut": true`. A formula or rollup field carries `"computed": true`, `"computedAt"` and the number AlianHub stored for it. A field whose value is kept beside the task (votes, linked tasks) is named with `"notReadHere": true` and no value. A field that is switched off, that belongs to another project, or that is for another task type is left out. A task the person cannot open answers `{ "error": "task not found" }`, as a missing one does.
 
 **Reading chat.** `chat.channels.list` lists the chat channels the person can open, and `chat.messages.list` reads the recent messages of one channel or of one task's comment thread. Both need `MCP_TOOLS_DATA`, the `chat:read` scope and a role that is shown comments. A connection without `chat:read` is listed neither tool, and a call of one is refused before anything is read. Direct messages are never listed or read.
 
@@ -587,6 +773,22 @@ The answer is `{ "proposalId", "state", "what", "changes", "filedAt", "next": ".
 
 The task's description is the message's text, stored as text, followed by a line that says where it came from; with a web address set on the server it also holds a link back. The title is the first line of the message unless `title` is given. With no `projectId`, the task lands in the list the message's channel belongs to, or in the list of the task the comment is on; a direct message needs `projectId` (and `sprintId` for a list other than the project's first). It also takes `assigneeIds`, `priority`, `dueDate`, `startDate`, `status`, `taskType`, `estimateMinutes` and `reason`. A message the person cannot read, a deleted one and an id that does not exist all answer `{ "ok": false, "error": "message not found" }`. A chat message's id comes from `chat.messages.list`, and a comment's from `comments.list` or `chat.messages.list`.
 
+## The work queue, performance numbers and delegated sessions
+
+**The work queue** (`MCP_TOOLS_WORK`). `queue.list` shows work waiting for an agent in the projects whose project manager is switched on: tasks a person handed over, and what the daily look found that needs judgement (a task with no owner or no estimate, a new task nobody sorted, a person with too much planned). It lists only items about tasks you can open, and leaves out the ones another agent holds. `queue.claim` takes one item for 30 minutes (claim it again to keep it longer). A claim gives no extra rights: the change itself is made with the usual tools and is checked and approved as always. `queue.release` gives an item back; with `finished: true` it leaves the queue. When the project has enough agents at work, a claim is told to wait.
+
+```json
+{ "name": "queue.claim", "arguments": { "itemId": "<item id>" } }
+```
+
+**Performance numbers** (`AGENT_PERFORMANCE_READ`). `performance.read` answers logged time, estimate against actual, sprint velocity and cumulative flow for up to 5 projects over at most 120 days. Arguments: `from` and `to` (`YYYY-MM-DD`), and `projectId` or `projectIds`, and `metrics`. It needs the `time:read` scope and the right to see each project.
+
+```json
+{ "name": "performance.read", "arguments": { "projectId": "<project id>", "from": "2026-10-01", "to": "2026-10-31" } }
+```
+
+**Delegated sessions** (`EXTERNAL_AGENT_SESSIONS`, for connected apps). When a person hands a task to a connected app, the app reports over `/mcp` with `session.activity` (one of the activity types, at most 4000 characters, 60 a minute), `session.complete` and `session.fail`. Each needs `tasks:write`. The first call comes within ten seconds of the announcement and carries the handle it was given. These three tools write the session record only, never workspace data.
+
 ## What an agent cannot do yet
 
-Create, share, archive or delete a goal, or add and remove its targets; change a project or its members; create, rename or move a folder; archive or restore a list; start or complete a sprint; create or edit a project's tags; change or remove a field or a view, formula and rollup fields, company-wide fields; dashboards; automations; time edits and time approval; checklists, attachments and watchers; converting a task to a subtask and back, merging and duplicating; reactions, files and resolving on a doc comment, and editing one; reactions on a task comment. Deleting is not planned.
+Create, share, archive or delete a goal, or add and remove its targets; change a project or its members; create, rename or move a folder; archive or restore a list; start or complete a sprint; create or edit a project's tags; change or remove a field or a view, company-wide fields; share, rename or delete a dashboard, move or remove its cards, or add a card that asks for a project, a list or a question; changing or switching off an automation rule that exists; time edits and time approval; checklists, attachments and watchers; converting a task to a subtask and back, merging and duplicating; reactions, files and resolving on a doc comment, and editing one; reactions on a task comment. Deleting is not planned.

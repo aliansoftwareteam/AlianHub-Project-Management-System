@@ -173,9 +173,9 @@ describe('one item per agent at a time', () => {
 
 describe('how many agents work in a project at once', () => {
     it('is three unless the project says otherwise', async () => {
-        expect(await projectLimits.read(CID, P_OPEN)).toEqual({ atOnce: 3, paused: false });
+        expect(await projectLimits.read(CID, P_OPEN)).toEqual({ atOnce: 3, paused: false, directTasks: 10 });
         project().agentLimits = { atOnce: 99, paused: 'yes' };
-        expect(await projectLimits.read(CID, P_OPEN)).toEqual({ atOnce: 3, paused: false });
+        expect(await projectLimits.read(CID, P_OPEN)).toEqual({ atOnce: 3, paused: false, directTasks: 10 });
     });
 
     it('at the limit a fourth agent is told to wait, holds nothing, and gets work when one finishes', async () => {
@@ -368,6 +368,21 @@ describe('who may change a project\'s limits for agents', () => {
         expect(changes()).toHaveLength(1);
         expect(changes()[0]).toMatchObject({ actorId: uid, entityType: 'project', entityId: P_OPEN, meta: { from: { agentsAtOnce: 3, agentsPaused: false }, to: { agentsAtOnce: 5, agentsPaused: false } } });
         expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', companyId: CID, updatedFields: { agentLimits: expect.objectContaining({ atOnce: 5 }) } }));
+    });
+
+    it('a save is announced once, as a change to the project, and sends no agents signal of its own', async () => {
+        await put(OWNER, { paused: true });
+        const told = socketEmitter.emit.mock.calls.filter(([event, change]) => event === 'update' && change.module === 'project');
+        expect(told).toHaveLength(1);
+        expect(told[0][1]).toMatchObject({ type: 'update', companyId: CID, updatedFields: { agentLimits: expect.objectContaining({ paused: true }) } });
+        expect(String(told[0][1].data._id)).toBe(P_OPEN);
+        expect(socketEmitter.emit.mock.calls.filter(([, change]) => change && change.module === 'agent' && change.data.kind === 'limits')).toEqual([]);
+    });
+
+    it('a refused save tells nobody', async () => {
+        await put(MEMBER, { paused: true });
+        await put(OWNER, { atOnce: 99 });
+        expect(socketEmitter.emit.mock.calls.filter(([, change]) => change && change.module === 'project')).toEqual([]);
     });
 
     it('a pause keeps who paused and when, and the limit beside it', async () => {

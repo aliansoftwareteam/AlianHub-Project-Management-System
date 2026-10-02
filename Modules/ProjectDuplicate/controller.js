@@ -12,7 +12,9 @@ const FAILED = 'The project could not be duplicated.';
 const refuse = (res, code, statusText, extra = {}) => res.status(code).send({ status: false, statusText, message: statusText, ...extra });
 const logged = (what) => (error) => logger.error(`duplicate project: ${what}: ${(error && error.message) || error}`);
 
-/* POST /api/v2/projects/:id/duplicate { name, include: { tasks, assignees, dates } } */
+/* POST /api/v2/projects/:id/duplicate { name, include: { tasks, assignees, dates } }
+   `req.onlyCaller` is set by the server alone, for a copy an agent asked for (Modules/Agents/projectDuplicate.js): that
+   copy is the caller's own from the one write that makes it. No request can carry it. */
 exports.duplicate = async (req, res) => {
     let companyId;
     try {
@@ -32,9 +34,10 @@ exports.duplicate = async (req, res) => {
         if (source.isPersonal === true) return refuse(res, 400, PERSONAL);
 
         const { include, name } = request;
+        const bundle = await readSource({ companyId, caller, source });
         const data = await buildProject({
             companyId, caller, name, include,
-            bundle: await readSource({ companyId, caller, source }),
+            bundle: req.onlyCaller === true ? rules.forCallerAlone(bundle, caller) : bundle,
             planFor: (copy) => planTasks(companyId, sourceId, copy.sourceListIds),
             readRows: sourceRows(companyId, sourceId),
         });

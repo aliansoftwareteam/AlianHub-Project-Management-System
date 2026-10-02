@@ -112,8 +112,8 @@ defineEmits(['delete-card','edit-card','refresh-card','period-change']); // Defi
 .my-component {
   height: 100%;
   padding: 20px;
-  background-color: #ffffff;
-  border: 1px solid #f0f0f0;
+  background-color: var(--surface);
+  border: 1px solid var(--hairline);
   border-radius: 10px;
 }
 h2 {
@@ -152,8 +152,8 @@ h2 {
   min-width: 0;
   font-size: 10px;
   font-weight: 600;
-  color: #3a3f52;
-  background: #f7f8fb;
+  color: var(--ink-label);
+  background: var(--surface-2);
   border-radius: 20px;
   padding: 3px 9px;
   white-space: nowrap;
@@ -169,14 +169,14 @@ h2 {
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
-  color: #3a3f52;
-  border: 1px solid #e5e7eb;
+  color: var(--ink-label);
+  border: 1px solid var(--hairline);
   border-radius: 6px;
   padding: 3px 24px 3px 8px;
   max-width: 130px;
   min-width: 56px;
   flex-shrink: 1;
-  background-color: #fff;
+  background-color: var(--surface);
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%235a6478' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
   background-repeat: no-repeat;
   background-position: right 7px center;
@@ -188,21 +188,21 @@ h2 {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .dashboard-period-select:hover {
-  border-color: #c7ccd9;
+  border-color: var(--hairline);
 }
 .dashboard-period-select:focus {
-  border-color: #2F3990;
+  border-color: var(--brand);
   box-shadow: 0 0 0 2px rgba(47, 57, 144, 0.12);
 }
 .dashboard-refresh-icon {
-  color: #5a6478;
+  color: var(--ink-2);
   cursor: pointer;
   transition: color 0.15s ease, transform 0.3s ease;
   display: inline-block;
   vertical-align: middle;
 }
 .dashboard-refresh-icon:hover {
-  color: #2F3990;
+  color: var(--brand);
   transform: rotate(90deg);
 }
 </style>

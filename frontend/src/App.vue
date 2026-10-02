@@ -70,12 +70,8 @@ import TaskDetailOverlay from '@/components/organisms/TaskDetailOverlay/TaskDeta
 import AgentLiveStrip from '@/views/Ai/AgentLiveStrip.vue'
 import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
-import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue'
-import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue'
 import KeyboardShortcuts from '@/components/organisms/KeyboardShortcuts/KeyboardShortcuts.vue'
 import SkipLink from '@/components/atom/SkipLink/SkipLink.vue'
-import TaskTemplateDialogHost from '@/components/molecules/TaskTemplates/TaskTemplateDialogHost.vue'
-import AiFieldFillDialog from '@/components/molecules/AiFieldFill/AiFieldFillDialog.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { recordRouteVisit } from '@/components/molecules/RecentVisits/routeVisits'
 import { useStore } from 'vuex';
@@ -98,12 +94,14 @@ import { warmWorkspaceChunks } from '@/config/warmChunks';
 import {socketHelper} from './composable/socketHelper';
 import { useFieldDefinitionsSync } from '@/plugins/customFieldView/fieldDefinitionsSync';
 import { useAgentChangeNotice } from '@/views/Ai/agentChangeNotice';
+import { useLiveProjects } from '@/views/Projects/liveProjects';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
 import { adoptAccountPrefs } from '@/views/Settings/Language/localePrefs';
+import { CommandPalette, QuickCreateTask, TaskTemplateDialogHost, AiFieldFillDialog } from '@/config/shellParts';
 const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
 import { aiAvailability, loadAiAvailability, trackAiPlan } from '@/composable/aiAvailability';
 import { AI_GATE, aiGateFor } from '@/router/ai/gate';
@@ -332,13 +330,6 @@ async function getFirebaseData() {
                     logged.value = true;
                     console.error("ERROR in setUsers: ", error);
                 }); 
-                if (getters['ToursData/Tours'] && !(getters['ToursData/Tours'])?.length) {
-                      dispatch('ToursData/getTours',userData.tour)
-                         .catch((error) => {
-                         console.error('ERROR in getTours:', error);
-                         });
-                      } 
-
 
                 if(getters['settings/rules'] && !getters['settings/rules'].length) {
                     dispatch("settings/setRules", companyId.value).then(() => {
@@ -709,6 +700,7 @@ provide("$mainTour", mainTour);
 provide("$socket",socket);
 useFieldDefinitionsSync(socket);
 useAgentChangeNotice(socket, companyId);
+useLiveProjects(socket, companyId);
 
 </script>
 

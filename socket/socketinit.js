@@ -14,6 +14,7 @@ require('./controller/whiteboardSocket');
 require('./controller/projectTemplateSocket');
 require('./controller/agentSocket');
 require('./controller/folderSocket');
+require('./controller/projectSocket');
 require('./controller/customFieldSocket');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');

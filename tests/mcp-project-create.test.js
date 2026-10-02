@@ -344,7 +344,7 @@ describe('undo moves the project to the trash', () => {
         const first = await filed(as(INSIDER));
         await approve(first);
         mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Draft the brief', ProjectID: String(made()._id), CompanyId: CID, statusKey: 1, deletedStatusKey: 0 });
-        expect((await undo(first)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/"Website relaunch" has a task now, so it was kept/) });
+        expect((await undo(first)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/The project "Website relaunch" has a task now, so it was kept/) });
         expect(Number(made().deletedStatusKey || 0)).toBe(0);
         expect(audits(TOOL, 'applied')[0].meta.undoneAt).toBeFalsy();
 

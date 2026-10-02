@@ -16,7 +16,7 @@ const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
 const { annotationsFor, isDestructive } = require('./annotations');
-const { propose, proposeBatch, fileable, outsideMayFile, declinedNotes } = require('./propose');
+const { propose, proposeBatch, afterManyTasks, fileable, outsideMayFile, declinedNotes } = require('./propose');
 const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
 const screenTools = require('./screenTools');
@@ -415,7 +415,8 @@ const call = async (ctx, name, args = {}) => {
     if (ready.answer) return ready.answer;
     const { params, rule, held } = ready;
     if (rule.decision !== projectPolicy.DECISION.REFUSE && (held || (v2.enabled() && isDestructive(actions.rating(tool.action))))) {
-        return propose(ctx, tool, params, str(args.reason, 500) || `${tool.name} via MCP`, held);
+        const filed = await propose(ctx, tool, params, str(args.reason, 500) || `${tool.name} via MCP`, held);
+        return rule.manyTasks ? afterManyTasks(filed, rule.reason, toolsFor(ctx).some((listed) => listed.batch)) : filed;
     }
     const out = await actions.perform({
         companyId: ctx.companyId,

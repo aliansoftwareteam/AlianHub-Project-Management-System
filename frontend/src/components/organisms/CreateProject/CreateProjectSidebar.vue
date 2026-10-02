@@ -163,7 +163,7 @@
                         </div>
                         <label v-if="sampleCount" class="ah-cp__check">
                             <input v-model="form.includeSamples" type="checkbox" class="ah-check" />
-                            <span>{{ $t('Auth.include_samples', { n: sampleCount }) }} <span class="ah-muted">{{ $t('Auth.include_samples_hint') }}</span></span>
+                            <span>{{ $t('Auth.include_samples', { n: sampleCount }, sampleCount) }} <span class="ah-muted">{{ $t('Auth.include_samples_hint') }}</span></span>
                         </label>
                         </template>
                         <div class="ah-cp__foot">

@@ -3,10 +3,13 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { oid } = require('../Automations/engine/tools');
 const registry = require('../Agents/registry');
 const setup = require('../Agents/setupRequests');
+const computed = require('../Agents/computedFields');
 const actions = require('../Agents/actions');
 const permissions = require('../Agents/permissions');
 const plans = require('../Agents/projectSetup');
 const projects = require('../Agents/projectCreate');
+const copies = require('../Agents/projectDuplicate');
+const lists = require('../Agents/listSetup');
 const { LIST_NAME_MAX } = require('../Agents/workRequests');
 const manageFlag = require('./manageFlag');
 const { TASK_ACCESS_FIELDS } = require('./visibility');
@@ -16,10 +19,11 @@ const { loadProject } = require('./dataTools');
 const { GRANT } = manageFlag;
 const DENIED = permissions.REASON;
 
-// Setting a project up: custom fields, saved views, a whole plan in one call, or a new project with its plan. These
-// show to everyone on the project, so a call never makes one: it is filed for the person to approve in AlianHub (their
-// actions are proposeOnly, Agents/registry/setup.js, projectSetup.js and projectCreate.js), and what is approved runs
-// the web app's own routes as that person (Modules/Agents/setupRequests.js, projectSetup.js and projectCreate.js).
+// Setting a project up: custom fields, saved views, a whole plan in one call, a new project with its plan, a copy of
+// a project, a folder with its lists, or a list made a sprint. These show to everyone on the project, so a call never
+// makes one: it is filed for the person to approve in AlianHub (their actions are proposeOnly, Agents/registry/setup.js,
+// projectSetup.js, projectCreate.js, projectDuplicate.js and listSetup.js), and what is approved runs the web app's own
+// routes (Modules/Agents/setupRequests.js, projectSetup.js, projectCreate.js, projectDuplicate.js and listSetup.js).
 
 const RAW_OPTIONS_MAX = 100;
 const RAW_TEXT_MAX = 200;
@@ -48,6 +52,24 @@ const FIELD = Object.freeze({
     required: ['name', 'type'],
 });
 
+/* A field of fields.create, which also takes the two kinds AlianHub works out. */
+const CREATE_FIELD = Object.freeze({
+    ...FIELD,
+    properties: {
+        ...FIELD.properties,
+        type: { type: 'string', enum: [...setup.CREATE_TYPES] },
+        function: { type: 'string', enum: [...computed.FUNCTIONS], description: 'For a rollup: what it works out from the subtasks under each task, at every level' },
+        source: {
+            type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX,
+            description: `For a rollup: the name of the field it reads on those subtasks. It can be a field in this request or in the project, of type ${computed.SOURCE_TYPES.join(', ')}. If left out, count counts the subtasks.`,
+        },
+        expression: {
+            type: 'string', minLength: 1, maxLength: computed.EXPRESSION_MAX,
+            description: 'For a formula: numbers, the task\'s own number fields by name in braces, + - * / and brackets, for example {Price} - {Cost}',
+        },
+    },
+});
+
 const VALUE = Object.freeze({
     type: 'object',
     additionalProperties: false,
@@ -62,13 +84,15 @@ const VALUE = Object.freeze({
 const NO_FIELD_SET = `${DENIED}: values are set the way ${setup.FIELD_SET} sets one, which this connection is not allowed to use. Leave values out, or ask the person to allow it.`;
 
 /* Values are refused at once where the caller could not set one by itself, where a task is not one of the project
- * the caller can open, or where a field would not take its value, so nobody is asked to approve a value that cannot
- * be set. A project the caller cannot open is left to the target check. */
+ * the caller can open, or where a field would not take its value, and a rollup or a formula where the field form
+ * would not save it, so nobody is asked to approve what cannot be made. A project the caller cannot open is left to the target check. */
 const fieldsToFile = async (ctx, args, vis) => {
-    if (args.values === undefined) return { args };
     const project = await loadProject(ctx, vis, args.projectId);
     if (!project) return { args };
     const projectId = String(project._id);
+    const unsaved = await setup.draftsMisfit({ companyId: ctx.companyId, projectId, definitions: args.fields });
+    if (unsaved) return { answer: { ok: false, error: unsaved } };
+    if (args.values === undefined) return { args };
     const refuse = async (reason) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'fields.create', params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId }); };
     const usable = registry.has(setup.FIELD_SET) && manageFlag.mayUse(ctx, GRANT)
         && registry.evaluate(setup.FIELD_SET, { __proposal: true }, { allowedActions: ctx.allowedActions }).allowed;
@@ -172,6 +196,51 @@ const projectToFile = async (ctx, args) => {
     return { args };
 };
 
+const copyAsked = (args) => copies.draftOf({ ...args, sourceProjectId: args.projectId });
+
+/* A copy is refused at once where its person may not create a project by hand, and answered at once where the project
+ * is a personal list or has more tasks than a copy made this way takes, so nobody is asked to approve what could not
+ * be made. A project the caller cannot open is left to the target check. */
+const copyToFile = async (ctx, args, vis) => {
+    const draft = copyAsked(args);
+    const lacked = await copies.refusedFor(ctx.companyId, ctx.userId);
+    if (lacked) {
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: copies.ACTION, params: { sourceProjectId: draft.sourceProjectId, name: draft.name }, reason: `${CANNOT_CREATE} (${lacked})`, ip: ctx.ip, taint: ctx.taint, entityType: 'project' });
+    }
+    const project = await loadProject(ctx, vis, args.projectId);
+    if (!project) return { args };
+    if (project.isPersonal === true) return { answer: { ok: false, error: copies.PERSONAL } };
+    const large = draft.tasks ? copies.tooLarge(await copies.taskCount({ companyId: ctx.companyId, uid: ctx.userId, source: project })) : '';
+    return large ? { answer: { ok: false, error: large } } : { args };
+};
+
+const FOLDER_NAME = Object.freeze({ type: 'string', minLength: 1, maxLength: lists.NAME_MAX });
+const FOLDER_PARTS = Object.freeze({
+    lists: NAMES(lists.LISTS_MAX, LIST_NAME_MAX, 'Lists to create inside it, by name'),
+    moveListIds: { type: 'array', minItems: 1, maxItems: lists.MOVES_MAX, items: ID, description: 'Lists the project already has to move into it, by id (see lists.list)' },
+});
+
+/* A folder is refused at once where its person may not make one of its parts by hand, and answered at once where the
+ * folder it goes in, or a list to move, is not one of the project that person can open, so nobody is asked to approve
+ * what could not be made. A project the caller cannot open is left to the target check. */
+const folderToFile = async (ctx, args, vis) => {
+    const project = await loadProject(ctx, vis, args.projectId);
+    if (!project) return { args };
+    const projectId = String(project._id);
+    const draft = lists.draftOf(args);
+    const refused = await lists.refusedParts(ctx.companyId, ctx.userId, projectId, draft);
+    if (refused.length) {
+        const reason = `${REFUSED}: ${refused.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`;
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: lists.FOLDER, params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId });
+    }
+    const parent = draft.parentFolderId ? await lists.parentProblem(ctx.companyId, projectId, draft.parentFolderId) : '';
+    if (parent) return { answer: { ok: false, error: `parentFolderId: ${parent}` } };
+    for (const sprintId of [draft, ...(draft.subfolders || [])].flatMap((folder) => folder.moveListIds || [])) {
+        if (!(await lists.listFor(ctx.companyId, ctx.userId, projectId, sprintId))) return { answer: { ok: false, error: `moveListIds: ${lists.LIST_NOT_FOUND} (${sprintId})` } };
+    }
+    return { args };
+};
+
 const TOOLS = [
     {
         name: 'fields.create',
@@ -180,13 +249,15 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: projectTarget,
-        description: `Adds up to ${setup.FIELDS_MAX} custom fields to one project in one call, each with a name and a type: ${setup.FIELD_TYPES.join(', ')}. `
+        description: `Adds up to ${setup.FIELDS_MAX} custom fields to one project in one call, each with a name and a type: ${setup.CREATE_TYPES.join(', ')}. `
             + 'A dropdown takes its options as plain text. A field the project already has by that name is kept, not made twice, so read fields.list first. '
+            + `A rollup works out a number for each task from the subtasks under it (function: ${computed.FUNCTIONS.join(', ')}; source: the number field it reads). A formula works out a number from the task's own number fields (expression). `
+            + 'Neither takes a value, because AlianHub works the number out and task.fields.list shows it. A rollup shows its number once the person approves it. A formula shows its number on a task after a field value on that task is next saved. '
             + `To give the fields their first values in the same approval, name them in values (at most ${setup.VALUES_MAX}): each a task of this project, a field by its name and the value. `
             + `${WAITS} Set or change a value later with task.field.set.`,
         input: input({
             projectId: ID,
-            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
+            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: CREATE_FIELD },
             values: { type: 'array', minItems: 1, maxItems: setup.VALUES_MAX, items: VALUE },
             ...REASON,
         }, ['projectId', 'fields']),
@@ -264,6 +335,79 @@ const TOOLS = [
         check: (args) => projects.problemIn(args),
         prepare: projectToFile,
         params: (args) => projects.draftOf(args),
+    },
+    {
+        name: copies.ACTION,
+        action: copies.ACTION,
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: (args) => ({ ...WRITE_TARGET, ...projectTarget(args) }),
+        description: 'Asks for a copy of a project the person can open, in one call: the project and the name of the copy. '
+            + 'The copy gets the project\'s folders, lists, statuses, custom fields, saved views and settings. Its automations are copied too, switched off, if the person approving may manage automations. '
+            + 'It gets no tasks unless tasks is true: set that only when the person said they want the tasks copied too. Copied tasks have no assignees, and dates are kept only when dates is true. '
+            + `A project with more than ${copies.TASKS_MAX} tasks cannot be copied with its tasks here. Ask for the copy without them, or ask the person to duplicate it in AlianHub. `
+            + 'The copy is private, with only the person who approves it on it, no matter who is on the project it is copied from. They add the others afterwards. '
+            + 'Read projects.list first to find the project. A personal list cannot be copied, and a connection limited to some projects cannot use this. '
+            + `${WAITS} The person sees the copy as one preview, with how many tasks it would include, and approves it once. Undo moves the copy to the trash, unless a task or a doc was added to it since.`,
+        input: input({
+            projectId: { ...ID, description: 'The project to copy' },
+            name: { type: 'string', minLength: 1, maxLength: projects.NAME_MAX, description: `The name of the copy, at least ${projects.NAME_MIN} characters` },
+            tasks: { type: 'boolean', description: 'Copy the tasks too. If left out, only the setup is copied.' },
+            dates: { type: 'boolean', description: 'Keep the dates of the project, its lists and its tasks. If left out, the copy has no dates.' },
+            ...REASON,
+        }, ['projectId', 'name']),
+        check: (args) => copies.problemIn(copyAsked(args)),
+        prepare: copyToFile,
+        params: copyAsked,
+    },
+    {
+        name: lists.FOLDER,
+        action: lists.FOLDER,
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: projectTarget,
+        description: 'Asks for a new folder in a project, in one call: its name and, if wanted, lists to create inside it, lists the project already has to move into it, '
+            + `and up to ${lists.SUBFOLDERS_MAX} subfolders, each with its own lists. To put the new folder inside an existing folder, give that folder in parentFolderId. `
+            + 'Folders go one level deep: a subfolder holds lists, not folders. Read lists.list first to see the folders and lists the project has. It cannot rename, move or delete a folder. '
+            + `${WAITS} The person sees the folder and everything in it as one preview and approves it once. The answer then says, part by part, what was made or moved and what could not be. `
+            + 'Undo puts the moved lists back and removes the folder, unless someone has put a list in it since.',
+        input: input({
+            projectId: ID,
+            name: FOLDER_NAME,
+            parentFolderId: { ...ID, description: 'A top-level folder of this project to put the new folder inside' },
+            ...FOLDER_PARTS,
+            subfolders: {
+                type: 'array', minItems: 1, maxItems: lists.SUBFOLDERS_MAX, items: input({ name: FOLDER_NAME, ...FOLDER_PARTS }, ['name']),
+                description: 'Subfolders to make inside the new folder. Do not use together with parentFolderId.',
+            },
+            ...REASON,
+        }, ['projectId', 'name']),
+        check: (args) => lists.folderPlanProblem(args),
+        prepare: folderToFile,
+        params: (args) => ({ projectId: str(args.projectId, 40), ...lists.draftOf(args) }),
+    },
+    {
+        name: lists.SPRINT,
+        action: lists.SPRINT,
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
+        description: 'Makes a list a sprint with a first day and a last day, or changes the days of a list that is already a sprint. '
+            + 'If there is no list yet, create it with list.create first, then name it here. The days are taken as the person\'s local days. '
+            + 'It cannot start or complete a sprint, or change a completed one. The person does those in AlianHub. '
+            + `${WAITS} Undo puts it back as it was: a plain list, or a sprint with its former days.`,
+        input: input({
+            projectId: ID,
+            sprintId: ID,
+            startDate: { ...DAY, description: 'The first day, written as YYYY-MM-DD' },
+            endDate: { ...DAY, description: 'The last day, written as YYYY-MM-DD' },
+            ...REASON,
+        }, ['projectId', 'sprintId', 'startDate', 'endDate']),
+        check: (args) => lists.sprintProblem(args),
+        params: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40), startDate: str(args.startDate, 10), endDate: str(args.endDate, 10) }),
     },
 ];
 
