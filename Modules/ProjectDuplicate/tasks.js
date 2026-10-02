@@ -50,7 +50,9 @@ const reserveKeys = async (companyId, projectRef, rows) => {
     return project.lastTaskId - rows.length;
 };
 
-const taskCopy = (row, { parent, key, placement, projectRef, companyId, caller, include, subTasks }) => ({
+const peopleOf = (row) => [...(row.AssigneeUserId || []).map(String), ...rules.peopleIn(row.checklistArray || [])];
+
+const taskCopy = (row, { parent, key, placement, projectRef, companyId, caller, include, kept, subTasks }) => ({
     ...rules.pick(row, rules.TASK_FIELDS),
     ...(include.dates ? rules.pick(row, rules.TASK_DATES) : {}),
     ...placement,
@@ -63,10 +65,10 @@ const taskCopy = (row, { parent, key, placement, projectRef, companyId, caller, 
     ancestors: parent ? ancestorsFor(parent) : [],
     subTasks,
     Task_Leader: caller,
-    AssigneeUserId: include.assignees ? (row.AssigneeUserId || []) : [],
+    AssigneeUserId: (row.AssigneeUserId || []).filter((id) => kept.has(String(id))),
     watchers: [],
     deletedStatusKey: rules.LIVE,
-    ...(row.checklistArray ? { checklistArray: include.assignees ? row.checklistArray : rules.withoutPeople(row.checklistArray) } : {}),
+    ...(row.checklistArray ? { checklistArray: rules.keepingPeople(row.checklistArray, kept) } : {}),
 });
 
 const countOnLists = (companyId, docs) => {
@@ -94,8 +96,10 @@ const copyTasks = async ({ companyId, caller, copy, plan, include, readRows, onP
                 .filter(({ row, parent, placement }) => placement && (row.ParentTaskId ? parent && canNest(parent).ok : true));
             if (!placed.length) continue;
             const first = await reserveKeys(companyId, projectRef, placed.map(({ row }) => row));
+            // Who a row names is stored on the row, so it is asked again of the project the copy lands in.
+            const kept = new Set(include.assignees ? await copy.keepPeople(placed.flatMap(({ row }) => peopleOf(row))) : []);
             const docs = placed.map(({ row, parent, placement }, at) => taskCopy(row, {
-                parent, placement, projectRef, companyId, caller, include,
+                parent, placement, projectRef, companyId, caller, include, kept,
                 key: `${code}-${first + at + 1}`,
                 subTasks: depth < MAX_DEPTH ? (plan.childrenOf.get(String(row._id)) || []).length : 0,
             }));

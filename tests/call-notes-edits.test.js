@@ -14,6 +14,7 @@ const C = '6f0000000000000000000c01';
 const HOST = '6f0000000000000000000001';
 const GUEST = '6f0000000000000000000002';
 const OUTSIDER = '6f0000000000000000000003';
+const ADMIN = '6f0000000000000000000004';
 const SAID = 'We looked at the lamp.';
 
 const call = async (handler, { uid = HOST, params = {}, body = {} } = {}) => {
@@ -77,10 +78,28 @@ describe('what a participant changes in the notes of a call', () => {
         expect(stored().recapPostedAt).toBeUndefined();
     });
 
-    it('still lets a participant discard the notes', async () => {
-        const res = await edit({ status: 'discarded' });
+    it('lets the person who started the notes discard them', async () => {
+        const res = await edit({ status: 'discarded' }, HOST);
         expect(res.body.status).toBe(true);
-        expect(stored()).toMatchObject({ status: 'discarded', deletedStatusKey: 1, editedBy: GUEST });
+        expect(stored()).toMatchObject({ status: 'discarded', deletedStatusKey: 1, editedBy: HOST });
+    });
+
+    it('lets an owner or admin who was on the call discard them', async () => {
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ADMIN, roleType: 2, status: 2, isDelete: false });
+        stored().participants.push(ADMIN);
+        const res = await edit({ status: 'discarded' }, ADMIN);
+        expect(res.body.status).toBe(true);
+        expect(stored()).toMatchObject({ status: 'discarded', deletedStatusKey: 1, editedBy: ADMIN });
+    });
+
+    it('keeps the notes when another participant asks to discard them, and still takes their edit', async () => {
+        const res = await edit({ status: 'discarded', summary: 'Gone.' });
+        expect(res.statusCode).toBe(403);
+        expect(res.body.status).toBe(false);
+        expect(stored()).toMatchObject({ status: 'ready', deletedStatusKey: 0, summary: 'Agreed to repaint.' });
+        expect(socketEmitter.emit).not.toHaveBeenCalled();
+
+        expect((await edit({ summary: 'Repaint in May.' })).body.status).toBe(true);
     });
 
     it('answers "not found" to someone who was not on the call', async () => {
