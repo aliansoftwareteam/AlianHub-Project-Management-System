@@ -18,9 +18,13 @@ const composable = vi.hoisted(() => ({
 }));
 vi.mock('@/composable', () => composable);
 vi.mock('@/composable/index', () => composable);
-vi.mock('@formkit/vue', async () => {
-    const vue = await import('vue');
-    return { FormKit: vue.defineComponent({ name: 'FormKit', setup: (_, { slots }) => () => vue.h('div', slots.default ? slots.default() : []) }) };
+const formKit = vi.hoisted(() => ({
+    stub: (vue) => vue.defineComponent({ name: 'FormKit', setup: (_, { slots }) => () => vue.h('div', slots.default ? slots.default() : []) })
+}));
+vi.mock('@formkit/vue', async () => ({ FormKit: formKit.stub(await import('vue')) }));
+vi.mock('@/plugins/customFieldView/lazyFormKit', async () => {
+    const library = { FormKit: formKit.stub(await import('vue')) };
+    return { ...library, ensureFormKit: () => Promise.resolve(library), bindFormKitApp: () => {} };
 });
 
 import customFieldPlugin from '@/plugins/customFieldView/customFieldPlugin';
