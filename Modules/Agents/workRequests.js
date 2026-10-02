@@ -22,7 +22,7 @@ const LIST_CREATE = 'project.project_sprint_create';
 const LIST_RENAME = 'project.project_sprint_name_edit';
 const LIST_MOVE = Object.freeze([LIST_RENAME, 'project.sprint_type_change', LIST_CREATE]);
 const TASK_NOT_FOUND = 'Task not found';
-const LIST_NOT_FOUND = 'that list was not found in that project';
+const LIST_NOT_FOUND = 'That list was not found in that project. Check lists.list or ask the person which list they mean.';
 
 const refuse = (message) => new tools.DeterministicError(message);
 const idOf = (value) => (value === undefined || value === null ? '' : String(value));
@@ -58,7 +58,7 @@ const tagNamed = (tags, wanted) => {
 const setTag = async ({ companyId, who, taskId, tag: wanted, operation }) => {
     const task = await liveTask(companyId, taskId);
     const tag = tagNamed(tagsOf(await storedProject(companyId, task.ProjectID)), wanted);
-    if (!tag) throw refuse('that tag is not one this task\'s project has');
+    if (!tag) throw refuse('That tag does not belong to this task\'s project. Check tags.list.');
     const held = (Array.isArray(task.tagsArray) ? task.tagsArray : []).map(String).includes(String(tag.uid));
     const changed = held !== (operation === 'add');
     if (changed) await asRoute(companyId, who, 'updateTags', { companyId: String(companyId), taskId: idOf(task._id), tagId: tag.uid, operation });
@@ -80,7 +80,7 @@ const openRelated = async (companyId, actor, action, relatedTaskId) => {
 };
 
 const linkTasks = ({ companyId, who, taskId, relatedTaskId, type }) => {
-    if (!RELATION_TYPE_LIST.includes(type)) throw refuse(`type needs one of ${RELATION_TYPE_LIST.join(', ')}`);
+    if (!RELATION_TYPE_LIST.includes(type)) throw refuse(`The link type must be one of ${RELATION_TYPE_LIST.join(', ')}.`);
     return withReason(() => asRoute(companyId, who, 'addTaskRelation', { companyId: String(companyId), taskId: idOf(taskId), relatedTaskId: idOf(relatedTaskId), type }));
 };
 
@@ -102,7 +102,7 @@ const relationsOf = async (companyId, uid, taskId) => {
 
 const actingAs = async (who) => {
     const person = await require('../Sprints/helpers/actingUser').actingUser({ uid: who.uid });
-    if (!person) throw refuse('a list change needs a person to make it as');
+    if (!person) throw refuse('This change has to be made for a person. Ask the person to connect you again.');
     return who.via ? { ...person, Employee_Name: byline(who.via, person.Employee_Name) } : person;
 };
 
@@ -113,26 +113,26 @@ const listWrite = (who, handler, request, fallback) => runAs(who.mark, () => dat
 const mayWriteLists = async (companyId, uid, projectId, keys) => {
     const access = await require('../../Config/projectAccess').canEditProject(companyId, uid, projectId, keys);
     if (access.allowed) return;
-    if (access.statusCode === 404) throw refuse('project not found');
-    throw refuse(`${permissions.REASON}: ${access.permission || 'writing in this project'} is not granted to the person behind this agent`);
+    if (access.statusCode === 404) throw refuse('That project was not found. Ask the person which project they mean.');
+    throw refuse(`${permissions.REASON}: ${access.permission || 'writing in this project'} is not allowed for the person you act for. Tell the person, and ask them to change it in AlianHub or do it themselves.`);
 };
 
 const listName = (value) => {
     const name = typeof value === 'string' ? value.trim() : '';
-    if (!name || name.length > LIST_NAME_MAX) throw refuse(`name needs 1 to ${LIST_NAME_MAX} characters`);
+    if (!name || name.length > LIST_NAME_MAX) throw refuse(`The name must be between 1 and ${LIST_NAME_MAX} characters.`);
     return name;
 };
 
 const folderOf = (value) => {
     const id = idOf(value);
-    if (id && !OBJECT_ID.test(id)) throw refuse('folderId needs a folder id');
+    if (id && !OBJECT_ID.test(id)) throw refuse('Give the id of a folder (see lists.list).');
     return id;
 };
 
 const openList = async (companyId, uid, projectId, sprintId) => {
     const list = await require('../Tasks/helpers/taskWritePlacement').listOf(companyId, uid, idOf(projectId), idOf(sprintId));
     if (!list) throw refuse(LIST_NOT_FOUND);
-    if (Number(list.deletedStatusKey) > 0) throw refuse('an archived list is restored before it is changed');
+    if (Number(list.deletedStatusKey) > 0) throw refuse('This list is archived. Restore it first, then change it.');
     return list;
 };
 
@@ -180,7 +180,7 @@ const moveList = async ({ companyId, who, projectId, sprintId, folderId }) => {
     const at = await listTarget({ companyId, who, projectId, sprintId }, [LIST_MOVE]);
     const from = idOf(at.list.folderId);
     const to = folderOf(folderId);
-    if (from === to) throw refuse(to ? 'the list is already in that folder' : 'the list is already at the top level');
+    if (from === to) throw refuse(to ? 'The list is already in that folder.' : 'The list is already at the top level.');
     const moved = await updateList({ companyId, who, at, set: { folderId: to || null, folderName: '' }, history: { type: 'moved' } }, 'the list was not moved');
     return { ...at, previous: from, folderId: idOf(moved.folderId) };
 };
@@ -193,14 +193,14 @@ const withdrawList = async ({ companyId, who, projectId, sprintId }) => {
     const held = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS, data: [{ sprintId: { $in: idForms(at.sprintId) }, deletedStatusKey: { $ne: TRASHED } }, { _id: 1 }],
     }, 'findOne');
-    if (held) throw refuse('the list holds tasks now, so it is not taken back: move them, or delete the list in the app');
+    if (held) throw refuse('The list has tasks in it now, so it was not removed. Move the tasks first, or ask the person to delete the list in AlianHub.');
     await updateList({ companyId, who, at, set: { deletedStatusKey: TRASHED } }, 'the list was not removed');
     return at;
 };
 
 const commentText = (value) => {
     const text = typeof value === 'string' ? value.trim() : '';
-    if (!text || text.length > MAX_MESSAGE_LENGTH) throw refuse(`text needs 1 to ${MAX_MESSAGE_LENGTH} characters`);
+    if (!text || text.length > MAX_MESSAGE_LENGTH) throw refuse(`The text must be between 1 and ${MAX_MESSAGE_LENGTH} characters.`);
     return text;
 };
 

@@ -36,7 +36,7 @@ const TASK_FIELDS = Object.freeze({ ProjectID: 1, sprintId: 1, mainChat: 1, Assi
 
 const REFUSAL = Object.freeze({
     NOT_CONNECTED: 'Only a connected agent takes work from the queue.',
-    NO_ITEM: 'item not found',
+    NO_ITEM: 'That item was not found. Check queue.list.',
     TAKEN: 'Another agent holds that item. Pick another one.',
     NOT_HELD: 'You do not hold that item. Your claim may have run out, or a person took the item back.',
     NOT_YOUR_AI: 'You can hand a task only to your own connected AI.',

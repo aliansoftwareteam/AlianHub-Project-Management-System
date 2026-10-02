@@ -25,7 +25,7 @@
     "actions": [
       {
         "key": "tasks.next",
-        "label": "Next assigned task",
+        "label": "See the next task assigned",
         "risk": "low",
         "undoable": false,
         "write": false,
@@ -34,7 +34,7 @@
       },
       {
         "key": "tasks.search",
-        "label": "Search own tasks",
+        "label": "Search tasks",
         "risk": "low",
         "undoable": false,
         "write": false,
@@ -43,7 +43,7 @@
       },
       {
         "key": "task.get",
-        "label": "Read a task brief",
+        "label": "Read a task",
         "risk": "low",
         "undoable": false,
         "write": false,
@@ -61,7 +61,7 @@
       },
       {
         "key": "task.status.set",
-        "label": "Set status (In progress / In review only)",
+        "label": "Set the status",
         "risk": "low",
         "undoable": true,
         "write": true,
@@ -71,7 +71,7 @@
       },
       {
         "key": "task.link",
-        "label": "Attach a PR, branch or doc",
+        "label": "Add a link to a task",
         "risk": "low",
         "undoable": true,
         "write": true,
@@ -89,7 +89,7 @@
       },
       {
         "key": "task.update",
-        "label": "Update task fields",
+        "label": "Change a task's details",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -123,7 +123,7 @@
       },
       {
         "key": "aifield.fill",
-        "label": "Fill an AI field on a task",
+        "label": "Fill in an AI field",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -132,7 +132,7 @@
       },
       {
         "key": "task.sprint.move",
-        "label": "Move a task between sprints",
+        "label": "Move a task to another list",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -150,7 +150,7 @@
       },
       {
         "key": "task.create",
-        "label": "File a task (opening status, unassigned)",
+        "label": "Create a task",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -187,7 +187,7 @@
       },
       {
         "key": "page.draft",
-        "label": "Draft a page (stays a draft until approved)",
+        "label": "Draft a doc",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -196,7 +196,7 @@
       },
       {
         "key": "chat.post",
-        "label": "Post in a channel",
+        "label": "Post in a chat channel",
         "risk": "low",
         "undoable": false,
         "write": true,
@@ -217,7 +217,7 @@
       },
       {
         "key": "deploy.staging",
-        "label": "Propose a staging deploy",
+        "label": "Ask to publish to the test site",
         "risk": "high",
         "undoable": false,
         "write": true,
@@ -274,7 +274,7 @@
     "actions": [
       {
         "key": "tasks.next",
-        "label": "Next assigned task",
+        "label": "See the next task assigned",
         "risk": "low",
         "undoable": false,
         "write": false,
@@ -289,7 +289,7 @@
       },
       {
         "key": "tasks.search",
-        "label": "Search own tasks",
+        "label": "Search tasks",
         "risk": "low",
         "undoable": false,
         "write": false,
@@ -304,7 +304,7 @@
       },
       {
         "key": "task.get",
-        "label": "Read a task brief",
+        "label": "Read a task",
         "risk": "low",
         "undoable": false,
         "write": false,
@@ -334,7 +334,7 @@
       },
       {
         "key": "task.status.set",
-        "label": "Set status (In progress / In review only)",
+        "label": "Set the status",
         "risk": "low",
         "undoable": true,
         "write": true,
@@ -350,7 +350,7 @@
       },
       {
         "key": "task.link",
-        "label": "Attach a PR, branch or doc",
+        "label": "Add a link to a task",
         "risk": "low",
         "undoable": true,
         "write": true,
@@ -380,7 +380,7 @@
       },
       {
         "key": "task.update",
-        "label": "Update task fields",
+        "label": "Change a task's details",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -420,7 +420,7 @@
       },
       {
         "key": "aifield.fill",
-        "label": "Fill an AI field on a task",
+        "label": "Fill in an AI field",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -435,7 +435,7 @@
       },
       {
         "key": "task.sprint.move",
-        "label": "Move a task between sprints",
+        "label": "Move a task to another list",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -465,7 +465,7 @@
       },
       {
         "key": "task.create",
-        "label": "File a task (opening status, unassigned)",
+        "label": "Create a task",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -526,7 +526,7 @@
       },
       {
         "key": "page.draft",
-        "label": "Draft a page (stays a draft until approved)",
+        "label": "Draft a doc",
         "risk": "medium",
         "undoable": true,
         "write": true,
@@ -541,7 +541,7 @@
       },
       {
         "key": "chat.post",
-        "label": "Post in a channel",
+        "label": "Post in a chat channel",
         "risk": "low",
         "undoable": false,
         "write": true,
@@ -574,7 +574,7 @@
       },
       {
         "key": "deploy.staging",
-        "label": "Propose a staging deploy",
+        "label": "Ask to publish to the test site",
         "risk": "high",
         "undoable": false,
         "write": true,
@@ -776,7 +776,7 @@
   "toolManifest": [
     {
       "name": "tasks.next",
-      "description": "The next task assigned to you, highest priority and nearest due date first. Start here.",
+      "description": "Shows the next task assigned to the person: the most urgent first, then the soonest due. Changes nothing.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -788,7 +788,7 @@
     },
     {
       "name": "tasks.search",
-      "description": "Search tasks you can see by text, status or project.",
+      "description": "Finds tasks the person can open, by text, status or project. Changes nothing.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -809,7 +809,7 @@
     },
     {
       "name": "task.get",
-      "description": "A task as a brief: goal, acceptance criteria, relations, linked docs and what the comment thread has settled. Read this before writing code.",
+      "description": "Shows one task in full: its goal, what counts as done, linked tasks and docs, and what the comments settled. Read it before you work on the task. Changes nothing.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -824,7 +824,7 @@
     },
     {
       "name": "task.comment",
-      "description": "Post a comment. Use it to report findings, ask a question, or leave a PR link with context.",
+      "description": "Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -843,7 +843,7 @@
     },
     {
       "name": "task.status.set",
-      "description": "Move a task to In progress or In review. Done is not available to agents — a person closes the task.",
+      "description": "Sets a task to In progress or In review at once. You cannot close a task: a person does that.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -862,7 +862,7 @@
     },
     {
       "name": "task.link",
-      "description": "Attach a pull request, branch or document URL to the task.",
+      "description": "Attaches a link to a task, such as a pull request, a branch or a doc, at once. The person can undo it.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -887,7 +887,7 @@
     },
     {
       "name": "task.create",
-      "description": "File a new task in a project, in its opening status and unassigned. Use it for work you found that is not on the board yet; put the goal and acceptance criteria in the description.",
+      "description": "Adds a new task to a project, unassigned and in its first status, at once. Use it for work that is not on the board yet, and put the goal and what counts as done in the description.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -921,7 +921,7 @@
     },
     {
       "name": "subtask.create",
-      "description": "Break the task down. One subtask per call.",
+      "description": "Adds one subtask to a task at once. Call it once for each subtask.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -940,7 +940,7 @@
     },
     {
       "name": "timelog.start",
-      "description": "Start the timer on a task so the hours you spend are attributed to you.",
+      "description": "Starts a timer on a task at once, so the time is logged for the person.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -955,7 +955,7 @@
     },
     {
       "name": "timelog.stop",
-      "description": "Stop the running timer and write the time log.",
+      "description": "Stops the running timer at once and saves the time as a time entry.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -973,7 +973,7 @@
     },
     {
       "name": "docs.read",
-      "description": "Read a page linked from a task, by page id.",
+      "description": "Shows a doc linked from a task, given its id. Changes nothing.",
       "inputSchema": {
         "type": "object",
         "properties": {

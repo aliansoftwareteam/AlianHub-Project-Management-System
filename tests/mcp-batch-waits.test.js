@@ -238,7 +238,7 @@ describe('what a waiting batch may hold', () => {
         seedGrant(OWNER, scopes);
         const out = await batch(outside(OWNER, scopes), [rename(twenty[0], 'One'), rename(twenty[1], 'Two'), { tool: 'task.comment', arguments: { taskId: String(twenty[2]._id), body: 'Hello' } }]);
         expect(out).toMatchObject({ pending: true, waiting: 2, applied: 0 });
-        expect(out.items[2]).toMatchObject({ refused: true, reason: expect.stringMatching(/needs a person's approval, which is filed only/) });
+        expect(out.items[2]).toMatchObject({ refused: true, reason: expect.stringMatching(/needs a person's approval, but this connection cannot ask for it/) });
         expect(proposalRows()[0]).toMatchObject({ oauthGrantId: GRANT_ID, oauthClientId: CLIENT, requestedBy: OWNER });
         expect(rows(SCHEMA_TYPE.COMMENTS)).toHaveLength(0);
         expect(stored(twenty[0]._id).TaskName).toBe('Bulk 1');

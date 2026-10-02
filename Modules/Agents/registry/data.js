@@ -4,14 +4,14 @@ const dataFlag = require('../../Mcp/dataFlag');
 const ACTIONS = [
     { key: 'projects.list', label: 'List projects', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_list' },
     { key: 'project.get', label: 'Read a project', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-    { key: 'sprints.list', label: 'List a project\'s sprints', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_list' },
+    { key: 'sprints.list', label: 'List a project\'s lists', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_list' },
     { key: 'statuses.list', label: 'List a project\'s statuses', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
     { key: 'comments.list', label: 'Read a task\'s comments', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-    { key: 'pages.search', label: 'Search pages', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-    { key: 'page.get', label: 'Read a page', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
+    { key: 'pages.search', label: 'Search docs', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
+    { key: 'page.get', label: 'Read a doc', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
     { key: 'timesheet.read', label: 'Read time entries', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: { key: 'sheet_settings.user_timesheet', write: false } },
     { key: 'comment.create', label: 'Comment on a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_comment' },
-    { key: 'timelog.create', label: 'Log time on a task (own time)', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'sheet_settings.user_timesheet' },
+    { key: 'timelog.create', label: 'Log time on a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'sheet_settings.user_timesheet' },
 ];
 
 const RATINGS = {

@@ -6,7 +6,7 @@ const workFlag = require('../../Mcp/workFlag');
 const ACTIONS = [
     { key: 'goals.list', label: 'List the goals the person can read', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
     { key: 'goal.get', label: 'Read a goal', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-    { key: 'goal.target.set', label: 'Report the value of a goal\'s target', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+    { key: 'goal.target.set', label: 'Update a goal\'s target', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
       constraint: 'only on a goal the person behind the agent can edit; never a target counted from tasks', permission: { key: 'task.task_list', write: false } },
     { key: 'goal.target.sources.add', label: 'Count a list or task toward a goal\'s target', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
       constraint: 'only on a goal the person behind the agent can edit, and a list or task every reader of the goal can open', permission: { key: 'task.task_list', write: false } },

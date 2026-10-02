@@ -154,7 +154,7 @@ describe('a token created for an agent, on the write routes beside the task rout
         const answer = await through(route, agentToken(uid), body, params);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: route, onBehalfOf: uid });
         expect(audits('agent.action')).toHaveLength(0);
@@ -206,7 +206,7 @@ describe('a task filed by an agent through the create route', () => {
         const answer = await through(CREATE, agentToken(uid), BEYOND_FILING[name]);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform task\.add/);
+        expect(answer.body.statusText).toMatch(/^That action is not available to agents \(task\.add\)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: CREATE, onBehalfOf: uid });
     });

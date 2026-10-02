@@ -27,11 +27,11 @@ const RAW_TEXT_MAX = 200;
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const ID = Object.freeze({ type: 'string', pattern: '^[a-fA-F0-9]{24}$' });
 const DAY = Object.freeze({ type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' });
-const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in a line; it is kept in the audit log' } });
+const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in one line. It is kept in the record of changes.' } });
 const input = (properties, required) => ({ type: 'object', additionalProperties: false, properties, required });
 const projectTarget = (args) => ({ projectId: str(args.projectId, 40) });
 
-const WAITS = 'Nothing is made by the call: it answers that the change is waiting, and the person approves it in AlianHub, where they see exactly what will be made. They can undo it afterwards.';
+const WAITS = 'Nothing is made by this call: it answers that the change is waiting, and the person approves it in AlianHub, where they see exactly what will be made. They can undo it afterwards.';
 
 const FIELD = Object.freeze({
     type: 'object',
@@ -59,7 +59,7 @@ const VALUE = Object.freeze({
     required: ['taskId', 'field', 'value'],
 });
 
-const NO_FIELD_SET = `${DENIED}: values are set as ${setup.FIELD_SET} sets one, which this connection may not use`;
+const NO_FIELD_SET = `${DENIED}: values are set the way ${setup.FIELD_SET} sets one, which this connection is not allowed to use. Leave values out, or ask the person to allow it.`;
 
 /* Values are refused at once where the caller could not set one by itself, where a task is not one of the project
  * the caller can open, or where a field would not take its value, so nobody is asked to approve a value that cannot
@@ -108,7 +108,7 @@ const viewToStartFrom = async (ctx, args, vis) => {
     return { args: { ...args, kind } };
 };
 
-const REFUSED = `${DENIED}: the person behind this token may not make these parts of the plan by hand`;
+const REFUSED = `${DENIED}: the person you act for is not allowed to make these parts of the plan themselves. Leave them out, or ask someone who can.`;
 const NAMES = (max, nameMax, description) => ({ type: 'array', minItems: 1, maxItems: max, items: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX }, description: `${description}, each at most ${nameMax} characters` });
 
 const PLAN_VIEW = Object.freeze({
@@ -159,7 +159,7 @@ const NEW_PROJECT_VIEW = Object.freeze({
     required: ['name'],
 });
 
-const CANNOT_CREATE = `${DENIED}: the person behind this token may not create a project by hand`;
+const CANNOT_CREATE = `${DENIED}: the person you act for is not allowed to create a project themselves. Ask someone who can.`;
 
 /* A project is refused at once where its person may not create one by hand, or may not make a part of its plan, so
  * nobody is asked to approve what could not be made. */
@@ -180,10 +180,9 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: projectTarget,
-        description: `Add up to ${setup.FIELDS_MAX} custom fields to one project in a single call, each with a name and a type: ${setup.FIELD_TYPES.join(', ')}. `
+        description: `Adds up to ${setup.FIELDS_MAX} custom fields to one project in one call, each with a name and a type: ${setup.FIELD_TYPES.join(', ')}. `
             + 'A dropdown takes its options as plain text. A field the project already has by that name is kept, not made twice, so read fields.list first. '
             + `To give the fields their first values in the same approval, name them in values (at most ${setup.VALUES_MAX}): each a task of this project, a field by its name and the value. `
-            + 'A value is set only on a task the person and the approver may both edit, and the answer says which were set. '
             + `${WAITS} Set or change a value later with task.field.set.`,
         input: input({
             projectId: ID,
@@ -202,8 +201,8 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: projectTarget,
-        description: `Add a saved view to one project: a ${Object.keys(setup.VIEW_KINDS).join(', ')} view with its own name, grouping, sorting, filters and columns. `
-            + 'It starts as a copy of the project\'s view of that kind, and everyone on the project sees it. A status or a field the project does not have is left out, and the answer says which part. '
+        description: `Adds a saved view to one project: a ${Object.keys(setup.VIEW_KINDS).join(', ')} view with its own name, grouping, sorting, filters and columns. `
+            + 'Everyone on the project sees it. A status or a field the project does not have is left out, and the answer says which part. '
             + `${WAITS} To only show the person a view that exists, give them a link with screen.link instead.`,
         input: input({
             projectId: ID,
@@ -223,10 +222,10 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: projectTarget,
-        description: 'Set up a project that exists from one plan, in a single call: '
+        description: 'Sets up a project that exists from one plan, in one call: '
             + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields and ${plans.VIEWS_MAX} saved views. Name only the parts you need. `
-            + 'A status is added as a working stage, before the statuses that close a task; one the company does not have yet can be added only when an owner or an admin sends and approves the plan. '
-            + 'A status or a field the project already has by that name is kept, not made twice, so read statuses.list, lists.list and fields.list first. '
+            + 'A status is added before the statuses that close a task; a status the company does not have yet needs an owner or an admin to approve the plan. '
+            + 'Anything the project already has by that name is kept, not made twice, so read statuses.list, lists.list and fields.list first. '
             + 'It cannot make a project, an automation or a task. '
             + `${WAITS} The person sees the whole plan as one preview and approves it once; the answer then says, part by part, what was made, what was kept and what could not be made.`,
         input: input({
@@ -248,11 +247,11 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: () => WRITE_TARGET,
-        description: 'Ask for a new project, in a single call: its name, what it is for, and the plan project.setup takes, '
+        description: 'Asks for a new project, in one call: its name, what it is for, and the plan project.setup takes, '
             + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields and ${plans.VIEWS_MAX} saved views. Name only the parts you need; the name alone is enough. `
-            + `It starts as a blank project: the statuses ${projects.startingStatuses().join(', ')}, one list, and ${projects.viewKinds().join(' and ')} views. It is private, with only the person who approves it on it; they add the others afterwards. `
-            + 'Use it only when the person has no project for the work: read projects.list first. It cannot make an automation or a task, and a token kept to some projects cannot use it. '
-            + `${WAITS} The person sees the project and its whole plan as one preview and approves it once, and is told, part by part, what was made and what could not be made. Undo moves the project to the trash.`,
+            + `It starts blank: the statuses ${projects.startingStatuses().join(', ')}, one list, and ${projects.viewKinds().join(' and ')} views. It is private, with only the person who approves it on it; they add the others afterwards. `
+            + 'Use it only when the person has no project for the work: read projects.list first. It cannot make an automation or a task, and a connection limited to some projects cannot use it. '
+            + `${WAITS} The person sees the whole plan as one preview and approves it once. Undo moves the project to the trash.`,
         input: input({
             name: { type: 'string', minLength: 1, maxLength: projects.NAME_MAX, description: `The project's name, at least ${projects.NAME_MIN} characters` },
             description: { type: 'string', maxLength: projects.DESCRIPTION_MAX, description: 'What the project is for, in a few lines' },

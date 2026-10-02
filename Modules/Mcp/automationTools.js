@@ -53,7 +53,7 @@ const TOOLS = [
         visibilityReason: 'Lists the kinds of trigger, condition and step a rule is made of; it reads nothing from any workspace.',
         strict: true,
         readParams: () => ({}),
-        description: 'What an automation can be made of: the triggers a rule can start from, the fields a condition can test with their operators, and the steps a rule can take with their settings. Read it before automation.create and copy its keys exactly.',
+        description: 'Shows what an automation can be made of: the triggers a rule can start from, the fields a condition can test with their operators, and the steps a rule can take with their settings. Read it before automation.create and copy its keys exactly. Changes nothing.',
         input: input({}, []),
         run: async () => rules.catalogueForAgents(),
     },
@@ -64,17 +64,17 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: (args) => ({ projectId: str(args.projectId, 40) }),
-        description: 'Propose one automation for one project: a trigger, optional conditions (all must hold) and the steps to take, in the terms of automation.catalogue. '
+        description: 'Proposes one automation for one project: a trigger, optional conditions (all must hold) and the steps to take, in the terms of automation.catalogue. '
             + 'Write a status, a person or a task type by its name. Nothing is made by the call: it answers that the rule is waiting, and an owner or an admin approves it in AlianHub, '
-            + 'where they see the rule in a sentence, each step, and how many recent tasks it matches. The rule is saved in their name, switched off unless enabled is true, and they can undo it. '
-            + 'Only owners and admins can have a rule proposed for them. If a part of what the person asked for cannot be written in the catalogue\'s terms, tell them which part; if the trigger cannot, do not call this.',
+            + 'where they see the rule in a sentence, each step, and how many recent tasks it matches. The rule is saved switched off unless enabled is true, and they can undo it. '
+            + 'Only owners and admins can have a rule proposed for them. If part of what the person asked for cannot be written in the catalogue\'s terms, tell them which part; if the trigger cannot, do not call this.',
         input: input({
             projectId: ID,
             trigger: { ...KEY, description: 'A trigger key of automation.catalogue' },
             conditions: { type: 'array', maxItems: rules.CONDITIONS_MAX, items: CONDITION },
             actions: { type: 'array', minItems: 1, maxItems: rules.STEPS_MAX, items: STEP },
             enabled: { type: 'boolean', description: 'true to switch the rule on as soon as it is approved; left out, it is saved switched off' },
-            reason: { type: 'string', maxLength: REASON_MAX, description: 'Why, in a line; it is kept in the audit log' },
+            reason: { type: 'string', maxLength: REASON_MAX, description: 'Why, in one line. It is kept in the record of changes.' },
         }, ['projectId', 'trigger', 'actions']),
         check: (args) => rules.draftProblem(args),
         prepare: vetted,

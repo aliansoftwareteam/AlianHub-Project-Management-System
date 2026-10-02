@@ -116,7 +116,7 @@ describe.each(Object.keys(people))('MCP tools apply the web app visibility for a
         const brief = await call('task.get', { taskId: fx.tA._id });
         expect(brief.taskId).toBe(fx.tA._id);
         expect(brief.relations.map((r) => r.key).sort()).toEqual(want.relations);
-        const notFound = { error: 'task not found' };
+        const notFound = { error: 'That task was not found. Ask the person which task they mean.' };
         for (const [open, t] of [[want.openB, fx.tB], [want.openC, fx.tC], [want.openPriv, fx.tPriv]]) {
             const out = await call('task.get', { taskId: t._id });
             if (open) expect(out.taskId).toBe(t._id); else expect(out).toEqual(notFound);
@@ -133,7 +133,7 @@ describe.each(Object.keys(people))('MCP tools apply the web app visibility for a
         expect((await call('docs.read', { pageId: fx.pgA._id })).text).toBe('pa');
         for (const [open, pg] of [[want.openB, fx.pgB], [want.openC, fx.pgC]]) {
             const out = await call('docs.read', { pageId: pg._id });
-            if (open) expect(out.text).toBe(pg.title); else expect(out).toEqual({ error: 'page not found' });
+            if (open) expect(out.text).toBe(pg.title); else expect(out).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
         }
     });
 
@@ -216,7 +216,7 @@ describe('MCP visibility for a caller who is no longer a member', () => {
 
     it('sees nothing and may write nothing', async () => {
         expect((await call('tasks.search', {})).tasks).toEqual([]);
-        expect(await call('task.get', { taskId: fx.tA._id })).toEqual({ error: 'task not found' });
+        expect(await call('task.get', { taskId: fx.tA._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         await refused(call('task.comment', { taskId: fx.tA._id, body: 'x' }));
     });
 });

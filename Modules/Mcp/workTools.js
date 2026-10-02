@@ -33,7 +33,7 @@ const findOne = (ctx, type, filter, fields) => MongoDbCrudOpration(ctx.companyId
 
 const ID = Object.freeze({ type: 'string', pattern: '^[a-fA-F0-9]{24}$' });
 const ID_OR_NONE = Object.freeze({ type: ['string', 'null'], pattern: '^[a-fA-F0-9]{24}$' });
-const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in a line; it is kept in the audit log' } });
+const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in one line. It is kept in the record of changes.' } });
 const input = (properties, required) => ({ type: 'object', additionalProperties: false, properties, required });
 
 const taskTarget = (args) => ({ taskId: str(args.taskId, 40) });
@@ -97,7 +97,7 @@ const SEARCH_INPUT = Object.freeze({ sprintId: { type: 'string', description: 'O
 /* What tasks.search adds for one list: the tasks that live in it and, for a caller who can open the list, the
  * tasks added to it. It goes beside the caller's own clause, so a task is still read by its home alone. */
 const listRows = async (ctx, vis, sprintId) => {
-    if (!isId(sprintId)) return { error: 'sprintId must be a list id' };
+    if (!isId(sprintId)) return { error: 'sprintId must be the id of a list (see lists.list).' };
     const ids = idForms(String(sprintId));
     const home = { sprintId: { $in: ids } };
     const list = await findOne(ctx, SCHEMA_TYPE.SPRINTS, { _id: oid(String(sprintId)) }, { projectId: 1 });
@@ -109,7 +109,7 @@ const TOOLS = [
     {
         name: 'tags.list',
         action: 'tags.list',
-        description: 'The tags one project defines: id, name and colour. Put one on a task with task.tags.add.',
+        description: 'Shows the tags one project uses: id, name and colour. Put one on a task with task.tags.add. Changes nothing.',
         input: input({ projectId: ID }, ['projectId']),
         visibility: 'filtered',
         strict: true,
@@ -123,7 +123,7 @@ const TOOLS = [
     {
         name: 'task.relations.list',
         action: 'task.relations.list',
-        description: 'The tasks a task is linked to, each with how: blocks, blocked_by, duplicates, duplicated_by or relates_to. Only linked tasks you can open are listed.',
+        description: 'Shows the tasks a task is linked to, each with how: blocks, blocked_by, duplicates, duplicated_by or relates_to. Only linked tasks the person can open are shown. Changes nothing.',
         input: input({ taskId: ID }, ['taskId']),
         visibility: 'filtered',
         strict: true,
@@ -140,7 +140,7 @@ const TOOLS = [
     {
         name: 'task.lists.list',
         action: 'task.lists.list',
-        description: 'The lists a task was added to beside its home list, which is the sprintId the task carries. Only lists you can open are listed.',
+        description: 'Shows the lists a task was added to besides its home list, which is the sprintId the task carries. Only lists the person can open are shown. Changes nothing.',
         input: input({ taskId: ID }, ['taskId']),
         visibility: 'filtered',
         strict: true,
@@ -157,7 +157,7 @@ const TOOLS = [
     {
         name: 'lists.list',
         action: 'lists.list',
-        description: 'The live lists of one project with the folder and parent folder each sits in, and the project\'s folders. A private list is listed only for the people on it, and for owners and admins.',
+        description: 'Shows the lists of one project, with the folder and parent folder each sits in, and the project\'s folders. A private list is shown only to the people on it, and to owners and admins. Changes nothing.',
         input: input({ projectId: ID }, ['projectId']),
         visibility: 'filtered',
         strict: true,
@@ -179,7 +179,7 @@ const TOOLS = [
     {
         name: 'page.comments.list',
         action: 'page.comments.list',
-        description: 'The comments on a doc you can open, oldest first. A reply names its thread in threadId.',
+        description: 'Shows the comments on a doc the person can open, oldest first. A reply names its thread in threadId. Changes nothing.',
         input: input({ pageId: ID, limit: { type: 'integer', minimum: 1, maximum: cursor.PAGE_MAX } }, ['pageId']),
         visibility: 'filtered',
         strict: true,
@@ -203,7 +203,7 @@ const TOOLS = [
         visibility: 'filtered',
         strict: true,
         target: taskTarget,
-        description: 'Put one of the project\'s tags on a task, by tag id or by name (see tags.list).',
+        description: 'Puts one of the project\'s tags on a task at once, by tag id or by name (see tags.list).',
         input: input({ taskId: ID, tag: TAG, ...REASON }, ['taskId', 'tag']),
         params: (args) => ({ taskId: str(args.taskId, 40), tag: str(args.tag, TAG_MAX) }),
     },
@@ -213,7 +213,7 @@ const TOOLS = [
         visibility: 'filtered',
         strict: true,
         target: taskTarget,
-        description: 'Take a tag off a task, by tag id or by name.',
+        description: 'Takes a tag off a task at once, by tag id or by name.',
         input: input({ taskId: ID, tag: TAG, ...REASON }, ['taskId', 'tag']),
         params: (args) => ({ taskId: str(args.taskId, 40), tag: str(args.tag, TAG_MAX) }),
     },
@@ -224,7 +224,7 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: linkTarget,
-        description: 'Link a task to another task you can open. The type reads from the first task: it blocks, is blocked_by, duplicates, is duplicated_by or relates_to the other. The other task shows the matching link. One link per pair of tasks.',
+        description: 'Links a task to another task the person can open, at once. The type reads from the first task: it blocks, is blocked_by, duplicates, is duplicated_by or relates_to the other. The other task shows the matching link. One link per pair of tasks.',
         input: input({ taskId: ID, relatedTaskId: ID, type: { type: 'string', enum: [...work.RELATION_TYPE_LIST] }, ...REASON }, ['taskId', 'relatedTaskId', 'type']),
         params: (args) => ({ taskId: str(args.taskId, 40), relatedTaskId: str(args.relatedTaskId, 40), type: str(args.type, 20) }),
     },
@@ -235,7 +235,7 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: linkTarget,
-        description: 'Remove the link between two tasks you can open, on both of them.',
+        description: 'Removes the link between two tasks the person can open, on both of them, at once.',
         input: input({ taskId: ID, relatedTaskId: ID, ...REASON }, ['taskId', 'relatedTaskId']),
         params: (args) => ({ taskId: str(args.taskId, 40), relatedTaskId: str(args.relatedTaskId, 40) }),
     },
@@ -246,7 +246,7 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: taskInList,
-        description: `Add a top-level task to another list you can open, in its own project or another one. It stays in its home list and keeps that project's statuses; its subtasks show under it. Not a Scrum sprint, a backlog or a personal list, and at most ${work.MAX_EXTRA_LISTS} lists per task. You need to be able to move tasks in the task's project and in the list's.`,
+        description: `Adds a top-level task to another list the person can open, in its own project or another one, at once. It stays in its home list and keeps that project's statuses; its subtasks show under it. It cannot go into a Scrum sprint, a backlog or a personal list, and a task can be in at most ${work.MAX_EXTRA_LISTS} extra lists. The person must be able to move tasks in the task's project and in the list's.`,
         input: input({ taskId: ID, projectId: LIST_PROJECT, sprintId: OTHER_LIST, ...REASON }, ['taskId', 'projectId', 'sprintId']),
         params: taskInListParams,
     },
@@ -257,7 +257,7 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: taskInList,
-        description: 'Take a task out of a list it was added to (see task.lists.list). It stays in its home list, which this never changes.',
+        description: 'Takes a task out of a list it was added to (see task.lists.list), at once. It stays in its home list, which this never changes.',
         input: input({ taskId: ID, projectId: LIST_PROJECT, sprintId: OTHER_LIST, ...REASON }, ['taskId', 'projectId', 'sprintId']),
         params: taskInListParams,
     },
@@ -268,7 +268,7 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: (args) => ({ projectId: str(args.projectId, 40) }),
-        description: 'Create a list in a project, at the top level or in one of the project\'s folders or subfolders (see lists.list).',
+        description: 'Creates a list in a project at once, at the top level or in one of the project\'s folders or subfolders (see lists.list).',
         input: input({ projectId: ID, name: LIST_NAME, folderId: { ...ID, description: 'The folder or subfolder to create it in' }, ...REASON }, ['projectId', 'name']),
         params: (args) => ({ projectId: str(args.projectId, 40), name: str(args.name, work.LIST_NAME_MAX), ...(args.folderId !== undefined ? { folderId: str(args.folderId, 40) } : {}) }),
     },
@@ -279,7 +279,7 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: listTarget,
-        description: 'Rename a list.',
+        description: 'Renames a list at once.',
         input: input({ projectId: ID, sprintId: { ...ID, description: 'The list (see lists.list)' }, name: LIST_NAME, ...REASON }, ['projectId', 'sprintId', 'name']),
         params: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40), name: str(args.name, work.LIST_NAME_MAX) }),
     },
@@ -290,7 +290,7 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: listTarget,
-        description: 'Move a list into a folder or subfolder of its own project, or to the top level with folderId null. Its tasks go with it.',
+        description: 'Moves a list into a folder or subfolder of its own project, or to the top level with folderId null, at once. Its tasks go with it.',
         input: input({ projectId: ID, sprintId: { ...ID, description: 'The list (see lists.list)' }, folderId: { ...ID_OR_NONE, description: 'The folder to move it into; null for the top level' }, ...REASON }, ['projectId', 'sprintId', 'folderId']),
         params: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40), folderId: args.folderId === null ? '' : str(args.folderId, 40) }),
     },
@@ -301,7 +301,7 @@ const TOOLS = [
         strict: true,
         filedUnder: DOCS_GRANT,
         target: pageTarget,
-        description: `Comment on a doc you can open. The text is stored as plain text, as the web app stores it. ${MENTIONS}`,
+        description: `Adds a comment to a doc the person can open, at once. The text is saved as plain text. ${MENTIONS}`,
         input: input({ pageId: ID, text: COMMENT_TEXT, ...REASON }, ['pageId', 'text']),
         params: (args) => ({ pageId: str(args.pageId, 40), text: str(args.text, work.COMMENT_MAX) }),
     },
@@ -312,7 +312,7 @@ const TOOLS = [
         strict: true,
         filedUnder: DOCS_GRANT,
         target: pageTarget,
-        description: `Reply to a comment on a doc you can open; a reply to a reply joins the same thread. ${MENTIONS}`,
+        description: `Replies to a comment on a doc the person can open, at once; a reply to a reply joins the same thread. ${MENTIONS}`,
         input: input({ pageId: ID, commentId: ID, text: COMMENT_TEXT, ...REASON }, ['pageId', 'commentId', 'text']),
         params: (args) => ({ pageId: str(args.pageId, 40), commentId: str(args.commentId, 40), text: str(args.text, work.COMMENT_MAX) }),
     },
@@ -323,7 +323,7 @@ const TOOLS = [
         strict: true,
         filedUnder: DOCS_GRANT,
         target: pageTarget,
-        description: 'Assign a comment thread on a doc to an active member who can read the doc, or clear it with assigneeId null. Only the people on the comment or an admin may change who holds it.',
+        description: 'Assigns a comment thread on a doc to an active member who can read the doc, or clears it with assigneeId null. Only the people on the comment or an admin may change who holds it.',
         input: input({ pageId: ID, commentId: ID, assigneeId: { ...ID_OR_NONE, description: 'A member id; null clears it' }, ...REASON }, ['pageId', 'commentId', 'assigneeId']),
         params: (args) => ({ pageId: str(args.pageId, 40), commentId: str(args.commentId, 40), assigneeId: args.assigneeId === null ? '' : str(args.assigneeId, 40) }),
     },

@@ -23,12 +23,12 @@ const KEY_MAX = 60;
 const MADE_OF = Object.freeze(['name', 'trigger', 'scope', 'conditions', 'steps', 'reactToAutomation', 'limits']);
 
 const REFUSED = Object.freeze({
-    reacts: 'an agent cannot make a rule that reacts to changes made by automations or agents; a person switches that on in AlianHub',
-    agentStep: 'an agent cannot propose a step that runs an AI agent; a person adds that step in AlianHub',
-    otherStep: `an agent can only propose these steps: ${MAY_PROPOSE.join(', ')}. A step that sends something outside the workspace (an email, a webhook, a Slack message) is added by a person in AlianHub`,
-    notATask: 'an agent can only propose a rule that starts from a task; a form or a schedule is set up by a person in AlianHub',
-    filer: 'Only owners and admins can manage automations, so an agent working for someone else cannot propose one.',
-    project: 'the project is not one this person can open',
+    reacts: 'A rule that reacts to changes made by automations or agents cannot be proposed. A person can switch that on in AlianHub.',
+    agentStep: 'A step that runs an AI agent cannot be proposed. A person can add it in AlianHub.',
+    otherStep: `Only these steps can be proposed: ${MAY_PROPOSE.join(', ')}. A step that sends something outside the workspace (an email, a webhook, a Slack message) is added by a person in AlianHub.`,
+    notATask: 'Only a rule that starts from a task can be proposed. A person can set up one that starts from a form or a schedule in AlianHub.',
+    filer: 'Only owners and admins can manage automations, so a rule cannot be proposed for anyone else. Ask an owner or an admin.',
+    project: 'That project was not found, or the person cannot open it.',
 });
 
 const ROUTES = Object.freeze({
@@ -173,7 +173,7 @@ const createRule = async ({ companyId, filer, approver, params }) => {
     if (!built.rule) throw refuse(built.rejected.join(' '));
     const answer = await answerOf('create', { companyId, uid: approver, body: { ...built.rule, enabled: draft.enabled } });
     const saved = dataOf(answer);
-    if (!saved || !saved._id) throw refuse(reasonOf(answer, 'the automation was not saved'));
+    if (!saved || !saved._id) throw refuse(reasonOf(answer, 'The automation was not saved. Try again, or tell the person.'));
     const ruleId = idOf(saved._id);
     return {
         project, projectId: idOf(project._id), ruleId, name: saved.name || '', sentence: saved.sentence || '', enabled: saved.enabled === true,
@@ -186,9 +186,9 @@ const createRule = async ({ companyId, filer, approver, params }) => {
 const withdrawRule = async ({ companyId, uid, ruleId, made }) => {
     const rule = await storedRule(companyId, ruleId);
     if (!rule) return { removed: false };
-    if (madeOf(rule) !== made) throw refuse(`the automation "${rule.name || ''}" was changed after it was made, so it stays; switch it off or delete it on the Automations page`);
+    if (madeOf(rule) !== made) throw refuse(`The automation "${rule.name || ''}" was changed after it was made, so it was left as it is. Switch it off or delete it on the Automations page.`);
     const answer = await answerOf('remove', { companyId, uid, params: { id: idOf(ruleId) } });
-    if (!dataOf(answer)) throw refuse(reasonOf(answer, 'the automation was not removed'));
+    if (!dataOf(answer)) throw refuse(reasonOf(answer, 'The automation was not removed. Try again, or tell the person.'));
     return { removed: true, name: rule.name || '' };
 };
 

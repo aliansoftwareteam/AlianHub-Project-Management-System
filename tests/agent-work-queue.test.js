@@ -296,7 +296,7 @@ describe('a claim', () => {
         rows(SCHEMA_TYPE.SPRINTS).find((row) => String(row._id) === S_SECRET).AssigneeUserId = [];
         expect(await queue(agent(OWNER, TOKEN_2))).toMatchObject([{ itemId }]);
         expect(rowOf(itemId).claim).toBeUndefined();
-        expect(await release(agent(OTHER), itemId)).toMatchObject({ ok: false, error: 'item not found' });
+        expect(await release(agent(OTHER), itemId)).toMatchObject({ ok: false, error: 'That item was not found. Check queue.list.' });
     });
 
     it('answers a hidden item, a missing one and one of another kind alike, and holds nothing', async () => {
@@ -306,7 +306,7 @@ describe('a claim', () => {
         await look();
         const secret = String(stored().find((row) => row.taskId === String(hidden._id) && row.rule === RULE.NO_OWNER)._id);
         const withChange = String(stored().find((row) => row.rule === RULE.STALE && row.facts.taskKey === 'OPN-QUIET')._id);
-        const missing = { ok: false, error: 'item not found' };
+        const missing = { ok: false, error: 'That item was not found. Check queue.list.' };
         expect(await claim(agent(MEMBER), secret)).toEqual(missing);
         expect(await claim(agent(MEMBER), '6f0000000000000000000fff')).toEqual(missing);
         expect(await claim(agent(OWNER), withChange)).toEqual(missing);
@@ -320,7 +320,7 @@ describe('a claim', () => {
     it('is refused to a connection that only reads', async () => {
         const { itemId } = await orphanItem();
         const out = await claim(world.readOnly(OWNER), itemId);
-        expect(out).toMatchObject({ isError: true, error: 'This token is read-only.' });
+        expect(out).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
         expect(rowOf(itemId).claim).toBeUndefined();
     });
 
@@ -541,8 +541,8 @@ describe('what people see, and taking an item back', () => {
         expect(rowOf(itemId)).toMatchObject({ status: 'open', leftQueue: { why: 'taken_back', userId: MEMBER } });
         expect(rowOf(itemId).claim).toBeUndefined();
         expect(await queue(agent(OTHER))).toEqual([]);
-        expect(await claim(agent(OTHER), itemId)).toEqual({ ok: false, error: 'item not found' });
-        expect(await release(agent(OTHER), itemId)).toEqual({ ok: false, error: 'item not found' });
+        expect(await claim(agent(OTHER), itemId)).toEqual({ ok: false, error: 'That item was not found. Check queue.list.' });
+        expect(await release(agent(OTHER), itemId)).toEqual({ ok: false, error: 'That item was not found. Check queue.list.' });
         expect((await card(MEMBER)).findings).toMatchObject([{ id: itemId, rule: RULE.NO_OWNER }]);
         expect(orphan.AssigneeUserId).toEqual([]);
     });

@@ -55,7 +55,7 @@ const declinedNotes = async (ctx, projectId) => {
 const fileable = async (ctx, tool, params) => {
     const refuse = async (why) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: why, ip: ctx.ip, taint: ctx.taint }); };
     if (ctx.token && ctx.token.oauth && !outsideMayFile(ctx, tool)) {
-        await refuse(`${tool.name} needs a person's approval, which is filed only for a personal access token, or for an outside client that holds the manage grant the tool needs.`);
+        await refuse(`${tool.name} needs a person's approval, but this connection cannot ask for it. Ask the person to do it in AlianHub, or to connect you again with the right permissions.`);
     }
     const check = registry.evaluate(tool.action, { ...params, __proposal: true }, { allowedActions: ctx.allowedActions });
     if (!check.allowed) await refuse(check.reason);

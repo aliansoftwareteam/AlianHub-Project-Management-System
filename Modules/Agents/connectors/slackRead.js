@@ -76,7 +76,7 @@ const failed = async (who, row, channelId, out) => {
     if (api.isTokenError(out.error)) await connection.markBroken(who.companyId, row, out.error);
     await record(who, { channelId, state: STATE.FAILED, error: out.error });
     const wait = out.retryAfter ? `, retry after ${out.retryAfter}s` : '';
-    return refusal('slack_failed', `Slack did not answer the read (${out.error}${wait}); it is not tried again in this run`, { slackError: out.error });
+    return refusal('slack_failed', `Slack did not answer the read (${out.error}${wait}). It will not be tried again in this run.`, { slackError: out.error });
 };
 
 /* A refused read took nothing in and reached no message, so it does not count against the run. */
@@ -88,28 +88,28 @@ const usedBy = async (companyId, runId) => {
 };
 
 const read = async ({ companyId, runId, actor, allowedActions, params = {} }) => {
-    if (!flag.slackOn()) throw refusal('connector_off', 'the Slack connector is off on this server');
-    if (!runId || !actor || !actor.agentId) throw refusal('run_required', 'a Slack channel is read only inside an agent run, where the read is counted and recorded');
+    if (!flag.slackOn()) throw refusal('connector_off', 'Slack is switched off on this server. Ask the person to have an owner or an admin switch it on.');
+    if (!runId || !actor || !actor.agentId) throw refusal('run_required', 'A Slack channel can be read only while an agent is running.');
     await require('../actions').authorizeRead({ companyId, actor, action: ACTION, params: { channel: String(params.channel || '') }, allowedActions });
     const used = await usedBy(companyId, runId);
-    if (!used) throw refusal('run_required', 'the run this read belongs to was not found');
+    if (!used) throw refusal('run_required', 'This read does not belong to a run that can be found, so nothing was read.');
 
     const who = { companyId, runId, actor };
-    if (used.calls >= LIMITS.RUN_CALLS) throw await refused(who, 'run_call_cap', `a run reads a connector at most ${LIMITS.RUN_CALLS} times`);
+    if (used.calls >= LIMITS.RUN_CALLS) throw await refused(who, 'run_call_cap', `One run can read from connected apps at most ${LIMITS.RUN_CALLS} times. Stop here and tell the person what you have.`);
     const charsLeft = LIMITS.RUN_CHARS - used.chars;
-    if (charsLeft <= 0) throw await refused(who, 'run_char_cap', `a run takes in at most ${LIMITS.RUN_CHARS} characters from connectors`);
+    if (charsLeft <= 0) throw await refused(who, 'run_char_cap', `One run can take in at most ${LIMITS.RUN_CHARS} characters from connected apps. Stop here and tell the person what you have.`);
 
     const { row, token, reason } = await connection.tokenFor(companyId);
     if (!token) {
         throw reason === 'broken'
-            ? await refused(who, 'connection_broken', 'Slack refused the stored bot token; an owner or admin has to replace it')
-            : await refused(who, 'not_connected', 'Slack is not connected in this workspace');
+            ? await refused(who, 'connection_broken', 'Slack is not accepting the saved connection. An owner or an admin has to reconnect Slack in AlianHub.')
+            : await refused(who, 'not_connected', 'Slack is not connected here. An owner or an admin can connect it in AlianHub.');
     }
 
     const uses = params.postable ? [connection.USE.READ, connection.USE.POST] : [connection.USE.READ];
     const channel = params.channel ? connection.allowedChannel(row, params.channel, uses) : connection.channelsFor(row, uses)[0];
     if (!channel) {
-        throw await refused(who, 'channel_not_readable', `that Slack channel is not on this workspace's allow-list for reading${params.postable ? ' and posting' : ''}; an owner or admin ticks it on the Integrations screen`);
+        throw await refused(who, 'channel_not_readable', `that Slack channel is not on the list agents may read${params.postable ? ' and post to' : ''}. An owner or an admin can add it on the Integrations screen.`);
     }
 
     const ask = (method, args) => api.call({ companyId, actor: actor.userId, token, method, args });
@@ -117,7 +117,7 @@ const read = async ({ companyId, runId, actor, allowedActions, params = {} }) =>
     if (!info.ok) throw await failed(who, row, channel.id, info);
     const live = info.body.channel || {};
     if (live.is_channel !== true || live.is_private || live.is_im || live.is_mpim || live.is_group) {
-        throw await refused(who, 'channel_private', 'Slack says that channel is private or a direct message, which agents never read', channel.id);
+        throw await refused(who, 'channel_private', 'that Slack channel is private or a direct message, and agents never read those. Tell the person.', channel.id);
     }
 
     const limit = clamp(params.limit, 1, LIMITS.MESSAGES, LIMITS.MESSAGES);

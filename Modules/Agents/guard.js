@@ -97,7 +97,7 @@ const taskPatchChecks = async (body, at) => {
  * workspace's proposal policy and the undo record apply; a task route has none of the three. */
 const evaluateOnRoute = (action, params) => {
     const check = registry.evaluate(action, params);
-    if (check.allowed && !registry.ACTIONS.includes(check.action)) return { allowed: false, reason: `Agents cannot perform ${action} on this route` };
+    if (check.allowed && !registry.ACTIONS.includes(check.action)) return { allowed: false, reason: `An agent is not allowed to do this (${action}). The person has to do it in AlianHub.` };
     return check;
 };
 
@@ -312,9 +312,9 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     if (!hit) return next();
     const body = req.body || {};
     if (hit.action === 'delete' || body.action === 'deleteTask') {
-        return refuse(req, res, actor, { action: hit.action === 'delete' ? `${/task/i.test(path) ? 'task' : 'project'}.delete` : 'task.delete', reason: `Agents cannot perform ${/task/i.test(path) ? 'task.delete' : 'project.delete'}`, params: {} });
+        return refuse(req, res, actor, { action: hit.action === 'delete' ? `${/task/i.test(path) ? 'task' : 'project'}.delete` : 'task.delete', reason: `An agent is not allowed to do this (${/task/i.test(path) ? 'task.delete' : 'project.delete'}). The person has to do it in AlianHub.`, params: {} });
     }
-    return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
+    return refuse(req, res, actor, { action: hit.action, reason: `An agent is not allowed to do this (${hit.action}). The person has to do it in AlianHub.`, params: {} });
 });
 
 module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };

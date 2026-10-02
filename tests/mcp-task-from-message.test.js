@@ -58,7 +58,7 @@ const listed = listedThrough(server);
 const TOOL = 'task.from_message';
 const MISSING = '6f0000000000000000000fff';
 const BASE = 'https://hub.example.test';
-const NOT_FOUND = { ok: false, error: 'message not found' };
+const NOT_FOUND = { ok: false, error: 'That message was not found. Check the id.' };
 const ADDRESS_KEYS = ['WEBURL', 'APIURL'];
 const savedAddress = Object.fromEntries(ADDRESS_KEYS.map((key) => [key, process.env[key]]));
 const { DONE, CONNECTED } = projectPolicy;
@@ -106,8 +106,8 @@ describe('the tool exists with the tools that manage tasks', () => {
         const id = idOf(message());
         expect(await listed(olderToken(OWNER))).not.toContain(TOOL);
         const before = taskCount();
-        expect(await make(olderToken(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
-        expect(await make(readOnly(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/read-only/) });
+        expect(await make(olderToken(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
+        expect(await make(readOnly(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/only read/) });
         expect(taskCount()).toBe(before);
     });
 
@@ -320,7 +320,7 @@ describe('the project\'s rule for agents holds it exactly as it holds a create',
         const id = idOf(message());
         const plain = await rpc(outside(OWNER, granted), 'task.create', { projectId: P_OPEN, sprintId: S_OPEN, title: 'Plain' });
         expect(outcomeOf(await make(outside(OWNER, granted), { messageId: id }))).toBe(outcomeOf(plain));
-        expect(await make(outside(OWNER, PLAIN_SCOPES), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
+        expect(await make(outside(OWNER, PLAIN_SCOPES), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
     });
 
     it('runs inside a batch as one of its changes', async () => {
@@ -335,7 +335,7 @@ describe('the project\'s rule for agents holds it exactly as it holds a create',
         const out = await rpc(ctx(OWNER), 'tasks.batch', { operations: [{ tool: TOOL, arguments: { messageId: idOf(message()) } }, { tool: TOOL, arguments: { messageId: MISSING } }] });
         expect(out).toMatchObject({ pending: true, applied: 0, notApplied: 2, waiting: 1 });
         expect(out.items[0]).toMatchObject({ ok: false, pending: true });
-        expect(out.items[1]).toMatchObject({ ok: false, error: 'message not found' });
+        expect(out.items[1]).toMatchObject({ ok: false, error: 'That message was not found. Check the id.' });
         expect(taskCount()).toBe(before);
         expect(proposals.create).toHaveBeenCalledTimes(1);
     });

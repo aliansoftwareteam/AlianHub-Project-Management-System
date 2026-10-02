@@ -64,7 +64,7 @@ const web = asPerson(routeTable(require('../Modules/Automations/routes').init));
 
 const TOOL = 'automation.create';
 const READ = 'automation.catalogue';
-const NO_PROJECT = 'not_visible: the project is not one the person behind this token can open';
+const NO_PROJECT = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
 const PEOPLE = [OWNER, ADMIN, INSIDER, OUTSIDER, GUEST];
 const MAY_PROPOSE = ['set_status', 'set_priority', 'add_comment', 'create_subtask', 'assign', 'notify'];
 const NOTICE = '[AI bench] Done notice';
@@ -158,7 +158,7 @@ describe('a rule is never made before a person has seen it', () => {
         const actor = as(OWNER).actor;
         const params = draftOf(doneNotice());
         expect(await projectPolicy.ask({ companyId: CID, actor, action: TOOL, params })).toMatchObject({ decision: 'propose' });
-        await expect(actions.perform({ companyId: CID, actor, action: TOOL, params })).rejects.toThrow(/must be proposed/);
+        await expect(actions.perform({ companyId: CID, actor, action: TOOL, params })).rejects.toThrow(/needs a person's approval first/);
         await expect(actions.perform({ companyId: CID, actor, action: TOOL, params: { ...params, __proposal: true } })).rejects.toThrow(/waits for a person's approval/);
         expect(rules()).toHaveLength(0);
     });
@@ -169,7 +169,7 @@ describe('what an agent may not put in a rule', () => {
 
     it('refuses a step that runs an agent, with the reason', async () => {
         const out = await rpc(as(OWNER), TOOL, doneNotice({ actions: [{ action: 'run_agent', config: { agent: 'Reviewer', skill: 'summarise' } }] }));
-        expect(out.rpcError).toMatchObject({ code: -32602, message: expect.stringMatching(/cannot propose a step that runs an AI agent/) });
+        expect(out.rpcError).toMatchObject({ code: -32602, message: expect.stringMatching(/A step that runs an AI agent cannot be proposed/) });
         nothingFiled();
     });
 
@@ -236,7 +236,7 @@ describe('who may ask for a rule', () => {
         expect(await rpc(as(OWNER), TOOL, doneNotice({ projectId: P_PERSONAL }))).toMatchObject({ refused: true, reason: NO_PROJECT });
         expect(await rpc(as(INSIDER), TOOL, doneNotice({ projectId: MISSING }))).toMatchObject({ refused: true, reason: NO_PROJECT });
         expect(await rpc({ ...as(OWNER), projectIds: narrowed(OWNER, [P_PRIVATE]).projectIds }, TOOL, doneNotice())).toMatchObject({ refused: true, reason: NO_PROJECT });
-        expect(await rpc(readOnly(OWNER), TOOL, doneNotice())).toMatchObject({ isError: true, error: 'This token is read-only.' });
+        expect(await rpc(readOnly(OWNER), TOOL, doneNotice())).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
         expect(waiting()).toHaveLength(0);
     });
 
@@ -364,7 +364,7 @@ describe('undo removes the rule while nobody has changed it', () => {
         const edited = { trigger: rule.trigger, scope: rule.scope, conditions: rule.conditions, steps: [{ id: 's1', type: 'action', action: 'add_comment', config: { body: 'Done, thank you' } }] };
         expect((await web('PUT /api/v2/automations/:id', OWNER, { params: { id: ruleId }, body: edited })).body.status).toBe(true);
         const out = await undo(id);
-        expect(out.results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/was changed after it was made, so it stays/) });
+        expect(out.results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/was changed after it was made, so it was left as it is/) });
         expect(liveRules()).toHaveLength(1);
         expect(liveRules()[0].steps[0].action).toBe('add_comment');
     });

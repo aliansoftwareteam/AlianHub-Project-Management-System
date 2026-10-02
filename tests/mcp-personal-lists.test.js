@@ -133,8 +133,8 @@ describe.each(PRIVILEGED)('what %s reads over MCP', (_who, uid) => {
 
     it('task.get and comments.list answer "not found" for a task in someone else\'s personal list and for a chat they are not in', async () => {
         for (const t of [fx.theirs, fx.theirsGiven, fx.chatTheirs]) {
-            expect(await call(uid, 'task.get', { taskId: t._id })).toEqual({ error: 'task not found' });
-            expect(await call(uid, 'comments.list', { taskId: t._id })).toEqual({ error: 'task not found' });
+            expect(await call(uid, 'task.get', { taskId: t._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+            expect(await call(uid, 'comments.list', { taskId: t._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         }
         const own = uid === OWNER ? fx.ownerOwn : fx.adminOwn;
         expect(await call(uid, 'task.get', { taskId: own._id })).toMatchObject({ key: ownKey });
@@ -145,7 +145,7 @@ describe.each(PRIVILEGED)('what %s reads over MCP', (_who, uid) => {
         const own = uid === OWNER ? PL_OWNER : PL_ADMIN;
         expect((await call(uid, 'projects.list', {})).projects.map((p) => p.projectId).sort()).toEqual([P_OPEN, own].sort());
         for (const tool of ['project.get', 'sprints.list', 'statuses.list']) {
-            expect(await call(uid, tool, { projectId: PL_SOMEONE })).toEqual({ error: 'project not found' });
+            expect(await call(uid, tool, { projectId: PL_SOMEONE })).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
         }
     });
 
@@ -153,8 +153,8 @@ describe.each(PRIVILEGED)('what %s reads over MCP', (_who, uid) => {
         expect((await call(uid, 'pages.search', {})).pages.map((p) => p.title)).not.toContain('their page');
         expect((await call(uid, 'pages.search', {})).pages.map((p) => p.title)).toContain('open page');
         expect(await call(uid, 'pages.search', { projectId: PL_SOMEONE })).toEqual({ pages: [] });
-        expect(await call(uid, 'page.get', { pageId: fx.pgTheirs._id })).toEqual({ error: 'page not found' });
-        expect(await call(uid, 'docs.read', { pageId: fx.pgTheirs._id })).toEqual({ error: 'page not found' });
+        expect(await call(uid, 'page.get', { pageId: fx.pgTheirs._id })).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
+        expect(await call(uid, 'docs.read', { pageId: fx.pgTheirs._id })).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
         expect(await call(uid, 'page.get', { pageId: fx.pgOpen._id })).toMatchObject({ title: 'open page' });
     });
 
@@ -192,7 +192,7 @@ describe.each(PRIVILEGED)('what %s reads over MCP', (_who, uid) => {
         expect(keys(await call(uid, 'tasks.search', {}))).toEqual(['OPEN-1']);
         tokenProjects = [PL_SOMEONE];
         expect(keys(await call(uid, 'tasks.search', {}))).toEqual([]);
-        expect(await call(uid, 'task.get', { taskId: fx.theirs._id })).toEqual({ error: 'task not found' });
+        expect(await call(uid, 'task.get', { taskId: fx.theirs._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         expect((await call(uid, 'projects.list', {})).projects).toEqual([]);
     });
 
@@ -218,7 +218,7 @@ describe('what stays as it is', () => {
 
     it('a member reads the projects they can open', async () => {
         expect(keys(await call(MEMBER, 'tasks.search', {}))).toEqual(['OPEN-1']);
-        expect(await call(MEMBER, 'task.get', { taskId: fx.theirs._id })).toEqual({ error: 'task not found' });
+        expect(await call(MEMBER, 'task.get', { taskId: fx.theirs._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
     });
 });
 

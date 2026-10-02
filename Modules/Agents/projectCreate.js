@@ -121,7 +121,7 @@ const codeFor = async (companyId, name) => {
         const code = at === 1 ? letters : `${letters}${at}`;
         if (!(await codeTaken(companyId, code))) return code;
     }
-    throw refuse('no free key was found for this project; create it in AlianHub under Projects');
+    throw refuse('No free project key was found. Ask the person to create the project in AlianHub under Projects.');
 };
 
 /* The body the Create project screen sends for its Blank choice, for `uid` alone. */
@@ -137,7 +137,7 @@ const bodyFor = ({ uid, name, code }) => ({
 const createAs = async ({ companyId, who, name }) => {
     const answer = await setup.answerOf('projectCreate', { companyId, who, body: bodyFor({ uid: who.uid, name, code: await codeFor(companyId, name) }) });
     const saved = answer.code === 200 && answer.body && answer.body.status === true && answer.body.data;
-    if (!saved || !saved._id) throw refuse(setup.reasonOf(answer, 'the project was not created'));
+    if (!saved || !saved._id) throw refuse(setup.reasonOf(answer, 'The project was not created. Try again, or tell the person.'));
     const project = await storedProject(companyId, saved._id);
     socketEmitter.emit('insert', { type: 'insert', companyId: String(companyId), data: project, module: 'project' });
     return project;
@@ -150,7 +150,7 @@ const describe = async ({ companyId, requester, approver, projectId, text }) => 
     const own = await canEditProject(companyId, requester.uid, projectId, [DESCRIPTION_KEY]);
     if (!own.allowed) return `${permissions.REASON}: ${DESCRIPTION_KEY} is not granted`;
     const answer = await setup.answerOf('projectUpdate', { companyId, who: approver, params: { id: projectId }, body: { updateObject: { descriptionBlock: descriptionBlockFrom(text) } } });
-    if (answer.code !== 200) return answer.code === 403 ? `the approver may not make this part: ${DESCRIPTION_KEY} is not granted` : setup.reasonOf(answer, 'the description was not saved');
+    if (answer.code !== 200) return answer.code === 403 ? `The person approving may not make this part: ${DESCRIPTION_KEY} is not granted` : setup.reasonOf(answer, 'The description was not saved.');
     socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: await storedProject(companyId, projectId), updatedFields: { descriptionBlock: 'set' }, module: 'project' });
     return '';
 };
@@ -201,9 +201,9 @@ const withdraw = async ({ companyId, who, projectId }) => {
     const inProject = idOf(project._id);
     const name = project.ProjectName || '';
     const held = await heldIn(companyId, inProject);
-    if (held) throw refuse(`the project "${name}" holds ${held} now, so it stays; delete it in AlianHub if it should go`);
+    if (held) throw refuse(`The project "${name}" has ${held} now, so it was kept. A person can delete it in AlianHub if it should go.`);
     const answer = await setup.answerOf('projectUpdate', { companyId, who, params: { id: inProject }, body: { updateObject: { deletedStatusKey: TRASHED } } });
-    if (answer.code !== 200) throw refuse(answer.code === 403 ? `you may not delete the project "${name}", so it stays` : setup.reasonOf(answer, 'the project was not moved to the trash'));
+    if (answer.code !== 200) throw refuse(answer.code === 403 ? `The person is not allowed to delete the project "${name}", so it was kept.` : setup.reasonOf(answer, 'the project was not moved to the trash'));
     socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: { ...plain(project), deletedStatusKey: TRASHED }, updatedFields: { deletedStatusKey: TRASHED }, module: 'project' });
     return { projectId: inProject, name, trashed: true };
 };
@@ -211,13 +211,13 @@ const withdraw = async ({ companyId, who, projectId }) => {
 const executors = {
     async [ACTION]({ companyId, actor, params, depth, approvedBy }) {
         const approverId = idOf(approvedBy);
-        if (!approverId) throw refuse('a project is made only once a person has approved it');
+        if (!approverId) throw refuse('A project is made only after a person approves it.');
         const problem = problemIn(params);
         if (problem) throw refuse(problem);
         const draft = draftOf(params);
         const requester = whoOf(actor, depth);
         const own = await mayCreate(companyId, approverId);
-        if (!own.allowed) throw refuse(`the approver may not create a project: ${own.permission} is not granted`);
+        if (!own.allowed) throw refuse(`The person approving may not create a project (${own.permission} is not granted).`);
         const approver = { uid: approverId, via: requester.via, mark: requester.mark ? { ...requester.mark, userId: approverId } : null };
         const project = await createAs({ companyId, who: approver, name: draft.name });
         const projectId = idOf(project._id);

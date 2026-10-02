@@ -70,7 +70,7 @@ const web = asPerson(routeTable(require('../Modules/Project/routes').init));
 
 const TOOL = 'view.create';
 const KEYS = ['project.view_list', 'project.project_details'];
-const NO_PROJECT = 'not_visible: the project is not one the person behind this token can open';
+const NO_PROJECT = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
 const V_LIST = '6f0000000000000000000e11';
 const V_BOARD = '6f0000000000000000000e12';
 const V_PRIVATE = '6f0000000000000000000e13';
@@ -151,7 +151,7 @@ describe('a view is never added before a person has seen it', () => {
         const params = { projectId: P_OPEN, name: 'Mine', kind: 'list', look: {} };
         expect(await projectPolicy.ask({ companyId: CID, actor, action: TOOL, params })).toMatchObject({ decision: 'propose' });
         expect(await projectPolicy.ask({ companyId: CID, actor, action: TOOL, params, approved: true })).toEqual({ decision: 'act', reason: '' });
-        await expect(actions.perform({ companyId: CID, actor, action: TOOL, params })).rejects.toThrow(/must be proposed/);
+        await expect(actions.perform({ companyId: CID, actor, action: TOOL, params })).rejects.toThrow(/needs a person's approval first/);
         await expect(actions.perform({ companyId: CID, actor, action: TOOL, params: { ...params, __proposal: true } })).rejects.toThrow(/waits for a person's approval/);
         expect(viewsOf(P_OPEN)).toHaveLength(2);
     });
@@ -184,7 +184,7 @@ describe('who may ask for a view', () => {
             expect(await rpc(as(uid), TOOL, { projectId, name: 'Nowhere' })).toMatchObject({ refused: true, reason: NO_PROJECT });
         }
         expect(await rpc({ ...as(INSIDER), projectIds: narrowed(INSIDER, [P_OPEN]).projectIds }, TOOL, { projectId: P_PRIVATE, name: 'Nowhere' })).toMatchObject({ refused: true, reason: NO_PROJECT });
-        expect(await rpc(readOnly(OWNER), TOOL, { projectId: P_OPEN, name: 'Nowhere' })).toMatchObject({ isError: true, error: 'This token is read-only.' });
+        expect(await rpc(readOnly(OWNER), TOOL, { projectId: P_OPEN, name: 'Nowhere' })).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
         expect(waiting()).toHaveLength(0);
     });
 

@@ -71,7 +71,7 @@ const setValue = async ({ companyId, uid, goalId, targetId, value }) => {
 /* One list or task is added to, or taken out of, what a target counts: the route is sent the whole set, as the web app sends it. */
 const changeSources = async ({ companyId, uid, goalId, targetId, kind, sourceId, operation }) => {
     const key = KINDS[kind];
-    if (!key) throw refuse('kind needs list or task');
+    if (!key) throw refuse('Say whether it is a list or a task.');
     const { goal, target } = await targetIn({ companyId, uid, goalId, targetId });
     if (target.kind !== 'tasks') throw refuse(NOT_COUNTED);
     if (goal.canEdit !== true) throw refuse(FORBIDDEN);

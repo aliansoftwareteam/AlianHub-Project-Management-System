@@ -52,7 +52,7 @@ const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 
 const TOOL = 'task.fields.list';
-const NO_TASK = { error: 'task not found' };
+const NO_TASK = { error: 'That task was not found. Ask the person which task they mean.' };
 const TEXT_MAX = 2000;
 const F = {
     note: '6f0000000000000000000f01', cost: '6f0000000000000000000f02', stage: '6f0000000000000000000f03', review: '6f0000000000000000000f04',
@@ -149,7 +149,7 @@ describe('the tool exists with the read tools', () => {
 
     it('answers a connection that only reads, and refuses one that may not read tasks', async () => {
         expect((await read(readOnly(OWNER), T_OPEN)).fields.length).toBeGreaterThan(0);
-        expect(await read(outside(OWNER, ['projects:read']), T_OPEN)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:read scope/) });
+        expect(await read(outside(OWNER, ['projects:read']), T_OPEN)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:read permission/) });
     });
 
     it('writes nothing', async () => {
