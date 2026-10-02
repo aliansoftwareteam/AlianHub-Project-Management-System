@@ -13,7 +13,6 @@ const workQueue = require('./manager/workQueue');
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const EDIT_ACTION = 'project.agent_limits.edit';
 const STOPPED_BY_PAUSE = 'agents were paused in this project';
-const LIMITS_CHANGE = 'limits';
 
 const recorded = (limits) => ({ agentsAtOnce: limits.atOnce, agentsPaused: limits.paused, agentsDirectTasks: limits.directTasks });
 
@@ -71,8 +70,6 @@ const saveProjectLimits = async (req, res) => {
         }
         removeCache('UserProjectData:', true);
         socketEmitter.emit('update', { type: 'update', companyId, data: saved.project, updatedFields: { agentLimits: saved.agentLimits }, module: 'project' });
-        // No relay carries a project event to a browser; the agents signal does, and names no project.
-        socketEmitter.emit('update', { type: 'update', module: 'agent', companyId, data: { kind: LIMITS_CHANGE }, updatedFields: { kind: LIMITS_CHANGE }, actor: { kind: 'human' }, depth: 1 });
         return res.json({ status: true, statusText: 'Limits updated.', data: await answer(companyId, at.projectId, true) });
     } catch (e) { logger.error(`saveProjectLimits: ${e.message}`); return fail(res, 500, e.message); }
 };

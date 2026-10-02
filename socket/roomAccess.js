@@ -207,6 +207,19 @@ const mayReceiveComments = (identity, change, prefix) => {
 const mayReceiveList = (identity, change) => sameCompany(identity, change)
     && stillAllowed(identity, `list:${change.projectId}:${change.sprintId}`, () => canOpenSprintBoard(identity, change.projectId, change.sprintId));
 
+const projectSubject = (projectId) => `project:${projectId}`;
+
+/* The answer GET /api/v1/project/:id gives this person. */
+const mayReceiveProject = (identity, change, projectId) => sameCompany(identity, change) && isId(projectId)
+    && stillAllowed(identity, projectSubject(projectId), async () => (await canReadProject(identity.companyId, identity.uid, String(projectId))).allowed);
+
+/* A change to who may open a project is told to the people it lets in, so the answers kept from before it are dropped. */
+const forgetProjectVerdicts = (companyId, projectId) => {
+    const company = `${companyId}:`;
+    const subject = `:${projectSubject(projectId)}`;
+    [...verdicts.keys()].filter((key) => key.startsWith(company) && key.endsWith(subject)).forEach((key) => verdicts.delete(key));
+};
+
 const mayReceiveCompany = (identity, companyId) => Boolean(identity) && identity.companyId === String(companyId || '')
     && stillAllowed(identity, 'seat', () => isCompanyMember(identity, identity.companyId));
 
@@ -261,6 +274,8 @@ module.exports = {
     mayReceiveTask,
     mayReceiveComments,
     mayReceiveList,
+    mayReceiveProject,
+    forgetProjectVerdicts,
     mayReceiveCompany,
     readsWholeCompany,
     toSeated,

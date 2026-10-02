@@ -1051,7 +1051,7 @@
     .dashboard-range-label {
         font-size: 12px;
         font-weight: 600;
-        color: #3a3f52;
+        color: var(--ink-label);
     }
     .dashboard-range-picker {
         min-width: 210px;
@@ -1075,7 +1075,7 @@
     }
     .dashboard-range-hint {
         font-size: 11px;
-        color: #9aa0b4;
+        color: var(--ink-2);
     }
     .center_no_record_found {
         position: absolute;
@@ -1084,7 +1084,7 @@
         transform: translate(-50%, -50%);
     }
     .vgl-layout {
-        background-color: #f5f3f3;
+        background-color: var(--fill);
         user-select: none;
     }
     .empty-layout {
@@ -1130,8 +1130,8 @@
         overflow: hidden;
     }
     .grid_layout_hover .vgl-item__resizer:before {
-        border-color: transparent transparent #bbbbbb;
-        border-bottom-color:#bbbbbb;
+        border-color: transparent transparent var(--border);
+        border-bottom-color:var(--border);
     }
     .vgl-item--placeholder {
         background-color: #D4D4D4;

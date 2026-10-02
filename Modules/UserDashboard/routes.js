@@ -1,10 +1,13 @@
 const ctrl = require('./controller');
 const atRisk = require('./atRisk');
 const { limitCallerBody } = require('../Company/helpers/callerQueryRules');
+const { agentsRefused } = require('../Agents/guard');
+
+const cardsByPeople = agentsRefused('dashboard.card.add');
 
 exports.init = (app) => {
     app.get('/api/v1/dashboard/:id', ctrl.getDashboard);
-    app.post('/api/v1/dashboard',ctrl.updateDashboard);
+    app.post('/api/v1/dashboard', cardsByPeople, ctrl.updateDashboard);
     app.get('/api/v1/cardcomponent',ctrl.getCardComponent);
     // EmployeeWorkloadReportCard data endpoint — pure filter-driven
     // report. All thresholds (active/idle/overloaded) come from the
@@ -46,7 +49,7 @@ exports.init = (app) => {
     app.post('/api/v1/dashboards', ctrl.createSharedDashboard);
     app.get('/api/v1/dashboards/:id', ctrl.getSharedDashboard);
     app.put('/api/v1/dashboards/:id', ctrl.updateSharedDashboard);
-    app.put('/api/v1/dashboards/:id/cards', ctrl.updateSharedDashboardCards);
+    app.put('/api/v1/dashboards/:id/cards', cardsByPeople, ctrl.updateSharedDashboardCards);
     app.post('/api/v1/dashboards/:id/duplicate', ctrl.duplicateSharedDashboard);
     app.delete('/api/v1/dashboards/:id', ctrl.deleteSharedDashboard);
 }
