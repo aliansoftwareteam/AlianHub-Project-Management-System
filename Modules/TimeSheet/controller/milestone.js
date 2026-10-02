@@ -1,7 +1,7 @@
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { evaluatePermission } = require("../../../Config/permissionGuard");
-const { resolveSheetScope, scopedTimeMatch, SHEET_PERMISSION } = require("../helpers/timeScope");
+const { resolveSheetScope, readingEveryone, scopedTimeMatch, SHEET_PERMISSION } = require("../helpers/timeScope");
 
 /* The project page shows hourly milestone totals for everyone on the project to anyone
  * whose project_milestone rule is not None; other callers count only their own time. */
@@ -20,11 +20,12 @@ exports.getTimeSheetForMilestone = async(req,res) => {
         const scope = await resolveSheetScope(companyId, req.uid, SHEET_PERMISSION.project);
         const everyone = scope.everyone
             || (scope.roleType !== null && scope.visible.includes(project) && await canSeeProjectMilestones(companyId, req.uid, project));
+        const reading = everyone && !scope.everyone ? await readingEveryone(companyId, scope) : scope;
 
         const query = [
             {
                 $match: {
-                    ...scopedTimeMatch({ ...scope, everyone }, { projectIds: [project] }),
+                    ...scopedTimeMatch(reading, { projectIds: [project] }),
                     LogStartTime: {
                         $lt: new Date(endDate).getTime() / 1000,
                         $gt: new Date(startDate).getTime() / 1000,

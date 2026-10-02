@@ -101,3 +101,27 @@ describe('a route that names a task by its id', () => {
         expect((await reaches(PANEL, uid, T_SECRET)).through).toBe(OPENS[uid].includes(T_SECRET));
     });
 });
+
+describe('a person\'s own time entry', () => {
+    const OWN = '6f0000000000000000000f01';
+    const OF_SOMEONE_ELSE = '6f0000000000000000000f02';
+    const LOG = ['../Modules/LogTime/routes', 'POST /api/v2/manualLogtime', (body) => ({ body })];
+    const REMOVE = ['../Modules/LogTime/routes', 'POST /api/v2/deleteManualLogtime', (body) => ({ body })];
+
+    beforeEach(() => {
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET, { _id: OWN, TicketID: T_SECRET, ProjectId: P_OPEN, Loggeduser: OUTSIDER, LogTimeDuration: 30 });
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET, { _id: OF_SOMEONE_ELSE, TicketID: T_SECRET, ProjectId: P_OPEN, Loggeduser: INSIDER, LogTimeDuration: 30 });
+    });
+
+    it('is theirs to correct and to delete on a task they can no longer open', async () => {
+        expect((await reaches(LOG, OUTSIDER, { isEdit: true, timeSheetId: OWN, ticketId: T_SECRET, projectId: P_OPEN })).through).toBe(true);
+        expect((await reaches(REMOVE, OUTSIDER, { timeSheetId: OWN, ticketId: T_SECRET, projectId: P_OPEN })).through).toBe(true);
+    });
+
+    it('opens nothing else: not new time on that task, not another person\'s entry, not another task', async () => {
+        expect((await reaches(LOG, OUTSIDER, { isEdit: false, timeSheetId: OWN, ticketId: T_SECRET, projectId: P_OPEN })).through).toBe(false);
+        expect((await reaches(LOG, OUTSIDER, { isEdit: true, timeSheetId: OF_SOMEONE_ELSE, ticketId: T_SECRET, projectId: P_OPEN })).through).toBe(false);
+        expect((await reaches(REMOVE, OUTSIDER, { timeSheetId: OF_SOMEONE_ELSE, ticketId: T_SECRET, projectId: P_OPEN })).through).toBe(false);
+        expect((await reaches(LOG, OUTSIDER, { isEdit: true, timeSheetId: OWN, ticketId: T_PRIVATE, projectId: P_OPEN })).through).toBe(false);
+    });
+});

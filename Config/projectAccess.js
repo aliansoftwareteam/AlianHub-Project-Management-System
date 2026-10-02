@@ -7,6 +7,7 @@ const { visibleProjectIds } = require('../Modules/Agents/scope');
 const { allowsProject } = require('./tokenNarrowing');
 const { PRIVATE_PROJECTS, seesEveryPrivateProject } = require('./rulePermissions');
 const { PROJECT_AGENT_FIELDS } = require('./projectAgentFields');
+const { sprintIdentities } = require('../Modules/Sprints/helpers/sprintVisibility');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TEAM_PREFIX = 'tId_';
@@ -208,14 +209,11 @@ const PROJECT_ACCESS_FIELDS = Object.freeze({ isPrivateSpace: 1, AssigneeUserId:
 const readStanding = async (companyId, uid) => {
     const roleType = await getRoleType(String(companyId || ''), String(uid || ''));
     const privileged = isPrivileged(roleType);
-    const teams = roleType === null || privileged ? [] : await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.TEAMS_MANAGEMENT, data: [{ assigneeUsersArray: { $in: [String(uid)] } }, { _id: 1 }],
-    }, 'find').catch(() => []);
     return {
         uid: String(uid || ''),
         roleType,
         privileged,
-        identities: new Set([String(uid), ...(teams || []).map((team) => `${TEAM_PREFIX}${team._id}`)]),
+        identities: new Set(roleType === null || privileged ? [String(uid)] : await sprintIdentities(companyId, uid)),
         everyPrivate: privileged || (roleType !== null && seesEveryPrivateProject(await evaluatePermission(companyId, uid, PRIVATE_PROJECTS))),
     };
 };

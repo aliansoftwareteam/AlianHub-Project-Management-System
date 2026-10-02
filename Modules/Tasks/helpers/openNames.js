@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
-const { canReadProject } = require('../../../Config/projectAccess');
+const { readableProjects } = require('../../../Config/projectAccess');
 const { readableTasks, TASK_READ_FIELDS } = require('./taskReadAccess');
 
 // A time log, a plan or an invoice line names its task and its project by id, and stays with the person after they
@@ -24,12 +24,9 @@ const openTasksById = async (companyId, uid, ids, fields = {}) => {
 };
 
 const openProjectsById = async (companyId, uid, ids, fields = {}) => {
-    const open = [];
-    for (const id of idsOf(ids)) {
-        if ((await canReadProject(companyId, uid, id)).allowed) open.push(id);
-    }
-    if (!open.length) return {};
-    return byId(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: open.map(oid) } }, fields] }, 'find') || []);
+    const wanted = idsOf(ids);
+    if (!wanted.length || !uid) return {};
+    return Object.fromEntries((await readableProjects(companyId, String(uid), wanted, fields)).open);
 };
 
 module.exports = { openTasksById, openProjectsById };

@@ -37,9 +37,9 @@ const threadNamedBy = async (companyId, fields) => {
 
 const opensThread = async (companyId, uid, thread) => (await commentThreadAccess(companyId, uid, thread)).allowed === true;
 
-/* Those of `userIds` who can open the project and, where the notice names a list or a task, that thread too. */
+/* Those of `userIds` who can open the thread: the project, and the list or task the notice names. */
 const readersOf = async (companyId, thread, userIds) => {
-    const readable = await Promise.all(userIds.map(async (uid) => (await canReadProject(companyId, uid, thread.projectId)).allowed && opensThread(companyId, uid, thread)));
+    const readable = await Promise.all(userIds.map((uid) => opensThread(companyId, uid, thread)));
     return userIds.filter((uid, index) => readable[index]);
 };
 

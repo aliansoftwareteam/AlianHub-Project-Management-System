@@ -72,8 +72,21 @@ const resolveSheetScope = async (companyId, uid, permissionKeys) => {
         everyone = (await Promise.all(keys.map((key) => grantsEveryone(companyId, uid, key)))).some(Boolean);
     }
     const visible = await visibleProjectsFor(companyId, scope);
-    const hiddenLists = scope.companyWide || !visible ? [] : await hiddenSprintIds(companyId, scope.uid, visible);
-    return { ...scope, everyone, visible, hiddenLists, closedTasks: await tasksOf(companyId, hiddenLists) };
+    const reading = { ...scope, everyone, visible };
+    return everyone && !scope.companyWide ? readingEveryone(companyId, reading) : reading;
+};
+
+/* The private lists of the projects a scope reads that its person is not on. An owner or admin reads past them. */
+const hiddenListsOf = async (companyId, scope) => {
+    if (scope.hiddenLists) return scope.hiddenLists;
+    return scope.companyWide || !scope.visible ? [] : hiddenSprintIds(companyId, scope.uid, scope.visible);
+};
+
+/* `scope` as it reads other people's rows: with the tasks it leaves theirs out for. Asked only by a read that
+ * shows everyone's time or plans; a person reading their own needs none of it. */
+const readingEveryone = async (companyId, scope) => {
+    const hiddenLists = await hiddenListsOf(companyId, scope);
+    return { ...scope, everyone: true, hiddenLists, closedTasks: await tasksOf(companyId, hiddenLists) };
 };
 
 /* The tasks of the private lists a person is not on. Their time and plans are their people's: someone who reads
@@ -124,6 +137,8 @@ module.exports = {
     resolveTimeScope,
     visibleProjectsFor,
     resolveSheetScope,
+    hiddenListsOf,
+    readingEveryone,
     scopedTimeMatch,
     scopedEstimateMatch,
     withoutHidden,
