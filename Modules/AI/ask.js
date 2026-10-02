@@ -98,7 +98,7 @@ const gather = async (companyId, uid, { question, projectId, limit = MAX_PER_TYP
     const searchIds = named || ids;
 
     const terms = searchTerms(question);
-    const taskMatch = { deletedStatusKey: { $ne: 1 }, ProjectID: { $in: searchIds }, ...(await hiddenSprintFilter(companyId, uid, searchIds)) };
+    const taskMatch = { deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, ProjectID: { $in: searchIds }, ...(await hiddenSprintFilter(companyId, uid, searchIds)) };
     const textMatch = orRegex(terms, ['TaskName', 'TaskKey', 'rawDescription']);
     if (textMatch) Object.assign(taskMatch, textMatch);
 

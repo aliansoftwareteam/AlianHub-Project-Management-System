@@ -97,6 +97,20 @@ describe('POST /api/v1/wasabi/uploadFile', () => {
         expect(tempFiles()).toEqual(before);
     });
 
+    it('leaves no temporary file when what follows the file in the request has it refused', async () => {
+        const before = tempFiles();
+        const form = new FormData();
+        form.append('companyId', COMPANY_A);
+        form.append('path', `Reminders/${COMPANY_A}/${USER}/note.txt`);
+        form.append('file', new Blob(['f35d wasabi body']), 'note.txt');
+        form.append('companyId', COMPANY_B);
+        const res = await fetch(`${baseURL}/api/v1/wasabi/uploadFile`, { method: 'POST', body: form });
+
+        expect(res.status).toBe(403);
+        expect(s3Send).not.toHaveBeenCalled();
+        expect(tempFiles()).toEqual(before);
+    });
+
     it('uploads for an active member of the company', async () => {
         const res = await multipart({ companyId: COMPANY_A, path: `Reminders/${COMPANY_A}/${USER}/note.txt` });
         expect(res.status).toBe(200);

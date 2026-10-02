@@ -10,8 +10,9 @@ const { getRoleType } = require('../../../Config/permissionGuard');
 const { ROLE_GUEST } = require('../../../Config/roleTypes');
 const { resolveRate } = require('../../TimeSheet/helpers/billingRules');
 const math = require('../helpers/billingMath');
-const { memberProfiles, activeMemberIds } = require('../../../utils/companyMembers');
+const { memberProfiles } = require('../../../utils/companyMembers');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { namedPeopleRefusal } = require('../../../Config/projectPeople');
 
 // Billing contract + milestone rollups (handoff 19a / 19b).
 //
@@ -59,11 +60,11 @@ const resolveUserNames = async (companyId, userIds) => {
     return out;
 };
 
-const signOffRefused = async (companyId, signOffUserId) => {
+const signOffRefused = async (companyId, projectId, signOffUserId) => {
     if (!signOffUserId) return false;
-    return !(await activeMemberIds(companyId, [signOffUserId])).length;
+    return typeof signOffUserId !== 'string' || Boolean(await namedPeopleRefusal(companyId, projectId, [signOffUserId]));
 };
-const SIGN_OFF_REFUSAL = 'The sign-off person has to be a member of this workspace.';
+const SIGN_OFF_REFUSAL = 'The sign-off person has to be a member of this workspace who can open the project.';
 
 const toEpoch = (value) => {
     if (value === null || value === undefined || value === '') return 0;
@@ -117,7 +118,7 @@ const loadMilestones = (companyId, projectId) => MongoDbCrudOpration(companyId, 
 const loadProjectTasks = (companyId, projectId) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.TASKS,
     data: [
-        { ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: 0 },
+        { ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: 0, mainChat: { $ne: true } },
         '_id TaskKey TaskName status statusType DueDate startDate AssigneeUserId',
     ],
 }, 'find');
@@ -439,7 +440,7 @@ exports.createBillingMilestone = async (req, res) => {
             return res.send({ status: false, statusText: 'A milestone amount must be a non-negative number.' });
         }
 
-        if (await signOffRefused(companyId, signOffUserId)) return res.send({ status: false, statusText: SIGN_OFF_REFUSAL });
+        if (await signOffRefused(companyId, projectId, signOffUserId)) return res.send({ status: false, statusText: SIGN_OFF_REFUSAL });
         const existing = await loadMilestones(companyId, projectId);
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.MILESTONE,
@@ -500,7 +501,7 @@ exports.updateBillingMilestone = async (req, res) => {
         if (body.dueDate !== undefined) { set.dueDate = toEpoch(body.dueDate); set.endDate = toEpoch(body.dueDate); }
         if (body.startDate !== undefined) set.startDate = toEpoch(body.startDate);
         if (body.signOffUserId !== undefined) {
-            if (await signOffRefused(companyId, body.signOffUserId)) return res.send({ status: false, statusText: SIGN_OFF_REFUSAL });
+            if (await signOffRefused(companyId, projectId, body.signOffUserId)) return res.send({ status: false, statusText: SIGN_OFF_REFUSAL });
             set.signOffUserId = String(body.signOffUserId || '');
         }
         if (body.taskIds !== undefined) {

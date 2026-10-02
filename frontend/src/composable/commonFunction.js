@@ -282,6 +282,9 @@ export const companyPrioritiesIcons = (key) => {
     return result[0];
 }
 
+/* '' for a picture the company uploaded, which storage holds, and for a priority the app has no icon for. */
+export const bundledPriorityIcon = (option) => (isBundledPriorityImage(option?.statusImage) ? companyPrioritiesIcons(option?.value)?.statusImage || '' : '');
+
 export const getImageUrl = (item) => {
     const { name, appStatus } = item;
 

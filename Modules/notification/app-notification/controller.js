@@ -4,6 +4,9 @@ const { Notification_key } = require("../../../Config/notificationKey.js");
 const mongoose = require("mongoose")
 const { mentionsKeptFromAgent, noticesKeptFromAgent, withoutKept } = require("../../Comments/helpers/agentChatRows");
 
+/* What an agent's request leaves alone among the notices or the mentions of the person. */
+const rowsKeptFromAgent = (req, userId, ofNotices) => (ofNotices ? noticesKeptFromAgent : mentionsKeptFromAgent)(req.headers['companyid'], userId);
+
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
 const fail = (res, code, message) => res.status(code).json({ status: false, statusText: message, message });
@@ -146,7 +149,7 @@ exports.updateMarkRead = async (req, res) => {
 
         const query = {
             type: isNotification ? SCHEMA_TYPE.NOTIFICATIONS : SCHEMA_TYPE.MENTIONS,
-            data: [filter, update],
+            data: [withoutKept(filter, await rowsKeptFromAgent(req, userId, isNotification)), update],
         };
 
         const response = await MongoDbCrudOpration(req.headers['companyid'], query, 'updateOne');
@@ -200,7 +203,7 @@ exports.updateMarkAllRead = async (req, res) => {
 
         const query = {
             type: key === 'notifications' ? SCHEMA_TYPE.NOTIFICATIONS : SCHEMA_TYPE.MENTIONS,
-            data: params,
+            data: [withoutKept(params[0], await rowsKeptFromAgent(req, userId, key === 'notifications')), params[1]],
         };
 
         const response = await MongoDbCrudOpration(req.headers['companyid'], query, 'updateMany');

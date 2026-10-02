@@ -57,6 +57,7 @@ const flowFor = async (companyId, uid, projectId, { from, to, utc = false } = {}
                 ProjectID: projectObjId,
                 deletedStatusKey: { $in: [0, 2, undefined] },
                 isParentTask: true,
+                mainChat: { $ne: true },
                 ...(await hiddenSprintFilter(companyId, uid, [projectId])),
             },
             '_id statusType createdAt updatedAt',

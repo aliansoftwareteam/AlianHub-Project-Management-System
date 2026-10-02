@@ -10,7 +10,7 @@ vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => nul
 
 import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
 import ApprovalQueue from '@/views/Inbox/ApprovalQueue.vue';
-import { broughtBack, canChoose, chosenParts, keptCounts, pickNames, toggled } from '@/components/molecules/IntentPreview/planPicks';
+import { broughtBack, canChoose, chosenParts, heldWith, keptCounts, lockedParts, pickNames, toggled } from '@/components/molecules/IntentPreview/planPicks';
 
 const i18n = () => createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
 
@@ -255,6 +255,163 @@ describe('the automations and first tasks of a plan on its card', () => {
         const heads = (kind) => wrapper.findAll(`[data-test="intent-line"][data-kind="${kind}"]`).map((el) => [el.find('dt').text(), el.classes().includes('is-more')]);
         expect(heads('planRule')).toEqual([['Automations', false], ['Automations', true]]);
         expect(heads('planTask')).toEqual([['First tasks', false], ['First tasks', true], ['First tasks', true]]);
+    });
+});
+
+describe('a part of a plan that an owner or admin approves', () => {
+    const NOTE = 'An owner or admin approves this part';
+    const forMember = () => ({
+        kind: 'setup',
+        title: 'Website',
+        lines: [
+            { kind: 'newLists', names: ['Backlog'], picks: ['lists:0'] },
+            { kind: 'planRule', text: 'When a task is created, notify its assignees', pick: 'rules:0' },
+            { kind: 'planTask', name: 'Write the brief', list: 'Backlog', status: '', assignee: '', hidden: 0, due: '', pick: 'tasks:0' },
+            { kind: 'planTask', name: 'Collect the logins', list: '', status: '', assignee: '', hidden: 0, due: '', pick: 'tasks:1' },
+        ],
+        needs: { 'tasks:0': ['lists:0'] },
+        locked: ['rules:0', 'tasks:1'],
+    });
+    const forOwner = () => ({ ...forMember(), locked: undefined });
+    const mountCard = (props) => {
+        wrapper = mount(IntentPreview, { attachTo: document.body, props: { preview: forMember(), ...props }, global: { plugins: [i18n()], stubs: { ShellIcon: true } } });
+        return wrapper;
+    };
+    const box = (key) => wrapper.find(`[data-test="intent-pick"][data-pick="${key}"]`);
+    const line = (key) => box(key).element.closest('[data-test="intent-line"]');
+
+    it('is left out of what is sent whatever is ticked, and cannot be ticked back', () => {
+        expect(lockedParts(forMember())).toEqual(['rules:0', 'tasks:1']);
+        expect(lockedParts(forOwner())).toEqual([]);
+        expect(lockedParts({ ...forMember(), locked: ['rules:9', 7] })).toEqual([]);
+        expect(chosenParts(forMember(), [])).toEqual({ lists: [0], rules: [], tasks: [0] });
+        expect(chosenParts(forMember(), ['lists:0', 'tasks:0'])).toEqual({ lists: [], rules: [], tasks: [] });
+        expect(chosenParts(forOwner(), [])).toBeNull();
+        expect(toggled(forMember(), [], 'rules:0')).toEqual([]);
+        expect(toggled(forMember(), [], 'lists:0')).toEqual(['lists:0', 'tasks:0']);
+    });
+
+    it('leaves out what cannot be made without it', () => {
+        const preview = { ...forMember(), needs: { 'tasks:0': ['lists:0', 'rules:0'] }, locked: ['rules:0'] };
+        expect(lockedParts(preview)).toEqual(['rules:0', 'tasks:0']);
+        expect(chosenParts(preview, [])).toEqual({ lists: [0], rules: [], tasks: [1] });
+    });
+
+    it('is shown unticked and held, with a plain line saying who approves it', () => {
+        mountCard({ choosable: true });
+        expect(box('rules:0').element.checked).toBe(false);
+        expect(box('rules:0').element.disabled).toBe(true);
+        expect(box('tasks:1').element.checked).toBe(false);
+        expect(box('tasks:1').element.disabled).toBe(true);
+        expect(line('rules:0').classList.contains('is-out')).toBe(true);
+        expect(wrapper.findAll('[data-test="intent-pick-locked"]').map((el) => el.text())).toEqual([NOTE, NOTE]);
+        expect(line('rules:0').querySelector('[data-test="intent-pick-locked"]')).not.toBeNull();
+        expect(box('rules:0').element.closest('label').textContent).toContain(NOTE);
+    });
+
+    it('leaves every other part ticked and free to untick', async () => {
+        mountCard({ choosable: true });
+        expect(box('lists:0').element.checked).toBe(true);
+        expect(box('lists:0').element.disabled).toBe(false);
+        expect(box('tasks:0').element.checked).toBe(true);
+        expect(line('tasks:0').querySelector('[data-test="intent-pick-locked"]')).toBeNull();
+        box('rules:0').element.dispatchEvent(new Event('change'));
+        expect(wrapper.emitted('update:leftOut')).toBeUndefined();
+        await box('tasks:0').trigger('change');
+        expect(wrapper.emitted('update:leftOut')).toEqual([[['tasks:0']]]);
+    });
+
+    it('says nothing of it on the card of an owner or admin, or where nothing can be chosen', () => {
+        wrapper = mount(IntentPreview, { attachTo: document.body, props: { preview: forOwner(), choosable: true }, global: { plugins: [i18n()], stubs: { ShellIcon: true } } });
+        expect(wrapper.findAll('[data-test="intent-pick-locked"]')).toHaveLength(0);
+        expect(wrapper.findAll('[data-test="intent-pick"]').every((el) => el.element.checked && !el.element.disabled)).toBe(true);
+        wrapper.unmount();
+        mountCard({});
+        expect(wrapper.findAll('[data-test="intent-pick-locked"]')).toHaveLength(0);
+    });
+
+    it('is not sent with a member\'s approval from the queue', async () => {
+        sendProposalDecision.mockReset();
+        sendProposalDecision.mockImplementation(() => Promise.resolve({ data: { status: true, data: { applied: [{ ok: true }], undoUntil: '2026-10-02T09:15:00.000Z' } } }));
+        const row = {
+            sourceType: 'proposal', sourceId: 'p1', proposalId: 'p1', kind: 'proposal', agentName: 'Claude', source: 'mcp', requestedBy: '', what: 'project.setup', why: 'Because',
+            changes: [{ action: 'project.setup', label: 'Set up the project', reversible: true, preview: forMember() }], gate: null, locked: false, editable: false, createdAt: '2026-10-02T09:00:00.000Z', unread: true,
+        };
+        wrapper = mount(ApprovalQueue, { attachTo: document.body, props: { proposals: [row] }, global: { plugins: [i18n()], stubs: { ShellIcon: true } } });
+        expect(wrapper.find('[data-test="intent-pick-locked"]').text()).toBe(NOTE);
+        await wrapper.find('[data-test="queue-approve"]').trigger('click');
+        await flushPromises();
+        expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'approve', { parts: { 0: { lists: [0], rules: [], tasks: [0] } } });
+    });
+
+    it('is not counted as ticked', () => {
+        expect(keptCounts(forMember(), [])).toEqual([{ part: 'rules', kept: 0, of: 1 }, { part: 'tasks', kept: 1, of: 2 }]);
+        expect(keptCounts(forMember(), ['tasks:0'])).toEqual([{ part: 'rules', kept: 0, of: 1 }, { part: 'tasks', kept: 0, of: 2 }]);
+        expect(keptCounts(forOwner(), [])).toEqual([]);
+        mountCard({ choosable: true });
+        expect(wrapper.find('[data-test="intent-pick-kept"]').text()).toBe('Ticked: 0 of 1 automation, 1 of 2 first tasks.');
+    });
+
+    it('is headed with the other parts of its kind, and keeps its line under the shared heading', () => {
+        mountCard({ choosable: true });
+        const tasks = wrapper.findAll('[data-test="intent-line"][data-kind="planTask"]');
+        expect(tasks.map((el) => el.find('dt').text())).toEqual(['First tasks', 'First tasks']);
+        expect(tasks[1].classes()).toEqual(expect.arrayContaining(['is-more', 'is-out']));
+        expect(tasks[1].find('[data-test="intent-pick-locked"]').text()).toBe(NOTE);
+        expect(box('tasks:1').element.closest('label').classList.contains('is-out')).toBe(true);
+    });
+
+    describe('beside a part that leaves and comes back', () => {
+        const alsoNeedsTheList = () => ({ ...forMember(), needs: { 'tasks:0': ['lists:0'], 'tasks:1': ['lists:0'] } });
+
+        it('is not one of the parts a tick moves', () => {
+            expect(toggled(alsoNeedsTheList(), [], 'lists:0')).toEqual(['lists:0', 'tasks:0']);
+            expect(toggled(alsoNeedsTheList(), ['lists:0', 'tasks:0', 'tasks:1'], 'tasks:0')).toEqual([]);
+            expect(broughtBack(alsoNeedsTheList(), ['tasks:0', 'tasks:1'], ['tasks:0', 'tasks:1'])).toEqual(['tasks:1']);
+            expect(chosenParts(alsoNeedsTheList(), [])).toEqual({ lists: [0], rules: [], tasks: [0] });
+        });
+
+        it('stays out of the line that says what else was left out, and stays unticked when that part is ticked back', async () => {
+            mountCard({ preview: alsoNeedsTheList(), choosable: true });
+            await box('lists:0').trigger('change');
+            expect(wrapper.emitted('update:leftOut')).toEqual([[['lists:0', 'tasks:0']]]);
+            expect(wrapper.find('[data-test="intent-pick-also"]').text()).toBe('“Write the brief” is left out too: it needs “Backlog”.');
+            await wrapper.setProps({ leftOut: ['lists:0', 'tasks:0'] });
+            await box('lists:0').trigger('change');
+            expect(wrapper.emitted('update:leftOut')[1]).toEqual([[]]);
+            expect(wrapper.find('[data-test="intent-pick-also"]').text()).toBe('“Write the brief” is back too: it was left out with “Backlog”.');
+            await wrapper.setProps({ leftOut: [] });
+            expect(box('tasks:0').element.checked).toBe(true);
+            expect(box('tasks:1').element.checked).toBe(false);
+            expect(box('tasks:1').element.disabled).toBe(true);
+            expect(wrapper.find('[data-test="intent-pick-kept"]').text()).toBe('Ticked: 0 of 1 automation, 1 of 2 first tasks.');
+        });
+    });
+
+    describe('that another part needs', () => {
+        const taskNeedsTheRule = () => ({ ...forMember(), needs: { 'tasks:0': ['lists:0', 'rules:0'] }, locked: ['rules:0'] });
+
+        it('holds that part out with it', () => {
+            expect(heldWith(taskNeedsTheRule())).toEqual([{ key: 'rules:0', held: ['tasks:0'] }]);
+            expect(heldWith(forMember())).toEqual([{ key: 'rules:0', held: [] }, { key: 'tasks:1', held: [] }]);
+            expect(heldWith(forOwner())).toEqual([]);
+            expect(toggled(taskNeedsTheRule(), [], 'tasks:0')).toEqual([]);
+            expect(keptCounts(taskNeedsTheRule(), [])).toEqual([{ part: 'rules', kept: 0, of: 1 }, { part: 'tasks', kept: 1, of: 2 }]);
+        });
+
+        it('is named as the reason that part is left out too, from the start', () => {
+            mountCard({ preview: taskNeedsTheRule(), choosable: true });
+            expect(wrapper.findAll('[data-test="intent-pick-held"]').map((el) => el.text())).toEqual(['“Write the brief” is left out too: it needs “When a task is created, notify its assignees”.']);
+            expect(box('tasks:0').element.checked).toBe(false);
+            expect(box('tasks:0').element.disabled).toBe(true);
+            expect(line('tasks:0').querySelector('[data-test="intent-pick-locked"]')).toBeNull();
+            expect(box('tasks:1').element.disabled).toBe(false);
+        });
+
+        it('says nothing more where no other part needs it', () => {
+            mountCard({ choosable: true });
+            expect(wrapper.findAll('[data-test="intent-pick-held"]')).toHaveLength(0);
+        });
     });
 });
 

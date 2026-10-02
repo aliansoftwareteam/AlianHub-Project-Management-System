@@ -166,7 +166,7 @@
 <script setup>
 
 defineOptions({ name: "LoginPage" });
-import { computed, inject, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, inject, nextTick, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -269,7 +269,8 @@ const handleSubmit = async () => {
             twoFactor.tempToken = user.data.tempToken;
             twoFactor.expiresAt = Date.now() + 5 * 60 * 1000;
             step.value = "twofa";
-            setTimeout(() => codeInputs.value[0]?.focus(), 50);
+            await nextTick();
+            codeInputs.value[0]?.focus();
             return;
         }
         await proceedAfterAuth(user.data.uid);

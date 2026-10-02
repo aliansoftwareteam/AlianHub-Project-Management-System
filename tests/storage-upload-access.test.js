@@ -202,6 +202,19 @@ describe('POST /api/v1/storage/uploadFile on server storage', () => {
         expect(fs.existsSync(path.join(STORAGE_ROOT, 'USER_PROFILES', filePath))).toBe(false);
     });
 
+    it('leaves no file behind when what follows the file in the request has it refused', async () => {
+        const filePath = `Reminders/${COMPANY_A}/${USER}/${hex()}.txt`;
+        const form = new FormData();
+        form.append('companyId', COMPANY_A);
+        form.append('path', filePath);
+        form.append('file', new Blob(['f35d upload body']), 'note.txt');
+        form.append('companyId', COMPANY_B);
+        const res = await fetch(`${baseURL}/upload`, { method: 'POST', headers: { 'x-uid': USER, 'x-aud': COMPANY_A }, body: form });
+
+        expect(res.status).toBe(403);
+        expect(fs.existsSync(path.join(STORAGE_ROOT, COMPANY_A, filePath))).toBe(false);
+    });
+
     it('stores an upload from an active member of the company', async () => {
         const filePath = `Reminders/${COMPANY_A}/${USER}/${hex()}.txt`;
         const res = await send({ companyId: COMPANY_A, filePath });

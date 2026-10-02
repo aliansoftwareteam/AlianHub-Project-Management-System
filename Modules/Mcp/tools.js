@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const { oid } = require('../Automations/engine/tools');
+const { escapeRegex } = require('../../utils/escapeRegex');
 const { buildBrief } = require('./brief');
 const { PAGE_TEXT_MAX, pageText } = require('./pageText');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
@@ -94,8 +95,8 @@ const TOOLS = [
         visibility: 'filtered',
         run: async (ctx, args, vis) => {
             const filter = taskFilter(ctx, vis, args.projectId);
-            if (args.query) filter.TaskName = { $regex: str(args.query, 120).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
-            if (args.status) filter.status = { $regex: `^${str(args.status, 60)}$`, $options: 'i' };
+            if (args.query) filter.TaskName = { $regex: escapeRegex(str(args.query, 120)), $options: 'i' };
+            if (args.status) filter.status = { $regex: `^${escapeRegex(str(args.status, 60))}$`, $options: 'i' };
             const planning = managesTasks(ctx);
             const named = args.sprintId !== undefined && args.sprintId !== '';
             const inList = workFlag.enabled() && named ? await workTools.listRows(ctx, vis, args.sprintId) : null;

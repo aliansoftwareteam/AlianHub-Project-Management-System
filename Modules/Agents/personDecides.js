@@ -26,15 +26,15 @@ const personDecides = async (req, res, action, refusal = SESSION_ONLY) => {
     return false;
 };
 
-/* The same rule in front of a handler, for a route that mounts it. */
-const decidedByPerson = (action, refusal) => async (req, res, next) => {
+/* The same rule in front of a handler, for a route that mounts it. `refusesAs` is read by the agent perimeter. */
+const decidedByPerson = (action, refusal) => Object.assign(async (req, res, next) => {
     try {
         return (await personDecides(req, res, action, refusal)) ? next() : undefined;
     } catch (e) {
         logger.error(`decidedByPerson: ${e.message}`);
         return res.status(500).json({ status: false, message: 'The check failed.', statusText: 'The check failed.' });
     }
-};
+}, { refusesAs: action });
 
 /* What an agent may do, and what runs with no person there, is a decision too: the routes that set either mount this. */
 const setByPerson = (action) => decidedByPerson(action, SESSION_SETS);

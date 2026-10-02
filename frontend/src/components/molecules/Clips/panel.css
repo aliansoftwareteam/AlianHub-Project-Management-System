@@ -38,7 +38,7 @@
     min-width: 0;
     font-size: 14px;
     font-weight: 600;
-    color: #fff;
+    color: var(--on-brand);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -53,7 +53,7 @@
     width: 26px;
     height: 26px;
     padding: 0;
-    color: rgba(255, 255, 255, 0.82);
+    color: color-mix(in srgb, var(--on-brand) 82%, transparent);
     background: transparent;
     border: 0;
     border-radius: 6px;
@@ -61,8 +61,8 @@
 }
 .cl__hbtn:hover,
 .cl__hbtn.is-on {
-    background: rgba(255, 255, 255, 0.16);
-    color: #fff;
+    background: color-mix(in srgb, var(--on-brand) 16%, transparent);
+    color: var(--on-brand);
 }
 
 /* ── Search ────────────────────────────────────────────────────────── */

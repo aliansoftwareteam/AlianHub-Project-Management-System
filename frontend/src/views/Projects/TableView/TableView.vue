@@ -172,6 +172,7 @@ import { columnCatalogue, gridMinWidth, gridTracks, useViewColumns } from '@/vie
 import { handleGridKey } from './gridKeyboard';
 import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
 import { isSortableField, valuePath } from '@/views/Projects/composables/customFieldQuery';
+import { useGroupSource } from '@/views/Projects/composables/groupSource';
 
 // PACKAGES
 import { useStore } from 'vuex';
@@ -309,6 +310,12 @@ function load(refetch) {
 
 watch([() => props.grouped, () => props.sprints, taskData], ([newGroup, newSprints], [oldGroup, oldSprints]) => {
     load(!isEqual(newGroup, oldGroup) || JSON.stringify(newSprints) !== JSON.stringify(oldSprints));
+});
+
+/* A group that is new reads its own rows as it is drawn (TableViewTable). */
+useGroupSource(project, () => props.grouped, () => {
+    load(false);
+    scheduleGroupCounts();
 });
 
 onMounted(() => {

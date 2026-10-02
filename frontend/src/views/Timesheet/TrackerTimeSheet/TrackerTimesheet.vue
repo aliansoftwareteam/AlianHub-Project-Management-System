@@ -192,6 +192,7 @@
     import * as env from '@/config/env';
     import { isOwnerOrAdmin } from "@/utils/roles";
     import { maskOf } from '@/utils/iconMask';
+    import { dayRange, hourSlots, hoursWithLogs, logsOf, shotsIn } from './trackerDay';
     const homeIcon = require('@/assets/images/home_icon.png');
     const backIcon = require('@/assets/images/svg/filter_back_icon.svg');
     const filterIcon = require('@/assets/images/svg/filter_icon.svg');
@@ -358,12 +359,7 @@
     }
     const getTimeSlot = () => {
         resetLogRange();
-        timeSlots.value = [];
-        for (let i = 0; i < 24; i++) {
-            let startTime = new Date(dateValue.value).setHours(i,0,0)
-            let endTime = new Date(dateValue.value).setHours(i+1,0,0)
-            timeSlots.value.push({time:i , inRange: false , start: startTime, end: endTime , trackShot: []});
-        }
+        timeSlots.value = hourSlots(dateValue.value);
     }
     function debouncer(timeout = 1000) {
         return new Promise((resolve) => {
@@ -420,134 +416,50 @@
             console.error(error);
         }
     }
-    const getTrackerTimesheetData = () => {
+    const dayLogs = ref([]);
+    let dayReads = 0;
+    /* One request for the whole day (./trackerDay.js). A later date or filter asks again, and the earlier answer is dropped. */
+    const getTrackerTimesheetData = async () => {
         subSpinner.value = true;
-        let batchObject = {first: [], second: [], third: []};
-        for (let i = 0; i < timeSlots.value.length; i++) {
-            if (i < 8) {
-                batchObject.first.push(timeSlots.value[i])
-            } else if (i >= 8 && i < 16) {
-                batchObject.second.push(timeSlots.value[i])
-            } else {
-                batchObject.third.push(timeSlots.value[i])
-            }
+        dayReads += 1;
+        const read = dayReads;
+        let logs = [];
+        try {
+            const userArray = await queryFunction();
+            const result = await apiRequest("post", `${env.TIMESHEET}/tracker`, {
+                selectedFilter: selectedFilters.value,
+                userArray,
+                ...dayRange(dateValue.value),
+                isEveryOne: isEveryOne.value
+            });
+            logs = logsOf(result?.data, projects.value);
+        } catch (error) {
+            console.error(error);
         }
-        
-        let count = 0;
-        let countFunction = (row) => {
-            if (count >= Object.keys(batchObject).length) {
-                finalRange.value.sort((a,b)=> a.time - b.time);
-                
-                let first = logRange.value.find((ele)=> ele.inRange)
-                if (first) {
-                    selectedSlot.value = first.time
-                    getDBData().catch((e) => {
-                        subSpinner.value = false;
-                        console.error(e)
-                    })
-                } else {
-                    subSpinner.value = false;
-                }
-                return;
-            } else {
-                let promise = []
-                row.forEach((ele) => {
-                    promise.push(executeQuery(ele));
-                })
-                Promise.allSettled(promise).then(()=>{
-                    count++;
-                    countFunction(batchObject[Object.keys(batchObject)[count]]);
-                }).catch((error)=>{
-                    console.error(error);
-                    count++;
-                    countFunction(batchObject[Object.keys(batchObject)[count]]);
-                })
-            }
+        if (read !== dayReads) return;
+        dayLogs.value = logs;
+        hoursWithLogs(logs, timeSlots.value).forEach((hour) => {
+            const ind = logRange.value.findIndex((x) => x.time === hour);
+            logRange.value[ind] = {time: hour, inRange: true};
+            finalRange.value.push({...logRange.value[ind], isSelected: false});
+        });
+        const first = logRange.value.find((ele) => ele.inRange);
+        if (!first) {
+            subSpinner.value = false;
+            return;
         }
-        countFunction(batchObject[Object.keys(batchObject)[count]]);
+        selectedSlot.value = first.time;
+        getDBData().catch((e) => {
+            subSpinner.value = false;
+            console.error(e);
+        });
     }
-    const getTrackShotData = (element) => {
-        return new Promise((resolve, reject) => {
-            try {
-                if (timeSlots.value[element].trackShot.length === 0) {
-                    let start = Math.floor(timeSlots.value[element].start / 1000);
-                    let end = Math.floor(timeSlots.value[element].end / 1000);
-                    queryFunction().then((userArr) => {
-                        const axiosObj = {
-                            selectedFilter : selectedFilters.value,
-                            userArray: userArr,
-                            start: start,
-                            end: end,
-                            isEveryOne: isEveryOne.value
-                        }
-                        apiRequest("post", `${env.TIMESHEET}/tracker`,axiosObj)
-                        .then((result) => {
-                            const timesheet = result.data; 
-                            let arrayData = [];
-                            let finalresult = timesheet.filter( (x)=>{
-                                 x.data =  x.data.filter( (y)=>{
-                                    let isProject =  projects.value.find((z)=> z._id == y.ProjectId)
-                                    if (isProject) {
-                                        return true;
-                                    }
-                                })
-                                if (x.data.length) {
-                                    return true
-                                }
-                            })
-                            finalresult.map((vals) => {
-                                let docTemp = vals;
-                                arrayData.push({ ...docTemp, 'logAddType': docTemp.logAddType ? docTemp.logAddType : 0 });
-                            })
-
-                            // Use reduce to concatenate 'data' arrays
-                            const finalData = arrayData.reduce((accumulator, currentValue) => {
-                                return accumulator.concat(currentValue.data);
-                            }, []);
-
-                            let array = [];
-                            finalData.forEach((row) => {
-                                if (row.trackShots && row.trackShots.length) {
-                                    row.trackShots.forEach((track) => {
-                                        let screenShotTime = track.screenShotTime ? Number(track.screenShotTime) : new Date().getTime()
-                                        if (screenShotTime >= start * 1000 && screenShotTime <= end * 1000) {
-                                            let proInd = projects.value.findIndex((x) => x._id === row.ProjectId)
-                                            let obj = {
-                                                time: screenShotTime,
-                                                image: track.image,
-                                                trackShots: track,
-                                                userId: row.Loggeduser,
-                                                memoName: row.LogDescription,
-                                                projectName: proInd !== -1 ? projects.value[proInd].ProjectName : '',
-                                                projectKey: proInd !== -1 ? projects.value[proInd].ProjectCode : '',
-                                                userProfile: getUser(row.Loggeduser)?.Employee_profileImageURL,
-                                                userName: getUser(row.Loggeduser)?.Employee_Name,
-                                                taskId: row.TicketID,
-                                                companyId: companyId.value,
-                                                projectId: row.ProjectId
-                                            }
-                                            array.push(obj);
-                                        }
-                                    })
-                                }
-                            })
-
-                            timeSlots.value[element].trackShot = array;
-                            timeSlotObj.value = timeSlots.value[element];
-                            resolve(timeSlots.value[element].trackShot);
-                        })
-                    }).catch((error)=>{
-                        reject(error);
-                        console.error(error);
-                    })
-                }
-                else {
-                    resolve([])
-                }            
-            } catch (error) {
-                reject(error);
-            }
-        })
+    const getTrackShotData = async (element) => {
+        const slot = timeSlots.value[element];
+        if (slot.trackShot.length) return [];
+        slot.trackShot = shotsIn(dayLogs.value, slot, { projects: projects.value, userOf: getUser, companyId: companyId.value });
+        timeSlotObj.value = slot;
+        return slot.trackShot;
     }
     function handleFilterItem(selectedItem, type, isUser=false){
         debouncerWithPromise(400).then(()=>{
@@ -593,58 +505,6 @@
                 }
 
                 resolve(userArray);
-            } catch (error) {
-                reject(error);
-            }
-        })
-    }
-    const executeQuery = (ele) => {
-        return new Promise((resolve, reject) => {
-            try {
-                let start = Math.floor(ele.start / 1000);
-                let end = Math.floor(ele.end / 1000);
-                queryFunction().then((userArr) => {
-                    const axiosObj = {
-                        selectedFilter : selectedFilters.value,
-                        userArray: userArr,
-                        start: start,
-                        end: end,
-                        isEveryOne: isEveryOne.value
-                    }
-                    apiRequest("post", `${env.TIMESHEET}/tracker`,axiosObj)
-                    .then((result) => {
-                        const timesheet = result.data;
-                        if (timesheet.length) {
-                            let finalresult = timesheet.filter( (x)=>{
-                                 x.data =  x.data.filter( (y)=>{
-                                    let isProject =  projects.value.find((z)=> z._id == y.ProjectId)
-                                    if (isProject) {
-                                        return true;
-                                    }
-                                })
-                                if (x.data.length) {
-                                    return true
-                                }
-                            })
-                            if (finalresult.length) {
-                                let ind = logRange.value.findIndex((x) => x.time === ele.time);
-                                logRange.value[ind] = {time: ele.time, inRange: true}
-                                finalRange.value.push({...logRange.value[ind], isSelected: false})
-                                resolve();
-                            } else {
-                                resolve();
-                            }
-                        } else {
-                            resolve();
-                        }
-                    }).catch((error) => {
-                        console.error(error);
-                        reject();
-                    })
-                }).catch((error)=>{
-                    console.error(error);
-                    reject(error)
-                })
             } catch (error) {
                 reject(error);
             }

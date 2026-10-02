@@ -5,22 +5,21 @@ const { mayListTasksIn } = require('./taskListProjects');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { visibilityStage, toObjectIds } = require('./taskQueryGuard');
-const { agentOf } = require('../../../Config/agentRequest');
+const { inConversation } = require('../../Comments/helpers/conversationReaders');
 
 /* Deleted, archived, or in a deleted project. */
 const NOT_LIVE = Object.freeze([1, 2, 7]);
 
 /* A record with no project behind it has no project rule to inherit. The only such records the
  * app writes are main-chat conversations, which belong to the people in them, owners included;
- * anything else (a task whose project is gone) is refused. An agent's request opens none of them. */
-const isChatParticipant = (task, uid) => task.mainChat === true && !agentOf(uid)
-    && (task.AssigneeUserId || []).map(String).includes(String(uid));
-
+ * anything else (a task whose project is gone) is refused. A conversation kept in a project is
+ * read by the people in it who can open that project, and by nobody else who can. */
 const canReadTask = async (companyId, uid, task) => {
     if (!task) return false;
     const project = await canReadProject(companyId, uid, task.ProjectID);
-    if (project.missing) return isChatParticipant(task, uid);
+    if (project.missing) return task.mainChat === true && inConversation(task, uid);
     if (!project.allowed) return false;
+    if (task.mainChat === true && !inConversation(task, uid)) return false;
     if (isPrivileged(await getRoleType(companyId, uid))) return true;
     if (!(await mayListTasksIn(companyId, uid, task.ProjectID))) return false;
     return canSeeSprintById(companyId, uid, task.sprintId);

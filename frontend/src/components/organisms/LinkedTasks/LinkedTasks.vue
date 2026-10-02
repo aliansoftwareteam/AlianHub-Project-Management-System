@@ -84,6 +84,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 // UTILS
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { typedSearchText } from '@/utils/searchText';
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 
 const { t } = useI18n();
@@ -210,6 +211,7 @@ function startAdding() {
     nextTick(() => searchInputRef.value?.focus());
 }
 defineExpose({ startAdding });
+const emit = defineEmits(['changed']);
 
 function cancelAdding() {
     isAdding.value = false;
@@ -228,7 +230,7 @@ function searchTasks() {
         return;
     }
     isSearching.value = true;
-    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const text = typedSearchText(query);
     const findQuery = [
         {
             // ProjectID is stored as an ObjectId; aggregate $match skips mongoose
@@ -238,8 +240,8 @@ function searchTasks() {
                 ProjectID: { objId: { $in: [props.task.ProjectID] } },
                 deletedStatusKey: { $in: [0, undefined] },
                 $or: [
-                    { TaskName: { $regex: escaped, $options: 'i' } },
-                    { TaskKey: { $regex: escaped, $options: 'i' } },
+                    { TaskName: { $regex: text, $options: 'i' } },
+                    { TaskKey: { $regex: text, $options: 'i' } },
                 ],
             }
         },
@@ -273,6 +275,7 @@ function addRelation(targetTask) {
             $toast.success(response.data.statusText, { position: "top-right" });
             cancelAdding();
             fetchRelations();
+            emit('changed');
         } else {
             $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: "top-right" });
         }
@@ -296,6 +299,7 @@ function removeRelation(item) {
         if (response.data?.status) {
             $toast.success(response.data.statusText, { position: "top-right" });
             fetchRelations();
+            emit('changed');
         } else {
             $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: "top-right" });
         }

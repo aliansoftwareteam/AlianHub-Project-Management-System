@@ -458,6 +458,19 @@ describe('typing in a thread', () => {
         expect(await received(member, 'commentTyping', () => typing(owner, thread))).toEqual([]);
     });
 
+    it('is carried only from a person who can still open the thread', async () => {
+        const member = await connect({ uid: MEMBER });
+        const owner = await connect({ uid: OWNER });
+        const thread = threadOf(home.project, home.openList, home.openTask);
+        expect(await commentRoom(member, thread)).toBe(true);
+        expect(await commentRoom(owner, thread)).toBe(true);
+        expect(await received(owner, 'commentTyping', () => typing(member, thread))).toEqual([{ roomPrefix: thread, userId: MEMBER, typing: true }]);
+
+        home.project.AssigneeUserId = [];
+        forgetAccess();
+        expect(await received(owner, 'commentTyping', () => typing(member, thread))).toEqual([]);
+    });
+
     it('is not carried by a room that is not a thread', async () => {
         const member = await connect({ uid: MEMBER });
         const owner = await connect({ uid: OWNER });

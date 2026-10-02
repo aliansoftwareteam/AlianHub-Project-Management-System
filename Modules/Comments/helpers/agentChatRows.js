@@ -39,4 +39,10 @@ const noticesKeptFromAgent = (companyId, uid) => keptFromAgent(companyId, uid, [
 /* `match` with the clause beside it, or `match` itself for a person's request. */
 const withoutKept = (match, kept) => (Object.keys(kept).length ? { $and: [match, kept] } : match);
 
-module.exports = { keptFromAgent, mentionsKeptFromAgent, noticesKeptFromAgent, withoutKept };
+/* Both clauses for a request that reads or changes the person's notices and mentions, named as the inbox names its rows. */
+const inboxRowsKeptFromAgent = async (companyId, uid) => {
+    const [notification, mention] = await Promise.all([noticesKeptFromAgent(companyId, uid), mentionsKeptFromAgent(companyId, uid)]);
+    return { notification, mention };
+};
+
+module.exports = { keptFromAgent, mentionsKeptFromAgent, noticesKeptFromAgent, inboxRowsKeptFromAgent, withoutKept };

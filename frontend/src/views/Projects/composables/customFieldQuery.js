@@ -6,6 +6,7 @@ import { maxOf as ratingMaxOf, text as ratingText } from '@fieldTypes/rating';
 import { RANGE as PROGRESS_RANGE } from '@fieldTypes/progress';
 import { linksOf } from '@fieldTypes/relationship';
 import { linkedValue } from '@/plugins/customFieldView/fieldTypes/fieldLinks';
+import { typedSearchText } from '@/utils/searchText';
 import { inBand, numberBands, numberOf } from './numberBands';
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -309,8 +310,6 @@ export function comparisonsFor(fieldType) {
 
 export const needsValue = (comparison) => !VALUELESS.includes(comparison);
 
-const escapeRegExp = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 function numberCondition(path, comparison, raw) {
     const number = Number(String(raw ?? '').replace(/,/g, ''));
     if (raw === '' || raw === null || !Number.isFinite(number)) return null;
@@ -394,7 +393,7 @@ function unscopedFilterCondition(row) {
     if (type === 'date') return dateCondition(path, comparison, values[0]);
     if (TEXT_TYPES.includes(type)) {
         const text = String(values[0]);
-        if (comparison === ':~') return { [path]: { $regex: escapeRegExp(text), $options: 'i' } };
+        if (comparison === ':~') return { [path]: { $regex: typedSearchText(text), $options: 'i' } };
         if (comparison === ':=') return { [path]: text };
     }
     return null;

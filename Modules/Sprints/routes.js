@@ -9,8 +9,7 @@ const { sprintUpdateFrom, sprintWriteKinds, folderUpdateFrom, writtenStatus } = 
 const { withActingUser } = require('./helpers/actingUser');
 const { newSprintNamesOnlyMembers, sprintPatchNamesOnlyMembers } = require('./helpers/sprintPeople');
 const { CHAT_CHANNEL, CHAT_CATEGORY, isChatSpace, requireChatAccess, serverListFlags } = require('./helpers/chatAccess');
-const { agentsRefused } = require('../Agents/guard');
-const { backlogsIn } = require('./helpers/backlogs');
+const { agentsRefused, agentsReadAlone } = require('../Agents/guard');
 
 const ALLOWED_SPRINT_TYPES = ['editSprintName', 'updateSprint', 'deleteChannel'];
 const ALLOWED_FOLDER_TYPES = ['editFolderName', 'updateFolder', 'moveFolder'];
@@ -37,11 +36,7 @@ const sprintProject = (pick, direct) => projectIdsFrom({ records: [[SCHEMA_TYPE.
 const listsByPeople = agentsRefused('sprint.create');
 
 /* Reading a backlog makes the Backlog list of a project that has none, and a list is not an agent's to add on a route. */
-const backlogMadeByPeople = async (req, res, next) => {
-    if (!req.apiToken && !req.agentRun) return next();
-    const kept = await backlogsIn(req.headers['companyid'] || '', bodyOf(req).projectId);
-    return kept.length ? next() : listsByPeople(req, res, next);
-};
+const backlogMadeByPeople = agentsReadAlone('sprint.create');
 
 // Chat channels and categories share the sprint and folder collections; their container is a chat space, not a project.
 const guard = (mode, projectIds, permissions = () => [], chatPermission = () => CHAT_CHANNEL) => (mode === READ
@@ -94,7 +89,7 @@ exports.init = (app) => {
     app.post('/api/v2/sprints/start', agentsRefused('sprint.start'), ...managesSprint, writesSprint, scrum.startSprint);
     app.post('/api/v2/sprints/complete', agentsRefused('sprint.complete'), ...managesSprint, writesSprint, scrum.completeSprint);
     app.get('/api/v2/sprints/complete-preview', ...guard(READ, sprintProject((req) => req.query && req.query.sprintId)), onSprint((req) => req.query && req.query.sprintId), scrum.completePreview);
-    app.post('/api/v2/sprints/backlog', ...guard(READ, (req) => bodyOf(req).projectId), backlogMadeByPeople, scrum.getBacklog);
+    app.post('/api/v2/sprints/backlog', backlogMadeByPeople, ...guard(READ, (req) => bodyOf(req).projectId), scrum.getBacklog);
     app.get('/api/v2/sprints/report', ...guard(READ, sprintProject((req) => req.query && req.query.sprintId)), onSprint((req) => req.query && req.query.sprintId), scrum.sprintReport);
 
     const addsSprint = projectIdsFrom({ records: [[SCHEMA_TYPE.FOLDERS, (req) => bodyOf(req).folder && bodyOf(req).folder.folderId]], direct: (req) => bodyOf(req).projectId });

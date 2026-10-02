@@ -5,6 +5,7 @@ import { clearFilterSignal } from './taskFilterSignal';
 import { ALL, cleanDoneBy, doneByMatch } from '@/components/molecules/Provenance/doneByQuery';
 import { agentTaskIds } from './agentWork';
 import { agentWorkMatch } from './agentWorkQuery';
+import { typedSearchText } from '@/utils/searchText';
 
 const withComparisons = (rows) => rows.map((row) => ({ ...row, comparisonsData: [row.comparison] }));
 
@@ -23,6 +24,7 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
     const doneBy = ref(ALL);
     const agentWorking = ref(false);
     const searchTask = ref(false);
+    const searchFailed = ref(false);
     const collapsed = ref(true);
     const groupBy = ref(0);
     const userSidebar = ref(false);
@@ -110,6 +112,7 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
     }
 
     function searchMongoDB() {
+        searchFailed.value = false;
         const doneByCondition = doneByMatch(doneBy.value);
         if (!taskSearch.value.trim().length && !filterUsers.value.length && !showArchived.value && !Object.keys(filterQuery.value).length && !doneByCondition && !agentWorking.value) {
             commit('projectData/mutateSearchTask', { data: [], op: 'added' });
@@ -128,16 +131,17 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
 
         const query_by = {};
         const searchStr = taskSearch.value ? taskSearch.value.toString() : '';
+        const typedText = { $regex: typedSearchText(searchStr), $options: 'i' };
         const andOr = '$or';
         query_by[andOr] = [];
         if (taskNameSearch.value) {
-            query_by[andOr].push({ TaskName: { $regex: searchStr, $options: 'i' } });
+            query_by[andOr].push({ TaskName: typedText });
         }
         if (taskKeySearch.value) {
-            query_by[andOr].push({ TaskKey: { $regex: searchStr, $options: 'i' } });
+            query_by[andOr].push({ TaskKey: typedText });
         }
         if (taskDescriptionSearch.value) {
-            query_by[andOr].push({ rawDescription: { $regex: searchStr, $options: 'i' } });
+            query_by[andOr].push({ rawDescription: typedText });
         }
         searchTask.value = true;
         const query = [
@@ -181,6 +185,7 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
 
         dispatch('projectData/searchTask', { query, showArchived: showArchived.value }).catch((error) => {
             console.error('ERROR in search tasks: ', error);
+            searchFailed.value = true;
         });
     }
 
@@ -240,6 +245,7 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
         doneBy,
         agentWorking,
         searchTask,
+        searchFailed,
         collapsed,
         groupBy,
         userSidebar,

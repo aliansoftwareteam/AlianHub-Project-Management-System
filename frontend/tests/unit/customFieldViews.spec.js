@@ -142,7 +142,7 @@ describe('filter by custom field', () => {
         expect(customFilterCondition(row(stage, ':', ['o1', 'o2']))).toEqual({ [valuePath(STAGE)]: { $in: ['o1', 'o2'] } });
         expect(customFilterCondition(row(stage, ':!=', ['o1']))).toEqual({ [valuePath(STAGE)]: { $nin: ['o1'] } });
         expect(customFilterCondition(row(done, ':=', [false]))).toEqual({ [valuePath(DONE)]: { $nin: [true, 'true'] } });
-        expect(customFilterCondition(row(note, ':~', ['a.b']))).toEqual({ [valuePath(NOTE)]: { $regex: 'a\\.b', $options: 'i' } });
+        expect(customFilterCondition(row(note, ':~', ['a.b']))).toEqual({ [valuePath(NOTE)]: { $regex: 'a.b', $options: 'i' } });
         expect(customFilterCondition(row(note, ':empty', [true]))).toEqual({ [valuePath(NOTE)]: { $in: [null, '', []] } });
         expect(customFilterCondition(row(note, ':set', [true]))).toEqual({ [valuePath(NOTE)]: { $nin: [null, '', []] } });
     });

@@ -10,8 +10,8 @@ const { validateSearchInput, truncate, RESULT_LIMIT_PER_TYPE } = require('./help
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 const { listsForViewerOf } = require('../Tasks/helpers/taskExtraLists');
-const { keptFromAgent } = require('../Comments/helpers/agentChatRows');
-const { agentOf } = require('../../Config/agentRequest');
+const { keptFromCaller } = require('../Comments/helpers/conversationRows');
+const { withoutConversationsOfOthers } = require('../Comments/helpers/conversationReaders');
 
 // Regex rather than $text: it works on every existing tenant database and keeps
 // short queries and substring matches predictable.
@@ -22,12 +22,12 @@ const asObjectIds = (ids) => ids
     .map((id) => new mongoose.Types.ObjectId(id));
 
 /* A task comment is visible where its task is, whatever project id the comment row carries. */
-const onVisibleTasks = async (companyId, comments, projectIds, sprintClause) => {
+const onVisibleTasks = async (companyId, uid, comments, projectIds, sprintClause) => {
     const taskIds = asObjectIds([...new Set(comments.map((comment) => comment.taskId).filter(Boolean).map(String))]);
     if (!taskIds.length) return comments.filter((comment) => !comment.taskId).map((comment) => ({ comment, task: null }));
     const tasks = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ _id: { $in: taskIds }, ProjectID: { $in: projectIds }, ...sprintClause }, 'TaskKey TaskName folderObjId'],
+        data: [{ _id: { $in: taskIds }, ProjectID: { $in: projectIds }, ...sprintClause, ...withoutConversationsOfOthers(uid) }, 'TaskKey TaskName folderObjId'],
     }, 'find');
     const visible = new Map((tasks || []).map((task) => [String(task._id), task]));
     return comments
@@ -78,14 +78,13 @@ exports.globalSearch = async (req, res) => {
         const sprintClause = hidden.length ? { sprintId: { $nin: hidden } } : {};
 
         const rx = { $regex: escapeRegex(String(query).trim()), $options: 'i' };
-        const chatKeptFromCaller = await keptFromAgent(companyId, uid);
-        const noChatRow = agentOf(uid) ? { mainChat: { $ne: true } } : {};
+        const chatKeptFromCaller = await keptFromCaller(companyId, uid);
 
         const [tasks, projects, comments, pages] = await Promise.all([
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
-                    { ProjectID: { $in: taskProjectIds }, ...sprintClause, ...noChatRow, deletedStatusKey: { $ne: 1 }, $or: [{ TaskName: rx }, { TaskKey: rx }] },
+                    { ProjectID: { $in: taskProjectIds }, ...sprintClause, ...withoutConversationsOfOthers(uid), deletedStatusKey: { $ne: 1 }, $or: [{ TaskName: rx }, { TaskKey: rx }] },
                     'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey sprintArray updatedAt extraLists',
                     { limit: RESULT_LIMIT_PER_TYPE, sort: { updatedAt: -1 } },
                 ],
@@ -119,7 +118,7 @@ exports.globalSearch = async (req, res) => {
                 ],
             }, 'find').catch(() => []),
         ]);
-        const visibleComments = await onVisibleTasks(companyId, comments || [], taskProjectIds, sprintClause);
+        const visibleComments = await onVisibleTasks(companyId, uid, comments || [], taskProjectIds, sprintClause);
         const taskLists = await listsForViewerOf(companyId, uid, tasks || []);
 
         // Client project routes always carry a sprint segment, so attach each

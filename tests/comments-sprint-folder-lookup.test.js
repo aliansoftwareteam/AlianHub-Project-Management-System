@@ -99,6 +99,8 @@ const run = (docs, stages) => stages.reduce((rows, stage) => {
 
 const folderShown = async () => {
     MongoDbCrudOpration.mockImplementation(async (companyId, { type, data: [pipeline] }, method) => {
+        /* The search first reads which conversations the caller is not in; there are none here. */
+        if (method === 'find' && ['main_chats', 'tasks'].includes(type)) return [];
         expect([companyId, type, method]).toEqual([COMPANY, 'comments', 'aggregate']);
         return run(DB.comments, pipeline);
     });

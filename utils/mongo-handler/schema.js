@@ -1025,6 +1025,8 @@ const schema = {
         savedReportId: { type: String, required: true },
         cadence: { type: String, default: 'weekly', required: false },
         recipients: { type: Array, default: [], required: false },
+        // Who last set the recipients: outside addresses are sent to only while this person is an owner or admin.
+        recipientsBy: { type: String, required: false },
         active: { type: Boolean, default: true, required: false },
         lastRunAt: { type: Date, required: false },
         nextRunAt: { type: Date, required: false },
@@ -5105,6 +5107,8 @@ const schema = {
         status: { type: String, default: 'ready', required: false },
         recapPostedAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
+        editedBy: { type: String, required: false },
+        editedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false }
     },
     folders:{

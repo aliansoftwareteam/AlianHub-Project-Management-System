@@ -4,7 +4,7 @@ const { memberProfiles } = require('../../utils/companyMembers');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { supersedesPending } = require('../../event/domainEventBus');
-const { createSnapshotStore } = require('../../utils/entityEvents');
+const { createSnapshotStore, isNotAnEdit } = require('../../utils/entityEvents');
 const { safeFetch } = require('../Agents/engine/safeFetch');
 const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
 const { signingSecretOf, NEEDS_ATTENTION } = require('./helpers/signingSecret');
@@ -237,7 +237,8 @@ function onTaskEvent(type) {
     return (payload) => {
         try {
             const doc = payload?.data;
-            if (!doc || !doc.CompanyId || !doc._id) return;
+            // A conversation is kept in the tasks collection and sends the same emits; it is never posted to a webhook.
+            if (!doc || !doc.CompanyId || !doc._id || doc.mainChat === true || isNotAnEdit(payload)) return;
             const companyId = String(doc.CompanyId);
             const event = classifyTaskEvent({ type, doc, updatedFields: payload?.updatedFields });
             if (!event) return;

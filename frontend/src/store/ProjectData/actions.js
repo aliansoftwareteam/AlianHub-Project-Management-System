@@ -68,7 +68,8 @@ export const getTasksFromMongoDB =({  state,commit,rootState,dispatch  }, payloa
             const {pid, sprintId, userId, showAllTasks,groupBy,currentView = 'tasks'} = payload;
             commit("setTaskSnapShotPayload",payload);
             const projectFound = Object.keys(state[currentView]).includes(pid);
-            if(projectFound && groupBy?.type !== state[currentView]?.[pid]?.groupBy?.type) {
+            // The groups too: a count that an event moves is looked up in them, and a project can gain a status under the same grouping.
+            if(projectFound && JSON.stringify(groupBy) !== JSON.stringify(state[currentView]?.[pid]?.groupBy)) {
                 state[currentView][pid].groupBy = groupBy;
             }
             rootState.settings.socketInstance.emit('getRoomList', rootState.settings.socketInstance.id, (rooms) => {
@@ -369,8 +370,10 @@ export const setTableTasksFromTypesense = ({ state, commit, rootGetters }, paylo
 
             const indexKey = `${parentId && parentId.length ? `${parentId}_` : ''}${item.searchKey}_${item.searchValue}`;
             if(sprintFound) {
-                page = state.tableTasks[pid][sprintId].index[indexKey] || 1;
-                skip = state.tableTasks[pid][sprintId].index[indexKey] ? state.tableTasks[pid][sprintId].index[indexKey] * 35 : 35;
+                // A group the sprint has no page of yet (a status the project gained while the Table was open) starts at its first row.
+                const read = state.tableTasks[pid][sprintId].index[indexKey];
+                page = read === undefined ? 0 : (read || 1);
+                skip = page * batchSize;
             }
             if((sortKey && sortKey.length && isFirst) || (resetTable === true)){
                 state.tableTasks = {};

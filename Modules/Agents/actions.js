@@ -25,6 +25,7 @@ const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { cannotOpen, CANNOT_OPEN_PROJECT } = require('../../Config/projectPeople');
 const { canCreatePageIn } = require('../Pages/helpers/pageAccess');
 const { readableTaskIds, openProject, listOf } = require('../Tasks/helpers/taskWritePlacement');
 const logger = require('../../Config/loggerConfig');
@@ -145,14 +146,21 @@ const announceMentions = async (companyId, commentId) => {
     }
 };
 
-const commentOn = async ({ companyId, actor, params, depth }, action, body) => {
+/* An agent that comments on its own answers to the project for the agents its comment names; one whose comment a
+ * person approved starts them as that person's comment would. */
+const startsNamedAgents = (companyId, actor, { taskId, body, depth, approvedBy }) => require('./triggers').fromComment(companyId, {
+    authorId: actor.userId, taskId, message: body, depth: clampDepth(depth) + 1,
+    ...(isAgent(actor) && !approvedBy ? { postedBy: actor, asked: true } : {}),
+});
+
+const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action, body) => {
     const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth));
     const a = attribution(actor);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
         data: [{ _id: oid(r.commentId) }, { $set: { userId: String(actor.userId || a.actorId), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null } }],
     }, 'updateOne').catch(() => {});
-    if (!actor.runId) await require('./triggers').fromComment(companyId, { authorId: actor.userId, taskId: params.taskId, message: body, depth: clampDepth(depth) + 1 });
+    if (!actor.runId) await startsNamedAgents(companyId, actor, { taskId: params.taskId, body, depth, approvedBy });
     const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId) : null;
     return {
         result: { commentId: r.commentId, ...(mentioned ? { mentioned } : {}) },
@@ -267,7 +275,9 @@ const executors = {
         const ids = (Array.isArray(params.assigneeIds) ? params.assigneeIds : [params.assigneeId]).filter((v) => OBJECT_ID.test(String(v || ''))).map(String);
         if (!ids.length) throw new tools.DeterministicError('assigneeIds is required');
         const previous = (task.AssigneeUserId || []).map(String);
-        if ((await nonMembersOf(companyId, ids.filter((id) => !previous.includes(id)))).length) throw new tools.DeterministicError(`assigneeIds: ${NOT_A_MEMBER}`);
+        const added = ids.filter((id) => !previous.includes(id));
+        if ((await nonMembersOf(companyId, added)).length) throw new tools.DeterministicError(`assigneeIds: ${NOT_A_MEMBER}`);
+        if (await cannotOpen(companyId, String(task.ProjectID), added)) throw new tools.DeterministicError(`assigneeIds: ${CANNOT_OPEN_PROJECT}`);
         const next = params.replace ? ids : [...new Set([...previous, ...ids])];
         const r = await tools.updateTask(companyId, task._id, { AssigneeUserId: next }, context(actor, 'task.assign', depth));
         return { result: { assignees: next }, undo: { kind: 'assign', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
@@ -396,6 +406,19 @@ const executors = {
         return require('./connectors/slackPost').post({ companyId, actor, params });
     },
 
+    /* For the person behind the agent, on the task named: the reminder the task screen sets. */
+    async 'reminder.create'({ companyId, actor, params }) {
+        const task = await tools.getTask(companyId, params.taskId);
+        const userId = String(actor.userId || '');
+        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('a reminder needs a person to remind');
+        const reminderAt = new Date(params.reminderAt || NaN);
+        if (Number.isNaN(reminderAt.getTime())) throw new tools.DeterministicError('reminderAt is not a valid date');
+        const saved = await require('../Reminders/helper').createReminder(companyId, userId, {
+            taskId: task._id, projectId: task.ProjectID, reminderAt, reminderText: String(params.reminderText || '').slice(0, 500),
+        });
+        return { result: { reminderId: String(saved._id) }, undo: null, entityId: task._id, entityName: task.TaskName };
+    },
+
     async 'chat.post'({ companyId, actor, params, depth }) {
         const r = await tools.addComment(companyId, params.taskId, params.body, context(actor, 'chat.post', depth));
         return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
@@ -446,7 +469,7 @@ const LIST_REFUSAL = 'not_visible: that list was not found in that project, or t
 
 /* These reach their task, project or list through the automation tool layer, which asks nothing about a person, so
  * the task routes' read rule is asked here. Every other executor runs a route's handler or a check of its own. */
-const TASK_WRITES = new Set(['task.status.set', 'task.link', 'task.assign', 'task.update', 'task.sprint.move', 'subtask.create', 'timelog.create', 'timelog.start', 'timelog.stop']);
+const TASK_WRITES = new Set(['task.status.set', 'task.link', 'task.assign', 'task.update', 'task.sprint.move', 'subtask.create', 'timelog.create', 'timelog.start', 'timelog.stop', 'reminder.create']);
 
 const targetRefusal = async (companyId, actor, action, params) => {
     const uid = String((actor && actor.userId) || '');

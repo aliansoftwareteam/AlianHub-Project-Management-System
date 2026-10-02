@@ -24,7 +24,7 @@ const plainOf = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObje
 const loadTask = async (companyId, taskId, uid) => {
     const _id = oid(taskId);
     if (!_id) return null;
-    const task = plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id, deletedStatusKey: { $ne: 1 } }] }, 'findOne'));
+    const task = plainOf(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }] }, 'findOne'));
     if (!task) return null;
     const visible = await scope.visibleProjectIds(companyId, uid);
     return visible.includes(String(task.ProjectID)) ? task : null;

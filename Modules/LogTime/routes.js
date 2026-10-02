@@ -32,6 +32,9 @@ const upload = multer({
 });
 const captureGuard = refuseUpload(captureRefusal);
 const { agentsRefused } = require('../Agents/guard');
+/* A capture is what the desktop tracker sees on its person's screen; it stands before the file is read. */
+const capturedByPeople = agentsRefused('timelog.capture');
+const { logged, started, stopped, edited } = require('./askedWrites');
 
 exports.init = (app) => {
     // V2 VERSION START
@@ -161,7 +164,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/manualLogtime', onAVisibleTask, ctrlV2.manualLogTime);
+    app.post('/api/v2/manualLogtime', onAVisibleTask, logged, ctrlV2.manualLogTime);
 
 
       /**
@@ -322,8 +325,8 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/timeTracker/start', ctrlV2.timeTrackerStart);
-    app.post('/api/v3/timeTracker/start', ctrlV2.timeTrackerStart2);
+    app.post('/api/v2/timeTracker/start', started, ctrlV2.timeTrackerStart);
+    app.post('/api/v3/timeTracker/start', started, ctrlV2.timeTrackerStart2);
 
         /**
      * @swagger
@@ -417,7 +420,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/timetracker/end',  ctrlV2.endTimeTracker)
+    app.post('/api/v2/timetracker/end', stopped, ctrlV2.endTimeTracker)
 
 
     /**
@@ -497,9 +500,9 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/timetracker/capture', upload.single("file"), captureGuard, ctrlV2.captureTimetracker);
-    app.post('/api/v3/timetracker/capture', upload.single("file"), captureGuard, ctrlV2.captureTimetracker2);
-    app.post('/api/v4/timetracker/capture', upload.single("file"), captureGuard, ctrlV2.captureTimetracker3);
+    app.post('/api/v2/timetracker/capture', capturedByPeople, upload.single("file"), captureGuard, ctrlV2.captureTimetracker);
+    app.post('/api/v3/timetracker/capture', capturedByPeople, upload.single("file"), captureGuard, ctrlV2.captureTimetracker2);
+    app.post('/api/v4/timetracker/capture', capturedByPeople, upload.single("file"), captureGuard, ctrlV2.captureTimetracker3);
 
 
 /* TIME SHEET DETAILS GET */
@@ -562,7 +565,7 @@ exports.init = (app) => {
     app.post('/api/v2/timetracker/timelog', ctrlV2.getTimelog)
     app.get('/api/v2/timetracker/running', ctrlV2.listRunningTimers);
     app.get('/api/v2/timetracker/can-start', ctrlV2.canStartTimer);
-    app.post('/api/v2/timetracker/trim', ctrlV2.trimTimer);
+    app.post('/api/v2/timetracker/trim', edited, ctrlV2.trimTimer);
 
 
 }

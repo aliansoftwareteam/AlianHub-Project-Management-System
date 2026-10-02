@@ -26,6 +26,13 @@ const ok = (res) => res?.data?.status === true;
 const failure = (res, fallback) => res?.data?.statusText || res?.data?.message || fallback;
 const thrown = (error, fallback) => error?.response?.data?.statusText || error?.response?.data?.message || error?.message || fallback;
 
+/* The agent feed hears of the workspace pause with every read of the agents (./agentFeed.js) and notes it here, so
+ * the strip, the AI sidebar, the card in AI > Accounts and Project Details show one state. */
+export function noteConnectedPaused(on) {
+    if (typeof on !== "boolean" || policy.value.connectedPaused === on) return;
+    policy.value = { ...policy.value, connectedPaused: on };
+}
+
 export function useAccounts() {
     const mode = computed(() => (account.value && account.value.mode) || "");
     const allowed = computed(() => policy.value.allowedModes || []);

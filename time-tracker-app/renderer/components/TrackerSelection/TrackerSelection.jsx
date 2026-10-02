@@ -397,9 +397,8 @@ const TrackerSelection = forwardRef(({
       deletedStatusKey: 0,
     };
     if (term) {
-      // Treat the search text as literal — escape regex metacharacters.
-      const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      match.TaskName = { $regex: escaped, $options: 'i' };
+      // Sent as typed: the server reads it as text and escapes it, so escaping it here would search for the backslashes.
+      match.TaskName = { $regex: term, $options: 'i' };
     }
     const findQuery = [
       { $match: match },

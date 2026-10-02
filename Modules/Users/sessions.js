@@ -3,7 +3,7 @@ const { dbCollections } = require("../../Config/collections.js");
 const logger = require("../../Config/loggerConfig");
 const { removeCache } = require("../../utils/commonFunctions.js");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries.js");
-const { signedInPersonOnly } = require("../Auth/helpers/accountSecurity");
+const { signedInPersonOnly, signedInPersonReads } = require("../Auth/helpers/accountSecurity");
 
 const TOKEN_TAIL = 6;
 
@@ -26,6 +26,7 @@ const toPublicSession = (s, currentId) => ({
 exports.listOwnSessions = async (req, res) => {
     try {
         if (!req.uid) return res.status(401).json({ status: false, message: "Unauthorized" });
+        if (!(await signedInPersonReads(req, res))) return undefined;
         const sessions = await MongoDbCrudOpration(dbCollections.GLOBAL, {
             type: dbCollections.SESSIONS,
             data: [{ userId: String(req.uid) }]

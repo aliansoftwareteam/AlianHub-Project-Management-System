@@ -182,10 +182,23 @@ const permissionCopies = (rows, projectId) => {
     }));
 };
 
-const withoutPeople = (value) => {
-    if (Array.isArray(value)) return value.map(withoutPeople);
+const NOBODY = new Set();
+
+/* A checklist as the copy stores it: each row's people are the ones in `kept`. */
+const keepingPeople = (value, kept) => {
+    if (Array.isArray(value)) return value.map((item) => keepingPeople(item, kept));
     if (!isPlainObject(value)) return value;
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === 'AssigneeUserId' ? [] : withoutPeople(item)]));
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, key === 'AssigneeUserId'
+        ? (Array.isArray(item) ? item : []).filter((id) => kept.has(String(id)))
+        : keepingPeople(item, kept)]));
+};
+
+const withoutPeople = (value) => keepingPeople(value, NOBODY);
+
+const peopleIn = (value) => {
+    if (Array.isArray(value)) return value.flatMap(peopleIn);
+    if (!isPlainObject(value)) return [];
+    return Object.entries(value).flatMap(([key, item]) => (key === 'AssigneeUserId' ? (Array.isArray(item) ? item.map(String) : []) : peopleIn(item)));
 };
 
 /* Top-level tasks, then their subtasks, then theirs. A subtask whose parent is not among the rows is left out with everything under it. */
@@ -210,5 +223,5 @@ const taskLevels = (rows) => {
 module.exports = {
     INLINE_TASK_LIMIT, BATCH, MAX_NAME, JOB_SOURCE, LIVE, TRASHED, OBJECT_ID, PROJECT_DATES, LIST_DATES, TASK_FIELDS, TASK_DATES,
     isPlainObject, refusal, parseRequest, refusedPaths, newId, idOf, pick, remap, nextProjectCode, forCallerAlone, projectCopy, hasCurrency,
-    isLive, folderCopies, listCopies, ruleTargets, ruleCopy, permissionCopies, withoutPeople, taskLevels,
+    isLive, folderCopies, listCopies, ruleTargets, ruleCopy, permissionCopies, withoutPeople, keepingPeople, peopleIn, taskLevels,
 };
