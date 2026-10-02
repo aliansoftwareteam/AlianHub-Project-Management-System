@@ -13,7 +13,7 @@ test.describe('the timer in the task panel', () => {
     test('start, stop and "Time logged" put the minutes on the task', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const suffix = uniqueSuffix();
-        const project = await createProject(owner.api, { name: `TIMER ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
+        const project = await createProject(owner.api, { name: `TIMER ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid, apps: ['TimeTracking'] });
         const name = `Timer task ${suffix}`;
         const task = await createTask(owner.api, { project, name, user: state.users.owner, companyOwnerId: owner.uid, assigneeIds: [owner.uid] });
 
