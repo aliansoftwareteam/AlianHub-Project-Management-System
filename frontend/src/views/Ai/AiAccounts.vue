@@ -516,7 +516,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, reactive, ref } from "vue";
+import { computed, inject, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { routeLocationKey } from "vue-router";
 import { useStore } from "vuex";
@@ -568,6 +568,8 @@ const TABS = ["modes", "link", "attribution", "rules", "connected"];
 const askedTab = String(inject(routeLocationKey, null)?.query?.tab || "");
 const tab = ref(TABS.includes(askedTab) ? askedTab : "modes");
 const draftModes = ref([...MODES]);
+// The stored modes can change under an open page; a draft of the old ones would save them back.
+watch(() => (policy.value.allowedModes || MODES).join(), () => { draftModes.value = [...(policy.value.allowedModes || MODES)]; });
 const savingPolicy = ref(false);
 const policySaved = ref(false);
 const policyError = ref("");

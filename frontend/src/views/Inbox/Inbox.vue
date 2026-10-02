@@ -823,6 +823,7 @@ const undoApprovals = async (ids) => {
         // eslint-disable-next-line no-await-in-loop
         const result = await decideOne(sendProposalDecision, id, 'undo', {}, t('Inbox.action_failed'));
         if (!result.ok) refused.push(result.error);
+        else if (result.left.length) refused.push(t('Inbox.queue_undo_left', { why: result.left[0] }));
     }
     busy.value = false;
     if (refused.length) $toast.error(refused[0], { position: 'top-right' });

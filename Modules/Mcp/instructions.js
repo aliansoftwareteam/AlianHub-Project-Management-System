@@ -66,6 +66,7 @@ const setupRule = (has) => {
         has('fields.create') && '`fields.create` adds fields to a project, all of them in one call',
         has('view.create') && '`view.create` adds a saved view',
         has('project.setup') && '`project.setup` sets up a project from one plan of statuses, lists, fields and views',
+        has('automation.create') && '`automation.create` adds a rule',
     ].filter(Boolean);
     return makes.length ? `- ${joined(makes)}. Everyone on the project sees these, so the person approves them in AlianHub first.` : '';
 };
