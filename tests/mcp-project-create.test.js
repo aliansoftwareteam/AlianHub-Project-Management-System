@@ -342,6 +342,83 @@ describe('approving makes the project as the web app would, as the person who ap
     });
 });
 
+describe('a part of a new project\'s plan the person reading may not make', () => {
+    const SETUP = 'project.setup';
+    const WITH_NEW_STATUS = { name: NAME, statuses: ['Blocked'], lists: ['Backlog'] };
+    const approveWith = (id, uid, parts) => proposals.approve(CID, id, { decider: human(uid), isPrivileged: uid === OWNER, ip: '', ...(parts ? { parts } : {}) });
+    const previewOf = async (id, uid) => (await intentPreview.forProposals(CID, uid, [stored(SCHEMA_TYPE.AGENT_PROPOSALS, id)])).get(String(id))[0];
+    const paramsOf = (id) => JSON.parse(JSON.stringify(stored(SCHEMA_TYPE.AGENT_PROPOSALS, id).changes[0].params));
+
+    it('is not asked for by the connection of a person who could not add it by hand', async () => {
+        const before = everythingNow();
+        const out = await rpc(as(INSIDER), TOOL, WITH_NEW_STATUS);
+        expect(out).toMatchObject({ refused: true, reason: expect.stringMatching(/statuses \("Blocked" does not exist in the company yet, and only an owner or an admin can add a status\)/) });
+        expect(everythingNow()).toBe(before);
+        expect(waiting()).toHaveLength(0);
+    });
+
+    it('is marked on the card of a member with who approves it, and on no owner\'s', async () => {
+        const id = await filed(as(OWNER), WITH_NEW_STATUS);
+        expect(await previewOf(id, INSIDER)).toMatchObject({ kind: 'project', locked: ['statuses:0'], lockedWhy: { 'statuses:0': 'owner_admin' } });
+        expect((await previewOf(id, OWNER)).locked).toBeUndefined();
+
+        const lists = await filed(as(INSIDER), { name: 'Second site', lists: ['Backlog'], fields: [{ name: 'Budget', type: 'money' }] });
+        setRule('project_sprint_create', false, [3]);
+        expect(await previewOf(lists, INSIDER)).toMatchObject({ locked: ['lists:0'], lockedWhy: { 'lists:0': 'own_rights' } });
+    });
+
+    it('is not approved by a member who keeps it, and no project is made', async () => {
+        const id = await filed(as(OWNER), WITH_NEW_STATUS);
+        const before = everythingNow();
+        expect(await approveWith(id, INSIDER)).toMatchObject({ status: 403, reason: 'not_permitted', why: 'owner_admin' });
+        expect(everythingNow()).toBe(before);
+        expect(waiting()).toHaveLength(1);
+    });
+
+    it('waits as a plan for the project once a member has approved the rest, and an owner makes it there', async () => {
+        const id = await filed(as(OWNER), WITH_NEW_STATUS);
+        const out = await approveWith(id, INSIDER, { 0: { lists: [0] } });
+        expect(out.error).toBeUndefined();
+        const projectId = String(made()._id);
+        expect(listsOf(projectId)).toEqual(['List', 'Backlog']);
+        expect(out.left).toEqual({ waiting: [expect.any(String)], retry: [] });
+        const [left] = out.left.waiting;
+        expect(stored(SCHEMA_TYPE.AGENT_PROPOSALS, left)).toMatchObject({ status: 'pending', splitFrom: id, what: 'Set up a project', requestedBy: OWNER });
+        expect(String(stored(SCHEMA_TYPE.AGENT_PROPOSALS, left).projectId)).toBe(projectId);
+        expect(stored(SCHEMA_TYPE.AGENT_PROPOSALS, left).changes[0]).toMatchObject({ action: SETUP, reversible: true });
+        expect(paramsOf(left)).toEqual({ projectId, statuses: ['Blocked'] });
+
+        const done = await approveWith(left, OWNER);
+        expect(done.error).toBeUndefined();
+        expect(projectsNamed()).toHaveLength(1);
+        expect(made().taskStatusData.map((status) => status.name)).toContain('Blocked');
+        expect(listsOf(projectId)).toEqual(['List', 'Backlog']);
+        expect(waiting()).toHaveLength(0);
+    });
+
+    it('offers a part that was tried and not made once more, for the project that was made', async () => {
+        jest.spyOn(fieldCtrl, 'insertCustomFieldPromise').mockRejectedValueOnce(new Error('disk full'));
+        const id = await filed(as(INSIDER), { name: NAME, lists: ['Backlog'], fields: [{ name: 'Budget', type: 'money' }] });
+        const out = await approveWith(id, INSIDER);
+        const projectId = String(made()._id);
+        expect(out.left).toEqual({ waiting: [], retry: [expect.any(String)] });
+        const [again] = out.left.retry;
+        expect(stored(SCHEMA_TYPE.AGENT_PROPOSALS, again)).toMatchObject({ status: 'pending', retryBy: INSIDER, splitFrom: id });
+        expect(paramsOf(again)).toEqual({ projectId, definitions: [{ name: 'Budget', type: 'money' }] });
+        expect((await approveWith(again, INSIDER)).error).toBeUndefined();
+        expect(fieldsOf(projectId)).toEqual(['Budget']);
+        expect(projectsNamed()).toHaveLength(1);
+        expect(listsOf(projectId)).toEqual(['List', 'Backlog']);
+    });
+
+    it('offers nothing again where the person who asked is not on the new project', async () => {
+        const out = await approveWith(await filed(as(OUTSIDER)), OWNER);
+        expect(out.applied[0].result.made).toBe(0);
+        expect(out.left).toBeUndefined();
+        expect(waiting()).toHaveLength(0);
+    });
+});
+
 describe('undo moves the project to the trash', () => {
     it('trashes it, where a person can restore it, and deletes nothing', async () => {
         const id = await filed(as(INSIDER));

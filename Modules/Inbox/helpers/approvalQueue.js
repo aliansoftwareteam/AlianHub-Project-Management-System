@@ -44,6 +44,7 @@ const toRow = (previews, batches = new Map()) => (proposal, standing) => ({
         return { action: change.action, ...asFiled, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}), ...changeLabels.markOf(change) };
     }),
     ...(batches.has(String(proposal._id)) ? { batch: batches.get(String(proposal._id)) } : {}),
+    ...(proposal.retryBy ? { retry: { why: proposal.retryWhy || '' } } : {}),
     cost: proposal.cost || null,
     gate: proposal.gate || null,
     locked: standing.locked,

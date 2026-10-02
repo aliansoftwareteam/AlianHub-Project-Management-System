@@ -157,11 +157,11 @@ const describe = async ({ companyId, requester, approver, projectId, text }) => 
 
 const descriptionPart = (error) => ({ part: DESCRIPTION, ok: !error, ...(error ? { error } : {}), items: error ? [] : [{ name: DESCRIPTION, made: true }] });
 
-const noneMade = (draft, error) => partsAsked(draft).map((part) => ({ part, ok: false, error, items: [] }));
+const noneMade = (draft, error, refused = false) => partsAsked(draft).map((part) => ({ part, ok: false, error, ...(refused ? { refused } : {}), items: [] }));
 
 const partsMade = async ({ companyId, requester, approver, projectId, draft }) => {
     const { canEditProject } = require('../../Config/projectAccess');
-    if (!(await canEditProject(companyId, requester.uid, projectId)).allowed) return noneMade(draft, NOT_ON_IT);
+    if (!(await canEditProject(companyId, requester.uid, projectId)).allowed) return noneMade(draft, NOT_ON_IT, true);
     const described = draft.description ? [descriptionPart(await describe({ companyId, requester, approver, projectId, text: draft.description }))] : [];
     const planned = plans.partsOf(draft).length ? await plans.carryOut({ companyId, who: requester, approvedBy: approver.uid, projectId, plan: draft }) : [];
     return [...described, ...planned];

@@ -1518,6 +1518,11 @@ const schema = {
         allowedActions: { type: Array, required: false },
         // Set on a change a standing approval applied: it is filed already approved, by the person who made that approval.
         standingApprovalId: { type: String, required: false },
+        // Set on the parts of a plan an approval left to be made later (Agents/planFollowUp.js): the proposal they came from.
+        splitFrom: { type: String, required: false },
+        // Set where those parts were tried and not made: the person who approved, who alone may try them once more, and why they were not made.
+        retryBy: { type: String, required: false },
+        retryWhy: { type: String, required: false },
     },
     // "Always do this": one kind of change, by one connection, in one project — managed by Modules/Agents/standingApprovals.js.
     agentStandingApprovals: {

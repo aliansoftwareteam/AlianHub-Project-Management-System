@@ -268,32 +268,32 @@ describe('approving carries out each part as the web app would', () => {
 
     it('adds a status the company does not have yet only for an owner or admin, as the settings screen does', async () => {
         const plan = { projectId: P_OPEN, statuses: ['Client check', 'In Review'] };
-        const member = await approve(await filed(as(INSIDER), plan));
-        expect(member.applied[0].ok).toBe(true);
-        expect(partOf(member.applied[0].result, 'statuses')).toMatchObject({ ok: false, items: [{ name: 'Client check', made: false, error: expect.stringMatching(/owner or an admin/) }, { name: 'In Review', made: true }] });
-        expect(member.applied[0].result.notMade).toEqual([{ part: 'statuses', name: 'Client check', error: expect.stringMatching(/owner or an admin/) }]);
-        expect(statusNames()).toEqual(['To Do', 'In Progress', 'In Review', 'Done']);
+        expect(await rpc(as(INSIDER), TOOL, plan)).toMatchObject({ refused: true, reason: expect.stringMatching(/only an owner or an admin can add a status/) });
+        const id = await filed(as(OWNER), plan);
+        expect(await approve(id, INSIDER)).toMatchObject({ status: 403, error: expect.stringMatching(/owner or admin approves a part of this plan/) });
+        expect(statusNames()).toEqual(['To Do', 'In Progress', 'Done']);
         expect(catalogue().settings).toHaveLength(4);
+        expect(waiting()).toHaveLength(1);
 
-        const owner = await approve(await filed(as(OWNER), plan));
-        expect(partOf(owner.applied[0].result, 'statuses').items).toEqual([{ name: 'Client check', made: true, statusKey: 5 }, { name: 'In Review', made: false, statusKey: 4 }]);
-        expect(statusNames()).toEqual(['To Do', 'In Progress', 'In Review', 'Client check', 'Done']);
+        const owner = await approve(id);
+        expect(partOf(owner.applied[0].result, 'statuses').items).toEqual([{ name: 'Client check', made: true, statusKey: 5 }, { name: 'In Review', made: true, statusKey: 4 }]);
+        expect(statusNames()).toEqual(['To Do', 'In Progress', 'Client check', 'In Review', 'Done']);
         expect(catalogue().settings.map((status) => status.name)).toContain('Client check');
     });
 
     it('makes for the approver only the parts the approver may make by hand', async () => {
         setRule('view_list', true, [3, 0]);
-        const id = await filed(as(INSIDER));
-        const out = await approve(id, GUEST);
+        const id = await filed(as(INSIDER), { projectId: P_OPEN, lists: ['Backlog'], fields: [{ name: 'Budget', type: 'money' }], views: [{ name: 'Review board', kind: 'board', groupBy: 'status' }] });
+        expect(await approve(id, GUEST)).toMatchObject({ status: 403, error: expect.stringMatching(/Your role may not make a part of this plan/) });
+        expect(waiting()).toHaveLength(1);
+        const out = await proposals.approve(CID, id, { decider: human(GUEST), isPrivileged: false, ip: '', parts: { 0: { lists: [], fields: [], views: [0] } } });
         expect(out.error).toBeUndefined();
         const { result } = out.applied[0];
-        expect(result.parts.map((part) => [part.part, part.ok])).toEqual([['statuses', false], ['lists', false], ['fields', false], ['views', true]]);
-        expect(partOf(result, 'lists').error).toMatch(/person approving may not/);
-        expect(statusNames()).toEqual(['To Do', 'In Progress', 'Done']);
+        expect(result.parts.map((part) => [part.part, part.ok])).toEqual([['views', true]]);
         expect(listsNamed('Backlog')).toHaveLength(0);
         expect(liveFields()).toEqual([]);
         expect(viewTitles()).toEqual(['List', 'Board', 'Review board']);
-        expect(partOf(result, 'views').items[0].leftOut).toEqual(expect.arrayContaining(['filters']));
+        expect(out.left.waiting).toHaveLength(1);
     });
 
     it('asks the person behind the token again, and makes nothing they may no longer make', async () => {

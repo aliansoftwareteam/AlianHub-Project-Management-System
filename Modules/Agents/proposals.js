@@ -18,6 +18,8 @@ const aiFeedback = require('../AI/feedback');
 const slackPost = require('./connectors/slackPost');
 const planFiling = require('./planFiling');
 const planLocks = require('./planLocks');
+const planShown = require('./planShown');
+const planFollowUp = require('./planFollowUp');
 const proposalText = require('./proposalText');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
@@ -254,6 +256,38 @@ const partAudits = (result) => (Array.isArray(result && result.parts) ? result.p
 
 const get = (companyId, id) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: oid(id) }] }, 'findOne');
 
+const CARRIED_OVER = Object.freeze(['agentId', 'agentName', 'runId', 'what', 'why', 'gate', 'priority', 'taint', 'source', 'finding', 'requestedBy', 'tokenId', 'tokenProjectIds', 'oauthClientId', 'oauthGrantId', 'allowedActions']);
+
+/* The parts of a plan an approval left to be made later (./planFollowUp.js), each kept as a proposal that waits
+ * for a person: filed for whoever the first was filed for, and held to everything a proposal is held to. A part
+ * that is tried once more is kept for the person who approved the plan. null where nothing was left. */
+const fileLeft = async (companyId, p, id, { decider, left }) => {
+    if (!left.waiting.length && !left.retry.length) return null;
+    const from = plain(p);
+    const carried = Object.fromEntries(CARRIED_OVER.filter((key) => from[key] !== undefined && from[key] !== null).map((key) => [key, from[key]]));
+    const sameKind = (change) => (Array.isArray(from.changes) ? from.changes : []).some((filed) => filed && filed.action === change.action);
+    const stored = (change) => ({
+        action: change.action, params: planFiling.storedParams(change.action, change.params), label: proposalText.labelOf(change),
+        reversible: Boolean(registry.get(change.action) && registry.get(change.action).undoable), rating: change.rating || actions.rating(change.action),
+    });
+    const file = async ({ projectId, change }, more = {}) => {
+        const saved = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AGENT_PROPOSALS,
+            data: {
+                ...carried, what: sameKind(change) ? from.what : proposalText.titleOf('', [change]),
+                taskId: null, projectId, status: STATUS.PENDING, cost: null, auditIds: [], splitFrom: String(id), ...more, changes: [stored(change)],
+            },
+        }, 'save');
+        emit(companyId, saved);
+        return String(saved._id);
+    };
+    const waiting = [];
+    for (const entry of left.waiting) waiting.push(await file(entry));
+    const retry = [];
+    for (const entry of left.retry) retry.push(await file(entry, { retryBy: String(decider.userId), retryWhy: entry.why }));
+    return { waiting, retry };
+};
+
 const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
     const filter = onlyIf ? { _id: oid(id), status: onlyIf } : { _id: oid(id) };
     const updated = await MongoDbCrudOpration(companyId, {
@@ -302,13 +336,15 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         }
         status = STATUS.EDITED;
     }
-    const partHeld = await planLocks.approveRefusal(companyId, { userId: decider.userId, privileged: Boolean(isPrivileged) }, changes);
+    const person = { userId: decider.userId, privileged: Boolean(isPrivileged) };
+    const partHeld = approverRights.retryRefusal(decider.userId, p) || await planLocks.approveRefusal(companyId, person, changes) || planShown.approveRefusal(changes);
     if (partHeld) return partHeld;
     // A connected agent's change was asked of the approver above; these run on the approver's own rights.
     if (!fromMcp) {
-        const lacking = await approverRights.approveRefusal(companyId, { userId: decider.userId, privileged: Boolean(isPrivileged) }, p, changes);
+        const lacking = await approverRights.approveRefusal(companyId, person, p, changes);
         if (lacking) return lacking;
     }
+    const held = kept ? await planFollowUp.heldBack(companyId, person, p.changes, kept.keptKeys) : [];
 
     const runs = require('./runs');
     const fromSystem = p.source === SOURCE_SYSTEM;
@@ -338,7 +374,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
             if (out.auditId) auditIds.push(out.auditId, ...partAudits(out.result));
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
-            applied.push({ action: c.action, ok: false, error: e.message });
+            applied.push({ action: c.action, ok: false, error: e.message, ...(Array.isArray(e.parts) ? { parts: e.parts } : {}) });
         }
     }
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
@@ -356,7 +392,10 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     // "waiting_approval" — and in every running count — after the work was done.
     const okCount = applied.filter((a) => a.ok).length;
     await settleRun(companyId, p, { decision: status, applied, reason: null, outcome: `${status} by a person — ${okCount} of ${applied.length} change(s) applied` });
-    return { proposal: updated, applied, undoToken: String(id), undoUntil };
+    const left = await quietly(`keep what ${id} left to be made`, () => fileLeft(companyId, p, id, {
+        decider, left: planFollowUp.leftBy({ stored: p.changes, changes, applied, held, secondTry: Boolean(p.retryBy) }),
+    }));
+    return { proposal: updated, applied, undoToken: String(id), undoUntil, ...(left ? { left } : {}) };
 };
 
 const decline = async (companyId, id, { decider, ip, reason }) => {
@@ -403,6 +442,16 @@ const withdraw = async (companyId, id, reason) => setStatus(companyId, id, {
     status: STATUS.DECLINED, decidedBy: SYSTEM_DECIDER, decidedAt: new Date(), declineReason: String(reason || '').slice(0, DECLINE_REASON_MAX),
 }, { onlyIf: STATUS.PENDING });
 
+const SECOND_TRY_UNDONE = 'The approval that left these parts to be tried again was undone.';
+
+/* The parts an approval left to be tried once more go with it when it is undone; the parts it left for someone else to approve stay. */
+const withdrawSecondTries = async (companyId, id) => {
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ splitFrom: String(id), retryBy: { $exists: true }, status: STATUS.PENDING }, { _id: 1 }],
+    }, 'find');
+    for (const row of rows || []) await withdraw(companyId, row._id, SECOND_TRY_UNDONE);
+};
+
 /* Undo within the window: every audited action, newest first. */
 const undoApproval = async (companyId, id, { decider, isPrivileged, ip }) => {
     const p = await get(companyId, id);
@@ -421,6 +470,7 @@ const undoApproval = async (companyId, id, { decider, isPrivileged, ip }) => {
         results.push({ auditId, ...(await undo.undoAuditRow(companyId, row, decider, ip, ctx).catch((e) => ({ ok: false, reason: e.message }))) });
     }
     const updated = await setStatus(companyId, id, { status: STATUS.UNDONE, undoUntil: null });
+    await quietly(`withdraw the second tries of ${id}`, () => withdrawSecondTries(companyId, id));
     await audit.recordProposalDecision(companyId, decider, { proposalId: id, decision: 'undone', agentName: p.agentName, runId: p.runId, changes: results, ip });
     return { proposal: updated, results };
 };
