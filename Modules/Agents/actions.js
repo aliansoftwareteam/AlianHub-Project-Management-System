@@ -509,7 +509,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     if (!(await threadMay(companyId, actor, action, params))) throw await refusal(companyId, actor, { action, params, reason: THREAD_REFUSAL, ip, taint });
     const closed = await targetRefusal(companyId, actor, action, params) || await draftRefusal(companyId, actor, action, params);
     if (closed) throw await refusal(companyId, actor, { action, params, reason: closed, ip, taint });
-    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved, taint, standing: true });
+    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved, taint, standing: true, applying: true });
     if (rule.decision !== projectPolicy.DECISION.ACT) {
         const held = rule.decision === projectPolicy.DECISION.PROPOSE ? `${rule.reason}, so it waits for a person's approval` : rule.reason;
         throw await refusal(companyId, actor, { action, params, reason: held, ip, taint });

@@ -173,9 +173,9 @@ describe('one item per agent at a time', () => {
 
 describe('how many agents work in a project at once', () => {
     it('is three unless the project says otherwise', async () => {
-        expect(await projectLimits.read(CID, P_OPEN)).toEqual({ atOnce: 3, paused: false });
+        expect(await projectLimits.read(CID, P_OPEN)).toEqual({ atOnce: 3, paused: false, directTasks: 10 });
         project().agentLimits = { atOnce: 99, paused: 'yes' };
-        expect(await projectLimits.read(CID, P_OPEN)).toEqual({ atOnce: 3, paused: false });
+        expect(await projectLimits.read(CID, P_OPEN)).toEqual({ atOnce: 3, paused: false, directTasks: 10 });
     });
 
     it('at the limit a fourth agent is told to wait, holds nothing, and gets work when one finishes', async () => {

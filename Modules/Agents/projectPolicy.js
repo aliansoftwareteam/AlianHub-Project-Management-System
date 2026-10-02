@@ -5,11 +5,13 @@ const registry = require('./registry');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
 const projectLimits = require('./projectLimits');
+const directChanges = require('./directChanges');
 
 // A project's own rule for agents, and the one function every agent write asks. It only holds an agent
 // back: the registry, the never-list, the person's permissions, the manage grant and taint routing are
 // asked around it exactly as they were, and an answer of "act" here grants nothing they refuse.
 // A project where agents are paused (./projectLimits) refuses every agent write here, before any other answer.
+// A connected agent that has changed as many tasks as the project counts (./directChanges) is answered last.
 
 const DONE = Object.freeze({ NEVER: 'never', APPROVAL: 'approval', YES: 'yes' });
 const CONNECTED = Object.freeze({ PROPOSE_ALL: 'propose_all', SINGLE_TASK: 'single_task' });
@@ -144,6 +146,17 @@ const reachesPaused = async (companyId, params) => {
     return paused.length > 0 && (await projectsOf(companyId, params)).some((id) => paused.includes(id));
 };
 
+/* A connected agent's own change to one more task than a project it reaches counts, as the answer that holds it; null otherwise. */
+const pastTheCount = async ({ companyId, actor, action, params, projectIds, applying }) => {
+    if (!isConnected(actor) || directChanges.NOT_A_CHANGE.has(action)) return null;
+    for (const projectId of projectIds) {
+        const { directTasks } = await projectLimits.read(companyId, projectId);
+        const place = await directChanges.admit({ companyId, projectId, actor, params, limit: directTasks, keep: applying });
+        if (!place.ok) return { decision: DECISION.PROPOSE, reason: directChanges.reasonOf(place.counted), manyTasks: true };
+    }
+    return null;
+};
+
 /* What the projects a write reaches hold it to: act as the caller's other rules allow, wait for a person, or
  * not at all. `approved` is true only where a person has approved this very change, which a pause does not hold:
  * it is the person's own decision. A write that names no
@@ -151,8 +164,10 @@ const reachesPaused = async (companyId, params) => {
  * for a person whatever a project is set to: answered here, a caller files it instead of meeting the registry's refusal.
  * `standing` is passed only by a caller that names the standing approval in the change's audit row. A standing
  * approval turns one answer, a connected agent's change that would wait, into "act" and comes back with it;
- * it never answers for a close, for a refusal, or for a proposeOnly action. */
-const ask = async ({ companyId, actor, action, params = {}, approved = false, standing = false, taint = null }) => {
+ * it never answers for a close, for a refusal, for a proposeOnly action, or for the count of tasks.
+ * `applying` is passed only by a caller that makes the change on an answer of "act": that is when the change is
+ * counted. Every other caller is told what the count would answer and takes no place in it. */
+const ask = async ({ companyId, actor, action, params = {}, approved = false, standing = false, taint = null, applying = false }) => {
     const entry = registry.get(action);
     if (!isAgent(actor) || !entry || !entry.write || ASKS_NOTHING.has(entry.key)) return act;
     const given = params && typeof params === 'object' ? params : {};
@@ -176,9 +191,11 @@ const ask = async ({ companyId, actor, action, params = {}, approved = false, st
         const covered = standing && !closing
             ? await require('./standingApprovals').covering({ companyId, actor, action: entry.key, params: given, projectIds, taint })
             : null;
-        return covered ? { ...act, standing: covered } : { decision: DECISION.PROPOSE, reason: REASON.PROPOSE_ALL };
+        if (!covered) return { decision: DECISION.PROPOSE, reason: REASON.PROPOSE_ALL };
+        return await pastTheCount({ companyId, actor, action: entry.key, params: given, projectIds, applying }) || { ...act, standing: covered };
     }
-    return act;
+    if (approved) return act;
+    return await pastTheCount({ companyId, actor, action: entry.key, params: given, projectIds, applying }) || act;
 };
 
 /* Whether a project now holds agents back where it did not before. */

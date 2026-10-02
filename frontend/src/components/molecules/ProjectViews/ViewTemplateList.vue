@@ -65,7 +65,7 @@
             data-template-more
             :aria-expanded="expanded ? 'true' : 'false'"
             @click="expanded = !expanded"
-        >{{ expanded ? $t('ViewTemplates.show_fewer') : $t('ViewTemplates.show_all', { n: templates.length }) }}</button>
+        >{{ expanded ? $t('ViewTemplates.show_fewer') : $t('ViewTemplates.show_all', { n: templates.length }, templates.length) }}</button>
         <p v-if="error" class="vtl__error" role="alert">{{ error }}</p>
     </section>
 </template>

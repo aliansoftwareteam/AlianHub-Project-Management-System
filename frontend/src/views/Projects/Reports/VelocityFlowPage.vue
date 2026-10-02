@@ -103,7 +103,7 @@ const projectName = computed(() => {
     const found = projects.value.find((p) => String(p._id) === projectId.value);
     return found ? (found.ProjectName || '') : '';
 });
-const headline = computed(() => [projectName.value, t('Reports.last_n_sprints', { n: rows.value.length || SPRINT_WINDOW })]
+const headline = computed(() => [projectName.value, t('Reports.last_n_sprints', { n: rows.value.length || SPRINT_WINDOW }, rows.value.length || SPRINT_WINDOW)]
     .filter(Boolean).join(' · ').toUpperCase());
 
 const splitAvailable = computed(() => hasActorSplit(rows.value));

@@ -47,7 +47,10 @@
                 <button v-if="canCreate" type="button" class="hs-label__btn" :title="$t('Home.new_project')" @click="$emit('create-project')"><ShellIcon name="plus" :size="13" /></button>
             </div>
             <ProjectTree v-if="projects.length" :projects="projects" :label="$t('Home.projects')" />
-            <div v-else class="hs-empty">{{ $t('Home.no_projects') }}</div>
+            <div v-else class="hs-empty" data-test="sidebar-no-projects">
+                <span>{{ $t('Home.no_projects') }}</span>
+                <button v-if="canCreate" type="button" class="hs-empty__btn" data-test="sidebar-create-project" @click="$emit('create-project')">{{ $t('Home.create_first_project') }}</button>
+            </div>
         </nav>
 
         <div class="hs-foot__wrap" @click.stop>
