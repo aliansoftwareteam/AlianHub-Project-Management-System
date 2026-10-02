@@ -68,7 +68,7 @@
                                                         :ref="projectView"
                                                     >
                                                         <img :src="publicIcon" v-if="!projectData.isPrivateSpace" class="pr-10px vertical-middle" alt="public-folder"/>
-                                                        <span class="font-size-14 text-ellipsis d-inline-block gray81 project__requirement">
+                                                        <span class="font-size-14 text-ellipsis d-inline-block project__requirement">
                                                             <span v-if="activeTab !== 'EmbedView' && projectComponentsIcons(activeTab)?.icon" class="ah-mask-icon phone-view__icon mr-5px" :style="maskOf(projectComponentsIcons(activeTab).icon)" aria-hidden="true"></span>
                                                             <img v-else-if="activeTab === 'EmbedView' && icons[selectedEmbedView?.type]" :src="icons[selectedEmbedView.type]" alt="" class="mr-5px">
                                                             {{activeTab !== 'EmbedView' ? (shownView?.title || viewLabel(shownView?.name)) : embedViewName || "N/A"}}
@@ -1382,6 +1382,7 @@ function closeModal() {
     height: 28px;
 }
 .project__requirement{
+    color: var(--ink-2);
     padding: 0px 10px 0 2px;
 }
 .project__requirement img{
