@@ -150,7 +150,7 @@ describe('composePage', () => {
         expect((await pageAi.composePage({ action: 'draft' })).status).toBe(false);
     });
 
-    it.failing('does not leave its 120 second timeout running after the model has answered', async () => {
+    it('does not leave its 120 second timeout running after the model has answered', async () => {
         answer('{"markdown":"ok"}');
         await pageAi.composePage({ action: 'draft' });
         expect(jest.getTimerCount()).toBe(0);

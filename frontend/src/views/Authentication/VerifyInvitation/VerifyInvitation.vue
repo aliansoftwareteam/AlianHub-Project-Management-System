@@ -35,6 +35,7 @@ import * as env from "@/config/env";
 const { t } = useI18n();
 const axios = inject("$axios");
 const userId = inject("$userId");
+const openCompany = inject("$companyId", null);
 const route = useRoute();
 const router = useRouter();
 
@@ -55,6 +56,9 @@ onMounted(async () => {
         const signedInUserId = userId.value || localStorage.getItem("userId") || "";
         if (signedInUserId) await getAuth(signedInUserId).catch(() => null);
         localStorage.setItem("selectedCompany", result.data.companyId);
+        // A person who had no workspace: told which company is open, the app does not look it up in the empty list it
+        // loaded before this one was joined and send them to name a workspace.
+        if (signedInUserId && openCompany && !openCompany.value) openCompany.value = result.data.companyId;
         stage.value = "accepted";
         setTimeout(() => {
             router.replace({ name: "Log-in" }).then(() => { if (signedInUserId) window.location.reload(); });

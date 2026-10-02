@@ -312,17 +312,30 @@ const proceedAfterAuth = async (userId) => {
     localStorage.setItem("SubmenuScreen", "project");
     updateUserStatus(userId);
 
-    if (!uData.AssignCompany?.length) { router.push({ name: "Create_Company" }); return; }
+    const toInvitation = INVITATION_REDIRECT.test(String(route.query.redirect_url || ""));
+    if (!uData.AssignCompany?.length) {
+        // Registered first and invited afterwards: the invitation is what gives this person a workspace.
+        if (toInvitation) await backToInvitation();
+        else router.push({ name: "Create_Company" });
+        return;
+    }
     const cid = localStorage.getItem("selectedCompany") ?? companyID;
     if (cid && isCompanyFind === false) { router.push({ name: "Create_Company" }); return; }
 
-    if (!localStorage.getItem("selectedCompany") && !INVITATION_REDIRECT.test(String(route.query.redirect_url || "")) && Array.isArray(companies) && companies.length > 1) {
+    if (!localStorage.getItem("selectedCompany") && !toInvitation && Array.isArray(companies) && companies.length > 1) {
         workspaces.value = companies;
         pendingUserId.value = userId;
         step.value = "workspace";
         return;
     }
     finishLogin(cid);
+};
+
+const backToInvitation = async () => {
+    localStorage.setItem("isLogging", "true");
+    localStorage.removeItem("ForgotEmail");
+    await router.replace(route.query.redirect_url);
+    window.location.reload();
 };
 
 const finishLogin = async (cid) => {

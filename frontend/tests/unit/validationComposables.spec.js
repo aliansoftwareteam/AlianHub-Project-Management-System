@@ -79,8 +79,7 @@ describe('checkErrors', () => {
             await expect(check({ field, name: 'Title', validations: 'min:3', event: input('  ab  ') })).resolves.toBe(false);
             await expect(check({ field, name: 'Title', validations: 'max:3', event: input('  abc  ') })).resolves.toBe(true);
         });
-        // Compares against en.phoneNumber, which is undefined (the key is nested in en.js), so the branch never runs.
-        it.fails('uses the phone message for a short phone number', async () => {
+        it('uses the phone message for a short phone number', async () => {
             field.value = '123';
             await checkErrors({ field, name: 'Phone Number', validations: 'min:10' });
             expect(field.error).toBe('companyErrorMessage.phoneNumberValid');
@@ -120,24 +119,23 @@ describe('checkErrors', () => {
             expect(field.error).toBe('The code field is required');
         });
 
-        // en.password / en.email / en.firstName ... are undefined (nested in en.js), so the special messages below are never chosen.
         describe('translated messages', () => {
             const run = async (name, value, opts = {}) => {
                 field.value = value;
                 await checkErrors({ field, name, validations: 'regex:^zzz$', ...opts });
                 return field.error;
             };
-            it.fails('short password', async () => {
+            it('short password', async () => {
                 expect(await run('Password', 'abc')).toBe('authErrorMessage.passwordValid');
                 expect(await run('New Password', 'abc')).toBe('authErrorMessage.newPasswordValid');
                 expect(await run('Current Password', 'abc')).toBe('authErrorMessage.currentPasswordValid');
             });
-            it.fails('long password that misses the pattern', async () => {
+            it('long password that misses the pattern', async () => {
                 expect(await run('Password', 'abcdefghi')).toBe('errorPage.The authErrorMessage.validPassRegex');
                 expect(await run('New Password', 'abcdefghi')).toBe('errorPage.The authErrorMessage.newPassword');
                 expect(await run('Current Password', 'abcdefghi')).toBe('errorPage.The authErrorMessage.currentPassword');
             });
-            it.fails('email, first and last name', async () => {
+            it('email, first and last name', async () => {
                 expect(await run('email', 'x')).toBe('authErrorMessage.emailError');
                 expect(await run('first name', 'x')).toBe('authErrorMessage.validCharactersfirst');
                 expect(await run('last name', 'x')).toBe('authErrorMessage.validCharacterslast');
@@ -145,7 +143,7 @@ describe('checkErrors', () => {
             it('any other field', async () => {
                 expect(await run('Zip Code', 'x')).toBe('errorPage.The errorPage.zip_code errorPage.field_must_be_a_valid errorPage.zip_code');
             });
-            it.fails('same wording when the value comes from an input event', async () => {
+            it('same wording when the value comes from an input event', async () => {
                 field.value = 'abc';
                 await checkErrors({ field, name: 'Password', validations: 'regex:^zzz$', event: input('abc') });
                 expect(field.error).toBe('authErrorMessage.passwordValid');
@@ -188,18 +186,15 @@ describe('checkErrors', () => {
     });
 
     describe('rule parsing', () => {
-        // Rule names are found with includes(), so a pattern containing "min"/"max"/"required" also triggers that rule.
-        it.fails('still applies a min rule written after a regex containing "min"', async () => {
+        it('still applies a min rule written after a regex containing "min"', async () => {
             field.value = 'admin';
             await expect(check({ field, name: 'Role', validations: 'regex:^admin$|min:10' })).resolves.toBe(false);
         });
-        // The pattern is cut at the first ":" from the right, so a pattern containing ":" is truncated.
-        it.fails('keeps colons inside a regex', async () => {
+        it('keeps colons inside a regex', async () => {
             field.value = '1:30';
             await expect(check({ field, name: 'Time', validations: 'regex:^[0-9]{2}:[0-9]{2}$' })).resolves.toBe(false);
         });
-        // Rules are split on "|", which breaks alternation inside a pattern.
-        it.fails('keeps "|" alternation inside a regex', async () => {
+        it('keeps "|" alternation inside a regex', async () => {
             field.value = 'cat';
             await expect(check({ field, name: 'Pet', validations: 'regex:^(cat|dog)$' })).resolves.toBe(true);
         });
@@ -359,8 +354,7 @@ describe('ValidationFunction format rules', () => {
             expect(ask(['a', 'b'], 'c')).toBe(false);
             expect(ask([], 'c')).toBe(false);
         });
-        // Only the first space is replaced, so "in the works" never matches "in_the_works".
-        it.fails('treats every space like an underscore', () => {
+        it('treats every space like an underscore', () => {
             expect(ask(['in the works'], 'in_the_works')).toBe(true);
         });
     });

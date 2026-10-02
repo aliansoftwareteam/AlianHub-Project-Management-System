@@ -19,10 +19,6 @@ export const setRules = ({ commit }) => {
                 } else {
                     resolve([])
                     commit("mutateArrangedRules", []);
-                    commit("mutateRules", {
-                        data: [],
-                        op: "added",
-                    })
                 }
             })
                 .catch((error) => {
@@ -204,7 +200,7 @@ export const setMileStoneStatus = ({ commit }) => {
             apiRequest("get", env.MILESTONE_STATUS).then((res) => {
                 if (res.status === 200 && res?.data && res?.data?.[0].settings?.length) {
                     commit("mutateProjectMilestoneStatus", { data: res?.data[0].settings, op: 'inital' })
-                    resolve(res[0]);
+                    resolve(res.data[0]);
                 } else {
                     resolve([]);
                 }
