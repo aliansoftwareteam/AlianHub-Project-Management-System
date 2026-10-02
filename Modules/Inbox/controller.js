@@ -14,7 +14,6 @@ const R = require('./helpers/inboxRules');
 const S = require('./helpers/inboxState');
 const { CHAT_THREAD_REPLY } = require('../Comments/helpers/chatThreads');
 const { inboxRowsKeptFromReader, withoutKept } = require('../Comments/helpers/readerRows');
-const { readableTasks, TASK_READ_FIELDS } = require('../Tasks/helpers/taskReadAccess');
 
 // The per-user counters document behind the header's red dot. `key` selects the field:
 // 5 is notification_counts, 4 is mention_counts.
@@ -222,18 +221,19 @@ const readApprovals = async (companyId, userId) => {
     }
 };
 
-/** Task names for the rows on this page: the sources carry an id but no title. A task the reader cannot open has none. */
-const readTaskNames = async (companyId, userId, items) => {
-    const ids = [...new Set(items.map((i) => i.taskId).filter(Boolean))].map(oid).filter(Boolean);
+/** Task names for the rows on this page: the sources carry an id but no title. `closedTasks` are the tasks the
+ * reader's rows name that they cannot open, which the rows were already read without: none of them is named. */
+const readTaskNames = async (companyId, items, closedTasks = []) => {
+    const ids = [...new Set(items.map((i) => i.taskId).filter(Boolean))].filter((id) => !closedTasks.includes(String(id))).map(oid).filter(Boolean);
     if (!ids.length) return new Map();
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ _id: { $in: ids } }, { TaskName: 1, ...TASK_READ_FIELDS }],
-    }, 'find').then((tasks) => readableTasks(companyId, userId, tasks)).catch((e) => {
+        data: [{ _id: { $in: ids } }, { TaskName: 1 }],
+    }, 'find').catch((e) => {
         logger.error(`${LOG_PREFIX} task name read failed: ${e.message}`);
         return [];
     });
-    return new Map(rows.map((r) => [String(r._id), String(r.TaskName || '')]));
+    return new Map((rows || []).map((r) => [String(r._id), String(r.TaskName || '')]));
 };
 
 /**
@@ -299,7 +299,7 @@ exports.list = async (req, res) => {
             .sort((a, b) => dir * (new Date(a.createdAt) - new Date(b.createdAt)));
         const page = merged.slice(skip, window);
 
-        const names = await readTaskNames(companyId, userId, page);
+        const names = await readTaskNames(companyId, page, kept.closedTasks);
         for (const i of page) {
             i.taskName = names.get(i.taskId) || '';
             i.dateGroup = R.dateGroupOf(i.createdAt, now);
@@ -393,6 +393,10 @@ exports.counts = async (req, res) => {
             readProposals(companyId, userId).then(queue.waitingCount),
             S.nextWakeAt(companyId, userId, now, kept),
         ]);
+
+        /* The header's unread badge reads the stored counters, which are moved as rows arrive and are read. They
+         * are set here to what this person's lists show, so a row kept from them is not a dot they can never clear. */
+        await S.settleCounters(companyId, userId, { notification: notifications + other, mention: mentions });
 
         return res.send({
             status: true,
