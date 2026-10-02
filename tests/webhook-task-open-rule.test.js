@@ -53,4 +53,15 @@ describe('a webhook is told of a task', () => {
     it('and never of a conversation', async () => {
         expect(await toldOf(CONVERSATION)).toEqual([]);
     });
+
+    it('and of nothing when the task cannot be read back, since what it was sent may not say where the task is', async () => {
+        const read = mockDb.crud;
+        mockDb.crud = (companyId, query, method) => (query.type === SCHEMA_TYPE.TASKS && method === 'findOne' ? Promise.reject(new Error('read failed')) : read(companyId, query, method));
+        try {
+            expect(await toldOf(T_OPEN)).toEqual([]);
+        } finally {
+            mockDb.crud = read;
+        }
+        expect((await toldOf(T_OPEN)).length).toBeGreaterThan(0);
+    });
 });

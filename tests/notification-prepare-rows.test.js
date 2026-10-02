@@ -83,12 +83,12 @@ describe('a notice a person sends about a task', () => {
 
     it('keeps its words as text, and carries only what a person writes', async () => {
         await sent(INSIDER, aboutTask(T_OPEN, {
-            message: '<img src=x onerror="go()"><b>Look</b> & see', changeType: 'agent_alert', changeData: { agentName: 'Robo' }, receiverID: OWNER, notificationType: 'email',
+            message: '<img src=x onerror="go()"><b>Look</b> & see (it\'s here)', changeType: 'agent_alert', changeData: { agentName: 'Robo' }, receiverID: OWNER, notificationType: 'email',
             notSeen: PEOPLE, clearedAt: new Date(), reason: 'direct', userId: OWNER,
         }));
         const row = written().find((entry) => entry.receiverID === OUTSIDER);
 
-        expect(row.message).toBe('&lt;img src=x onerror=&quot;go&#40;&#41;&quot;&gt;&lt;b&gt;Look&lt;/b&gt; &amp; see');
+        expect(row.message).toBe('&lt;img src=x onerror="go()"&gt;&lt;b&gt;Look&lt;/b&gt; &amp; see (it\'s here)');
         expect(row).toMatchObject({ userId: INSIDER, key: 'task_edit', type: 'tasks', projectId: P_OPEN, taskId: T_OPEN, notificationType: 'push' });
         expect(row.clearedAt).toBeUndefined();
         expect(row.notSeen.slice().sort()).toEqual([...PEOPLE].sort());

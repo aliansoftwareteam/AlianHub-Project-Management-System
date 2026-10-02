@@ -43,7 +43,7 @@
                         <div v-for="task in tasksFor(line)" :key="task._id" class="billing__trace-row">
                             <span class="ah-mono billing__trace-key">{{ task.key }}</span>
                             <span class="billing__trace-name">{{ task.name || $t('Time.task_not_open') }}</span>
-                            <span class="ah-chip" :class="task.done ? 'ah-chip--ok' : ''">{{ task.done ? $t('Billing.task_done') : $t('Billing.task_open') }}</span>
+                            <span v-if="!task.hidden" class="ah-chip" :class="task.done ? 'ah-chip--ok' : ''">{{ task.done ? $t('Billing.task_done') : $t('Billing.task_open') }}</span>
                         </div>
                     </div>
                     <div v-if="logsFor(line).length" class="billing__trace-group">

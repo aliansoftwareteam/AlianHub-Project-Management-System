@@ -17,7 +17,6 @@ const { wakeOnActivity } = require('../../Inbox/helpers/inboxState');
 const { canReadProject } = require('../../../Config/projectAccess');
 const mongoose = require('mongoose');
 const { commentThreadAccess } = require('../../Comments/helpers/threadAccess');
-const { sanitizeInput } = require('../../serviceFunction');
 
 const REQUEST_TEXT_FIELDS = ['key', 'type', 'message', 'projectId', 'taskId', 'sprintId', 'folderId', 'changeType', 'comments_id'];
 
@@ -26,6 +25,10 @@ const requestFields = (body) => Object.fromEntries(REQUEST_TEXT_FIELDS
     .map((field) => [field, body[field]]));
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+/* A person's words are kept as text: nothing in them opens a tag. Quotes and brackets stay as typed, since a
+ * notice is also read where markup is not, on a phone's lock screen and in a mail subject. */
+const asText = (words) => words.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /* The thread a request names, with the list read from the stored task: a row is read later by the place it names. */
 const threadNamedBy = async (companyId, fields) => {
@@ -68,7 +71,7 @@ exports.handleNotification = async (req, res) => {
     req.body = {
       ...fields,
       ...(thread.sprintId ? { sprintId: thread.sprintId } : {}),
-      ...(typeof fields.message === 'string' ? { message: sanitizeInput(fields.message) } : {}),
+      ...(typeof fields.message === 'string' ? { message: asText(fields.message) } : {}),
       changeData: body.changeData && typeof body.changeData === 'object' && !Array.isArray(body.changeData) ? body.changeData : {},
       companyId,
       userId: String(req.uid),
