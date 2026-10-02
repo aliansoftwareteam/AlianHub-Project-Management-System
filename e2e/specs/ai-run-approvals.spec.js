@@ -43,8 +43,8 @@ test.describe('Inbox: Needs your approval', () => {
         await expect.poll(() => proposals.statusOf(id)).toBe('approved');
 
         await page.reload();
-        await expect(page.getByRole('region', { name: 'Needs your approval' })).toBeVisible();
-        await expect(queueRow(page, why)).toHaveCount(0);
+        await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible();
+        await expect(page.getByRole('listitem').filter({ hasText: why })).toHaveCount(0);
 
         await owner.api.delete(`/api/v2/agents/${agent._id}`);
     });
@@ -62,8 +62,8 @@ test.describe('Inbox: Needs your approval', () => {
         await expect.poll(() => proposals.statusOf(id)).toBe('declined');
 
         await page.reload();
-        await expect(page.getByRole('region', { name: 'Needs your approval' })).toBeVisible();
-        await expect(queueRow(page, why)).toHaveCount(0);
+        await expect(page.getByRole('heading', { level: 1, name: 'Inbox' })).toBeVisible();
+        await expect(page.getByRole('listitem').filter({ hasText: why })).toHaveCount(0);
 
         await owner.api.delete(`/api/v2/agents/${agent._id}`);
     });
