@@ -1,6 +1,7 @@
 const ctrl = require('./controller');
 const renderer = require('./publicRenderer');
 const rateLimit = require('express-rate-limit');
+const { decidedByPerson } = require('../Agents/personDecides');
 
 // Public share pages are unauthenticated — rate-limit by IP so a leaked link
 // can't be hammered to scrape data or spam the intake form.
@@ -14,7 +15,7 @@ exports.init = (app) => {
     app.put('/api/v2/public-shares/:id', ctrl.updateShare);
     app.delete('/api/v2/public-shares/:id', ctrl.deleteShare); // hard revoke
     app.get('/api/v2/intake', ctrl.listIntake);
-    app.post('/api/v2/intake/review', ctrl.reviewIntake);
+    app.post('/api/v2/intake/review', decidedByPerson('intake.review'), ctrl.reviewIntake);
 
     // Unauthenticated public pages (server-rendered HTML), rate-limited by IP.
     app.get('/share/:token', publicReadLimiter, renderer.renderShare);

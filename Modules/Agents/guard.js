@@ -302,6 +302,9 @@ const PERIMETER = [
     { test: (m, p) => /chargebee|subscription|invoice|billing|milestone|refundamount|paymentplan|customer-update/i.test(p), action: 'billing.*' },
     { test: (m, p) => m !== 'GET' && /\/api\/v1\/members|\/teams|\/company-invitation|\/root-members/i.test(p), action: 'member.remove' },
     { test: (m, p) => m !== 'GET' && /securityPermissions|\/setting\/roles|\/sso\/|\/scim\//i.test(p), action: 'permissions.edit' },
+    { test: (m, p) => m !== 'GET' && /\/projectRules\/|\/importSettings(ProjectFunction)?$/i.test(p), action: 'permissions.edit' },
+    { test: (m, p) => m !== 'GET' && /\/manageTrackerUserPermission/i.test(p), action: 'member.seat' },
+    { test: (m, p) => m !== 'GET' && /\/sendInvitationEmail|\/importUser$/i.test(p), action: 'member.invite' },
     { test: (m, p) => /\/deploy|\/git\/merge/i.test(p), action: 'deploy.production' },
     { test: (m, p) => m !== 'GET' && /\/api\/v2\/api-tokens/i.test(p) && !/\/me$/.test(p), action: 'token.manage' },
 ];

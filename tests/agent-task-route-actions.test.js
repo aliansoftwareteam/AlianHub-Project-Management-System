@@ -276,6 +276,23 @@ describe('the paths no agent reaches', () => {
         expect(await through(session(OWNER), 'PUT', '/api/v2/sso/config')).toBe('passed');
     });
 
+    it.each([
+        ['a project\'s own permission rules', 'PUT', '/api/v1/projectRules/update'],
+        ['the company\'s roles and rules put back as they came', 'POST', '/api/v1/importSettings'],
+        ['a project\'s settings and rules copied in', 'POST', '/api/v1/importSettingsProjectFunction'],
+        ['who holds a tracker seat', 'POST', '/api/v1/manageTrackerUserPermission'],
+        ['an invitation to the workspace', 'POST', '/api/v2/sendInvitationEmail'],
+        ['a list of people to invite', 'POST', '/api/v1/importUser'],
+    ])('refuses an agent %s, and lets a person and a person\'s own token through', async (_what, method, url) => {
+        expect(await through(agentToken(OWNER), method, url)).toBe(403);
+        expect(await through(scriptToken(OWNER), method, url)).toBe('passed');
+        expect(await through(session(OWNER), method, url)).toBe('passed');
+    });
+
+    it('lets an agent read a project\'s permission rules', async () => {
+        expect(await through(agentToken(OWNER), 'GET', '/api/v1/projectRules/6f0000000000000000000d01')).toBe('passed');
+    });
+
     it('refuses an agent the renewal of a token, its own included', async () => {
         const renew = `/api/v2/api-tokens/${agentToken(OWNER).apiToken._id}/renew`;
         expect(await through(agentToken(OWNER), 'POST', renew)).toBe(403);
