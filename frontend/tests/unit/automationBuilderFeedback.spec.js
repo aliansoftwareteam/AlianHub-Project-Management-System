@@ -116,9 +116,15 @@ describe('a sentence typed while the builder is still opening', () => {
 
     it('finds the box the person is in still empty when that answer arrives, and filled once they change a part instead', async () => {
         const store = createStore({ modules: { settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType: 1 }) } } } });
+        const waiting = [];
+        const answer = { data: { status: true, data: { sentence: 'When a task is created, set the status to .', errors: [], issues: [], parseErrors: [], ambiguities: [], grammar: {} } } };
+        const land = async () => {
+            waiting.splice(0).forEach((resolve) => resolve(answer));
+            await flushPromises();
+        };
         apiRequest.mockImplementation((method, url) => {
             if (url.endsWith('/registry')) return ok(MANIFEST);
-            if (url.endsWith('/compile')) return ok({ sentence: 'When a task is created, set the status to .', errors: [], issues: [], parseErrors: [], ambiguities: [], grammar: {} });
+            if (url.endsWith('/compile')) return new Promise((resolve) => { waiting.push(resolve); });
             if (url === '/api/v1/project') return ok(PROJECTS);
             return ok([]);
         });
@@ -127,12 +133,13 @@ describe('a sentence typed while the builder is still opening', () => {
         await startNew(wrapper);
         const sentence = wrapper.find('.au__sentence-input');
         expect(document.activeElement).toBe(sentence.element);
+        await land();
         expect(sentence.element.value).toBe('');
 
         const scope = wrapper.find('[data-test="scope-picker"]');
         scope.element.focus();
         await scope.setValue('p1');
-        await flushPromises();
+        await land();
         expect(sentence.element.value).toBe('When a task is created, set the status to .');
         wrapper.unmount();
     });
