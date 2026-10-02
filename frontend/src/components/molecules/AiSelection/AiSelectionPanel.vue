@@ -43,7 +43,7 @@
             :text="checkedTitles.join('\n')"
             :busy="busy"
             :show-replace="titles.length > 0"
-            :replace-label="$t('AiSelection.create_tasks', { n: checkedTitles.length })"
+            :replace-label="$t('AiSelection.create_tasks', { n: checkedTitles.length }, checkedTitles.length)"
             @replace="createTasks"
             @retry="split"
             @cancel="close"
@@ -264,7 +264,7 @@ async function createTasks() {
             userId: idOf(userId),
             userData: userDataOf(getUser(idOf(userId)), getters["settings/companyOwnerDetail"]?.userId)
         });
-        showUndoToast({ message: t("AiSelection.tasks_created", { n: created.length || chosen.length }), undo });
+        showUndoToast({ message: t("AiSelection.tasks_created", { n: created.length || chosen.length }, created.length || chosen.length), undo });
     } catch (err) {
         console.error("ERROR in creating tasks from a selection: ", err);
         $toast.error(t("AiSelection.failed"), { position: "top-right" });

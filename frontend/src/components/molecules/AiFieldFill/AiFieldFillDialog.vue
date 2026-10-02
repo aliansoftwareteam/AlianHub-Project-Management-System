@@ -69,7 +69,7 @@
                         data-ai-fill-confirm
                         :disabled="!canConfirm"
                         @click="confirmAiFill"
-                    >{{ bulk ? $t('AiFields.fill_n', { n: state.taskIds.length }) : $t('AiFields.apply') }}</button>
+                    >{{ bulk ? $t('AiFields.fill_n', { n: state.taskIds.length }, state.taskIds.length) : $t('AiFields.apply') }}</button>
                 </div>
                 <p v-if="state.phase === PHASE.PREVIEW" class="aff__hint">{{ $t('AiFields.spend_note') }}</p>
             </div>
