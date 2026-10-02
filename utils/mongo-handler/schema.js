@@ -1475,6 +1475,8 @@ const schema = {
         agentName: { type: String, required: false },
         runId: { type: String, required: false },
         taskId: { type: String, required: false },
+        // Every task a batch names. A person who cannot read one of them does not see the proposal (Agents/access.js).
+        taskIds: { type: [String], default: undefined, required: false },
         projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
         what: { type: String, required: true },
         why: { type: String, required: false },

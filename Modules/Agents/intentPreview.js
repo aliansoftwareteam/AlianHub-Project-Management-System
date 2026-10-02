@@ -11,6 +11,8 @@ const plans = require('./projectSetup');
 // a project, list, parent task, person or custom field is named only when that viewer may see it, and everything
 // else on a line is the proposal's own text, handed over as text. Fields, a view and a whole plan are the project's own,
 // so for a viewer who cannot open the project they have no preview at all. A kind of change with no entry in BUILDERS has none.
+// A connected agent's batch is several changes on one card (forBatches): how many tasks, what changes on them, and the
+// first few tasks by name.
 
 const DESCRIPTION_MAX = 280;
 const TEXT_MAX = 250;
@@ -233,4 +235,76 @@ const forProposals = async (companyId, uid, proposals) => {
     ]));
 };
 
-module.exports = { forProposals, DESCRIPTION_MAX };
+const SOURCE_MCP = 'mcp';
+const BATCH_NAMES = 5;
+const STATUS_CHANGES = Object.freeze(['task.status.set', 'task.status.change']);
+const EDITS = Object.freeze(['task.edit', 'task.update']);
+const EDITED = Object.freeze({
+    TaskName: (value) => ({ what: 'title', value: textOf(value) }),
+    rawDescription: () => ({ what: 'description', value: '' }),
+    Task_Priority: (value) => ({ what: 'priority', value: textOf(value, 10).toUpperCase() }),
+    DueDate: (value) => ({ what: 'due', value: textOf(value, 40) }),
+    startDate: (value) => ({ what: 'start', value: textOf(value, 40) }),
+    totalEstimatedTime: (value) => ({ what: 'estimate', value: Number(value) > 0 ? Math.round(Number(value)) : '' }),
+});
+const OTHER = 'other';
+const CHANGED = Object.freeze({
+    'task.assignees.set': 'assignees', 'task.assign': 'assignees', 'task.field.set': 'field', 'task.move': 'move', 'task.sprint.move': 'move',
+    'task.archive': 'archive', 'task.restore': 'restore', 'task.add': 'task', 'task.create': 'task', 'subtask.add': 'subtask', 'subtask.create': 'subtask',
+    'task.comment': 'comment', 'comment.create': 'comment', 'task.link': 'link',
+});
+
+/* A connected agent files one change for a call of its own, so several changes are a batch. */
+const isBatch = (proposal) => Boolean(proposal) && proposal.source === SOURCE_MCP && changesOf(proposal).length > 1;
+
+/* What one change of a batch changes: a status, each field an edit names, or its kind. The text is the proposal's own. */
+const changedBy = (change) => {
+    const params = paramsOf(change);
+    if (STATUS_CHANGES.includes(change.action)) return [{ what: 'status', value: textOf(objectOf(params.status).name, 60) }];
+    if (EDITS.includes(change.action)) {
+        return Object.entries(detailedFields(params)).map(([field, value]) => (Object.hasOwn(EDITED, field) ? EDITED[field](value) : { what: OTHER, value: '' }));
+    }
+    return [{ what: Object.hasOwn(CHANGED, change.action) ? CHANGED[change.action] : OTHER, value: '' }];
+};
+
+/* One line for each thing a batch changes, with how many tasks it changes that on: the value when every change
+ * sets the same one, `mixed` when they differ. A change that names no task, a new task for one, counts as its own. */
+const changeLinesOf = (changes) => {
+    const groups = new Map();
+    changes.forEach((change, at) => changedBy(change).forEach(({ what, value }) => {
+        const group = groups.get(what) || { on: new Set(), values: new Set() };
+        group.on.add(idOf(paramsOf(change).taskId).toLowerCase() || `change:${at}`);
+        group.values.add(value);
+        groups.set(what, group);
+    }));
+    return [...groups].map(([what, { on, values }]) => ({ kind: 'batchChange', what, count: on.size, value: values.size === 1 ? [...values][0] : '', mixed: values.size > 1 }));
+};
+
+const taskIdsOf = (changes) => [...new Set(changes.map((change) => idOf(paramsOf(change).taskId).toLowerCase()).filter(Boolean))];
+
+/* For each batch among the proposals, by proposal id: its one card. A task is named, and can be opened from the
+ * card, only when the viewer can read it; the rest are a count. */
+const forBatches = async (companyId, uid, proposals) => {
+    const batches = (Array.isArray(proposals) ? proposals : []).filter(isBatch);
+    if (!batches.length) return new Map();
+    const readable = await readableTaskIds(companyId, uid, batches.flatMap((proposal) => taskIdsOf(changesOf(proposal))));
+    const tasks = readable.length ? await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: readable.map(oid) }, deletedStatusKey: { $ne: 1 } }, { TaskName: 1, ProjectID: 1, sprintId: 1, folderObjId: 1 }],
+    }, 'find') : [];
+    const rowOf = new Map((tasks || []).map((task) => [String(task._id).toLowerCase(), {
+        taskId: String(task._id), name: textOf(task.TaskName), projectId: idOf(task.ProjectID), sprintId: idOf(task.sprintId), folderId: idOf(task.folderObjId),
+    }]));
+    return new Map(batches.map((proposal) => {
+        const changes = changesOf(proposal);
+        const ids = taskIdsOf(changes);
+        const shown = ids.map((id) => rowOf.get(id)).filter((row) => row && row.name).slice(0, BATCH_NAMES);
+        return [String(proposal._id), {
+            kind: 'batch',
+            tasks: ids.length,
+            changes: changes.length,
+            lines: [...changeLinesOf(changes), ids.length > 0 && { kind: 'batchTasks', tasks: shown, others: ids.length - shown.length }].filter(Boolean),
+        }];
+    }));
+};
+
+module.exports = { forProposals, forBatches, DESCRIPTION_MAX };

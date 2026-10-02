@@ -54,6 +54,28 @@ const textsOf = (list) => (Array.isArray(list) ? list : []).map(textOf).filter(B
 /* A custom field by its name, a built-in choice in words. */
 const chosenText = (t, line, known, prefix) => textOf(line.field) || (known.includes(line.by) ? t(`IntentPreview.${prefix}_${line.by}`) : '');
 
+const tasksText = (t, n) => t('IntentPreview.batch_tasks', { n }, n);
+
+/* What a batch changes, as the label of its line: a field of the task, or the kind of change. */
+const BATCH_LABELS = Object.freeze({
+    status: 'line_status', priority: 'line_priority', due: 'line_due', start: 'line_start', estimate: 'line_estimate', description: 'line_description',
+    title: 'batch_what_title', assignees: 'batch_what_assignees', field: 'line_field', move: 'batch_what_move', archive: 'batch_what_archive',
+    restore: 'batch_what_restore', task: 'new_task', subtask: 'new_subtask', comment: 'batch_what_comment', link: 'line_links', other: 'batch_what_other',
+});
+
+const BATCH_VALUES = Object.freeze({
+    priority: (t, value) => (PRIORITIES.includes(value.toLowerCase()) ? t(`IntentPreview.priority_${value.toLowerCase()}`) : value),
+    due: (t, value, locale) => dateText(locale, value),
+    start: (t, value, locale) => dateText(locale, value),
+    estimate: (t, value) => (countOf(Number(value)) ? estimateText(t, countOf(Number(value))) : ''),
+});
+
+const batchValue = (t, line, locale) => {
+    const given = typeof line.value === 'number' ? String(line.value) : textOf(line.value);
+    if (!given) return '';
+    return Object.hasOwn(BATCH_VALUES, line.what) ? BATCH_VALUES[line.what](t, given, locale) : given;
+};
+
 export const LINE_KINDS = {
     place: (t, line) => {
         const project = textOf(line.project);
@@ -121,6 +143,22 @@ export const LINE_KINDS = {
         const text = shown || (others ? t('IntentPreview.fields_not_shown', { n: others }, others) : '');
         return text ? { label: t('IntentPreview.line_columns'), text } : null;
     },
+    batchChange: (t, line, locale) => {
+        const n = countOf(line.count);
+        if (!n) return null;
+        const label = t(`IntentPreview.${Object.hasOwn(BATCH_LABELS, line.what) ? BATCH_LABELS[line.what] : BATCH_LABELS.other}`);
+        const tasks = tasksText(t, n);
+        if (line.mixed) return { label, text: t('IntentPreview.batch_mixed_on', { tasks }) };
+        const value = batchValue(t, line, locale);
+        return { label, text: value ? t('IntentPreview.batch_value_on', { value, tasks }) : tasks };
+    },
+    /* The tasks a batch names. `open` are the ones the viewer can open, each drawn as a button; `text` is the rest, as a count. */
+    batchTasks: (t, line) => {
+        const open = (Array.isArray(line.tasks) ? line.tasks : []).filter((task) => task && textOf(task.name) && textOf(task.taskId));
+        const others = countOf(line.others);
+        if (!open.length) return others ? { label: t('IntentPreview.line_batch_tasks'), text: t('IntentPreview.tasks_not_shown', { n: others }, others) } : null;
+        return { label: t('IntentPreview.line_batch_tasks'), open, text: others ? t('IntentPreview.tasks_and_more', { n: others }) : '' };
+    },
 };
 
 const HEADINGS = Object.freeze({
@@ -129,7 +167,18 @@ const HEADINGS = Object.freeze({
     fields: { kind: 'IntentPreview.new_fields', wants: 'IntentPreview.wants_fields' },
     view: { kind: 'IntentPreview.new_view', wants: 'IntentPreview.wants_view' },
     setup: { kind: 'IntentPreview.new_setup', wants: 'IntentPreview.wants_setup' },
+    batch: { kind: 'IntentPreview.batch_kind' },
 });
+
+const isBatch = (preview) => Boolean(preview) && preview.kind === 'batch';
+const batchCount = (preview) => countOf(preview.tasks) || countOf(preview.changes);
+const batchWord = (preview) => (countOf(preview.tasks) ? 'tasks' : 'changes');
+
+/* A card's own title: the name of what is created, or for a batch how much it changes. */
+export const titleOf = (t, preview) => {
+    if (isBatch(preview)) return t(`IntentPreview.batch_${batchWord(preview)}`, { n: batchCount(preview) }, batchCount(preview));
+    return textOf(preview?.title);
+};
 
 const headingOf = (preview) => (preview && Object.hasOwn(HEADINGS, preview.kind) ? HEADINGS[preview.kind] : null);
 
@@ -138,9 +187,12 @@ export const kindLabel = (t, preview) => (headingOf(preview) ? t(headingOf(previ
 export const linesOf = (t, locale, preview) => (Array.isArray(preview?.lines) ? preview.lines : [])
     .filter((line) => line && typeof line === 'object' && Object.hasOwn(LINE_KINDS, line.kind))
     .map((line) => ({ kind: line.kind, ...LINE_KINDS[line.kind](t, line, locale) }))
-    .filter((line) => line.text);
+    .filter((line) => line.text || line.open);
 
 /* "create the task “Fix the login bug”", to follow "<agent> wants to"; '' for a preview that cannot be put that way. */
-export const intentTitle = (t, preview) => (headingOf(preview) && textOf(preview.title) ? t(headingOf(preview).wants, { title: textOf(preview.title) }) : '');
+export const intentTitle = (t, preview) => {
+    if (isBatch(preview)) return batchCount(preview) ? t(`IntentPreview.wants_batch_${batchWord(preview)}`, { n: batchCount(preview) }, batchCount(preview)) : '';
+    return headingOf(preview) && textOf(preview.title) ? t(headingOf(preview).wants, { title: textOf(preview.title) }) : '';
+};
 
-export const intentSummary = (t, preview) => (headingOf(preview) ? t('IntentPreview.summary', { kind: kindLabel(t, preview), title: textOf(preview.title) }) : '');
+export const intentSummary = (t, preview) => (headingOf(preview) ? t('IntentPreview.summary', { kind: kindLabel(t, preview), title: titleOf(t, preview) }) : '');
