@@ -1,3 +1,5 @@
+const { MongoClient } = require('mongodb');
+const { resolveMongoUrl } = require('../../e2e/support/env');
 const { createProject, createTask, loginAs, readState } = require('../../e2e/support/fixtures');
 
 const state = readState();
@@ -111,12 +113,16 @@ const trackerTodayQuery = ({ userId, projectIDs, startDate, endDate }) => [
     { $unwind: '$taskData' },
 ];
 
-const rowsIn = async (owner, collection) => {
-    const res = await owner.api.post('/api/v1/timesheet', { queryeta: [{ $limit: 1 }, { $lookup: { from: collection, pipeline: [], as: 'rows' } }] });
-    expect(res.status).toBe(200);
-    expect(res.body.length).toBe(1);
-    return res.body[0].rows;
-};
+let client;
+beforeAll(async () => {
+    client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
+    await client.connect();
+});
+afterAll(async () => {
+    if (client) await client.close();
+});
+
+const rowsIn = (collection) => client.db(state.companyId).collection(collection).find({}).toArray();
 
 describe('review 635 — timesheet and estimate queries against real Mongo', () => {
     it('gives a member a non-zero tracked-time card total on their own project', async () => {
@@ -178,7 +184,25 @@ describe('review 635 — timesheet and estimate queries against real Mongo', () 
             const res = await member.api.post('/api/v1/estimatedTime', { queryeta });
             expect([JSON.stringify(queryeta), res.status]).toEqual([JSON.stringify(queryeta), 400]);
         }
-        expect(await rowsIn(owner, probe)).toEqual([]);
+        expect(await rowsIn(probe)).toEqual([]);
+    });
+
+    it('lets an owner join tasks, with their folders and sprints, and no other collection', async () => {
+        const owner = await loginAs('owner');
+        const target = await projectWithTask(owner, [owner]);
+        await logHour(owner, target);
+
+        const { start, end } = windowSeconds();
+        const worked = await owner.api.post('/api/v1/timesheet', {
+            queryeta: trackerTodayQuery({ userId: owner.uid, projectIDs: [target.project._id], startDate: start * 1000, endDate: end * 1000 }),
+        });
+        expect(worked.status).toBe(200);
+        expect(worked.body.map((row) => String(row.taskData._id))).toContain(String(target.task._id));
+
+        for (const collection of ['users', 'company_users', 'comments', 'apiTokens', 'webhooks', 'timesheets']) {
+            const res = await owner.api.post('/api/v1/timesheet', { queryeta: [{ $limit: 1 }, { $lookup: { from: collection, pipeline: [], as: 'rows' } }] });
+            expect([collection, res.status]).toEqual([collection, 400]);
+        }
     });
 
     it('refuses a member\'s $unionWith on estimatedTime and keeps their read to their own plan', async () => {
