@@ -1,6 +1,6 @@
 # Progress: 047, AI-run
 
-State at build 806 (`14.36.0-beta.806`), 2026-10-02 21:00 IST. Tracker: AP-441.
+State at build 810 (`14.36.0-beta.810`), 2026-10-02 22:45 IST. Tracker: AP-441.
 
 How to read a line: `[x]` is merged into `beta`, with its PR and build number. "Inside build 762" means the PR reached `beta` inside a combined PR:
 
@@ -16,7 +16,8 @@ How to read a line: `[x]` is merged into `beta`, with its PR and build number. "
 | 781 | #1463, the sixteenth | 794 | #1488, the twentieth |
 | 786 | #1457, the seventeenth | 802 | #1500, the twenty-first |
 | 805 | #1524, a side batch | 803 | #1509, the twenty-second |
-| 806 | #1525, the twenty-third | | |
+| 806 | #1525, the twenty-third | 809 | #1544, the twenty-fifth |
+| 810 | #1547, the twenty-fourth | | |
 
 Build 763 is #1394 alone. Build 768 is the docs PR #1411. "In review (#n)" has an open PR. "Needs the owner" waits for a step only the owner can take.
 
@@ -78,7 +79,8 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] S-2 A plan filed on the web route is stored, checked and shown as one filed over MCP, and a part only an owner or admin approves is shown locked (#1515, inside build 806)
 - [x] A project made or changed shows without a reload (#1466, inside build 790). Lists and folders follow live (#1482, inside build 794)
 - [x] T-2 The connected AI as a named member (#1410, inside build 769)
-- [x] T-4 Agent work visible in List, Table and Board, with a filter (#1409, inside build 769). "Group by who is working" is not built
+- [x] T-4 Agent work visible in List, Table and Board, with a filter (#1409, inside build 769)
+- [x] T-4 Group by "Who is working" in List, Table and Board (#1534, inside build 809)
 - [x] T-5 Several agents at once (#1414, inside build 770)
 - [x] S-4 Home as "what next" (#1400, inside build 765)
 - [ ] AI-1b The replay test in CI. It needs a passing AI-1 run first
@@ -97,7 +99,7 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] S-5 Empty screens say what they are for and offer the next step (#1444, inside build 777)
 - [x] S-3 Plain words in what the MCP server tells a connected agent: tool texts, refusal reasons and labels (#1468, inside build 803)
 - [x] S-3 The audit log and the skill library in words, with a test that fails when a new event has none (#1497, inside build 802)
-- [ ] S-3 What is left: the keys still in the plain-words baseline, and `Views.replan_chain*`
+- [x] S-3 The last 24 strings (#1529, inside build 809). The baseline keeps seven keys, all on the Scrum sprint screens, where "sprint" is the product's own word
 
 **Follow-ups the slices named**
 - [x] #1421 (inside build 771): a control for the workspace's "a person checks before Done" switch, one sentence in the MCP instructions about a close that waits, and the spec for Undo after a create is approved
@@ -108,10 +110,12 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 **Proof and hand checks, 2026-10-02**
 - [x] The ninth hand check, build 782: the eighth's six defects are fixed; nine new ones, answered by #1497 and #1498 (inside build 802)
 - [x] The tenth hand check, builds 792 to 802: thirteen defects, answered by #1517 (the task panel follows its own writes, search takes text as text, confirms say what happens) and #1519 (computed fields stay fresh, a field can be archived or deleted, dark mode), both inside build 806. Checked by hand on build 806: a new checklist shows at once, and so does its removal
-- [ ] The eleventh hand check, build 806: running
+- [x] The eleventh hand check, builds 803 to 806: eleven of the tenth's thirteen are fixed; eleven new defects, four of them medium. Fixes are in review: #1538, #1541, #1545
 - [x] Browser tests for the AI-run screens, core flows, two people, narrow and dark, accessibility (#1416, #1438, #1439, #1440, #1448, #1451, #1473, #1489)
 - [x] Three independent reads of the combined access rules (batches 20, 21 with 22, and 23). What they found is fixed in #1511, #1515 and `fix/batch-23-review` (all inside build 806)
-- [ ] A fourth read, of #1521 (a thing read by its id answers only to a person who can open it): fifteen findings, six of them steps back for ordinary use. The PR is held until they are fixed
+- [x] A fourth and a fifth read, of #1521 (a thing read by its id answers only to a person who can open it): fifteen findings, then nine more in the fixes. All but one are fixed; #1521 merged as build 810 with migration 072 (two indexes)
+- [x] A sixth read, of the twenty-fifth batch, before its pull request: two faults (a tab return that emptied the new groups; a refill that lost its place in a chain), fixed in #1534 and #1533 (inside build 809)
+- [ ] Three more reads, of #1535, #1536 and #1537 (the twenty-sixth batch): the faults they found are fixed; one more fix is in progress, and the batch is held for it
 - [x] A user guide for working with your own AI app: `docs/guide/agents/` (#1490, build 799)
 
 **Later, optional (with a server key)**
@@ -122,11 +126,10 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 ## What is left
 
 **Can be done without the owner**
-- #1521 (private lists and reads by id): fix what its review found, then merge it as batch 24.
-- The eleventh hand check of build 806, and fixes for what it finds.
-- In progress on 2026-10-02 evening: T-4 "group by who is working"; the last plain-words batch (S-3); S-2, a part the approver's role may not make is shown locked before approval, and the AI Inbox gets part ticks; three server leftovers (work started on a timer inside a request, the kinds of file the speech upload takes, one browser test that pauses agents for its neighbours).
-- Revise the benchmark sheet's table against today's tools (a cloud session is writing it).
-- T-2: "@" for a connected AI in chat.
+- The twenty-sixth batch (`chore/integrate-batch-26`, no pull request yet): #1535 (work after a change runs under no bystander's limits, and a narrowed token's limits ride with its change), #1536 (S-2: a part the approver may not make is locked before approval, and what is left waits), #1537 (T-2: "@" your own AI in chat), #1546 (one approval for benchmark jobs 7 and 13), the eleventh sweep's fixes (#1538, #1541, #1545), legacy classes batch 2 (#1531), the benchmark sheet read against today's tools (#1530) and three guide chapters (#1532). It waits for one fix (`fix/agent-run-keeps-starter-rules`). It carries migration 073 (one index).
+- After it: four cloud drafts (#1539 guide, #1540 legacy classes 3, #1542 colours 7, #1543 web helper specs).
+- Agent changes made over the web routes: name them in history and count them in a rule chain the way changes over MCP are. Its own slice.
+- Home's "Waiting on you" card and the Approvals page still approve a plan whole.
 - The benchmark gaps still open that have no slice: a reply in a task's comment thread, a doc's versions, a timesheet's submit and approve.
 
 **Needs the owner**
@@ -243,9 +246,19 @@ Each is reversible. The PR is named so the choice can be found.
 - A workflow run and an upload started by an agent ask the same rules as any other change by an agent (#1520).
 - A workspace made on the sign-up page gets its company row; migration 071 repairs older ones and wrote nothing here (#1504).
 
+### Choices to review, builds 807 to 810
+
+Each is reversible. The PR is named so the choice can be found.
+- Group by "Who is working": the last group is named "No agent"; no dragging into or within these groups; an agent's group shows only to a person who can see one of its tasks (#1534).
+- The speech upload takes audio files only, judged by the file's first bytes; WMA, AIFF and AMR are refused (#1533).
+- Operator screens no longer name an environment setting; they say what it does. The Gantt replan line no longer says "critical path" (#1529).
+- A person can always correct or delete their own time entry where it is, and can never move it through that door. An email inbox's maker can always switch it off or delete it; mail stops being filed once the maker cannot open the place, and the row says so (#1521).
+- A notice names a task only to a person who can open it today; that check is remembered for ten seconds (#1521).
+- The unread counts are settled when a person reads them, and only lowered; an agent's read never changes them (#1521).
+
 ## Last step
 
-Builds 804 to 806 reached `beta` on 2026-10-02 between 19:05 and 20:33 IST: the docs PR #1522, a side batch (#1524: the workspace rows repair with migration 071, bugs the new unit tests found, tests and the first-hour guide) and the twenty-third batch (#1525: nine PRs and the fixes to its own review). The local server answers build 806; migration 071 wrote nothing on the local database. #1521 is assembled as batch 24 and held: its review reported before it had a pull request, as the rule now is. This docs PR ticks the lines above and regenerates the beta log and the API reference.
+Builds 807 to 810 reached `beta` on 2026-10-02 between 21:05 and 22:28 IST: the docs PR #1526, the accessibility checks #1471, the twenty-fifth batch (#1544) and the twenty-fourth (#1547, which is #1521). The local server answers build 810; migration 072 was dry-run first (two indexes, nothing else) and applied at start. Seen by hand on 809 and 810: the "Who is working" grouping with no agent connected, and the Inbox after #1521. The twenty-sixth batch is assembled, checked and reviewed, and waits for one fix. This docs PR ticks the lines above and regenerates the beta log.
 
 ## Blockers
 
@@ -295,3 +308,9 @@ Builds 804 to 806 reached `beta` on 2026-10-02 between 19:05 and 20:33 IST: the 
 - The connection dropped from about 19:50 to 20:30; two agents stalled and were resumed.
 - A fourth read, of #1521, found fifteen things before the PR had a pull request: an unread badge that would stick, doc notices lost for a person a doc is shared with, a comparison that never matches on a real database (the test database hid it), a person unable to correct their own time, and about 175 database reads for one Inbox page. The PR went back to its author.
 - 20:50: seven local agents and five cloud sessions at work; the usage window stood at 23% and the week at 62%.
+- 21:05 to 22:28: #1526 (docs, build 807), #1471 (accessibility checks, 808), the twenty-fifth batch (#1544, 809) and the twenty-fourth (#1547, 810) merged. The twenty-fifth was read before its pull request; the read found that coming back to the browser tab emptied the new "Who is working" groups, and that an AI field filled again after an agent's edit had lost its place in the chain that the loop guard counts.
+- #1521 was read twice. The second read found that the fix for "a person can correct their own time" let the entry be moved into a project the person cannot open, and that an agent reading the counts changed the person's own badge. Both were fixed before the merge.
+- The eleventh hand check listed eleven new defects, three of them dark-mode faults from the colour batches. Three agents fixed them (#1538, #1541, #1545).
+- The read of #1535 found that a limit the PR set out to keep had never applied on the real road: a narrowed token writes only over MCP, which never set it. The limit is now set where an MCP call starts. The coordinator had told the owner the opposite and corrected it.
+- A last narrow read of #1535's queue change found one thing to put right before the merge. The batch waits for its fix.
+- Usage: the week went from 62% to 70% between 20:45 and 22:20 with seven local agents and five cloud sessions. From 22:20 only the path to the three batches was kept running.
