@@ -57,7 +57,6 @@ const LIST_KEYS = [
     ['ViewListdescription', 'forms_view', 'Collect requests through a shareable form — every submission arrives as a task in the sprint you choose.'],
     ['TalkToText', 'pick_project_sprint', 'Please select a project and sprint.'],
     ['EmptyState', 'no_sprints_msg', 'Lists group related tasks together — a sprint, a phase, or simply a heading. Add one to organise this project.'],
-    ['Tour', 'toggle_search_options_description_text', 'Toggle between options to search by project, sprint, or folder as you type.'],
     ['Toast', 'Sprint restored successfully', 'Sprint restored successfully'],
     ['Toast', 'Sprint archived successfully', 'Sprint archived successfully'],
     ['Toast', 'Sprint deleted successfully', 'Sprint deleted successfully'],

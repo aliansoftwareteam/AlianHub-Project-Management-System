@@ -6,6 +6,7 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { showUndoToast, undoToast } from "@/composable/useUndoToast";
 import { AGENTS_CHANGED_EVENT, APPLIED_CHANGE } from "./agentFeed";
+import { agentActionLabel } from "./agentActionLabels";
 
 /* The person's own connected agent changed something without waiting for approval. The signal carries the id
  * alone; what it was is read from the server, which answers this person only and leaves out what they cannot
@@ -67,7 +68,8 @@ export function useAgentChangeNotice(socket, companyId) {
         const agent = new Set(shown.map((change) => change.agentName)).size === 1 ? only.agentName : "";
         const single = alone && isOneChange(only);
         let message = agent ? t("AgentChange.many", { agent, n: total }, total) : t("AgentChange.many_mixed", { n: total }, total);
-        if (single) message = only.name ? t("AgentChange.one", { agent, task: only.name, what: only.label }) : t("AgentChange.one_unnamed", { agent, what: only.label });
+        const what = single ? agentActionLabel(t, only.action, only.label) : "";
+        if (single) message = only.name ? t("AgentChange.one", { agent, task: only.name, what }) : t("AgentChange.one_unnamed", { agent, what });
         noticeId = showUndoToast({
             message,
             wrap: true,

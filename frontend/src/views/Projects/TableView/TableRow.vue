@@ -195,7 +195,7 @@ const riskTitle = computed(() => {
         pct: top.overPct || 0,
         done: top.done || 0,
         total: top.total || 0
-    });
+    }, top.total || 0);
 });
 
 function generate() {

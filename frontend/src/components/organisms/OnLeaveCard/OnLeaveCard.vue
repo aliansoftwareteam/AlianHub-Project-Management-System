@@ -197,23 +197,23 @@ onMounted(load);
 
 <style scoped>
 .olc { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
-.olc-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
+.olc-msg { color: var(--ink-2); font-size: 12px; padding: 10px 0; }
 .olc-stats { display: flex; gap: 10px; }
-.olc-stat { flex: 1; background: #f5f7fb; border-radius: 8px; padding: 8px; text-align: center; }
-.olc-stat-num { font-size: 24px; font-weight: 700; color: #3a3f52; line-height: 1.1; }
-.olc-stat-ab .olc-stat-num { color: #e11d48; }
-.olc-stat-pr .olc-stat-num { color: #0f766e; }
-.olc-stat-label { font-size: 10.5px; color: #6b7280; margin-top: 2px; }
+.olc-stat { flex: 1; background: var(--surface-2); border-radius: 8px; padding: 8px; text-align: center; }
+.olc-stat-num { font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.1; }
+.olc-stat-ab .olc-stat-num { color: var(--danger); }
+.olc-stat-pr .olc-stat-num { color: var(--ok-ink); }
+.olc-stat-label { font-size: 10.5px; color: var(--ink-2); margin-top: 2px; }
 .olc-table-wrap { overflow: auto; }
 .olc-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
-.olc-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid #eef0f6; position: sticky; top: 0; background: #fff; }
-.olc-table td { padding: 5px 6px; border-bottom: 1px solid #f4f5f9; color: #3a3f52; }
+.olc-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--hairline); position: sticky; top: 0; background: var(--surface); }
+.olc-table td { padding: 5px 6px; border-bottom: 1px solid var(--hairline); color: var(--ink); }
 .olc-user { font-weight: 600; }
 .olc-user-cell { display: flex; align-items: center; gap: 6px; }
 .olc-ticket { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
 .olc-task-link { color: #0e7490; cursor: pointer; }
 .olc-task-link:hover { text-decoration: underline; }
 .olc-task-link b { color: #0e7490; font-size: 11px; }
-.olc-dates { color: #6b7280; }
-.olc-status { display: inline-block; padding: 1px 8px; border-radius: 10px; background: #f3f4f6; font-size: 11px; }
+.olc-dates { color: var(--ink-2); }
+.olc-status { display: inline-block; padding: 1px 8px; border-radius: 10px; background: var(--fill); font-size: 11px; }
 </style>
