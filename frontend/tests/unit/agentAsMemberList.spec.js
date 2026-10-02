@@ -116,6 +116,18 @@ describe('a connected AI in the member list', () => {
         expect(agentRows()).toHaveLength(0);
     });
 
+    it('names the viewer\'s own AI as the assignee picker does, and says where a task can be handed to it', async () => {
+        answer([agentOf('u1', 'Asha Rao', { mine: true }), agentOf('u2', 'Ben Ortiz')]);
+        await open();
+        const [mine, theirs] = agentRows();
+        expect(mine.find('.mbv__agent-name').text()).toBe('TaskPanel.my_ai');
+        expect(mine.text()).toContain('Members.agent_hand_where');
+        expect(theirs.find('.mbv__agent-name').text()).toBe('Claude');
+        expect(theirs.text()).not.toContain('Members.agent_hand_where');
+        expect(en.Members.agent_hand_where).toMatch(/assignee list/);
+        expect(en.Members.agent_hand_where).toMatch(/project manager is on/);
+    });
+
     it('is worded in plain words', () => {
         expect(en.Members.agent_tag).toBe('Agent');
         expect(en.Members.agent_connected_by).toContain('{name}');
