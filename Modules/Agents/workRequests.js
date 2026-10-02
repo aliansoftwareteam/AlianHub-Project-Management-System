@@ -350,11 +350,12 @@ const executors = {
     },
 
     ...require('./setupRequests').executors,
+    ...require('./projectSetup').executors,
     ...require('./automationRequests').executors,
 };
 
 module.exports = {
-    executors, tagsOf, setTag, linkTasks, unlinkTasks, relationsOf, renameList, moveList, withdrawList, pageCommentsOf, assignPageComment,
+    executors, tagsOf, setTag, linkTasks, unlinkTasks, relationsOf, createList, renameList, moveList, withdrawList, pageCommentsOf, assignPageComment,
     extraListsOf, setExtraList,
     RELATION_TYPE_LIST, LIST_NAME_MAX, COMMENT_MAX: MAX_MESSAGE_LENGTH, MAX_EXTRA_LISTS,
 };

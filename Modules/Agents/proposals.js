@@ -273,7 +273,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     for (const c of changes) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, decidedBy: decider.userId, ...(marker ? { taint: marker } : {}) });
+            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, ...(marker ? { taint: marker } : {}) });
             if (out.auditId) auditIds.push(out.auditId);
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {

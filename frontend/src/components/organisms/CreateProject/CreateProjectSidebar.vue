@@ -61,7 +61,7 @@
                             <div v-if="selected.Description" class="ah-cp__sample-row ah-cp__sample-row--more">{{ selected.Description }}</div>
                         </template>
                         <template v-else-if="sampleCount">
-                            <div class="ah-label">{{ $t('Auth.sample_tasks_label', { n: sampleCount }) }}</div>
+                            <div class="ah-label">{{ $t('Auth.sample_tasks_label', { n: sampleCount }, sampleCount) }}</div>
                             <div v-for="name in (selected.sampleTaskNames || []).slice(0, 3)" :key="name" class="ah-cp__sample-row"><span class="ah-cp__box"></span>{{ name }}<span class="ah-mono">1h</span></div>
                             <div v-if="sampleCount > 3" class="ah-cp__sample-row ah-cp__sample-row--more"><span class="ah-cp__box"></span>{{ $t('Auth.more_tasks', { n: sampleCount - 3 }) }}</div>
                         </template>

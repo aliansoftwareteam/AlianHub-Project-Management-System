@@ -61,6 +61,8 @@ const saveProjectManager = async (req, res) => {
         });
         removeCache('UserProjectData:', true);
         socketEmitter.emit('update', { type: 'update', companyId, data: saved.project, updatedFields: { agentManager: saved.agentManager }, module: 'project' });
+        // No relay sends a project's event to a browser; an open task reads its hand-over offer again on this one.
+        workQueue.announce(companyId);
         if (saved.to.on) {
             await dailyLook.lookAt(companyId, saved.project).catch((e) => logger.error(`saveProjectManager: the first look at ${at.projectId} failed: ${e.message}`));
         }

@@ -20,8 +20,8 @@
                 </div>
             </li>
         </ul>
-        <router-link v-if="hasInbox" class="hwait__inbox" data-test="waiting-inbox" :to="{ name: 'AiInbox', params: { cid: companyId } }">
-            {{ $t('Inbox.open_ai_inbox') }}
+        <router-link v-if="hasInbox" class="hwait__inbox" data-test="waiting-inbox" :to="allWaiting.to">
+            {{ $t(allWaiting.label) }}
         </router-link>
     </section>
 </template>
@@ -101,9 +101,14 @@ async function approve(item) {
 
 // Workflow steps are not in the Inbox's approval tab yet, so they still open where they can be answered.
 const inQueueTab = (item) => item.kind === "proposal" && router.hasRoute("inbox");
-const openItem = (item) => router.push(inQueueTab(item)
+const placeOf = (item) => (inQueueTab(item)
     ? { name: "inbox", params: { cid: companyId?.value ?? companyId }, query: { tab: "approval" } }
-    : { name: "AiInbox", params: { cid: companyId?.value ?? companyId } }).catch(() => {});
+    : { name: "AiInbox", params: { cid: companyId?.value ?? companyId } });
+const openItem = (item) => router.push(placeOf(item)).catch(() => {});
+const allWaiting = computed(() => {
+    const proposal = items.value.find(inQueueTab);
+    return { to: placeOf(proposal || {}), label: proposal ? "Home.waiting_open_inbox" : "Inbox.open_ai_inbox" };
+});
 
 watch(aiOff, (off) => { if (!off && !loaded.value) load().catch(() => {}); });
 watch(() => (visible.value ? items.value.length : 0), (count) => emit("count", count), { immediate: true });

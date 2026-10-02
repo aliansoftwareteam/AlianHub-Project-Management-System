@@ -210,9 +210,9 @@ const pastRuns = async ({ companyId, uid, rule }) => {
 };
 
 const executors = {
-    async [ACTION]({ companyId, actor, params, depth, decidedBy }) {
+    async [ACTION]({ companyId, actor, params, depth, approvedBy }) {
         const filer = whoOf(actor, depth).uid;
-        const made = await createRule({ companyId, filer, approver: OBJECT_ID.test(idOf(decidedBy)) ? idOf(decidedBy) : filer, params });
+        const made = await createRule({ companyId, filer, approver: OBJECT_ID.test(idOf(approvedBy)) ? idOf(approvedBy) : filer, params });
         return {
             result: { projectId: made.projectId, ruleId: made.ruleId, name: made.name, sentence: made.sentence, enabled: made.enabled, ownerId: made.ownerId },
             undo: { kind: UNDO_KIND, projectId: made.projectId, ruleId: made.ruleId, made: made.made },

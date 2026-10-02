@@ -34,7 +34,7 @@
                     <span class="pt-row__name">{{ row.name }}</span>
                     <template v-if="row.count !== null && row.count !== undefined">
                         <span class="pt-row__count" aria-hidden="true">{{ row.count }}</span>
-                        <span class="ah-sr-only">, {{ $t('ProjectTree.tasks', { n: row.count }) }}</span>
+                        <span class="ah-sr-only">, {{ $t('ProjectTree.tasks', { n: row.count }, row.count) }}</span>
                     </template>
                 </router-link>
                 <FavouriteStar

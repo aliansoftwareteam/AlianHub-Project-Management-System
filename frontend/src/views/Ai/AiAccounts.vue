@@ -75,6 +75,8 @@
                         </div>
                     </section>
 
+                    <WorkspaceDoneCheck :privileged="privileged" />
+
                     <div class="acct-callout acct-callout--ok">
                         <strong>{{ $t('Accounts.recommended_label') }}</strong> {{ $t('Accounts.recommended_body') }}
                     </div>
@@ -524,6 +526,7 @@ import { useGetterFunctions } from "@/composable/index.js";
 import AiSidebar from "./AiSidebar.vue";
 import AccountAttribution from "./AccountAttribution.vue";
 import ConnectedApps from "./ConnectedApps.vue";
+import WorkspaceDoneCheck from "./WorkspaceDoneCheck.vue";
 import { oauthAvailable } from "@/views/OAuth/oauthShared";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
 import { DOCS_GRANT, EXPIRY_OVER_MAX, TASKS_GRANT, TOKEN_SCOPES, canGrantDocs, canGrantTasks, defaultExpiryFor, expiryChoicesFor, grantsOf, tokenFormProblem } from "./tokenPolicy";

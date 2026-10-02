@@ -1,10 +1,15 @@
 const setup = require('../Agents/setupRequests');
+const actions = require('../Agents/actions');
+const { REASON: DENIED } = require('../Agents/permissions');
+const plans = require('../Agents/projectSetup');
+const { LIST_NAME_MAX } = require('../Agents/workRequests');
 const { GRANT } = require('./manageFlag');
 const { loadProject } = require('./dataTools');
 
-// Setting a project up: custom fields and saved views. Both show to everyone on the project, so a call never makes
-// one: it is filed for the person to approve in AlianHub (their actions are proposeOnly, Agents/registry/setup.js),
-// and what is approved runs the web app's own routes as that person (Modules/Agents/setupRequests.js).
+// Setting a project up: custom fields, saved views, or a whole plan in one call. These show to everyone on the
+// project, so a call never makes one: it is filed for the person to approve in AlianHub (their actions are
+// proposeOnly, Agents/registry/setup.js and projectSetup.js), and what is approved runs the web app's own routes as
+// that person (Modules/Agents/setupRequests.js and projectSetup.js).
 
 const RAW_OPTIONS_MAX = 100;
 const RAW_TEXT_MAX = 200;
@@ -53,6 +58,39 @@ const viewToStartFrom = async (ctx, args, vis) => {
     return { args: { ...args, kind } };
 };
 
+const REFUSED = `${DENIED}: the person behind this token may not make these parts of the plan by hand`;
+const NAMES = (max, nameMax, description) => ({ type: 'array', minItems: 1, maxItems: max, items: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX }, description: `${description}, each at most ${nameMax} characters` });
+
+const PLAN_VIEW = Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        name: { type: 'string', minLength: 1, maxLength: setup.VIEW_NAME_MAX },
+        kind: { type: 'string', enum: Object.keys(setup.VIEW_KINDS), description: 'Left out, a list view' },
+        ...LOOK,
+        showFields: {
+            type: 'array', maxItems: setup.LOOK_MAX.columns, items: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX },
+            description: 'Fields of this same plan to show as columns, by name; a field the project already has goes in showFieldIds',
+        },
+    },
+    required: ['name'],
+});
+
+/* A plan is refused at once where its person may not make one of its parts by hand, or a view has nothing to start
+ * from, so nobody is asked to approve a part that cannot be made. A project the caller cannot open is left to the target check. */
+const planToFile = async (ctx, args, vis) => {
+    const project = await loadProject(ctx, vis, args.projectId);
+    if (!project) return { args };
+    const plan = plans.planOf(args);
+    const refused = await plans.refusedParts(ctx.companyId, ctx.userId, String(project._id), plan);
+    if (refused.length) {
+        const reason = `${REFUSED}: ${refused.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`;
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'project.setup', params: { projectId: String(project._id) }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: String(project._id) });
+    }
+    const kind = (plan.views || []).map((view) => view.kind).find((wanted) => !setup.sourceView(project, wanted));
+    return kind ? { answer: { ok: false, error: setup.noSource(kind) } } : { args };
+};
+
 const TOOLS = [
     {
         name: 'fields.create',
@@ -88,6 +126,31 @@ const TOOLS = [
         check: (args) => (setup.viewNameOf(args.name) ? setup.lookProblem(args) : 'name needs some text'),
         prepare: viewToStartFrom,
         params: (args) => ({ projectId: str(args.projectId, 40), name: setup.viewNameOf(args.name), kind: str(args.kind, 20), look: setup.lookOf(args) }),
+    },
+    {
+        name: 'project.setup',
+        action: 'project.setup',
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: projectTarget,
+        description: 'Set up a project that exists from one plan, in a single call: '
+            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields and ${plans.VIEWS_MAX} saved views. Name only the parts you need. `
+            + 'A status is added as a working stage, before the statuses that close a task; one the company does not have yet can be added only when an owner or an admin sends and approves the plan. '
+            + 'A status or a field the project already has by that name is kept, not made twice, so read statuses.list, lists.list and fields.list first. '
+            + 'It cannot make a project, an automation or a task. '
+            + `${WAITS} The person sees the whole plan as one preview and approves it once; the answer then says, part by part, what was made, what was kept and what could not be made.`,
+        input: input({
+            projectId: ID,
+            statuses: NAMES(plans.STATUSES_MAX, plans.STATUS_NAME_MAX, 'Statuses to add, by name'),
+            lists: NAMES(plans.LISTS_MAX, LIST_NAME_MAX, 'Lists to create, by name'),
+            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
+            views: { type: 'array', minItems: 1, maxItems: plans.VIEWS_MAX, items: PLAN_VIEW },
+            ...REASON,
+        }, ['projectId']),
+        check: (args) => plans.planProblem(args),
+        prepare: planToFile,
+        params: (args) => ({ projectId: str(args.projectId, 40), ...plans.planOf(args) }),
     },
 ];
 

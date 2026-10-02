@@ -319,7 +319,7 @@ describe('who may change a project\'s policy', () => {
         expect(project(P_OPEN).agentPolicy).toMatchObject({ ...STRICT, updatedBy: uid });
         expect(changes()).toHaveLength(1);
         expect(changes()[0]).toMatchObject({ actorId: uid, entityType: 'project', entityId: P_OPEN, meta: { from: { done: APPROVAL, connected: CONNECTED.SINGLE_TASK }, to: STRICT } });
-        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', updatedFields: { agentPolicy: expect.objectContaining(STRICT) } }));
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', companyId: CID, updatedFields: { agentPolicy: expect.objectContaining(STRICT) } }));
     });
 
     it.each([['a member', MEMBER], ['a guest', GUEST]])('%s is refused, and reads it without being offered the change', async (_who, uid) => {

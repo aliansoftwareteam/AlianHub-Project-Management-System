@@ -3,6 +3,7 @@ import { timerState, elapsedSeconds, startTimer, stopTimer, discardTimer, ensure
 import Store from '@/store/index';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { PERIOD_LOCKED } from '@/composable/timeLogFailure';
 
 const OVERNIGHT_MS = 12 * 3600 * 1000;
 const MAX_ENTRY_MINUTES = 24 * 60 - 1;
@@ -122,13 +123,18 @@ export function useTimer() {
         if (minutes == null) {
             const ranMinutes = Math.max(1, Math.round(elapsed.value / 60));
             const result = await stopTimer();
-            if (result && result.tooShort) return { ...cur, minutes: 0, tooShort: true };
-            if (result && !result.logged) throw Object.assign(new Error(result.statusText || 'log_failed'), { code: result.code });
+            if (!result) return null;
+            if (result.tooShort) return { ...cur, minutes: 0, tooShort: true };
+            if (!result.logged) throw Object.assign(new Error(result.statusText || 'log_failed'), { code: result.code, timerKept: result.timerKept });
             lastStopped.value = { ...cur, minutes: ranMinutes, stoppedAt: Date.now() };
             return lastStopped.value;
         }
         const mins = Number(minutes);
-        await logTime({ task: cur, minutes: mins, endAt: Number(cur.startedAt) + mins * 60000, note: cur.note, billable: cur.billable });
+        try {
+            await logTime({ task: cur, minutes: mins, endAt: Number(cur.startedAt) + mins * 60000, note: cur.note, billable: cur.billable });
+        } catch (error) {
+            throw Object.assign(error, { timerKept: true });
+        }
         discardTimer();
         lastStopped.value = { ...cur, minutes: mins, stoppedAt: Date.now() };
         return lastStopped.value;
@@ -166,7 +172,7 @@ export function useTimer() {
     const trim = async (session, minutes) => {
         const res = await apiRequest('post', env.TIMER_TRIM, { timeSheetId: session.timeSheetId, minutes });
         const body = (res && res.data) || {};
-        if (!body.status) throw new Error(body.statusText || 'trim_failed');
+        if (!body.status) throw Object.assign(new Error(body.statusText || 'trim_failed'), { code: body.code, timerKept: body.code === PERIOD_LOCKED });
         sessions.value = sessions.value.filter((s) => s.timeSheetId !== session.timeSheetId);
         return body.data;
     };

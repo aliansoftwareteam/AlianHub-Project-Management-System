@@ -46,7 +46,7 @@ describe('#1 rule-triggered agent runs go through the run engine', () => {
     it('refuses with canStart\'s reason — paused, pause-all, spend cap and the daily limit all apply', async () => {
         runs.canStart.mockResolvedValueOnce({ ok: false, reason: 'Agent is paused (pause_all).' });
         await expect(runAgent.run(args({ skill: 'qa-review', agent: 'code reviewer' }))).rejects.toMatchObject({ deterministic: true, message: 'Code Reviewer cannot run: Agent is paused (pause_all).' });
-        expect(runs.canStart).toHaveBeenCalledWith(expect.objectContaining({ name: 'Code Reviewer' }), { trigger: 'rule', companyId: C, depth: 0 });
+        expect(runs.canStart).toHaveBeenCalledWith(expect.objectContaining({ name: 'Code Reviewer' }), { trigger: 'rule', companyId: C, depth: 0, projectId: 'p1' });
         expect(runs.start).not.toHaveBeenCalled();
     });
 

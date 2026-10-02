@@ -2,7 +2,7 @@
     <div class="ah-page evr">
         <header class="ah-toolbar evr__toolbar">
             <h1 class="ah-toolbar__title">{{ $t('Everything.title') }}</h1>
-            <span v-if="status === 'ready' && showTotal" class="evr__total" data-test="evr-total">{{ $t('Everything.count', { n: total }) }}</span>
+            <span v-if="status === 'ready' && showTotal" class="evr__total" data-test="evr-total">{{ $t('Everything.count', { n: total }, total) }}</span>
             <div class="evr__toolbar-end">
                 <EverythingViews
                     :views="views"

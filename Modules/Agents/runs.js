@@ -10,6 +10,7 @@ const { MAX_DEPTH } = require('../../event/domainEventBus');
 const telemetry = require('../../Config/telemetry');
 const { dailyRunLimitOf } = require('./dailyRunLimit');
 const { runClause } = require('./privateWork');
+const projectLimits = require('./projectLimits');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -47,12 +48,16 @@ const runsToday = (companyId, agentId) => MongoDbCrudOpration(companyId, {
 // The bus drops any envelope deeper than MAX_DEPTH, so a run whose actions would
 // emit past it is refused up front instead of running and losing its events.
 const LOOP_DEPTH_EXCEEDED = 'loop_depth_exceeded';
+const PROJECT_PAUSED = 'Agents are paused in this project. A person has to resume them first.';
 
-/* Can this agent start a run right now? Returns { ok, reason }. */
-const canStart = async (agent, { trigger, viaAccount, companyId, depth } = {}) => {
+const pausedIn = async (companyId, projectId) => ((await projectLimits.pausedAmong(companyId, [projectId])).length ? PROJECT_PAUSED : '');
+
+/* Can this agent start a run right now? Returns { ok, reason }. With `projectId`, a project where agents are paused refuses the start. */
+const canStart = async (agent, { trigger, viaAccount, companyId, depth, projectId } = {}) => {
     if (!agent) return { ok: false, reason: 'Agent not found.' };
     if (clampDepth(depth) >= MAX_DEPTH) return { ok: false, reason: LOOP_DEPTH_EXCEEDED, code: LOOP_DEPTH_EXCEEDED, depth: clampDepth(depth), maxDepth: MAX_DEPTH };
     if (agent.paused) return { ok: false, reason: `Agent is paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.` };
+    if (companyId && projectId && await pausedIn(companyId, projectId)) return { ok: false, reason: PROJECT_PAUSED, code: 'project_paused' };
     try {
         await aiSwitch.assertAllowed(companyId);
     } catch (error) {
@@ -315,6 +320,19 @@ const pauseAll = async (companyId, reason) => {
     return { stopped };
 };
 
+/* The same for one project, when a person pauses agents there. The agents themselves stay as they were. */
+const stopIn = async (companyId, projectId, outcome) => {
+    const active = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_RUNS, data: [{ projectId: { $in: idForms(String(projectId)) }, status: { $in: [STATUS.QUEUED, STATUS.RUNNING] } }, '_id status'],
+    }, 'find');
+    let stopped = 0;
+    for (const r of active || []) {
+        // eslint-disable-next-line no-await-in-loop
+        if (await finish(companyId, r._id, { status: STATUS.STOPPED, outcome, onlyIf: r.status })) stopped += 1;
+    }
+    return { stopped };
+};
+
 const subtaskChange = (task, f) => ({
     action: 'subtask.create', label: `Create subtask "[${f.severity}] ${f.title}"`, reversible: true,
     params: { taskId: String(task._id), title: `[${f.severity}] ${f.title}`, description: [f.why, f.fix ? `Fix: ${f.fix}` : '', f.evidence ? `Evidence: ${f.evidence}` : ''].filter(Boolean).join('\n') },
@@ -377,6 +395,9 @@ const notifyStarter = async (companyId, run, task, { status, outcome, error }) =
  * the run away mid-flight — then nothing more is written and nobody is told. */
 const executeSkill = async (companyId, run, agent, task, deps) => {
     const { runGraph } = require('./engine/graph');
+    if (task && task._id && task.updatedAt && deps && deps.actor) {
+        await require('./taskReads').saw(companyId, deps.actor, String(task._id), task.updatedAt).catch((e) => logger.error(`[agent-run] ${run._id}: the read of its task was not kept: ${e.message}`));
+    }
     const state = await runGraph({ companyId, run, agent, task, deps });
     if (state.status !== 'abandoned') await notifyStarter(companyId, run, task, state);
     return state;
@@ -391,4 +412,4 @@ const skillSlugOf = (agent, explicit) => {
     return first.key || first.slug || first.name || 'qa-review';
 };
 
-module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, idempotencyKeyFor, start, create, get, patch, appendAction, recordStep, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };
+module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, idempotencyKeyFor, start, create, get, patch, appendAction, recordStep, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, stopIn, pausedIn, getAgent, emitAgent, changesFor, executeSkill, monthKey };

@@ -56,7 +56,7 @@ const saveProjectPolicy = async (req, res) => {
         await agentAudit.recordProjectPolicyChange(companyId, caller.actor, { projectId: at.projectId, projectName: saved.project.ProjectName, from: saved.from, to: saved.to, ip: req.ip || '' });
         if (projectPolicy.tightened(saved.from, saved.to)) await standingApprovals.endForProject(companyId, at.projectId, standingApprovals.ENDED.POLICY, caller.actor.userId, req.ip || '');
         removeCache('UserProjectData:', true);
-        socketEmitter.emit('update', { type: 'update', data: saved.project, updatedFields: { agentPolicy: saved.agentPolicy }, module: 'project' });
+        socketEmitter.emit('update', { type: 'update', companyId, data: saved.project, updatedFields: { agentPolicy: saved.agentPolicy }, module: 'project' });
         return res.json({ status: true, statusText: 'Policy updated.', data: await answer(companyId, at.projectId, true) });
     } catch (e) { logger.error(`saveProjectPolicy: ${e.message}`); return fail(res, 500, e.message); }
 };

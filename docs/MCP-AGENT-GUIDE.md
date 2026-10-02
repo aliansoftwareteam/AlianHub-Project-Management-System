@@ -14,7 +14,7 @@ Three things, in this order.
    |---|---|
    | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link`, `person.place` |
    | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
-   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, `automation.catalogue`, `automation.create`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
+   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, `automation.catalogue`, `automation.create`, `project.setup`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
    | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
 
 2. **What the token was created with.** A token has scopes (read, write) and may have grants:
@@ -326,6 +326,20 @@ These need `MCP_TOOLS_WORK` and the write scope, and no grant. A field or a view
 { "name": "view.create", "arguments": { "projectId": "<project id>", "name": "My open work", "kind": "board", "groupBy": "priority", "mine": true } }
 ```
 
+`project.setup`: set up a project that exists from one plan, in one call. Arguments: `projectId`, and any of `statuses` (up to 10 names of at most 60 characters), `lists` (up to 10 names of at most 100 characters), `fields` (up to 10, as in `fields.create`) and `views` (up to 5, each as in `view.create`, plus `showFields`: fields of the same plan to show as columns, by name), and `reason`. Every name is cleaned to plain text. The whole plan is one proposal and one approval, and the Inbox shows every part on one card. It cannot make a project, an automation or a task.
+
+```json
+{ "name": "project.setup", "arguments": { "projectId": "<project id>", "statuses": ["In Review"], "lists": ["Backlog", "This week"], "fields": [{ "name": "Budget", "type": "money" }], "views": [{ "name": "Review board", "kind": "board", "groupBy": "status", "showFields": ["Budget"] }] } }
+```
+
+What happens to a plan:
+
+- A plan with a part its person may not make by hand is refused at once, and the answer names the part and the permission. So is a plan with a view of a kind the project has no view of.
+- Approved, each part runs the web app's own route as the person behind the token, and only where the approver may make that part by hand too. A part that fails does not stop the others: the result lists each part with what was made, what was kept and what was not made, and `notMade` names each of those with the reason.
+- A status is added as a working stage, before the statuses that close a task. A status the project already has by that name is kept. One the company has in its own status list is taken from there with its colours. One the company does not have is added to that list first, which only an owner or an admin may do: the plan's person and its approver both have to be one, or that status is not made.
+- Lists are created at the top level of the project. A list is not checked against the lists the project has, so read `lists.list` first.
+- Undo takes back what the plan made, newest part first: its views, its fields (as for `fields.create`), its lists while they are empty, and its statuses while no task is in them. Whatever is in use stays, and the undo names it and says why. A status added to the company's list stays in that list, as it does when a person takes a status off a project.
+
 Undo, from the Inbox or the agent audit log: a view an agent added is removed, and nothing else. Each field it made is switched off, as the field form's own switch does, only while it is still that project's alone and no task holds a value in it. A field that holds a value, or that someone has since put on another project, stays, and the undo names it and says why.
 
 
@@ -459,7 +473,7 @@ The text is fixed and ships with the server. It holds no name, id or other data 
 
 | Prompt | Shown as | Arguments | What it does |
 |---|---|---|---|
-| `set_up_my_project` | Set up my project | `project` | Asks a few questions, reads what the project has, shows the whole plan (lists and first tasks), and makes it only after a yes. Offered only to a connection that may create tasks |
+| `set_up_my_project` | Set up my project | `project` | Asks a few questions, reads what the project has, shows the whole plan, and makes it only after a yes. On a connection that may run `project.setup` the statuses, lists, fields and views go in that one call and wait for the person's approval in AlianHub; elsewhere the agent makes lists and first tasks and leaves the rest to the person. Offered only to a connection that may create tasks |
 | `plan_my_day` | Plan my day | `project` | What to do first today, what can wait, what is late. Changes nothing |
 | `what_is_at_risk` | What is at risk | `project` | Overdue work, tasks nobody owns, work that stopped moving, the biggest risks first. Changes nothing |
 | `write_the_status_report` | Write the status report | `project`, `period` | A short report shown in the conversation first; saved as a doc only where `page.create` is offered and after a yes |

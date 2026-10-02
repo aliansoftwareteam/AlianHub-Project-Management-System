@@ -218,6 +218,9 @@ a.ph2__sprint:focus-visible { outline: none; box-shadow: var(--focus); }
     white-space: nowrap;
     min-width: 0;
 }
+button.ph2__agents { border: 0; cursor: pointer; font-family: inherit; }
+button.ph2__agents:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ph2__agents--paused { font-weight: 600; }
 .ph2__agents-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rail-ok); flex: none; }
 .ph2__agents-label { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ph2__agents-meta { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--rail-ink-2); }

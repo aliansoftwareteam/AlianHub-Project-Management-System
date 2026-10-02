@@ -4,10 +4,12 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const registry = require('./registry');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
+const projectLimits = require('./projectLimits');
 
 // A project's own rule for agents, and the one function every agent write asks. It only holds an agent
 // back: the registry, the never-list, the person's permissions, the manage grant and taint routing are
 // asked around it exactly as they were, and an answer of "act" here grants nothing they refuse.
+// A project where agents are paused (./projectLimits) refuses every agent write here, before any other answer.
 
 const DONE = Object.freeze({ NEVER: 'never', APPROVAL: 'approval', YES: 'yes' });
 const CONNECTED = Object.freeze({ PROPOSE_ALL: 'propose_all', SINGLE_TASK: 'single_task' });
@@ -136,8 +138,15 @@ const closes = async (companyId, action, params) => {
     return false;
 };
 
+/* Whether the write reaches a project where agents are paused. The write's projects are looked up only when the company has one. */
+const reachesPaused = async (companyId, params) => {
+    const paused = await projectLimits.pausedAmong(companyId);
+    return paused.length > 0 && (await projectsOf(companyId, params)).some((id) => paused.includes(id));
+};
+
 /* What the projects a write reaches hold it to: act as the caller's other rules allow, wait for a person, or
- * not at all. `approved` is true only where a person has approved this very change. A write that names no
+ * not at all. `approved` is true only where a person has approved this very change, which a pause does not hold:
+ * it is the person's own decision. A write that names no
  * project, a goal's for one, is outside every project's rule. An action the registry marks proposeOnly waits
  * for a person whatever a project is set to: answered here, a caller files it instead of meeting the registry's refusal.
  * `standing` is passed only by a caller that names the standing approval in the change's audit row. A standing
@@ -146,10 +155,11 @@ const closes = async (companyId, action, params) => {
 const ask = async ({ companyId, actor, action, params = {}, approved = false, standing = false, taint = null }) => {
     const entry = registry.get(action);
     if (!isAgent(actor) || !entry || !entry.write || ASKS_NOTHING.has(entry.key)) return act;
+    const given = params && typeof params === 'object' ? params : {};
+    if (!approved && await reachesPaused(companyId, given)) return { decision: DECISION.REFUSE, reason: projectLimits.REASON.PAUSED, paused: true };
     if (entry.proposeOnly && !approved) return { decision: DECISION.PROPOSE, reason: REASON.PROPOSE_ONLY };
     const mayClose = STATUS_ACTIONS.has(entry.key) || CREATE_ACTIONS.has(entry.key);
     if (!mayClose && !isConnected(actor)) return act;
-    const given = params && typeof params === 'object' ? params : {};
     const projectIds = await projectsOf(companyId, given);
     if (!projectIds.length) return act;
     const policies = await Promise.all(projectIds.map((id) => read(companyId, id)));
