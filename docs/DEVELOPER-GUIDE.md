@@ -27,6 +27,8 @@ The backend serves the built SPA from `frontend/dist`; `cd frontend && npm run b
 | `cd frontend && npm test` | Vitest + `@vue/test-utils` in jsdom (`frontend/tests/*.spec.js`) |
 | `cd frontend && npm run lint -- --no-fix` | Vue CLI ESLint |
 | `node scripts/unused-components.js` | `.vue` files nothing imports (must print nothing) |
+| `node scripts/env-doc.js --check` | env variables described and docs regenerated |
+| `npm run style:check` | hard-coded colours and legacy style classes against `scripts/style-baseline.json` |
 | `npm run env:doc:check` | `docs/ENV.md`, `.env.example` and `frontend/.env.example` match what the code reads, and every description is still read. Not run in CI: run `node scripts/env-doc.js` and commit the three files in the docs pull request that follows merges to `beta` |
 | `node scripts/env-doc.js --check` | every env variable the code reads is described; generated files that are out of date are a warning here and a failure in `npm run env:doc:check` |
 | `npm run api:doc:check` | `docs/API.md` and `docs/api/openapi.json` match the routes and `scripts/api-doc.meta.json`. Not run in CI: run `npm run api:doc` and commit both files in the docs pull request that follows merges to `beta` |
@@ -44,6 +46,7 @@ The conventions in place:
 - `env-doc` — every `process.env.*` and `VUE_APP_*` read is described in `scripts/env-doc.meta.json`.
 - `api-doc` — `scripts/api-doc.meta.json` is well formed and the API reference generates from the current tree, the same on every run. It does not compare the committed files, so a pull request that adds or removes a route needs to do nothing: a route with no entry is listed as undocumented until the docs pull request describes it.
 - `unused-components` — no orphaned single-file component.
+- `style-check` — hard-coded colours and legacy style classes under `frontend/src`; a per-file baseline may only fall.
 - `naming-conventions` — module folder and file naming.
 
 Writing a frontend spec: mount with `@vue/test-utils`; `frontend/tests/setup.js` installs i18n, `$t`, and the shell provides (`$userId`, `$companyId`, `$clientWidth`, `$socket`). Mock `@/services` and heavy children with `vi.mock`; keep shared mocks in `vi.hoisted`. `frontend/tests/TaskDetailPanel.spec.js` is the template for a large component, `useProjectTree.spec.js` for a composable.
@@ -159,6 +162,22 @@ Read them once at module load (`process.env.NAME || default`), describe the key 
 ### Locale keys
 
 `t('Namespace.key')` with a literal key; when the key is built at run time, end the literal with `_` or `.` (`t('Inbox.tab_' + kind)`) so the audit can resolve the prefix. `node scripts/i18n-rename-namespace.js <From> <To>` moves a namespace and rewrites every reference.
+
+### Colours and style classes
+
+Colours come from the tokens in `frontend/src/assets/css/tokens.css` (`var(--surface)`, `var(--ink)`, `var(--brand)`, …) and the `ah-` classes built on them, so a screen follows the theme. `scripts/style-check.js` counts what each `.vue`, `.css` and `.scss` file under `frontend/src` still hard-codes, and `scripts/style-baseline.json` holds those two counts per file:
+
+- **Hard-coded colours** — hex (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`), `rgb()`/`rgba()`/`hsl()`/`hsla()` with literal arguments, and CSS colour names (`white`, `black`, `red`, …). They are read from declaration values in stylesheets, `<style>` blocks and `style=` / `:style=` attributes. Not read: selectors, comments, strings, `url()`, `var()` and its fallback, `<script>`, SVG attributes such as `fill=`, and `tokens.css` itself. A colour name counts only in a property that takes a colour, or inside a string of a `:style` binding.
+- **Legacy classes** — uses in `class=` / `:class=` of a class that a sheet in `frontend/src/assets/css` (other than `tokens.css`) defines on its own (`.name` or `.name:hover`, not `.a .b`) with a hard-coded colour or font value: `bg-white`, `bg-light-gray`, `GunPowder`, `color47`, `btn-white`, `blue`, `black`, `font-size-13`, `font-weight-500`, `border`, `form-control`, … The list is derived from those sheets on every run, so a utility rewritten onto tokens stops counting.
+
+| Command | What it does |
+|---|---|
+| `npm run style:check` | totals, and every file above or below its baseline; `--top 25` adds the files with the most, `--json` prints the counts |
+| `npm run style:check -- <file>` | every finding in that file, by line |
+| `npm run style:baseline` | lowers the baseline to the current counts; refuses to raise one |
+| `npm run style:baseline -- --allow-increase` | also raises; a deliberate exception only |
+
+The conventions test fails when a file is above its baseline, when a file without an entry has any, and when an entry is higher than the file now needs — so the PR that removes colours lowers the baseline too. A deliberate exception is a file that moved or was split (its counts move with it) or a colour that cannot be a token; say which in the PR body. The baseline is one sorted line per file with no timestamp: on a merge conflict keep the higher count and re-run `npm run style:baseline`.
 
 ## Where things are
 
