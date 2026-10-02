@@ -74,8 +74,7 @@
                         />
                         <span v-if="card.kind === 'agent'" class="ah-avatar ah-avatar--agent">◉</span>
                         <span v-else class="ah-avatar" :style="{ background: card.color }">
-                            <img v-if="card.avatar" :src="card.avatar" :alt="card.name" />
-                            <template v-else>{{ initial(card.name) }}</template>
+                            <AvatarImage :src="card.avatar" :alt="card.name">{{ initial(card.name) }}</AvatarImage>
                         </span>
                         <div class="ap__who-text">
                             <div class="ap__title">{{ card.title }}</div>
@@ -137,6 +136,7 @@
 </template>
 
 <script setup>
+import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import { ref, computed, inject, nextTick, onMounted, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';

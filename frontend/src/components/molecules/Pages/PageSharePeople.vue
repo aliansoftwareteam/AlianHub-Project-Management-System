@@ -15,8 +15,7 @@
         <ul v-else class="psp__list">
             <li v-for="person in people" :key="person.userId" class="psp__row" data-test="doc-share-person" :data-user="person.userId">
                 <span class="ah-avatar" aria-hidden="true">
-                    <img v-if="person.image" :src="person.image" alt="" />
-                    <template v-else>{{ person.initial }}</template>
+                    <AvatarImage :src="person.image">{{ person.initial }}</AvatarImage>
                 </span>
                 <span class="psp__name">{{ person.name }}</span>
                 <span v-if="!person.active" class="ah-chip ah-chip--sm ah-chip--warn">{{ $t('Docs.share_inactive') }}</span>
@@ -51,6 +50,7 @@
 </template>
 
 <script setup>
+import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
