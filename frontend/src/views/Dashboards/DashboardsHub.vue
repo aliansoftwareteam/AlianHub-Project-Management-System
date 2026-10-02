@@ -60,6 +60,17 @@
                     </div>
                 </article>
 
+                <EmptyState
+                    v-if="loaded && activeTab === 'shared' && !visible.length"
+                    class="dash__empty"
+                    data-test="dash-empty-shared"
+                    :heading-level="2"
+                    :title="$t('Dash.shared_empty_title')"
+                    :message="$t('Dash.shared_empty_msg')"
+                    :action-label="$t('Dash.shared_empty_action')"
+                    @action="activeTab = 'all'"
+                />
+
                 <button type="button" class="dash__tile dash__tile--template" @click="openCreate('team')">
                     <span class="dash__template-title">{{ $t('Dash.start_from_template') }}</span>
                     <span class="dash__template-text">{{ $t('Dash.template_lede') }}</span>
@@ -107,6 +118,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, inject } from 'vue
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { CARD_CATALOG, catalogEntry } from '@/plugins/dashboard/cardCatalog';
 import { fetchDashboards, createDashboard, duplicateDashboard, removeDashboard, makeCardUid } from '@/plugins/dashboard/dashboardsApi';
 
@@ -129,6 +141,7 @@ const TEMPLATES = [
 
 const dashboards = ref([]);
 const activeTab = ref('all');
+const loaded = ref(false);
 const error = ref('');
 const menuFor = ref('');
 const createOpen = ref(false);
@@ -260,6 +273,8 @@ onMounted(async () => {
         dashboards.value = await fetchDashboards();
     } catch (e) {
         error.value = t('Dash.load_failed');
+    } finally {
+        loaded.value = true;
     }
 });
 onBeforeUnmount(() => document.removeEventListener('click', closeMenus));

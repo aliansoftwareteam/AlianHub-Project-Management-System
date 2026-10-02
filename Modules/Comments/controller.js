@@ -23,14 +23,19 @@ const { withoutImportFields } = require("./helpers/importFields");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
 const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
 const { withoutServerOwnedFields } = require("./helpers/serverOwnedFields");
+const { keptFromAgent } = require("./helpers/agentChatRows");
 
 /* A comment an agent run writes never starts agents, so agents cannot start each other.
  * Required on use: the agent modules are only needed by a comment that names an agent. */
 const startMentionedAgents = async (req, companyId, comment) => {
     if (!parseAgentMentionIds(comment.message).length) return;
-    const actor = await require("../Agents/actor").resolveActor(req);
+    const { resolveActor, isAgent } = require("../Agents/actor");
+    const actor = await resolveActor(req);
     if (actor.runId) return;
-    await require("../Agents/triggers").fromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
+    await require("../Agents/triggers").fromComment(companyId, {
+        authorId: comment.userId, taskId: comment.taskId, message: comment.message,
+        ...(isAgent(actor) ? { postedBy: actor, path: `${req.method} ${String(req.originalUrl || '').split('?')[0]}`, ip: req.ip || '' } : {}),
+    });
 };
 
 /* Only a signed-in person names their own connected AI: a comment written through a token or by an agent hands nothing over. */
@@ -399,15 +404,15 @@ exports.searchComments = async (req, res) => {
         const convertedProjectIds = projectIds.map(id => new mongoose.Types.ObjectId(id));
         const skipValue = parseInt(skip);
         const batchSizeValue = parseInt(batchSize);
+        const keptFromCaller = await keptFromAgent(req.headers['companyid'], req.uid);
 
-
-        // Aggregation stages
         const searchResultMatch = {
             $match: {
                 $and: [
                     { ...additionalFilter },
                     { projectId: { $in: convertedProjectIds } },
                     { isDeleted: { $ne: true } },
+                    keptFromCaller,
                     ...(searchStr
                         ? [
                             {

@@ -283,7 +283,7 @@ defineExpose({ refresh });
 .ah-time__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .ah-time__caption { font: 500 var(--fs-xs, 11px) var(--font-ui); color: var(--ink-label); }
 .ah-time__input {
-    width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 7px;
+    box-sizing: border-box; width: 100%; min-width: 0; min-height: 32px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 7px;
     background: var(--surface); color: var(--ink); font: 400 var(--fs-md, 13px) var(--font-ui);
 }
 .ah-time__check { display: inline-flex; align-items: center; gap: 6px; font: 400 var(--fs-md, 13px) var(--font-ui); color: var(--ink); }

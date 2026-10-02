@@ -385,7 +385,8 @@ module.exports = {
         })
     },
 
-    convertToTask({companyId,projectData,taskId,sprintObj,parentTaskId,oldSprintObj,oldProject}) {
+    /* The parent and the list that lose the row are read from the stored task. */
+    convertToTask({companyId,projectData,taskId,sprintObj,oldProject}) {
         return new Promise((resolve, reject) => {
             try {
                 let deleteObj = {
@@ -413,6 +414,12 @@ module.exports = {
                         ]
                     }
                     MongoDbCrudOpration(companyId,object, "findOne").then((task) => {
+                        const leaves = {
+                            parentId: plainIdOf(task.ParentTaskId).id,
+                            projectId: String(task.ProjectID),
+                            sprintId: String(task.sprintId),
+                            folderId: task.folderObjId || null,
+                        };
                         let obj = {};
                         let unsetObj = {};
                         if(projectData.id !== oldProject.id) {
@@ -486,30 +493,30 @@ module.exports = {
                         }
                         MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((result) => {
                             socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...obj,folderId: ''}, module: 'task', companyId });
-                            let object = {
+                            const parentLosesOne = leaves.parentId ? MongoDbCrudOpration(companyId, {
                                 type:SCHEMA_TYPE.TASKS,
                                 data: [
-                                    { _id: new mongoose.Types.ObjectId(task.ParentTaskId || parentTaskId) },
+                                    { _id: new mongoose.Types.ObjectId(leaves.parentId) },
                                     {$inc: {"subTasks": -1}},
                                     {returnDocument: 'after'}
                                 ]
-                            }
-                            MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then(async (response) => {
-                                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {subTasks: response.subTask}, module: 'task', companyId });
+                            }, "findOneAndUpdate") : Promise.resolve(null);
+                            parentLosesOne.then(async (response) => {
+                                if (response) socketEmitter.emit('update', { type: "update", data: response , updatedFields: {subTasks: response.subTasks}, module: 'task', companyId });
                                 await carrySubtree(companyId, taskId, [], { projectData, sprintObj, oldProject }).catch((error) => {
                                     logger.error(`ERROR IN CONVERT TO TASK SUBTREE ${error}`)
                                 });
                                 resolve({status: true, statusText: "Convert TO Task"});
-                                if(oldSprintObj.id !== sprintObj.id || JSON.parse(JSON.stringify(oldProject)).id !== JSON.parse(JSON.stringify(projectData)).id){
+                                if(leaves.sprintId !== String(sprintObj.id) || leaves.projectId !== String(projectData.id)){
                                     const decObj = {
                                         body: {
                                             companyId: companyId,
-                                            projectId: oldProject.id,
-                                            folderId: oldSprintObj?.folderId || null,
+                                            projectId: leaves.projectId,
+                                            folderId: leaves.folderId,
                                             updateObject :{$inc: { tasks: -1}},
                                         },
                                         params : {
-                                            id : oldSprintObj.id
+                                            id : leaves.sprintId
                                         }
                                     }
                                     updateSprintFun(decObj).catch((error) => {

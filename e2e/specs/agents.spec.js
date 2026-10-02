@@ -58,7 +58,7 @@ test.describe('ai agents as the owner', () => {
     test('the skill library lists the action registry', async ({ page, state }) => {
         await page.goto(`/#/${state.companyId}/ai/skills`);
         await expect(page.locator('.ah-toolbar__title')).toHaveText('Skill library');
-        await expect(page.getByRole('cell', { name: 'task.comment', exact: true })).toBeVisible();
+        await expect(page.locator('[data-test="action-name"][title="task.comment"]')).toHaveText('Add a comment');
     });
 });
 

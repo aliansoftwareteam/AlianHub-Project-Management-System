@@ -235,7 +235,7 @@ describe('the audit hash chain through real routes', () => {
         };
         try {
             const [header, ...lines] = (await csv({ action: 'scim.config_update' })).split('\n');
-            expect(header).toBe('time,actorType,actor,agent,run,event,entity,reason,cost_usd,undone_at,integrity');
+            expect(header).toBe('time,actorType,actor,agent,run,event,event_label,entity,reason,cost_usd,undone_at,integrity');
             const line = lines.find((l) => l.startsWith(at));
             expect(line).toBeTruthy();
             expect(line).not.toContain('forged-');

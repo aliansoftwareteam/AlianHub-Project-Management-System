@@ -66,3 +66,29 @@ export function projectSprintList({ project, showArchived, includeSprint = () =>
     });
     return list;
 }
+
+const LIST_ROUTE = /^Project(Folder)?Sprint(Task)?$/;
+
+/* The id of the folder a list sits in, '' at the top level of the project, null when the project does not hold it. */
+function folderOfList(project, sprintId) {
+    const holds = (holder) => sprintsOf(holder).some((sprint) => sprint.id === sprintId);
+    if (holds(project)) return '';
+    const folder = Object.values(project?.sprintsfolders || {}).find(holds);
+    return folder ? folderIdOf(folder) : null;
+}
+
+/* A list keeps its id when it moves between folders, so an address made before the move names a place that no
+   longer holds it. The address of where it is now, or null when the address is right or the list is nowhere. */
+export function movedListRoute({ route, project }) {
+    const { cid, id, sprintId, taskId, folderId = '' } = route?.params || {};
+    if (!sprintId || !LIST_ROUTE.test(route.name)) return null;
+    const home = folderOfList(project, sprintId);
+    if (home === null || home === folderId) return null;
+    const task = taskId ? 'Task' : '';
+    return {
+        name: home ? `ProjectFolderSprint${task}` : `ProjectSprint${task}`,
+        params: { cid, id, ...(home ? { folderId: home } : {}), sprintId, ...(taskId ? { taskId } : {}) },
+        query: route.query,
+        hash: route.hash,
+    };
+}

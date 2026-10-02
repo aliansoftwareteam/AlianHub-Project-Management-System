@@ -913,7 +913,7 @@ describe('the audit log export', () => {
         const lineOf = (lines, id) => lines.find((l) => l.startsWith(new Date(auditRows().find((r) => String(r._id) === id).createdAt).toISOString()));
 
         const all = await exportCsv({ action: 'agent.action' });
-        expect(all[0]).toBe('time,actorType,actor,agent,run,event,entity,reason,cost_usd,undone_at,integrity');
+        expect(all[0]).toBe('time,actorType,actor,agent,run,event,event_label,entity,reason,cost_usd,undone_at,integrity');
         expect(lineOf(all, plainId)).not.toContain('forged');
         expect(lineOf(all, plainId)).toMatch(new RegExp(`,,broken:${forgedSeq}$`));
 

@@ -71,7 +71,8 @@ const app = { get: register('GET'), post: register('POST'), put: register('PUT')
     'Comments', 'MainChats', 'Reactions',
     'AI', 'EstimatedTime', 'AssignmentRules', 'ProjectTemplates', 'Portfolio', 'Calls', 'TaskTemplates', 'TimeSheet', 'Company', 'ScreenshotRetention', 'Webhooks',
     'ScheduledReports', 'EmailNotification', 'notification-count', 'notification/notification-middleware', 'notification/prepare-notification-data', 'Forms', 'EmailIn',
-    'Calendar', 'ExportJobs', 'AgentSessions', 'RecurringTasks', 'Pto', 'LogTime', 'storage/wasabi', 'UserDashboard',
+    'Calendar', 'ExportJobs', 'AgentSessions', 'RecurringTasks', 'Pto', 'LogTime', 'storage/wasabi',
+    'UserDashboard', 'GeneralReminders', 'TimesheetApproval',
     'settings/Designation', 'settings/ProjectSkills', 'settings/commonDateFormate', 'settings/fileExtensions', 'settings/settingCurrency', 'settings/taskPriority',
 ].forEach((name) => require(`../Modules/${name}/routes`).init(app));
 
@@ -205,10 +206,37 @@ describe('a token created for an agent, on the write routes beside the task rout
     it.each([
         ['listing the links of a task', RELATIONS, { action: 'list', taskId: T_OPEN }],
         ['listing the open blockers of a task', RELATIONS, { action: 'openBlockers', taskId: T_OPEN }],
-        ['reading a backlog', 'POST /api/v2/sprints/backlog', { projectId: P_OPEN }],
         ['previewing a CSV import', 'POST /api/v2/imports/csv/preview', {}],
     ])('%s, a read, still goes through and leaves no record', async (label, route, body) => {
         expect(await through(route, agentToken(OWNER), body)).toBe(REACHED);
+        expect(agentAudits()).toHaveLength(0);
+    });
+});
+
+describe('the backlog of a project, which is made the first time it is read', () => {
+    const BACKLOG = 'POST /api/v2/sprints/backlog';
+    const read = (caller) => through(BACKLOG, caller, { projectId: P_OPEN });
+
+    it('is read by an agent once the project has one, and that leaves no record', async () => {
+        mockDb.seed(SCHEMA_TYPE.SPRINTS, { name: 'Backlog', projectId: P_OPEN, isBacklog: true, deletedStatusKey: 0 });
+
+        expect(await read(agentToken(OWNER))).toBe(REACHED);
+        expect(await read(agentRun(OWNER))).toBe(REACHED);
+        expect(agentAudits()).toHaveLength(0);
+    });
+
+    it.each([['a token created for an agent', agentToken], ['an agent run', agentRun]])('is not made by %s, and that is recorded', async (label, as) => {
+        const answer = await read(as(OWNER));
+
+        expect(answer.code).toBe(403);
+        expect(audits('agent.action_refused')).toHaveLength(1);
+        expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, action: 'sprint.create', path: BACKLOG, onBehalfOf: OWNER });
+    });
+
+    it('is made for a person, signed in or through a personal token', async () => {
+        for (const caller of [session(OWNER), session(INSIDER), personalToken(INSIDER)]) {
+            expect(await read(caller)).toBe(REACHED);
+        }
         expect(agentAudits()).toHaveLength(0);
     });
 });
@@ -362,8 +390,8 @@ const PROPOSED_ON_THE_WEB = {
         'copying a project with its tasks': ['POST /api/v2/projects/:id/duplicate', { name: 'Copy', withTasks: true }, inProject, 'project.create'],
     },
     'dashboard.card.add': {
-        'changing the cards of the home dashboard': ['POST /api/v1/dashboard', { op: 'add', card: { key: 'DueSoonCard' } }],
-        'changing the cards of a dashboard': ['PUT /api/v1/dashboards/:id/cards', { cards: [] }, { id: TEMPLATE }],
+        'adding a card to the home dashboard': ['POST /api/v1/dashboard', { op: 'add', card: { key: 'DueSoonCard' } }, {}, 'dashboard.manage'],
+        'adding a card to a dashboard': ['PUT /api/v1/dashboards/:id/cards', { cards: [{ key: 'DueSoonCard' }] }, { id: TEMPLATE }, 'dashboard.manage'],
     },
     'automation.create': {
         'adding an automation': ['POST /api/v2/automations', rule],
@@ -428,6 +456,12 @@ const SET_UP_BY_PEOPLE = {
         'changing the company list of task types': ['PUT /api/v1/setting/taskType', { name: 'Spike' }],
         'adding a task type template': ['POST /api/v1/templates/taskType', { TemplateName: 'Ours' }],
         'changing a task type template': ['PUT /api/v1/templates/taskType', { id: TEMPLATE }],
+    },
+    'project.tags.edit': {
+        'adding a tag to those a project has': ['POST /api/v1/project/tags', { id: P_OPEN, operation: 'push', items: { uid: 'tag-1', tagName: 'Urgent' } }],
+        'renaming a tag of a project': ['POST /api/v1/project/tags', { id: P_OPEN, operation: 'update', key: 'tagName', items: { id: 'tag-1', tagName: 'Later' } }],
+        'removing a tag of a project': ['POST /api/v1/project/tags', { id: P_OPEN, operation: 'delete', items: { id: 'tag-1' } }],
+        'replacing the tags of a project': projectUpdate({ tagsArray: [] }),
     },
     'project.settings': {
         'switching the apps of a project': projectUpdate({ apps: [] }),
@@ -620,6 +654,22 @@ const ALSO_BY_PEOPLE = {
     'file.delete': {
         'removing a stored file': ['POST /api/v1/wasabi/deleteFile', { companyId: CID, path: 'Project/x' }],
     },
+    'dashboard.manage': {
+        'changing the dashboard of the person': ['POST /api/v1/dashboard', { cards: [] }],
+        'adding a dashboard': ['POST /api/v1/dashboards', { name: 'Ours', visibility: 'workspace' }],
+        'changing a dashboard': ['PUT /api/v1/dashboards/:id', { name: 'Renamed', visibility: 'workspace' }, { id: TEMPLATE }],
+        'changing the cards of a dashboard': ['PUT /api/v1/dashboards/:id/cards', { cards: [] }, { id: TEMPLATE }],
+        'copying a dashboard': ['POST /api/v1/dashboards/:id/duplicate', {}, { id: TEMPLATE }],
+    },
+    'reminder.manage': {
+        'raising a reminder for another member': ['POST /api/v1/general-reminders', { title: 'Call the client', remindAt: '2026-11-02T09:00:00.000Z', assignedTo: INSIDER }],
+        'changing a reminder': ['PATCH /api/v1/general-reminders/:id', { title: 'Renamed' }, { id: TEMPLATE }],
+        'sending a reminder now': ['POST /api/v1/general-reminders/:id/run-now', {}, { id: TEMPLATE }],
+        'sending every reminder that is due': ['POST /api/v1/general-reminders/run-due', {}],
+    },
+    'timesheet.submit': {
+        'submitting the timesheet of the person': ['POST /api/v2/timesheet-approval/submit', { weekStart: '2026-09-28' }],
+    },
 };
 
 /* Changes the web app has no route for. A Slack message is sent by an approved proposal alone, and the connector's
@@ -635,7 +685,7 @@ const ALSO_HELD = rowsOf(ALSO_BY_PEOPLE);
 const AGENTS_MAY_CHANGE = {
     ProjectName: 'Renamed', Description: 'Text', description: 'Text', descriptionBlock: { blocks: [] }, projectIcon: { type: 'color', data: 'blue' },
     DueDate: '2026-11-01T00:00:00.000Z', dueDateDeadLine: [], StartDate: '2026-10-01T00:00:00.000Z', EndDate: '2026-11-01T00:00:00.000Z',
-    source: 'other', proposalId: '', skills: [], attachments: [], customField: {}, checklistArray: [], tagsArray: [],
+    source: 'other', proposalId: '', skills: [], attachments: [], customField: {}, checklistArray: [],
     favouriteTasks: { userId: OWNER }, [`watchers.${OWNER}`]: true,
 };
 const fieldOf = (path) => path.split('.')[0];
@@ -738,6 +788,15 @@ describe('what an agent proposes, or never does, on the web app\'s own routes', 
 
     it.each(Object.entries(AGENTS_MAY_CHANGE))('%s of a project is still an agent\'s to change as its person may', async (path, value) => {
         expect(await through(UPDATE, agentToken(OWNER), { updateObject: { [path]: value } }, inProject)).toBe(REACHED);
+        expect(agentAudits()).toHaveLength(0);
+    });
+
+    it.each([
+        ['adding an item', { operation: 'push', checklistItem: { id: 'item-1', name: 'Sign the contract', isChecked: false } }],
+        ['renaming an item', { operation: 'update', key: 'name', checklistItem: { id: 'item-1', name: 'Sign it' } }],
+        ['ticking an item', { operation: 'update', key: 'isChecked', checklistItem: [{ id: 'item-1', name: 'Sign it', isChecked: true }] }],
+    ])('%s of the checklist of a project, on its own route, is still an agent\'s as its person may', async (label, body) => {
+        expect(await through('POST /api/v1/project/checklist', agentToken(OWNER), { id: P_OPEN, ...body })).toBe(REACHED);
         expect(agentAudits()).toHaveLength(0);
     });
 

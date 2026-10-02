@@ -311,4 +311,22 @@ describe('list rows in the project tree', () => {
         await flushPromises();
         expect(rowNamed(wrapper, 'Glyphs')).toBeDefined();
     });
+
+    it('take the open page of a list that was moved to its new address', async () => {
+        const wrapper = await tree();
+        apiRequest.mockResolvedValue({ data: { status: true, data: moved('d1', 'ops') } });
+        await choose(rowNamed(wrapper, 'Roadmap'), 'Move to folder…');
+        targets()[3].click();
+        await flushPromises();
+        expect(wrapper.vm.$router.currentRoute.value).toMatchObject({ name: 'ProjectFolderSprint', params: { folderId: 'ops', sprintId: 'd1' } });
+    });
+
+    it('leave the page where it is when another list is moved', async () => {
+        const wrapper = await tree();
+        apiRequest.mockResolvedValue({ data: { status: true, data: moved('r1', 'ops') } });
+        await choose(rowNamed(wrapper, 'Inbox'), 'Move to folder…');
+        targets()[3].click();
+        await flushPromises();
+        expect(wrapper.vm.$router.currentRoute.value.params).toMatchObject({ folderId: 'design', sprintId: 'd1' });
+    });
 });
