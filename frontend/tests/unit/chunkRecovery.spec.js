@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installChunkRecovery, isChunkLoadError } from '@/config/chunkRecovery';
-import { isOnline, unreachable, pageUnavailable } from '@/offline';
+import { away, isOnline, unreachable, pageUnavailable } from '@/offline';
 
 const chunkError = () => Object.assign(new Error('Loading chunk project-list-view failed.'), { name: 'ChunkLoadError' });
 
@@ -80,6 +80,16 @@ describe('installChunkRecovery', () => {
         installChunkRecovery({ config: {} }, router);
         router.handler(chunkError());
         expect(pageUnavailable.value).toBe(false);
+    });
+
+    it('leaves the offline banner to speak when a lazy panel chunk is missing while away', () => {
+        isOnline.value = false;
+        const app = { config: {} };
+        installChunkRecovery(app, fakeRouter());
+        app.config.errorHandler(chunkError(), null, 'async component loader');
+        expect(reload).not.toHaveBeenCalled();
+        expect(pageUnavailable.value).toBe(false);
+        expect(away.value).toBe(true);
     });
 
     it('does not reload a second time within the guard window', () => {
