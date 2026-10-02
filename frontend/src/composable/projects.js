@@ -39,9 +39,13 @@ export function useProjects() {
 			}
 		})
 	}
+	function userTimeFormat() {
+		const user = getUser(uid.value);
+		return user ? (user.timeFormat || "12") : "24";
+	}
 	function getDateType(seconds) {
 		try {
-			let timeformat = getUser(uid.value)?.timeFormat || "hh:mm A";
+			let timeformat = userTimeFormat();
 			if (timeformat == "12") {
 				return moment(new Date(seconds)).format("hh:mm A");
 			} else {
@@ -53,7 +57,7 @@ export function useProjects() {
 	}
 	function getDateAndTime(seconds) {
 		try {
-			let timeformat = getUser(uid.value)?.timeFormat || "hh:mm A";
+			let timeformat = userTimeFormat();
 			if (timeformat == "12") {
 				return `${convertDateFormat(seconds, '', { showDayName: false })}, ${moment(new Date(seconds)).format(`hh:mm A`)}`;
 			} else {
@@ -77,7 +81,7 @@ export function useProjects() {
 		} else {
 			let mainAvailable = maxProject - projectCount;
 
-			if (mainAvailable) {
+			if (mainAvailable > 0) {
 				//request specific type
 				return checkSpecificTypeCount(requestFor);
 			} else {

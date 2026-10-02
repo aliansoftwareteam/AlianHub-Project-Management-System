@@ -31,8 +31,12 @@ beforeEach(() => {
 });
 
 describe('the setup wizard seeds the whole view catalogue', () => {
-    it('stores all 20 views even when the settings import stops before the catalogue', async () => {
-        importSettingsFunction.mockImplementation((payload, cb) => cb({ status: false, statusText: 'Batch update stopped due to failure in batch 1' }));
+    it('stores all 20 views even when the settings import stored only some of them', async () => {
+        importSettingsFunction.mockImplementation((payload, cb) => {
+            mockDbFor(payload.body.companyId).seed(T, { keyName: 'ProjectListView', name: 'List' });
+            mockDbFor(payload.body.companyId).seed(T, { keyName: 'ProjectKanban', name: 'Board' });
+            cb({ status: true });
+        });
 
         const companyId = await createFirstCompany({ userId: '6f0000000000000000000001', email: 'owner@example.com', companyName: 'Acme', sampleData: false });
 
@@ -48,5 +52,12 @@ describe('the setup wizard seeds the whole view catalogue', () => {
         await createFirstCompany({ userId: '6f0000000000000000000001', email: 'owner@example.com', companyName: 'Acme' });
 
         expect(viewsAtSample).toBe(20);
+    });
+
+    it('does not open a company whose settings import stopped: the catalogue alone does not make it usable', async () => {
+        importSettingsFunction.mockImplementation((payload, cb) => cb({ status: false, statusText: 'Batch update stopped due to failure in batch 1' }));
+
+        await expect(createFirstCompany({ userId: '6f0000000000000000000001', email: 'owner@example.com', companyName: 'Acme', sampleData: false }))
+            .rejects.toThrow(/could not be set up/);
     });
 });

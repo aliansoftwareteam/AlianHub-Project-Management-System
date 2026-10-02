@@ -150,9 +150,21 @@ const joinInvitedCompany = async ({ companyId, invitation, userId, provider }) =
         ],
     }, 'findOneAndUpdate');
     if (!claimed) return false;
-    await recordInvitedOwner({ companyId, invitation, userId }).catch((error) => {
-        logger.error(`Record invited owner error in ${provider} signup: ${error}`);
-    });
+    try {
+        await recordInvitedOwner({ companyId, invitation, userId });
+    } catch (error) {
+        // An owner invitation is not accepted until the company names its new owner: the seat is given back, the
+        // account is made without the company, and the same link is accepted once the person is signed in.
+        logger.error(`${provider} signup: the invited owner was not recorded, so the invitation waits again: ${error?.message || error}`);
+        await mongoRef.MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.COMPANY_USERS,
+            data: [
+                { _id: invitation._id, status: ACCEPTED_INVITATION, userId },
+                { $set: { status: PENDING_INVITATION, linkId: invitation.linkId, userId: invitation.userId || '' } },
+            ],
+        }, 'findOneAndUpdate');
+        return false;
+    }
     await importUserNotifications(companyId, userId).catch((error) => {
         logger.error(`Import notification setting error in ${provider} signup: ${error}`);
     });

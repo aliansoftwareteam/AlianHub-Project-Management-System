@@ -117,6 +117,7 @@ async function composePage({ action, title, instruction, currentText, companyId,
     });
 
     let result;
+    let timer;
     try {
         result = await Promise.race([
             provider.chat({
@@ -126,11 +127,13 @@ async function composePage({ action, title, instruction, currentText, companyId,
                 temperature: 0.6,
                 spend: { feature: FEATURES.PAGE_COMPOSE, companyId, userId },
             }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('AI request timed out.')), REQUEST_TIMEOUT_MS)),
+            new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('AI request timed out.')), REQUEST_TIMEOUT_MS); }),
         ]);
     } catch (error) {
         logger.error(`page AI compose failed: ${error && error.message ? error.message : error}`);
         return { status: false, reason: (error && error.message) || 'Could not compose page content.' };
+    } finally {
+        clearTimeout(timer);
     }
 
     const markdown = parseMarkdownPayload(result && result.content);
