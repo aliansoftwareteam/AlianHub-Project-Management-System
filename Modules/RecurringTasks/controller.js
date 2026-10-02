@@ -8,6 +8,7 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const { cleanDescription, RichTextLimitError } = require('../Tasks/helpers/cleanRichText');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 
 // Build a valid task `data` template from the request (mirrors the defaults in
 // taskMongo.createSubTaskWithAi so taskMongo.create accepts it).
@@ -94,7 +95,8 @@ exports.listByProject = async (req, res) => {
             type: SCHEMA_TYPE.RECURRING_TASKS,
             data: [{ ProjectID: new mongoose.Types.ObjectId(projectId), deletedStatusKey: 0 }],
         }, 'find');
-        res.send({ status: true, data: defs || [] });
+        const hidden = ((await hiddenSprintFilter(companyId, req.uid, [projectId])).sprintId || { $nin: [] }).$nin.map(String);
+        res.send({ status: true, data: (defs || []).filter((def) => !hidden.includes(String(def.sprintId || ''))) });
     } catch (error) {
         logger.error(`[recurringTasks] list failed: ${error.message}`);
         res.send({ status: false, statusText: error.message });

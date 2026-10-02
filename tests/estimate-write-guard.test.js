@@ -2,6 +2,7 @@ const mockCrud = jest.fn(async (companyId, mongoObj) => ({ _id: 'row', TaskId: m
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockCrud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ ...jest.requireActual('../Modules/Sprints/helpers/sprintVisibility'), hiddenSprintIds: jest.fn(async () => []) }));
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(),
     evaluatePermission: jest.fn(),

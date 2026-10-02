@@ -536,6 +536,7 @@ describe('assignment rules: who decides a suggestion', () => {
 
     const waiting = async (mode) => {
         seedRules(GRANTS);
+        store(SCHEMA_TYPE.RULES).find((rule) => rule.key === 'task_list').roles.push({ key: 0, permission: false });
         mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GUEST, roleType: 0, status: 2, isDelete: false });
         mockDb.seed(SCHEMA_TYPE.USERS, { _id: GUEST, Employee_Name: 'Gia' });
         const project = seedProject({ AssigneeUserId: [OWNER, EDITOR, PRIYA, SAM, GUEST] });

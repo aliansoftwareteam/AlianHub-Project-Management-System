@@ -1,4 +1,5 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
+const { canReadProject } = require('../../Config/projectAccess');
 const { dbCollections, settingsCollectionDocs } = require("../../Config/collections");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
@@ -72,7 +73,10 @@ exports.undoImport = async (req, res) => {
         const job = OBJECT_ID.test(id)
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.IMPORT_JOBS, data: [{ _id: new mongoose.Types.ObjectId(id), source: { $ne: DUPLICATE } }] }, 'findOne')
             : null;
-        if (!job) return res.status(404).send({ status: false, statusText: 'Import not found.' });
+        /* An import is undone in a project the person can still open: a job in any other reads like none. */
+        if (!job || (job.projectId && !(await canReadProject(companyId, String(req.uid), String(job.projectId))).allowed)) {
+            return res.status(404).send({ status: false, statusText: 'Import not found.' });
+        }
 
         const out = await undoImportJob(companyId, { job, actor: await sessionActor(req), keepEdited: Boolean(req.body && req.body.keepEdited) });
         if (out.refused) {

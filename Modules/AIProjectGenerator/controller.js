@@ -849,7 +849,7 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
             description: projectDoc.description || '',
             taskStatusNames: (projectDoc.taskStatusData || []).map((s) => s.name).filter(Boolean),
             taskTypes: (projectDoc.taskTypeCounts || []).map((t) => ({ key: t.key, name: t.name })),
-            sprintNames: await orchestrator.loadSprintNamesForProject(companyId, projectId),
+            sprintNames: await orchestrator.loadSprintNamesForProject(companyId, projectId, uid),
         };
         const members = await loadActiveMembers(companyId);
         const memory = await memoryStore.contextFor({ companyId, userId: String(uid), projectId });

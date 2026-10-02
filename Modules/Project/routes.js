@@ -57,5 +57,5 @@ exports.init = (app) => {
     app.post('/api/v1/project/checklist', requireProjectAccess({ projectIds: (req) => req.body.id, permissions: checklistPermissions }), checklistCtrl.handleChecklist);
     app.post('/api/v1/get-remaining-projects', keepVisibleProjects({ get: (req) => req.body && req.body.dataIds, set: (req, ids) => { req.body.dataIds = ids; } }), projectFilterCtrl.getRemainingProject);
     app.post('/api/v1/project/tags', agentsRefused(PROJECT_TAGS_EDIT), requireProjectAccess({ projectIds: (req) => req.body.id, permissions: () => ['task.task_tag'] }), tagsCtrl.handleTags);
-    app.get('/api/v1/projectdata/taskData', readsProject(projectIdsFrom({ records: [[SCHEMA_TYPE.TASKS, (req) => req.query.taskId]], direct: (req) => req.query.projectId })), getQueryCtrl.getQueryFun)
+    app.get('/api/v1/projectdata/taskData', readsProject(projectIdsFrom({ records: [[SCHEMA_TYPE.TASKS, (req) => req.query.taskId]], direct: (req) => req.query.projectId, conversations: true })), getQueryCtrl.getQueryFun)
 }

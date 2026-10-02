@@ -9,6 +9,8 @@ const MILESTONE_STATUS = [['project.project_milestone_status_change', 'project.p
 const bodyMilestone = (req) => req.body && req.body.milestoneObject;
 const queryProject = (req) => req.query && req.query.projectId;
 const readsProject = (projectIds) => requireProjectAccess({ mode: READ, projectIds });
+/* The report names its projects as a list or as one id; either way it is the list that is narrowed. */
+const reportedProjects = (req) => (req.body ? [].concat(req.body.element === undefined || req.body.element === null ? [] : req.body.element) : []);
 const changesMilestone = (milestoneId, permissions) => requireProjectAccess({
     projectIds: projectIdsFrom({ records: [[SCHEMA_TYPE.MILESTONE, milestoneId]], direct: (req) => req.body && req.body.projectId }),
     permissions: () => permissions,
@@ -427,9 +429,9 @@ exports.init = (app) => {
     app.post('/api/v1/draggablemilestone', changesMilestone(bodyMilestone, MILESTONE), ctrl.draggableMilestone);
 
     app.get('/api/v1/milestone/project/:pid', readsProject((req) => req.params.pid), ctrl.getMilestoneByProject);
-    app.get('/api/v1/milestone/:id', readsProject(projectIdsFrom({ records: [[SCHEMA_TYPE.MILESTONE, (req) => req.params.id]] })), ctrl.getMilestone);
+    app.get('/api/v1/milestone/:id', readsProject(projectIdsFrom({ records: [[SCHEMA_TYPE.MILESTONE, (req) => req.params.id]], direct: (req) => req.params.id })), ctrl.getMilestone);
     app.post('/api/v1/milestone', requireCompanyAdmin({ permission: 'settings.milestone_weekly_range' }), ctrl.updateWeeklyRangeMilestone);
-    app.post('/api/v1/milestoneReport', keepVisibleProjects({ get: (req) => req.body && req.body.element, set: (req, ids) => { req.body.element = ids; } }), ctrl.getMilestoneReport);
+    app.post('/api/v1/milestoneReport', keepVisibleProjects({ get: reportedProjects, set: (req, ids) => { req.body.element = ids; } }), ctrl.getMilestoneReport);
 
     // Billing (handoff 19a / 19b / 19d). `billing.*` is deliberately absent from
     // Modules/Agents/registry.js — no agent path may reach these.

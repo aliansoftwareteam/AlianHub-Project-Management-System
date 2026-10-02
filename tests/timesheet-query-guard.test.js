@@ -12,6 +12,7 @@ jest.mock('../Config/permissionGuard', () => ({
 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
 jest.mock('../Modules/PersonalList/ownership', () => ({ ...jest.requireActual('../Modules/PersonalList/ownership'), othersPersonalListIds: jest.fn(async () => []) }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ ...jest.requireActual('../Modules/Sprints/helpers/sprintVisibility'), hiddenSprintIds: jest.fn(async () => []) }));
 jest.mock('../Modules/EstimatedTime/aiTaskEstimator', () => ({ estimateAndPersist: jest.fn(), _internal: {} }));
 jest.mock('../Modules/LogTime/controllerV2/helpers', () => ({ updateRemainingTime: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));

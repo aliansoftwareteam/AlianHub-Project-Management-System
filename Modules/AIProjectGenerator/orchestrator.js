@@ -50,6 +50,7 @@ const { checkProjectPlan, removeProjectCount } = require('../createProject/contr
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
 const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
 const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
@@ -1205,27 +1206,31 @@ async function loadProjectForTasks(companyId, projectId) {
 // The project's sprint names, for the planning prompt. Read from the SPRINTS
 // collection for the same reason as loadSprintForTasks below: the project doc's
 // sprintsObj is a legacy copy that no sprint write maintains.
-async function loadSprintNamesForProject(companyId, projectId) {
+async function loadSprintNamesForProject(companyId, projectId, uid) {
     let oid;
     try { oid = new mongoose.Types.ObjectId(String(projectId)); } catch (_e) { return []; }
+    const hidden = ((await hiddenSprintFilter(companyId, uid, [String(projectId)])).sprintId || { $nin: [] }).$nin.map(String);
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.SPRINTS,
         data: [{ projectId: oid, deletedStatusKey: { $ne: 1 } }],
     }, 'find').catch(() => []);
-    return (Array.isArray(rows) ? rows : []).map((s) => s && s.name).filter(Boolean);
+    return (Array.isArray(rows) ? rows : []).filter((s) => s && !hidden.includes(String(s._id))).map((s) => s.name).filter(Boolean);
 }
 
 // Load a single sprint by id (company-scoped, non-deleted) from the SPRINTS
 // collection — the source of truth — rather than the project doc's
 // denormalized `sprintsObj`, which a freshly-loaded project doc may not carry.
-async function loadSprintForTasks(companyId, sprintId) {
+async function loadSprintForTasks(companyId, sprintId, uid) {
     let oid;
     try { oid = new mongoose.Types.ObjectId(String(sprintId)); } catch (_e) { return null; }
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.SPRINTS,
         data: [{ _id: oid, deletedStatusKey: { $ne: 1 } }],
     }, 'find').catch(() => []);
-    return (Array.isArray(rows) && rows[0]) || null;
+    const sprint = (Array.isArray(rows) && rows[0]) || null;
+    if (!sprint) return null;
+    const hidden = ((await hiddenSprintFilter(companyId, uid, [String(sprint.projectId || '')])).sprintId || { $nin: [] }).$nin.map(String);
+    return hidden.includes(String(sprint._id)) ? null : sprint;
 }
 
 async function rollbackTasks({ companyId, tracker }) {
@@ -1465,7 +1470,7 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
             // Resolve the target sprint from the SPRINTS collection (source of
             // truth). The project doc's denormalized `sprintsObj` can be empty on
             // a freshly-loaded doc, which is why the earlier id lookup missed.
-            const sprintRow = await withTimeout(loadSprintForTasks(companyId, targetSprintId), 45000, 'loadSprintForTasks');
+            const sprintRow = await withTimeout(loadSprintForTasks(companyId, targetSprintId, uid), 45000, 'loadSprintForTasks');
             if (!sprintRow) throw new Error('Target list not found in this project');
             // Defensive: keep the tasks in the project they were requested for.
             const sprintProjectId = String(sprintRow.projectId || sprintRow.ProjectID || sprintRow.projectID || '');
@@ -1569,6 +1574,7 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
 module.exports = {
     executePlan,
     executeTasksIntoProject,
+    loadSprintForTasks,
     loadProjectForTasks,
     loadSprintNamesForProject,
     normalizePlanColors,

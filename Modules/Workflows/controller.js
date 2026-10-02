@@ -17,6 +17,9 @@ const queue = require('./queue');
 const stepTypes = require('./stepTypes');
 const definitions = require('./definitions');
 const dryRun = require('./dryRun');
+const { canReadProject } = require('../../Config/projectAccess');
+const { canReadTask, TASK_READ_FIELDS } = require('../Tasks/helpers/taskReadAccess');
+const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 
 // The workflow API: start a run, read a run and its steps, and apply the four
 // controls a person has over a step that went wrong.
@@ -82,10 +85,16 @@ const readableRun = async (companyId, caller, runId) => {
     const run = await store.getRun(companyId, runId);
     if (!run) return null;
     if (caller.privileged) return (await access.readableRuns(companyId, caller, [run])).length ? run : null;
-    if (String(run.startedBy || '') === String(caller.actor.userId)) return run;
-    const visible = await access.visibleProjectIdsFor(companyId, caller);
-    if (run.projectId && visible && visible.includes(String(run.projectId))) return run;
-    return null;
+    return (await readByMember(companyId, caller, await access.visibleProjectIdsFor(companyId, caller), run)) ? run : null;
+};
+
+/* Someone who is not an owner or admin reads a run they started, and a run of a project they can open; a run
+ * on a task, only when they can open that task. */
+const readByMember = async (companyId, caller, visible, run) => {
+    const uid = String(caller.actor.userId);
+    if (String(run.startedBy || '') === uid) return true;
+    if (!run.projectId || !visible || !visible.includes(String(run.projectId))) return false;
+    return !OBJECT_ID.test(String(run.taskId || '')) || (await readableTaskIds(companyId, uid, [String(run.taskId)])).length === 1;
 };
 
 const CREDENTIAL_FIELDS = ['credentialId', 'previousCredentialId'];
@@ -272,8 +281,10 @@ exports.listRuns = async (req, res) => {
         const rows = (await store.listRuns(ctx.companyId, req.query || {})) || [];
         if (ctx.caller.privileged) return ok(res, 'Runs fetched.', await access.readableRuns(ctx.companyId, ctx.caller, rows));
         const visible = await access.visibleProjectIdsFor(ctx.companyId, ctx.caller);
-        const mine = rows.filter((run) => String(run.startedBy || '') === String(ctx.caller.actor.userId)
-            || (run.projectId && visible && visible.includes(String(run.projectId))));
+        const mine = [];
+        for (const run of rows) {
+            if (await readByMember(ctx.companyId, ctx.caller, visible, run)) mine.push(run);
+        }
         return ok(res, 'Runs fetched.', mine);
     } catch (error) {
         logger.error(`[workflow-api] listRuns: ${error.message}`);
@@ -646,19 +657,20 @@ exports.decideApproval = async (req, res) => {
 
 /* The real thing the author wants to try the workflow against, read rather than
  * touched. A task that is not there is an answer, not an error: the plan comes
- * back saying the input was not found. */
-const inputFor = async (companyId, body) => {
+ * back saying the input was not found, and it says the same of one the author
+ * cannot open. */
+const inputFor = async (companyId, uid, body) => {
     if (OBJECT_ID.test(String(body.taskId || ''))) {
         const task = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS, data: [{ _id: String(body.taskId), mainChat: { $ne: true } }, { TaskName: 1, ProjectID: 1 }],
+            type: SCHEMA_TYPE.TASKS, data: [{ _id: String(body.taskId), mainChat: { $ne: true } }, { TaskName: 1, ...TASK_READ_FIELDS }],
         }, 'findOne');
-        if (!task) return { kind: 'task', id: String(body.taskId), found: false };
+        if (!task || !(await canReadTask(companyId, uid, task))) return { kind: 'task', id: String(body.taskId), found: false };
         return { kind: 'task', id: String(task._id), name: task.TaskName || '', projectId: task.ProjectID ? String(task.ProjectID) : null, found: true };
     }
     if (OBJECT_ID.test(String(body.projectId || ''))) {
-        const project = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PROJECTS, data: [{ _id: String(body.projectId) }, { ProjectName: 1 }],
-        }, 'findOne');
+        const project = (await canReadProject(companyId, uid, String(body.projectId))).allowed
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: String(body.projectId) }, { ProjectName: 1 }] }, 'findOne')
+            : null;
         if (!project) return { kind: 'project', id: String(body.projectId), found: false };
         return { kind: 'project', id: String(project._id), name: project.ProjectName || '', found: true };
     }
@@ -685,7 +697,7 @@ exports.dryRun = async (req, res) => {
         const steps = Array.isArray(body.steps) ? body.steps : [];
         if (!steps.length) return fail(res, 'steps must be a non-empty array');
         if (steps.length > MAX_STEPS) return fail(res, `a workflow may not have more than ${MAX_STEPS} steps`);
-        const input = await inputFor(ctx.companyId, body);
+        const input = await inputFor(ctx.companyId, String(ctx.caller.actor.userId), body);
         return ok(res, 'Dry run planned.', dryRun.plan({ steps, deadlineMs: body.deadlineMs, budgetUsd: body.budgetUsd, input }));
     } catch (error) {
         logger.error(`[workflow-api] dryRun: ${error.message}`);

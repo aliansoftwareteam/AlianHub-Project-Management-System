@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { memberProfiles } = require('../../utils/companyMembers');
 const logger = require('../../Config/loggerConfig');
@@ -161,6 +163,37 @@ async function resolveUserNames(companyId, ids) {
     }
 }
 
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const rowOf = (companyId, type, id, fields) => (OBJECT_ID.test(String(id || ''))
+    ? MongoDbCrudOpration(companyId, { type, data: [{ _id: new mongoose.Types.ObjectId(String(id)) }, fields] }, 'findOne').catch(() => null)
+    : null);
+
+/* A task with nothing private about its place: one any member of the workspace reads. */
+const openToEveryMember = async (companyId, task) => {
+    const [project, list] = await Promise.all([
+        rowOf(companyId, SCHEMA_TYPE.PROJECTS, task.ProjectID, { isPrivateSpace: 1, isPersonal: 1 }),
+        rowOf(companyId, SCHEMA_TYPE.SPRINTS, task.sprintId, { private: 1 }),
+    ]);
+    return !(project && (project.isPrivateSpace === true || project.isPersonal === true)) && !(list && list.private === true);
+};
+
+/* A webhook sends what it is told to an address outside the workspace, so it is told of a task only when the
+ * person who keeps it can open that task. One kept by nobody, made before a webhook had a keeper, is told of the
+ * tasks every member reads. A conversation is nobody's task. */
+const hooksToldOf = async (companyId, hooks, task) => {
+    if (task.mainChat === true) return [];
+    const verdicts = new Map();
+    const reads = (keeper) => {
+        if (!verdicts.has(keeper)) verdicts.set(keeper, (keeper ? canReadTask(companyId, keeper, task) : openToEveryMember(companyId, task)).catch(() => false));
+        return verdicts.get(keeper);
+    };
+    const told = [];
+    for (const hook of hooks) {
+        if (await reads(String(hook.createdBy || ''))) told.push(hook);
+    }
+    return told;
+};
+
 async function flush(companyId, event, doc, changedKeys) {
     const hooks = await getCompanyWebhooks(companyId);
     const targets = hooks.filter((hook) => subscribesTo(hook, event));
@@ -193,6 +226,9 @@ async function flush(companyId, event, doc, changedKeys) {
     if (!shouldDeliverTask(fullDoc, readErrored)) return;
     if (!fullDoc) fullDoc = doc; // transient read error → best-effort with the socket payload
 
+    const told = await hooksToldOf(companyId, targets, fullDoc);
+    if (!told.length) return;
+
     const data = trimTaskForDelivery(fullDoc);
 
     // Always resolve assignee + lead ids → names (one batched lookup) so the
@@ -220,7 +256,7 @@ async function flush(companyId, event, doc, changedKeys) {
     if (previous) body.previous = previous;
 
     taskSnapshots.remember(taskId, data);
-    targets.forEach((hook) => { deliverToHook(companyId, hook, body, 1); });
+    told.forEach((hook) => { deliverToHook(companyId, hook, body, 1); });
 }
 
 function deliverPending(key, entry) {

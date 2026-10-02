@@ -16,7 +16,7 @@
                 <i18n-t keypath="Time.overnight_body" tag="div" class="lt__alert-body">
                     <template #start>{{ s.startClock }}</template>
                     <template #when>{{ s.whenLabel }}</template>
-                    <template #task><strong>{{ s.taskName }}</strong></template>
+                    <template #task><strong>{{ s.taskName || $t('Time.task_not_open') }}</strong></template>
                     <template #recorded>{{ formatHm(s.recordedMinutes) }}</template>
                 </i18n-t>
                 <div class="tv-row-actions">

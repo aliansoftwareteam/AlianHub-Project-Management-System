@@ -19,12 +19,16 @@ const controller = require('../Modules/EmailIn/controller');
 
 const COMPANY = '6f0000000000000000000c01';
 const PROJECT = '6f0000000000000000000701';
+const OWNER = '6f0000000000000000000001';
 const oid = (hex) => new mongoose.Types.ObjectId(hex);
 
-const seedProject = () => mockDbFor(COMPANY).crud(COMPANY, {
-    type: SCHEMA_TYPE.PROJECTS,
-    data: { _id: oid(PROJECT), ProjectName: 'Shop', ProjectCode: 'SHP', deletedStatusKey: 0 },
-}, 'save');
+const seedProject = async () => {
+    mockDbFor(COMPANY).seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+    return mockDbFor(COMPANY).crud(COMPANY, {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: { _id: oid(PROJECT), ProjectName: 'Shop', ProjectCode: 'SHP', deletedStatusKey: 0 },
+    }, 'save');
+};
 
 const seedSprint = (hex, extra = {}) => mockDbFor(COMPANY).crud(COMPANY, {
     type: SCHEMA_TYPE.SPRINTS,
@@ -34,13 +38,13 @@ const seedSprint = (hex, extra = {}) => mockDbFor(COMPANY).crud(COMPANY, {
 const createInbox = async (body) => {
     const sent = {};
     await controller.createInbox(
-        verified({ headers: { companyid: COMPANY }, uid: 'u1', body }),
+        verified({ headers: { companyid: COMPANY }, uid: OWNER, body }),
         { send: (payload) => { sent.payload = payload; } },
     );
     return sent.payload;
 };
 
-const body = { projectId: PROJECT, userData: { id: 'u1', Employee_Name: 'Owner' } };
+const body = { projectId: PROJECT, userData: { id: OWNER, Employee_Name: 'Owner' } };
 
 /* The project document's sprintsObj is a legacy copy no sprint write maintains, so an
  * inbox resolving its target sprint from it refused every project whose sprints were

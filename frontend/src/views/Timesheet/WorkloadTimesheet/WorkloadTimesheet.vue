@@ -69,12 +69,12 @@
                                 v-for="c in d.chips.slice(0, 2)"
                                 :key="c.estimateId"
                                 class="wl__chip"
-                                draggable="true"
-                                :title="`${c.name} · ${formatHm(c.minutes)}`"
+                                :draggable="Boolean(c.name)"
+                                :title="`${c.name || $t('Time.task_not_open')} · ${formatHm(c.minutes)}`"
                                 @dragstart="onDragStart($event, u, d, c)"
                                 @dragend="onDragEnd"
-                            >{{ c.name || c.taskId }}</span>
-                            <span v-if="d.chips.length > 2" class="wl__chip wl__chip--more" :title="d.chips.slice(2).map((c) => c.name).join(', ')">+{{ d.chips.length - 2 }}</span>
+                            >{{ c.name || $t('Time.task_not_open') }}</span>
+                            <span v-if="d.chips.length > 2" class="wl__chip wl__chip--more" :title="d.chips.slice(2).map((c) => c.name || $t('Time.task_not_open')).join(', ')">+{{ d.chips.length - 2 }}</span>
                         </div>
                     </template>
                 </div>
