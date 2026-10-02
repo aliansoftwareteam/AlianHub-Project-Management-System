@@ -59,6 +59,12 @@ async function sendInvitation({ ownerApi, companyId, role, email }) {
 
 const invitationPath = (companyId, inviteRow) => `/#/invitation?companyId=${companyId}-${inviteRow._id}&token=${encodeURIComponent(inviteRow.linkId)}`;
 
+/* The link mailed to an invited address that already has an account (Modules/Auth/controller/sendInvitation.js). */
+const mailedInvitationPath = ({ userId, companyId, invitation }) => {
+    const blob = Buffer.from(`userId=${userId}&companyId=${companyId}&docId=${invitation._id}&linkId=${invitation.linkId}`).toString('base64');
+    return `/#/verify-invitation?id=${encodeURIComponent(blob)}`;
+};
+
 /* An account made outside any invitation. Mail is not delivered in the suite, so the address is marked
  * verified the way tests/integration/invitation-signed-in-accept.int.test.js does. */
 async function registerVerifiedAccount(baseURL, { firstName, lastName, email }) {
@@ -314,6 +320,7 @@ module.exports = {
     listSprints,
     login,
     loginAs,
+    mailedInvitationPath,
     readState,
     readTask,
     registerVerifiedAccount,

@@ -1,5 +1,5 @@
 const { test, expect } = require('../support/test');
-const { PASSWORD, emailFor, invitationPath, inviteMember, registerVerifiedAccount, sendInvitation, uniqueSuffix } = require('../support/fixtures');
+const { PASSWORD, emailFor, invitationPath, inviteMember, mailedInvitationPath, registerVerifiedAccount, sendInvitation, uniqueSuffix } = require('../support/fixtures');
 const { firstScreenSettled, signInThroughForm, skipFirstRun, watchApiAnswers } = require('../support/pages');
 
 test.describe.configure({ timeout: 60000 });
@@ -47,6 +47,26 @@ test.describe('joining by invitation', () => {
         await page.getByRole('button', { name: 'Accept invitation' }).click();
         await expect(page).toHaveURL(new RegExp(`#/${state.companyId}/welcome/connect-ai`));
         await expect(page.getByRole('heading', { level: 1, name: 'Connect your AI' })).toBeVisible();
+        await firstScreenSettled(page);
+
+        expect(answers.answered).toBeGreaterThan(0);
+        expect(answers.refused).toEqual([]);
+    });
+
+    test('following the mailed link while signed in opens the workspace with no refused request', async ({ page, state, loginAs }) => {
+        const owner = await loginAs('owner');
+        const email = `mailed.${uniqueSuffix()}@e2e.alianhub.test`;
+        const userId = await registerVerifiedAccount(state.baseURL, { firstName: 'Mila', lastName: 'Mailed', email });
+        const invitation = await sendInvitation({ ownerApi: owner.api, companyId: state.companyId, role: 'member', email });
+
+        await signIn(page, email);
+        await expect(page.getByRole('textbox', { name: 'Name your workspace' })).toBeVisible();
+
+        const answers = watchApiAnswers(page);
+        await page.goto(mailedInvitationPath({ userId, companyId: state.companyId, invitation }));
+        await expect(page.getByRole('heading', { name: 'Invitation accepted' })).toBeVisible();
+        await page.waitForURL(new RegExp(`#/${state.companyId}(/|\\?|$)`));
+        await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
         await firstScreenSettled(page);
 
         expect(answers.answered).toBeGreaterThan(0);
