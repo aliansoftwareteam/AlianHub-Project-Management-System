@@ -67,7 +67,7 @@
                     {{ $t('Docs.docs') }}
                     <span class="ah-label hub__stats">{{ $t('Docs.pages_count', { n: pages.length }) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
                 </span>
-                <select v-model="view" class="hub__view-select">
+                <select v-model="view" class="hub__view-select" :aria-label="$t('Docs.view_select')">
                     <option value="recent">{{ $t('Docs.recent') }}</option>
                     <option value="mine">{{ $t('Docs.mine') }}</option>
                     <option value="shared">{{ $t('Docs.shared_with_me') }}</option>

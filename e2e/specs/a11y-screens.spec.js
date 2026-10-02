@@ -64,11 +64,11 @@ async function auditScreen(page, open) {
 
 async function openView(page, view) {
     if ((page.viewportSize()?.width || 0) > 767) {
-        await page.getByRole('button', { name: view, exact: true }).click();
+        await page.getByRole('button', { name: view, exact: true }).click({ timeout: 10000 });
         return;
     }
-    await page.locator('.project-views-row').getByRole('button').first().click();
-    await page.getByRole('option', { name: new RegExp(`^${view}`) }).click();
+    await page.locator('.project-views-row').getByRole('button').first().click({ timeout: 10000 });
+    await page.locator('.viewlist-mobile-dropdown').getByText(view, { exact: true }).click({ timeout: 10000 });
 }
 
 async function projectWithTasks({ owner, state, label }) {
@@ -85,7 +85,7 @@ async function projectWithTasks({ owner, state, label }) {
 test.describe('accessibility: everyday screens in light and dark, desktop and 390px', () => {
     test.use(asRole('owner'));
     test.beforeEach(async ({ page }) => {
-        test.setTimeout(180000);
+        test.setTimeout(90000);
         await skipFirstRun(page);
     });
 
@@ -123,8 +123,8 @@ test.describe('accessibility: everyday screens in light and dark, desktop and 39
             const { url } = await projectWithTasks({ owner, state, label: `A11Y ${view.toUpperCase()}` });
             await page.setViewportSize({ width: VIEWPORTS[0].width, height: VIEWPORTS[0].height });
             await page.goto(url);
-            await page.getByRole('button', { name: 'Add View', exact: true }).click();
-            await page.getByRole('button', { name: new RegExp(`^${view}`) }).click();
+            await page.getByRole('button', { name: 'Add View', exact: true }).click({ timeout: 10000 });
+            await page.getByRole('button', { name: new RegExp(`^${view}`) }).click({ timeout: 10000 });
             await auditScreen(page, async () => {
                 await page.goto(url);
                 await openView(page, view);
