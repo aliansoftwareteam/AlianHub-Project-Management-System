@@ -1,3 +1,4 @@
+const { AsyncResource } = require('async_hooks');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const logger = require('../../../Config/loggerConfig');
 const { myCache } = require('../../../Config/config');
@@ -76,6 +77,10 @@ function run(key) {
     running.add(work);
 }
 
+/* A refill is made for the person recorded on the field's last fill, not for whoever edited the task: bound here,
+ * where no request is running, it runs under no token's project list, no agent's mark and no request. */
+const runOutsideAnyRequest = AsyncResource.bind(run);
+
 /* Edits come in bursts (typing in the description saves many times), so one refill runs after the last. */
 function schedule(companyId, taskId, parts) {
     if (!OBJECT_ID.test(String(companyId || '')) || !OBJECT_ID.test(String(taskId || '')) || !parts.length) return;
@@ -83,7 +88,7 @@ function schedule(companyId, taskId, parts) {
     const entry = pending.get(key) || { companyId: String(companyId), taskId: String(taskId), changed: new Set() };
     parts.forEach((part) => entry.changed.add(part));
     clearTimeout(entry.timer);
-    entry.timer = setTimeout(() => run(key), debounceMs);
+    entry.timer = setTimeout(() => runOutsideAnyRequest(key), debounceMs);
     if (entry.timer && typeof entry.timer.unref === 'function') entry.timer.unref();
     pending.set(key, entry);
 }
@@ -125,7 +130,7 @@ function stop() {
 
 /* Runs every pending refill now and waits for all of them. */
 async function flush() {
-    [...pending.keys()].forEach(run);
+    [...pending.keys()].forEach((key) => runOutsideAnyRequest(key));
     await Promise.all([...running]);
 }
 

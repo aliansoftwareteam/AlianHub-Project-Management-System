@@ -1,7 +1,8 @@
 'use strict';
 
-/* How long an uploaded recording runs, read from its container: WebM (what the browser recorder writes),
- * MP4 and WAV. Anything else, or a file whose container does not say, is estimated from its size. */
+/* Whether an uploaded file is audio, and how long it runs, both read from its first bytes and its container: WebM
+ * (what the browser recorder writes), MP4 and WAV state a length. Other audio, or a file whose container does not
+ * say, is estimated from its size. */
 
 const ESTIMATED_BYTES_PER_MINUTE = 480000;
 
@@ -106,11 +107,25 @@ function wavSeconds(buffer) {
     return null;
 }
 
+const tagAt = (buffer, at, tag) => buffer.length >= at + tag.length && buffer.toString('latin1', at, at + tag.length) === tag;
+const isWebm = (buffer) => buffer.length >= 4 && buffer.readUInt32BE(0) === 0x1a45dfa3;
+const isMp4 = (buffer) => tagAt(buffer, 4, 'ftyp');
+const isWav = (buffer) => tagAt(buffer, 0, 'RIFF') && tagAt(buffer, 8, 'WAVE');
+
+/* An MP3 or AAC file with no tag starts at a frame: eleven set bits, then a layer. Layer one is left out, because
+ * UTF-16 text starts with the same two bytes. */
+const startsAtAudioFrame = (buffer) => buffer.length >= 2 && buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0 && (buffer[1] & 0x06) !== 0x06;
+
+/* Read from the bytes, not from the name or the type the sender states: the browser recorder names an MP4 recording
+ * .webm, and a stored voice note comes back as video/webm. */
+const isAudioFile = (buffer) => Buffer.isBuffer(buffer) && (isWebm(buffer) || isMp4(buffer) || isWav(buffer)
+    || tagAt(buffer, 0, 'OggS') || tagAt(buffer, 0, 'fLaC') || tagAt(buffer, 0, 'ID3') || startsAtAudioFrame(buffer));
+
 function containerSeconds(buffer) {
     if (buffer.length < 16) return null;
-    if (buffer.readUInt32BE(0) === 0x1a45dfa3) return webmSeconds(buffer);
-    if (buffer.toString('latin1', 4, 8) === 'ftyp') return mp4Seconds(buffer);
-    if (buffer.toString('latin1', 0, 4) === 'RIFF' && buffer.toString('latin1', 8, 12) === 'WAVE') return wavSeconds(buffer);
+    if (isWebm(buffer)) return webmSeconds(buffer);
+    if (isMp4(buffer)) return mp4Seconds(buffer);
+    if (isWav(buffer)) return wavSeconds(buffer);
     return null;
 }
 
@@ -122,4 +137,4 @@ function measure(buffer) {
     return { seconds: (buffer.length / ESTIMATED_BYTES_PER_MINUTE) * 60, estimated: true };
 }
 
-module.exports = { measure, ESTIMATED_BYTES_PER_MINUTE };
+module.exports = { measure, isAudioFile, ESTIMATED_BYTES_PER_MINUTE };
