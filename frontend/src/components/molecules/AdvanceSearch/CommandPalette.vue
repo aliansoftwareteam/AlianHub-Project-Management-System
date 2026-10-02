@@ -283,7 +283,7 @@ const canNewDoc = computed(() => {
 });
 
 const COMMANDS = computed(() => [
-    { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus', shortcut: 'create-task' },
+    { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus', shortcut: 'create-task', takesName: true },
     { key: 'new-doc', label: t('Docs.new_doc'), icon: 'docs', show: canNewDoc.value },
     { key: 'new-project', label: t('Inbox.cmd_new_project'), icon: 'projects', show: allowed('project.project_list'), takesName: true },
     { key: 'start-timer', label: t('Inbox.cmd_start_timer'), icon: 'play', show: !!timesheetRoute() },
@@ -527,7 +527,7 @@ const command = (key, name = '') => {
     if (key === 'toggle-theme') { toggleTheme(); close(); return; }
     if (key === 'logout') { close(); logOut({ islogOut: true }); return; }
     window.dispatchEvent(new CustomEvent('ah:command', { detail: { command: key, query: query.value.trim() } }));
-    if (key === 'new-task') { close(); openQuickCreate(); return; }
+    if (key === 'new-task') { close(); openQuickCreate({ name }); return; }
     if (key === 'new-doc') { close(); createIn(docProjectId.value); return; }
     if (key === 'new-project') return go({ name: 'Projects', params: { cid: cid.value }, query: { create: 'project', name: name || undefined } });
     if (key === 'start-timer') { const r = timesheetRoute(); return r ? go(to(r)) : close(); }

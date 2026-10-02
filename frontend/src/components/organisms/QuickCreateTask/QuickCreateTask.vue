@@ -127,6 +127,7 @@ import { isMacPlatform } from "@/components/molecules/AdvanceSearch/paletteKeys"
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { listLabel } from "@/utils/folderTree";
 import { applyContext, applyTemplate, defaultTemplateOf, dayFromOffset, listTemplates, localDay, renderTitle } from "@/components/molecules/TaskTemplates/taskTemplates";
+import { inferAssignee, inferDue, placeOfVisits, preferredSprint, readCreated, rememberCreated } from "./placeInference";
 import {
     assigneeIdsFor,
     closeQuickCreate,
@@ -182,6 +183,8 @@ const templates = ref([]);
 const templateId = ref("");
 const prefilled = reactive({ name: "", due: "", priority: "" });
 
+const visitedPlace = ref(null);
+
 let prepared = Promise.resolve();
 let listsLoaded = Promise.resolve();
 let doneTimer = null;
@@ -232,13 +235,19 @@ function prepare() {
     const personal = personalList.ensure()
         .then((res) => { personalSprint.value = res?.sprint || null; })
         .catch((e) => console.error("ERROR in quick create personal list: ", e));
-    return Promise.all([personal, loadProjectRules(allProjects.value)]).finally(() => {
+    const visited = routeProjectId() || quickCreate.projectId
+        ? Promise.resolve()
+        : apiRequest("get", `${env.RECENT_VISITS}?types=project,sprint&limit=5`)
+            .then((res) => { visitedPlace.value = res?.data?.status ? placeOfVisits(res.data.data) : null; })
+            .catch(() => {});
+    return Promise.all([personal, visited, loadProjectRules(allProjects.value)]).finally(() => {
         preparing.value = false;
         if (!quickCreate.open) return;
         projectId.value = pickDefaultProject({
             requestedId: quickCreate.projectId,
             routeProjectId: routeProjectId(),
-            lastUsedId: readLastProject(cid.value, me.value),
+            recentId: visitedPlace.value?.projectId,
+            lastUsedId: readCreated(cid.value, me.value)?.projectId || readLastProject(cid.value, me.value),
             projects: options.value
         });
     });
@@ -260,7 +269,12 @@ function loadLists(p) {
 function resetFields(p) {
     const s = defaultStatus(p);
     statusKey.value = s ? String(s.key) : "";
-    assigneeId.value = members.value.some((m) => m.id === me.value) ? me.value : "";
+    assigneeId.value = inferAssignee({
+        created: readCreated(cid.value, me.value),
+        projectId: String(p._id),
+        memberIds: members.value.map((m) => m.id),
+        me: me.value
+    });
     if (!priorities.value.some((x) => x.value === priority.value)) priority.value = priorities.value[0]?.value || "MEDIUM";
 }
 
@@ -306,8 +320,18 @@ watch(project, (p, was) => {
     listsLoaded = loadLists(p).then((found) => {
         if (String(projectId.value) !== pid) return;
         lists.value = found;
-        const preferred = quickCreate.sprintId || (String(route?.params?.id || "") === pid ? String(route?.params?.sprintId || "") : "");
+        const preferred = preferredSprint({
+            requestedId: quickCreate.sprintId,
+            routeSprintId: String(route?.params?.id || "") === pid ? String(route?.params?.sprintId || "") : "",
+            projectId: pid,
+            visit: visitedPlace.value,
+            created: readCreated(cid.value, me.value)
+        });
         sprintId.value = pickDefaultSprint(found, preferred);
+        if (!due.value) {
+            due.value = inferDue({ created: readCreated(cid.value, me.value), projectId: pid, today: localDay() });
+            prefilled.due = due.value;
+        }
     });
 });
 
@@ -316,8 +340,9 @@ const focusTitle = () => nextTick(() => nameEl.value?.focus());
 watch(() => quickCreate.open, (on) => {
     if (!on) return;
     error.value = "";
-    name.value = readDraft();
+    name.value = quickCreate.name || readDraft();
     due.value = "";
+    visitedPlace.value = null;
     priority.value = "MEDIUM";
     Object.assign(prefilled, { name: "", due: "", priority: "" });
     projectId.value = "";
@@ -429,6 +454,7 @@ async function submit(intent) {
                 .catch((e) => console.error("ERROR in quick create template: ", e));
         }
         rememberLastProject(cid.value, me.value, p._id);
+        rememberCreated(cid.value, me.value, { projectId: p._id, sprintId: list.id, assigneeId: assigneeId.value, due: due.value });
         bumpListCount(p, list);
         const task = { companyId: cid.value, projectId: String(p._id), sprintId: list.id, folderId: list.folderId, taskId: String(result.id) };
         name.value = "";
