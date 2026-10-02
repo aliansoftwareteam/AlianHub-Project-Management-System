@@ -397,6 +397,7 @@ import { canControlRun } from "@/views/Ai/agentAccess";
 import taskClass from "@/utils/TaskOperations";
 import { onInstantEdit } from "@/utils/instantTaskEdit";
 import { ownEditsInFlight } from "@/utils/taskUpdateMarker";
+import { closingToastKey } from "./taskLeftToast";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig } from "@/config/publicConfig";
@@ -918,7 +919,8 @@ watch(taskDetailGetter, (newVal) => {
     }
     const deleted = updatedFields?.deletedStatusKey === 1 || updatedFields?.deletedStatusKey === 2;
     if (deleted && (fullDocument?._id === props.taskId || fullDocument?.isParentTask)) {
-        $toast.info(t(updatedFields.deletedStatusKey === 1 ? "Toast.Task_deleted_successfully" : "Toast.Task_archived_successfully"), { position: "top-right" });
+        const toastKey = closingToastKey(newVal, props.taskId);
+        if (toastKey) $toast.info(t(toastKey), { position: "top-right" });
         emit("close");
         return;
     }
