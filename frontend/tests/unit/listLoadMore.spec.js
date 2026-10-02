@@ -7,7 +7,7 @@ import { createI18n } from 'vue-i18n';
 import { defineComponent, h, ref } from 'vue';
 import en from '@/locales/en';
 
-const { server } = vi.hoisted(() => ({ server: { tasks: [], calls: [] } }));
+const { server } = vi.hoisted(() => ({ server: { tasks: [], calls: [], everything: null, everythingCalls: [] } }));
 
 vi.mock('@/services', () => {
     const matches = (task, condition = {}) => Object.entries(condition).every(([field, want]) => {
@@ -39,6 +39,10 @@ vi.mock('@/services', () => {
     };
     return {
         apiRequest: vi.fn((method, url, body) => {
+            if (String(url).endsWith('/tasks/everything')) {
+                server.everythingCalls.push(body);
+                return Promise.resolve({ data: { status: true, data: server.everything || { rows: [], projects: {}, nextCursor: null } } });
+            }
             const stages = body?.findQuery || [];
             server.calls.push(stages);
             return Promise.resolve({ status: 200, data: answer(stages) });
@@ -83,6 +87,8 @@ const task = (n, statusKey) => ({
 const seedServer = () => {
     server.tasks = [...Array.from({ length: 100 }, (_, i) => task(i + 1, 1)), ...Array.from({ length: 10 }, (_, i) => task(i + 101, 2))];
     server.calls = [];
+    server.everything = null;
+    server.everythingCalls = [];
 };
 
 function seedStore() {
@@ -95,6 +101,8 @@ function seedStore() {
     Store.state.settings.socketInstance = { id: 'sock', emit: vi.fn(), on: vi.fn(), off: vi.fn() };
     Store.state.users.users = [{ _id: 'u1', Employee_Name: 'Olivia Owner' }];
     Store.state.projectData.tasks = {};
+    Store.state.projectData.allProjects = [];
+    Store.state.projectData.otherProjectChanges = 0;
     Store.state.projectData.searchedTasks = [];
     Store.state.projectData.getPaginatedTaskPayload = [];
     Store.state.taskSelection.selectedTaskIds = [];
@@ -469,5 +477,65 @@ describe('a change to a task that is not loaded', () => {
         expect(server.calls.length - before).toBe(1);
         expect(headerCount('To Do')).toBe('97');
         expect(headerCount('Done')).toBe('13');
+    });
+});
+
+describe('tasks added to the list from other projects', () => {
+    const OTHER = 'p2';
+    const IN_REVIEW = { key: 7, name: 'In review', type: 'active', bgColor: '#7c3aed35', textColor: '#7c3aed' };
+    const card = { _id: OTHER, ProjectName: 'Operations', ProjectCode: 'OPS', taskStatusData: [IN_REVIEW], taskTypeCounts: [], apps: [], statusType: 'active', edit: { status: true, priority: true } };
+    const visitor = (over = {}) => ({
+        _id: 'x1', TaskName: 'Renew the contract', TaskKey: 'OPS-4', ProjectID: OTHER, sprintId: 's9', sprintArray: { id: 's9', name: 'Ops queue' },
+        status: { key: 7, text: 'In review', type: 'active' }, statusKey: 7, statusType: 'active', AssigneeUserId: [], isParentTask: true, subTasks: 0,
+        extraLists: [{ projectId: PID, sprintId: SPRINT, name: 'List', projectName: 'Scale Test' }], ...over
+    });
+    const foot = () => wrapper.find('[data-other-project-rows]');
+
+    beforeEach(() => {
+        Store.state.projectData.allProjects = { data: [PROJECT, { _id: OTHER, ProjectName: 'Operations', statusType: 'active' }] };
+        server.everything = { rows: [visitor()], projects: { [OTHER]: card }, nextCursor: null };
+    });
+
+    it('sit at the foot of the list, with their own status and the mark of where they live', async () => {
+        await openList();
+
+        expect(server.everythingCalls).toEqual([{ filter: { sprintIds: [SPRINT], projectIds: [OTHER] }, limit: 100 }]);
+        expect(foot().find('.opr__head').text()).toContain('From other projects');
+        expect(foot().find('.evr__name').text()).toBe('Renew the contract');
+        expect(foot().find('.lv2__status-chip').text()).toBe('In review');
+        expect(foot().find('.evr__status button').exists()).toBe(false);
+        expect(foot().find('[data-home-mark]').attributes('title')).toBe('Lives in Ops queue, in Operations');
+        expect(wrapper.findAll('.row').map((row) => row.attributes('data-id'))).not.toContain('x1');
+    });
+
+    it('show on a list that holds no task of its own', async () => {
+        server.tasks = [];
+        await openList();
+
+        expect(foot().find('.evr__name').text()).toBe('Renew the contract');
+    });
+
+    it('are read again when a change to one of them reaches the list', async () => {
+        await openList();
+        server.everything = { rows: [visitor({ TaskName: 'Renew the lease' })], projects: { [OTHER]: card }, nextCursor: null };
+
+        Store.commit('projectData/mutateUpdateFirebaseTasks', { snap: {}, op: 'modified', pid: PID, sprintId: SPRINT, data: visitor({ TaskName: 'Renew the lease' }), updatedFields: { TaskName: 'Renew the lease' } });
+        await settle(1000);
+
+        expect(server.everythingCalls).toHaveLength(2);
+        expect(foot().find('.evr__name').text()).toBe('Renew the lease');
+        expect(wrapper.findAll('.row').map((row) => row.attributes('data-id'))).not.toContain('x1');
+    });
+
+    it('are left out under a search, and when the server sends none', async () => {
+        await openList();
+        searched.value = true;
+        await settle();
+        expect(foot().exists()).toBe(false);
+
+        wrapper.unmount();
+        server.everything = null;
+        await openList();
+        expect(foot().exists()).toBe(false);
     });
 });

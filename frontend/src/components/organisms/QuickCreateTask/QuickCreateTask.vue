@@ -128,6 +128,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { listLabel } from "@/utils/folderTree";
 import { applyContext, applyTemplate, defaultTemplateOf, dayFromOffset, listTemplates, localDay, renderTitle } from "@/components/molecules/TaskTemplates/taskTemplates";
 import {
+    assigneeIdsFor,
     closeQuickCreate,
     creatableProjects,
     defaultStatus,
@@ -207,7 +208,13 @@ const priorities = computed(() => {
 const members = computed(() => {
     const p = project.value;
     if (!p) return [];
-    const everyone = p.isPersonal || check("task.task_assignee", p) !== true ? [me.value] : (p.AssigneeUserId || []).map(String);
+    const everyone = assigneeIdsFor(p, {
+        me: me.value,
+        seat: getters["settings/companyUserDetail"],
+        teams: getters["settings/teams"],
+        rules: getters["settings/rules"],
+        mayAssignOthers: check("task.task_assignee", p) === true
+    });
     return everyone.filter(Boolean).map((id) => ({ id, name: getUser(id)?.Employee_Name || "" })).filter((m) => m.name);
 });
 const selectedList = computed(() => lists.value.find((l) => l.id === sprintId.value) || null);

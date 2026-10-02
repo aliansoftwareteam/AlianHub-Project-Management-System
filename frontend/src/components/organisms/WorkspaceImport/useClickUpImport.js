@@ -87,6 +87,7 @@ export function useClickUpImport() {
 
     const skippedRows = computed(() => (preview.value?.skippedRows || []));
     const unreadDates = computed(() => (preview.value?.unreadDates || []));
+    const skippedCells = computed(() => results.value.flatMap((result) => result.skippedCells || []));
     const unmatchedAssignees = computed(() => Array.from(new Set(results.value.flatMap((result) => result.unmatchedAssignees || []))));
     const adjusted = computed(() => adjustedTotals(results.value));
     const summary = computed(() => {
@@ -95,5 +96,5 @@ export function useClickUpImport() {
     });
     const undoableJobs = computed(() => results.value.filter((result) => result.ok && result.jobId && result.created > 0).map((result) => String(result.jobId)));
 
-    return { rows, preview, previewError, running, progress, results, existingMode, totals, skippedRows, unreadDates, unmatchedAssignees, adjusted, summary, undoableJobs, reset, loadPreview, run };
+    return { rows, preview, previewError, running, progress, results, existingMode, totals, skippedRows, unreadDates, skippedCells, unmatchedAssignees, adjusted, summary, undoableJobs, reset, loadPreview, run };
 }

@@ -22,6 +22,7 @@
             <TaskTypeIcon v-if="hasTypeIcon" :taskType="taskType" class="evr__type" aria-hidden="true" />
             <button type="button" class="evr__name evr__card-name" :title="task.TaskName" @click.stop="$emit('open', task)">{{ task.TaskName }}</button>
         </div>
+        <slot name="lists"><TaskListChips :task="task" /></slot>
         <div class="evr__card-foot">
             <span class="evr__status" @click.stop>
                 <ListStatusCircle :task="task" :statuses="statuses" :editable="canStatus" @change="(status) => $emit('status', task, status)" />
@@ -41,6 +42,7 @@ import ListAssigneeCell from "@/views/Projects/ListView/ListAssigneeCell.vue";
 import ListDueCell from "@/views/Projects/ListView/ListDueCell.vue";
 import ListPriorityCell from "@/views/Projects/ListView/ListPriorityCell.vue";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
+import TaskListChips from "@/views/Projects/components/TaskListChips.vue";
 import { useRowState } from "./useRowState";
 
 defineOptions({ name: "EverythingCard" });

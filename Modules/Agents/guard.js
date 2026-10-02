@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const registry = require('./registry');
+const projectPolicy = require('./projectPolicy');
 const audit = require('./agentAudit');
 const { resolveActor, isAgent, attribution } = require('./actor');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
@@ -107,6 +108,9 @@ const evaluateOnRoute = (action, params) => {
     return check;
 };
 
+/* A route cannot file a proposal, so what a project holds for a person is refused here and named as the MCP tool's to file. */
+const heldOnRoute = (rule) => (rule.decision === projectPolicy.DECISION.PROPOSE ? `${rule.reason}, and a route cannot propose one: the agent's MCP tool files it for approval` : rule.reason);
+
 const plain = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
 const named = (value) => [].concat(value === undefined || value === null ? [] : value).map((entry) => idText(entry) || String(entry || '')).filter(Boolean);
 
@@ -182,6 +186,26 @@ const pageCreateChecks = (req, body) => {
     return { action: 'page.create', params: { ...params, fields: Object.fromEntries(beyond.map((field) => [field, 1])) } };
 };
 
+/* What the handler answered, once it has: the handlers behind these routes answer most failures as HTTP 200
+ * with `status: false`, so the HTTP status alone does not say whether the write happened. */
+const answerOf = (res) => {
+    const answer = {};
+    ['send', 'json'].filter((name) => typeof res[name] === 'function').forEach((name) => {
+        const original = res[name];
+        res[name] = function answered(body, ...rest) {
+            if (answer.body === undefined && body && typeof body === 'object' && !Buffer.isBuffer(body)) answer.body = body;
+            return original.call(this, body, ...rest);
+        };
+    });
+    return answer;
+};
+
+const failureOf = (res, answer) => {
+    if (res.statusCode >= 400) return `HTTP ${res.statusCode}`;
+    const body = answer.body || {};
+    return body.status === false ? String(body.statusText || body.message || 'status false') : '';
+};
+
 /* `checksOf(req, body, companyId)` names the registry action, or actions, the request is; every one must be
  * allowed without a flag. A write is recorded, a read is not. */
 const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
@@ -195,6 +219,10 @@ const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
         writes = writes || Boolean(check.action.write);
     }
     if (!writes) return next();
+    for (const { action, params } of checks) {
+        const rule = await projectPolicy.ask({ companyId, actor, action, params });
+        if (rule.decision !== projectPolicy.DECISION.ACT) return refuse(req, res, actor, { action, reason: heldOnRoute(rule), params, entityId: params.taskId });
+    }
     const [{ action, params }] = checks;
     let auditId;
     try {
@@ -202,9 +230,11 @@ const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
     } catch (e) {
         return res.status(503).json({ status: false, message: e.message, statusText: audit.AUDIT_UNAVAILABLE });
     }
+    const answer = answerOf(res);
     res.on('finish', () => {
-        const settle = res.statusCode >= 400
-            ? audit.failAction(companyId, auditId, `HTTP ${res.statusCode}`)
+        const failure = failureOf(res, answer);
+        const settle = failure
+            ? audit.failAction(companyId, auditId, failure)
             : audit.applyAction(companyId, auditId, { undo: null });
         settle.catch((e) => logger.error(`agent guard: ${e.message}`));
     });
@@ -220,12 +250,45 @@ const pageCreateChecked = routeGuard(pageCreateChecks);
 
 /* A doc an agent creates is its draft whatever the body says, so that a person signs it off. */
 const pageCreateGuard = (req, res, next) => pageCreateChecked(req, res, () => {
-    if (isAgent(req.agentActor)) req.body = { ...plain(req.body), createdByAgent: true, agentName: attribution(req.agentActor).label };
+    if (isAgent(req.agentActor)) req.agentDraft = { agentName: attribution(req.agentActor).label };
     return next();
 });
 
 /* For a write route the registry has no action for, or only one behind a flag: `action` names it in the refusal and its audit row. */
 const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
+
+const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const WORD = /^[a-z][a-z-]*$/;
+const sourcesAlone = (body) => Object.keys(body).length === 1 && body.sources !== undefined;
+
+/* The action each goal write is, by its method and its path below the goal routes, `:id` standing for an id. */
+const GOAL_WRITES = {
+    'POST /': 'goal.create',
+    'PATCH /:id': 'goal.update',
+    'POST /:id/archive': 'goal.archive',
+    'POST /:id/restore': 'goal.restore',
+    'POST /:id/targets': 'goal.target.add',
+    'PATCH /:id/targets/:id': (body) => (sourcesAlone(body) ? ['goal.target.sources.add', 'goal.target.sources.remove'] : 'goal.target.edit'),
+    'DELETE /:id/targets/:id': 'goal.target.remove',
+    'PUT /:id/targets/:id/value': 'goal.target.set',
+};
+
+/* A goal write that is not listed is still judged, under the name of its last word, so a route added later is
+ * closed to an agent token until it is given an action here. */
+const goalChecks = (req, body) => {
+    const segments = String(req.url || '').split('?')[0].split('/').filter(Boolean);
+    const ids = segments.filter((segment) => OBJECT_ID.test(segment));
+    const listed = GOAL_WRITES[`${req.method} /${segments.map((segment) => (OBJECT_ID.test(segment) ? ':id' : segment)).join('/')}`];
+    const last = segments[segments.length - 1] || '';
+    const actions = listed ? [].concat(typeof listed === 'function' ? listed(body) : listed) : [`goal.${WORD.test(last) ? last : 'write'}`];
+    const params = { ...(ids[0] ? { goalId: ids[0] } : {}), ...(ids[1] ? { targetId: ids[1] } : {}) };
+    return actions.map((action) => ({ action, params }));
+};
+
+const goalWriteGuard = routeGuard(goalChecks);
+
+/* Mounted on the goal routes' prefix, so it runs before every handler under it. */
+const goalGuard = (req, res, next) => (READ_METHODS.has(req.method) ? next() : goalWriteGuard(req, res, next));
 
 /* The perimeter: paths no agent token may reach whatever the body says. These
  * correspond to the actions absent from the registry. */
@@ -251,4 +314,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };

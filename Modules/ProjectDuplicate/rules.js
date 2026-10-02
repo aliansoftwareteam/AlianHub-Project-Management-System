@@ -53,6 +53,9 @@ const parseRequest = (body) => {
     return { ok: true, name, include: { tasks, assignees, dates } };
 };
 
+/* The fields a schema refused, when that is why a save failed. */
+const refusedPaths = (error) => (error && error.name === 'ValidationError' && error.errors ? Object.keys(error.errors) : []);
+
 const newId = () => new mongoose.Types.ObjectId();
 const idOf = (value) => String(value == null ? '' : value);
 const pick = (source, fields) => Object.fromEntries(fields.filter((field) => source[field] !== undefined).map((field) => [field, source[field]]));
@@ -82,11 +85,15 @@ const nextProjectCode = (sourceCode, taken) => {
     return `${base.slice(0, 2)}${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
 };
 
+/* A project made before the currency was required, or by a path that skipped validation, may hold none, or an empty one. */
+const hasCurrency = (project) => Boolean(project.ProjectCurrency) && typeof project.ProjectCurrency === 'object' && Boolean(project.ProjectCurrency.code);
+
 const withCaller = (people, caller) => [...new Set([...(Array.isArray(people) ? people : []).map(String), String(caller)])];
 
 /* The copy is a project of its own: no proposal id, favourites, watchers or activity of the source come with it. */
-const projectCopy = (source, { id, name, code, caller, companyId, include, ids }) => ({
+const projectCopy = (source, { id, name, code, caller, companyId, include, ids, currency = {} }) => ({
     ...remap(pick(source, PROJECT_SETTINGS), ids),
+    ProjectCurrency: hasCurrency(source) ? source.ProjectCurrency : currency,
     ...(include.dates ? pick(source, PROJECT_DATES) : {}),
     _id: id,
     ProjectName: name,
@@ -194,6 +201,6 @@ const taskLevels = (rows) => {
 
 module.exports = {
     INLINE_TASK_LIMIT, BATCH, MAX_NAME, JOB_SOURCE, LIVE, TRASHED, OBJECT_ID, PROJECT_DATES, LIST_DATES, TASK_FIELDS, TASK_DATES,
-    isPlainObject, refusal, parseRequest, newId, idOf, pick, remap, nextProjectCode, projectCopy,
+    isPlainObject, refusal, parseRequest, refusedPaths, newId, idOf, pick, remap, nextProjectCode, projectCopy, hasCurrency,
     isLive, folderCopies, listCopies, ruleTargets, ruleCopy, permissionCopies, withoutPeople, taskLevels,
 };

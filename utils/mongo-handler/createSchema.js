@@ -280,6 +280,11 @@ const agentFindingsSchema = new Schema(schema.agentFindings, {strict: true, time
 agentFindingsSchema.index({ taskId: 1, factId: 1 }, { unique: true });
 agentFindingsSchema.index({ projectId: 1, status: 1 });
 
+const projectFindingsSchema = new Schema(schema.projectFindings, {strict: true, timestamps: true});
+// One row per project and cause. Unique, so two servers looking at once cannot file the same finding twice.
+projectFindingsSchema.index({ projectId: 1, key: 1 }, { unique: true, name: 'project_cause' });
+projectFindingsSchema.index({ projectId: 1, status: 1, openedAt: -1 });
+
 const agentsSchema = new Schema(schema.agents, {strict: true, timestamps: true});
 agentsSchema.index({ paused: 1 });
 agentsSchema.index({ ownerId: 1 });
@@ -339,6 +344,8 @@ agentProposalsSchema.index({ status: 1, createdAt: -1 });
 agentProposalsSchema.index({ createdAt: -1 });
 agentProposalsSchema.index({ agentId: 1, createdAt: -1 });
 agentProposalsSchema.index({ taskId: 1 });
+const agentStandingApprovalsSchema = new Schema(schema.agentStandingApprovals, {strict: true, timestamps: true});
+agentStandingApprovalsSchema.index({ projectId: 1, action: 1, status: 1 });
 const callsSchema = new Schema(schema.calls, {strict: true, timestamps: true});
 callsSchema.index({ callId: 1 }, { unique: true });
 callsSchema.index({ chatId: 1, createdAt: -1 });
@@ -385,6 +392,7 @@ permissionDecisionsSchema.index({ day: 1 }, { expireAfterSeconds: 30 * 24 * 60 *
 const egressAllowlistsSchema = new Schema(schema.egressAllowlists, {strict: true, timestamps: false});
 const connectorConnectionsSchema = new Schema(schema.connectorConnections, {strict: true, timestamps: true});
 connectorConnectionsSchema.index({ connector: 1, deletedStatusKey: 1 });
+connectorConnectionsSchema.index({ userId: 1, connector: 1, deletedStatusKey: 1 });
 const instructionPatternsSchema = new Schema(schema.instructionPatterns, {strict: true, timestamps: false});
 const agentSessionsSchema = new Schema(schema.agentSessions, {strict: true, timestamps: false});
 agentSessionsSchema.index({ taskId: 1, createdAt: -1 });
@@ -571,6 +579,7 @@ module.exports = {
     workflowApprovalsSchema,
     workflowDefinitionsSchema,
     agentFindingsSchema,
+    projectFindingsSchema,
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
@@ -580,6 +589,7 @@ module.exports = {
     aiReplaysSchema,
     aiAlertsSchema,
     agentProposalsSchema,
+    agentStandingApprovalsSchema,
     agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,

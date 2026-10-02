@@ -242,7 +242,7 @@ describe('renaming a list', () => {
 
         const taken = input('d1');
         await type(taken, 'research');
-        expect(toast.error).toHaveBeenCalledWith('Sprint already exists', { position: 'top-right' });
+        expect(toast.error).toHaveBeenCalledWith('List already exists', { position: 'top-right' });
         expect(apiRequest).not.toHaveBeenCalled();
     });
 

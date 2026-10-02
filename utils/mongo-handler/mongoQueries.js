@@ -106,6 +106,7 @@ const {
     workflowApprovalsSchema,
     workflowDefinitionsSchema,
     agentFindingsSchema,
+    projectFindingsSchema,
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
@@ -115,6 +116,7 @@ const {
     aiReplaysSchema,
     aiAlertsSchema,
     agentProposalsSchema,
+    agentStandingApprovalsSchema,
     agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,
@@ -360,6 +362,8 @@ exports.checkType = (type) => {
             return workflowDefinitionsSchema
         case SCHEMA_TYPE.AGENT_FINDINGS:
             return agentFindingsSchema
+        case SCHEMA_TYPE.PROJECT_FINDINGS:
+            return projectFindingsSchema
         case SCHEMA_TYPE.AGENTS:
             return agentsSchema
         case SCHEMA_TYPE.AGENT_RUNS:
@@ -378,6 +382,8 @@ exports.checkType = (type) => {
             return aiAlertsSchema
         case SCHEMA_TYPE.AGENT_PROPOSALS:
             return agentProposalsSchema
+        case SCHEMA_TYPE.AGENT_STANDING_APPROVALS:
+            return agentStandingApprovalsSchema
         case SCHEMA_TYPE.AGENT_SKILLS:
             return agentSkillsSchema
         case SCHEMA_TYPE.CALLS:
@@ -662,6 +668,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.WORKFLOW_DEFINITIONS}`
         case SCHEMA_TYPE.AGENT_FINDINGS:
                 return `${dbCollections.AGENT_FINDINGS}`
+        case SCHEMA_TYPE.PROJECT_FINDINGS:
+                return `${dbCollections.PROJECT_FINDINGS}`
         case SCHEMA_TYPE.AGENTS:
                 return `${dbCollections.AGENTS}`
         case SCHEMA_TYPE.AGENT_RUNS:
@@ -680,6 +688,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AI_ALERTS}`
         case SCHEMA_TYPE.AGENT_PROPOSALS:
                 return `${dbCollections.AGENT_PROPOSALS}`
+        case SCHEMA_TYPE.AGENT_STANDING_APPROVALS:
+                return `${dbCollections.AGENT_STANDING_APPROVALS}`
         case SCHEMA_TYPE.AGENT_SKILLS:
                 return `${dbCollections.AGENT_SKILLS}`
         case SCHEMA_TYPE.CALLS:

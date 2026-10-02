@@ -21,7 +21,7 @@ vi.mock('@/components/organisms/Shell/shellState', () => ({ openPanel: vi.fn() }
 
 import Inbox from '@/views/Inbox/Inbox.vue';
 
-const TABS = ['primary', 'other', 'later', 'done', 'cleared'];
+const TABS = ['approval', 'primary', 'other', 'later', 'done', 'cleared'];
 const row = (id, extra = {}) => ({
     sourceType: 'notification',
     sourceId: id,
@@ -68,12 +68,12 @@ beforeEach(() => {
 afterEach(() => { if (wrapper) wrapper.unmount(); wrapper = null; });
 
 describe('Inbox tabs', () => {
-    it('are a real tablist of Primary, Other, Later, Done and Cleared', async () => {
+    it('are a real tablist of Needs your approval, Primary, Other, Later, Done and Cleared', async () => {
         await mountInbox();
         const tabs = topTabs().findAll('[role="tab"]');
         expect(tabs.map((t) => t.attributes('data-tab'))).toEqual(TABS);
-        expect(tabs.map((t) => t.attributes('aria-selected'))).toEqual(['true', 'false', 'false', 'false', 'false']);
-        expect(tabs.map((t) => t.attributes('tabindex'))).toEqual(['0', '-1', '-1', '-1', '-1']);
+        expect(tabs.map((t) => t.attributes('aria-selected'))).toEqual(['false', 'true', 'false', 'false', 'false', 'false']);
+        expect(tabs.map((t) => t.attributes('tabindex'))).toEqual(['-1', '0', '-1', '-1', '-1', '-1']);
         const panelId = tabs[0].attributes('aria-controls');
         const panel = wrapper.find(`#${panelId}`);
         expect(panel.exists()).toBe(true);
@@ -95,7 +95,8 @@ describe('Inbox tabs', () => {
         expect(topTabs().find('[data-tab="cleared"]').attributes('aria-selected')).toBe('true');
         await topTabs().find('[data-tab="cleared"]').trigger('keydown', { key: 'ArrowRight' });
         await flushPromises();
-        expect(topTabs().find('[data-tab="primary"]').attributes('aria-selected')).toBe('true');
+        expect(topTabs().find('[data-tab="approval"]').attributes('aria-selected')).toBe('true');
+        expect(listCalls().at(-1)[1]).toContain('tab=approval');
     });
 });
 

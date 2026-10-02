@@ -144,7 +144,7 @@ describe('the demo project looks worked-in — whatever the setup answer', () =>
         for (const p of used) expect(['URGENT', 'HIGH', 'MEDIUM', 'LOW']).toContain(p);
 
         // The expand arrow has something to open, and the chat column is not empty
-        expect(docs.filter((d) => d.isParentTask === false)).toHaveLength(3);
+        expect(docs.filter((d) => d.isParentTask === false)).toHaveLength(4);
         expect(comments).toHaveLength(1);
     });
 
@@ -152,7 +152,7 @@ describe('the demo project looks worked-in — whatever the setup answer', () =>
         const { docs, comments } = demo('marketing');
         expect(docs[0].TaskName).toBe('Start here — this project is a sandbox');
         expect(docs.some((d) => d.TaskName === 'Draft the message')).toBe(true);
-        expect(docs.filter((d) => d.isParentTask === false)).toHaveLength(3);
+        expect(docs.filter((d) => d.isParentTask === false)).toHaveLength(4);
         expect(comments).toHaveLength(1);
     });
 
@@ -161,13 +161,26 @@ describe('the demo project looks worked-in — whatever the setup answer', () =>
         const kids = docs.filter((d) => d.isParentTask === false);
         const parent = docs.find((d) => d.subTasks > 0);
         expect(parent).toBeDefined();
-        expect(parent.subTasks).toBe(kids.length);
+        const direct = kids.filter((d) => d.ParentTaskId === String(parent._id));
+        expect(parent.subTasks).toBe(direct.length);
         for (const kid of kids) {
-            expect(kid.ParentTaskId).toBe(String(parent._id));
+            const above = docs.find((d) => String(d._id) === kid.ParentTaskId);
+            expect(above).toBeDefined();
+            expect(kid.ancestors).toEqual([...above.ancestors, String(above._id)]);
             expect(kid.sprintId).toBe(sprint.sprintId);
-            expect(kid.subTasks).toBe(0);
             expect(new TaskModel(kid).validateSync()).toBeUndefined();
         }
+    });
+
+    test('one task has subtasks three levels deep, and none goes deeper', () => {
+        const { docs } = demo('marketing');
+        const depths = docs.map((d) => d.ancestors.length);
+        expect(Math.max(...depths)).toBe(2);
+        const deepest = docs.find((d) => d.ancestors.length === 2);
+        expect(deepest.ancestors[0]).toBe(String(docs.find((d) => d.subTasks > 0)._id));
+        const middle = docs.find((d) => String(d._id) === deepest.ancestors[1]);
+        expect(middle.subTasks).toBe(1);
+        expect(deepest.subTasks).toBe(0);
     });
 
     test('the comment is attached to a task that exists', () => {
@@ -241,7 +254,7 @@ describe('the demo project is split across sprints', () => {
         const { docs } = buildTaskDocs(project, sprints, demoTasksForFocus(''), 0, OWNER);
         const parent = docs.find((d) => d.subTasks > 0);
         const kids = docs.filter((d) => d.isParentTask === false);
-        expect(kids).toHaveLength(3);
+        expect(kids).toHaveLength(4);
         for (const kid of kids) expect(kid.sprintId).toBe(parent.sprintId);
     });
 
@@ -287,5 +300,36 @@ describe('no sample task starts overdue', () => {
             const { docs } = buildTaskDocs(noClose, sprint, demoTasksForFocus(focus), 0, OWNER);
             expect(openAndOverdue(docs)).toEqual([]);
         }
+    });
+});
+
+describe('the sample custom fields', () => {
+    const made = {
+        hours: { id: '67beeeea2930c35b90cd8801' },
+        area: { id: '67beeeea2930c35b90cd8802', options: { Design: 'aa11', Build: 'bb22', Review: 'cc33' } },
+    };
+    const withFields = () => buildTaskDocs(project, sprint, demoTasksForFocus(''), 0, OWNER, made).docs;
+
+    test('a few tasks hold a number and a dropdown value, stored as the task panel stores them', () => {
+        const held = withFields().filter((d) => d.customField && Object.keys(d.customField).length);
+        expect(held.length).toBeGreaterThanOrEqual(3);
+        expect(held.length).toBeLessThan(8);
+        for (const doc of held) {
+            expect(typeof doc.customField[made.hours.id].fieldValue).toBe('string');
+            expect(Number.isFinite(Number(doc.customField[made.hours.id].fieldValue))).toBe(true);
+            expect(doc.customField[made.area.id].fieldValue).toHaveLength(1);
+            expect(Object.values(made.area.options)).toContain(doc.customField[made.area.id].fieldValue[0]);
+            expect(new TaskModel(doc).validateSync()).toBeUndefined();
+        }
+    });
+
+    test('the values group into more than one total', () => {
+        const groups = new Set(withFields().filter((d) => d.customField).map((d) => d.customField[made.area.id].fieldValue[0]));
+        expect(groups.size).toBeGreaterThanOrEqual(2);
+    });
+
+    test('a field that could not be created leaves its values off rather than failing the task', () => {
+        const docs = buildTaskDocs(project, sprint, demoTasksForFocus(''), 0, OWNER, {}).docs;
+        expect(docs.every((d) => !d.customField || Object.keys(d.customField).length === 0)).toBe(true);
     });
 });

@@ -77,7 +77,7 @@ module.exports = {
                             ]
                         }
                         MongoDbCrudOpration(companyId,deletedObj,"findOneAndUpdate").then((result)=>{
-                            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey: result.deletedStatusKey}, module: 'task' });
+                            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey: result.deletedStatusKey}, module: 'task', companyId });
                         })
 
                         let finalAttach = mergeTask.attachments ? mergeTask.attachments : [];
@@ -132,7 +132,7 @@ module.exports = {
                             ]
                         }
                         MongoDbCrudOpration(companyId,updateObj,'findOneAndUpdate').then((result) => {
-                            socketEmitter.emit('update', { type: "update", data: result , updatedFields: mergeObj, module: 'task' });
+                            socketEmitter.emit('update', { type: "update", data: result , updatedFields: mergeObj, module: 'task', companyId });
                             // resolve();
                         }).catch((err)=>{
                             logger.error(`${err}:"Error in Updating Doc Merge Task"`)
@@ -158,7 +158,7 @@ module.exports = {
                                 ]
                             }
                             MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((result)=>{
-                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task' });
+                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task', companyId });
                             })
                         }
                         if(mergeTask.sprintId !== task.sprintId || JSON.parse(JSON.stringify(mergeTask)).ProjectID !== JSON.parse(JSON.stringify(task)).ProjectID){
@@ -314,7 +314,6 @@ module.exports = {
                         ]
                     }
                     MongoDbCrudOpration(companyId, projectObj, "findOneAndUpdate").then((response) => {
-                        socketEmitter.emit('update', { type: "update", data: response , updatedFields: {taskTypeCounts: response.taskTypeCounts,lastTaskId: response.lastTaskId}, module: 'task' });
                         obj.TaskKey = projectData.ProjectCode + '-' +  response.lastTaskId;
                         HandleTask(companyId, obj, false, null, userData,indexObj)
                         .then((taskResult) => {
@@ -353,7 +352,7 @@ module.exports = {
                                                 ]
                                             }
                                             MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate").then((result)=>{
-                                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {attachments: result.attachments}, module: 'task' });
+                                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {attachments: result.attachments}, module: 'task', companyId });
                                             })
                                         })
                                     }

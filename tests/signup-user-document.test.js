@@ -30,7 +30,7 @@ const { createOwner } = require('../Modules/Setup/createCompany');
 
 const USER_ID = '6f0000000000000000000001';
 const COMPANY = '6f0000000000000000000c01';
-const USER_DOCUMENT_FIELDS = ['AssignCompany', 'Employee_Email', 'Employee_FName', 'Employee_LName', 'Employee_Name', 'Time_Format', 'isActive', 'isDeleted', 'isEmailVerified', 'isOnline'];
+const USER_DOCUMENT_FIELDS = ['AssignCompany', 'Employee_Email', 'Employee_FName', 'Employee_LName', 'Employee_Name', 'Time_Format', 'isActive', 'isDeleted', 'isEmailVerified', 'isOnline', 'navPreferences'];
 const PRIVILEGED = {
     isProductOwner: true,
     isEmailVerified: true,
@@ -43,6 +43,7 @@ const PRIVILEGED = {
     forgotPasswordToken: 'token',
     agentAccount: { mode: 'x' },
     demo: true,
+    navPreferences: { mode: 'full', pinned: ['audit'] },
     _id: '6f00000000000000000000ff',
 };
 
@@ -68,6 +69,11 @@ describe('buildUserDocument', () => {
 
         expect(Object.keys(doc).sort()).toEqual(USER_DOCUMENT_FIELDS);
         expect(doc).toMatchObject({ AssignCompany: [], Employee_Name: 'Ada Lovelace', isEmailVerified: false, isActive: true, isDeleted: false });
+    });
+
+    it('starts every new account in Simple, whatever the request says', () => {
+        const doc = createUser.buildUserDocument({ firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', ...PRIVILEGED });
+        expect(doc.navPreferences).toEqual({ mode: 'simple' });
     });
 
     it('marks an admitted invitee verified in the invited company', () => {

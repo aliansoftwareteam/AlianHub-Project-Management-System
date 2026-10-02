@@ -462,7 +462,8 @@ const updateAssignee = (event, type, { undoing = false } = {}) =>{
             taskData: props.task,
             employeeName: getUser(event.id).Employee_Name,
             type: ASSIGNEE_OPERATION[type] || "",
-            userData
+            userData,
+            announce: true
         })
         .then(() => {
             delete assigneeInProgress.value[event?.id];
@@ -475,7 +476,6 @@ const updateAssignee = (event, type, { undoing = false } = {}) =>{
         .catch((error) => {
             delete assigneeInProgress.value[event?.id];
             console.error("ERROR in updateAssignee: ", error);
-            $toast.error(t('Toast.Assignee_not_updated'),{position: 'top-right'});
         })
     } catch (error) {
         console.error(error);
@@ -526,7 +526,7 @@ function priorityOption(value) {
     return { value, name: priority.name, statusImage: priority.image };
 }
 
-const updatePriority = async(val, { undoing = false, from = null } = {}) => {
+const updatePriority = (val, { undoing = false, from = null } = {}) => {
     try {
         const userData = getUserData();
         const previousValue = from ? from.value : props.task.Task_Priority;
@@ -539,17 +539,22 @@ const updatePriority = async(val, { undoing = false, from = null } = {}) => {
 
         const priority = getPriority(previousValue) || {};
 
-        let priorityObj = {
-            'statusImage' : await getWasabiImageLink(project.value.CompanyId,priority.image),
+        const taskId = props.task._id;
+        const taskName = props.task.TaskName;
+        const priorityObj = Promise.all([
+            getWasabiImageLink(project.value.CompanyId,priority.image),
+            getWasabiImageLink(project.value.CompanyId,val.statusImage)
+        ]).then(([statusImage, newStatusImage]) => ({
+            'statusImage' : statusImage,
             'priorityName' : priority.name,
-            'taskId': props.task._id,
-            'taskName': props.task.TaskName,
+            'taskId': taskId,
+            'taskName': taskName,
             'userName' : userData.Employee_Name,
-            'newStatusImage' : await getWasabiImageLink(project.value.CompanyId,val.statusImage),
+            'newStatusImage' : newStatusImage,
             'newPriorityName' : val.name
-        }
+        }));
 
-        taskClass.updatePriority({firebaseObj: { Task_Priority: val.value }, projectData: projectData, taskData: props.task, priorityObj, userData})
+        taskClass.updatePriority({firebaseObj: { Task_Priority: val.value }, projectData: projectData, taskData: props.task, priorityObj, userData, announce: true})
         .then(() => {
             if (undoing) return undoneToast();
             if (!previousValue) return $toast.success(t('Toast.Priority_updated_successfully'),{position: 'top-right'});
@@ -560,7 +565,6 @@ const updatePriority = async(val, { undoing = false, from = null } = {}) => {
         })
         .catch((error) => {
             console.error("ERROR in update priority: ", error);
-            $toast.error(t('Toast.Priority_not_updated'),{position: 'top-right'});
         })
     } catch (error) {
         console.error('updatePriority error', error);
@@ -625,7 +629,7 @@ const updateStatus = (oldVal, newval, { undoing = false } = {}) => {
             ProjectName: project.value.ProjectName,
             ProjectCode: project.value.ProjectCode
         }
-        taskClass.updateStatus({ newStatus, prevStatus, projectData: projectData, task: props.task, userData})
+        taskClass.updateStatus({ newStatus, prevStatus, projectData: projectData, task: props.task, userData, announce: true})
         .then(() => {
             if (undoing) return undoneToast();
             showUndoToast({
@@ -633,8 +637,8 @@ const updateStatus = (oldVal, newval, { undoing = false } = {}) => {
                 undo: () => updateStatus(newval, oldVal, { undoing: true })
             });
         })
-        .catch(() => {
-            $toast.error(t('Toast.Status_not_updated'),{position: 'top-right'});
+        .catch((error) => {
+            console.error("ERROR in updateStatus: ", error);
         })
     } catch (error) {
         console.error('updateStatus error', error);
@@ -695,7 +699,8 @@ const updateDueDate = (event) => {
             project: projectData,
             task: props.task,
             obj: notificationObj,
-            userData
+            userData,
+            announce: true
         }).then(() => {
             showUndoToast({
                 message: t('Toast.Due_date_updated_successfully'),
@@ -706,7 +711,6 @@ const updateDueDate = (event) => {
             });
         }).catch((error) => {
             console.error("ERROR in updateDueDate: ", error);
-            $toast.error(t('Toast.Due_date_not_updated'),{position: 'top-right'});
             isSpinner.value = false;
         })
     } catch (error) {
@@ -752,10 +756,10 @@ function restoreDueDate(before, changedTo) {
         },
         task: props.task,
         obj: notificationObj,
-        userData
+        userData,
+        announce: true
     }).then(undoneToast).catch((error) => {
         console.error("ERROR in restoreDueDate: ", error);
-        $toast.error(t('Toast.Due_date_not_updated'),{position: 'top-right'});
     });
 }
 

@@ -6,6 +6,7 @@ const { getRoleType, isPrivileged } = require('../Config/permissionGuard');
 const { canSeeSprint, canSeeSprintById, sprintIdentities } = require('../Modules/Sprints/helpers/sprintVisibility');
 const { canUsePage } = require('../Modules/Pages/helpers/pageAccess');
 const { mayListTasksIn } = require('../Modules/Tasks/helpers/taskListProjects');
+const { findRoomsByPrefix } = require('./helper');
 const logger = require('../Config/loggerConfig');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -187,22 +188,27 @@ const stillAllowed = (identity, subject, decide) => {
     return allowed;
 };
 
-const sameCompany = (identity, change) => !change.companyId || String(change.companyId) === identity.companyId;
+/* The writer names the company it wrote in. An event that names none is sent to nobody. */
+const sameCompany = (identity, change) => Boolean(identity && change) && String(change.companyId || '') === identity.companyId;
 
-/* Task events carry no company, so the row is judged where the socket lives: a row of another company has no
- * project or chat space behind it there. */
 const mayReceiveTask = (identity, change) => {
     const task = change && change.data;
-    if (!identity || !task || !sameCompany(identity, change)) return false;
+    if (!task || !sameCompany(identity, change)) return false;
     if (task.mainChat === true && !isParticipant(task, identity.uid)) return false;
     const subject = `task:${task.ProjectID}:${task.sprintId}:${task.mainChat === true}`;
     return stillAllowed(identity, subject, () => readsTask(identity, task));
 };
 
 const mayReceiveComments = (identity, change, prefix) => {
-    if (!identity || !change || String(change.companyId || '') !== identity.companyId) return false;
+    if (!sameCompany(identity, change)) return false;
     return stillAllowed(identity, `comments:${prefix}`, () => canOpenComments(identity, prefix));
 };
+
+const mayReceiveList = (identity, change) => sameCompany(identity, change)
+    && stillAllowed(identity, `list:${change.projectId}:${change.sprintId}`, () => canOpenSprintBoard(identity, change.projectId, change.sprintId));
+
+const mayReceiveCompany = (identity, companyId) => Boolean(identity) && identity.companyId === String(companyId || '')
+    && stillAllowed(identity, 'seat', () => isCompanyMember(identity, identity.companyId));
 
 /* A send waits for its verdict, so sends go out one after another: two changes to a row reach a room in the
  * order they were made. */
@@ -211,6 +217,28 @@ const inOrder = (send) => {
     sends = sends.then(send).catch((error) => logger.error(`Socket relay failed: ${error.message || error}`));
     return sends;
 };
+
+const COMPANY_ROOM = 'selected_companies_';
+
+/* One `send(entry)` for each of `rooms` whose socket is in `companyId` and still holds a seat there: a room
+ * outlives the seat it was joined on. */
+const toSeated = (rooms, companyId, send) => {
+    const id = String(companyId || '');
+    if (!id || !rooms.length) return undefined;
+    return inOrder(async () => {
+        for (const entry of rooms) {
+            // eslint-disable-next-line no-await-in-loop
+            if (!entry.socket || !(await mayReceiveCompany(entry.socket.identity, id))) continue;
+            if (entry.socket.rooms.has(entry.roomName)) send(entry);
+        }
+    });
+};
+
+/* `only` keeps a send to some of the people in the company's room. */
+const toCompanyRoom = (companyId, send, only = () => true) => toSeated(
+    findRoomsByPrefix(`${COMPANY_ROOM}${String(companyId || '')}`).filter((entry) => entry.socket && entry.socket.identity && only(entry.socket.identity)),
+    companyId, send,
+);
 
 module.exports = {
     identityOf,
@@ -225,8 +253,14 @@ module.exports = {
     readablePage,
     isCompanyMember,
     onJoin,
+    sameCompany,
     mayReceiveTask,
     mayReceiveComments,
+    mayReceiveList,
+    mayReceiveCompany,
+    toSeated,
+    toCompanyRoom,
+    COMPANY_ROOM,
     inOrder,
     forgetVerdicts: () => verdicts.clear(),
 };

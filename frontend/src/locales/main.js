@@ -1,7 +1,8 @@
+import { watch } from "vue";
 import { createI18n } from "vue-i18n";
 import en from "./en";
 import { createLocaleLoader, FALLBACK_LOCALE } from "@/utils/localeLoader";
-import { bootLocaleDirection } from "@/views/Settings/Language/localePrefs";
+import { applyDirection, bootLocaleDirection } from "@/views/Settings/Language/localePrefs";
 
 // Text direction has to be on <html> before the first paint, not after a page
 // mounts, or the shell renders left-to-right and then jumps.
@@ -18,3 +19,5 @@ export const i18n = createI18n({
 });
 
 export const { loadLocale, switchLocale, applyStoredLocale } = createLocaleLoader(i18n);
+
+watch(i18n.global.locale, (code) => applyDirection(code), { flush: "sync" });

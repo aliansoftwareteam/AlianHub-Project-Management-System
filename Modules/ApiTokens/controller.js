@@ -7,7 +7,7 @@ const { myCache } = require("../../Config/config");
 const {
     SCOPES, MIN_EXPIRY_DAYS, STRICT_GRACE_DAYS, LAST_USED_WRITE_INTERVAL_MS,
     generateToken, hashToken, tokenPrefixOf, looksLikeToken, isStrict, validateCreateInput, isExpired, effectiveScopes, graceStanding, lastUsedIsStale,
-    maxLifetimeDays, maxExpiryDaysFor, mayExceedMaxLifetime, lifetimeStanding,
+    maxLifetimeDays, maxExpiryDaysFor, defaultExpiryDays, mayExceedMaxLifetime, lifetimeStanding,
 } = require('./helpers/apiTokenRules');
 const { strictSince } = require('./helpers/strictSince');
 const { maxLifetimeSince } = require('./helpers/maxLifetimeSince');
@@ -61,6 +61,12 @@ const lifetimeStandings = async (docs, { strict, now }) => {
 
 const ymd = (date) => new Date(date).toISOString().slice(0, 10);
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const expiryAfter = (days, now = new Date()) => new Date(now.getTime() + Number(days) * DAY_MS);
+
+const ONCE = 'Copy it now — it is not shown again.';
+const mcpUrlOf = (companyId) => `${String(process.env.APIURL || '').replace(/\/$/, '')}/mcp?companyId=${companyId}`;
+
 const NO_EXPIRY_UPDATE = 'Under the token expiry rule a token without an expiry cannot be changed, only revoked. Create a new token with an expiry.';
 
 /* POST /api/v2/api-tokens  body: { name, scopes?, expiresInDays?, userData } */
@@ -84,13 +90,10 @@ exports.createToken = async (req, res) => {
             userId,
             active: true,
         };
-        if (expiresInDays) {
-            doc.expiresAt = new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000);
-        }
+        if (expiresInDays) doc.expiresAt = expiryAfter(expiresInDays);
         const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_TOKENS, data: doc }, 'save');
 
-        // The only time the raw token is ever returned.
-        return res.send({ status: true, statusText: 'Token created. Copy it now — it is not shown again.', data: { ...maskToken(created), token: rawToken } });
+        return res.send({ status: true, statusText: `Token created. ${ONCE}`, data: { ...maskToken(created), token: rawToken } });
     } catch (error) {
         logger.error(`ERROR in create api token: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
@@ -115,7 +118,8 @@ const grantsFor = (asked, scopes) => {
 
 /* POST /api/v2/api-tokens/mcp  body: { name, mode?, provider?, projectIds?, expiresInDays?, grants?, scopes? (strict mode only) }
  * Mints a token for a CLI/coding agent: kind 'agent', read+write scopes, and the
- * account mode the run is attributed to. Returns the MCP URL to paste. */
+ * account mode the run is attributed to. Returns the MCP URL to paste. Outside strict
+ * mode a request that names no lifetime gets the default one; strict mode asks for it. */
 exports.createMcpToken = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
@@ -142,13 +146,12 @@ exports.createMcpToken = async (req, res) => {
             projectIds: Array.isArray(projectIds) ? projectIds.filter((id) => /^[0-9a-fA-F]{24}$/.test(String(id))).map(String) : [],
             grants,
         };
-        if (expiresInDays) doc.expiresAt = new Date(Date.now() + Number(expiresInDays) * 24 * 60 * 60 * 1000);
+        doc.expiresAt = expiryAfter(expiresInDays || defaultExpiryDays());
         const created = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_TOKENS, data: doc }, 'save');
-        const base = String(process.env.APIURL || '').replace(/\/$/, '');
         return res.send({
-            status: true, statusText: 'Token created. Copy it now — it is not shown again.',
+            status: true, statusText: `Token created. ${ONCE}`,
             data: { ...maskToken(created), kind: 'agent', agentAccount: doc.agentAccount, projectIds: doc.projectIds, token: rawToken,
-                    mcpUrl: `${base}/mcp?companyId=${companyId}`, tools: require('../Mcp/tools').manifest({ canWrite: scopes.includes('write'), token: doc }).map((tool) => tool.name) },
+                    mcpUrl: mcpUrlOf(companyId), tools: require('../Mcp/tools').manifest({ canWrite: scopes.includes('write'), token: doc }).map((tool) => tool.name) },
         });
     } catch (error) {
         logger.error(`ERROR in create mcp token: ${error.message}`);
@@ -176,7 +179,7 @@ exports.listTokens = async (req, res) => {
         // The flag is named only while it is on, so the answer with it off is the one
         // given before it existed; the screen asks for the credential list on seeing it.
         const policy = {
-            strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: maxExpiryDaysFor({ strict }), scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
+            strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: maxExpiryDaysFor({ strict }), defaultExpiryDays: defaultExpiryDays({ strict }), scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
             strictSince: since,
             ...(stepCredentialsEnabled() ? { stepCredentials: true } : {}),
             ...(manageFlag.enabled() ? { grants: [...manageFlag.GRANTS] } : {}),
@@ -330,6 +333,54 @@ exports.updateToken = async (req, res) => {
         return res.send({ status: true, statusText: 'Token updated.', data: maskToken(updated) });
     } catch (error) {
         logger.error(`ERROR in update api token: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+/* POST /api/v2/api-tokens/:id/renew — a new secret and a fresh default lifetime for the
+ * caller's own token; anyone else is answered as if it did not exist. The write names the
+ * hash it replaces, so of two renewals racing each other only one hands out a secret. */
+exports.renewToken = async (req, res) => {
+    try {
+        const companyId = req.headers['companyid'] || '';
+        const userId = actingUserId(req);
+        const { id } = req.params;
+        if (req.apiToken || req.agentRun) return res.status(403).send({ status: false, statusText: 'API tokens cannot renew tokens.' });
+        if (!companyId || !userId || !/^[0-9a-fA-F]{24}$/.test(String(id))) {
+            return res.send({ status: false, statusText: 'companyId and a valid token id are required.' });
+        }
+        const filter = { _id: new mongoose.Types.ObjectId(id), userId };
+        const owned = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_TOKENS, data: [filter] }, 'findOne');
+        if (!owned) return res.send({ status: false, statusText: 'Token not found.' });
+        if (owned.active === false) return res.send({ status: false, statusText: 'A revoked token cannot be renewed. Create a new token.' });
+        const mode = owned.agentAccount && owned.agentAccount.mode;
+        if (mode) {
+            const policy = await require('../Agents/accounts').getPolicy(companyId);
+            if (!policy.allowedModes.includes(mode)) {
+                return res.status(403).send({ status: false, statusText: `This workspace requires ${policy.allowedModes.join(' or ')} accounts — ${mode} is not allowed by your admin.` });
+            }
+        }
+        const now = new Date();
+        const rawToken = generateToken();
+        const renewed = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.API_TOKENS,
+            data: [
+                { ...filter, active: { $ne: false }, tokenHash: owned.tokenHash },
+                { $set: { tokenHash: hashToken(rawToken), prefix: tokenPrefixOf(rawToken), expiresAt: expiryAfter(defaultExpiryDays(), now), renewedAt: now }, $unset: { expiryNoticeAt: '' } },
+                { returnDocument: 'after' },
+            ],
+        }, 'findOneAndUpdate');
+        if (!renewed) return res.send({ status: false, statusText: 'Token not found.' });
+        require('../Audit/recorder').recordAuditFromReq(req, {
+            action: 'api_token.renewed', entityType: 'api_token', entityId: String(renewed._id), entityName: renewed.name,
+            meta: { kind: renewed.kind || 'personal', expiresAt: renewed.expiresAt },
+        });
+        return res.send({
+            status: true, statusText: `Token renewed. ${ONCE}`,
+            data: { ...maskToken(renewed), token: rawToken, ...(renewed.kind === 'agent' ? { mcpUrl: mcpUrlOf(companyId) } : {}) },
+        });
+    } catch (error) {
+        logger.error(`ERROR in renew api token: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

@@ -9,6 +9,7 @@ const { canManageRules } = require('../Automations/helpers/ruleAccess');
 const matcher = require('../Automations/engine/matcher');
 const { asList, announceFields } = require('../CustomField/helpers/fieldProjects');
 const { removeLinksOfTasks } = require('../CustomField/helpers/fieldLinkStore');
+const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
 const rules = require('./rules');
 
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
@@ -95,9 +96,10 @@ const writeStructure = async ({ companyId, caller, bundle, name, code, include, 
     await insert(companyId, SCHEMA_TYPE.SPRINTS, listRows);
     await insert(companyId, SCHEMA_TYPE.PROJECT_RULES, rules.permissionCopies(bundle.permissions, projectId));
 
+    const currency = rules.hasCurrency(source) ? undefined : await defaultCurrencyOf(companyId);
     const project = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
-        data: rules.projectCopy(source, { id: projectRef, name, code: code || rules.nextProjectCode(source.ProjectCode, codes.map((row) => row.ProjectCode)), caller, companyId, include, ids }),
+        data: rules.projectCopy(source, { id: projectRef, name, code: code || rules.nextProjectCode(source.ProjectCode, codes.map((row) => row.ProjectCode)), caller, companyId, include, ids, currency }),
     }, 'save');
     const sharedFields = await linkCustomFields(companyId, bundle.fieldIds, projectId);
     made.rules = await copyAutomations({ companyId, caller, sourceRules: bundle.rules, projectId, ids, notes });

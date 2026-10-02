@@ -100,7 +100,7 @@ module.exports = {
                             }
     
                             MongoDbCrudOpration(projectData.CompanyId, objSchema, 'findOneAndUpdate').then((result)=>{
-                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task' });
+                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task', companyId: projectData.CompanyId });
                             }).catch(error => {
                                 logger.error(`ERROR in update parent task: ${projectData?._id||data?.ProjectID}> ${data.id} : ${error.message}`);
                             })

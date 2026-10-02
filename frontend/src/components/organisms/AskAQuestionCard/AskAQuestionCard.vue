@@ -124,7 +124,7 @@ const showReply = (body) => {
         return showError(body.code === 'ai_budget_exhausted' ? t('Dash.ask_budget_exhausted') : '');
     }
     const data = body.data || {};
-    if (data.configured === false) return showEmpty(availabilityText(AI_STATE.UNCONFIGURED));
+    if (data.configured === false) return showEmpty(t('ConnectAi.card_no_model'));
     if (!String(data.answer || '').trim()) return showEmpty(t(messageKey(data.emptyCode) || 'Dash.ask_no_answer'));
     return showAnswer(data);
 };
@@ -167,7 +167,8 @@ const awaitAvailability = () => {
 const reportWithoutAsking = () => {
     if (!question.value) return showEmpty(t('Dash.ask_pick_question')) || true;
     if (access.value === AI_ACCESS.UNKNOWN) return awaitAvailability() || true;
-    if (access.value === AI_ACCESS.OFF || access.value === AI_ACCESS.UNCONFIGURED) return showEmpty(availabilityText(aiAvailability.state)) || true;
+    if (access.value === AI_ACCESS.UNCONFIGURED) return showEmpty(t('ConnectAi.card_no_model')) || true;
+    if (access.value === AI_ACCESS.OFF) return showEmpty(availabilityText(aiAvailability.state)) || true;
     if (access.value === AI_ACCESS.NOT_PERMITTED) return showEmpty(t('Dash.ask_not_permitted')) || true;
     if (!unref(dashboardId)) return showError() || true;
     return false;

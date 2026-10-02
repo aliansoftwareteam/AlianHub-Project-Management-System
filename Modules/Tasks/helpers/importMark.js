@@ -14,4 +14,7 @@ const importMarkOf = (importMark, row) => {
     return { importJobId: String(importMark.jobId), ...(sourceId ? { importSourceId: sourceId } : {}) };
 };
 
-module.exports = { IMPORT_MARK_FIELDS, withoutImportMark, importMarkOf };
+/* Who a task event of an import is from: the automations and the assignment rules answer no event that carries it. */
+const importActorOf = (userData) => ({ kind: 'import', userId: String((userData && userData.id) || '') });
+
+module.exports = { IMPORT_MARK_FIELDS, withoutImportMark, importMarkOf, importActorOf };

@@ -24,6 +24,10 @@ const scopeForTool = (name) => {
     if (Object.prototype.hasOwnProperty.call(TOOL_SCOPES, name)) return TOOL_SCOPES[name];
     const dataTools = require('./dataTools');
     if (Object.prototype.hasOwnProperty.call(dataTools.SCOPES, name)) return dataTools.SCOPES[name];
+    const screenTools = require('./screenTools');
+    if (Object.prototype.hasOwnProperty.call(screenTools.SCOPES, name)) return screenTools.SCOPES[name];
+    const intentScope = require('./intentTools').scopeOf(name);
+    if (intentScope) return intentScope;
     const manageTools = require('./manageTools');
     if (enabled() && Object.prototype.hasOwnProperty.call(manageTools.SCOPES, name)) return manageTools.SCOPES[name];
     const workTools = require('./workTools');

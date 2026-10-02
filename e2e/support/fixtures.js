@@ -7,6 +7,7 @@ const { STATE_DIR } = require('./env');
 const PASSWORD = 'E2e-Passw0rd!';
 const STATE_FILE = path.join(STATE_DIR, 'run.json');
 const COMPANY_NAME = 'E2E Workspace';
+const NAV_PREFERENCES = '/api/v2/users/nav-preferences';
 
 /* roleType values from utils/data.js importCompanyRoles. Guest is the most restricted. */
 const ROLES = {
@@ -48,7 +49,7 @@ async function setupOwner(baseURL) {
  * invite, which stores the company_users row even when the mail cannot be delivered and
  * returns it; the invitee registers with isInvitation, which marks the email verified;
  * then, signed in as the invitee, the row is linked and activated (status 2). */
-async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstName, lastName }) {
+async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstName, lastName, navMode = 'full' }) {
     const { roleType } = ROLES[role];
     const invite = await ownerApi.post('/api/v2/sendInvitationEmail', {
         email, companyId, companyName: COMPANY_NAME, role: roleType, designation: 0,
@@ -71,6 +72,9 @@ async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstNa
     assertOk(await api.put('/api/v1/root-members', { id: inviteRow._id, data: { userId, status: 2 }, companyId, linkId: inviteRow.linkId }), `accept invite for ${email}`);
     assertOk(await api.post('/api/v1/importSettingsNotification', { companyId, userId }), `notification settings for ${email}`);
     assertOk(await api.post('/api/v1/removeUserNotification', { companyId, userId, type: 'Add' }), `notification counter for ${email}`);
+    // A new account starts in Simple, with five places on the rail. The suite walks the whole app, so its
+    // people get the full rail unless a spec asks for the newcomer's (navMode: null).
+    if (navMode) assertOk(await api.put(NAV_PREFERENCES, { mode: navMode }), `${navMode} rail for ${email}`);
 
     return { role, roleType, email, userId, companyUserId: String(inviteRow._id) };
 }
@@ -212,6 +216,7 @@ async function createFixtures(baseURL) {
     const { companyId } = owner;
     const ownerSession = await login(baseURL, owner.email);
     const ownerApi = createApiClient({ baseURL, accessToken: ownerSession.accessToken, companyId });
+    assertOk(await ownerApi.put(NAV_PREFERENCES, { mode: 'full' }), 'full rail for the owner');
 
     const users = { owner };
     for (const role of ROLE_NAMES.filter((name) => name !== 'owner')) {

@@ -39,21 +39,24 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
      * inheriting that failure mode.
      */
     socket.on('commentTyping', (data) => {
-        if (!data || !data.roomPrefix || !socket.rooms.has(roomFor(socket, data.roomPrefix))) return;
+        const { identity } = socket;
+        if (!identity || !data || !data.roomPrefix || !socket.rooms.has(roomFor(socket, data.roomPrefix))) return;
 
         const payload = {
             roomPrefix: data.roomPrefix,
-            userId: data.userId,
+            userId: identity.uid,
             typing: !!data.typing,
         };
 
-        const companyId = socket.identity && socket.identity.companyId;
-        findRoomsByPrefix(data.roomPrefix).forEach((entry) => {
-            // Never echo to the author — including their own other tabs, which the
-            // client also guards against by user id.
-            if (!entry.socket || entry.socket === socket || entry.socket.disconnected) return;
-            if (!companyId || !entry.socket.identity || entry.socket.identity.companyId !== companyId) return;
-            entry.socket.emit('commentTyping', payload);
+        // The author's other tabs are in the room too; the client drops those by user id.
+        const others = findRoomsByPrefix(data.roomPrefix).filter((entry) => entry.socket && entry.socket !== socket);
+        if (!others.length) return;
+        inOrder(async () => {
+            for (const entry of others) {
+                // eslint-disable-next-line no-await-in-loop
+                if (!(await mayReceiveComments(entry.socket.identity, identity, data.roomPrefix))) continue;
+                if (!entry.socket.disconnected && entry.socket.rooms.has(entry.roomName)) entry.socket.emit('commentTyping', payload);
+            }
         });
     });
 };

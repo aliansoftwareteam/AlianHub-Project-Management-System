@@ -5,6 +5,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockDb.crud(...args) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
+jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => require('./fixtures/taskListRules').taskListRules()) }));
 
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -298,21 +299,37 @@ describe('the change relay', () => {
     };
     const change = { type: 'update', module: 'whiteboards', companyId: C, projectId: PROJECT, sprintId: LIST, boardId: 'board-1', revision: 4, elements: [card('a', T1)], updatedBy: ANA };
 
-    it('tells the people who have the list open that the board changed: its id and revision, and nothing of what is on it', () => {
+    beforeEach(() => {
+        require('../Config/config').myCache.flushAll();
+        require('../socket/roomAccess').forgetVerdicts();
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: ANA, roleType: 1, status: 2, isDelete: false });
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: new mongoose.Types.ObjectId(PROJECT), ProjectName: 'Team', isPrivateSpace: false, AssigneeUserId: [ANA] });
+        [LIST, OTHER_LIST].forEach((id) => mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: new mongoose.Types.ObjectId(id), projectId: PROJECT, private: false, AssigneeUserId: [] }));
+    });
+
+    it('tells the people who have the list open that the board changed: its id and revision, and nothing of what is on it', async () => {
         const watching = join(ROOM, 's1');
-        relay(change);
+        await relay(change);
         expect(watching).toHaveBeenCalledTimes(1);
         expect(watching).toHaveBeenCalledWith(EVENT, { boardId: 'board-1', revision: 4 });
     });
 
-    it('reaches no other list, no other company, and no socket that has left the room', () => {
+    it('reaches no other list, no other company, and no socket that has left the room', async () => {
         const otherList = join(`project_sprint_${PROJECT}_${OTHER_LIST}`, 's2');
         const otherCompany = join(ROOM, 's3', { companyId: OTHER_COMPANY });
         const left = join(ROOM, 's4', { inRoom: false });
-        relay(change);
-        relay({ ...change, companyId: '' });
-        relay(undefined);
+        await relay(change);
+        await relay({ ...change, companyId: '' });
+        await relay(undefined);
         [otherList, otherCompany, left].forEach((emit) => expect(emit).not.toHaveBeenCalled());
+    });
+
+    it('reaches nobody who can no longer open the list', async () => {
+        const watching = join(ROOM, 's5');
+        mockDb.store[SCHEMA_TYPE.SPRINTS].forEach((row) => Object.assign(row, { private: true, AssigneeUserId: [BEN] }));
+        mockDb.store[SCHEMA_TYPE.COMPANY_USERS][0].roleType = 3;
+        await relay(change);
+        expect(watching).not.toHaveBeenCalled();
     });
 
     it('is fed by every save and restore', async () => {

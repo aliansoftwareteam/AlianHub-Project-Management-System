@@ -38,7 +38,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: MEMBER_ROLE, status: 2, isDelete: false });
-    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT_ID, CompanyId: CID, isGlobalPermission: true });
+    mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT_ID, CompanyId: CID, isGlobalPermission: true, isPrivateSpace: false });
     mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK_ID, CompanyId: CID, ProjectID: PROJECT_ID, TaskName: 'Fix the thing', TaskKey: 'AR-1', Task_Priority: 'LOW' });
 });
 
@@ -54,7 +54,7 @@ describe('perform() evaluates the permission catalogue of the person behind the 
     });
 
     it('lets the same action through for a member whose role grants it', async () => {
-        seedRules(SCHEMA_TYPE.RULES, { task_priority: true });
+        seedRules(SCHEMA_TYPE.RULES, { task_priority: true, task_list: true });
 
         const out = await priorityUpdate(MEMBER);
 

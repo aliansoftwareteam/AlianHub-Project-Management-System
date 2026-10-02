@@ -112,11 +112,11 @@ const refused = (skill, { refused: ticket, model, usage }, started) => ({ status
 
 /* PHASE 1 — gather. A generic skill collects its own input; the page audit
  * needs a public URL in the task. Either declines with `skipped`. */
-async function gather({ skillSlug = 'qa-review', task, companyId, memory, startedBy, runId }) {
+async function gather({ skillSlug = 'qa-review', task, companyId, memory, startedBy, runId, actor, allowedActions }) {
     const skill = await requireSkill(companyId, skillSlug);
     const started = Date.now();
     if (skill.kind === 'generic') {
-        const context = await egressContext.run({ companyId, actor: startedBy }, () => skill.gather({ task, companyId, memory, startedBy, runId }));
+        const context = await egressContext.run({ companyId, actor: startedBy }, () => skill.gather({ task, companyId, memory, startedBy, runId, actor, allowedActions }));
         if (!context || context.skip) return skipped(skill, (context && context.skip) || 'nothing to work on', started);
         return { status: GATHERED, skill: skill.slug, context };
     }
@@ -157,7 +157,8 @@ async function analyseAudit(skill, { task, context, budget, spend, companyId, ag
     const { url } = context;
     let auditResult;
     try {
-        auditResult = await egressContext.run({ companyId, actor: spend && spend.userId }, () => audit(url));
+        const connectorRead = taint.connectorsRead(spend).join(', ');
+        auditResult = await egressContext.run({ companyId, actor: spend && spend.userId, ...(connectorRead ? { connectorRead } : {}) }, () => audit(url));
     } catch (error) {
         return { status: 'failed', reason: `could not fetch ${url}: ${error.message}`, skill: skill.slug, url, findings: [], usage: emptyUsage(), durationMs: Date.now() - started };
     }

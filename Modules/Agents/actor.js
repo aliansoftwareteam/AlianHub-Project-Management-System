@@ -3,6 +3,7 @@ const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { myCache } = require('../../Config/config');
 const serviceIdentity = require('./serviceIdentity');
+const { toolNameOf, VIA_EXTERNAL, VIA_PERSONAL } = require('./actingAgent');
 
 // Who is calling. Three kinds:
 //   human   — a web session (JWT) or a plain personal token used by a script
@@ -76,8 +77,6 @@ const resolveActor = async (req) => {
     return { ...base, kind: ACTOR_HUMAN, viaAccount: 'workspace' };
 };
 
-const VIA_EXTERNAL = 'external';
-
 /* An outside client holding an OAuth grant, acting for the person who granted it. Built by the MCP
  * server from the verified grant, never from the request, and kept out of VIA so no token's
  * agentAccount can claim it. */
@@ -105,21 +104,22 @@ const serviceActor = (service, { runId = null, userId = '', traceId = null, work
 const isAgent = (actor) => Boolean(actor && actor.kind === ACTOR_AGENT);
 const isService = (actor) => Boolean(actor && actor.kind === ACTOR_SERVICE);
 
-/* How attribution reads everywhere (27c): person, tool, account type. */
+/* How attribution reads everywhere (27c): person, tool, account type. `label` is the audit log's wording.
+ * What people read on a task is `shownAs` (./actingAgent), built from the same tool name. */
 const attribution = (actor) => {
     if (isService(actor)) return { actorId: serviceIdOf(actor.service), actorType: ACTOR_SERVICE, service: actor.service, label: SERVICE_LABELS[actor.service] };
     if (!isAgent(actor)) return { actorId: actor.userId, actorType: ACTOR_HUMAN, label: actor.personName || '' };
     if (actor.viaAccount === VIA_EXTERNAL) {
         return { actorId: actor.clientId, actorType: ACTOR_AGENT, agentId: null, viaAccount: VIA_EXTERNAL,
                  clientId: actor.clientId, grantId: actor.grantId, delegatedBy: actor.delegatedBy,
-                 label: `${actor.agentName || 'Outside client'} for ${actor.personName || 'Member'}` };
+                 label: `${toolNameOf(actor)} for ${actor.personName || 'Member'}` };
     }
-    if (actor.viaAccount === 'personal') {
-        return { actorId: actor.userId, actorType: ACTOR_AGENT, agentId: actor.agentId, viaAccount: 'personal',
-                 label: `${actor.personName || 'Member'} via ${actor.provider || actor.agentName || 'personal agent'}` };
+    if (actor.viaAccount === VIA_PERSONAL) {
+        return { actorId: actor.userId, actorType: ACTOR_AGENT, agentId: actor.agentId, viaAccount: VIA_PERSONAL,
+                 label: `${actor.personName || 'Member'} via ${toolNameOf(actor)}` };
     }
     return { actorId: actor.agentId || actor.userId, actorType: ACTOR_AGENT, agentId: actor.agentId, viaAccount: actor.viaAccount,
-             label: actor.agentName || 'Agent' };
+             label: toolNameOf(actor) };
 };
 
 module.exports = {

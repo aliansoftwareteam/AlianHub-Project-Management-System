@@ -26,6 +26,7 @@ const targetOf = (params = {}) => {
     if (params.relatedTaskId) target.relatedTaskId = String(params.relatedTaskId);
     if (params.projectId) target.projectId = String(params.projectId);
     if (params.projectId && params.sprintId) target.sprintId = String(params.sprintId);
+    if (params.listProjectId && params.sprintId) Object.assign(target, { projectId: String(params.listProjectId), sprintId: String(params.sprintId) });
     if (params.pageId) target.pageId = String(params.pageId);
     if (params.goalId) Object.assign(target, goalTokens.WRITE_TARGET);
     return target;
@@ -97,4 +98,4 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     return null;
 };
 
-module.exports = { refusalFor, targetOf };
+module.exports = { refusalFor, targetOf, reachable, liveToken };

@@ -13,6 +13,7 @@
             >{{ actionLabel }}</button>
             <button v-if="secondaryLabel" type="button" class="empty-state__link" @click="$emit('secondary')">{{ secondaryLabel }}</button>
         </div>
+        <EmptySentence v-if="sentence" :sentence="sentence" />
         <a
             v-if="resolvedHelpHref"
             :href="resolvedHelpHref"
@@ -27,6 +28,7 @@
 import { computed, defineProps, defineEmits } from 'vue';
 import { useStore } from 'vuex';
 import EmptyIllustration from './EmptyIllustration.vue';
+import EmptySentence from './EmptySentence.vue';
 
 defineEmits(['action', 'secondary']);
 
@@ -40,6 +42,8 @@ const props = defineProps({
     actionAllowed: { type: Boolean, default: true },
     secondaryLabel: { type: String, default: '' },
     compact: { type: Boolean, default: false },
+    // What to say to an AI to fill this screen. Shown only to a person who has one to say it to.
+    sentence: { type: String, default: '' },
     // A path appended to the company's help link. Left empty, no link is shown.
     helpPath: { type: String, default: '' },
     // Declared so that views which still pass a picture do not leak it onto the root as an attribute; nothing draws it.

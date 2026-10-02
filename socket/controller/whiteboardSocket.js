@@ -1,18 +1,24 @@
 const { findRoomsByPrefix } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { mayReceiveList, inOrder } = require('../roomAccess');
 
 const EVENT = 'whiteboardChanged';
 
-/* The list's own room is joined through canOpenSprintBoard, so only people who may open the list hear of it.
-   Only the board's id and revision are sent; each client reads the board again through the API. */
+/* Only the board's id and revision are sent, to the people who may still open the list; each client reads the
+   board again through the API. */
+const send = async (change, rooms) => {
+    for (const entry of rooms) {
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await mayReceiveList(entry.socket && entry.socket.identity, change))) continue;
+        if (entry.socket.rooms.has(entry.roomName)) entry.namespace.to(entry.roomName).emit(EVENT, { boardId: change.boardId, revision: change.revision });
+    }
+};
+
 const relay = (change) => {
-    const { companyId, projectId, sprintId, boardId, revision } = change || {};
-    if (!companyId || !projectId || !sprintId) return;
-    findRoomsByPrefix(`project_sprint_${projectId}_${sprintId}`).forEach((entry) => {
-        const identity = entry.socket && entry.socket.identity;
-        if (!identity || identity.companyId !== String(companyId) || !entry.socket.rooms.has(entry.roomName)) return;
-        entry.namespace.to(entry.roomName).emit(EVENT, { boardId, revision });
-    });
+    const { companyId, projectId, sprintId } = change || {};
+    if (!companyId || !projectId || !sprintId) return undefined;
+    const rooms = findRoomsByPrefix(`project_sprint_${projectId}_${sprintId}`);
+    return rooms.length ? inOrder(() => send(change, rooms)) : undefined;
 };
 
 socketEmitter.on('whiteboards:update', relay);

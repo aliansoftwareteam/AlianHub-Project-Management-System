@@ -50,6 +50,7 @@
                         :showSpinner="onboarding.removingSample.value"
                         @confirm="removeSampleConfirmed"
                     />
+                    <HomeWhatNext v-if="shownNext" :next="shownNext" @act="onNext" />
                     <div class="home__grid">
                         <MyWorkCard
                             ref="myWorkCard"
@@ -68,9 +69,10 @@
                             @open-project="goProject"
                         />
                         <div class="home__side">
+                            <WaitingOnYouCard v-if="waitingFirst" ref="waitingCard" @hide="hideCard('waiting')" @count="waitingCount = $event" />
                             <AgendaCard :day="agendaDay" :items="agendaItems" :connected="agenda.connected.value" :first-run="firstRun" @shift="shiftAgenda" />
-                            <template v-for="id in homeCards.layout" :key="id">
-                                <WaitingOnYouCard v-if="id === 'waiting'" @hide="hideCard(id)" />
+                            <template v-for="id in cardsBelowAgenda" :key="id">
+                                <WaitingOnYouCard v-if="id === 'waiting'" ref="waitingCard" @hide="hideCard(id)" @count="waitingCount = $event" />
                                 <AssignedCommentsCard v-else-if="id === 'assigned_comments'" @open="openTask" @hide="hideCard(id)" />
                                 <StandupCard v-else-if="id === 'standup'" @hide="hideCard(id)" />
                                 <RecentsCard v-else-if="id === 'recents'" @open="openTask" @hide="hideCard(id)" />
@@ -130,6 +132,8 @@ import PlannerPanel from "@/components/molecules/Home/PlannerPanel.vue";
 import TimerChip from "@/components/molecules/Home/TimerChip.vue";
 import SetupChecklist from "@/components/molecules/Home/SetupChecklist.vue";
 import HomeCardsMenu from "@/components/molecules/Home/HomeCardsMenu.vue";
+import HomeWhatNext from "@/components/molecules/Home/HomeWhatNext.vue";
+import { NEXT, useWhatNext } from "@/components/molecules/Home/whatNext";
 import WaitingOnYouCard from "@/components/molecules/Home/WaitingOnYouCard.vue";
 import StandupCard from "@/components/molecules/Home/StandupCard.vue";
 import RecentsCard from "@/components/molecules/Home/RecentsCard.vue";
@@ -195,6 +199,40 @@ const agendaItems = computed(() => agenda.itemsFor(agendaDay.value, work.mine.va
 
 const myRecord = computed(() => (getters["users/users"] || []).find((u) => u._id === userId.value));
 watch(myRecord, (record) => { if (record) syncHomeCards(userId.value, record.homeCards); }, { immediate: true });
+
+/* Only an account that never arranged Home gets approvals above the agenda; an arranged one keeps the order it had. */
+const waitingFirst = computed(() => !homeCards.arranged && homeCards.layout.includes("waiting"));
+const cardsBelowAgenda = computed(() => (waitingFirst.value ? homeCards.layout.filter((id) => id !== "waiting") : homeCards.layout));
+
+const waitingCard = ref(null);
+const waitingCount = ref(0);
+const ownProjects = computed(() => projects.value.filter((p) => p._id !== sampleProject.value?._id && !p.isPersonal && p.deletedStatusKey !== 1));
+const projectsLoaded = computed(() => Array.isArray(getters["projectData/projects"]?.data));
+const emptyWorkspace = computed(() => projectsLoaded.value && !ownProjects.value.length && !work.openTasks.value.some((task) => task.ProjectID !== sampleProject.value?._id));
+const waitingShown = computed(() => (homeCards.layout.includes("waiting") ? waitingCount.value : 0));
+const whatsNext = useWhatNext({ work, waiting: waitingShown, empty: emptyWorkspace, canCreateProject, canOpenInbox: computed(() => router.hasRoute("inbox")) });
+const STARTS = [NEXT.START_PROJECT, NEXT.START_TASK];
+/* While the setup card is up it names the one next step, so a second "start here" is not put above it. */
+const shownNext = computed(() => {
+    const next = whatsNext.next.value;
+    return next && showChecklist.value && !surfaceOpen.value && STARTS.includes(next.kind) ? null : next;
+});
+watch(waitingCount, () => whatsNext.load());
+
+function focusWaiting() {
+    const card = [].concat(waitingCard.value || [])[0]?.$el;
+    if (!card?.querySelector) return;
+    card.scrollIntoView?.({ block: "nearest" });
+    card.querySelector(".hwait__actions button")?.focus();
+}
+
+function onNext(kind) {
+    if (kind === NEXT.APPROVALS) router.push({ name: "inbox", params: { cid: companyId.value }, query: { tab: "approval" } }).catch(() => {});
+    else if (kind === NEXT.WAITING) focusWaiting();
+    else if (kind === NEXT.OVERDUE || kind === NEXT.TODAY) myWorkCard.value?.showGroup(kind);
+    else if (kind === NEXT.START_PROJECT) createProjectOpen.value = true;
+    else myWorkCard.value?.focusAdd();
+}
 
 async function hideCard(id) {
     try {
@@ -273,15 +311,20 @@ async function onTimer(task) {
     if (timer.active) {
         const previous = timer.active.taskName;
         try {
-            await stop({ companyId: companyId.value, userId: userId.value });
+            const stopped = await stop({ companyId: companyId.value, userId: userId.value });
             $toast.info(t("Home.timer_switched", { task: previous }), { position: "top-right" });
+            if (stopped && !stopped.logged) $toast.info(t("TaskPanel.timer_too_short"), { position: "top-right" });
         } catch (error) {
             console.error("timer stop failed", error);
             $toast.error(t(timeLogFailureKey(error, "Home.timer_log_failed")), { position: "top-right" });
             return;
         }
     }
-    start(task, work.projectOf(task));
+    try {
+        await start(task, work.projectOf(task));
+    } catch (error) {
+        $toast.error(t(timeLogFailureKey(error, "Time.action_failed")), { position: "top-right" });
+    }
 }
 
 function onSetDate(task) {
@@ -336,13 +379,18 @@ async function onSchedule({ taskId, start: begin, end }) {
 }
 
 const closePops = () => { newOpen.value = false; };
-const onVisible = () => { if (document.visibilityState === "visible") work.fetchOpen().catch(() => {}); };
+const onVisible = () => {
+    if (document.visibilityState !== "visible") return;
+    work.fetchOpen().catch(() => {});
+    whatsNext.load();
+};
 
 onMounted(() => {
     const me = getUser(userId.value, "all") || {};
     if (me.presence) homeState.presence = { ...homeState.presence, ...me.presence };
     work.fetchOpen().catch((error) => console.error("my work failed", error));
     agenda.load().catch(() => {});
+    whatsNext.load();
     document.addEventListener("click", closePops);
     document.addEventListener("visibilitychange", onVisible);
 });

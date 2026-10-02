@@ -30,7 +30,7 @@ const PROJECT_ARCHIVED = 2;
 const ROW_FIELDS = Object.freeze({
     TaskName: 1, TaskKey: 1, status: 1, statusKey: 1, statusType: 1, Task_Priority: 1, AssigneeUserId: 1,
     DueDate: 1, startDate: 1, ProjectID: 1, sprintId: 1, folderObjId: 1, TaskType: 1, TaskTypeKey: 1, tagsArray: 1,
-    subTasks: 1, ancestors: 1, ParentTaskId: 1, isParentTask: 1, createdAt: 1, updatedAt: 1, extraLists: 1,
+    subTasks: 1, ancestors: 1, ParentTaskId: 1, isParentTask: 1, createdAt: 1, updatedAt: 1, extraLists: 1, sprintArray: 1,
 });
 
 const TOP_KEYS = ['filter', 'group', 'sort', 'cursor', 'limit', 'includeSubtasks', 'includeClosedProjects', 'timezone'];

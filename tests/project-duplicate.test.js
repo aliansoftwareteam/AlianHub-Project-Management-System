@@ -601,6 +601,53 @@ describe('what is written fits the schemas', () => {
             expect([type, Object.keys(doc).filter((key) => doc[key] !== undefined && !(key in kept))]).toEqual([type, []]);
         });
     });
+
+    const projectFits = (project) => new (modelOf(SCHEMA_TYPE.PROJECTS))(project).validateSync() || null;
+    const fitDetails = { ProjectType: 'fixed', ProjectRequiredDefaultComponent: 'ListView', projectIcon: { type: 'color', data: 'blue' }, status: 'active', statusType: 'active' };
+
+    it('gives the copy of a project without a currency the default one of the company', async () => {
+        seed(SCHEMA_TYPE.CURRENCY_LIST, { code: 'USD', symbol: '$', name: 'US Dollar', isDefault: false, isDelete: false });
+        seed(SCHEMA_TYPE.CURRENCY_LIST, { code: 'EUR', symbol: '€', name: 'Euro', isDefault: true, isDelete: false });
+        launch = seedLaunch({ ...fitDetails, ProjectCode: 'BARE', ProjectCurrency: null });
+        const res = await duplicate(launch.id);
+        expect(res.body.status).toBe(true);
+        const { project } = copyOf(res);
+        expect(project.ProjectCurrency).toMatchObject({ code: 'EUR', symbol: '€', name: 'Euro' });
+        expect(Object.keys(project.ProjectCurrency)).not.toContain('_id');
+        expect(projectFits(project)).toBeNull();
+    });
+
+    it('fits the schema when the company has no default currency either', async () => {
+        launch = seedLaunch({ ...fitDetails, ProjectCode: 'BARE' });
+        const res = await duplicate(launch.id);
+        expect(res.body.status).toBe(true);
+        expect(projectFits(copyOf(res).project)).toBeNull();
+    });
+
+    it('keeps the currency of a source that has one', async () => {
+        seed(SCHEMA_TYPE.CURRENCY_LIST, { code: 'EUR', symbol: '€', name: 'Euro', isDefault: true, isDelete: false });
+        launch = seedLaunch({ ...fitDetails, ProjectCode: 'PAID', ProjectCurrency: { code: 'USD', symbol: '$' } });
+        expect(copyOf(await duplicate(launch.id)).project.ProjectCurrency).toEqual({ code: 'USD', symbol: '$' });
+    });
+});
+
+describe('a copy the schema refuses', () => {
+    it('answers the reason in the usual shape and writes nothing', async () => {
+        const real = db().crud.getMockImplementation();
+        db().crud.mockImplementation(async (companyId, query, method) => {
+            if (query.type === SCHEMA_TYPE.PROJECTS && method === 'save') {
+                const refusedDoc = new mongoose.Error.ValidationError();
+                refusedDoc.addError('ProjectType', new mongoose.Error.ValidatorError({ path: 'ProjectType', message: 'Path `ProjectType` is required.' }));
+                throw refusedDoc;
+            }
+            return real(companyId, query, method);
+        });
+        const res = await duplicate(launch.id);
+        const reason = refused(res, 400);
+        expect(reason).toMatch(/ProjectType/);
+        expect(res.body.message).toBe(reason);
+        nothingCopied();
+    });
 });
 
 describe('a large project', () => {

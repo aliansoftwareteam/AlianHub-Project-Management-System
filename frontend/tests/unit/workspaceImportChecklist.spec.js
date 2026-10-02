@@ -43,13 +43,13 @@ beforeEach(() => {
 });
 
 describe('the import on the project step', () => {
-    it.each(['owner', 'admin'])('is offered to an %s as the second action of the first step', (role) => {
+    it.each(['owner', 'admin'])('is offered to an %s as the second action of the project step', (role) => {
         const steps = useChecklist(ROLE[role]).steps.value;
-        expect(steps[0]).toMatchObject({ key: 'project', alt: { key: 'import', label: 'Home.import_from' } });
+        expect(steps.find((s) => s.key === 'project')).toMatchObject({ alt: { key: 'import', label: 'Home.import_from' } });
     });
 
     it.each(['member', 'guest'])('is never shown to a %s', (role) => {
-        expect(useChecklist(ROLE[role]).steps.value.filter((s) => s.alt)).toEqual([]);
+        expect(useChecklist(ROLE[role]).steps.value.filter((s) => s.alt?.key === 'import')).toEqual([]);
         expect(MEMBER_STEPS).not.toContain('project');
         expect(WORKSPACE_STEPS).toContain('project');
         expect(ADMIN_STEPS).toContain('project');

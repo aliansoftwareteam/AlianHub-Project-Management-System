@@ -152,7 +152,8 @@ import { useGetterFunctions } from "@/composable/index.js";
 import { useAppVersion } from "@/composable/useAppVersion";
 import { useAuth } from "@/services";
 import { useNavItems } from "./navItems";
-import { shellState, openPanel, closePopovers, toggleTheme, syncNavPreferences } from "./shellState";
+import { shellState, openPanel, closePopovers, toggleTheme, syncNavPreferences, keepOnRail } from "./shellState";
+import { placesInUse } from "./placesInUse";
 import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 import { useI18n } from "vue-i18n";
 import KeyHint from "@/components/atom/KeyHint/KeyHint.vue";
@@ -185,6 +186,9 @@ const productInitial = computed(() => productName.value.charAt(0).toUpperCase())
 const me = computed(() => getUser(userId.value) || {});
 const myRecord = computed(() => (getters["users/users"] || []).find((u) => u._id === userId.value));
 watch(myRecord, (record) => { if (record) syncNavPreferences(userId.value, record.navPreferences); }, { immediate: true });
+watch(() => Boolean(myRecord.value) && shellState.nav.mode === "simple", (asks) => {
+    if (asks) placesInUse().then((keys) => keys.forEach(keepOnRail));
+}, { immediate: true });
 const companies = computed(() => getters["settings/companies"] || []);
 const otherCompanies = computed(() => companies.value.filter((c) => c._id !== companyId.value));
 

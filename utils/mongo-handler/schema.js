@@ -386,6 +386,11 @@ const schema = {
             type: String,
             required: true,
         },
+        // Only on a change an agent made (Modules/Agents/actingAgent): UserId stays the person, so every
+        // reader that filters by person still finds the row. A person's own change has none of the three.
+        actorType: { type: String, required: false },
+        agentName: { type: String, required: false },
+        actedFor: { type: String, required: false },
         // BUG-046 / #100: createdAt/updatedAt are populated by Mongoose
         // (`timestamps: true` on historySchema). Keep the field
         // declarations so older code paths that still reference the
@@ -446,6 +451,10 @@ const schema = {
         projectIds: { type: Array, default: [], required: false },
         // What the token was created to do beyond its scopes (Modules/Mcp/manageFlag.js); never changed afterwards.
         grants: { type: Array, default: [], required: false },
+        // When the secret in use was issued by a renewal; the lifetime is counted from here.
+        renewedAt: { type: Date, required: false },
+        // Set when the owner was told the token is about to end, so they are told once; a renewal clears it.
+        expiryNoticeAt: { type: Date, required: false },
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
@@ -627,6 +636,11 @@ const schema = {
         progressPct: { type: Number, default: 0, required: false },
         reachedAt: { type: Date, default: null, required: false },
         notifiedAt: { type: Date, required: false },
+        aiSummary: {
+            text: { type: String, required: false },
+            basis: { type: String, required: false },
+            madeAt: { type: Date, required: false },
+        },
         targets: {
             type: [{
                 _id: false,
@@ -668,6 +682,9 @@ const schema = {
         revision: { type: Number, default: 0, required: false },
         createdBy: { type: String, required: false },
         updatedBy: { type: String, required: false },
+        // Written by the welcome project's seeder alone, with that project's id: removing the sample takes this goal and no goal a person made.
+        sample: { type: Boolean, required: false },
+        sampleProjectId: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // A list's whiteboard (Modules/Whiteboards). elements is what applyPatch returns: cards that name a task by id
@@ -1129,6 +1146,28 @@ const schema = {
         firstSeenAt: { type: Date, required: false },
         lastSeenAt: { type: Date, required: false },
     },
+    // What a project's daily look found, by rule and with no model — managed by Modules/Agents/manager.
+    projectFindings: {
+        projectId: { type: mongoose.Schema.Types.Mixed, required: true, set: objectIdIfHex },
+        // rule, subject and cause; one row per project and key, reopened when the cause comes back
+        key: { type: String, required: true },
+        rule: { type: String, required: true },
+        taskId: { type: String, required: false },
+        // every task the finding names or counts: a reader sees it only when they can open them all
+        taskIds: { type: [String], default: [], required: false },
+        userId: { type: String, required: false },
+        facts: { type: Object, default: {}, required: false },
+        // open | handled (its change was approved and the cause lasts) | declined (never offered again) | closed (the cause is gone)
+        status: { type: String, default: 'open', required: true },
+        proposalId: { type: String, required: false },
+        openedAt: { type: Date, required: false },
+        lastSeenAt: { type: Date, required: false },
+        closedAt: { type: Date, required: false },
+        // The connected agent that holds the item in the work queue: { by, userId, name, at, until }. Absent, or past `until`, the item is free.
+        claim: { type: Object, required: false },
+        // { why: 'taken_back' | 'finished', userId, name, at }: not handed to an agent again while the row stays open.
+        leftQueue: { type: Object, required: false },
+    },
     // Agents as teammates — managed by Modules/Agents.
     agents: {
         // Set only by scripts/demo; demo:unseed deletes nothing without it.
@@ -1216,8 +1255,11 @@ const schema = {
         steps: { type: Array, default: [], required: false },
         // Set once the run took in content from outside the workspace (Modules/Agents/taint.js); absent on a clean run
         tainted: { type: Boolean, required: false },
-        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction, ref, at }] — where it came from, never the content
+        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction | connector, ref, at }] — where it came from, never the content
         taintSources: { type: Array, default: undefined, required: false },
+        // [{ action, connector, channelId, state: applied | failed | refused, messages, chars, truncated, reason, error, at }] — one per
+        // connector read the run tried; the per-run caps are counted from it, and it never holds what was read
+        connectorReads: { type: Array, default: undefined, required: false },
         // 'report' for a scheduled report run (no task); absent on a task run
         kind: { type: String, required: false },
         scheduleId: { type: String, required: false },
@@ -1440,8 +1482,11 @@ const schema = {
         declineReason: { type: String, required: false },
         // { sources: [{ kind, ref, at }], reason } — set when the run behind it read external content
         taint: { type: Object, required: false },
-        // 'mcp' when an MCP tool call filed it: requestedBy is the token's person, who the approved change runs as
+        // 'mcp' when an MCP tool call filed it: requestedBy is the token's person, who the approved change runs as.
+        // 'system' when a project's daily look filed it: the approved change runs on the approver's own rights.
         source: { type: String, required: false },
+        // { id, rule, facts, projectName } of the finding a 'system' proposal answers
+        finding: { type: Object, required: false },
         requestedBy: { type: String, required: false },
         tokenId: { type: String, required: false },
         // the token's project list when it filed; approval refuses a target outside it
@@ -1450,6 +1495,33 @@ const schema = {
         oauthClientId: { type: String, required: false },
         oauthGrantId: { type: String, required: false },
         allowedActions: { type: Array, required: false },
+        // Set on a change a standing approval applied: it is filed already approved, by the person who made that approval.
+        standingApprovalId: { type: String, required: false },
+    },
+    // "Always do this": one kind of change, by one connection, in one project — managed by Modules/Agents/standingApprovals.js.
+    agentStandingApprovals: {
+        projectId: { type: String, required: true },
+        action: { type: String, required: true },
+        label: { type: String, required: false },
+        // the connection it covers: a personal token, or an outside client's grant
+        tokenId: { type: String, required: false },
+        oauthClientId: { type: String, required: false },
+        oauthGrantId: { type: String, required: false },
+        // the person behind that connection
+        requestedBy: { type: String, required: true },
+        agentId: { type: String, required: false },
+        agentName: { type: String, required: false },
+        madeBy: { type: String, required: true },
+        madeAt: { type: Date, required: true },
+        proposalId: { type: String, required: false },
+        expiresAt: { type: Date, required: true },
+        // active | ended
+        status: { type: String, default: 'active', required: true },
+        endedAt: { type: Date, required: false },
+        endedBy: { type: String, required: false },
+        endedBecause: { type: String, required: false },
+        uses: { type: Number, default: 0, required: false },
+        lastUsedAt: { type: Date, required: false },
     },
     automationRuns: {
         ruleId: { type: String, required: true },
@@ -1940,6 +2012,8 @@ const schema = {
         revokedAt: { type: Date, required: false },
         revokedReason: { type: String, required: false },
         lastUsedAt: { type: Date, required: false },
+        // Set when the person was told the grant is about to end, so they are told once.
+        expiryNoticeAt: { type: Date, required: false },
     },
     // kind is code, access, refresh or consent (an answered consent request). purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
     oauthTokens: {
@@ -1989,23 +2063,40 @@ const schema = {
         // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
         version: { type: Number, required: false },
     },
-    // One row per workspace and connector (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
+    // One row per workspace and connector, or per person and connector when the connection is a person's own
+    // (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
     connectorConnections: {
         connector: { type: String, required: true },
-        // { bot_token: 'sec_…', signing_secret: 'sec_…' }
+        // The person a personal connection belongs to; absent on a workspace connection.
+        userId: { type: String, required: false },
+        // { bot_token: 'sec_…', signing_secret: 'sec_…' } or { refresh_token: 'sec_…', access_token: 'sec_…' }
         secretHandles: { type: Object, default: {}, required: false },
         secretSetAt: { type: Object, default: {}, required: false },
         team: { type: Object, required: false },
         // [{ id, name, member }] as the provider listed them when the token was saved or the list refreshed
         channels: { type: Array, default: [], required: false },
         channelsFetchedAt: { type: Date, required: false },
-        // [{ id, name }] the channels an owner or admin chose; a post anywhere else is refused
+        // [{ id, name, read, post }] the channels an owner or admin chose and what agents may do in each; a row
+        // without the two ticks is from before reading existed and means post only
         allowedChannels: { type: Array, default: [], required: false },
-        // connected | broken
+        // connected | broken, and for a person's connection also pending | revoked
         status: { type: String, default: 'connected', required: false },
         brokenReason: { type: String, required: false },
         brokenAt: { type: Date, required: false },
+        // What the provider granted, and { email, sub } of the account the person connected
+        scopes: { type: [String], default: undefined, required: false },
+        account: { type: Object, required: false },
+        accessExpiresAt: { type: Date, required: false },
+        connectedAt: { type: Date, required: false },
+        lastUsedAt: { type: Date, required: false },
+        lastRefreshedAt: { type: Date, required: false },
+        // { stateHash, verifier, sessionId, origin } of a connect attempt in progress; cleared when it is used
+        oauth: { type: Object, required: false },
+        disconnectedAt: { type: Date, required: false },
+        // self | admin | member_removed
+        disconnectedBy: { type: String, required: false },
         lastPostAt: { type: Date, required: false },
+        lastReadAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
         updatedBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
@@ -2588,10 +2679,13 @@ const schema = {
             importedWork: { type: Boolean, required: false },
             openedMyWork: { type: Boolean, required: false },
             viewedShortcuts: { type: Boolean, required: false },
+            connectAiSkipped: { type: Boolean, required: false },
             toursOffered: { type: [String], required: false, default: undefined }
         },
+        // mode has no default on purpose: see newAccountNavPreferences in Modules/Users/helpers/navPreferencesRules.js.
         navPreferences: {
-            pinned: { type: [String], required: false, default: undefined }
+            pinned: { type: [String], required: false, default: undefined },
+            mode: { type: String, required: false }
         },
         accessibilityPreferences: {
             singleKeyShortcuts: { type: Boolean, required: false }
@@ -3509,6 +3603,21 @@ const schema = {
         personalOwner: {
             type: String,
             default: ""
+        },
+        // { done: 'never' | 'approval' | 'yes', connected: 'propose_all' | 'single_task', updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectPolicy.js).
+        agentPolicy: {
+            type: Object,
+            required: false
+        },
+        // { on, updatedBy, updatedAt }; absent means off (Modules/Agents/manager/settings.js).
+        agentManager: {
+            type: Object,
+            required: false
+        },
+        // The day (YYYY-MM-DD) of the last daily look: the mark a server takes before it looks, so two never look on one day.
+        agentManagerLookedOn: {
+            type: String,
+            required: false
         },
         ProjectType: {
             type: String,

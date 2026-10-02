@@ -1,11 +1,14 @@
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useCustomComposable } from "@/composable";
 import { isAiSectionRoute } from "@/router/ai/section";
+import { CONNECT_AI_ROUTE } from "@/router/ai/connect";
 import { aiReachable, canUseAi } from "@/composable/aiAvailability";
 import { isOwnerOrAdmin as isOwnerOrAdminRole } from "@/utils/roles";
 import { canApprove } from "@/views/Approvals/approvalAccess";
+import { keepOnRail, shellState } from "./shellState";
+import { SIMPLE_PLACES } from "./navMode";
 
 const PROJECT_ROUTE_PREFIX = "Project";
 
@@ -32,7 +35,7 @@ export function useNavItems(companyId) {
         return null;
     });
 
-    const rail = computed(() => [
+    const places = computed(() => [
         { key: "home", label: "Shell.home", icon: "home", to: to("Home"), match: (r) => r.name === "Home" || r.name === "PersonalList", show: true },
         { key: "everything", label: "Shell.everything", icon: "layers", to: to("Everything"), match: (r) => r.name === "Everything", show: ready.value && exists("Everything") },
         { key: "goals", label: "Shell.goals", icon: "target", to: to("Goals"), match: (r) => r.name === "Goals" || r.name === "Goal", show: ready.value && exists("Goals") },
@@ -46,7 +49,7 @@ export function useNavItems(companyId) {
         { key: "time", label: "Shell.time", icon: "time", to: timesheetRoute.value ? to(timesheetRoute.value) : null, match: (r) => String(r.name || "").includes("Timesheet"), show: !!timesheetRoute.value }
     ].filter((i) => i.show));
 
-    const more = computed(() => {
+    const menu = computed(() => {
         const groups = [
             {
                 label: "Shell.work",
@@ -94,9 +97,28 @@ export function useNavItems(companyId) {
     });
 
     const isActive = (item) => !!(item.match && item.match(route));
+
+    const simple = computed(() => shellState.nav?.mode === "simple");
+    const inSimple = (item) => {
+        if (item.key === "everything") return { ...item, label: "Shell.my_work", to: to("Everything", { query: { mine: "1" } }) };
+        // Where the built-in AI cannot answer this person (no model on the server, say), Ask leads to connecting their own.
+        if (item.key === "ai") return { ...item, label: "Shell.ask", to: !canUseAi() && exists(CONNECT_AI_ROUTE) ? to(CONNECT_AI_ROUTE) : item.to };
+        return item;
+    };
+    const rail = computed(() => {
+        if (!simple.value) return places.value;
+        const kept = shellState.nav.pinned || [];
+        const five = SIMPLE_PLACES.map((key) => places.value.find((item) => item.key === key)).filter(Boolean).map(inSimple);
+        return [...five, ...places.value.filter((item) => !SIMPLE_PLACES.includes(item.key) && kept.includes(item.key))];
+    });
+    const more = computed(() => {
+        const tucked = simple.value ? places.value.filter((item) => !rail.value.some((shown) => shown.key === item.key)) : [];
+        return tucked.length ? [{ label: "Shell.more_places", items: tucked }, ...menu.value] : menu.value;
+    });
+    watch(() => (simple.value ? places.value.find(isActive)?.key : ""), (key) => { if (key) keepOnRail(key); }, { immediate: true });
     // Connections sits in both the AI section and the More menu; a rail tile that already
     // claims the route wins, so the two never light up together.
     const moreActive = computed(() => !rail.value.some(isActive) && more.value.some((g) => g.items.some(isActive)));
 
-    return { rail, more, isActive, moreActive, ready, companyUser, isOwnerOrAdmin };
+    return { rail, more, isActive, moreActive, ready, companyUser, isOwnerOrAdmin, simple };
 }

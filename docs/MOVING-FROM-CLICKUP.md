@@ -114,9 +114,13 @@ Imported comments notify nobody and count as unread for nobody. Imported tasks h
 Every imported task keeps its ClickUp task id. When you import into **An existing project** and tasks of the file are already in that project, the preview says how many and offers two choices:
 
 - **Leave them as they are** (the default). Only the rows that are new are imported. A new subtask goes under its parent even when the parent was imported earlier.
-- **Update them from the file.** The task's name, status, dates, assignees, priority, tags, description and custom fields take the file's value wherever the file has one. An empty cell leaves the task as it is, so an assignee or a date set here is not wiped by a blank in the file. Comments that are new in the file are added; a comment already brought in (same time and author) is not added twice. Checklists and attachment links are not touched. The update writes no history line and notifies nobody.
+- **Update them from the file.** The task's name, status, dates, assignees, priority, tags, description and custom fields take the file's value wherever the file has one. An empty cell leaves the task as it is, so an assignee or a date set here is not wiped by a blank in the file. Comments that are new in the file are added; a comment already brought in (same time and author) is not added twice. Checklists and attachment links are not touched. The update notifies nobody, and no automation or assignment rule runs because of it.
+
+A status the file changed is saved the way a status you change by hand is: the task leaves its old place on the board, a task moved to a done status records you as the person who closed it, and the task's history gets a "changed status" line in your name. That line counts as work on the task, so undoing the import that created the task will stop and name it (see [Undo](#undo)). A status that is the same as the task's writes nothing. A status the project does not have is not applied: the task keeps the status it has, and the summary names the task and the status. Nothing else of an update writes a history line.
 
 A task that was moved to the trash no longer counts as already here: importing its row again creates it anew.
+
+A task counts as already here only in the project it was imported into, and the preview says so. The same file imported into another project creates its tasks again there.
 
 ## Undo
 
@@ -124,7 +128,7 @@ A task that was moved to the trash no longer counts as already here: importing i
 
 - The person who ran the import can undo it, and so can an owner or admin.
 - If someone has worked on an imported task since (changed it, commented on it, or added a subtask), the undo stops and names those tasks. Choose **Undo, and keep those tasks** to trash the rest; a kept task keeps the tasks above it.
-- Custom fields the import created are switched off when no task outside the trash still uses them. Statuses and tags it added stay.
+- Custom fields the import created are switched off when no task outside the trash still uses them, in any project the field belongs to. A field that has since been made a field of every project stays. Statuses and tags it added stay.
 - Tasks the import only updated are not touched, and what an update changed is not rolled back.
 - One undo covers one ClickUp list. The last screen of an import undoes all its lists at once.
 - Nobody is notified.

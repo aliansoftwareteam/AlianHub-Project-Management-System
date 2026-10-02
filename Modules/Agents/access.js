@@ -5,8 +5,10 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { hiddenSprintIds, canSeeSprintById } = require('../Sprints/helpers/sprintVisibility');
 const privateWork = require('./privateWork');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+const GATE_OWNER_ADMIN = 'owner_admin';
 
 const sameId = (a, b) => Boolean(a) && Boolean(b) && String(a) === String(b);
 
@@ -72,6 +74,15 @@ const readScopeOf = async (companyId, caller) => {
     return { projectIds, hiddenTaskIds, privateWork: privateScope };
 };
 
+/* The clause every list of proposals is read through, whichever screen asks. */
+const proposalScopeClause = ({ projectIds, hiddenTaskIds, privateWork: privateScope } = {}) => ({
+    ...(Array.isArray(projectIds) ? { projectId: { $in: idForms(projectIds.map(String)) } } : {}),
+    ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
+    ...(privateScope ? privateWork.proposalClause(privateScope) : {}),
+});
+
+const mayDecideProposal = (caller, proposal) => Boolean(caller && caller.human) && (proposal.gate !== GATE_OWNER_ADMIN || Boolean(caller.privileged));
+
 const inOpenProject = async (companyId, caller, record) => {
     const visible = await visibleProjectIdsFor(companyId, caller);
     return visible.includes(String(record.projectId || '')) && canSeeTaskOf(companyId, caller, record);
@@ -113,4 +124,5 @@ module.exports = {
     privileged, humanActor, callerOf, canManageAgents, canControlRun, canUndoDecision, canActAsAgent,
     visibleProjectIdsFor, agentProjectsFor, hiddenTaskIdsFor, canSeeTaskOf, projectScope, REFUSAL,
     privateWorkFor, readScopeOf, canSeeRun, readableRuns, canSeeProposal,
+    GATE_OWNER_ADMIN, proposalScopeClause, mayDecideProposal,
 };

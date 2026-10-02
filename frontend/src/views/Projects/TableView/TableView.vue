@@ -137,6 +137,7 @@
                     :title="$t(emptyTitleKey)"
                     :message="$t(emptyMessageKey)"
                     :actionLabel="canCreate ? $t('EmptyState.no_tasks_action') : ''"
+                    :sentence="canCreate && emptySentenceKey ? $t(emptySentenceKey) : ''"
                     helpPath="tasks"
                     @action="createTask = true"
                 />
@@ -168,15 +169,16 @@ import { useViewSettings } from '@/views/Projects/composables/viewSettingsContex
 import { useListRowEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
 import { columnCatalogue, gridMinWidth, gridTracks, useViewColumns } from '@/views/Projects/composables/viewColumns';
 import { handleGridKey } from './gridKeyboard';
+import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
 import { isSortableField, valuePath } from '@/views/Projects/composables/customFieldQuery';
 
 // PACKAGES
 import { useStore } from 'vuex';
-import { computed, inject, onMounted, provide, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 
 defineOptions({ name: "ProjectTableView" });
 
-const { groupBy } = taskListHelper();
+const { groupBy, getGroupCounts } = taskListHelper();
 const { getters } = useStore();
 const { checkApps, checkPermission } = useCustomComposable();
 
@@ -206,7 +208,7 @@ const tagsOn = computed(() => checkApps('tags') && checkPermission('task.task_ta
 const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');
 const showArchiveVar = inject("showArchived");
-const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
 
 const rowEdit = useListRowEdit(project, showArchiveVar);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { table: true, searched: Boolean(searchedTask?.value) }));
@@ -222,6 +224,26 @@ const catalogue = computed(() => columnCatalogue('table', {
 const columnState = useViewColumns(computed(() => project.value?._id), 'table', catalogue);
 provide('tableColumns', columnState.visibleColumns);
 const columnCount = computed(() => columnState.visibleColumns.value.length + 2);
+
+const totalColumns = computed(() => totalColumnsOf(columnState.visibleColumns.value));
+const COUNT_SETTLE_MS = 400;
+let countTimer = null;
+
+function refreshGroupCounts() {
+    if (searchedTask?.value || !project.value?._id) return;
+    groupedTasks.value.filter(isSprintOpen).forEach((sprint) => {
+        getGroupCounts({ projectId: project.value._id, sprintId: sprintKey(sprint), items: sprint.items || [], projectData: project.value, totals: totalColumns.value, table: true })
+            .catch((error) => console.error("ERROR in table group counts: ", error));
+    });
+}
+
+function scheduleGroupCounts() {
+    clearTimeout(countTimer);
+    countTimer = setTimeout(refreshGroupCounts, COUNT_SETTLE_MS);
+}
+provide('tableTotals', { columns: totalColumns, refresh: scheduleGroupCounts });
+watch(() => totalColumns.value.map((column) => column.id).join(), scheduleGroupCounts);
+onBeforeUnmount(() => clearTimeout(countTimer));
 const gridStyle = computed(() => {
     const tracks = gridTracks('table', columnState.visibleColumns.value);
     return { '--tv2-cols': tracks, minWidth: `${gridMinWidth(tracks)}px` };

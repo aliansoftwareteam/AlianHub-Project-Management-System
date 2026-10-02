@@ -3,6 +3,7 @@ import moment from "moment";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import Store from "@/store/index";
+import { PERIOD_LOCKED } from "@/composable/timeLogFailure";
 
 /* The one running timer per person. The task panel, Home and the Time pages all read and
  * write this entry; `ah.timer` was the key Home and Time used before they shared it. */
@@ -133,11 +134,25 @@ export function isTimerFor(taskId) {
     return Boolean(timerState.entry) && timerState.entry.taskId === String(taskId);
 }
 
+/* The timer lives in this browser until it stops, so the server is asked first whether today is in an
+ * approved timesheet period. When it cannot be asked the timer starts: stopping is checked again. */
+async function startRefusal() {
+    try {
+        const answer = (await apiRequest("get", env.TIMER_CAN_START))?.data;
+        return answer && answer.status === false && answer.code === PERIOD_LOCKED ? answer : null;
+    } catch (_e) {
+        return null;
+    }
+}
+
 /**
  * One timer per person: starting a second one stops (and logs) the first.
- * Returns the entry that was stopped, so the caller can say so.
+ * Returns the entry that was stopped, so the caller can say so. Throws with the
+ * server's code when today cannot take time, leaving any running timer as it was.
  */
 export async function startTimer(context) {
+    const refusal = await startRefusal();
+    if (refusal) throw Object.assign(new Error(refusal.statusText || refusal.code), { code: refusal.code });
     const previous = timerState.entry && timerState.entry.taskId !== String(context.taskId) ? await stopTimer() : null;
     timerState.entry = {
         ...context,

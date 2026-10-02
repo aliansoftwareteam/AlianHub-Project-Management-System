@@ -12,7 +12,7 @@
             </details>
         </div>
 
-        <p v-if="blockedKey" class="ah-small ami__off" data-test="memory-import-off">{{ $t(blockedKey) }}</p>
+        <p v-if="blockedKey" class="ah-small ami__off" data-test="memory-import-off">{{ $t(blockedKey) }} <ConnectAiHint /></p>
         <div class="ah-field">
             <label class="ah-field__label" :for="pasteId">{{ $t('AskMemory.paste_label') }}</label>
             <textarea :id="pasteId" v-model="pasted" class="ah-input ah-textarea" :maxlength="limit" :placeholder="$t('AskMemory.paste_hint')" data-test="memory-paste"></textarea>
@@ -53,6 +53,7 @@ import { useI18n } from "vue-i18n";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import ConnectAiHint from "@/components/molecules/AiUnavailable/ConnectAiHint.vue";
 import { AI_ACCESS, aiAccessFor } from "@/composable/aiAvailability";
 import { memoryErrorKey } from "./askMemory";
 

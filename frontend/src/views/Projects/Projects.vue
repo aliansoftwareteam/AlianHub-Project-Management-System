@@ -437,6 +437,7 @@ import AppState from '@/components/molecules/AppState/AppState.vue';
 import { computed, defineComponent, inject, onMounted, provide, ref, watch, onUnmounted, nextTick } from 'vue';
 import { escapeHtml } from '@/utils/notificationHtml';
 import isEqual from 'lodash/isEqual';
+import { inList } from '@/store/ProjectData/listMembership';
 import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -1148,9 +1149,9 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
     if (searchTask.value) {
         if (getters['projectData/searchedTasks']?.length) {
             if (showArchived.value) {
-                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => y.sprintId === x.id || x.isFolder === true || x.deletedStatusKey === 2).length) || [];
+                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => inList(y, x.id) || x.isFolder === true || x.deletedStatusKey === 2).length) || [];
             } else {
-                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => y.sprintId === x.id || x.isFolder === true).length) || [];
+                tmp = tmp?.filter((x) => getters['projectData/searchedTasks'].filter((y) => inList(y, x.id) || x.isFolder === true).length) || [];
             }
         } else {
             tmp = tmp?.filter((x) => x.isFolder || x.deletedStatusKey === 2);

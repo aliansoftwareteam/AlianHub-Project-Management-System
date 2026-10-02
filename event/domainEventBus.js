@@ -6,6 +6,7 @@ const logger = require('../Config/loggerConfig');
 const telemetry = require('../Config/telemetry');
 const socketEmitter = require('./socketEventEmitter');
 const { normalizeChangedFields, createSnapshotStore } = require('../utils/entityEvents');
+const actingAgent = require('../Modules/Agents/actingAgent');
 
 // Canonical domain-event bus — stage 1 of the automation engine (ADR 002).
 //
@@ -25,8 +26,9 @@ const MAX_DEPTH = 3;
 
 // Actor kinds. Events an automation itself caused are marked so rules can ignore
 // them by default — without this, rule A's write wakes rule B, whose write wakes
-// rule A, and one tenant's database absorbs the difference.
-const ACTOR_KINDS = Object.freeze(['user', 'automation', 'agent', 'system']);
+// rule A, and one tenant's database absorbs the difference. An import's writes are
+// marked too: the lists that count tasks still hear of them, and no rule answers them.
+const ACTOR_KINDS = Object.freeze(['user', 'automation', 'agent', 'system', 'import']);
 
 const bus = new EventEmitter();
 bus.setMaxListeners(50);
@@ -90,6 +92,15 @@ const resolveActor = (payload) => {
     const raw = payload?.actor;
     const kind = ACTOR_KINDS.includes(raw?.kind) ? raw.kind : 'system';
     return { userId: raw?.userId ? String(raw.userId) : null, kind };
+};
+
+/* A web handler an agent ran (Modules/Agents/taskRequests, workRequests) emits a task change as it does for a
+ * person: with no actor and no depth. The agent's mark supplies both, one hop past the event the agent
+ * answered, which is what the older agent path sends with its emits. An emit that names its own actor keeps it. */
+const originOf = (payload) => {
+    const mark = payload?.actor ? null : actingAgent.current();
+    if (!mark) return { actor: resolveActor(payload), depth: Number(payload?.depth) || 0 };
+    return { actor: { userId: mark.userId ? String(mark.userId) : null, kind: 'agent' }, depth: (Number(mark.depth) || 0) + 1 };
 };
 
 const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, depth }) => ({
@@ -205,9 +216,11 @@ function publish(envelope) {
         logger.error(`${LOG_PREFIX} dropped ${envelope.type} for ${envelope.entity.id} — depth ${envelope.depth} exceeds ${MAX_DEPTH}`);
         return;
     }
-    bus.emit('domain.event', envelope);
-    bus.emit(envelope.type, envelope);
-    record(envelope).catch((error) => logger.error(`${LOG_PREFIX} could not record ${eventLabel(envelope)}: ${failureText(error)}`));
+    actingAgent.outside(() => {
+        bus.emit('domain.event', envelope);
+        bus.emit(envelope.type, envelope);
+        record(envelope).catch((error) => logger.error(`${LOG_PREFIX} could not record ${eventLabel(envelope)}: ${failureText(error)}`));
+    });
 }
 
 function flush(entry) {
@@ -261,8 +274,7 @@ function onTaskEvent(emitType) {
             const companyId = String(doc.CompanyId);
             const key = `${companyId}:${String(doc._id)}:${emitType}`;
             const changedNow = normalizeChangedFields(payload?.updatedFields);
-            const actor = resolveActor(payload);
-            const depth = Number(payload?.depth) || 0;
+            const { actor, depth } = originOf(payload);
 
             const existing = pending.get(key);
             if (supersedesPending(existing, doc, changedNow)) {
@@ -285,11 +297,11 @@ function onTaskEvent(emitType) {
             }
 
             const entry = { companyId, doc, changed: new Set(changedNow), emitType, actor, depth };
-            entry.timer = setTimeout(() => {
+            entry.timer = actingAgent.outside(() => setTimeout(() => {
                 if (pending.get(key) !== entry) return;
                 pending.delete(key);
                 flushSafely(entry);
-            }, DEBOUNCE_MS);
+            }, DEBOUNCE_MS));
             pending.set(key, entry);
         } catch (error) {
             logger.error(`${LOG_PREFIX} event handling failed: ${failureText(error)}`);
@@ -375,6 +387,7 @@ module.exports = {
     classifyTaskEvent,
     trimTask,
     resolveActor,
+    originOf,
     buildEnvelope,
     buildEntityEnvelope,
     classifyPageEvent,

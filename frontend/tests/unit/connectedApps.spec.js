@@ -47,6 +47,13 @@ describe('Accounts > Connected apps', () => {
         expect(rows[1].find('[data-test="last-used"]').text()).toBe('ConnectedApps.never_used');
     });
 
+    it('says when each connection ends and that connecting again renews it', async () => {
+        const wrapper = await mountWith({ rows: [...grants(), { ...grants()[0], grantId: 'g3', expiresAt: null }] });
+        const rows = wrapper.findAll('[data-test="grant-row"]');
+        expect(rows[0].find('[data-test="grant-ends"]').text()).toBe('ConnectedApps.ends');
+        expect(rows[2].find('[data-test="grant-ends"]').exists()).toBe(false);
+    });
+
     it('revokes a grant after confirmation and drops it from the list', async () => {
         const wrapper = await mountWith();
         await wrapper.findAll('[data-test="grant-row"]')[0].find('button[data-test="revoke-grant"]').trigger('click');

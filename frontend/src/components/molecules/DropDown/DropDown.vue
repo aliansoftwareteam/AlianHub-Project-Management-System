@@ -48,6 +48,7 @@
 <script setup>
 import {Comment, Fragment, computed, defineProps, h, isVNode, nextTick, onBeforeUnmount, provide, ref, watch} from "vue";
 import { useCustomComposable } from "@/composable";
+import { positionPanel } from "./panelPlacement";
 
 const {debounce, makeUniqueId} = useCustomComposable();
 
@@ -509,27 +510,11 @@ function buttonClick(flag = false) {
             const element = document.getElementById(dyid.value);
             let childNode = document.getElementById(panelId.value);
             if(element == null || childNode == null ) { return }
-            const {top, left, width: ddWidth, height: ddHeight} = element.getBoundingClientRect();
-            const {height, width} = childNode.getBoundingClientRect();
-
-            if(document.documentElement.clientWidth < (left + width + 25)) {
-                const offset = document.documentElement.clientWidth - (left + width + 15);
-                childNode.style.left = left + offset + "px";
-            } else {
-                childNode.style.left = left + "px";
+            const rect = element.getBoundingClientRect();
+            if(props.keepSameWidth){
+                childNode.style.width = rect.width + "px";
             }
-
-            if(document.documentElement.clientHeight < (top + height + 25)) {
-                const offset = document.documentElement.clientHeight - (top + height + 15);
-                childNode.style.top = top + offset +"px";
-            } else {
-                if(props.keepSameWidth){
-                    let widthCheck = document.getElementsByClassName(`drop-down-menu`)[0];
-                    widthCheck.style.width = ddWidth + "px"
-                }
-                const position = top + (ddHeight < 25 ? 25 : ddHeight)
-                childNode.style.top = position +"px";
-            }
+            positionPanel(childNode, rect, { belowOffset: rect.top + (rect.height < 25 ? 25 : rect.height) });
         })
     }
 

@@ -34,6 +34,7 @@ const open = async ({ roleType = 1 } = {}) => {
         routes: [
             { path: '/:cid', name: 'Home', component: blank },
             { path: '/:cid/ai/inbox', name: 'AiInbox', component: blank },
+            { path: '/:cid/inbox', name: 'inbox', component: blank },
         ],
     });
     await router.push({ name: 'Home', params: { cid: 'company-1' } });
@@ -84,8 +85,17 @@ describe('Waiting on you (Home card)', () => {
         expect(apiRequest).toHaveBeenCalledWith('post', expect.stringContaining('/run-a1/steps/step-a1/decide'), { decision: 'approved', comment: '' });
     });
 
-    it('opens the AI Inbox from a row', async () => {
+    it('opens the Inbox\'s approval tab from a proposal', async () => {
         serverProposals = [proposal('p1')];
+        const { wrapper, router } = await open();
+        await rows(wrapper)[0].find('[data-test="waiting-open"]').trigger('click');
+        await flushPromises();
+        expect(router.currentRoute.value.name).toBe('inbox');
+        expect(router.currentRoute.value.query.tab).toBe('approval');
+    });
+
+    it('opens the AI Inbox from a workflow step, which the approval tab does not hold yet', async () => {
+        serverApprovals = [approval('a1')];
         const { wrapper, router } = await open();
         await rows(wrapper)[0].find('[data-test="waiting-open"]').trigger('click');
         await flushPromises();
@@ -99,6 +109,26 @@ describe('Waiting on you (Home card)', () => {
         expect(rows(wrapper)).toHaveLength(1);
         expect(wrapper.text()).toContain('Change p2');
         expect(wrapper.text()).not.toContain('Change p1');
+    });
+
+    it('says why on every line an agent proposed, and that none was given when it gave none', async () => {
+        serverProposals = [proposal('p1', { why: 'The date slipped twice.' }), proposal('p2')];
+        serverApprovals = [approval('a1')];
+        const { wrapper } = await open();
+        const whys = rows(wrapper).map((row) => row.find('[data-test="waiting-why"]'));
+        expect(whys[0].text()).toContain('Ai.why');
+        expect(whys[0].text()).toContain('The date slipped twice.');
+        expect(whys[1].text()).toContain('Time.why_no_reason');
+        expect(whys[2].exists()).toBe(false);
+    });
+
+    it('tells Home how many things it holds, and again once one is decided', async () => {
+        serverProposals = [proposal('p1'), proposal('p2')];
+        const { wrapper } = await open();
+        expect(wrapper.emitted('count').at(-1)).toEqual([2]);
+        await rows(wrapper)[0].find('[data-test="waiting-approve"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.emitted('count').at(-1)).toEqual([1]);
     });
 
     it('is hidden when nothing is waiting', async () => {
