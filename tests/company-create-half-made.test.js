@@ -11,7 +11,16 @@ const mockCrud = async (db, query, method) => {
         refusal.tries += 1;
         if (refusal.tries <= refusal.times) throw new Error(`the database refused ${method} on ${query.type}`);
     }
+    if (method === 'save' && query.type === SCHEMA_TYPE.COMPANIES) mockValidateCompanyRow(query.data);
     return mockDbFor(String(db)).crud(db, query, method);
+};
+/* The fake stores anything; the real company schema refuses a row with a required field empty. */
+const mockValidateCompanyRow = (row) => {
+    const mongoose = require('mongoose');
+    const { schema } = require('../utils/mongo-handler/schema');
+    const Company = mongoose.models.HalfMadeCompany || mongoose.model('HalfMadeCompany', new mongoose.Schema(schema.companies, { strict: true }));
+    const refused = new Company(row).validateSync();
+    if (refused) throw refused;
 };
 
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
@@ -100,9 +109,14 @@ beforeEach(() => {
     mockDbFor(GLOBAL).seed(SCHEMA_TYPE.PRECOMPANIES, { _id: NEXT_READY, isAvailable: true, pickupCount: 0 });
 });
 
+const WHAT_THE_SIGN_UP_PAGE_SENDS = {
+    companyName: 'Fresh Co', teamSize: '2-15', teamFocus: '', seedSampleProject: false, refferalCode: '',
+    phoneNumber: '', country: '', city: '', state: '', countryCodeObj: {}, logtimeDays: 8,
+    eventId: 'ev_test', Cst_countryCode: '', Cst_stateCode: '',
+};
 const create$ = (body = {}) => app.call('POST', '/api/v2/company/create', {
     token: signSession(CALLER, [OTHER_COMPANY]),
-    body: { companyName: 'Fresh Co', logtimeDays: 8, eventId: 'ev_test', ...body },
+    body: { ...WHAT_THE_SIGN_UP_PAGE_SENDS, ...body },
 });
 const stopEvents = () => emitListener.mock.calls.filter(([, data]) => data.step === 'STOP').map(([, data]) => data);
 const caller = () => rowsOf(GLOBAL, SCHEMA_TYPE.USERS).find((row) => String(row._id) === CALLER);
@@ -124,6 +138,12 @@ describe('POST /api/v2/company/create, a whole workspace', () => {
         expect(rowsOf(READY, SCHEMA_TYPE.USERID)).toHaveLength(1);
         expect(stopEvents()).toEqual([{ step: 'STOP', companyId: READY }]);
         expect(sendAttachMail).not.toHaveBeenCalled();
+    });
+
+    it('stores a company row the company schema accepts, though the sign-up page asks for no country', async () => {
+        await create$();
+
+        expect(companyRows()[0]).toMatchObject({ Cst_CompanyName: 'Fresh Co', Cst_Country: 'N/A', userId: CALLER });
     });
 
     it('says it is made only once everything is done, so the page cannot open it before the reply', async () => {

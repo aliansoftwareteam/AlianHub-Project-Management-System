@@ -1,5 +1,5 @@
 const { test, expect } = require('../support/test');
-const { PASSWORD, registerVerifiedAccount, uniqueSuffix } = require('../support/fixtures');
+const { PASSWORD, readCompanyRow, registerVerifiedAccount, uniqueSuffix } = require('../support/fixtures');
 const { firstScreenSettled, skipFirstRun, watchApiAnswers } = require('../support/pages');
 
 // The suite's server has no ready-made company, so the workspace is set up while the person waits.
@@ -24,7 +24,8 @@ test.describe('sign-up', () => {
         await page.locator('#password').fill(PASSWORD);
         await page.locator('.auth__actions button[type="submit"]').click();
 
-        await page.getByRole('textbox', { name: 'Name your workspace' }).fill(`Signup ${uniqueSuffix()}`);
+        const workspaceName = `Signup ${uniqueSuffix()}`;
+        await page.getByRole('textbox', { name: 'Name your workspace' }).fill(workspaceName);
         await page.getByRole('button', { name: 'Continue', exact: true }).click();
         const answers = watchApiAnswers(page);
         await page.getByRole('button', { name: 'Skip — start blank' }).click();
@@ -35,6 +36,9 @@ test.describe('sign-up', () => {
         await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
         await firstScreenSettled(page);
         expect(answers.refused).toEqual([]);
+        // The workspace opens even when its own row was never stored, so the row is read where it is kept.
+        const [, workspaceId] = /#\/([0-9a-f]{24})\//.exec(page.url());
+        expect(await readCompanyRow(workspaceId)).toMatchObject({ Cst_CompanyName: workspaceName });
 
         await page.getByRole('button', { name: 'Skip for now' }).click();
         await expect(page).not.toHaveURL(/welcome/);

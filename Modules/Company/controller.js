@@ -25,6 +25,7 @@ const { pinSessionTenant } = require("../../Config/tenant.js");
 const { getRoleType, ROLE_OWNER } = require("../../Config/permissionGuard.js");
 const { escapeHtml } = require('../../utils/escapeHtml');
 const { WORKSPACE_FAILURE, failureReply } = require('./helpers/workspaceFailure');
+const { COUNTRY_NOT_ASKED } = require('./helpers/companyDetails');
 
 const TEAM_SIZES = ["1", "2-15", "16-50", "50+"];
 
@@ -501,7 +502,7 @@ const companyRowFor = (companyMongoId, bodyData) => ({
         userId: bodyData.userId,
         Cst_CompanyName: bodyData.companyName,
         Cst_Phone: bodyData.phoneNumber || "",
-        Cst_Country: bodyData.country || "",
+        Cst_Country: bodyData.country || COUNTRY_NOT_ASKED,
         Cst_City: bodyData.city || "",
         Cst_State: bodyData.state || "",
         Cst_DialCode: bodyData.countryCodeObj || {},

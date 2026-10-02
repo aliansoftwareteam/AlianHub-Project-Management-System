@@ -65,18 +65,35 @@ const mailedInvitationPath = ({ userId, companyId, invitation }) => {
     return `/#/verify-invitation?id=${encodeURIComponent(blob)}`;
 };
 
+async function inGlobalDatabase(read) {
+    const client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
+    await client.connect();
+    try {
+        return await read(client.db('global'));
+    } finally {
+        await client.close();
+    }
+}
+
+/* The workspace's own row, which the rest of the app reads its name, plan and details from. */
+const readCompanyRow = (companyId) => inGlobalDatabase((global) => global.collection('companies').findOne({ _id: new ObjectId(String(companyId)) }));
+
 /* An account made outside any invitation. Mail is not delivered in the suite, so the address is marked
  * verified the way tests/integration/invitation-signed-in-accept.int.test.js does. */
 async function registerVerifiedAccount(baseURL, { firstName, lastName, email }) {
     const created = assertOk(await createApiClient({ baseURL }).post('/api/v2/createUser', { firstName, lastName, email, password: PASSWORD }), `register ${email}`);
-    const client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
-    await client.connect();
-    try {
-        await client.db('global').collection('users').updateOne({ _id: new ObjectId(String(created.statusText._id)) }, { $set: { isEmailVerified: true } });
-    } finally {
-        await client.close();
-    }
-    return String(created.statusText._id);
+    const userId = String(created.statusText._id);
+    await inGlobalDatabase((global) => global.collection('users').updateOne({ _id: new ObjectId(userId) }, { $set: { isEmailVerified: true } }));
+    return userId;
+}
+
+/* A workspace of the account's own, made the way the last sign-up step makes one. */
+async function createWorkspace(baseURL, { email, name }) {
+    const session = await login(baseURL, email);
+    const made = assertOk(await createApiClient({ baseURL, accessToken: session.accessToken }).post('/api/v2/company/create', {
+        companyName: name, teamSize: '2-15', teamFocus: '', seedSampleProject: false, logtimeDays: 8, eventId: `ev_${uniqueSuffix()}`,
+    }), `workspace for ${email}`);
+    return String(made.companyId);
 }
 
 /* Invite acceptance without mail, through the same calls the /invitation page makes
@@ -311,6 +328,7 @@ module.exports = {
     createList,
     createProject,
     createTask,
+    createWorkspace,
     emailFor,
     findTasksByName,
     firstSprint,
@@ -321,6 +339,7 @@ module.exports = {
     login,
     loginAs,
     mailedInvitationPath,
+    readCompanyRow,
     readState,
     readTask,
     registerVerifiedAccount,
