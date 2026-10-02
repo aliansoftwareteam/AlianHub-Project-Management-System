@@ -8,7 +8,8 @@ import { createI18n } from 'vue-i18n';
 import { defineComponent, h, ref } from 'vue';
 import en from '@/locales/en';
 
-const { server } = vi.hoisted(() => ({ server: { tasks: [], calls: [] } }));
+/* `hidden` are the tasks this viewer's role keeps from them: the server leaves them out of every answer. */
+const { server } = vi.hoisted(() => ({ server: { tasks: [], calls: [], hidden: [], tabReturns: [] } }));
 
 vi.mock('@/services', () => {
     const holds = (have, want) => {
@@ -25,8 +26,15 @@ vi.mock('@/services', () => {
         if (field === 'objId') return Object.entries(want).every(([key, value]) => task[key] === value);
         return holds(task[field], want);
     });
+    const shown = (match) => server.tasks.filter((task) => !server.hidden.includes(task._id) && matches(task, match));
+    /* A tab that comes back asks for what changed in each group while it was away, and for the group's count. */
+    const tabAnswer = (body) => {
+        const group = body.item?.mongoConditions?.[0] || body.item?.conditions?.[0] || {};
+        const count = shown({ ProjectID: body.pid, sprintId: body.sprintId, ...group }).length;
+        return body.istableTask ? [] : [{ result: [], count: count ? [{ count }] : [] }];
+    };
     const answer = (stages) => {
-        const rows = server.tasks.filter((task) => matches(task, stages.find((stage) => stage.$match)?.$match || {}));
+        const rows = shown(stages.find((stage) => stage.$match)?.$match || {});
         const facet = stages.find((stage) => stage.$facet)?.$facet;
         if (!facet) {
             const skip = stages.find((stage) => '$skip' in stage)?.$skip || 0;
@@ -44,6 +52,10 @@ vi.mock('@/services', () => {
     return {
         apiRequest: vi.fn((method, url, body) => {
             if (String(url).endsWith('/tasks/everything')) return Promise.resolve({ data: { status: true, data: { rows: [], projects: {}, nextCursor: null } } });
+            if (String(url).endsWith('/tabSyncTask')) {
+                server.tabReturns.push(body);
+                return Promise.resolve({ status: 200, data: tabAnswer(body) });
+            }
             const stages = body?.findQuery || [];
             server.calls.push(stages);
             return Promise.resolve({ status: 200, data: answer(stages) });
@@ -72,6 +84,7 @@ import { heldTasks, openRuns } from '@/views/Ai/agentFeed';
 import { agentWorkIn } from '@/views/Projects/composables/agentWork';
 import { agentWorkGroups, inAgentWorkGroup } from '@/views/Projects/composables/agentWorkQuery';
 import { taskInGroup } from '@/views/Projects/ListView/listFilter';
+import { tabSyncHelper } from '@/utils/tabSyncs';
 import { AGENT_WORK_GROUP } from '@viewSettings';
 
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
@@ -112,6 +125,7 @@ function seedStore() {
     Store.state.projectData.otherProjectChanges = 0;
     Store.state.projectData.searchedTasks = [];
     Store.state.projectData.getPaginatedTaskPayload = [];
+    Store.state.projectData.getTableTaskPayload = [];
     Store.state.taskSelection.selectedTaskIds = [];
 }
 
@@ -201,6 +215,18 @@ async function agentsMove(change) {
     await settle(600);
 }
 
+/* What App.vue does when the browser tab is shown again while a list of the project is open. */
+async function returnToTab() {
+    sessionStorage.setItem('joinedRooms', JSON.stringify([`project_sprint_${PID}_${SPRINT}`]));
+    sessionStorage.setItem('tableaveTime', String(Date.now()));
+    let tabSync;
+    const Shell = defineComponent({ setup() { ({ tabSync } = tabSyncHelper()); return () => h('i'); } });
+    const shell = mount(Shell, { global: { plugins: [Store] } });
+    tabSync();
+    await settle(600);
+    shell.unmount();
+}
+
 beforeEach(() => {
     /* setImmediate stays real: flushPromises waits on it. */
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -208,6 +234,9 @@ beforeEach(() => {
     window.IntersectionObserver = FakeIntersectionObserver;
     server.tasks = [task(1, TODO.key, 'Collect the logins'), task(2, DONE.key, 'Sign the contract'), task(3, TODO.key, 'Write the brief')];
     server.calls = [];
+    server.hidden = [];
+    server.tabReturns = [];
+    sessionStorage.clear();
     heldTasks.value = [];
     openRuns.value = [];
     seedStore();
@@ -277,6 +306,50 @@ describe.each(VIEWS)('the %s grouped by who is working', (name, view, props, gro
         heldTasks.value = [claim('t1', { projectId: 'p2' })];
         await open(view, props);
         expect(groups().map(([group]) => group)).toEqual([NO_AGENT]);
+    });
+
+    it('names an agent only to a viewer who has a task of its group', async () => {
+        heldTasks.value = [claim('t1')];
+        server.hidden = ['t1'];
+        await open(view, props);
+        expect(groups()).toEqual([[NO_AGENT, ['Sign the contract', 'Write the brief']]]);
+        expect(wrapper.text()).not.toContain(PRIYAS_CLAUDE);
+
+        wrapper.unmount();
+        server.hidden = [];
+        seedStore();
+        await open(view, props);
+        expect(groups()).toEqual([[PRIYAS_CLAUDE, ['Collect the logins']], [NO_AGENT, ['Sign the contract', 'Write the brief']]]);
+    });
+
+    it('asks for each group it draws once when its tab comes back, however often the agents moved', async () => {
+        await open(view, props);
+        await agentsMove(() => { heldTasks.value = [claim('t1')]; });
+        await agentsMove(() => { heldTasks.value = [claim('t1'), claim('t2')]; });
+        await agentsMove(() => { heldTasks.value = [claim('t1'), claim('t2'), claim('t3')]; });
+
+        await returnToTab();
+
+        const drawn = agentWorkGroups(agentWorkIn(PID), NO_AGENT).map((group) => group.searchValue);
+        expect(server.tabReturns.map((body) => body.item.searchValue).sort()).toEqual(drawn.slice().sort());
+    });
+});
+
+describe('a tab that comes back to a List grouped by who is working', () => {
+    const counts = () => {
+        const found = Store.state.projectData.tasks[PID][SPRINT].found;
+        return agentWorkGroups(agentWorkIn(PID), NO_AGENT).map((group) => [group.name, found[`${group.searchKey}_${group.searchValue}`]]);
+    };
+
+    it('keeps the count of every group', async () => {
+        heldTasks.value = [claim('t2')];
+        await open(ListView, { sprintLoading: false });
+        expect(counts()).toEqual([[PRIYAS_CLAUDE, 1], [NO_AGENT, 2]]);
+
+        await returnToTab();
+
+        expect(server.tabReturns.map((body) => body.item.conditions[0]._id)).toEqual([{ objId: { $in: ['t2'] } }, { objId: { $nin: ['t2'] } }]);
+        expect(counts()).toEqual([[PRIYAS_CLAUDE, 1], [NO_AGENT, 2]]);
     });
 });
 

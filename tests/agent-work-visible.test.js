@@ -44,6 +44,7 @@ const controller = require('../Modules/Agents/manager/controller');
 const server = require('../Modules/Mcp/server');
 const { relay, EVENT } = require('../socket/controller/agentSocket');
 const { getTaskByQyery } = require('../Modules/Tasks/helpers/getTasksData');
+const { getTabSyncTasks } = require('../Modules/Tasks/controller/getTabSyncTasks');
 const { agentWorkMatch, agentWorkGroups } = require('../frontend/src/views/Projects/composables/agentWorkQuery');
 const { cleanViewSettings, AGENT_WORK_GROUP } = require('../Modules/Project/helpers/viewSettings');
 const { validatePipeline } = require('../Modules/Tasks/helpers/taskQueryGuard');
@@ -269,6 +270,46 @@ describe('the grouping "who is working"', () => {
         expect(() => validatePipeline(page)).not.toThrow();
         expect(page[0].$match._id).toEqual({ objId: { $nin: [P_DEST] } });
         expect(budgetOf('api.listByAgentWork')).toEqual(budgetOf('api.listFirstPage'));
+    });
+});
+
+describe('a list grouped by who is working, read again when its tab comes back', () => {
+    /* The stored page request of one group, as the web app sends it again: JSON, so every id is text. */
+    const tabReturn = async (uid, group) => {
+        mockDb.calls.length = 0;
+        const body = { pid: P_OPEN, sprintId: S_OPEN, istableTask: false, tabLeaveTime: 0, userId: uid, showAllTasks: true, item: JSON.parse(JSON.stringify(group)) };
+        const answer = await through(getTabSyncTasks, { uid, headers: { companyid: CID }, body });
+        const [pipeline] = mockDb.calls.find((call) => call.type === SCHEMA_TYPE.TASKS && call.method === 'aggregate').data;
+        const counted = pipeline.find((stage) => stage.$facet).$facet.count[0].$match;
+        const [operator, ids] = Object.entries(counted.$and[1]._id)[0];
+        return { code: answer.code, operator, ids, rows: answer.body[0].result.map((row) => String(row._id)).sort(), count: answer.body[0].count[0]?.count || 0 };
+    };
+    const isObjectId = (id) => id && id._bsontype === 'ObjectId';
+
+    it('asks the database for the ids of each group as ids, and counts the rows the group holds', async () => {
+        const [open] = await heldTasks({});
+        const free = String(task()._id);
+        const [agent, nobody] = await groupsFor(OWNER);
+
+        const held = await tabReturn(OWNER, agent);
+        expect(held).toMatchObject({ code: 200, operator: '$in', rows: [open.id], count: 1 });
+        expect(held.ids.map(String)).toEqual([open.id]);
+        expect(held.ids.every(isObjectId)).toBe(true);
+
+        const rest = await tabReturn(OWNER, nobody);
+        expect(rest).toMatchObject({ code: 200, operator: '$nin' });
+        expect(rest.ids.every(isObjectId)).toBe(true);
+        expect(rest.rows).toContain(free);
+        expect(rest.rows).not.toContain(open.id);
+        expect(rest.count).toBe(rest.rows.length);
+    });
+
+    it('still refuses a group whose condition the task query would refuse', async () => {
+        const answer = await through(getTabSyncTasks, {
+            uid: OWNER, headers: { companyid: CID },
+            body: { pid: P_OPEN, sprintId: S_OPEN, istableTask: false, tabLeaveTime: 0, userId: OWNER, item: { indexName: 'groupByStatusIndex', conditions: [{ $where: 'true' }] } },
+        });
+        expect(answer.code).toBe(400);
     });
 });
 
