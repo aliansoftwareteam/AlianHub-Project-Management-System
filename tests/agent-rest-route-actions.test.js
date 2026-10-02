@@ -130,6 +130,10 @@ const FILED = {
     'a description, a priority and dates': newTask({ ...opening, rawDescription: 'Text', Task_Priority: 'HIGH', DueDate: '2026-10-10T00:00:00.000Z', startDate: '2026-10-01T00:00:00.000Z' }),
 };
 
+/* A sign-off is a signed-in person's: a token of any kind stops in front of it. */
+const SIGN_OFF = NO_ACTION['approving a drafted doc'][0];
+const OPEN_TO_TOKENS = Object.values(NO_ACTION).filter(([route]) => route !== SIGN_OFF);
+
 const audits = (action) => rows(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => row.action === action);
 const agentAudits = () => rows(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => String(row.action).startsWith('agent.'));
 const AGENTS_OF = [['an owner', OWNER], ['an admin', ADMIN], ['a member', INSIDER], ['a member outside the private work', OUTSIDER], ['a guest', GUEST]];
@@ -222,16 +226,22 @@ describe('a task filed by an agent through the create route', () => {
 
 describe('everyone else on those routes', () => {
     it.each([
-        ['a signed-in owner', session(OWNER)],
-        ['a signed-in admin', session(ADMIN)],
-        ['a personal token of an owner', personalToken(OWNER)],
-    ])('%s reaches every one of them, and nothing is recorded as an agent\'s', async (label, caller) => {
-        for (const [route, body, params] of Object.values(NO_ACTION)) {
+        ['a signed-in owner', session(OWNER), Object.values(NO_ACTION)],
+        ['a signed-in admin', session(ADMIN), Object.values(NO_ACTION)],
+        ['a personal token of an owner', personalToken(OWNER), OPEN_TO_TOKENS],
+    ])('%s reaches every one of them, and nothing is recorded as an agent\'s', async (label, caller, reached) => {
+        for (const [route, body, params] of reached) {
             expect([route, await through(route, caller, body, params)]).toEqual([route, REACHED]);
         }
         for (const body of [...Object.values(BEYOND_FILING), ...Object.values(FILED)]) {
             expect(await through(CREATE, caller, body)).toBe(REACHED);
         }
+        expect(agentAudits()).toHaveLength(0);
+    });
+
+    it.each([['an owner', OWNER], ['a member', INSIDER]])('a personal token of %s does not sign off a drafted doc', async (label, uid) => {
+        const [route, body, params] = NO_ACTION['approving a drafted doc'];
+        expect(await through(route, personalToken(uid), body, params)).toMatchObject({ code: 403, body: { status: false } });
         expect(agentAudits()).toHaveLength(0);
     });
 
