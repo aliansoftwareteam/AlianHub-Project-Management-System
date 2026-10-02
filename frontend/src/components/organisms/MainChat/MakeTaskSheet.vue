@@ -45,6 +45,7 @@
 </template>
 
 <script setup>
+import { defaultStatus } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 /**
  * Turn a message, a voice note or a meeting action item into a task. The task's
  * description carries the source text and a link back to where it came from.
@@ -160,7 +161,7 @@ async function create() {
         errors.value.form = t('Chat.pick_both');
         return;
     }
-    const status = (project.taskStatusData || []).find((x) => x.type === 'default_active');
+    const status = defaultStatus(project);
     const taskType = (project.taskTypeCounts || [])[0];
     if (!status || !taskType) {
         errors.value.form = t('Chat.no_project_ready');

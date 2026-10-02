@@ -50,6 +50,8 @@
 .comment-input__agent-note {
     flex: 1 1 0;
     min-width: 0;
+    margin-left: 10px;
+    font-size: 12px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

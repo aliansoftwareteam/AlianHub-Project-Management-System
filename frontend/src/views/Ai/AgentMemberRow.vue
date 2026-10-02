@@ -37,10 +37,10 @@ const ownerLine = computed(() => {
 
 const accessLine = computed(() => {
     const projects = projectScopeOf(props.agent);
-    const scope = projects.scoped ? t("Parity.n_projects", { n: projects.ids.length }) : t("Parity.no_project_scope");
+    const scope = projects.scoped ? t("Parity.n_projects", { n: projects.ids.length }, projects.ids.length) : t("Parity.no_project_scope");
     const skills = (props.agent.skills || []).length;
     const writes = (props.agent.allowedActions || []).filter((a) => !a.startsWith("tasks.") && a !== "task.get" && a !== "docs.read").length;
-    return skills ? `${scope} · ${t("Parity.n_skills", { n: skills })}` : `${scope} · ${writes ? t("Parity.n_actions", { n: writes }) : t("Parity.read_only")}`;
+    return skills ? `${scope} · ${t("Parity.n_skills", { n: skills }, skills)}` : `${scope} · ${writes ? t("Parity.n_actions", { n: writes }) : t("Parity.read_only")}`;
 });
 
 const activeLine = computed(() => props.lastActive || (props.agent.paused ? t("Parity.paused") : t("Parity.idle")));

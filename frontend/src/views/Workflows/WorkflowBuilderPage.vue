@@ -196,7 +196,7 @@
                                 @click="toggle(workflow)"
                             ><span class="wb__knob"></span></button>
                             <span class="wb__row-name">{{ workflow.name }}</span>
-                            <span class="wb__row-count ah-mono">{{ $t('WorkflowBuilder.n_steps', { n: (workflow.steps || []).length }) }}</span>
+                            <span class="wb__row-count ah-mono">{{ $t('WorkflowBuilder.n_steps', { n: (workflow.steps || []).length }, (workflow.steps || []).length) }}</span>
                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="edit(workflow)">{{ $t('WorkflowBuilder.edit') }}</button>
                             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm wb__delete" @click="remove(workflow)">{{ $t('WorkflowBuilder.delete') }}</button>
                         </div>

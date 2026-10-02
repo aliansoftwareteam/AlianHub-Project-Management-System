@@ -29,7 +29,7 @@
                 <template #button>
                     <div class="d-flex align-items-center justify-content-center profile-image black text-nowrap font-weight-400 ml--5px border-2px-blue font-size-12 bg-colorlightgray position-re" :style="{width: imageWidth, height: imageWidth}">
                         <span aria-hidden="true">+{{detailedUsers.length - numOfUsers}}</span>
-                        <span class="ah-sr-only">{{ $t('Common.more_assignees', { count: detailedUsers.length - numOfUsers }) }}</span>
+                        <span class="ah-sr-only">{{ $t('Common.more_assignees', { count: detailedUsers.length - numOfUsers }, detailedUsers.length - numOfUsers) }}</span>
                     </div>
                 </template>
                 <template #options>

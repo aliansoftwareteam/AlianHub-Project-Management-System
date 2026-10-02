@@ -25,6 +25,7 @@
 .gv__chart { flex: 1 1 auto; height: 100%; min-height: 360px; }
 .gv__empty,
 .gv__msg { position: absolute; top: 56px; left: 50%; transform: translateX(-50%); max-width: 420px; text-align: center; }
+.gv__empty.empty-state { width: min(420px, 90%); background: var(--surface); border-radius: var(--r-card, 8px); }
 .gv__msg code { font: var(--text-data); background: var(--surface-2); padding: 2px var(--sp-2); border-radius: var(--r-sm, 5px); }
 
 .gv__tray {

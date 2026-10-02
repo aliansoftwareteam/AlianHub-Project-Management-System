@@ -197,6 +197,7 @@
 </template>
 
 <script setup>
+import { defaultStatus } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 /**
  * The Main Chat conversation surface.
  *
@@ -809,9 +810,7 @@ async function createDirectConversation() {
     const sprint = project && project.sprintsObj
         ? Object.values(project.sprintsObj)[0]
         : null;
-    const status = project && project.taskStatusData
-        ? project.taskStatusData.find((x) => x.type === 'default_active')
-        : null;
+    const status = defaultStatus(project);
     const taskType = project && project.taskTypeCounts ? project.taskTypeCounts[0] : null;
 
     if (!project || !sprint || !status || !taskType) {

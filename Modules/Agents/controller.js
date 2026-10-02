@@ -33,6 +33,7 @@ const confidence = require('./engine/confidence');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const triggers = require('./triggers');
 const { agentsRefused } = require('./guard');
+const { personDecides } = require('./personDecides');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
 const companyOf = (req) => String(req.headers['companyid'] || '');
@@ -586,15 +587,30 @@ exports.putRoutingPolicy = async (req, res) => {
     } catch (e) { logger.error(`putRoutingPolicy: ${e.message}`); return fail(res, e.message, 500); }
 };
 
+/* What the AI Inbox page draws a proposal from, beside the proposal itself: for a person, the one card of a batch
+ * (the same the Inbox queue shows, naming only the tasks that person can read), and which changes came with no words of their own. */
+const asCards = async (companyId, caller, listed) => {
+    const batches = caller.human
+        ? await require('./intentPreview').forBatches(companyId, caller.actor.userId, listed).catch((e) => { logger.error(`proposal cards: ${e.message}`); return new Map(); })
+        : new Map();
+    const { markOf } = require('./changeLabels');
+    return listed.map((p) => ({
+        ...p,
+        changes: (Array.isArray(p.changes) ? p.changes : []).map((change) => ({ ...change, ...markOf(change) })),
+        ...(batches.has(String(p._id)) ? { batch: batches.get(String(p._id)) } : {}),
+    }));
+};
+
 /* GET /api/v2/agents/proposals?status=pending&bucket=primary|later&agentId= */
 exports.listProposals = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         const q = req.query || {};
-        const readScope = await readScopeOf(companyId, await callerOf(req, companyId));
+        const caller = await callerOf(req, companyId);
+        const readScope = await readScopeOf(companyId, caller);
         const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope });
-        return res.send({ status: true, statusText: 'Proposals fetched.', data: out.proposals, counts: out.counts });
+        return res.send({ status: true, statusText: 'Proposals fetched.', data: await asCards(companyId, caller, out.proposals), counts: out.counts });
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -617,8 +633,9 @@ exports.createProposal = async (req, res) => {
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
-const decide = (fn) => async (req, res) => {
+const decide = (action, fn) => async (req, res) => {
     try {
+        if (!(await personDecides(req, res, action))) return undefined;
         const companyId = companyOf(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid proposal id are required.');
         const caller = await callerOf(req, companyId);
@@ -634,9 +651,9 @@ const decide = (fn) => async (req, res) => {
 
 const approveOnceOrAlways = (companyId, id, { always, ...decision }) => (always ? standingApprovals.approveAlways(companyId, id, decision) : proposals.approve(companyId, id, decision));
 
-exports.approveProposal = decide(approveOnceOrAlways);
-exports.declineProposal = decide(proposals.decline);
-exports.undoProposal = decide(proposals.undoApproval);
+exports.approveProposal = decide('proposal.approve', approveOnceOrAlways);
+exports.declineProposal = decide('proposal.decline', proposals.decline);
+exports.undoProposal = decide('proposal.undo', proposals.undoApproval);
 
 /* GET / PUT / DELETE /api/v2/agents/account — my personal coding-agent link */
 exports.getAccount = async (req, res) => {

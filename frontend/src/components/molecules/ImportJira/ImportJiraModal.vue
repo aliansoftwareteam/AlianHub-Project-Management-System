@@ -13,7 +13,7 @@
             <input ref="fileEl" type="file" accept=".csv,.xlsx" class="font-size-13 jimport__file" @change="parseFile" />
 
             <div v-if="rows.length" class="font-size-13 jimport__preview">
-                {{ $t('Projects.import_rows_found', { count: rows.length }) }}
+                {{ $t('Projects.import_rows_found', { count: rows.length }, rows.length) }}
             </div>
 
             <div class="d-flex align-items-center jimport__controls" v-if="rows.length">

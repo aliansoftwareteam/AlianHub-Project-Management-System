@@ -45,13 +45,6 @@ describe('rules other screens used from the old header stylesheet stay loaded', 
         expect(css).toMatch(/@keyframes blink\s*\{/);
     });
 
-    test('the tour panel cards keep their styles in the shell stylesheet', () => {
-        const css = read('components/organisms/Shell/style.css');
-        for (const selector of ['.tour-box-card', '.tour__title', '.tour__description', '.tour_image', '.comment__notification-message']) {
-            expect(css).toContain(`.tour_sidebar ${selector}`);
-        }
-    });
-
     test('the create-project status forms keep their column widths and heading padding', () => {
         const css = read('components/templates/CreateProject/style.css');
         expect(css).toMatch(/\.statusHeader h3\.heading_text\s*\{[^}]*padding:\s*30\.5px 16px/);

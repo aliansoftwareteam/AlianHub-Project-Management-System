@@ -12,7 +12,7 @@
         <template v-else>
             <div class="tm__head">
                 <h2 class="ah-h3 tm__title">{{ $t('Filters.teams') }}</h2>
-                <span class="ah-label">{{ teams.length }} · {{ $t('Settings.people_count', { n: peopleCount }) }}</span>
+                <span class="ah-label">{{ teams.length }} · {{ $t('Settings.people_count', { n: peopleCount }, peopleCount) }}</span>
             </div>
 
             <EmptyState v-if="!teams.length" class="ah-empty" illustration="people" data-test="teams-empty" :title="$t('Settings.teams_empty_title')" :message="$t('Settings.teams_empty')" />
@@ -38,7 +38,7 @@
                                 <input class="ah-input tm__name-input" v-model.trim="existingValue" :aria-label="$t('Settings.team_name')" @keydown.enter.prevent="saveTeamName(row)" @keydown.esc="row.isEdit = false" @blur="row.isEdit = false" v-focus />
                             </template>
                             <button v-else type="button" class="tm__name" :disabled="editPermission !== true" @click="openInput(row)">{{ row.name }}</button>
-                            <div class="ah-small">{{ $t('Settings.people_count', { n: (row.assigneeUsersArray || []).length }) }}</div>
+                            <div class="ah-small">{{ $t('Settings.people_count', { n: (row.assigneeUsersArray || []).length }, (row.assigneeUsersArray || []).length) }}</div>
                         </div>
                     </div>
                     <Assignee

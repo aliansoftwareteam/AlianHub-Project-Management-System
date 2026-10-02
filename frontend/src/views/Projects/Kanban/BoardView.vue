@@ -49,10 +49,22 @@
             </template>
             <template v-else>
                 <div class="board-view__empty">
+                    <CreateTask
+                        v-if="creatingFirstTask"
+                        :sprint="sprints[0]"
+                        :assigneeOptions="project?.AssigneeUserId"
+                        :groupBy="grouped"
+                        :considerWidth="false"
+                        @cancel="creatingFirstTask = false"
+                        @submit="creatingFirstTask = false"
+                    />
                     <EmptyState
-                        v-if="project?.deletedStatusKey !== 2"
+                        v-else-if="project?.deletedStatusKey !== 2"
                         :title="$t(emptyTitleKey)"
                         :message="$t(emptyMessageKey)"
+                        :actionLabel="canCreateFirstTask ? $t('EmptyState.no_tasks_action') : ''"
+                        data-test="board-empty"
+                        @action="creatingFirstTask = true"
                         :sentence="emptySentenceKey ? $t(emptySentenceKey) : ''"
                         helpPath="tasks"
                     />
@@ -66,6 +78,8 @@
 import { ref, computed, onMounted, watch, inject, provide, defineProps, defineEmits } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import CreateTask from '@/components/atom/CreateTask/CreateTask.vue';
+import { useCustomComposable } from '@/composable';
 import { markFirstRunStep, FIRST_RUN_STEPS } from '@/composable/firstRunProgress';
 import isEqual from 'lodash/isEqual';
 
@@ -110,6 +124,13 @@ const showArchiveVar = inject("showArchived");
 const searchedTask = inject('searchedTask');
 const project = inject('selectedProject');
 const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
+const { checkPermission } = useCustomComposable();
+const creatingFirstTask = ref(false);
+const canCreateFirstTask = computed(() => Boolean(props.sprints?.length)
+    && !showArchiveVar.value
+    && !searchedTask.value
+    && checkPermission('task.task_create', project.value?.isGlobalPermission) === true
+    && checkPermission('task.task_list', project.value?.isGlobalPermission) === true);
 
 const customFields = useProjectCustomFields(project, { archived: showArchiveVar });
 const cardCatalogue = computed(() => columnCatalogue('board', { fields: customFields.defs.value }));
