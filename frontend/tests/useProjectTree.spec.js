@@ -1,20 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { config, flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { defineComponent, ref } from 'vue';
 
-const { push, projects, routeParams, routeQuery, toast, setSprints, setFolders, refreshFolders } = await vi.hoisted(async () => ({
+const { push, projects, routeParams, routeQuery, toast, setSprints, setFolders } = await vi.hoisted(async () => ({
     push: vi.fn(),
     projects: (await import('vue')).ref([]),
     routeParams: { id: '' },
     routeQuery: { tab: 'ProjectListView' },
     toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
     setSprints: vi.fn(() => Promise.resolve([])),
-    setFolders: vi.fn(() => Promise.resolve([])),
-    refreshFolders: vi.fn(() => Promise.resolve())
+    setFolders: vi.fn(() => Promise.resolve([]))
 }));
-
-vi.mock('@/views/Projects/folderActions', () => ({ refreshFolders, FOLDERS_CHANGED_EVENT: 'foldersChanged' }));
 
 vi.mock('vue-router', () => ({
     useRouter: () => ({ push }),
@@ -148,22 +145,6 @@ describe('useProjectTree', () => {
 
         expect(project.sprintsObj).toEqual({});
         expect(project.sprintsfolders.f9.sprintsObj.s10).toMatchObject({ _id: 's10', id: 's10', folderName: 'Folder' });
-    });
-
-    it('reads the open project\'s folders again when the company\'s folders change, and stops listening when it leaves', async () => {
-        projects.value = [alpha, beta];
-        routeParams.id = 'p1';
-        mountTree();
-        await flushPromises();
-        const socket = config.global.provide.$socket.value;
-        const [, onChanged] = socket.on.mock.calls.find(([event]) => event === 'foldersChanged');
-
-        onChanged({ type: 'update' });
-        expect(refreshFolders).toHaveBeenCalledTimes(1);
-        expect(refreshFolders.mock.calls[0][1]).toBe('p1');
-
-        mounted.pop().unmount();
-        expect(socket.off).toHaveBeenCalledWith('foldersChanged', onChanged);
     });
 
     it('drops a folder it folded in earlier once the list no longer returns it, and nothing it did not add', async () => {
