@@ -68,7 +68,7 @@ const idempotencyKeyOf = (req) => {
     return raw;
 };
 
-const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, REFUSAL } = access;
+const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, decidesProposals, staysInside, REFUSAL } = access;
 
 /* A run that is someone else's private work is not there for an owner or admin; a member's standing
  * on a run is decided by the checks each route already makes. */
@@ -610,7 +610,7 @@ exports.listProposals = async (req, res) => {
         const caller = await callerOf(req, companyId);
         const readScope = await readScopeOf(companyId, caller);
         const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope });
-        return res.send({ status: true, statusText: 'Proposals fetched.', data: await asCards(companyId, caller, out.proposals), counts: out.counts });
+        return res.send({ status: true, statusText: 'Proposals fetched.', data: await asCards(companyId, caller, out.proposals.filter(staysInside(readScope.projectIds))), counts: out.counts });
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -639,10 +639,11 @@ const decide = (action, fn) => async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid proposal id are required.');
         const caller = await callerOf(req, companyId);
-        if (!caller.human) return fail(res, 'Agents cannot decide proposals — a person has to.', 403);
+        if (!caller.human) return fail(res, REFUSAL.DECIDE_PERSON, 403);
         // One answer for a proposal that is not there and one the caller may not see.
         const proposal = await proposals.get(companyId, req.params.id);
         if (!proposal || !(await canSeeProposal(companyId, caller, proposal))) return fail(res, 'Proposal not found.', 404);
+        if (!decidesProposals(caller)) return fail(res, REFUSAL.DECIDE_MEMBER, 403, refusalOf({ reason: 'not_permitted' }));
         const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
         return res.send({ status: true, statusText: 'Done.', data: out });
