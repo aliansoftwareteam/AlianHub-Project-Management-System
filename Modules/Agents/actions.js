@@ -306,9 +306,9 @@ const executors = {
         const task = await tools.getTask(companyId, params.taskId);
         if (task.ParentTaskId) throw new tools.DeterministicError('a subtask moves with its parent');
         const target = oid(params.sprintId);
-        if (!target) throw new tools.DeterministicError('a valid sprintId is required');
+        if (!target) throw new tools.DeterministicError('a valid list id is required');
         const sprint = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: target, projectId: task.ProjectID }] }, 'findOne');
-        if (!sprint) throw new tools.DeterministicError('sprint not found in this project');
+        if (!sprint) throw new tools.DeterministicError('list not found in this project');
         const previous = { sprintId: task.sprintId, sprintArray: task.sprintArray, folderObjId: task.folderObjId || null };
         const placement = await sprintPlacementOf(companyId, sprint);
         const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset, pullOfLists([target]));

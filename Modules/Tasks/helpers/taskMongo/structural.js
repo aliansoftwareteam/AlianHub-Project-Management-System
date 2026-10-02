@@ -314,7 +314,7 @@ module.exports = {
                     }
 
                     addSprintFun(addObj).then((res) => {
-                        resolve({status: true, statusText: "Sprint added successfully", data: res.data});
+                        resolve({status: true, statusText: "List added successfully", data: res.data});
 
                         const decObj = {
                             body: {
