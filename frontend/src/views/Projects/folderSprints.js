@@ -1,5 +1,6 @@
 import { folderIdOf, folderTrail, isLiveFolder, isOrphanFolder, subfoldersOf } from '@/utils/folderTree';
 
+const DELETED = 1;
 const ARCHIVED = 2;
 const ARCHIVED_WITH_PARENT = 6;
 
@@ -12,6 +13,15 @@ export function folderWithoutLists(folders, folderId) {
     if (!folder || !isLiveFolder(folders, folder)) return null;
     const inside = [folder, ...subfoldersOf(folders, folderIdOf(folder)).filter((sub) => isLiveFolder(folders, sub))];
     return inside.flatMap(sprintsOf).some(isLiveSprint) ? null : folder;
+}
+
+/* `rows` are the folders the project's own read answers, which the live follower replaces (liveLists.js). The folded
+   copy on the project can keep a folder that read no longer lists, so the page asks here whether its folder is gone:
+   not listed, in the trash, or under a folder that is. Before the read has landed nothing is said. */
+export function folderIsGone(rows, folderId) {
+    if (!folderId || !Array.isArray(rows)) return false;
+    const folder = rows.find((row) => folderIdOf(row) === String(folderId));
+    return !folder || Number(folder.deletedStatusKey) === DELETED || isOrphanFolder(rows, folder);
 }
 
 /* What the project header names after the project: the folder in view with its parent and, when one list is shown, that list. */
