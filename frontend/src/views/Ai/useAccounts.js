@@ -113,9 +113,9 @@ export function useAccounts() {
         }
     };
 
-    const savePolicy = async (allowedModes) => {
+    const putPolicy = async (body) => {
         try {
-            const res = await apiRequest("put", env.AGENT_POLICY, { allowedModes });
+            const res = await apiRequest("put", env.AGENT_POLICY, body);
             if (!ok(res)) throw new Error(failure(res, "The policy was not saved."));
             policy.value = res.data.data || policy.value;
             return policy.value;
@@ -123,6 +123,9 @@ export function useAccounts() {
             throw new Error(thrown(error, "The policy was not saved."));
         }
     };
+
+    const savePolicy = (allowedModes) => putPolicy({ allowedModes });
+    const saveCheckBeforeDone = (on) => putPolicy({ requireCheckBeforeDone: Boolean(on) });
 
     const linkAccount = async (body) => {
         try {
@@ -191,6 +194,6 @@ export function useAccounts() {
         account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, stepCredentials, stepCredentialPolicy, manifest, runs, peopleHours,
         mode, allowed, isAllowed,
         loadAccount, loadPolicy, loadTokens, loadTokensNeedingExpiry, loadStepCredentials, loadManifest, loadRuns, loadPeopleHours,
-        savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken, renewToken
+        savePolicy, saveCheckBeforeDone, linkAccount, unlinkAccount, mintToken, revokeToken, renewToken
     };
 }
