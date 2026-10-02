@@ -7,7 +7,7 @@ const ACTIONS = Object.freeze([
     'page.comments.list', 'page.comment.create', 'page.comment.reply', 'page.comment.assign',
     'goals.list', 'goal.get', 'goal.target.set', 'goal.target.sources.add', 'goal.target.sources.remove',
     'task.lists.list', 'task.lists.add', 'task.lists.remove',
-    'fields.create', 'view.create', 'project.setup', 'project.create',
+    'fields.create', 'view.create', 'project.setup', 'project.create', 'folder.create', 'list.sprint.set',
     'automation.catalogue', 'automation.create',
 ]);
 
