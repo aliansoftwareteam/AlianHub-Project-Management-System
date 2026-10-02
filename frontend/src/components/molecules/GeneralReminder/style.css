@@ -14,13 +14,13 @@
     justify-content: center;
     padding: 24px 16px;
     overflow-y: auto;
-    background: rgba(23, 24, 36, 0.45);
+    background: var(--scrim);
 }
 
 .gr__dialog {
     width: 100%;
     max-width: 560px;
-    background: #fff;
+    background: var(--surface);
     border-radius: 12px;
     box-shadow: 0 18px 60px rgba(23, 24, 36, 0.25);
     display: flex;
@@ -34,14 +34,14 @@
     align-items: center;
     gap: 10px;
     padding: 14px 16px;
-    border-bottom: 1px solid #EDEDF3;
+    border-bottom: 1px solid var(--hairline);
 }
 /* Plain dialog title — not a tab. */
 .gr__title {
     margin: 0;
     font-size: 15px;
     font-weight: 600;
-    color: #191A2B;
+    color: var(--ink);
 }
 .gr__close {
     margin-left: auto;
@@ -50,14 +50,14 @@
     justify-content: center;
     width: 26px;
     height: 26px;
-    color: #8A8CA6;
+    color: var(--ink-2);
     background: transparent;
     border: 0;
     border-radius: 6px;
 }
 .gr__close:hover {
-    background: #F2F2F8;
-    color: #191A2B;
+    background: var(--fill);
+    color: var(--ink);
 }
 
 /* Body */
@@ -70,11 +70,11 @@
     border: 0;
     outline: none;
     font-size: 17px;
-    color: #191A2B;
+    color: var(--ink);
     padding: 2px 0 6px;
 }
 .gr__name::placeholder {
-    color: #A5A6BA;
+    color: var(--ink-2);
 }
 .gr__adddesc {
     display: inline-flex;
@@ -82,27 +82,27 @@
     gap: 7px;
     padding: 4px 0;
     font-size: 13px;
-    color: #8A8CA6;
+    color: var(--ink-2);
     background: transparent;
     border: 0;
 }
 .gr__adddesc:hover {
-    color: #2F3990;
+    color: var(--brand);
 }
 .gr__desc {
     width: 100%;
     margin-top: 4px;
     padding: 8px 10px;
     font-size: 13px;
-    color: #191A2B;
-    border: 1px solid #E5E7EB;
+    color: var(--ink);
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     outline: none;
     resize: vertical;
     font-family: inherit;
 }
 .gr__desc:focus {
-    border-color: #AEB5DC;
+    border-color: var(--brand-border);
 }
 
 /* Chips */
@@ -123,15 +123,15 @@
     padding: 0 10px;
     font-size: 12.5px;
     font-weight: 500;
-    color: #4A4B58;
-    background: #fff;
-    border: 1px solid #E1E1EF;
+    color: var(--ink-label);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     white-space: nowrap;
 }
 .gr__chip:hover {
-    border-color: #AEB5DC;
-    background: #F5F7FF;
+    border-color: var(--brand-border);
+    background: var(--brand-tint);
 }
 .gr__avatar {
     display: inline-flex;
@@ -140,8 +140,8 @@
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: #2F3990;
-    color: #fff;
+    background: var(--brand);
+    color: var(--on-brand);
     font-size: 9.5px;
     font-weight: 600;
 }
@@ -155,8 +155,8 @@
     width: max-content;
     min-width: 268px;
     padding: 10px;
-    background: #fff;
-    border: 1px solid #E5E7EB;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 10px;
     box-shadow: 0 10px 30px rgba(23, 24, 36, 0.14);
 }
@@ -171,7 +171,7 @@
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: #9092AC;
+    color: var(--ink-2);
 }
 .gr__presets {
     display: flex;
@@ -184,27 +184,27 @@
     font-size: 12px;
     line-height: 1.2;
     white-space: nowrap;
-    color: #4A4B58;
-    background: #F4F4FA;
+    color: var(--ink-label);
+    background: var(--fill);
     border: 0;
     border-radius: 6px;
 }
 .gr__preset:hover {
-    background: #EAEEFF;
-    color: #2F3990;
+    background: var(--brand-tint);
+    color: var(--brand);
 }
 .gr__dtinput {
     width: 100%;
     padding: 7px 8px;
     font-size: 13px;
-    color: #191A2B;
-    border: 1px solid #E5E7EB;
+    color: var(--ink);
+    border: 1px solid var(--hairline);
     border-radius: 7px;
     outline: none;
     font-family: inherit;
 }
 .gr__dtinput:focus {
-    border-color: #AEB5DC;
+    border-color: var(--brand-border);
 }
 .gr__popfoot {
     display: flex;
@@ -215,13 +215,13 @@
     padding: 5px 12px;
     font-size: 12px;
     font-weight: 600;
-    color: #fff;
-    background: #2F3990;
+    color: var(--on-brand);
+    background: var(--brand);
     border: 0;
     border-radius: 6px;
 }
 .gr__popdone:hover {
-    background: #262E75;
+    background: var(--brand-deep);
 }
 .gr__opt {
     display: flex;
@@ -230,28 +230,28 @@
     gap: 8px;
     padding: 7px 8px;
     font-size: 13px;
-    color: #191A2B;
+    color: var(--ink);
     background: transparent;
     border: 0;
     border-radius: 6px;
     text-align: left;
 }
 .gr__opt:hover {
-    background: #F4F4FA;
+    background: var(--fill);
 }
 .gr__opt.is-sel {
-    color: #2F3990;
+    color: var(--brand);
     font-weight: 500;
 }
 .gr__tick {
     margin-left: auto;
-    color: #2F3990;
+    color: var(--brand);
     flex: none;
 }
 .gr__sep {
     height: 1px;
     margin: 5px 0;
-    background: #EDEDF3;
+    background: var(--fill);
 }
 .gr__custom {
     display: flex;
@@ -259,26 +259,26 @@
     gap: 6px;
     padding: 6px 8px;
     font-size: 12px;
-    color: #6B6B70;
+    color: var(--ink-2);
 }
 .gr__custominput {
     width: 62px;
     padding: 5px 7px;
     font-size: 12.5px;
-    border: 1px solid #E5E7EB;
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     outline: none;
     font-family: inherit;
 }
 .gr__custominput:focus {
-    border-color: #AEB5DC;
+    border-color: var(--brand-border);
 }
 
 /* Attachments */
 .gr__attach {
     margin-top: 14px;
     padding: 10px;
-    border: 1px solid #E5E7EB;
+    border: 1px solid var(--hairline);
     border-radius: 10px;
 }
 .gr__attachhead {
@@ -286,7 +286,7 @@
     font-weight: 600;
     letter-spacing: 0.03em;
     text-transform: uppercase;
-    color: #9092AC;
+    color: var(--ink-2);
     margin-bottom: 8px;
 }
 .gr__file {
@@ -295,43 +295,43 @@
     gap: 8px;
     padding: 7px 9px;
     margin-bottom: 6px;
-    background: #FAFAFD;
-    border: 1px solid #EDEDF3;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
     border-radius: 7px;
 }
 .gr__fileok {
-    color: #177C5C;
+    color: var(--ok-ink);
     flex: none;
 }
 .gr__filename {
     flex: 1;
     min-width: 0;
     font-size: 12.5px;
-    color: #191A2B;
+    color: var(--ink);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .gr__filex {
     display: inline-flex;
-    color: #9092AC;
+    color: var(--ink-2);
     background: transparent;
     border: 0;
     flex: none;
 }
 .gr__filex:hover {
-    color: #A32D2D;
+    color: var(--danger-ink);
 }
 .gr__drop {
     padding: 10px;
     font-size: 12px;
-    color: #9092AC;
+    color: var(--ink-2);
     text-align: center;
-    border: 1px dashed #D6D8E7;
+    border: 1px dashed var(--border);
     border-radius: 8px;
 }
 .gr__browse {
-    color: #2F3990;
+    color: var(--brand);
     font-weight: 500;
     text-decoration: underline;
 }
@@ -345,7 +345,7 @@
     align-items: center;
     gap: 10px;
     padding: 12px 16px;
-    border-top: 1px solid #EDEDF3;
+    border-top: 1px solid var(--hairline);
 }
 .gr__clip {
     display: inline-flex;
@@ -353,29 +353,29 @@
     justify-content: center;
     width: 32px;
     height: 32px;
-    color: #6B6B70;
+    color: var(--ink-2);
     background: transparent;
-    border: 1px solid #E1E1EF;
+    border: 1px solid var(--hairline);
     border-radius: 8px;
 }
 .gr__clip:hover,
 .gr__clip.is-on {
-    color: #2F3990;
-    background: #EAEEFF;
-    border-color: #AEB5DC;
+    color: var(--brand);
+    background: var(--brand-tint);
+    border-color: var(--brand-border);
 }
 .gr__create {
     margin-left: auto;
     padding: 8px 16px;
     font-size: 13.5px;
     font-weight: 600;
-    color: #fff;
-    background: #2F3990;
+    color: var(--on-brand);
+    background: var(--brand);
     border: 0;
     border-radius: 8px;
 }
 .gr__create:hover:not(:disabled) {
-    background: #262E75;
+    background: var(--brand-deep);
 }
 .gr__create:disabled {
     opacity: 0.5;
