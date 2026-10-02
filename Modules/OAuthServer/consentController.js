@@ -66,16 +66,16 @@ const standingIn = (companyId, client, approval, scopes) => {
     return { approval: approval.status, eligible: true, reason: '' };
 };
 
-/* A manage scope is the person's to give or keep back: it is granted only when the client asked for it and the
+/* An opt-in scope is the person's to give or keep back: it is granted only when the client asked for it and the
  * person ticked it. Everything else asked for is granted together, as before. */
 const partsOf = (scopes) => ({
-    asked: scopes.filter((scope) => !config.isManageScope(scope)),
-    optional: scopes.filter((scope) => config.isManageScope(scope)),
+    asked: scopes.filter((scope) => !config.isOptInScope(scope)),
+    optional: scopes.filter((scope) => config.isOptInScope(scope)),
 });
 
 const tickedOf = (value) => (Array.isArray(value) ? value : [value]).filter((scope) => typeof scope === 'string');
 
-const grantedOf = (opened, ticked) => opened.scopes.filter((scope) => !config.isManageScope(scope) || ticked.includes(scope));
+const grantedOf = (opened, ticked) => opened.scopes.filter((scope) => !config.isOptInScope(scope) || ticked.includes(scope));
 
 // The person, from their session, never an API token: a token is not someone consenting.
 const personOrRefuse = (req, res) => {

@@ -46,11 +46,18 @@ const server = require('../Modules/Mcp/server');
 
 const {
     OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, L_OPEN, L_SECRET, L_PRIVATE, T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, OPENS,
-    MISSING, BEFORE, FLAGS, ctx, narrowed, readOnly, outside, settle,
+    MISSING, TOKEN, BEFORE, FLAGS, outside, settle,
 } = world;
 const { seed, rows, stored, setRule, rpcThrough, listedThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
+
+const CHAT = 'chat:read';
+/* A token its person created to read chat: the scope is in no other, so every caller here holds it by name. */
+const ctx = (uid, over = {}) => world.ctx(uid, { token: { _id: TOKEN, userId: uid, scopes: ['read', 'write'], grants: [CHAT], active: true }, ...over });
+const narrowed = (uid, projectIds) => ctx(uid, { projectIds });
+const readOnly = (uid) => ctx(uid, { canWrite: false, token: { _id: TOKEN, userId: uid, scopes: ['read'], grants: [CHAT], active: true } });
+const EVERY_OTHER_SCOPE = ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write', 'tasks:manage', 'docs:manage'];
 
 const CHANNELS = 'chat.channels.list';
 const MESSAGES = 'chat.messages.list';
@@ -118,12 +125,12 @@ describe('the tools exist with the read tools', () => {
         expect(await inChannel(ctx(OWNER), C_OPEN)).toEqual({ rpcError: { code: -32601, message: `Unknown tool "${MESSAGES}"` } });
     });
 
-    it.each(BOTH)('on, %s is a read that needs the right to see comments and changes nothing', async (name) => {
+    it.each(BOTH)('on, %s is a read that needs the chat scope and the right to see comments, and changes nothing', async (name) => {
         expect(await listed(ctx(OWNER))).toContain(name);
         expect(registry.get(name)).toMatchObject({ write: false, risk: 'low', undoable: false });
         expect(registry.permissionsFor(name)).toEqual([{ key: 'task.task_comment', write: false }]);
         expect(actions.rating(name)).toMatchObject({ write: false, money: false });
-        expect(scopes.scopeForTool(name)).toBe('tasks:read');
+        expect(scopes.scopeForTool(name)).toBe(CHAT);
         expect(tools.registered().find((tool) => tool.name === name).strict).toBe(true);
     });
 
@@ -138,12 +145,50 @@ describe('the tools exist with the read tools', () => {
         expect(listedTool.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
     });
 
-    it('answers a connection that only reads, and refuses one that may not read tasks', async () => {
+    it('answers a connection that only reads, when it holds the chat scope', async () => {
         message();
         expect((await channels(readOnly(OWNER))).channels.length).toBeGreaterThan(0);
         expect((await inChannel(readOnly(OWNER), C_OPEN)).messages).toHaveLength(1);
-        expect(await channels(outside(OWNER, ['projects:read']))).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:read scope/) });
-        expect(await inChannel(outside(OWNER, ['projects:read']), C_OPEN)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:read scope/) });
+        expect((await inChannel(outside(OWNER, [CHAT]), C_OPEN)).messages).toHaveLength(1);
+        expect((await channels(outside(OWNER, ['tasks:read', CHAT]))).channels.length).toBeGreaterThan(0);
+    });
+
+    describe('the chat scope is in no other scope', () => {
+        const WITHOUT = {
+            'a token that reads and writes': () => world.ctx(OWNER),
+            'a token that only reads': () => world.readOnly(OWNER),
+            'a token created to manage tasks and write docs': () => world.ctx(OWNER, { token: { _id: TOKEN, userId: OWNER, scopes: ['read', 'write'], grants: ['tasks:manage', 'docs:manage'], active: true } }),
+            'a token whose scope list names it without the person having given it': () => world.ctx(OWNER, { token: { _id: TOKEN, userId: OWNER, scopes: ['read', 'write', CHAT], active: true } }),
+            'an app that reads tasks': () => outside(OWNER, ['tasks:read']),
+            'an app that holds every other scope': () => outside(OWNER, EVERY_OTHER_SCOPE),
+        };
+
+        it.each(Object.keys(WITHOUT))('%s is listed neither tool and is refused both, with nothing read', async (who) => {
+            process.env.MCP_TOOLS_MANAGE = 'on';
+            message({ message: 'Not for this connection' });
+            const caller = WITHOUT[who]();
+            const names = await listed(caller);
+            expect(names).toEqual(expect.arrayContaining(['tasks.search', 'comments.list']));
+            BOTH.forEach((name) => expect(names).not.toContain(name));
+            mockDb.calls.length = 0;
+            for (const answer of [await channels(caller), await inChannel(caller, C_OPEN), await inTask(caller, T_OPEN)]) {
+                expect(answer).toMatchObject({ isError: true, error: 'This token lacks the chat:read scope.' });
+                expect(JSON.stringify(answer)).not.toMatch(/scratch|Not for this connection/);
+            }
+            expect(mockDb.calls).toHaveLength(0);
+        });
+
+        it('the same callers are listed both and read once the person gives the scope by name', async () => {
+            message();
+            expect(await listed(ctx(OWNER))).toEqual(expect.arrayContaining(BOTH));
+            expect(await listed(outside(OWNER, ['tasks:read', CHAT]))).toEqual(expect.arrayContaining(BOTH));
+            expect((await inChannel(ctx(OWNER), C_OPEN)).messages).toHaveLength(1);
+        });
+
+        it('the instructions and prompts of a connection without it never send it to either tool', async () => {
+            const told = (await server.handleRpc(world.ctx(OWNER), { jsonrpc: '2.0', id: 1, method: 'initialize', params: {} })).result.instructions;
+            BOTH.forEach((name) => expect(told).not.toContain(name));
+        });
     });
 
     it('takes one channel or one task, and a count it caps', async () => {

@@ -271,8 +271,9 @@ const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.a
 
 const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...intentTools.TOOLS, ...contextTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
 
-/* A tool that needs a grant is one only a caller holding that grant lists or runs. */
-const holdsGrantFor = (ctx, tool) => !tool.grant || manageFlag.mayUse(ctx, tool.grant);
+/* A tool that needs a grant, or a scope a person gives only by name, is one only a caller holding it lists or runs. */
+const holdsOptIn = (ctx, tool) => !tool.optIn || scopes.grantedScopes(ctx && ctx.token).includes(tool.optIn);
+const holdsGrantFor = (ctx, tool) => (!tool.grant || manageFlag.mayUse(ctx, tool.grant)) && holdsOptIn(ctx, tool);
 
 /* For a caller whose token was created to manage tasks, an existing tool is its fuller form; for everyone else it is as it was. */
 const formFor = (ctx, tool) => {
@@ -323,6 +324,7 @@ const refuseBadArguments = (tool, args) => {
 };
 
 const scopeRefusal = (ctx, tool, write) => {
+    if (!holdsOptIn(ctx, tool)) return `This token lacks the ${tool.optIn} scope.`;
     if (tool.grant && !manageFlag.holdsGrant(ctx.token, tool.grant)) return `This token does not hold the ${tool.grant} grant, which ${tool.name} needs.`;
     if (tool.grant && !manageFlag.mayUse(ctx, tool.grant)) return 'This token is read-only.';
     if (ctx.token && ctx.token.oauth) {

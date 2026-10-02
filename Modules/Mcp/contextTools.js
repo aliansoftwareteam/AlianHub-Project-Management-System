@@ -242,14 +242,6 @@ const TOOLS = [
     ...chatTools.TOOLS,
 ];
 
-const SCOPES = Object.freeze({
-    [ME]: 'projects:read',
-    [WORKDAYS]: 'projects:read',
-    [FIELDS]: 'tasks:read',
-    [PROPOSAL]: 'tasks:read',
-    ...chatTools.SCOPES,
-});
-
 const offered = () => TOOLS.filter((tool) => registry.has(tool.action));
 
-module.exports = { TOOLS, SCOPES, offered };
+module.exports = { TOOLS, offered };

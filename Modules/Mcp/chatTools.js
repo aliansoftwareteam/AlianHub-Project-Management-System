@@ -9,12 +9,14 @@ const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
 const { commentPlainText } = require('../Comments/helpers/plainText');
 const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
 const { isSomeoneElsesPersonalList } = require('../PersonalList/ownership');
+const { CHAT_SCOPE } = require('../../Config/mcpOAuth');
 const { TASK_ACCESS_FIELDS } = require('./visibility');
 const { turnBackIfKeptAway, askThePerson } = require('./readGate');
 
 // Reading chat: the channels the chat sidebar lists for the person, and the recent messages of one channel or of one
 // task's thread. A thread is read by the rule the web chat reads it by (Comments/helpers/threadAccess), inside the
-// connection's own limits. Direct messages are left out altogether: nothing here lists or reads one.
+// connection's own limits. Direct messages are left out altogether: nothing here lists or reads one. Both tools need
+// the chat scope, which no other scope carries: a connection holds it only when its person gave it by name.
 
 const CHANNELS = 'chat.channels.list';
 const MESSAGES = 'chat.messages.list';
@@ -129,6 +131,7 @@ const TOOLS = [
         description: 'The chat channels the person can open, by name, each with its id. Read one with chat.messages.list. Direct messages are not listed.',
         input: input({ query: { type: 'string', maxLength: 120, description: 'Part of the channel name' } }, []),
         strict: true,
+        optIn: CHAT_SCOPE,
         visibility: 'none',
         visibilityReason: NOT_IN_A_PROJECT,
         readParams: () => ({}),
@@ -146,6 +149,7 @@ const TOOLS = [
             limit: { type: 'integer', minimum: 1, maximum: COUNT_MAX },
         }, []),
         strict: true,
+        optIn: CHAT_SCOPE,
         check: (args) => ((args.channelId === undefined) === (args.taskId === undefined) ? 'name one channelId or one taskId' : ''),
         visibility: 'filtered',
         authorizesPerProject: true,
@@ -163,6 +167,4 @@ const TOOLS = [
     },
 ];
 
-const SCOPES = Object.freeze({ [CHANNELS]: 'tasks:read', [MESSAGES]: 'tasks:read' });
-
-module.exports = { TOOLS, SCOPES };
+module.exports = { TOOLS };

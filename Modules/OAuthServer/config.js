@@ -6,17 +6,24 @@ const DAY_MS = 24 * 60 * MINUTE_MS;
  * personal token's write. A client asks for one, the person ticks it at consent, and an owner or admin
  * names it in the workspace's approval of that client. */
 const MANAGE_SCOPES = Object.freeze(['tasks:manage', 'docs:manage']);
-const SCOPES = Object.freeze(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write', ...MANAGE_SCOPES]);
-const READ_SCOPES = Object.freeze(SCOPES.filter((scope) => scope.endsWith(':read')));
+/* Reading chat is given the same way and no other: it is not part of reading tasks, of a default approval, of a
+ * personal token's read or of a manage scope. */
+const CHAT_SCOPE = 'chat:read';
+const OPT_IN_SCOPES = Object.freeze([...MANAGE_SCOPES, CHAT_SCOPE]);
+const SCOPES = Object.freeze(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write', ...OPT_IN_SCOPES]);
 const isManageScope = (scope) => MANAGE_SCOPES.includes(scope);
-const PLAIN_SCOPES = Object.freeze(SCOPES.filter((scope) => !isManageScope(scope)));
+const isOptInScope = (scope) => OPT_IN_SCOPES.includes(scope);
+const READ_SCOPES = Object.freeze(SCOPES.filter((scope) => scope.endsWith(':read') && !isOptInScope(scope)));
+const PLAIN_SCOPES = Object.freeze(SCOPES.filter((scope) => !isOptInScope(scope)));
 
-// A manage scope unlocks nothing while its tools are off, so it is neither listed nor taken at authorization then.
+// An opt-in scope unlocks nothing while its tools are off, so it is neither listed nor taken at authorization then.
 const manageOffered = () => require('../Mcp/manageFlag').enabled();
-const offeredScopes = () => (manageOffered() ? [...SCOPES] : [...PLAIN_SCOPES]);
+const chatOffered = () => require('../Mcp/dataFlag').enabled();
+const isOffered = (scope) => (isManageScope(scope) ? manageOffered() : scope !== CHAT_SCOPE || chatOffered());
+const offeredScopes = () => SCOPES.filter(isOffered);
 
 /* The scopes a client named for itself, or null when it named none and may ask for any. A pre-registered
- * client that named none is taken to have named every scope but the manage ones. */
+ * client that named none is taken to have named every scope but the opt-in ones. */
 const namedScopes = (client) => {
     const named = Array.isArray(client.scopes) ? client.scopes : [];
     if (named.length) return named;
@@ -24,9 +31,9 @@ const namedScopes = (client) => {
 };
 
 const mayAskFor = (client, scope) => {
-    if (!isManageScope(scope)) return true;
+    if (!isOptInScope(scope)) return true;
     const named = namedScopes(client);
-    return manageOffered() && (!named || named.includes(scope));
+    return isOffered(scope) && (!named || named.includes(scope));
 };
 
 const CODE_TTL_MS = MINUTE_MS;
@@ -130,6 +137,6 @@ const endpoints = (env = process.env) => {
 };
 
 module.exports = {
-    SCOPES, READ_SCOPES, MANAGE_SCOPES, PLAIN_SCOPES, isManageScope, offeredScopes, namedScopes, mayAskFor, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS, MODE,
+    SCOPES, READ_SCOPES, MANAGE_SCOPES, CHAT_SCOPE, OPT_IN_SCOPES, PLAIN_SCOPES, isManageScope, isOptInScope, offeredScopes, namedScopes, mayAskFor, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS, MODE,
     mode, isOn, dcrOn, lifetimes, rateLimitPerMinute, metadataCacheMs, issuer, issuerProblem, assertIssuer, resource, canonicalResource, endpoints,
 };

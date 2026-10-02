@@ -23,16 +23,19 @@ Three things, in this order.
    |---|---|
    | `tasks:manage` | `task.update`, `task.assign`, `task.field.set`, `task.move`, `task.archive`, `task.restore`, `tasks.batch`, `comment.update`, the reads `fields.list`, `subtasks.list`, `members.list`, `task.history`, `task.links.list`, and the fuller forms of `tasks.search`, `task.get`, `task.create`, `subtask.create`, `task.comment` and `task.status.set` |
    | `docs:manage` | `page.create`, `page.update` |
+   | `chat:read` | `chat.channels.list`, `chat.messages.list` |
 
-   A token keeps exactly what it was created with. A grant cannot be added to a token later, so a token made before these tools existed lists and runs exactly what it did before; create a new token to use them. The two grants are separate: a token may manage tasks without writing docs, and the reverse.
+   A token keeps exactly what it was created with. A grant cannot be added to a token later, so a token made before these tools existed lists and runs exactly what it did before; create a new token to use them. The grants are separate: a token may manage tasks without writing docs, and the reverse. Reading chat is its own grant too: no scope and no other grant carries it, so a token reads chat only when its person ticked it by name.
 
 3. **What the person may do.** Each call is checked against the person's role and the project's permissions, the projects and private lists they can open, and the token's own project list when it was narrowed to some projects. Another person's personal list and a conversation the person is not in are closed to everyone, owners and admins included.
 
-An agent connected through OAuth (`MCP_OAUTH`) is held to the scopes its connection names. It can hold either grant as the scope of the same name, `tasks:manage` or `docs:manage`, and only when all three of these are true:
+An agent connected through OAuth (`MCP_OAUTH`) is held to the scopes its connection names. It can hold each grant as the scope of the same name, `tasks:manage`, `docs:manage` or `chat:read`, and only when all three of these are true:
 
 - **The app asked for it** when it sent the person to sign in.
-- **The person ticked it** on the consent screen. Both start unticked, each with a sentence saying what it allows; everything else the app asked for is granted together as before.
-- **An owner or admin approved it for that app by name** under Settings, Agent clients. Approving an app without choosing permissions never includes either one, and an app an admin registered without a list of permissions cannot be given them at all; register it again naming them.
+- **The person ticked it** on the consent screen. Each starts unticked, with a sentence saying what it allows (for `chat:read`, "Read messages in channels you are in"); everything else the app asked for is granted together as before.
+- **An owner or admin approved it for that app by name** under Settings, Agent clients. Approving an app without choosing permissions never includes any of them, and an app an admin registered without a list of permissions cannot be given them at all; register it again naming them.
+
+`chat:read` is listed and can be asked for only while `MCP_TOOLS_DATA` is on. It is not one of the scopes an app gets when it asks for none, and `tasks:read` does not include it: an app connected before it existed reads no chat until its person connects it again and ticks it.
 
 The `MCP_TOOLS_WORK` tools take the plain scopes: `projects:read` for `tags.list`, `lists.list`, `goals.list` and `goal.get`, `tasks:read` for `task.relations.list` and `task.lists.list`, `docs:read` for `page.comments.list`, and `tasks:write` for each of their writes.
 
@@ -55,8 +58,8 @@ Sign-up ends on a step called **Connect your AI**, and the same page stays under
 In the web app, open the AI accounts page, choose **My account**, then **New token**.
 
 - Give it a name, and choose the project it is limited to, or all your projects.
-- Tick **Let this agent manage tasks** to create it with `tasks:manage`, and **Let this agent write docs** to create it with `docs:manage`. The boxes are shown only while `MCP_TOOLS_MANAGE` is on. Leave both unticked for an agent that should only read, comment, set an in-progress status and file tasks, and, where `MCP_TOOLS_WORK` is on, tag and link tasks, create, rename and move lists and comment on docs.
-- Where the server requires it, choose an expiry and the read and write scopes. A grant needs the write scope.
+- Tick **Let this agent manage tasks** to create it with `tasks:manage`, and **Let this agent write docs** to create it with `docs:manage`. The boxes are shown only while `MCP_TOOLS_MANAGE` is on. Tick **Let this agent read chat** to create it with `chat:read`; that box is shown only while `MCP_TOOLS_DATA` is on. Leave both unticked for an agent that should only read, comment, set an in-progress status and file tasks, and, where `MCP_TOOLS_WORK` is on, tag and link tasks, create, rename and move lists and comment on docs.
+- Where the server requires it, choose an expiry and the read and write scopes. A manage grant needs the write scope, and reading chat needs the read scope.
 
 The token is shown once. Add it to the agent as a bearer token:
 
@@ -549,7 +552,7 @@ The answer is `{ "of": "workspace", "workingDays": ["Monday", ...], "dayNumbers"
 
 The answer is `{ "taskId", "projectId", "about": "...", "fields": [{ "fieldId", "title", "type", "value" }] }`, by field name. `value` is text, a number, true or false, an ISO date, the labels of the options chosen, or `[{ "id", "name" }]` for people; null when the field is empty. A text longer than 2,000 characters is cut and carries `"cut": true`. A formula or rollup field carries `"computed": true` and the number AlianHub stored for it. A field whose value is kept beside the task (votes, linked tasks) is named with `"notReadHere": true` and no value. A field that is switched off, that belongs to another project, or that is for another task type is left out. A task the person cannot open answers `{ "error": "task not found" }`, as a missing one does.
 
-**Reading chat.** `chat.channels.list` lists the chat channels the person can open, and `chat.messages.list` reads the recent messages of one channel or of one task's comment thread. Both need `MCP_TOOLS_DATA`, the right to read tasks, and a role that is shown comments. Direct messages are never listed or read.
+**Reading chat.** `chat.channels.list` lists the chat channels the person can open, and `chat.messages.list` reads the recent messages of one channel or of one task's comment thread. Both need `MCP_TOOLS_DATA`, the `chat:read` scope and a role that is shown comments. A connection without `chat:read` is listed neither tool, and a call of one is refused before anything is read. Direct messages are never listed or read.
 
 ```json
 { "name": "chat.channels.list", "arguments": { "query": "scratch" } }
