@@ -30,27 +30,18 @@ jest.mock('../common-storage/common-server.js', () => mockStub());
 process.env.STORAGE_TYPE = 'server';
 
 const mongoHelper = require('../Modules/Tasks/helpers/mongo_helper');
-const socketEmitter = require('../event/socketEventEmitter');
-const taskNotices = require('../Modules/Tasks/helpers/handleNotification');
-const domainEventBus = require('../event/domainEventBus');
-const matcher = require('../Modules/Automations/engine/matcher');
-const assignmentRules = require('../Modules/AssignmentRules/engine');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const importers = require('../Modules/Importers/controller');
-const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
-const { TASK_ACTION_FIELDS } = require('../Modules/Tasks/helpers/taskWriteFields');
 const guardFixture = require('./fixtures/taskWriteGuard');
 
 mongoHelper.getTotalSprintCount = async () => true;
 
 const { CID, OWNER, OPEN_PROJECT: PROJECT } = guardFixture;
-const OTHER_PROJECT = '6f0000000000000000000a09';
 const SPRINT = '6f0000000000000000000e01';
 const guard = guardFixture.create(mockDb);
 const settle = async () => { for (let i = 0; i < 40; i += 1) await new Promise((resolve) => setImmediate(resolve)); };
 
 const STATUSES = [{ name: 'To Do', key: 1, type: 'default_active' }, { name: 'In Progress', key: 2, type: 'active' }, { name: 'Done', key: 3, type: 'close' }];
-const DONE = STATUSES[2];
 const LIST = { 'List Name': 'Website relaunch', 'Folder Name': 'Marketing', 'Space Name': 'Acme' };
 const fileRows = (statuses = {}) => [
     { ...LIST, 'Task ID': 'c1', 'Task Name': 'Write the copy', Status: statuses.c1 === undefined ? 'to do' : statuses.c1, 'Story Points (number)': '3' },
