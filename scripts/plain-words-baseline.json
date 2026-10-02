@@ -48,16 +48,7 @@
     "Members.start_sprint": [
       "sprint"
     ],
-    "Projects.health_by_signals": [
-      "sprint"
-    ],
-    "Projects.health_note": [
-      "sprint"
-    ],
     "Projects.no_burndown_data": [
-      "sprint"
-    ],
-    "Projects.why_sprint_over": [
       "sprint"
     ],
     "Provenance.velocity_line": [

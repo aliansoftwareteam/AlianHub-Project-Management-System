@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deriveHealth } from '@/views/Projects/ProjectsListing/useProjectHealth';
+import en from '@/locales/en';
 
 const DAY = 86400000;
 const snap = (over = {}) => ({ loading: false, loaded: true, total: 10, done: 5, overdue: 0, progressPct: 50, sprint: null, ...over });
@@ -31,5 +32,15 @@ describe('deriveHealth', () => {
     it('is blocked when the sprint ended with work left', () => {
         const sprint = { startDate: new Date(Date.now() - 10 * DAY).toISOString(), endDate: new Date(Date.now() - DAY).toISOString() };
         expect(deriveHealth({}, snap({ sprint, progressPct: 60 })).key).toBe('blocked');
+    });
+});
+
+describe('what the Projects page says about health', () => {
+    it.each(['health_note', 'health_by_signals', 'why_sprint_over', 'why_burndown', 'why_clear'])('%s is in plain words', (key) => {
+        expect(en.Projects[key]).not.toMatch(/sprint|burn-?down/i);
+    });
+
+    it('keeps the numbers the late-work line fills in', () => {
+        ['{drift}', '{done}', '{elapsed}'].forEach((slot) => expect(en.Projects.why_burndown).toContain(slot));
     });
 });

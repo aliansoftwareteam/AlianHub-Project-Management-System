@@ -105,6 +105,7 @@ import Sidebar from "@/components/molecules/Sidebar/Sidebar.vue"
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 import { useI18n } from "vue-i18n";
+import { twinNotes } from "@/utils/agentTwins";
 
 // UTILS
 const {getUser, getTeam} = useGetterFunctions();
@@ -284,6 +285,7 @@ const detailedOptions = computed(() => {
         // res[isDisplayTeam.value ? 1: 0].options.push(x);
     })
     if (props.agents.length) {
+        const noteOf = twinNotes(props.agents.filter((agent) => !agent.connected));
         res.push({
             label: t('TaskPanel.agents_group'),
             options: props.agents.map((agent) => ({
@@ -294,6 +296,7 @@ const detailedOptions = computed(() => {
                 type: 'agent',
                 agentId: agent._id,
                 ...(agent.connected ? { connected: true, ownerId: agent.ownerId, shownAs: agent.shownAs } : {}),
+                ...(!agent.connected && noteOf(agent) ? { designation: noteOf(agent) } : {}),
                 tag: t('TaskPanel.agent_tag'),
                 teamColor: { color: '#fff', bgColor: 'var(--agent)' }
             }))

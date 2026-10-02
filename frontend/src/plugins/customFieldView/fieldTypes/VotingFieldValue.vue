@@ -16,14 +16,14 @@
         </button>
         <span v-if="!compact && voters.length" class="ftv__voters" role="group" :aria-label="$t('FieldTypes.voting_voters')">
             <span v-for="voter in voters" :key="voter.id" class="ah-avatar ah-avatar--sm" data-voter :title="voter.name">
-                <img v-if="voter.image" :src="voter.image" alt="" />
-                <template v-else>{{ voter.initial }}</template>
+                <AvatarImage :src="voter.image">{{ voter.initial }}</AvatarImage>
             </span>
         </span>
     </span>
 </template>
 
 <script setup>
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";

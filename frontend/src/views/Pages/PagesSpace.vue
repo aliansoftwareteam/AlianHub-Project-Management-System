@@ -223,6 +223,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
@@ -418,7 +419,7 @@ const avatarNode = (userId, agent) => {
     if (agent) return h('span', { class: 'ah-avatar ah-avatar--sm ah-avatar--agent' }, h(ShellIcon, { name: 'agent', size: 12 }));
     const user = userOf(userId);
     if (!user) return null;
-    return h('span', { class: 'ah-avatar ah-avatar--sm', title: user.name }, user.image ? h('img', { src: user.image, alt: '' }) : user.initials);
+    return h('span', { class: 'ah-avatar ah-avatar--sm', title: user.name }, h(AvatarImage, { src: user.image || '' }, () => user.initials));
 };
 
 const reviewChip = (page) => (page.isWiki

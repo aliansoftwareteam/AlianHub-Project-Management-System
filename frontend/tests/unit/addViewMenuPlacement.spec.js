@@ -65,7 +65,8 @@ function measure(element) {
 const panel = () => document.getElementById('dd_embeddropdown');
 const panelRight = () => px(panel().style.left) + PANEL.width;
 
-async function openMenu() {
+/* A size observer reports when the page draws a frame; a page that draws none (a tab in the background) hears nothing from it. */
+async function openMenu({ frames = true } = {}) {
     wrapper = mount(AddViewMenu, {
         props: { projectData: { _id: 'p1', ProjectRequiredComponent: [] } },
         attachTo: '#app',
@@ -76,7 +77,7 @@ async function openMenu() {
     vi.advanceTimersByTime(150);
     state.release({ data: CATALOGUE });
     await flushPromises();
-    resizeAll();
+    if (frames) resizeAll();
 }
 
 beforeEach(() => {
@@ -110,6 +111,28 @@ describe('the Add view menu placement', () => {
         expect(panel().querySelector('.view__list-dropdown')).not.toBeNull();
         expect(panelRight()).toBeLessThanOrEqual(WINDOW.width - MARGIN);
         expect(px(panel().style.left)).toBeGreaterThanOrEqual(MARGIN);
+    });
+
+    it('stays inside the window when the views load and the page draws no frame', async () => {
+        triggerRect = rectOf(850, 20, 150, 30);
+        await openMenu({ frames: false });
+
+        expect(panel().querySelector('.view__list-dropdown')).not.toBeNull();
+        expect(panelRight()).toBeLessThanOrEqual(WINDOW.width - MARGIN);
+        expect(px(panel().style.left)).toBe(1000 - PANEL.width);
+    });
+
+    it('moves back inside when the window gets narrower while it is open', async () => {
+        triggerRect = rectOf(700, 76, 90, 28);
+        await openMenu();
+        expect(px(panel().style.left)).toBe(790 - PANEL.width);
+
+        Object.defineProperty(document.documentElement, 'clientWidth', { configurable: true, value: 800 });
+        triggerRect = rectOf(300, 76, 90, 28);
+        window.dispatchEvent(new Event('resize'));
+
+        expect(px(panel().style.left)).toBe(300);
+        expect(panelRight()).toBeLessThanOrEqual(800 - MARGIN);
     });
 
     it('opens beside its button when there is room', async () => {

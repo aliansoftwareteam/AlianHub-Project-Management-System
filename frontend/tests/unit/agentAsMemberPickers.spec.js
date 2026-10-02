@@ -32,6 +32,10 @@ import en from '@/locales/en';
 const ENTRY = { ownerId: 'u1', name: 'Claude', ownerName: 'Asha Rao', shownAs: 'Claude, for Asha Rao', lastWorkedAt: '2026-10-01T09:00:00.000Z', mine: true };
 const OWN_AI = { _id: 'own_u1', name: 'Claude', connected: true, ownerId: 'u1', shownAs: 'Claude, for Asha Rao', mentionKey: 'myai_u1' };
 const REVIEWER = { _id: 'a1', name: 'Reviewer', autonomy: 1 };
+const TWINS = [
+    { _id: 'a2', name: 'QA Reviewer', description: 'Reviews a page named in a task.', autonomy: 1 },
+    { _id: 'a3', name: 'QA Reviewer', description: 'Reviews QA Sandbox tasks.', autonomy: 1 },
+];
 const HAND_OVER = '/api/v2/agents/work-queue/task/t1/hand-over';
 const SidebarStub = { name: 'Sidebar', props: ['options', 'visible'], emits: ['selected', 'itemClicked'], render: () => null };
 
@@ -114,6 +118,16 @@ describe('the task assignee picker', () => {
         expect(wrapper.emitted('agent')).toEqual([[option]]);
         expect(wrapper.emitted('selected')).toBeUndefined();
     });
+
+    it('tells two agents with one name apart by what each does, and adds nothing to a name that stands alone', async () => {
+        const groups = (await openPicker(mountPicker([...TWINS, REVIEWER]))).props('options');
+        expect(groups[1].options.map((o) => [o.label, o.designation])).toEqual([
+            ['QA Reviewer', 'Reviews a page named in a task.'],
+            ['QA Reviewer', 'Reviews QA Sandbox tasks.'],
+            ['Reviewer', undefined],
+        ]);
+        expect(new Set(groups[1].options.map((o) => o.id)).size).toBe(3);
+    });
 });
 
 describe('the comment mention list', () => {
@@ -153,6 +167,17 @@ describe('the comment mention list', () => {
 
     it('writes a name the comment can draw as a mention, whatever the app is called', async () => {
         expect(await mentionOf({ ...OWN_AI, name: 'Claude.ai (web)' })).toBe('@[Claude ai web](myai_u1)');
+    });
+
+    it('tells two agents with one name apart by what each does', async () => {
+        const wrapper = mount(Composer, { props: { agents: [...TWINS, REVIEWER] }, attachTo: document.body, global: { provide, mocks: { $t: echo } } });
+        await typeAt(wrapper);
+        const rows = wrapper.findAll('[role="group"] [role="option"]').map((row) => row.text());
+        wrapper.unmount();
+        expect(rows).toHaveLength(3);
+        expect(rows[0]).toContain('Reviews a page named in a task.');
+        expect(rows[1]).toContain('Reviews QA Sandbox tasks.');
+        expect(rows[2]).toBe('RReviewerTaskPanel.agent_tag');
     });
 });
 
