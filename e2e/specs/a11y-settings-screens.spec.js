@@ -2,7 +2,7 @@
 const AxeBuilder = require('@axe-core/playwright').default;
 const { test, expect, asRole } = require('../support/test');
 const { createProject, uniqueSuffix } = require('../support/fixtures');
-const { skipFirstRun } = require('../support/pages');
+const { fadesFinished, skipFirstRun } = require('../support/pages');
 
 test.describe.configure({ timeout: 45000 });
 
@@ -23,9 +23,6 @@ async function blockingViolations(page, screen) {
         .filter((v) => (v.impact === 'serious' || v.impact === 'critical') && !allowed(screen, v))
         .map((v) => `${v.id} (${v.impact}): ${v.help}: ${v.nodes.map((n) => `${n.target.join(' ')} [${(n.any[0] && n.any[0].message) || ''}]`).join(' | ')}`);
 }
-
-// Screens fade in; axe reads a half-faded colour as low contrast.
-const settled = (page) => page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect.getTiming().iterations !== Infinity).map((a) => a.finished.catch(() => {}))));
 
 const VARIANTS = [
     { name: 'light', theme: 'light' },
@@ -71,7 +68,8 @@ const SCREENS = [
 
 for (const variant of VARIANTS) {
     test.describe(`accessibility of the settings screens: ${variant.name}`, () => {
-        test.use({ ...asRole('owner'), viewport: { width: 1280, height: 800 }, colorScheme: variant.theme });
+        // The other worker's activity reloads a list at any moment, and what it draws fades in: without motion axe reads colours at rest.
+        test.use({ ...asRole('owner'), viewport: { width: 1280, height: 800 }, colorScheme: variant.theme, reducedMotion: 'reduce' });
         test.beforeEach(async ({ page }) => {
             await skipFirstRun(page);
             await page.addInitScript((theme) => localStorage.setItem('ah.theme', theme), variant.theme);
@@ -82,7 +80,7 @@ for (const variant of VARIANTS) {
                 const owner = await loginAs('owner');
                 await screen.open(page, { state, owner });
                 await expect(page.locator('html')).toHaveAttribute('data-theme', variant.theme);
-                await settled(page);
+                await fadesFinished(page);
                 expect(await blockingViolations(page, screen.name)).toEqual([]);
             });
         }

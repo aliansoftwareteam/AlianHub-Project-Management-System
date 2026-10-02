@@ -25,7 +25,9 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
     }
     async function expectPlanLines(row) {
         await expectLine(row, 'New statuses', 'In Review');
-        await expectLine(row, 'New lists', 'Backlog, This week');
+        await expectLine(row, 'New lists', 'Backlog');
+        await expectLine(row, 'New lists', 'This week');
+        await expect(row.getByRole('checkbox', { name: 'This week', exact: true })).toBeChecked();
         await expectLine(row, 'Field', 'Budget: Money');
         await expectLine(row, 'Field', 'Region: Dropdown (North, South)');
         await expectLine(row, 'New view', 'Review board: Board');

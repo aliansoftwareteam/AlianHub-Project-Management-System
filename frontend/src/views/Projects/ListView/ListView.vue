@@ -199,6 +199,7 @@ import { columnCatalogue, listColumnClass, listColumnsAt, listGridVars, useViewC
 import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
 import OtherProjectRows from '@/views/Projects/components/OtherProjectRows.vue';
 import { useOtherProjectRows } from '@/views/Projects/composables/otherProjectRows';
+import { useGroupSource } from '@/views/Projects/composables/groupSource';
 
 // UTILS
 const {getters} = useStore();
@@ -393,17 +394,22 @@ let initStarted = false;
 let refetchWanted = false;
 let fetchedFor = '';
 
+/* Groups the List already read answer at once (`firstPageOnly` below), so only a new one is asked for. */
+const groupSource = useGroupSource(project, () => props.grouped, () => {
+    init(props.grouped, true, project.value, props.sprints, groupedTasks, false, false);
+});
+
 /* The first call, and the first one that has sprints to fetch, load at once. The page then
  * calls again several times while the sprint list and the props settle, so later calls wait
- * for the last of a burst, and a fetch is skipped when the same project, grouping and sprints
- * were fetched already. */
+ * for the last of a burst, and a fetch is skipped when the same project, grouping, sprints
+ * and groups were fetched already. */
 function init (group,refetch,projects,sprints,groupedTasksData,isBoard,isInitial) {
     if(isInitial == true){
         isLoading.value = true;
     }
     refetchWanted = refetchWanted || refetch === true;
     const run = () => {
-        const signature = JSON.stringify([projects?._id, group, (sprints || []).map((sprint) => sprint?.id)]);
+        const signature = JSON.stringify([projects?._id, group, (sprints || []).map((sprint) => sprint?.id), groupSource.value]);
         const fetch = refetchWanted && signature !== fetchedFor;
         refetchWanted = false;
         if(fetch && sprints?.length) fetchedFor = signature;

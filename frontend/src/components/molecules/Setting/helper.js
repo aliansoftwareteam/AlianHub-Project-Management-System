@@ -22,6 +22,17 @@ const locationObj = ref({
 })
 const maxFileSize = '500Kb!';
 
+/* The picker closes before the next one opens, so the move to the next address box comes half a second after a
+ * choice. A person who went on to another box of the form in that time stays in it. */
+function goOnTo(id) {
+    const next = document.getElementById(id);
+    const active = document.activeElement;
+    const inAnotherBox = Boolean(active && active !== next && active.form && active.form === next?.form && !active.readOnly);
+    if (!next || inAnotherBox) return false;
+    next.focus();
+    return true;
+}
+
 
 export function setFocus() {
     contriesArray.value = Country.getAllCountries();
@@ -138,11 +149,7 @@ export function setFocus() {
             formData.value.Cst_countryCode.value = val.isoCode;
             statesArray.value = State.getStatesOfCountry(val.isoCode);
             setTimeout(() => {
-                if(statesArray.value.length > 0) {
-                    const ele = document.getElementById("refState");
-                    ele.focus();
-                    fieldType.value = "state"
-                }
+                if(statesArray.value.length > 0 && goOnTo("refState")) fieldType.value = "state";
             }, 500);
         }
         if (fieldType.value === "state") {
@@ -152,11 +159,7 @@ export function setFocus() {
             formData.value.Cst_stateCode.value = val.isoCode;
             citiesArray.value = City.getCitiesOfState(val.countryCode, val.isoCode);
             setTimeout(() => {
-                if(citiesArray.value.length > 0) {
-                    const refcity = document.getElementById("refCity");
-                    refcity.focus();
-                    fieldType.value = "city"
-                }
+                if(citiesArray.value.length > 0 && goOnTo("refCity")) fieldType.value = "city";
             }, 500);
         }
         if (fieldType.value === "city") {

@@ -6,7 +6,14 @@
             <strong class="ipv__title" data-test="intent-title">{{ title }}</strong>
         </div>
         <dl v-if="lines.length" class="ipv__lines">
-            <div v-for="(line, i) in lines" :key="i" class="ipv__line" :class="{ 'is-out': isOut(line.pick) || isOut(line.under) }" data-test="intent-line" :data-kind="line.kind">
+            <div
+                v-for="(line, i) in rows"
+                :key="i"
+                class="ipv__line"
+                :class="{ 'is-out': isOut(line.pick) || isOut(line.under), 'is-under': choosing && line.under, 'is-more': line.more }"
+                data-test="intent-line"
+                :data-kind="line.kind"
+            >
                 <dt class="ipv__label">{{ line.label }}</dt>
                 <dd v-if="line.open" class="ipv__text ipv__open">
                     <button v-for="task in line.open" :key="task.taskId" type="button" class="ipv__task" data-test="intent-open-task" @click="emit('open-task', task)">{{ task.name }}</button>
@@ -19,7 +26,7 @@
                     </label>
                 </dd>
                 <dd v-else-if="choosing && line.pick" class="ipv__text">
-                    <label class="ipv__pick" :class="{ 'is-locked': isLocked(line.pick) }">
+                    <label class="ipv__pick" :class="{ 'is-out': isOut(line.pick), 'is-locked': isLocked(line.pick) }">
                         <input type="checkbox" class="ah-check" data-test="intent-pick" :data-pick="line.pick" :checked="!isOut(line.pick)" :disabled="disabled || isLocked(line.pick)" @change="toggle(line.pick)" />
                         <span>{{ line.text }} <span v-if="needsOwner(line.pick)" class="ipv__locked" data-test="intent-pick-locked">{{ t('IntentPreview.pick_locked') }}</span></span>
                     </label>
@@ -28,6 +35,8 @@
             </div>
         </dl>
         <p v-if="choosing" class="ipv__hint" data-test="intent-pick-hint">{{ t('IntentPreview.pick_hint') }}</p>
+        <p v-if="choosing && kept" class="ipv__hint ipv__went" data-test="intent-pick-kept">{{ t('IntentPreview.pick_kept', { parts: kept }) }}</p>
+        <p v-for="line in held" :key="line" class="ipv__hint ipv__went" data-test="intent-pick-held">{{ line }}</p>
         <p v-if="choosing && went" class="ipv__hint ipv__went" role="status" data-test="intent-pick-also">{{ went }}</p>
     </div>
 </template>
@@ -37,7 +46,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { kindLabel, linesOf, titleOf } from './intentLines';
-import { canChoose, lockedParts, pickNames, toggled } from './planPicks';
+import { broughtBack, canChoose, heldWith, keptText, lockedParts, pickNames, toggled } from './planPicks';
 
 defineOptions({ name: 'IntentPreview' });
 
@@ -56,27 +65,55 @@ const kind = computed(() => kindLabel(t, props.preview));
 const title = computed(() => titleOf(t, props.preview));
 const lines = computed(() => linesOf(t, locale.value, props.preview));
 const choosing = computed(() => props.choosable && canChoose(props.preview));
+const kept = computed(() => (choosing.value ? keptText(t, props.preview, props.leftOut) : ''));
 const went = ref('');
 
 const locked = computed(() => lockedParts(props.preview));
 const isLocked = (key) => choosing.value && locked.value.includes(key);
 const needsOwner = (key) => isLocked(key) && props.preview.locked.includes(key);
+
+/* Several parts of one kind in a row are headed once, in the plural, where each has its own tick box. */
+const GROUP_LABELS = Object.freeze({ field: 'IntentPreview.line_fields', planRule: 'IntentPreview.line_rules', planTask: 'IntentPreview.line_first_tasks' });
+const grouped = (a, b) => Boolean(a?.pick && b?.pick) && a.kind === b.kind && Object.hasOwn(GROUP_LABELS, a.kind);
+const rows = computed(() => lines.value.map((line, i, all) => {
+    if (!choosing.value) return line;
+    const more = grouped(all[i - 1], line);
+    return more || grouped(line, all[i + 1]) ? { ...line, more, label: t(GROUP_LABELS[line.kind]) } : line;
+}));
+
 const isOut = (key) => choosing.value && Boolean(key) && (props.leftOut.includes(key) || locked.value.includes(key));
+
+const names = computed(() => pickNames(props.preview));
+const said = (message, keys, key) => {
+    const quoted = keys.map((held) => (names.value.get(held) || '').replace(/\.$/, '')).filter(Boolean).map((name) => t('IntentPreview.pick_named', { name }));
+    return quoted.length ? t(message, { names: quoted.join(', '), name: names.value.get(key) || '' }, quoted.length) : '';
+};
+
+// A part that needs one this person may not approve is left out with it, and the card says so from the start.
+const held = computed(() => (choosing.value ? heldWith(props.preview).map((entry) => said('IntentPreview.pick_also_out', entry.held, entry.key)).filter(Boolean) : []));
+
+// By the part the person unticked: what went out with it, so ticking it back undoes the whole click.
+const wentWith = {};
 
 const toggle = (key) => {
     if (isLocked(key)) return;
     const next = toggled(props.preview, props.leftOut, key);
-    const leaving = next.includes(key);
-    const moved = (leaving ? next.filter((held) => !props.leftOut.includes(held)) : props.leftOut.filter((held) => !next.includes(held))).filter((held) => held !== key);
-    const names = pickNames(props.preview);
-    const named = { names: moved.map((held) => names.get(held)).filter(Boolean).join(', '), name: names.get(key) || '' };
-    went.value = moved.length ? t(leaving ? 'IntentPreview.pick_also_out' : 'IntentPreview.pick_also_kept', named, moved.length) : '';
-    emit('update:leftOut', next);
+    if (next.includes(key)) {
+        wentWith[key] = next.filter((part) => part !== key && !props.leftOut.includes(part));
+        went.value = said('IntentPreview.pick_also_out', wentWith[key], key);
+        emit('update:leftOut', next);
+        return;
+    }
+    const after = broughtBack(props.preview, next, wentWith[key] || []);
+    delete wentWith[key];
+    const needed = props.leftOut.filter((part) => part !== key && !next.includes(part) && !locked.value.includes(part));
+    went.value = [said('IntentPreview.pick_also_kept', needed, key), said('IntentPreview.pick_also_back', next.filter((part) => !after.includes(part)), key)].filter(Boolean).join(' ');
+    emit('update:leftOut', after);
 };
 </script>
 
 <style scoped>
-.ipv { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: var(--r-md, 8px); background: var(--surface); color: var(--ink); }
+.ipv { --ipv-under: 21px; display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: var(--r-md, 8px); background: var(--surface); color: var(--ink); }
 .ipv__head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .ipv__icon { flex: none; color: var(--ink-2); }
 .ipv__kind { flex: none; }
@@ -96,13 +133,17 @@ const toggle = (key) => {
 .ipv__pick.is-locked { cursor: default; }
 /* An inline block of its own keeps the line through a part that is left out off the reason beside it. */
 .ipv__locked { display: inline-block; width: 100%; color: var(--ink-2); font-size: var(--fs-sm, 11.5px); line-height: 1.45; }
+.ipv__line.is-more .ipv__label { visibility: hidden; }
+.ipv__line.is-under .ipv__text { padding-left: var(--ipv-under); }
 .ipv__hint { margin: 0; color: var(--ink-2); font-size: var(--fs-sm, 11.5px); line-height: 1.45; }
 .ipv__went { color: var(--ink); }
+@media (max-width: 767px) {
+    .ipv__pick { box-sizing: border-box; min-height: 36px; padding: 8px 0; }
+}
 @media (max-width: 480px) {
     .ipv__line { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 767px) {
-    .ipv__pick { min-height: 36px; align-items: center; }
-    .ipv__pick .ah-check { margin-top: 0; }
+    .ipv__line.is-more .ipv__label { display: none; }
+    .ipv__line.is-under { padding-left: var(--ipv-under); }
+    .ipv__line.is-under .ipv__text { padding-left: 0; }
 }
 </style>

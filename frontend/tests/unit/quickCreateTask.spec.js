@@ -259,18 +259,11 @@ describe('QuickCreateTask', () => {
         expect(document.activeElement).toBe(title(wrapper).element);
     });
 
-    it('opens on c from the page and not from a text field', async () => {
-        await mountDialog();
-        const input = document.createElement('input');
-        document.body.appendChild(input);
-        input.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', bubbles: true }));
-        await flushPromises();
-        expect(quickCreate.open).toBe(false);
-        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', bubbles: true }));
-        await flushPromises();
-        expect(quickCreate.open).toBe(true);
+    it('draws open when it was asked for before it had loaded', async () => {
+        openQuickCreate({ name: 'Asked early' });
+        const wrapper = await mountDialog();
         expect($('[role="dialog"]').exists()).toBe(true);
-        input.remove();
+        expect(title(wrapper).element.value).toBe('Asked early');
     });
 
     it('defaults to the project on screen and offers only projects the user may create in', async () => {

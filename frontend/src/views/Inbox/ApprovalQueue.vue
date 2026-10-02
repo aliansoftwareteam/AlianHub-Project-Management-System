@@ -12,7 +12,7 @@
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ t('Ai.not_reversible') }}</span>
                         </li>
                     </ul>
-                    <p v-if="choiceOf(p)" class="aq__lead" data-test="queue-review-parts">{{ t('Inbox.queue_parts_left_out') }}</p>
+                    <p v-if="keptOf(p)" class="aq__lead" data-test="queue-review-parts">{{ t('Inbox.queue_parts_kept', { parts: keptOf(p) }) }}</p>
                 </li>
             </ol>
             <div class="aq__actions">
@@ -225,7 +225,7 @@ import { sendProposalDecision } from '@/composable/agentProposals';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
 import { intentSummary, intentTitle } from '@/components/molecules/IntentPreview/intentLines';
-import { chosenParts } from '@/components/molecules/IntentPreview/planPicks';
+import { chosenParts, keptText } from '@/components/molecules/IntentPreview/planPicks';
 import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
 import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
@@ -317,6 +317,7 @@ const choiceOf = (p) => {
     });
     return Object.keys(parts).length ? { parts } : null;
 };
+const keptOf = (p) => (choiceOf(p) ? (p.changes || []).map((change, i) => keptText(t, change.preview, leftOut[pickKey(p, i)])).filter(Boolean).join(', ') : '');
 const toggleEdit = (p) => {
     if (isEditing(p)) { editing.value = ''; return; }
     forgetPicks(p);
@@ -451,6 +452,8 @@ const approveReviewed = async () => {
 .aq__head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .aq__what { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere; color: var(--ink); }
 .aq__what strong { font-weight: 600; }
+/* In this column the 12ch basis .aq__what has for a row would be its height. */
+.aq__review-item .aq__what { flex: none; }
 .aq__when { margin-left: auto; font: 400 var(--fs-sm, 10px)/1 var(--font-ui); color: var(--ink-2); flex: none; }
 .aq__label { font: var(--text-label); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
 .aq__why { margin: 0; color: var(--ink); line-height: 1.45; overflow-wrap: anywhere; white-space: pre-line; }

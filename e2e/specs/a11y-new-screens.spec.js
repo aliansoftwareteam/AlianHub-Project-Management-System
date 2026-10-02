@@ -2,7 +2,7 @@
 const AxeBuilder = require('@axe-core/playwright').default;
 const { test, expect, asRole } = require('../support/test');
 const { createProject, createTask, uniqueSuffix } = require('../support/fixtures');
-const { skipFirstRun } = require('../support/pages');
+const { fadesFinished, skipFirstRun } = require('../support/pages');
 const { createAgent, openProposals } = require('../support/proposals');
 
 test.describe.configure({ timeout: 45000 });
@@ -108,7 +108,8 @@ const SCREENS = [
 
 for (const variant of VARIANTS) {
     test.describe(`accessibility of the new screens: ${variant.name}`, () => {
-        test.use({ ...asRole('owner'), viewport: variant.viewport, colorScheme: variant.theme });
+        // The other worker's activity reloads a list at any moment, and what it draws fades in: without motion axe reads colours at rest.
+        test.use({ ...asRole('owner'), viewport: variant.viewport, colorScheme: variant.theme, reducedMotion: 'reduce' });
         test.beforeEach(async ({ page }) => {
             await skipFirstRun(page);
             await page.addInitScript((theme) => localStorage.setItem('ah.theme', theme), variant.theme);
@@ -121,6 +122,7 @@ for (const variant of VARIANTS) {
                 try {
                     await screen.open(page, { state, owner }, cleanup);
                     await expect(page.locator('html')).toHaveAttribute('data-theme', variant.theme);
+                    await fadesFinished(page);
                     expect(await blockingViolations(page, screen.name)).toEqual([]);
                 } finally {
                     for (const undo of cleanup) await undo();

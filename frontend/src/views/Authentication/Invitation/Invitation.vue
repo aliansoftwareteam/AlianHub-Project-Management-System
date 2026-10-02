@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, reactive, ref } from "vue";
+import { computed, inject, nextTick, onMounted, reactive, ref } from "vue";
 
 defineOptions({ name: "InvitationPage" });
 import { useRoute, useRouter } from "vue-router";
@@ -184,7 +184,8 @@ onMounted(async () => {
             stage.value = sameAddress(signedInEmail.value, invite.email) ? "accept" : "wrong";
         } else {
             stage.value = "form";
-            setTimeout(() => nameInput.value?.focus(), 50);
+            await nextTick();
+            nameInput.value?.focus();
         }
     } catch (error) {
         console.error(error);
