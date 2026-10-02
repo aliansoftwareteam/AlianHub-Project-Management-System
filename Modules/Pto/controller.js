@@ -11,6 +11,7 @@ const sendMail = require('../service.js');
 
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { personDecides } = require('../Agents/personDecides');
 const failed = (res, where, e) => {
     if (e instanceof TenantError) return res.status(e.statusCode).json({ status: false, statusText: e.message });
     logger.error(`${where}: ${e.message}`);
@@ -161,6 +162,7 @@ exports.listPto = async (req, res) => {
 // PUT /api/v1/pto/:id/status — approve / reject (owner/admin only).
 exports.updatePtoStatus = async (req, res) => {
     try {
+        if (!(await personDecides(req, res, 'pto.decide'))) return undefined;
         const companyId = sessionTenantOf(req);
         const roleType = await getRoleType(companyId, req.uid);
         if (!isPrivileged(roleType)) return res.status(403).json({ status: false, statusText: 'Owner/admin only.' });
