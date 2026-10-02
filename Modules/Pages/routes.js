@@ -27,7 +27,7 @@ exports.init = (app) => {
     app.get('/api/v2/pages/:id/shares', shares.listShares);
     app.put('/api/v2/pages/:id/shares/:userId', sharesByPeople, shares.putShare);
     app.delete('/api/v2/pages/:id/shares/:userId', sharesByPeople, shares.removeShare);
-    app.put('/api/v2/pages/:id/review', agentsRefused('page.review'), ctrl.markReviewed);
+    app.put('/api/v2/pages/:id/review', decidedByPerson('page.review'), ctrl.markReviewed);
     app.put('/api/v2/pages/:id/approve', decidedByPerson('page.approve'), ctrl.approvePage);
     app.put('/api/v2/pages/:id/restore', agentsRefused('page.restore'), ctrl.restorePage);
     app.post('/api/v2/pages/:id/images', agentsRefused('page.image'), ctrl.uploadImage);
