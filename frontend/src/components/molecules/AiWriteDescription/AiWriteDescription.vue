@@ -229,7 +229,7 @@ function useThis() {
 .aiwd-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -240,8 +240,8 @@ function useThis() {
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 64px);
     overflow-y: auto;
-    background: #ffffff;
-    color: #1f1f1f;
+    background: var(--surface);
+    color: var(--ink);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
     padding: 16px;
@@ -256,47 +256,47 @@ function useThis() {
 .aiwd-title {
     font-size: 15px;
     font-weight: 600;
-    color: #1f1f1f;
+    color: var(--ink);
 }
 .aiwd-close {
     border: none;
     background: transparent;
     font-size: 22px;
     line-height: 1;
-    color: #6b6b6b;
+    color: var(--ink-2);
     cursor: pointer;
     padding: 0 4px;
 }
-.aiwd-close:hover { color: #1f1f1f; }
+.aiwd-close:hover { color: var(--ink); }
 .aiwd-body { margin-bottom: 12px; }
 .aiwd-modes {
     display: inline-flex;
     margin-bottom: 10px;
-    border: 1px solid #d7d7d7;
+    border: 1px solid var(--border);
     border-radius: 6px;
     overflow: hidden;
 }
 .aiwd-mode {
     border: none;
-    background: #ffffff;
-    color: #6b6b6b;
+    background: var(--surface);
+    color: var(--ink-2);
     font-size: 12px;
     font-weight: 500;
     padding: 6px 14px;
     cursor: pointer;
     font-family: var(--font-ui);
 }
-.aiwd-mode + .aiwd-mode { border-left: 1px solid #d7d7d7; }
-.aiwd-mode-active { background: #2f3990; color: #ffffff; }
+.aiwd-mode + .aiwd-mode { border-left: 1px solid var(--border); }
+.aiwd-mode-active { background: var(--brand); color: var(--on-brand); }
 .aiwd-textarea,
 .aiwd-input {
     width: 100%;
-    border: 1px solid #d7d7d7;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 8px 10px;
     font-size: 13px;
-    color: #1f1f1f;
-    background: #ffffff;
+    color: var(--ink);
+    background: var(--surface);
     font-family: var(--font-ui);
     resize: vertical;
     box-sizing: border-box;
@@ -304,15 +304,15 @@ function useThis() {
 .aiwd-textarea:focus,
 .aiwd-input:focus {
     outline: none;
-    border-color: #2f3990;
+    border-color: var(--brand);
 }
 .aiwd-hint {
     font-size: 12px;
-    color: #8a8a8a;
+    color: var(--ink-2);
     margin: 6px 0 0;
 }
 .aiwd-hint-strong {
-    color: #1f1f1f;
+    color: var(--ink);
     font-weight: 500;
     margin-bottom: 10px;
     margin-top: 0;
@@ -321,19 +321,19 @@ function useThis() {
 .aiwd-question-label {
     display: block;
     font-size: 13px;
-    color: #1f1f1f;
+    color: var(--ink);
     margin-bottom: 4px;
 }
 .aiwd-preview {
     font-size: 13px;
     line-height: 1.5;
-    color: #1f1f1f;
+    color: var(--ink);
     max-height: 320px;
     overflow-y: auto;
-    border: 1px solid #ececec;
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     padding: 10px 12px;
-    background: #fafafa;
+    background: var(--surface-2);
     word-break: break-word;
 }
 .aiwd-preview :deep(h1),
@@ -342,13 +342,13 @@ function useThis() {
     font-size: 14px;
     font-weight: 600;
     margin: 10px 0 4px;
-    color: #1f1f1f;
+    color: var(--ink);
 }
 .aiwd-preview :deep(ul),
 .aiwd-preview :deep(ol) { padding-left: 18px; margin: 4px 0; }
 .aiwd-preview :deep(p) { margin: 4px 0; }
 .aiwd-preview :deep(code) {
-    background: #eceef5;
+    background: var(--fill);
     border-radius: 3px;
     padding: 1px 4px;
     font-size: 12px;
@@ -358,14 +358,14 @@ function useThis() {
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: #2f3990;
+    color: var(--brand);
     margin-bottom: 10px;
 }
 .aiwd-spinner {
     width: 14px;
     height: 14px;
-    border: 2px solid #c7cbe8;
-    border-top-color: #2f3990;
+    border: 2px solid var(--brand-border);
+    border-top-color: var(--brand);
     border-radius: 50%;
     display: inline-block;
     animation: aiwd-spin 0.7s linear infinite;
@@ -375,7 +375,7 @@ function useThis() {
 }
 .aiwd-error {
     font-size: 12px;
-    color: #e02d2d;
+    color: var(--danger);
     margin: 0 0 10px;
 }
 .aiwd-footer {

@@ -108,14 +108,14 @@ function openTask(task) {
 .recent-visits__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .recent-visits__card {
-    background: #fff;
+    background: var(--surface);
     border-radius: 10px;
     width: min(440px, 92vw);
     max-height: 64vh;
@@ -124,15 +124,15 @@ function openTask(task) {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
 }
 .recent-visits__head { margin-bottom: 8px; }
-.recent-visits__close { color: #9a9a9a; }
-.recent-visits__close:hover { color: #e84a4a; }
+.recent-visits__close { color: var(--ink-2); }
+.recent-visits__close:hover { color: var(--danger); }
 .recent-visits__row {
     padding: 7px 8px;
     border-radius: 6px;
     min-width: 0;
 }
 .recent-visits__row:hover {
-    background: #f7f9fc;
+    background: var(--surface-hover);
 }
 .recent-visits__name {
     overflow: hidden;
@@ -141,12 +141,12 @@ function openTask(task) {
     flex: 1;
 }
 .recent-visits__status {
-    background: #f0f0f0;
+    background: var(--fill);
     border-radius: 10px;
     padding: 1px 7px;
     margin-left: 8px;
     white-space: nowrap;
-    color: #6a6a6a;
+    color: var(--ink-2);
 }
 .recent-visits__empty {
     padding: 18px 12px;

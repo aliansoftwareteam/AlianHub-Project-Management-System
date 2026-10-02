@@ -299,14 +299,14 @@ onBeforeUnmount(() => {
     position: fixed; right: 20px; bottom: 20px; z-index: 3000;
     display: flex; align-items: center; gap: 18px;
     padding: 14px 16px; border-radius: 14px;
-    background: #fff; box-shadow: 0 12px 34px rgba(23, 30, 52, .22);
+    background: var(--surface); box-shadow: 0 12px 34px rgba(23, 30, 52, .22);
     animation: call-ring-in .18s ease-out;
 }
 @keyframes call-ring-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 .call-ring__who { display: flex; align-items: center; gap: 11px; }
 .call-ring__text { display: flex; flex-direction: column; }
-.call-ring__name { font-size: 13.5px; font-weight: 600; color: #1e2436; }
-.call-ring__sub { font-size: 11.5px; color: #7b8496; }
+.call-ring__name { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.call-ring__sub { font-size: 11.5px; color: var(--ink-2); }
 .call-ring__actions { display: flex; align-items: center; gap: 9px; }
 /* Deliberately plain next to accept and decline: silencing the ringer is a preference,
    not one of the two answers being asked for. */
@@ -314,9 +314,9 @@ onBeforeUnmount(() => {
     width: 28px; height: 28px; flex: none;
     display: inline-flex; align-items: center; justify-content: center;
     border: none; border-radius: 50%; background: transparent;
-    color: #9aa3b4; cursor: pointer; transition: background .12s ease, color .12s ease;
+    color: var(--ink-2); cursor: pointer; transition: background .12s ease, color .12s ease;
 }
-.call-ring__quiet:hover { background: #eef0f5; color: #5b6472; }
+.call-ring__quiet:hover { background: var(--fill); color: var(--ink-2); }
 
 /* In-call window. */
 .call-win {
@@ -393,7 +393,7 @@ onBeforeUnmount(() => {
 .call-toast {
     position: fixed; right: 20px; bottom: 20px; z-index: 3000;
     max-width: 300px; padding: 11px 14px; border-radius: 10px;
-    background: #1e2436; color: #fff; font-size: 12.5px; cursor: pointer;
+    background: var(--ink); color: var(--surface); font-size: 12.5px; cursor: pointer;
     box-shadow: 0 10px 26px rgba(23, 30, 52, .22);
 }
 </style>

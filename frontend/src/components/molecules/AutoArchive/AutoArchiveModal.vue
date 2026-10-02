@@ -108,28 +108,28 @@ function save() {
 .aarch__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .aarch__card {
-    background: #fff;
+    background: var(--surface);
     border-radius: 10px;
     width: min(420px, 92vw);
     padding: 16px 20px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
 }
 .aarch__head { margin-bottom: 8px; }
-.aarch__close { color: #9a9a9a; }
-.aarch__close:hover { color: #e84a4a; }
+.aarch__close { color: var(--ink-2); }
+.aarch__close:hover { color: var(--danger); }
 .aarch__hint { margin-bottom: 12px; }
 .aarch__row { margin-bottom: 12px; }
 .aarch__row--muted { opacity: 0.5; }
 .aarch__days {
     width: 70px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 5px 8px;
 }
