@@ -323,6 +323,6 @@ See [.claude/SECURITY-PATTERNS.md](.claude/SECURITY-PATTERNS.md) for detailed pr
 
 ---
 
-**Last Updated:** 2026-10-01  
-**Version:** 14.36.0-beta.758 (`npm run version:show` prints the current one)  
+**Last Updated:** 2026-10-02  
+**Version:** 14.36.0-beta.766 (`npm run version:show` prints the current one)  
 **Status:** ✅ Documentation reorganized for Claude Code
