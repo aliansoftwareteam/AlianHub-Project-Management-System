@@ -70,12 +70,14 @@ test.describe('inviting a member', () => {
         await page.getByRole('combobox', { name: 'Role', exact: true }).selectOption({ label: 'Member' });
         await page.getByRole('button', { name: 'Send', exact: true }).click();
 
+        // Other specs invite people into the same workspace, so the checks stay on this invitation's row.
+        const row = page.locator('.mbv__row', { hasText: email });
         await expect(page.getByText(email, { exact: true })).toBeVisible();
-        await expect(page.getByText(/^invited /)).toBeVisible();
+        await expect(row.getByText(/^invited /)).toBeVisible();
 
         await page.reload();
         await expect(page.getByText(email, { exact: true })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'resend', exact: true })).toBeVisible();
+        await expect(row.getByRole('button', { name: 'resend', exact: true })).toBeVisible();
     });
 });
 
