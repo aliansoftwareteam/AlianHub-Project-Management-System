@@ -112,6 +112,14 @@ describe('a formula or a rollup worked out again', () => {
         expect(deliveries().map((body) => body.changedFields)).toEqual([['Task_Priority']]);
     });
 
+    it('a conversation, which is kept among the tasks, is never sent', async () => {
+        mockDb.seed(SCHEMA_TYPE.TASKS, { ...taskDoc('LOW'), _id: OTHER_TASK, mainChat: true });
+        emitFor('task:update', { ...taskDoc('LOW'), _id: OTHER_TASK, mainChat: true }, { TaskName: 'A and B' });
+        emitFor('task:insert', { ...taskDoc('LOW'), _id: OTHER_TASK, mainChat: true }, undefined);
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+
     it('is no more sent when the value went with its deleted field', async () => {
         mockEmitter.emit('task:update', { data: taskDoc('URGENT'), updatedFields: { 'customField.6f00000000000000000000f1': null }, source: 'field_removed' });
         await jest.advanceTimersByTimeAsync(2000);

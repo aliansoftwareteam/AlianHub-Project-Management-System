@@ -269,7 +269,8 @@ function onTaskEvent(emitType) {
     return (payload) => {
         try {
             const doc = payload?.data;
-            if (!doc || !doc.CompanyId || !doc._id || isNotAnEdit(payload)) return;
+            // A conversation is kept in the tasks collection and sends the same emits; it is no task for a rule.
+            if (!doc || !doc.CompanyId || !doc._id || doc.mainChat === true || isNotAnEdit(payload)) return;
 
             const companyId = String(doc.CompanyId);
             const key = `${companyId}:${String(doc._id)}:${emitType}`;

@@ -140,6 +140,13 @@ describe('a formula or a rollup worked out again', () => {
         expect(published[0]).toMatchObject({ type: 'task.priority_changed', changedFields: ['Task_Priority'], depth: 0 });
     });
 
+    it('a conversation, which is kept among the tasks, is no event either', async () => {
+        emit('task:insert', taskDoc({ _id: OTHER_TASK, mainChat: true }), undefined);
+        emit('task:update', taskDoc({ _id: OTHER_TASK, mainChat: true }), { TaskName: 'A and B' });
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(published).toEqual([]);
+    });
+
     it('is no more an event when the value went with its deleted field', async () => {
         emit('task:update', taskDoc(), { 'customField.6f00000000000000000000f1': null }, { source: 'field_removed' });
         await jest.advanceTimersByTimeAsync(2000);
