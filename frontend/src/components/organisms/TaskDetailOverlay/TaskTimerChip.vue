@@ -94,8 +94,7 @@ async function stop() {
     } else if (result.tooShort) {
         $toast.info(t("TaskPanel.timer_too_short"), { position: "top-right" });
     } else {
-        const key = timeLogFailureKey(result, "");
-        $toast.error(key ? t(key) : (result.statusText || t("Home.timer_log_failed")), { position: "top-right" });
+        $toast.error(t(timeLogFailureKey(result, "Home.timer_log_failed")), { position: "top-right" });
     }
 }
 </script>

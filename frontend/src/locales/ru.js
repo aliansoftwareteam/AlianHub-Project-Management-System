@@ -2224,6 +2224,8 @@ export default {
         "task_required": "Pick a task first.",
         "log_failed": "Couldn't log time — try again.",
         "period_locked": "That day is in an approved timesheet period, so time can't be added to it.",
+        "timer_kept_period_locked": "This day is in an approved week, so the time can't be logged yet. Your timer was not stopped and nothing is lost. Ask an approver to reopen the week, then stop it again.",
+        "timer_kept_log_failed": "Couldn't log the time. Your timer was not stopped, so nothing is lost — try again.",
         "logged_ok": "Logged {h} on {task}.",
         "search_tasks": "Search your tasks…",
         "no_tasks": "No tasks match.",

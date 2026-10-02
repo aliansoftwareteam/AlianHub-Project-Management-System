@@ -104,7 +104,7 @@ exports.trimTimer = async (req, res) => {
         }
         const startSec = Number(entry.LogStartTime) || 0;
         const locked = await isPeriodLocked({ companyId, userId: entry.Loggeduser, date: new Date(startSec * 1000) });
-        if (locked) return res.send({ status: false, statusText: 'This timesheet period is approved and locked.' });
+        if (locked) return res.send({ status: false, statusText: 'This timesheet period is approved and locked.', code: PERIOD_LOCKED });
 
         const bounds = T.trimBounds({ startSec, minutes: check.minutes });
         const updated = await MongoDbCrudOpration(companyId, {
