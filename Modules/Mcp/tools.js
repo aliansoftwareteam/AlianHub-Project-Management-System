@@ -317,8 +317,9 @@ const actionsOffered = () => [...offered(), ...Object.values(manageTools.VARIANT
 /* An OAuth token is held to the one scope the tool needs; a personal token keeps its read/write rule. */
 const PAGE_ARGS = Object.freeze({ cursor: { type: 'string', maxLength: 2000 }, limit: { type: 'integer', minimum: 1, maximum: cursor.PAGE_MAX } });
 
+/* `tooLarge` answers before the schema does, so a call past a tool's size says what to send instead. */
 const argumentProblem = (tool, args) => (tool.strict
-    ? argsSchema.problemIn(tool.input, args, tool.paginated ? PAGE_ARGS : {}) || (tool.check ? tool.check(args) : '')
+    ? (tool.tooLarge ? tool.tooLarge(args) : '') || argsSchema.problemIn(tool.input, args, tool.paginated ? PAGE_ARGS : {}) || (tool.check ? tool.check(args) : '')
     : '');
 
 const refuseBadArguments = (tool, args) => {

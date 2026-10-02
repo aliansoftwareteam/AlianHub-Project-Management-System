@@ -30,7 +30,13 @@ const ROLE_NAMES = Object.freeze({ [ROLE_GUEST]: 'guest', [ROLE_OWNER]: 'owner',
 
 const { GRANT, DOCS_GRANT } = manageFlag;
 const HISTORY_TEXT_MAX = 600;
-const BATCH_MAX = 25;
+const BATCH_MAX = 50;
+const batchTooLarge = (args) => {
+    const given = args && Array.isArray(args.operations) ? args.operations.length : 0;
+    return given > BATCH_MAX
+        ? `a batch takes at most ${BATCH_MAX} changes, and this one has ${given}. Nothing was filed and nothing has changed. Send the first ${BATCH_MAX} as one batch and the rest as another, and tell the person each one waits for its own approval.`
+        : '';
+};
 
 const isId = (v) => OBJECT_ID.test(String(v || ''));
 const idOf = (v) => (v === undefined || v === null ? '' : String(v));
@@ -267,7 +273,9 @@ const TOOLS = [
         strict: true,
         batch: true,
         target: () => ({}),
-        description: `Runs up to ${BATCH_MAX} change tools in one call, in order. When every step is on the same task, each is applied on its own and reports its own result, so one refusal does not stop or undo the others, and a person can undo the ones that applied together. When the steps name more than one task, nothing runs yet: the changes wait in AlianHub as one proposal that a person approves or declines whole. A link counts both of its tasks, and each new task, subtask or doc counts as a task of its own. Keep such a batch inside one project.`,
+        description: `Runs up to ${BATCH_MAX} change tools in one call, in order. When every step is on the same task, each is applied on its own and reports its own result, so one refusal does not stop or undo the others, and a person can undo the ones that applied together. When the steps name more than one task, nothing runs yet: the changes wait in AlianHub as one proposal that a person approves or declines whole. A link counts both of its tasks, and each new task, subtask or doc counts as a task of its own. Keep such a batch inside one project. `
+            + 'When one request changes many tasks, or changes several things on each of them, put every change in one batch, so the person approves once: do not split it into smaller batches.',
+        tooLarge: batchTooLarge,
         input: input({
             operations: {
                 type: 'array', minItems: 1, maxItems: BATCH_MAX,

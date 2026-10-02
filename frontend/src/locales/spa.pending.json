@@ -6027,6 +6027,8 @@
     "IntentPreview.task_with": "{name} ({details})",
     "IntentPreview.tasks_and_more": "and {n} more",
     "IntentPreview.tasks_not_shown": "{n} task you cannot open | {n} tasks you cannot open",
+    "IntentPreview.tasks_show_all": "Show all {n} tasks",
+    "IntentPreview.tasks_show_fewer": "Show fewer",
     "IntentPreview.value_empty": "Empty",
     "IntentPreview.value_no": "No",
     "IntentPreview.value_on_task": "{field} on “{task}”: {value}",

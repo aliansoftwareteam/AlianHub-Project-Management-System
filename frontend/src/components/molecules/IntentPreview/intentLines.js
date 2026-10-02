@@ -225,12 +225,20 @@ export const LINE_KINDS = {
         if (!value && !task) return null;
         return { label: batchLabel(t, line.what), text: value && task ? t('IntentPreview.batch_item_on', { value, task }) : value || task };
     },
-    /* The tasks a batch names. `open` are the ones the viewer can open, each drawn as a button; `text` is the rest, as a count. */
+    /* The tasks a batch names. `open` are the first ones the viewer can open, each drawn as a button, and `text` is the
+     * rest as a count. `rest` are the others the viewer can open, drawn once the person asks for all of them, with
+     * `restText` for the ones they cannot open. */
     batchTasks: (t, line) => {
-        const open = (Array.isArray(line.tasks) ? line.tasks : []).filter((task) => task && textOf(task.name) && textOf(task.taskId));
+        const openable = (tasks) => (Array.isArray(tasks) ? tasks : []).filter((task) => task && textOf(task.name) && textOf(task.taskId));
+        const open = openable(line.tasks);
         const others = countOf(line.others);
         if (!open.length) return others ? { label: t('IntentPreview.line_batch_tasks'), text: t('IntentPreview.tasks_not_shown', { n: others }, others) } : null;
-        return { label: t('IntentPreview.line_batch_tasks'), open, text: others ? t('IntentPreview.tasks_and_more', { n: others }) : '' };
+        const rest = openable(line.rest).slice(0, others);
+        const closed = others - rest.length;
+        return {
+            label: t('IntentPreview.line_batch_tasks'), open, text: others ? t('IntentPreview.tasks_and_more', { n: others }) : '',
+            ...(rest.length ? { rest, restText: closed ? t('IntentPreview.tasks_not_shown', { n: closed }, closed) : '' } : {}),
+        };
     },
     ...AUTOMATION_LINE_KINDS,
     ...LIST_SETUP_LINE_KINDS,

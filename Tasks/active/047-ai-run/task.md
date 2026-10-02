@@ -124,7 +124,7 @@ The code on `beta` is ahead of both in four places. Each was checked in the file
 - **The manage grant over OAuth is merged.** #1307 merged on 2026-10-01: an app asks for it, the person ticks it, and an owner or admin approves the app by name. The notes put it "at the top of the list" as work to do. What is left is to prove it with a real Claude connection.
 - **Any status, including Done, already exists for a connected agent.** `task.status.change` is in `registry.js` and runs in `Modules/Agents/taskRequests.js`. It is offered only to a connection that holds the manage grant, and the close is recorded as made through the agent and marked unchecked. Merged in #1270.
 - **Complete creates in one call already exist.** `task.add` and `subtask.add` take description, assignees, priority, dates, status, type, estimate and links (`CREATE_FIELDS` in `registry.js`). Merged in #1270.
-- **A bulk call already exists.** `tasks.batch` runs up to 25 writes in one call. Each is checked on its own, and the ones that applied can be undone together (`Modules/Mcp/manageTools.js`). Merged in #1270.
+- **A bulk call already exists.** `tasks.batch` runs up to 50 writes in one call (25 until AI-1 raised it). Each is checked on its own, and the ones that applied can be undone together (`Modules/Mcp/manageTools.js`). Merged in #1270.
 
 All of it is behind flags that are off by default, and each pull request says it was not exercised against a running server. So it is merged and not yet proven by use.
 
@@ -258,7 +258,7 @@ Earlier, and already on `beta` (see "Corrections" above): any status including D
 A task, a subtask or a message-to-task from one sentence. The place (project, list, assignee, date) is taken from where the person is and shown as a preview.
 
 **Exists**
-- Over MCP: a complete create in one call (`task.add`, `subtask.add`), a batch of up to 25 writes, edits, assignees, a field value, moving and archiving (`Modules/Mcp/manageTools.js`, `Modules/Agents/taskRequests.js`). People and lists are found with `members.list` and `lists.list`. A date given as a day is read in the person's time zone.
+- Over MCP: a complete create in one call (`task.add`, `subtask.add`), a batch of up to 50 writes, edits, assignees, a field value, moving and archiving (`Modules/Mcp/manageTools.js`, `Modules/Agents/taskRequests.js`). People and lists are found with `members.list` and `lists.list`. A date given as a day is read in the person's time zone.
 - A write that must wait is filed as a proposal, and approval asks the connection again (`Modules/Mcp/propose.js`, `approval.js`).
 - The server knows the person's recent places (`Modules/RecentVisits/`). No tool tells the agent.
 - In the web app:

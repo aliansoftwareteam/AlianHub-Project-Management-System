@@ -195,7 +195,7 @@ describe('every new tool keeps to what the person behind the token can open', ()
         ['comment.update', (id) => ({ taskId: id, commentId: 'abc', text: 'x' }), /commentId is not in the form/],
         ['task.history', (id) => ({ taskId: id, since: 'yesterday' }), /since is not an argument/],
         ['tasks.batch', () => ({ operations: [] }), /operations must have at least 1 item/],
-        ['tasks.batch', () => ({ operations: Array.from({ length: 26 }, () => ({ tool: 'task.archive', arguments: {} })) }), /at most 25 items/],
+        ['tasks.batch', () => ({ operations: Array.from({ length: 51 }, () => ({ tool: 'task.archive', arguments: {} })) }), /at most 50 changes, and this one has 51/],
         ['tasks.batch', () => ({ operations: [{ tool: 'task.archive' }] }), /operations\[0\]\.arguments is required/],
         ['page.create', () => ({ title: 'x', visibility: 'private' }), /visibility is not an argument/],
         ['page.update', () => ({ pageId: '6f00000000000000000000ff' }), /name a title or a text/],

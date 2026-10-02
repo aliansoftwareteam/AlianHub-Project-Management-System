@@ -9602,6 +9602,8 @@ export default {
         line_batch_tasks: "Tasks",
         tasks_and_more: "and {n} more",
         tasks_not_shown: "{n} task you cannot open | {n} tasks you cannot open",
+        tasks_show_all: "Show all {n} tasks",
+        tasks_show_fewer: "Show fewer",
         pick_hint: "Untick anything you do not want. Only what is ticked is made.",
         pick_also_out: "{names} is left out too: it needs “{name}”. | {names} are left out too: they need “{name}”.",
         pick_also_kept: "{names} is kept too: “{name}” needs it. | {names} are kept too: “{name}” needs them.",
