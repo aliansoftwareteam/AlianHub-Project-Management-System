@@ -1,4 +1,6 @@
 const ctrl = require('./controller');
+const { agentsRefused } = require('../Agents/guard');
+
 exports.init = (app) => {
       /**
      * @swagger
@@ -77,7 +79,7 @@ exports.init = (app) => {
     app.post("/api/v1/updateunreadcommentscount", ctrl.updateUnReadCommentsCount);
     app.post("/api/v1/pushupdateunreadcommentscount", ctrl.updateUnReadCommentsCount);
 
-    app.post("/api/v1/unsetCommentCounts", (req, res) => {
+    app.post("/api/v1/unsetCommentCounts", agentsRefused('unread.reset'), (req, res) => {
         const sessionCompanyId = String(req.headers.companyid || "");
         const { companyId: bodyCompanyId, projectId = "", sprintId = "", searchKey } = req.body || {};
         if (bodyCompanyId && String(bodyCompanyId) !== sessionCompanyId) {

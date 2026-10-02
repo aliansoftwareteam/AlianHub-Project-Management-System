@@ -9,11 +9,12 @@ const { agentsRefused } = require('../../Agents/guard');
 
 const companyAdmin = requireCompanyAdmin();
 const statusesByPeople = agentsRefused('project.setup');
+const taskTypesByPeople = agentsRefused('task_types.edit');
 
 exports.init = (app) => {
     app.get('/api/v1/templates/taskType', ctrl.getTaskTypeTemplate);
-    app.put('/api/v1/templates/taskType', companyAdmin, ctrl.updateTaskTypeTemplate);
-    app.post('/api/v1/templates/taskType', companyAdmin, ctrl.insertTaskTypeTemplate);
+    app.put('/api/v1/templates/taskType', taskTypesByPeople, companyAdmin, ctrl.updateTaskTypeTemplate);
+    app.post('/api/v1/templates/taskType', taskTypesByPeople, companyAdmin, ctrl.insertTaskTypeTemplate);
     app.delete('/api/v1/templates/taskType/:id', companyAdmin, ctrl.deleteTaskTypeTemplate);
 
     app.get('/api/v1/templates/taskStatus', ctrlTaskStatus.getTaskStatusTemplate);
@@ -21,7 +22,7 @@ exports.init = (app) => {
     app.post('/api/v1/templates/taskStatus', statusesByPeople, companyAdmin, ctrlTaskStatus.insertTaskStatusTemplate);
     app.delete('/api/v1/templates/taskStatus/:id', companyAdmin, ctrlTaskStatus.deleteTaskStatusTemplate);
 
-    app.put('/api/v1/setting/taskType', companyAdmin, ctrlTaskTypeSetting.updateTaskTypeSettingTemplate);
+    app.put('/api/v1/setting/taskType', taskTypesByPeople, companyAdmin, ctrlTaskTypeSetting.updateTaskTypeSettingTemplate);
     app.put('/api/v1/setting/taskStatus', statusesByPeople, companyAdmin, ctrlTaskStatusSetting.updateTaskStatusSettingTemplate);
     app.put('/api/v1/setting/projectStatus', statusesByPeople, companyAdmin, ctrlProjectStatusSetting.updateProjectStatusSettingTemplate);
     app.get('/api/v1/setting/projectStatus', ctrlProjectStatusSetting.getProjectStatus);

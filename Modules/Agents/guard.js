@@ -9,6 +9,11 @@ const logger = require('../../Config/loggerConfig');
 const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 const { canReadProject, fieldsOf } = require('../../Config/projectAccess');
 const { refuse } = require('./personDecides');
+const { runForAgentOf } = require('../../Config/agentRequest');
+const { CHAT_SCOPE } = require('../../Config/mcpOAuth');
+const { holdsGrant } = require('../Mcp/manageFlag');
+const dataFlag = require('../Mcp/dataFlag');
+const { DIRECT, CHANNEL, conversationOf } = require('../Comments/helpers/conversation');
 
 // Middleware that applies the registry to the ordinary REST routes when the
 // caller is an agent token. Humans pass straight through — the guard never
@@ -250,23 +255,51 @@ const pageCreateGuard = (req, res, next) => pageCreateChecked(req, res, () => {
 /* For a write route the registry has no action for, or only one behind a flag: `action` names it in the refusal and its audit row. */
 const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
 
-/* The fields of the project update that are a person's to change: where the project sits (the trash, the archive and
- * the way back, its open or closed state), who is on it and which rules it follows, and the statuses and saved views
- * an agent proposes through its MCP tools. */
+/* What the project update takes from an agent, as its person may: what the project is called and says, when it is
+ * due, where the work came from, what is attached to it, and the person's own marks on it. */
+const AGENT_PROJECT_FIELDS = new Set([
+    'ProjectName', 'Description', 'description', 'descriptionBlock', 'projectIcon', 'DueDate', 'dueDateDeadLine', 'StartDate', 'EndDate',
+    'source', 'proposalId', 'skills', 'attachments', 'customField', 'checklistArray', 'tagsArray', 'favouriteTasks', 'watchers',
+]);
+
+/* Every other field is a person's to change. These are refused under the name of what they are: where the project
+ * sits (the trash, the archive and the way back, its open or closed state), who is on it and which rules it follows,
+ * how it is billed, its task types, and the statuses and saved views an agent proposes through its MCP tools. */
 const PROJECT_FIELD_ACTIONS = {
     deletedStatusKey: 'project.delete', status: 'project.status.set', statusType: 'project.status.set',
     AssigneeUserId: 'member.remove', LeadUserId: 'member.remove',
     isPrivateSpace: 'permissions.edit', isGlobalPermission: 'permissions.edit',
+    ProjectType: 'billing.project', ProjectCurrency: 'billing.project', BillingPeriod: 'billing.project',
     taskStatusData: 'project.setup', TemplateTaskStatusId: 'project.setup', projectStatusData: 'project.setup', projectStatusTemplateId: 'project.setup',
+    taskTypeCounts: 'task_types.edit', TaskTypeTemplateId: 'task_types.edit',
     ProjectRequiredComponent: 'view.create', ProjectRequiredDefaultComponent: 'view.create', viewColumn: 'view.create',
 };
-const projectFieldRefused = Object.fromEntries([...new Set(Object.values(PROJECT_FIELD_ACTIONS))].map((action) => [action, agentsRefused(action)]));
+/* A field in neither list is a setting of the project, so one added later is closed to an agent until it is listed. */
+const PROJECT_SETTINGS = 'project.settings';
+const projectFieldRefused = Object.fromEntries([...new Set([...Object.values(PROJECT_FIELD_ACTIONS), PROJECT_SETTINGS])].map((action) => [action, agentsRefused(action)]));
 
-/* An agent changes a project's other details as its person may. */
 const projectUpdateGuard = (req, res, next) => {
-    const held = fieldsOf(req.body && req.body.updateObject).find((field) => Object.hasOwn(PROJECT_FIELD_ACTIONS, field));
-    return held ? projectFieldRefused[PROJECT_FIELD_ACTIONS[held]](req, res, next) : next();
+    const held = fieldsOf(req.body && req.body.updateObject).find((field) => !AGENT_PROJECT_FIELDS.has(field));
+    if (held === undefined) return next();
+    return projectFieldRefused[Object.hasOwn(PROJECT_FIELD_ACTIONS, held) ? PROJECT_FIELD_ACTIONS[held] : PROJECT_SETTINGS](req, res, next);
 };
+
+/* Chat is given to a token by name, and the grant unlocks nothing while the tools it belongs to are off. */
+const holdsChat = (token) => dataFlag.enabled() && holdsGrant(token, CHAT_SCOPE);
+
+const CHAT_REFUSED = { [DIRECT]: 'chat.direct', [CHANNEL]: 'chat.channel' };
+
+/* An agent never reads or writes a direct message, and a channel only with a token that was given chat. A task's own
+ * thread stays the agent's as its person may. `threadOf(req, companyId)` is the comment thread the route reads or
+ * writes, the kind of conversation when the route is about one kind alone, or null when it names neither. */
+const chatGuard = (threadOf) => withActor(async (req, res, next, actor) => {
+    const companyId = req.headers['companyid'] || '';
+    const named = await threadOf(req, companyId);
+    const kind = named && typeof named === 'object' ? await conversationOf(companyId, named) : named;
+    const held = kind === DIRECT || (kind === CHANNEL && !holdsChat(req.apiToken));
+    if (!held) return next();
+    return refuse(req, res, actor, { action: CHAT_REFUSED[kind], reason: `Agents cannot perform ${CHAT_REFUSED[kind]}`, params: {} });
+});
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const WORD = /^[a-z][a-z-]*$/;
@@ -320,7 +353,7 @@ const PERIMETER = [
 const agentPerimeter = withActor(async (req, res, next, actor) => {
     const path = String(req.originalUrl || req.path || '').split('?')[0];
     const hit = PERIMETER.find((r) => r.test(req.method, path));
-    if (!hit) return next();
+    if (!hit) return runForAgentOf(actor.userId, { chat: holdsChat(req.apiToken) }, next);
     const body = req.body || {};
     if (hit.action === 'delete' || body.action === 'deleteTask') {
         return refuse(req, res, actor, { action: hit.action === 'delete' ? `${/task/i.test(path) ? 'task' : 'project'}.delete` : 'task.delete', reason: `Agents cannot perform ${/task/i.test(path) ? 'task.delete' : 'project.delete'}`, params: {} });
@@ -328,4 +361,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, agentPerimeter, TASK_PATCH_ACTIONS };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS };

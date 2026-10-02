@@ -9,7 +9,8 @@ const supportMailLimiter = rateLimit({
     keyGenerator: (req) => String(req.uid || req.ip),
     message: { status: false, statusText: 'Too many support mails. Try again later.' },
 });
+const { agentsRefused } = require('../Agents/guard');
 
 exports.init = (app) => {
-    app.post('/api/v2/support-mail', supportMailLimiter, sendSupportMail);
+    app.post('/api/v2/support-mail', agentsRefused('email.send'), supportMailLimiter, sendSupportMail);
 };

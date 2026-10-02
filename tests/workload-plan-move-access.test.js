@@ -149,7 +149,7 @@ describe('the route', () => {
     it('judges the task fields before the plan is moved', () => {
         const routes = fs.readFileSync(path.join(__dirname, '..', 'Modules/TimeSheet/routes.js'), 'utf8');
 
-        expect(routes).toMatch(/'\/api\/v1\/timesheet\/workload-move', requireMovedTaskFields, gridctrl\.moveWorkloadChip\)/);
+        expect(routes).toMatch(/'\/api\/v1\/timesheet\/workload-move', agentsRefused\('workload\.move'\), requireMovedTaskFields, gridctrl\.moveWorkloadChip\)/);
     });
 });
 

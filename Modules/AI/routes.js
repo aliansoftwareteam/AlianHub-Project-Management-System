@@ -20,10 +20,14 @@ const { chatSummaryHandler } = require('./chatSummary');
 const notesToTasks = require('./notesToTasks');
 const assist = require('./assistController');
 const { chatAskHandler, chatAskPostHandler } = require('./chatAsk');
+const { agentsRefused } = require('../Agents/guard');
+
+/* The workspace's AI writes these when a person asks for them. */
+const askedByPeople = agentsRefused('ai.spend');
 
 exports.init = (app) => {
-    app.post('/api/v1/generatePrompt', ctrl.generatePrompt);
-    app.post('/api/v1/generatePromptChat', ctrl.generatePromptChat);
+    app.post('/api/v1/generatePrompt', askedByPeople, ctrl.generatePrompt);
+    app.post('/api/v1/generatePromptChat', askedByPeople, ctrl.generatePromptChat);
     app.post('/api/v1/deleteUserChat', ctrl.deleteUserChat);
     app.post('/api/v1/getPrompts', ctrl.getPrompts);
     app.post('/api/v1/findOnePrompts', ctrl.findOnePrompts);
@@ -35,53 +39,53 @@ exports.init = (app) => {
     // agnostic (Anthropic / OpenAI / DeepSeek via the AIProjectGenerator
     // llmProvider). companyId resolves from the companyid header (set by the
     // axios interceptor). Returns { questions } or { description }.
-    app.post('/api/v1/ai/description', ctrl.writeDescription);
-    app.post('/api/v1/ai/task-summary', ctrl.summarizeTask);
+    app.post('/api/v1/ai/description', askedByPeople, ctrl.writeDescription);
+    app.post('/api/v1/ai/task-summary', askedByPeople, ctrl.summarizeTask);
     // The kept summary and area of the rows a table shows. Reads only: never a model call.
     app.post('/api/v1/ai/task-values', taskValues.keptValues);
     // Files a task under one of the labels its OWN project already uses (a
     // category custom field, else the project tags, else the company task
     // types). Never invents a vocabulary — a project with none gets a reason.
-    app.post('/api/v1/ai/task-category', ctrl.categoriseTask);
+    app.post('/api/v1/ai/task-category', askedByPeople, ctrl.categoriseTask);
     app.get('/api/v1/ai/task-assist', assist.capabilities);
-    app.post('/api/v1/ai/task-next-steps', assist.nextSteps);
+    app.post('/api/v1/ai/task-next-steps', askedByPeople, assist.nextSteps);
     app.post('/api/v1/ai/task-research', assist.research);
-    app.post('/api/v1/ai/selection/improve', assist.improve);
-    app.post('/api/v1/ai/selection/tasks', assist.splitTasks);
+    app.post('/api/v1/ai/selection/improve', askedByPeople, assist.improve);
+    app.post('/api/v1/ai/selection/tasks', askedByPeople, assist.splitTasks);
     // Ask (handoff 13i). Retrieval is scoped to the projects the caller can
     // already open, so this endpoint can never widen anyone's permissions.
     app.get('/api/v1/ai/ask/sources', askController.sources);
-    app.post('/api/v1/ai/ask', askController.ask);
-    app.post('/api/v1/ai/ask/stream', askStream.askStream);
+    app.post('/api/v1/ai/ask', askedByPeople, askController.ask);
+    app.post('/api/v1/ai/ask/stream', askedByPeople, askStream.askStream);
     app.get('/api/v1/ai/ask/threads', askThreads.listThreads);
     app.get('/api/v1/ai/ask/threads/:id', askThreads.getThread);
     app.put('/api/v1/ai/ask/threads/:id', askThreads.renameThread);
     app.delete('/api/v1/ai/ask/threads/:id', askThreads.deleteThread);
     app.get('/api/v1/ai/ask/card/:dashboardId/:cardUid', askCard.readAnswer);
-    app.post('/api/v1/ai/ask/card/:dashboardId/:cardUid', askCard.askAnswer);
+    app.post('/api/v1/ai/ask/card/:dashboardId/:cardUid', askedByPeople, askCard.askAnswer);
     app.get('/api/v1/ai/ask/post/targets', askPost.targets);
-    app.post('/api/v1/ai/ask/post', askPost.post);
+    app.post('/api/v1/ai/ask/post', agentsRefused('ai.answer.post'), askPost.post);
     app.put('/api/v1/ai/feedback', feedback.saveFeedback);
     app.get('/api/v1/ai/feedback/mine', feedback.listMine);
     app.delete('/api/v1/ai/feedback/:id', feedback.removeFeedback);
     app.get('/api/v1/ai/quality', quality.getQuality);
     app.post('/api/v1/ai/quality/held-out', quality.runHeldOut);
     app.get('/api/v1/ai/memory', aiProfile.getProfile);
-    app.put('/api/v1/ai/memory', aiProfile.saveProfile);
+    app.put('/api/v1/ai/memory', agentsRefused('ai.memory.edit'), aiProfile.saveProfile);
     app.delete('/api/v1/ai/memory', aiProfile.clearProfile);
-    app.post('/api/v1/ai/memory/import/preview', aiProfileImport.previewImport);
-    app.post('/api/v1/ai/memory/import/confirm', aiProfileImport.confirmImport);
+    app.post('/api/v1/ai/memory/import/preview', askedByPeople, aiProfileImport.previewImport);
+    app.post('/api/v1/ai/memory/import/confirm', agentsRefused('ai.memory.edit'), aiProfileImport.confirmImport);
     app.get('/api/v1/ai/ask/build/:projectId', askBuild.buildTarget);
-    app.post('/api/v1/ai/ask/create-tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/ai/ask/create-tasks'].entry), askBuild.createTasks);
+    app.post('/api/v1/ai/ask/create-tasks', requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/ai/ask/create-tasks'].entry), agentsRefused('tasks.import'), askBuild.createTasks);
     // Talk to Text — audio → text via OpenAI Whisper (multipart, field "file").
-    app.post('/api/v1/ai/transcribe', ...transcribe.transcribe);
-    app.post('/api/v1/ai/meeting-notes', meetingNotes.meetingNotesHandler);
-    app.post('/api/v1/ai/chat-summary', chatSummaryHandler);
-    app.post('/api/v1/ai/notes-to-tasks/propose', notesToTasks.proposeHandler);
-    app.post('/api/v1/ai/notes-to-tasks', notesToTasks.createHandler);
-    app.post('/api/v1/ai/notes-to-tasks/undo', notesToTasks.undoHandler);
-    app.post('/api/v1/ai/chat-ask', chatAskHandler);
-    app.post('/api/v1/ai/chat-ask/post', chatAskPostHandler);
+    app.post('/api/v1/ai/transcribe', askedByPeople, ...transcribe.transcribe);
+    app.post('/api/v1/ai/meeting-notes', askedByPeople, meetingNotes.meetingNotesHandler);
+    app.post('/api/v1/ai/chat-summary', askedByPeople, chatSummaryHandler);
+    app.post('/api/v1/ai/notes-to-tasks/propose', askedByPeople, notesToTasks.proposeHandler);
+    app.post('/api/v1/ai/notes-to-tasks', agentsRefused('tasks.import'), notesToTasks.createHandler);
+    app.post('/api/v1/ai/notes-to-tasks/undo', agentsRefused('task.delete'), notesToTasks.undoHandler);
+    app.post('/api/v1/ai/chat-ask', askedByPeople, chatAskHandler);
+    app.post('/api/v1/ai/chat-ask/post', agentsRefused('ai.answer.post'), chatAskPostHandler);
     app.get('/api/v1/generatePrompt/events/:id', (req, res) => {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');

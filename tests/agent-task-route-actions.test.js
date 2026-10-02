@@ -248,7 +248,7 @@ describe('the table the rule reads', () => {
     });
 
     it('leaves no guard exported that no route mounts', () => {
-        const mounted = ['Modules/Tasks/routes.js', 'Modules/Agents/routes.js', 'Modules/Pages/routes.js', 'Modules/Goals/routes.js', 'Modules/Project/routes.js'].map((file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
+        const mounted = ['Modules/Tasks/routes.js', 'Modules/Agents/routes.js', 'Modules/Pages/routes.js', 'Modules/Goals/routes.js', 'Modules/Project/routes.js', 'Modules/Comments/routes.js'].map((file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8')).join('\n');
 
         Object.entries(guard).filter(([, value]) => typeof value === 'function').forEach(([name]) => {
             expect(mounted).toMatch(new RegExp(`\\b${name}\\b`));

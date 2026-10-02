@@ -67,8 +67,8 @@ exports.init = (app) => {
     app.post('/api/v2/custom-fields/compute', requireTaskWritePermission(COMPUTED_VALUES), ctrl.computeFields)
     app.post('/api/v2/custom-fields/links/resolve', fieldLinks.resolve)
     app.post('/api/v2/custom-fields/:fieldId/vote', fieldLinks.vote)
-    app.post('/api/v2/custom-fields/:fieldId/ai/preview', aiFields.preview)
+    app.post('/api/v2/custom-fields/:fieldId/ai/preview', agentsRefused('ai.spend'), aiFields.preview)
     app.post('/api/v2/custom-fields/:fieldId/ai/apply', aiFields.apply)
-    app.post('/api/v2/custom-fields/:fieldId/ai/jobs', aiFields.startJob)
+    app.post('/api/v2/custom-fields/:fieldId/ai/jobs', agentsRefused('ai.spend'), aiFields.startJob)
     app.get('/api/v2/custom-fields/ai/jobs/:jobId', aiFields.readJob)
 }
