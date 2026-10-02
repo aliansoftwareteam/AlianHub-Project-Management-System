@@ -6,7 +6,7 @@
 <div>
     <div class="createprojectContent whitebodyContent_v2">
         <div class="form-group d-flex align-items-center" id="createprojectname_driver">
-            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectSlider.project_name') }}<span class="text-red asterisk">*</span></label>
+            <label :class="{'project-form-taskstatustitle-desktop': clientWidth > 767 , 'project-form-taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectSlider.project_name') }}<span class="text-red asterisk">*</span></label>
             <div class="input-field-group">
                 <InputText
                     class="form-control login-input"
@@ -29,7 +29,7 @@
             </div>
         </div>
         <div class="form-group d-flex align-items-center" id="createprojectkey_driver">
-            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.key') }}<span class="text-red asterisk">*</span></label>
+            <label :class="{'project-form-taskstatustitle-desktop': clientWidth > 767 , 'project-form-taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.key') }}<span class="text-red asterisk">*</span></label>
             <div class="input-field-group">
                 <InputText
                     class="form-control login-input"
@@ -49,14 +49,14 @@
             </div>
         </div>
         <div class="form-group d-flex align-items-center" id="createprojectsource_driver">
-            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.source') }}<span class="text-red asterisk">*</span></label>
+            <label :class="{'project-form-taskstatustitle-desktop': clientWidth > 767 , 'project-form-taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.source') }}<span class="text-red asterisk">*</span></label>
             <div class="input-field-group">
                 <ProjectSourceSelect v-model="theModel.source.value" @changed="onSourceChange"/>
                 <div class="text-red">{{theModel.source.error}}</div>
             </div>
         </div>
         <div class="form-group d-flex align-items-center" id="createprojectproposalid_driver">
-            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >
+            <label :class="{'project-form-taskstatustitle-desktop': clientWidth > 767 , 'project-form-taskstatustitle-mobile': clientWidth <= 767}" >
                 {{ $t('ProjectDetails.proposal_id') }}<span class="text-red asterisk" v-if="isUpwork(theModel.source.value)">*</span>
             </label>
             <div class="input-field-group">
@@ -69,23 +69,23 @@
                     maxlength="100"
                     type="text"
                 />
-                <div class="font-size-12 gray81" v-if="isUpwork(theModel.source.value)">{{ $t('Projects.proposal_id_format_hint') }}</div>
+                <div class="project-form-font-size-12 project-form-gray81" v-if="isUpwork(theModel.source.value)">{{ $t('Projects.proposal_id_format_hint') }}</div>
                 <div class="text-red">{{theModel.proposalId.error}}</div>
             </div>
         </div>
         <div class="form-group d-flex align-items-center" id="createprojectskills_driver">
-            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.skills') }}</label>
+            <label :class="{'project-form-taskstatustitle-desktop': clientWidth > 767 , 'project-form-taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.skills') }}</label>
             <div class="input-field-group">
                 <SkillsSelect v-model="theModel.skills.value" :bordered="true" :showAll="true" @changed="syncModel()"/>
             </div>
         </div>
         <div class="form-group d-flex align-items-center" id="createprojectduedate_driver">
-            <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('Projects.due_date') }}</label>
+            <label :class="{'project-form-taskstatustitle-desktop': clientWidth > 767 , 'project-form-taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('Projects.due_date') }}</label>
             <VueDatePicker class="text-capitalize" :placeholder="$t('PlaceHolder.Select_Project_Due_Date')" v-model="theModel.dueDate.value" @input="updateDueDate(event)" auto-apply  :close-on-auto-apply="true" :min-date="new Date()" :enable-time-picker="false"/>
         </div>
         <div class="form-group d-flex align-items-center" id="createprojectleadassignee_driver">
             <div class="labelDetail leadMain d-flex align-items-center">
-                <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.lead') }}</label>
+                <label :class="{'project-form-taskstatustitle-desktop': clientWidth > 767 , 'project-form-taskstatustitle-mobile': clientWidth <= 767}" >{{ $t('ProjectDetails.lead') }}</label>
                 <ul class="d-flex">
                     <li class="addIcon ml-0px">
                         <Assignee
@@ -263,4 +263,25 @@ li{
     list-style: none;
 }
 
+</style>
+
+<style scoped>
+.project-form-gray81 {
+    color: var(--ink-2);
+}
+.project-form-font-size-12 {
+    font-size: 12px;
+}
+.project-form-taskstatustitle-desktop {
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    line-height: 21px !important;
+    color: var(--ink) !important;
+}
+.project-form-taskstatustitle-mobile {
+    font-size: 16px !important;
+    line-height: 21px !important;
+    font-weight: 500 !important;
+    color: var(--ink) !important;
+}
 </style>

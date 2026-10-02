@@ -6,10 +6,10 @@
     <div class="pt-20px">
         <div class="checklist-main mobile__bg--withPadding">
             <div class="d-flex align-items-center">
-                <h3 :class="{'font-size-16 font-weight-600' : clientWidth <=767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="black checklist-main__title">{{$t('Checklist.checklist')}}</h3>
+                <h3 :class="{'check-list-font-size-16 check-list-font-weight-600' : clientWidth <=767 , 'check-list-font-size-14 check-list-font-weight-700' : clientWidth > 767 }" class="check-list-black checklist-main__title">{{$t('Checklist.checklist')}}</h3>
                 <div class="d-flex align-items-center ml-auto" @click="generateChecklistWithAi()" v-if="canUseAi({ project, permitted: checkPermission('task.task_checklist',project?.isGlobalPermission) === true })">
                     <img :src="aiIcon" class="mr-3px" />
-                    <span class="cursor-pointer ai-color ai-border-bottom font-size-14 font-weight-500 checklist-main__suggest" :class="[{'pointer-event-none' : isSpinnerAi}]">{{$t('Checklist.suggest_checklists')}}</span>
+                    <span class="cursor-pointer ai-color ai-border-bottom check-list-font-size-14 check-list-font-weight-500 checklist-main__suggest" :class="[{'pointer-event-none' : isSpinnerAi}]">{{$t('Checklist.suggest_checklists')}}</span>
                 </div>
             </div>
             <div v-if="props.isMainSpinner">
@@ -25,7 +25,7 @@
                                 <div class="d-flex justify-content-between parent-item">
                                     <div class="d-flex align-items-center w-85">
                                         <img src="@/assets/images/table_arrow.png" alt="" v-if="row?.subItems && row.subItems.length" class="align-items-center cursor-pointer" :style="`transform: rotateZ(${row.isExpand ? '90' : '0'}deg); margin-left:2px;`" @click="handleCollapseExpand(row)"/>
-                                        <label class="font-weight-normal font-size-14 d-flex ml-10-px black" :class="[{'w-90': row.name.length > 100}]">
+                                        <label class="check-list-font-weight-normal check-list-font-size-14 d-flex ml-10-px check-list-black" :class="[{'w-90': row.name.length > 100}]">
                                             <InputText v-if="row.isEdit"
                                                 v-model.trim="oldItemName"
                                                 :placeHolder="$t('PlaceHolder.Enter_item_name')"
@@ -35,10 +35,10 @@
                                                 class="input-edit-checklist"
                                                 :class="[{'border-bottom-red': isInvalid}]"
                                             />
-                                            <span v-else class="text-ellipsis font-size-14 font-weight-500 black" :title="row.name">{{ row.name }}</span>
+                                            <span v-else class="text-ellipsis check-list-font-size-14 check-list-font-weight-500 check-list-black" :title="row.name">{{ row.name }}</span>
                                         </label>
                                         <div class="d-flex ml-10-px">
-                                            <span class="d-flex align-items-center font-size-13 font-weight-400 GunPowder">({{ row.checkItem }}/{{ row.totalSubItems }})</span>
+                                            <span class="d-flex align-items-center check-list-font-size-13 check-list-font-weight-400 check-list-GunPowder">({{ row.checkItem }}/{{ row.totalSubItems }})</span>
                                         </div>
                                         <div class="d-flex align-items-center">
                                             <img v-if="permission === true" class="ml-10-px mr-4-px cursor-pointer action-img-border" src="@/assets/images/svg/pluss.svg" alt="Add" @click="showInput(row)" />
@@ -116,12 +116,12 @@
                     />
                 </div>
                 <button v-if="permission === true" type="button" class="new-checklist-section" :disabled="adding" :aria-busy="adding ? 'true' : 'false'" @click="addCheckList">
-                    <span class="d-flex"><i class="mr-8px font-size-18 font-normal">+</i>{{$t('Checklist.add_checklist')}}</span>
+                    <span class="d-flex"><i class="mr-8px check-list-font-size-18 check-list-font-normal">+</i>{{$t('Checklist.add_checklist')}}</span>
                 </button>
                 <div v-if="isSpinnerAi">
                     <Skelaton v-for="i in 4" :key="i" class="border-radius-5-px m-5px border-bottom px-1 subtask__item-input"/>
                 </div>
-                <span v-if="isError" class="red">{{$t('generalErrorMessage.something_went_wrong')}}</span>
+                <span v-if="isError" class="check-list-red">{{$t('generalErrorMessage.something_went_wrong')}}</span>
             </div>
         </div>
     </div>
@@ -837,3 +837,45 @@ function updateChecklist (array) {
 defineExpose({ addCheckList });
 </script>
 <style> @import "./style.css"; </style>
+
+<style scoped>
+.check-list-black {
+    color: var(--ink);
+}
+.check-list-red {
+    color: var(--danger-ink);
+}
+.check-list-GunPowder {
+    color: var(--ink-2);
+}
+.check-list-font-weight-normal {
+    font-weight: normal;
+}
+.check-list-font-normal {
+    font-style: normal;
+}
+.check-list-font-weight-400 {
+    font-weight: 400 !important;
+}
+.check-list-font-weight-500 {
+    font-weight: 500 !important;
+}
+.check-list-font-weight-600 {
+    font-weight: 600 !important;
+}
+.check-list-font-weight-700 {
+    font-weight: 700 !important;
+}
+.check-list-font-size-13 {
+    font-size: 13px;
+}
+.check-list-font-size-14 {
+    font-size: 14px;
+}
+.check-list-font-size-16 {
+    font-size: 16px;
+}
+.check-list-font-size-18 {
+    font-size: 18px !important;
+}
+</style>

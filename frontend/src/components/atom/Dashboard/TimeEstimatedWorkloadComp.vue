@@ -3,7 +3,7 @@
         <DropDown :id="cardUID" mode="listbox">
             <template #button>
                 <div :ref="cardUID"
-                    class="status-estimate d-flex align-items-center font-weight-500 font-size-14 p-4px cursor-pointer w-max-content dark-gray">
+                    class="status-estimate d-flex align-items-center time-estimated-workload-comp-font-weight-500 time-estimated-workload-comp-font-size-14 p-4px cursor-pointer w-max-content time-estimated-workload-comp-dark-gray">
                     <img src="@/assets/images/svg/calender.svg" alt="" style="width:12px;height:12px;" class="mr-4px">
                     <span>{{$t(`dashboardCard.${selectedOptionName}`)}}</span>
                 </div>
@@ -23,14 +23,14 @@
         <table class="table time-sheet-table">
             <thead>
                 <tr>
-                    <th class="text-left font-size-14 font-weight-500 text-uppercase dark-gray ">
+                    <th class="text-left time-estimated-workload-comp-font-size-14 time-estimated-workload-comp-font-weight-500 text-uppercase time-estimated-workload-comp-dark-gray ">
                     </th>
                     <th v-if="componentId === 'TimeEstimatedComp' || componentId === 'TimeEstimatedWorkloadComp'"
-                        class="text-right font-size-14 font-weight-500 text-uppercase dark-gray">
+                        class="text-right time-estimated-workload-comp-font-size-14 time-estimated-workload-comp-font-weight-500 text-uppercase time-estimated-workload-comp-dark-gray">
                         {{ $t('UserTimesheet.planned') }}
                     </th>
                     <th v-if="componentId === 'TimeTrackComp' || componentId === 'TimeEstimatedWorkloadComp'"
-                        class="text-right font-size-14 font-weight-500 text-uppercase dark-gray ml-5">
+                        class="text-right time-estimated-workload-comp-font-size-14 time-estimated-workload-comp-font-weight-500 text-uppercase time-estimated-workload-comp-dark-gray ml-5">
                         {{ $t('UserTimesheet.logged') }}
                     </th>
                 </tr>
@@ -41,17 +41,17 @@
                         <div class="d-flex align-items-center">
                             <UserProfile decorative :data="{ title: user?.name, image: user?.image }" width="30px" :showDot="false"
                                 :thumbnail="'30x30'" />
-                            <span class="ml-8px font-size-14 font-weight-500 text-ellipsis w-85" :title="user.name">
+                            <span class="ml-8px time-estimated-workload-comp-font-size-14 time-estimated-workload-comp-font-weight-500 text-ellipsis w-85" :title="user.name">
                                 {{ user.name }}
                             </span>
                         </div>
                     </td>
                     <td v-if="componentId === 'TimeEstimatedComp' || componentId === 'TimeEstimatedWorkloadComp'"
-                        class="text-right font-size-14 font-weight-500 py-8px">
+                        class="text-right time-estimated-workload-comp-font-size-14 time-estimated-workload-comp-font-weight-500 py-8px">
                         {{ formatMinutesToHHMMSS(user.estimatedTime) }}
                     </td>
                     <td v-if="componentId === 'TimeTrackComp' || componentId === 'TimeEstimatedWorkloadComp'"
-                        class="text-right font-size-14 font-weight-500 py-8px">
+                        class="text-right time-estimated-workload-comp-font-size-14 time-estimated-workload-comp-font-weight-500 py-8px">
                         {{ formatMinutesToHHMMSS(user.totalTrackedTime) }}
                     </td>
                 </tr>
@@ -422,5 +422,17 @@ watch([() => props.cardData], async(newValue) => {
   top: 0;
   background-color: var(--surface);
   z-index: 1;
+}
+</style>
+
+<style scoped>
+.time-estimated-workload-comp-dark-gray {
+    color: var(--ink);
+}
+.time-estimated-workload-comp-font-weight-500 {
+    font-weight: 500 !important;
+}
+.time-estimated-workload-comp-font-size-14 {
+    font-size: 14px;
 }
 </style>

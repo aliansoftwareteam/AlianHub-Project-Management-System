@@ -19,7 +19,7 @@
                 class="position-fi d-flex flex-column sidebar-content z-index-7"
                 :id="tourId"
             >
-                <div v-if="!hideHeader" :class="[headClass, {'bg-white blue': !themed}]" class="sidebar-head d-flex align-items-center justify-content-between px-1 border-bottom cursor-default">
+                <div v-if="!hideHeader" :class="[headClass, {'bg-white sidebar-blue': !themed}]" class="sidebar-head d-flex align-items-center justify-content-between px-1 border-bottom cursor-default">
                     <slot name="head">
                         <div class="assignee-headtitle d-block text-ellipsis text-nowrap">
                             <slot name="head-left">
@@ -32,7 +32,7 @@
                         </div>
                         <div class="cursor-pointer d-flex align-items-center text-nowrap">
                             <slot name="head-right">
-                                <button v-if="multiSelect && showClear" type="button" class="mr-1" :class="[themed ? 'ah-btn ah-btn--secondary ah-btn--sm' : 'clear-all outline-primary bg-light-gray black', {'opacity-5 cursor-default': !value.length, 'opacity-10 cursor-pointer': value.length}]" @click="$emit('clear')">{{$t('Filters.clearall')}}</button>
+                                <button v-if="multiSelect && showClear" type="button" class="mr-1" :class="[themed ? 'ah-btn ah-btn--secondary ah-btn--sm' : 'clear-all outline-primary sidebar-bg-light-gray sidebar-black', {'opacity-5 cursor-default': !value.length, 'opacity-10 cursor-pointer': value.length}]" @click="$emit('clear')">{{$t('Filters.clearall')}}</button>
                                 <button type="button" class="sidebar-close" :aria-label="$t('Projects.close')" @click="$emit('update:visible', !visible)">
                                     <ShellIcon v-if="themed" name="x" :size="15" />
                                     <img v-else :src="closeBlueImage" alt="" class="cursor-pointer"/>
@@ -41,11 +41,11 @@
                         </div>
                     </slot>
                 </div>
-                <div class="sidebar-body style-scroll" :class="{'black bg-white': !themed}" :id="uniqueId" :style="{
+                <div class="sidebar-body sidebar-style-scroll" :class="{'sidebar-black bg-white': !themed}" :id="uniqueId" :style="{
                     'height': (hideHeader ? '100%' : '')
                 }">
                     <div v-if="enableSearch" class="mobile-list-inputsearch-wrapper border-bottom p-15px" :class="{'bg-white': !themed}">
-                        <input ref="sidebar_search" type="text" v-model="search" :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" class="form-control listsidebar-search font-size-16" @input="$emit('searchChange', search)">
+                        <input ref="sidebar_search" type="text" v-model="search" :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" class="form-control listsidebar-search sidebar-font-size-16" @input="$emit('searchChange', search)">
                     </div>
                     <slot name="body">
                         <div v-if="defaultLayout" class="overflow-y-auto sidebar-options overflow-x-hidden" :role="filteredOptions?.length ? 'listbox' : null" :aria-label="filteredOptions?.length ? title : null" :aria-multiselectable="multiSelect ? 'true' : null" :style="`height: ${!enableSearch ? 'calc(100% - 0px);' : 'calc(100% - 62px);'}`">
@@ -68,7 +68,7 @@
                                 </template>
                                 <template v-else>
                                     <div class="text-center mt-10px">
-                                        <span class="red" >{{$t('ProjectSlider.no_result_found')}}</span>
+                                        <span class="sidebar-red" >{{$t('ProjectSlider.no_result_found')}}</span>
                                     </div>
                                 </template>
                             </template>
@@ -98,7 +98,7 @@
                                             {{group.label}}
                                         </div>
                                         <div class="text-center mt-10px">
-                                            <span class="red">{{$t('ProjectSlider.no_result_found')}}</span>
+                                            <span class="sidebar-red">{{$t('ProjectSlider.no_result_found')}}</span>
                                         </div>
                                     </div>
                                 </template>
@@ -446,4 +446,35 @@ useFocusTrap(panelRef, computed(() => props.visible && !props.disableBackdrop));
 
 <style>
 @import "./style.css";
+</style>
+
+<style scoped>
+.sidebar-black {
+    color: var(--ink);
+}
+.sidebar-blue {
+    color: var(--brand) !important;
+}
+.sidebar-red {
+    color: var(--danger-ink);
+}
+.sidebar-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.sidebar-font-size-16 {
+    font-size: 16px;
+}
+.sidebar-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.sidebar-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.sidebar-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

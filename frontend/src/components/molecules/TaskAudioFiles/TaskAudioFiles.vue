@@ -1,5 +1,5 @@
 <template>
-    <div class="position-sti bg-white task__audio-component h-100">
+    <div class="position-sti task-audio-files-bg-white task__audio-component h-100">
         <div class="input__file-Search">
             <InputText v-model="search" :place-holder="$t('PlaceHolder.search')" @input="onSerch" :isOutline="false"/>
         </div>
@@ -24,7 +24,7 @@
                         <li v-if="index == 3 && Number(userList.length-4) !== 0" class="position-re li__equal-four">
                             <DropDown mode="listbox" multiselectable :id="'Assignee_'+'fileandlinks'" :bodyClass="{'audio__user-sidebar' : true}">
                                 <template #button>
-                                    <div @click="toggleUsers = true" class="cursor-pointer d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap">
+                                    <div @click="toggleUsers = true" class="cursor-pointer d-flex align-items-center justify-content-center profile-image task-audio-files-GunPowder task-audio-files-blue text-nowrap">
                                         + {{ Number(userList.length-4) }}
                                     </div>
                                 </template>
@@ -35,9 +35,9 @@
                                         :selected="Boolean(user1.isSelected)"
                                         @click="user1.isSelected = !user1.isSelected,getDataWithUserFilter()"
                                     >
-                                        <div class="font-size-13 getdata__userfilter">
-                                            <div class="overflow-y-auto overflow-x-hidden drop-down-options black">
-                                                <div class="align-items-center border-radius-5-px justify-content-between hover-purple cursor-pointer text-nowrap drop-down-item">
+                                        <div class="task-audio-files-font-size-13 getdata__userfilter">
+                                            <div class="overflow-y-auto overflow-x-hidden drop-down-options task-audio-files-black">
+                                                <div class="align-items-center border-radius-5-px justify-content-between task-audio-files-hover-purple cursor-pointer text-nowrap drop-down-item">
                                                     <div class="d-flex align-items-center" :title="user1.Employee_Name" @click.stop.prevent="user1.isSelected = !user1.isSelected,getDataWithUserFilter()">
                                                         <input type="checkbox" :class="[{'checkboxBlueFileLink' : user1.isSelected}]" :id="'checkboxlinkfile'+user1.id" v-model="user1.isSelected" />
                                                         <UserProfile decorative
@@ -67,11 +67,11 @@
             <div class="border-radius-6-px file__ascedesc-wrapper">
                 <DropDown mode="listbox" id="filter" :bodyClass="{'z-index-10' : true}">
                     <template #button>
-                        <div ><span class="font-size-16 font-weight-700 gray81 mr-15px">{{$t('Projects.sort_by')}}:</span> <span class="font-size-16 font-weight-400 gray81 ml-6px sort__by-category">{{selectedOrder == '0' ? $t('Filters.a_to_z') : $t('Filters.z_to_a')}}</span></div>
+                        <div ><span class="task-audio-files-font-size-16 task-audio-files-font-weight-700 task-audio-files-gray81 mr-15px">{{$t('Projects.sort_by')}}:</span> <span class="task-audio-files-font-size-16 task-audio-files-font-weight-400 task-audio-files-gray81 ml-6px sort__by-category">{{selectedOrder == '0' ? $t('Filters.a_to_z') : $t('Filters.z_to_a')}}</span></div>
                     </template>
                     <template #options>
                         <DropDownOption
-                            class="font-size-16 font-weight-400 gray81"
+                            class="task-audio-files-font-size-16 task-audio-files-font-weight-400 task-audio-files-gray81"
                             v-for="order in orders"
                             :key="order.value"
                             :item="order"
@@ -487,3 +487,36 @@ const getDataWithUserFilter = () => {
 }
 </script>
 <style src="./style.css"></style>
+
+<style scoped>
+.task-audio-files-black {
+    color: var(--ink);
+}
+.task-audio-files-blue {
+    color: var(--brand) !important;
+}
+.task-audio-files-GunPowder {
+    color: var(--ink-2);
+}
+.task-audio-files-gray81 {
+    color: var(--ink-2);
+}
+.task-audio-files-hover-purple:hover {
+    color: var(--brand) !important;
+}
+.task-audio-files-bg-white {
+    background-color: var(--surface);
+}
+.task-audio-files-font-weight-400 {
+    font-weight: 400 !important;
+}
+.task-audio-files-font-weight-700 {
+    font-weight: 700 !important;
+}
+.task-audio-files-font-size-13 {
+    font-size: 13px;
+}
+.task-audio-files-font-size-16 {
+    font-size: 16px;
+}
+</style>

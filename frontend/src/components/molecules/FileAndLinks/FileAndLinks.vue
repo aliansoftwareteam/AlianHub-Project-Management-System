@@ -3,34 +3,34 @@
     Assignee: Parth Detroja
 -->
 <template>
-    <div class="font-ui overflow-y-auto bg-white h-100 all__filelinks-wrapper">
-        <div class="bg-white position-re h-100">
-            <div class="files-links-tabs position-sti bg-white">    
+    <div class="font-ui overflow-y-auto file-and-links-bg-white h-100 all__filelinks-wrapper">
+        <div class="file-and-links-bg-white position-re h-100">
+            <div class="files-links-tabs position-sti file-and-links-bg-white">    
                 <ul class="d-flex">
                     <li
                         class="d-flex"
                         :class="activeTab == 'all' ? 'active' : ''"
                         @click="activeTab !== 'all' ? activeTab = 'all': ''"
                     >
-                        <span class="font-size-18 font-weight-700 font-ui cursor-pointer">{{$t('Projects.all')}}</span>
+                        <span class="file-and-links-font-size-18 file-and-links-font-weight-700 font-ui cursor-pointer">{{$t('Projects.all')}}</span>
                     </li>
                     <li
                         class="d-flex"
                         :class="activeTab == 'files' ? 'active' : ''"
                         @click="activeTab !== 'files' ? activeTab = 'files': ''"
                     >
-                        <span class="font-size-18 font-weight-700 font-ui cursor-pointer">{{$t('Projects.files')}}</span>
+                        <span class="file-and-links-font-size-18 file-and-links-font-weight-700 font-ui cursor-pointer">{{$t('Projects.files')}}</span>
                     </li>
                     <li
                         class="d-flex"
                         :class="activeTab == 'links' ? 'active' : ''"
                         @click="activeTab !== 'links' ? activeTab = 'links': ''"
                     >
-                        <span class="font-size-18 font-weight-700 font-ui cursor-pointer">{{$t('Projects.links')}}</span>
+                        <span class="file-and-links-font-size-18 file-and-links-font-weight-700 font-ui cursor-pointer">{{$t('Projects.links')}}</span>
                     </li>
                 </ul>
             </div>
-            <div class="position-sti bg-white file__links-wrapper">
+            <div class="position-sti file-and-links-bg-white file__links-wrapper">
                 <div class="input__file-Search">
                     <InputText v-model="search" :place-holder="$t('PlaceHolder.search')" :isOutline="false" @input="onInput"/>
                 </div>
@@ -55,7 +55,7 @@
                                 <li v-if="index == 3 && Number(userList.length-4) !== 0" class="position-re li__equal-three">
                                     <DropDown :id="'Assignee_'+'fileandlinks'" mode="listbox" :bodyClass="{'filelinks__user-sidebar' : true}">
                                         <template #button>
-                                            <div @click="toggleUsers = true" class="cursor-pointer d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap">
+                                            <div @click="toggleUsers = true" class="cursor-pointer d-flex align-items-center justify-content-center profile-image file-and-links-GunPowder file-and-links-blue text-nowrap">
                                                 <span aria-hidden="true">+ {{ Number(userList.length-4) }}</span>
                                                 <span class="ah-sr-only">{{ $t('Filters.more_users', { count: Number(userList.length-4) }, Number(userList.length-4)) }}</span>
                                             </div>
@@ -67,9 +67,9 @@
                                                 :selected="Boolean(user1.isSelected)"
                                                 @click="user1.isSelected = !user1.isSelected,getDataWithUserFilter()"
                                             >
-                                                <div class="font-size-13 getdata__userfilter">
-                                                    <div class="overflow-y-auto overflow-x-hidden drop-down-options black">
-                                                        <div class="align-items-center border-radius-5-px justify-content-between hover-purple cursor-pointer text-nowrap drop-down-item">
+                                                <div class="file-and-links-font-size-13 getdata__userfilter">
+                                                    <div class="overflow-y-auto overflow-x-hidden drop-down-options file-and-links-black">
+                                                        <div class="align-items-center border-radius-5-px justify-content-between file-and-links-hover-purple cursor-pointer text-nowrap drop-down-item">
                                                             <div class="d-flex align-items-center selected__employee-users" :title="user1.Employee_Name">
                                                                 <input type="checkbox" :class="[{'checkboxBlueFileLink' : user1.isSelected}]" :id="'checkboxlinkfile'+user1._id" v-model="user1.isSelected" />
                                                                 <UserProfile decorative
@@ -98,11 +98,11 @@
                     <div class="border-radius-6-px  file__ascedesc-wrapper">
                         <DropDown id="filter" mode="listbox" :bodyClass="{'file__ascedesc-dropdown z-index-10' : true}">
                             <template #button>
-                                <div ><span class="font-size-16 font-weight-700 gray81 mr-15px">{{$t('Projects.sort_by')}}:</span> <span class="font-size-16 font-weight-400 gray81 ml-6px sort__by-category">{{selectedOrder == '0' ? $t('Filters.a_to_z') : $t('Filters.z_to_a')}}</span></div>
+                                <div ><span class="file-and-links-font-size-16 file-and-links-font-weight-700 file-and-links-gray81 mr-15px">{{$t('Projects.sort_by')}}:</span> <span class="file-and-links-font-size-16 file-and-links-font-weight-400 file-and-links-gray81 ml-6px sort__by-category">{{selectedOrder == '0' ? $t('Filters.a_to_z') : $t('Filters.z_to_a')}}</span></div>
                             </template>
                             <template #options>
                                 <DropDownOption
-                                    class="font-size-16 font-weight-400 gray81"
+                                    class="file-and-links-font-size-16 file-and-links-font-weight-400 file-and-links-gray81"
                                     v-for="order in orders"
                                     :key="order.value"
                                     :item="order"
@@ -154,10 +154,10 @@
                                     </span>
                                     <div class="file-link-name">
                                         <div class="d-flex file-name">
-                                            <span class="font-size-14 font-weight-500 text-ellipsis text-decoration-none w-100 d-inline-block pr-5px" :title="item.fileName">{{item.fileName}}</span>
+                                            <span class="file-and-links-font-size-14 file-and-links-font-weight-500 text-ellipsis text-decoration-none w-100 d-inline-block pr-5px" :title="item.fileName">{{item.fileName}}</span>
                                             <span>{{item.size}}</span>
                                         </div>
-                                        <h4 class="font-size-14 font-weight-500 m-0 gray81 pt-5px">{{item?.userDetail?.Employee_Name}}</h4>
+                                        <h4 class="file-and-links-font-size-14 file-and-links-font-weight-500 m-0 file-and-links-gray81 pt-5px">{{item?.userDetail?.Employee_Name}}</h4>
                                         <div class="d-flex  file-link-date">
                                             <div>
                                                 <!-- Linked cloud file: we hold a link, not the bytes, so
@@ -174,7 +174,7 @@
                                                 <img v-else class="cursor-pointer mr-15px" src="@/assets/images/svg/downloadVector.svg" @click="downloadDocument(item.downloadUrl, item.fileName, item), item.isSpinner = true">
                                                 <img v-show="item.getFrom === 'comments'" @click="highlightComment(item)" class="cursor-pointer" :src="messageReply">
                                             </div>
-                                            <span v-if="!getDateAndTime(item.createTime).includes('Invalid date')" class="font-size-13 gray81 font-weight-400">
+                                            <span v-if="!getDateAndTime(item.createTime).includes('Invalid date')" class="file-and-links-font-size-13 file-and-links-gray81 file-and-links-font-weight-400">
                                                     {{ getDateAndTime(item.createTime) }}
                                             </span>
                                         </div>
@@ -183,14 +183,14 @@
                                 <div class="d-flex align-items-start w-100 img-attached-wrapper" :class="[{'opacity_0_3': item.isSpinner}]" v-if='item.attachedType == "link"'>
                                     <span class="files-img"><img :src="linkIcon" alt="link" class="linkIconLink"></span>
                                     <div class="file-link-name">
-                                        <a :href='item.attached'  :class="[{'black' : item.attachedType === 'file','blue' : item.attachedType === 'link'}]"  target=”_blank” class="font-size-14 font-weight-500 text-ellipsis text-decoration-none w-100 d-inline-block pr-5px">{{item.fileName}}</a>
-                                        <h4 v-if="item.getFrom != undefined && item.getFrom !== 'description'" class="font-size-14 font-weight-500 m-0 gray81 pt-5px">{{item?.userDetail?.Employee_Name}}</h4>
-                                        <h4 v-else class="font-size-14 font-weight-500 m-0 gray81 pt-5px">{{ $t('Description.description') }}</h4>
+                                        <a :href='item.attached'  :class="[{'file-and-links-black' : item.attachedType === 'file','file-and-links-blue' : item.attachedType === 'link'}]"  target=”_blank” class="file-and-links-font-size-14 file-and-links-font-weight-500 text-ellipsis text-decoration-none w-100 d-inline-block pr-5px">{{item.fileName}}</a>
+                                        <h4 v-if="item.getFrom != undefined && item.getFrom !== 'description'" class="file-and-links-font-size-14 file-and-links-font-weight-500 m-0 file-and-links-gray81 pt-5px">{{item?.userDetail?.Employee_Name}}</h4>
+                                        <h4 v-else class="file-and-links-font-size-14 file-and-links-font-weight-500 m-0 file-and-links-gray81 pt-5px">{{ $t('Description.description') }}</h4>
                                         <div class="d-flex file-link-date">
                                             <div>
                                                 <img v-show="item.getFrom != undefined && item.getFrom == 'comments'" class="cursor-pointer mr-15px" @click="highlightComment(item)"  :src="messageReply">
                                             </div>
-                                            <span  class="font-size-13 gray81 font-weight-400">{{item.createTime ? getDateAndTime(item.createTime) : '' }}</span>
+                                            <span  class="file-and-links-font-size-13 file-and-links-gray81 file-and-links-font-weight-400">{{item.createTime ? getDateAndTime(item.createTime) : '' }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -757,3 +757,45 @@
     }
 </script>
 <style src="./style.css"></style>
+
+<style scoped>
+.file-and-links-black {
+    color: var(--ink);
+}
+.file-and-links-blue {
+    color: var(--brand) !important;
+}
+.file-and-links-GunPowder {
+    color: var(--ink-2);
+}
+.file-and-links-gray81 {
+    color: var(--ink-2);
+}
+.file-and-links-hover-purple:hover {
+    color: var(--brand) !important;
+}
+.file-and-links-bg-white {
+    background-color: var(--surface);
+}
+.file-and-links-font-weight-400 {
+    font-weight: 400 !important;
+}
+.file-and-links-font-weight-500 {
+    font-weight: 500 !important;
+}
+.file-and-links-font-weight-700 {
+    font-weight: 700 !important;
+}
+.file-and-links-font-size-13 {
+    font-size: 13px;
+}
+.file-and-links-font-size-14 {
+    font-size: 14px;
+}
+.file-and-links-font-size-16 {
+    font-size: 16px;
+}
+.file-and-links-font-size-18 {
+    font-size: 18px !important;
+}
+</style>

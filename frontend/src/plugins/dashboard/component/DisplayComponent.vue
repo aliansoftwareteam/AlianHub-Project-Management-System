@@ -1,29 +1,29 @@
 <template>
-    <div class="d-flex align-items-center justify-content-between bg-white display__componet-wrapper border-bottom-mobiledrop flex-wrap cursor-pointer p10px-p15px" v-if="taskValue && Object.keys(taskValue).length" @click.stop.prevent="openInNewTab(taskValue)">
+    <div class="d-flex align-items-center justify-content-between display-component-bg-white display__componet-wrapper border-bottom-mobiledrop flex-wrap cursor-pointer p10px-p15px" v-if="taskValue && Object.keys(taskValue).length" @click.stop.prevent="openInNewTab(taskValue)">
         <div class="d-flex align-items-center w-50">
             <div class="d-flex justify-content-between align-items-center" :class="[{'pr-10px' : lable.toLocaleLowerCase() === 'done'}]">
                 <span class="position-re ml-5px border-radius-1-px" v-if="lable.toLocaleLowerCase() !== 'done'"   :style="[{'background-color':(allTaskStatusArray && allTaskStatusArray?.settings?.length) ? allTaskStatusArray.settings.find((ut)=> ut.key === taskValue.statusKey)?.textColor : 'black','width':'10px','height':'10px','margin-right': '15px'}]"></span>
                 <img v-else :src="greenCheck" class="mr-15px">
             </div>
             <div class="d-flex flex-column text-ellipsis">
-                <div v-if="findParticularProject && Object.keys(findParticularProject).length" class="d-flex white align-items-center pb-3px">
-                    <span class="text-ellipsis font-weight-400 gray81 font-size-12 d-inline-block" v-if="taskValue.folderObjId && taskValue.folderArray?.name">
+                <div v-if="findParticularProject && Object.keys(findParticularProject).length" class="d-flex display-component-white align-items-center pb-3px">
+                    <span class="text-ellipsis display-component-font-weight-400 display-component-gray81 display-component-font-size-12 d-inline-block" v-if="taskValue.folderObjId && taskValue.folderArray?.name">
                         {{findParticularProject.ProjectName}} /
                         {{taskValue.folderArray?.name}} 
                         / {{taskValue.sprintArray?.name}} {{ taskValue.isParentTask == false ? taskValue.parentTaskName : '' }}
                     </span>
-                    <span class="text-ellipsis black font-weight-400 gray81 font-size-12 d-inline-block" v-else-if="taskValue.sprintId && taskValue.sprintArray?.name">
+                    <span class="text-ellipsis display-component-black display-component-font-weight-400 display-component-gray81 display-component-font-size-12 d-inline-block" v-else-if="taskValue.sprintId && taskValue.sprintArray?.name">
                         {{findParticularProject.ProjectName}} / 
                         {{taskValue.sprintArray?.name}}
                         {{ taskValue.isParentTask == false ? taskValue.parentTaskName : '' }}
                     </span>
-                    <span class="text-ellipsis black font-weight-400 gray81 font-size-12 d-inline-block" v-else>
+                    <span class="text-ellipsis display-component-black display-component-font-weight-400 display-component-gray81 display-component-font-size-12 d-inline-block" v-else>
                         {{findParticularProject.ProjectName}}
                     </span>
                 </div>
                 <div class="d-flex align-items-center text-ellipsis">
                     <img :src="subtask" v-if="!taskValue.isParentTask" class="mr-10px">
-                    <span class="text-ellipsis black font-size-16 font-weight-400 d-inline-block pr-10px" :title="taskValue.TaskName">{{ taskValue.TaskName }}</span>
+                    <span class="text-ellipsis display-component-black display-component-font-size-16 display-component-font-weight-400 d-inline-block pr-10px" :title="taskValue.TaskName">{{ taskValue.TaskName }}</span>
                 </div>
             </div>
         </div>
@@ -229,3 +229,27 @@ const openInNewTab = (task) => {
 };
 </script>
 <style scoped src="../css/style.css"></style>
+
+<style scoped>
+.display-component-white {
+    color: var(--on-brand) !important;
+}
+.display-component-black {
+    color: var(--ink);
+}
+.display-component-gray81 {
+    color: var(--ink-2);
+}
+.display-component-bg-white {
+    background-color: var(--surface);
+}
+.display-component-font-weight-400 {
+    font-weight: 400 !important;
+}
+.display-component-font-size-12 {
+    font-size: 12px;
+}
+.display-component-font-size-16 {
+    font-size: 16px;
+}
+</style>

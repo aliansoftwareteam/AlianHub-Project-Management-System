@@ -11,13 +11,13 @@
             <span><img :src="closeScreenshotPreview" @click="closeSidebar()" class="close_icon_sidebar"/></span>
         </template>
         <template #body>
-            <div class="screnshotpreviewMain bg-white overflow-auto style-scroll h-100">
-                <div class="projectAndTasknamekeyDiv bg-light-gray text-ellipsis w-100 d-inline-block">
-                    <div class="d-inline-block projectDetailkeyScreenshotPreview align-items-center justify-content-center font-ui gray text-ellipsis w-100 text-center pr-10px pl-10px">{{screenShotdetail.projectKey}}  |  {{screenShotdetail.projectName}}  / <img class="folderIconImg" v-if="screenShotdetail.isFolderSprint === true" src="@/assets/images/folder.png"> {{screenShotdetail.folderName}} {{screenShotdetail.isFolderSprint === true ? '/' : ''}} {{screenShotdetail.sprintName}}</div>
-                    <div class="d-block tasknameScreenshotpreview justify-content-around black font-ui text-ellipsis font-size-16 font-weight-500 w-100 text-center pr-10px pl-10px">{{screenShotdetail.taskName}}</div>
+            <div class="screnshotpreviewMain bg-white overflow-auto preview-timelog-screen-shot-style-scroll h-100">
+                <div class="projectAndTasknamekeyDiv preview-timelog-screen-shot-bg-light-gray text-ellipsis w-100 d-inline-block">
+                    <div class="d-inline-block projectDetailkeyScreenshotPreview align-items-center justify-content-center font-ui preview-timelog-screen-shot-gray text-ellipsis w-100 text-center pr-10px pl-10px">{{screenShotdetail.projectKey}}  |  {{screenShotdetail.projectName}}  / <img class="folderIconImg" v-if="screenShotdetail.isFolderSprint === true" src="@/assets/images/folder.png"> {{screenShotdetail.folderName}} {{screenShotdetail.isFolderSprint === true ? '/' : ''}} {{screenShotdetail.sprintName}}</div>
+                    <div class="d-block tasknameScreenshotpreview justify-content-around preview-timelog-screen-shot-black font-ui text-ellipsis preview-timelog-screen-shot-font-size-16 preview-timelog-screen-shot-font-weight-500 w-100 text-center pr-10px pl-10px">{{screenShotdetail.taskName}}</div>
                 </div>
                 <div class="d-flex startEndMaidiv justify-content-between align-items-center">
-                    <span class="starttoEndTime font-ui black font-weight-500">{{(screenShotdetail.screenShotTime.seconds || screenShotdetail.screenShotTime._seconds) ? getDateType(screenShotdetail.screenShotTime.seconds ? screenShotdetail.screenShotTime.seconds : screenShotdetail.screenShotTime._seconds * 1000) : getDateType(parseInt(screenShotdetail.screenShotTime))}}</span>
+                    <span class="starttoEndTime font-ui preview-timelog-screen-shot-black preview-timelog-screen-shot-font-weight-500">{{(screenShotdetail.screenShotTime.seconds || screenShotdetail.screenShotTime._seconds) ? getDateType(screenShotdetail.screenShotTime.seconds ? screenShotdetail.screenShotTime.seconds : screenShotdetail.screenShotTime._seconds * 1000) : getDateType(parseInt(screenShotdetail.screenShotTime))}}</span>
                     <span class="d-flex align-items-center">
                         <UserProfile decorative
                             :showDot="false"
@@ -30,11 +30,11 @@
                             :thumbnail="'25x25'"
                         />
                         <!-- <img :src="screenShotdetail.userProfile ? screenShotdetail.userProfile : '@/assets/images/default_user.png'" :alt="screenShotdetail.userId" style="width:20px;height:20px;border-radius:50%;"/> -->
-                        <span class="font-size-12 gray ml-10px">{{screenShotdetail.userName}}</span>
+                        <span class="preview-timelog-screen-shot-font-size-12 preview-timelog-screen-shot-gray ml-10px">{{screenShotdetail.userName}}</span>
                     </span>
                 </div>
                 <div class="d-flex commentsidebarMaindiv">
-                    <span class="commentinSidebar font-ui GunPowder font-size-16 text-ellipsis mw-70">{{screenShotdetail.memoName}}</span>
+                    <span class="commentinSidebar font-ui preview-timelog-screen-shot-GunPowder preview-timelog-screen-shot-font-size-16 text-ellipsis mw-70">{{screenShotdetail.memoName}}</span>
                 </div>
                 <div class="fullImgDiv" v-if="!screenShotdetail.deleted">
                     <img class="selectedOPenImgTimeSheet" v-if="screenShotdetail.image.includes('http')" :src="screenShotdetail.image">
@@ -94,3 +94,40 @@
 </script>
 
 <style src="./style.css"></style>
+
+<style scoped>
+.preview-timelog-screen-shot-black {
+    color: var(--ink);
+}
+.preview-timelog-screen-shot-gray {
+    color: var(--ink-2);
+}
+.preview-timelog-screen-shot-GunPowder {
+    color: var(--ink-2);
+}
+.preview-timelog-screen-shot-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.preview-timelog-screen-shot-font-weight-500 {
+    font-weight: 500 !important;
+}
+.preview-timelog-screen-shot-font-size-12 {
+    font-size: 12px;
+}
+.preview-timelog-screen-shot-font-size-16 {
+    font-size: 16px;
+}
+.preview-timelog-screen-shot-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.preview-timelog-screen-shot-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.preview-timelog-screen-shot-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
+</style>

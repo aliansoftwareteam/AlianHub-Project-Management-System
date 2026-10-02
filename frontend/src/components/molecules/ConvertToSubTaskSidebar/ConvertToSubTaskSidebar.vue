@@ -2,7 +2,7 @@
     <div class="mainConverToSubTask">
     <Sidebar width="607px"  :top="clientWidth <= 767 ? '0px' : '46px'" className="converted__sidebar" :title="sidebarTitle">
             <template #head-left >
-                <div class="blue font-ui screenShotPreview text-ellipsis text-nowrap pr-15px" :class="clientWidth>767 ? 'font-size-18' : 'font-size-16'">{{ sidebarTitle }}</div>
+                <div class="blue font-ui screenShotPreview text-ellipsis text-nowrap pr-15px" :class="clientWidth>767 ? 'convert-to-sub-task-sidebar-font-size-18' : 'convert-to-sub-task-sidebar-font-size-16'">{{ sidebarTitle }}</div>
             </template>
             <template #head-right>
                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="closeSidebar()">{{$t('Projects.cancel')}}</button>
@@ -48,25 +48,25 @@
                                 'type':taskData.type,
                                     'event':$event.event}),$emit('taskData',taskData.value)"
                             />
-                            <div class="red font-size-12">{{taskData.error}}</div>
+                            <div class="convert-to-sub-task-sidebar-red convert-to-sub-task-sidebar-font-size-12">{{taskData.error}}</div>
                         </div>
                     </div>
                     <div class="cts-card overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar p15x-20px" :class="{'border-radius-12-px' : clientWidth > 767, 'border-radius-0 ' : clientWidth <= 767 , 'convert__projecttask-wrapper':props.isDuplicate === true || isCreteTask === true }"  :style="[{margin : clientWidth > 767 ? '15px' : '0px' , height : clientWidth <= 767 ?  '100%' : '' , maxHeight :  clientWidth > 767 ? 'calc(100vh - 46px)' : '100%' }]">
-                        <span v-if="props.isDuplicate === true || isCreteTask === true" class="font-size-16 font-weight-500 dark-gray mb-20px">{{$t('Projects.location')}}</span>
+                        <span v-if="props.isDuplicate === true || isCreteTask === true" class="convert-to-sub-task-sidebar-font-size-16 convert-to-sub-task-sidebar-font-weight-500 dark-gray mb-20px">{{$t('Projects.location')}}</span>
                         <p v-if="listPicker && listPicker.note" class="convert__picker-note">{{ listPicker.note }}</p>
                         <p v-if="losesExtraLists" class="convert__depth-note">{{ $t('TaskLists.convert_note') }}</p>
                         <div :class="[{'duplicate__component-with--convertlist':props.isDuplicate === true || isCreteTask === true,'duplicate_component_only' : props.isDuplicate === true}]">
-                            <div class="gray" :class="{'font-size-12' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{$t('Notification.project')}}</div>
+                            <div class="gray" :class="{'convert-to-sub-task-sidebar-font-size-12' : clientWidth > 767, 'convert-to-sub-task-sidebar-font-size-16' : clientWidth <= 767}">{{$t('Notification.project')}}</div>
                             <div class="d-flex align-items-center justify-content-between project__title-browsewrapper" v-if="isShowProjectList === false" :style="[{paddingTop : clientWidth > 767 ? '7px' : '15px'}]">
                                 <div class="d-flex align-items-center text-ellipsis" :style="[{width : clientWidth > 767 ? '78%' : '50%'}]">
-                                    <span v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center font-weight-400 inital-box" :style="[{'background-color': selectedProjectData.projectIcon.data}]">{{ selectedProjectData.ProjectName.charAt(0).toUpperCase()}}</span>
+                                    <span v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center convert-to-sub-task-sidebar-font-weight-400 inital-box" :style="[{'background-color': selectedProjectData.projectIcon.data}]">{{ selectedProjectData.ProjectName.charAt(0).toUpperCase()}}</span>
                                     <template v-else-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'image'">
                                         <WasabiImage class="profile-sm-square project__icon" v-if="!selectedProjectData.projectIcon.data.includes('http')" :data="{url: selectedProjectData.projectIcon.data, filename: selectedProjectData.projectIcon.data.split('/').pop(), extension: selectedProjectData.projectIcon.data.split('/').pop().split('.').pop()}"/>
                                         <img v-else class="profile-sm-square project__icon" :src="selectedProjectData.projectIcon.data" alt=""/>
                                     </template>
-                                    <span class="text-ellipsis Project-name-sidebar font-weight-500" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{selectedProjectData.ProjectName}}</span>
+                                    <span class="text-ellipsis Project-name-sidebar convert-to-sub-task-sidebar-font-weight-500" :class="{'convert-to-sub-task-sidebar-font-size-13' : clientWidth > 767, 'convert-to-sub-task-sidebar-font-size-16' : clientWidth <= 767}">{{selectedProjectData.ProjectName}}</span>
                                 </div>
-                                <button type="button" class="cts-browse" @click="isShowProjectList = true" :class="{'font-size-14' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{$t('Projects.browse_projects')}}</button>
+                                <button type="button" class="cts-browse" @click="isShowProjectList = true" :class="{'convert-to-sub-task-sidebar-font-size-14' : clientWidth > 767, 'convert-to-sub-task-sidebar-font-size-16' : clientWidth <= 767}">{{$t('Projects.browse_projects')}}</button>
                             </div>
                             <template v-if="isShowProjectList === true">
                                 <InputText :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="projectSearch" class="input__Search"/>
@@ -74,12 +74,12 @@
                                     <div class="overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar duplicate__convertTask" :style="[{ maxHeight : clientWidth > 767 ? 'calc(100vh - 214px)' : 'calc(100vh - 240px)'}]">
                                         <div v-for="project in projectDatas" :key="project" class="browse__Categotyproject-wrapper">
                                             <div class="d-flex align-items-center browse__project-wrapper" @click="changeProject(project)">
-                                                <span v-if="project.projectIcon && project.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center font-weight-400 inital-box ml-6px" :style="[{'background-color': project.projectIcon.data}]">{{ project.ProjectName.charAt(0).toUpperCase()}}</span>
+                                                <span v-if="project.projectIcon && project.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center convert-to-sub-task-sidebar-font-weight-400 inital-box ml-6px" :style="[{'background-color': project.projectIcon.data}]">{{ project.ProjectName.charAt(0).toUpperCase()}}</span>
                                                 <template v-else-if="project.projectIcon && project.projectIcon.type === 'image'">
                                                     <WasabiImage class="profile-sm-square project__icon" v-if="!project.projectIcon.data.includes('http')" :data="{url: project.projectIcon.data, filename: project.projectIcon.data.split('/').pop(), extension: project.projectIcon.data.split('/').pop().split('.').pop()}"/>
                                                     <img v-else class="profile-sm-square project__icon" :src="project.projectIcon.data" alt=""/>
                                                 </template>
-                                                <span class="text-ellipsis Project-name-sidebar font-weight-500" :class="{'font-size-14' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}">{{project.ProjectName}}</span>
+                                                <span class="text-ellipsis Project-name-sidebar convert-to-sub-task-sidebar-font-weight-500" :class="{'convert-to-sub-task-sidebar-font-size-14' : clientWidth > 767, 'convert-to-sub-task-sidebar-font-size-16' : clientWidth <= 767}">{{project.ProjectName}}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1190,3 +1190,30 @@
 </script>
 <style scoped src="./style.css"></style>
 <style src="./theme.css"></style>
+
+<style scoped>
+.convert-to-sub-task-sidebar-red {
+    color: var(--danger-ink);
+}
+.convert-to-sub-task-sidebar-font-weight-400 {
+    font-weight: 400 !important;
+}
+.convert-to-sub-task-sidebar-font-weight-500 {
+    font-weight: 500 !important;
+}
+.convert-to-sub-task-sidebar-font-size-12 {
+    font-size: 12px;
+}
+.convert-to-sub-task-sidebar-font-size-13 {
+    font-size: 13px;
+}
+.convert-to-sub-task-sidebar-font-size-14 {
+    font-size: 14px;
+}
+.convert-to-sub-task-sidebar-font-size-16 {
+    font-size: 16px;
+}
+.convert-to-sub-task-sidebar-font-size-18 {
+    font-size: 18px !important;
+}
+</style>
