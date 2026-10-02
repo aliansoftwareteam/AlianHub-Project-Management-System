@@ -70,7 +70,7 @@
                                 <div class="d-flex align-items-center justify-content-start mysetiing_save">
                                     <button :disabled="isSpinner" @click.prevent="handleChangePassword()"
                                         :class="[{ 'pointer-events-none': isSpinner }]"
-                                        class="btn_btn mysetting_save_btn ml-15px">{{ $t('Settings.save_changes')
+                                        class="ah-btn ah-btn--primary mysetting_save_btn ml-15px">{{ $t('Settings.save_changes')
                                         }}</button>
                                 </div>
                             </form>

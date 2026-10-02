@@ -102,6 +102,7 @@ import { useListRowMenu } from '@/views/Projects/ListView/useListRowMenu.js';
 import { useListInlineEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
 import { useGroupSource } from '@/views/Projects/composables/groupSource';
 import { AGENT_WORK_GROUP } from '@viewSettings';
+import { drawsGroup } from '@/views/Projects/composables/agentWorkQuery';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
@@ -247,7 +248,7 @@ const processedBoardData = computed(() => {
             disabled: group.dropDisabled || (group.searchKey === "DueDate" && ["Next", "Overdue", "No Due Date"].includes(group.name)),
             totalTaskCounts: dataKeys || {},
         };
-    });
+    }).filter((column) => drawsGroup(column, column.tasksArray.length));
 });
 
 /* A search or a filter is matched against this project's own data, which says nothing of a task that lives elsewhere. */

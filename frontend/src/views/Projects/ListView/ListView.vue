@@ -88,7 +88,7 @@
                         </div></div>
 
                         <template v-if="sprint.isExpanded">
-                            <template v-for="item in (sprint.items || [])" :key="item.key">
+                            <template v-for="item in drawnGroups(sprint)" :key="item.key">
                                 <ListGroup
                                     v-if="isGroupOpen(sprint, item)"
                                     :item="item"
@@ -200,6 +200,7 @@ import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
 import OtherProjectRows from '@/views/Projects/components/OtherProjectRows.vue';
 import { useOtherProjectRows } from '@/views/Projects/composables/otherProjectRows';
 import { useGroupSource } from '@/views/Projects/composables/groupSource';
+import { drawsGroup } from '@/views/Projects/composables/agentWorkQuery';
 
 // UTILS
 const {getters} = useStore();
@@ -338,6 +339,10 @@ const shownSprints = computed(() => archiveViewLists(groupedTasks.value, { archi
 
 function groupCount(sprint, item) {
     return listGroups.groupCount(groupCounts(sprint), item);
+}
+
+function drawnGroups(sprint) {
+    return (sprint.items || []).filter((item) => drawsGroup(item, groupCount(sprint, item)));
 }
 
 function isGroupOpen(sprint, item) {

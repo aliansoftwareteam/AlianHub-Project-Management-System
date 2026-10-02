@@ -1066,6 +1066,19 @@ export const setGetTableTaskPayload = (state, payload) =>{
     }
 }
 
+/* Every stored page request is sent again when the tab comes back (utils/tabSyncs.js). Groups come and go, an
+   agent's with each task it takes or lets go, and the request of a group no longer drawn would be sent for as long
+   as the page lives. `groups` names, for each list of the project just grouped, the keys of the groups it draws. */
+export const keepRequestsOfGroups = (state, {pid, groups}) => {
+    const drawn = (ele) => {
+        const keys = ele.data?.pid === pid ? groups[String(ele.data.sprintId)] : null;
+        return !keys || keys.includes(ele.data.item?.key);
+    };
+    ['getPaginatedTaskPayload', 'getTableTaskPayload'].forEach((list) => {
+        if(!state[list].every(drawn)) state[list] = state[list].filter(drawn);
+    });
+}
+
 export const setTaskDetailData = (state, payload) =>{
     state.taskDetailData = payload;
 }

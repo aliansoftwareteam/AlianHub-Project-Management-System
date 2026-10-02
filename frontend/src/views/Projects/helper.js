@@ -1012,6 +1012,11 @@ export function taskListHelper() {
                 restoreGroupState(sprints, groupedTasks.value, indexKey.value);
             }
 
+            dispatch("projectData/keepRequestsOfGroups", {
+                pid: project._id,
+                groups: Object.fromEntries(sprints.filter((sprint) => Array.isArray(sprint.items)).map((sprint) => [String(sprint.id || sprint._id), sprint.items.map((item) => item.key)]))
+            });
+
             if(sprints && sprints.length) {
                 const openSprint = sprintToLoad(sprints, fetchTask === true);
                 if(openSprint?.isExpanded) {
