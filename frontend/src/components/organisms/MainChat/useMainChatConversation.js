@@ -146,9 +146,11 @@ export function useMainChatConversation(options) {
     }
 
     /* The comments API answers a send with the new id alone, so a row it settles keeps the time it already shows:
-     * the stored one when the socket echo came first, the time it was sent otherwise. */
+     * the stored one when the socket echo came first, the time it was sent otherwise. It also keeps the mark the
+     * server put on the message, which the echo brings and the answer does not. */
     function decorateSent(doc, shown) {
-        return { ...decorate(doc), createdAt: doc.createdAt || (shown && shown.createdAt) };
+        const asked = shown && shown.ownAiAsk ? { ownAiAsk: shown.ownAiAsk } : {};
+        return { ...decorate(doc), ...asked, createdAt: doc.createdAt || (shown && shown.createdAt) };
     }
 
     /* ------------------------------------------------------------------ *

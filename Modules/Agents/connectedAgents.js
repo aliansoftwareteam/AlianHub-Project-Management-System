@@ -18,7 +18,7 @@ const { toolNameOf, byline, VIA_EXTERNAL, VIA_PERSONAL } = require('./actingAgen
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const QUEUE_SCOPE = 'tasks:read';
 const TOKEN_MODES = Object.freeze(['workspace', 'personal', 'local']);
-const TOKEN_FIELDS = Object.freeze({ userId: 1, name: 1, active: 1, expiresAt: 1, lastUsedAt: 1, agentAccount: 1, projectIds: 1 });
+const TOKEN_FIELDS = Object.freeze({ userId: 1, name: 1, active: 1, expiresAt: 1, lastUsedAt: 1, agentAccount: 1, projectIds: 1, createdAt: 1 });
 
 const isId = (value) => OBJECT_ID.test(String(value || ''));
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
@@ -40,7 +40,7 @@ const throughTokens = async (companyId, ownerIds, now) => {
     const rows = await find(companyId, SCHEMA_TYPE.API_TOKENS, [{ kind: 'agent', userId: { $in: ownerIds } }, TOKEN_FIELDS]);
     return rows.filter((row) => row.active !== false && row.lastUsedAt && !isExpired(row, now)).map((row) => {
         const kept = (row.projectIds || []).map(String);
-        return { ownerId: String(row.userId), name: tokenName(row), lastUsedAt: new Date(row.lastUsedAt), reaches: (projectId) => !kept.length || kept.includes(String(projectId)) };
+        return { ownerId: String(row.userId), name: tokenName(row), lastUsedAt: new Date(row.lastUsedAt), madeAt: row.createdAt, reaches: (projectId) => !kept.length || kept.includes(String(projectId)) };
     });
 };
 
@@ -50,7 +50,7 @@ const throughApps = async (companyId, ownerIds, now) => {
     if (!rows.length) return [];
     const nameOf = await clientNames(rows);
     return rows.map((row) => ({
-        ownerId: String(row.userId), name: toolNameOf({ viaAccount: VIA_EXTERNAL, agentName: nameOf(row) }), lastUsedAt: new Date(row.lastUsedAt),
+        ownerId: String(row.userId), name: toolNameOf({ viaAccount: VIA_EXTERNAL, agentName: nameOf(row) }), lastUsedAt: new Date(row.lastUsedAt), madeAt: row.createdAt,
         reaches: () => (row.scopes || []).includes(QUEUE_SCOPE),
     }));
 };
@@ -59,6 +59,8 @@ const namesOf = async (userIds) => {
     const rows = await find(dbCollections.GLOBAL, SCHEMA_TYPE.USERS, [{ _id: { $in: userIds.map((id) => new mongoose.Types.ObjectId(id)) } }, { Employee_Name: 1 }]);
     return new Map(rows.map((row) => [String(row._id), row.Employee_Name || '']));
 };
+
+const wasThereAt = (connection, since) => !since || !connection.madeAt || new Date(connection.madeAt).getTime() <= new Date(since).getTime();
 
 /* One entry a person, named after the connection that worked last. */
 const entriesOf = async (companyId, ownerIds, now) => {
@@ -74,7 +76,7 @@ const entriesOf = async (companyId, ownerIds, now) => {
         const ownerName = names.get(ownerId) || '';
         return {
             entry: { ownerId, name: latest.name, ownerName, shownAs: byline(latest.name, ownerName || 'Member'), lastWorkedAt: latest.lastUsedAt },
-            reaches: (projectId) => own.some((connection) => connection.reaches(projectId)),
+            reaches: (projectId, since) => own.some((connection) => (!projectId || connection.reaches(projectId)) && wasThereAt(connection, since)),
         };
     });
 };
@@ -88,11 +90,12 @@ const listFor = async (companyId, viewerId, now = new Date()) => {
     return entries.map(({ entry }) => ({ ...entry, mine: entry.ownerId === String(viewerId) })).sort(byOwnerName);
 };
 
-/* A person's own entry, and with a project only while one of their connections can read tasks in it. */
-const ownFor = async (companyId, uid, projectId, now = new Date()) => {
+/* A person's own entry, and with a project only while one of their connections can read tasks in it. `since` asks for
+ * a connection that was already there at that time: one made later was never handed what waited before it. */
+const ownFor = async (companyId, uid, projectId, now = new Date(), { since = null } = {}) => {
     if (!isId(uid) || !(await seatedIds(companyId, [String(uid)])).length) return null;
     const [own] = await entriesOf(companyId, [String(uid)], now);
-    return own && (!projectId || own.reaches(projectId)) ? { ...own.entry, mine: true } : null;
+    return own && own.reaches(projectId, since) ? { ...own.entry, mine: true } : null;
 };
 
 module.exports = { listFor, ownFor };

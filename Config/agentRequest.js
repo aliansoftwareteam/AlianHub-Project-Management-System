@@ -14,4 +14,8 @@ const agentOf = (uid) => {
     return store && store.uid === String(uid || '') ? store : null;
 };
 
-module.exports = { runForAgentOf, agentOf };
+/* The person's own rule asked from inside their agent's request: whether they may still open a thing. It answers
+ * yes or no for a check; nothing the agent is kept from is read for it this way. */
+const asThePerson = (fn) => storage.exit(fn);
+
+module.exports = { runForAgentOf, agentOf, asThePerson };

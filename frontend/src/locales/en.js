@@ -1802,6 +1802,7 @@ export default {
         empty_title: "Docs hold what your team writes down",
         empty_msg: "Use a doc for a brief, a decision or meeting notes, then link the tasks that carry it out. Add the first one and it will appear here.",
         docs: "Docs",
+        view_select: "Show docs",
         wiki: "Wiki",
         new_doc: "New doc",
         new_wiki_page: "New wiki page",
@@ -12291,6 +12292,8 @@ export default {
     AgentChat: {
         replying: "The agent is replying…",
         could_not_reply: "The agent could not reply to this.",
+        asked_own_ai: "Asked {name}",
+        asked_own_ai_hint: "That AI gets the question when it next asks for work.",
         change_done: "DONE",
         change_proposed: "WAITING FOR APPROVAL",
         change_refused: "NOT ALLOWED",

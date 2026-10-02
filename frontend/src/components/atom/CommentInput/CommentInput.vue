@@ -42,7 +42,7 @@
                                 @click="addMention(agent)"
                             >
                                 <span class="ah-avatar ah-avatar--sm ah-avatar--agent mr-10px" aria-hidden="true">{{ agent.name.slice(0, 1).toUpperCase() }}</span>
-                                <span>{{ agent.name }}</span>
+                                <span>{{ agent.own ? $t('TaskPanel.my_ai', { name: agent.name }) : agent.name }}</span>
                                 <span class="ah-chip ah-chip--agent ah-chip--mono ml-10px">{{ $t('TaskPanel.agent_tag') }}</span>
                                 <span v-if="agent.note" class="comment-input__agent-note">{{ agent.note }}</span>
                             </li>
@@ -244,7 +244,7 @@ const filteredUsers = computed(() => {
 const filteredAgents = computed(() => {
     const noteOf = twinNotes(props.agents.filter((agent) => !agent.mentionKey));
     return props.agents
-        .map((agent) => (agent.mentionKey ? { name: mentionName(agent.name), key: agent.mentionKey } : { name: agent.name, key: agentMentionKey(agent._id), note: noteOf(agent) }))
+        .map((agent) => (agent.mentionKey ? { name: mentionName(agent.name), key: agent.mentionKey, own: true } : { name: agent.name, key: agentMentionKey(agent._id), note: noteOf(agent) }))
         .filter((agent) => agent.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase()));
 });
 
