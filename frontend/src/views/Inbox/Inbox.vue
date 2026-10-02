@@ -878,9 +878,11 @@ const undoApprovals = async (ids) => {
     else $toast.success(t('Inbox.queue_undone'), { position: 'top-right' });
     loadCounts();
 };
-const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects }) => {
+const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, more }) => {
     queue.value = queue.value.filter((p) => p.proposalId !== id);
     loadCounts();
+    // What an approval left to be made later is back in the queue as rows of its own.
+    if (more) load(false, { inPlace: true, quiet: true });
     showProjects(store, madeProjects);
     if (verb !== 'approve') { showUndo(t('Inbox.queue_declined')); return; }
     // Approvals made while the bar is still up share one Undo, so approving several is undone together.

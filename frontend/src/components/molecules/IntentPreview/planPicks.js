@@ -1,16 +1,38 @@
 // Which parts of a plan the person approving keeps. The server names each part a line stands for by a key,
-// "<kind>:<its place in the stored plan>", says which part needs which (Modules/Agents/planChoice.js), and which
-// parts this person may not approve (Modules/Agents/planLocks.js). What is sent back is only the places kept, so
-// the page can leave parts out and never add or reword one.
+// "<kind>:<its place in the stored plan>", says which part needs which (Modules/Agents/planChoice.js), which
+// parts this person may not approve (Modules/Agents/planLocks.js) and which have nothing to show
+// (Modules/Agents/planShown.js). What is sent back is only the places kept, so the page can leave parts out and
+// never add or reword one, and a part the person was not shown is never one of them.
+
+import { linesOf } from './intentLines';
 
 const textOf = (value) => (typeof value === 'string' ? value.trim() : '');
 const linesIn = (preview) => (Array.isArray(preview?.lines) ? preview.lines : []).filter((line) => line && typeof line === 'object');
 const picksOf = (line) => (Array.isArray(line.picks) ? line.picks : []).filter((key) => typeof key === 'string');
-const keysIn = (preview) => linesIn(preview).flatMap((line) => [...picksOf(line), ...(typeof line.pick === 'string' ? [line.pick] : [])]);
+const namedIn = (preview) => linesIn(preview).flatMap((line) => [...picksOf(line), ...(typeof line.pick === 'string' ? [line.pick] : [])]);
+
+/* Whether a line has words is the same in every language, so the lines are read here with their keys for words. */
+const shownLines = (preview) => linesOf((key) => key, 'en', preview);
+const keysIn = (preview) => shownLines(preview).flatMap((line) => [...(line.picks || []).map((pick) => pick.key), ...(typeof line.pick === 'string' ? [line.pick] : [])]);
 const needsIn = (preview) => (preview?.needs && typeof preview.needs === 'object' ? preview.needs : {});
 const neededBy = (preview, key) => (Array.isArray(needsIn(preview)[key]) ? needsIn(preview)[key] : []);
 
 export const canChoose = (preview) => keysIn(preview).length > 0;
+
+/* The parts of the plan with no line on the card: those the server says it cannot show, and any whose line has no
+ * words here. They are left out whatever is ticked. */
+export const hiddenParts = (preview) => {
+    const shown = keysIn(preview);
+    const blank = (Array.isArray(preview?.blank) ? preview.blank : []).filter((key) => typeof key === 'string');
+    return [...new Set([...blank, ...namedIn(preview)])].filter((key) => !shown.includes(key));
+};
+
+/* Why a part is one this person may not approve: an owner or an admin approves it, or their own role may not make it. */
+export const LOCKED_BY_RIGHTS = 'own_rights';
+export const lockReason = (preview, key) => {
+    if (!Array.isArray(preview?.locked) || !preview.locked.includes(key)) return '';
+    return preview.lockedWhy?.[key] === LOCKED_BY_RIGHTS ? LOCKED_BY_RIGHTS : 'owner_admin';
+};
 
 /* For each part this person may not approve: the parts that cannot be made without it. */
 export const heldWith = (preview) => {
@@ -92,16 +114,34 @@ export const keptText = (t, preview, leftOut) => keptCounts(preview, leftOut)
     .map((count) => t(`IntentPreview.${KEPT_WORDS[count.part]}`, { kept: count.kept, total: count.of }, count.of))
     .join(', ');
 
-/* What goes with the approval: for each kind of part on the card, the places kept. Null while everything is kept. */
+/* What goes with the approval: for each kind of part of the plan, the places kept. Null while everything is kept
+ * and every part has a line on the card. */
 export const chosenParts = (preview, leftOut) => {
     const known = keysIn(preview);
+    const hidden = hiddenParts(preview);
     const out = leftOutOf(preview, leftOut);
-    if (!known.some((key) => out.has(key))) return null;
+    if (!known.some((key) => out.has(key)) && !hidden.length) return null;
     const chosen = {};
-    known.forEach((key) => {
+    [...known, ...hidden].forEach((key) => {
         const [part, at] = key.split(':');
         chosen[part] = chosen[part] || [];
-        if (!out.has(key)) chosen[part].push(Number(at));
+        if (known.includes(key) && !out.has(key)) chosen[part].push(Number(at));
     });
     return chosen;
 };
+
+/* What goes with the approval of a proposal: the chosen parts of each of its changes, by the change's place.
+ * `leftOutAt(i)` is what the person unticked on the card of change i. Null while every change is kept whole. */
+export const partsChoice = (changes, leftOutAt) => {
+    const parts = {};
+    (Array.isArray(changes) ? changes : []).forEach((change, i) => {
+        const chosen = chosenParts(change?.preview, leftOutAt(i));
+        if (chosen) parts[i] = chosen;
+    });
+    return Object.keys(parts).length ? { parts } : null;
+};
+
+export const keptSummary = (t, changes, leftOutAt) => (Array.isArray(changes) ? changes : [])
+    .map((change, i) => keptText(t, change?.preview, leftOutAt(i)))
+    .filter(Boolean)
+    .join(', ');

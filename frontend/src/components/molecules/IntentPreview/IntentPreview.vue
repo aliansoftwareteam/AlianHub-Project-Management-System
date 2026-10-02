@@ -22,19 +22,20 @@
                 <dd v-else-if="choosing && line.picks?.length" class="ipv__text ipv__picks">
                     <label v-for="pick in line.picks" :key="pick.key" class="ipv__pick" :class="{ 'is-out': isOut(pick.key), 'is-locked': isLocked(pick.key) }">
                         <input type="checkbox" class="ah-check" data-test="intent-pick" :data-pick="pick.key" :checked="!isOut(pick.key)" :disabled="disabled || isLocked(pick.key)" @change="toggle(pick.key)" />
-                        <span>{{ pick.name }} <span v-if="needsOwner(pick.key)" class="ipv__locked" data-test="intent-pick-locked">{{ t('IntentPreview.pick_locked') }}</span></span>
+                        <span>{{ pick.name }} <span v-if="lockNote(pick.key)" class="ipv__locked" data-test="intent-pick-locked">{{ lockNote(pick.key) }}</span></span>
                     </label>
                 </dd>
                 <dd v-else-if="choosing && line.pick" class="ipv__text">
                     <label class="ipv__pick" :class="{ 'is-out': isOut(line.pick), 'is-locked': isLocked(line.pick) }">
                         <input type="checkbox" class="ah-check" data-test="intent-pick" :data-pick="line.pick" :checked="!isOut(line.pick)" :disabled="disabled || isLocked(line.pick)" @change="toggle(line.pick)" />
-                        <span>{{ line.text }} <span v-if="needsOwner(line.pick)" class="ipv__locked" data-test="intent-pick-locked">{{ t('IntentPreview.pick_locked') }}</span></span>
+                        <span>{{ line.text }} <span v-if="lockNote(line.pick)" class="ipv__locked" data-test="intent-pick-locked">{{ lockNote(line.pick) }}</span></span>
                     </label>
                 </dd>
                 <dd v-else class="ipv__text">{{ line.text }}</dd>
             </div>
         </dl>
         <p v-if="choosing" class="ipv__hint" data-test="intent-pick-hint">{{ t('IntentPreview.pick_hint') }}</p>
+        <p v-if="choosable && hidden" class="ipv__hint ipv__went" data-test="intent-pick-hidden">{{ t('IntentPreview.pick_hidden', { n: hidden }, hidden) }}</p>
         <p v-if="choosing && kept" class="ipv__hint ipv__went" data-test="intent-pick-kept">{{ t('IntentPreview.pick_kept', { parts: kept }) }}</p>
         <p v-for="line in held" :key="line" class="ipv__hint ipv__went" data-test="intent-pick-held">{{ line }}</p>
         <p v-if="choosing && went" class="ipv__hint ipv__went" role="status" data-test="intent-pick-also">{{ went }}</p>
@@ -46,7 +47,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { kindLabel, linesOf, titleOf } from './intentLines';
-import { broughtBack, canChoose, heldWith, keptText, lockedParts, pickNames, toggled } from './planPicks';
+import { broughtBack, canChoose, heldWith, hiddenParts, keptText, LOCKED_BY_RIGHTS, lockedParts, lockReason, pickNames, toggled } from './planPicks';
 
 defineOptions({ name: 'IntentPreview' });
 
@@ -68,9 +69,16 @@ const choosing = computed(() => props.choosable && canChoose(props.preview));
 const kept = computed(() => (choosing.value ? keptText(t, props.preview, props.leftOut) : ''));
 const went = ref('');
 
+const hidden = computed(() => hiddenParts(props.preview).length);
+
 const locked = computed(() => lockedParts(props.preview));
 const isLocked = (key) => choosing.value && locked.value.includes(key);
-const needsOwner = (key) => isLocked(key) && props.preview.locked.includes(key);
+/* Who can approve a part this person may not, said on that part alone and not on the parts held out with it. */
+const lockNote = (key) => {
+    const why = isLocked(key) ? lockReason(props.preview, key) : '';
+    if (!why) return '';
+    return t(why === LOCKED_BY_RIGHTS ? 'IntentPreview.pick_locked_rights' : 'IntentPreview.pick_locked');
+};
 
 /* Several parts of one kind in a row are headed once, in the plural, where each has its own tick box. */
 const GROUP_LABELS = Object.freeze({ field: 'IntentPreview.line_fields', planRule: 'IntentPreview.line_rules', planTask: 'IntentPreview.line_first_tasks' });

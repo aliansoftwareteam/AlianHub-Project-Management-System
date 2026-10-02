@@ -228,7 +228,7 @@ describe('the automations and first tasks of a plan on its card', () => {
         await wrapper.find('[data-pick="statuses:0"]').trigger('change');
         expect(wrapper.emitted('update:leftOut')).toEqual([[['statuses:0', 'rules:0', 'tasks:0']]]);
         expect(wrapper.find('[data-test="intent-pick-also"]').text()).toBe('“When a task moves to In Review, notify its assignees”, “Write the brief” are left out too: they need “In Review”.');
-        expect(chosenParts(withWork(), ['statuses:0', 'rules:0', 'tasks:0'])).toEqual({ statuses: [], lists: [0], rules: [1, 2], tasks: [1, 2, 3] });
+        expect(chosenParts(withWork(), ['statuses:0', 'rules:0', 'tasks:0'])).toEqual({ statuses: [], lists: [0], rules: [1], tasks: [1, 2] });
     });
 
     it('brings back with a status the automation that named it, and not the task whose list is still left out', async () => {

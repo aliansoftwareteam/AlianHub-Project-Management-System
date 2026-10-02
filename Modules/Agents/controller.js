@@ -596,15 +596,21 @@ exports.putRoutingPolicy = async (req, res) => {
 };
 
 /* What the AI Inbox page draws a proposal from, beside the proposal itself: for a person, the one card of a batch
- * (the same the Inbox queue shows, naming only the tasks that person can read), and which changes came with no words of their own. */
+ * and the card of each change that waits (the same the Inbox queue shows, naming only what that person may see, and
+ * marking the parts of a plan that person may not approve), and which changes came with no words of their own. */
 const asCards = async (companyId, caller, listed) => {
-    const batches = caller.human
-        ? await require('./intentPreview').forBatches(companyId, caller.actor.userId, listed).catch((e) => { logger.error(`proposal cards: ${e.message}`); return new Map(); })
-        : new Map();
+    const intentPreview = require('./intentPreview');
+    const cards = (build, rows) => (caller.human
+        ? build(companyId, caller.actor.userId, rows).catch((e) => { logger.error(`proposal cards: ${e.message}`); return new Map(); })
+        : new Map());
+    const [batches, previews] = await Promise.all([cards(intentPreview.forBatches, listed), cards(intentPreview.forProposals, listed.filter((p) => p.status === proposals.STATUS.PENDING))]);
     const { markOf } = require('./changeLabels');
     return listed.map((p) => ({
         ...p,
-        changes: (Array.isArray(p.changes) ? p.changes : []).map((change) => ({ ...change, ...markOf(change) })),
+        changes: (Array.isArray(p.changes) ? p.changes : []).map((change, at) => {
+            const preview = (previews.get(String(p._id)) || [])[at];
+            return { ...change, ...markOf(change), ...(preview ? { preview } : {}) };
+        }),
         ...(batches.has(String(p._id)) ? { batch: batches.get(String(p._id)) } : {}),
     }));
 };

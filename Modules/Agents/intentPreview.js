@@ -11,6 +11,7 @@ const projects = require('./projectCreate');
 const planChoice = require('./planChoice');
 const planFiling = require('./planFiling');
 const planLocks = require('./planLocks');
+const planShown = require('./planShown');
 const planWorkPreview = require('./planWorkPreview');
 const automation = require('./automationPreview');
 const listSetup = require('./listSetupPreview');
@@ -225,24 +226,34 @@ const planLines = (change, context) => {
     const params = paramsOf(change);
     return [
         namesLine('newStatuses', 'statuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
-        namesLine('newLists', 'lists', params.lists, plans.LISTS_MAX, TEXT_MAX),
+        namesLine('newLists', 'lists', params.lists, plans.LISTS_MAX, planShown.NAME_MAX),
         ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map((field, at) => picked(fieldLine(field), keyOf('fields', at))),
         ...planViews(change).flatMap((view, at) => planViewLines(view, at, idOf(params.projectId), context)),
     ];
 };
 
-/* The plan of a project that exists also lists its automations and first tasks, each a part of its own
- * (./planWorkPreview.js), and says which parts the viewer may not approve (./planLocks.js). */
+/* What a plan's card says beside its lines: which part needs which, which parts the viewer may not approve and
+ * why (./planLocks.js), and which parts have nothing to show (./planShown.js). */
+const planMarks = async (change, context) => {
+    const locks = await planLocks.locksIn(context.companyId, await context.viewer(), change);
+    const blank = planShown.blankIn(change.action, paramsOf(change));
+    return {
+        needs: planChoice.needsOf(paramsOf(change)),
+        ...(locks.size ? { locked: [...locks.keys()], lockedWhy: Object.fromEntries(locks) } : {}),
+        ...(blank.length ? { blank } : {}),
+    };
+};
+
+/* The plan of a project that exists also lists its automations and first tasks, each a part of its own (./planWorkPreview.js). */
 const planPreview = async (change, context) => {
     const place = placeLine(paramsOf(change), context.named);
     if (!place) return null;
     const lines = [place, ...planLines(change, context), ...(await planWorkPreview.lines(change, context))].filter(Boolean);
-    const locked = await planLocks.lockedIn(context.companyId, await context.viewer(), change);
-    return { kind: 'setup', title: place.project, lines, needs: planChoice.needsOf(paramsOf(change)), ...(locked.length ? { locked } : {}) };
+    return { kind: 'setup', title: place.project, lines, ...(await planMarks(change, context)) };
 };
 
 /* A project that is not there yet: its name, who will be on it, what it is for, and the plan that comes with it. */
-const projectPreview = (change, context) => {
+const projectPreview = async (change, context) => {
     const params = paramsOf(change);
     const title = textOf(params.name, projects.NAME_MAX);
     if (!title) return null;
@@ -250,7 +261,7 @@ const projectPreview = (change, context) => {
         kind: 'project',
         title,
         lines: [{ kind: 'members', only: 'approver' }, descriptionLine({ rawDescription: params.description }), ...planLines(change, context)].filter(Boolean),
-        needs: planChoice.needsOf(params),
+        ...(await planMarks(change, context)),
     };
 };
 
