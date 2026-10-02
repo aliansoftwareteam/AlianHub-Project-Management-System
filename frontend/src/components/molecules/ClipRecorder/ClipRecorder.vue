@@ -467,21 +467,21 @@ onBeforeUnmount(() => {
 .clip__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1100;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .clip__card {
-    background: #fff;
+    background: var(--surface);
     border-radius: 10px;
     width: min(460px, 92vw);
     padding: 16px 20px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
     /* Mounted at the app shell (navy Header) — set an explicit dark text colour so
        labels/title don't inherit the header's white text and vanish on the card. */
-    color: #2b2b2b;
+    color: var(--ink);
 }
 .clip__head {
     margin-bottom: 12px;
@@ -490,7 +490,7 @@ onBeforeUnmount(() => {
     gap: 14px;
 }
 .clip__close {
-    color: #9a9a9a;
+    color: var(--ink-2);
 }
 .clip__close:hover {
     color: #e84a4a;
@@ -504,21 +504,21 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
     padding-top: 12px;
     margin-bottom: 0;
-    border-top: 1px solid #ededf3;
+    border-top: 1px solid var(--hairline);
 }
 .clip__mode {
     display: flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     padding: 6px 10px;
     cursor: pointer;
     font-size: 12.5px;
 }
 .clip__mode--active {
-    border-color: #2f3990;
-    background: #f1f2fb;
+    border-color: var(--brand);
+    background: var(--brand-tint);
 }
 /* Pushed to the far right of the same row. */
 .clip__start {
@@ -527,14 +527,14 @@ onBeforeUnmount(() => {
     font-family: inherit;
     font-size: 12.5px;
     font-weight: 600;
-    color: #fff;
-    background: #2f3990;
+    color: var(--on-brand);
+    background: var(--brand);
     border: 0;
     border-radius: 8px;
     cursor: pointer;
 }
 .clip__start:hover {
-    background: #262e75;
+    background: var(--brand-deep);
 }
 .clip__mode input:disabled {
     cursor: not-allowed;
@@ -549,8 +549,8 @@ onBeforeUnmount(() => {
     border-radius: 8px;
 }
 .clip__msg--err {
-    background: #fdecec;
-    color: #c0392b;
+    background: var(--danger-bg);
+    color: var(--danger);
 }
 .clip__dot {
     width: 10px;
@@ -580,14 +580,14 @@ onBeforeUnmount(() => {
 }
 .clip__title-input {
     width: 100%;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     padding: 8px 10px;
     outline: none;
-    color: #2b2b2b;
+    color: var(--ink);
 }
 .clip__title-input:focus {
-    border-color: #2f3990;
+    border-color: var(--brand);
 }
 .clip__actions {
     margin-top: 4px;
@@ -598,15 +598,15 @@ onBeforeUnmount(() => {
     cursor: not-allowed;
 }
 .clip__btn-ghost {
-    background: #f1f1f1;
-    border: 1px solid #e0e0e0;
+    background: var(--fill);
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     padding: 6px 14px;
-    color: #333;
+    color: var(--ink-label);
     cursor: pointer;
 }
 .clip__btn-ghost:hover {
-    background: #e7e7e7;
+    background: var(--fill);
 }
 .clip__btn-ghost:disabled {
     opacity: 0.6;
