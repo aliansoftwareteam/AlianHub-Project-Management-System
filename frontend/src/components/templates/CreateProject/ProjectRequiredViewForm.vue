@@ -8,21 +8,21 @@
     :style="[{padding : clientWidth > 767 ? '16.5px' : '18.5px'}]"
     :class="{'border-radius-5-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767}"
     >
-        <h3 class="m-0"  :class="{'task-heading-desktop': clientWidth > 767 , 'task-heading-mobile': clientWidth <= 767}">{{$t('ProjectDetails.required_view')}}</h3>
+        <h3 class="m-0"  :class="{'project-required-view-form-task-heading-desktop': clientWidth > 767 , 'project-required-view-form-task-heading-mobile': clientWidth <= 767}">{{$t('ProjectDetails.required_view')}}</h3>
     </div>
-    <p class="navigating"  :class="{'p-navigating-desktop': clientWidth > 767 , 'p-navigating-mobile': clientWidth <= 767}">{{$t('ProjectDetails.set_the_require').replace('BRAND_NAME', brandSettings && brandSettings?.productName ? brandSettings.productName : 'Alian Hub')}}
+    <p class="navigating"  :class="{'project-required-view-form-p-navigating-desktop': clientWidth > 767 , 'project-required-view-form-p-navigating-mobile': clientWidth <= 767}">{{$t('ProjectDetails.set_the_require').replace('BRAND_NAME', brandSettings && brandSettings?.productName ? brandSettings.productName : 'Alian Hub')}}
     </p>
     <div  class="align-items-center justify-content-space-between mobile-reuired-views">
         <!-- start required design   -->
         <div class="requiredviewListWrapper style-scroll d-flex flex-wrap justify-content-between">
-            <div v-for="(viewList, index) in requiredViewobj.value" :key="index" :class="{'outline-required': !viewList.viewStatus, 'outline-primary': viewList.viewStatus}" class="position-re requiredListItem d-flex align-items-center justify-content-between mb-20px">
+            <div v-for="(viewList, index) in requiredViewobj.value" :key="index" :class="{'project-required-view-form-outline-required': !viewList.viewStatus, 'project-required-view-form-outline-primary': viewList.viewStatus}" class="position-re requiredListItem d-flex align-items-center justify-content-between mb-20px">
                 <div class="Icon_text d-flex align-items-center">
                     <img :src="!viewList.viewStatus ? projectComponentsIcons(viewList.keyName).icon : projectComponentsIcons(viewList.keyName).activeIcon" :alt="viewList.name">
                     <!-- <h4 style="margin: 0px 0px 0px 5px;" class="changesFont margin-left-value">{{viewList.name}}</h4> -->
-                    <span class="changesFont margin-left-value ml-5px" :class="{'enableapp-list-desktop': clientWidth > 767 , 'enableapp-list-mobile': clientWidth <= 767,'blue':viewList.viewStatus}">{{$t(`ViewList.${viewList.name}`)}}</span>
+                    <span class="changesFont margin-left-value ml-5px" :class="{'enableapp-list-desktop': clientWidth > 767 , 'enableapp-list-mobile': clientWidth <= 767,'project-required-view-form-blue':viewList.viewStatus}">{{$t(`ViewList.${viewList.name}`)}}</span>
                 </div>
                 <div class="text-toggle d-flex align-items-center">
-                    <span class="blue font-size-10" v-if="viewList.setAsDefault === true">
+                    <span class="project-required-view-form-blue project-required-view-form-font-size-10" v-if="viewList.setAsDefault === true">
                         <img :src="homeSetting" alt="home" class="default_home_settingsImg"/>
                         {{$t('Projects.default_view')}}
                     </span>
@@ -41,7 +41,7 @@
                 </div>
             </div>
         </div>
-        <div class="red font-size-14 mt-10px text-center" v-if="requiredViewobj?.error">{{requiredViewobj?.error}}</div>
+        <div class="project-required-view-form-red project-required-view-form-font-size-14 mt-10px text-center" v-if="requiredViewobj?.error">{{requiredViewobj?.error}}</div>
         <!-- start required design end -->
     </div>
 </div>
@@ -159,6 +159,67 @@ const brandSettings = computed(() => getters['brandSettingTab/brandSettings']);
         emit('update:modelValue', requiredViewobj.value)
     }
 </script>
+<style scoped>
+.project-required-view-form-font-size-10 {
+    font-size: 10px;
+}
+.project-required-view-form-font-size-14 {
+    font-size: 14px;
+}
+.project-required-view-form-red {
+    color: var(--danger-ink);
+}
+.project-required-view-form-blue {
+    color: var(--brand) !important;
+}
+.project-required-view-form-outline-primary {
+    height: 30px;
+    background: var(--surface);
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    color: var(--brand);
+    cursor: pointer;
+    font-family: var(--font-ui);
+}
+.project-required-view-form-outline-required {
+    height: 30px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 7px;
+    color: var(--ink-2);
+    cursor: pointer;
+    font-family: var(--font-ui);
+}
+.project-required-view-form-task-heading-desktop {
+    font-weight: 700 !important;
+    font-size: 18px !important;
+    line-height: 27px !important;
+    color: var(--ink) !important;
+    text-align: center !important;
+}
+.project-required-view-form-p-navigating-desktop {
+    font-style: normal;
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 19px;
+    text-align: center;
+    color: var(--ink-2);
+}
+@media (max-width: 767px) {
+    .project-required-view-form-task-heading-mobile {
+        color: var(--brand) !important;
+        text-align: center !important;
+    }
+    .project-required-view-form-p-navigating-mobile {
+        font-style: italic;
+        font-size: 16px;
+        line-height: 26px;
+        text-align: center;
+        color: var(--ink-2);
+    }
+}
+</style>
+
 <style scoped>
 @import './style.css';
 </style>

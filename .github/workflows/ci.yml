@@ -127,6 +127,7 @@ jobs:
             e2e/.state/conformance
             e2e/.state/conformance-server.log
           retention-days: 7
+          include-hidden-files: true
           if-no-files-found: ignore
 
   e2e-build:

@@ -584,7 +584,7 @@ describe('an action under a step credential', () => {
         permissions.holderMay.mockImplementation(async () => ({ allowed: false, reason: 'permission_denied: task.task_comment is not granted to the person behind this agent', permission: 'task.task_comment' }));
         await refused(token, 'permission_denied');
         permissions.holderMay.mockImplementation(async () => ({ allowed: true, reason: '', permission: null }));
-        await expect(performWith(token, { allowedActions: ['task.get'] })).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringContaining("not in this agent's skills") });
+        await expect(performWith(token, { allowedActions: ['task.get'] })).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringContaining("is not switched on for this connection") });
     });
 
     it('cannot be presented as a bearer token on either verifier', async () => {

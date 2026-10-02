@@ -7,6 +7,7 @@ const registry = require('./registry');
 const runs = require('./runs');
 const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
 const proposals = require('./proposals');
+const proposalText = require('./proposalText');
 const approverRights = require('./approverRights');
 const standingApprovals = require('./standingApprovals');
 const accounts = require('./accounts');
@@ -37,6 +38,7 @@ const { agentsRefused } = require('./guard');
 const { personDecides, refuse } = require('./personDecides');
 const runStart = require('./runStart');
 const proposalFiling = require('./proposalFiling');
+const { tokenAllowsProject } = require('../../Config/tokenNarrowing');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
 const companyOf = (req) => String(req.headers['companyid'] || '');
@@ -482,7 +484,7 @@ exports.startRun = async (req, res) => {
         if (taskId) {
             task = await tools.getTask(companyId, taskId).catch(() => null);
             if (!task) return fail(res, 'Task not found.', 404);
-            if (!human && !triggers.isWorkTask(task)) return fail(res, 'Task not found.', 404);
+            if (!triggers.isWorkTask(task) || !tokenAllowsProject(req.apiToken, task.ProjectID)) return fail(res, 'Task not found.', 404);
             if (!(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
             if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) return fail(res, 'This agent is not scoped to that project.', 403);
         }
@@ -623,7 +625,7 @@ exports.listProposals = async (req, res) => {
 
 const NAMED_NOT_FOUND = 'A task, project, list, doc or run this proposal names was not found.';
 
-/* POST /api/v2/agents/proposals — only an agent files one, only in its own name, only about what its person can open, and a plan only as a connected agent could file it */
+/* POST /api/v2/agents/proposals — only an agent files one, only in its own name, only about what its person can open, only in the projects it works in, and a plan only as a connected agent could file it */
 exports.createProposal = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -636,10 +638,12 @@ exports.createProposal = async (req, res) => {
         if (!canActAsAgent(caller, agentId)) return fail(res, REFUSAL.ACT_AS_AGENT, 403);
         const agent = await runs.getAgent(companyId, agentId);
         if (!agent) return fail(res, 'Agent not found.', 404);
+        if (!proposalText.words(b.what)) return fail(res, 'what is required: say in one sentence what the proposal does.');
         if (actor.tokenId && require('./connectors/slackPost').hasSlackChange(b.changes)) return fail(res, 'A Slack message is proposed only by a workspace agent\'s own run, not through a token.', 403);
         const runId = b.runId || actor.runId;
         const open = await proposalFiling.namesOnlyOpenThings(companyId, actor.userId, b) && (!runId || await proposalFiling.ownRun(companyId, actor.userId, agentId, runId));
         if (!open) return fail(res, NAMED_NOT_FOUND, 404);
+        if (!(await proposalFiling.insideAgentScope(companyId, agent, b))) return fail(res, 'This agent is not scoped to that project.', 403);
         const refused = await proposalFiling.refusedChange(companyId, actor, b);
         if (refused) return refuse(req, res, actor, { ...refused, entityId: refused.params.taskId });
         const stopped = await proposalFiling.stoppedPlan(companyId, actor, agent, b);
@@ -777,7 +781,7 @@ exports.routableTasks = async (req, res) => {
         const sprints = await hiddenSprintFilter(companyId, req.uid, wanted);
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ ...sprints, deletedStatusKey: { $ne: 1 }, ProjectID: { $in: wanted }, statusType: { $nin: ['close', 'done', 'default_close'] } },
+            data: [{ ...sprints, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, ProjectID: { $in: wanted }, statusType: { $nin: ['close', 'done', 'default_close'] } },
                    'TaskName TaskKey status statusType Task_Priority ProjectID tagsArray AssigneeUserId totalEstimatedTime updatedAt links description rawDescription',
                    { sort: { updatedAt: -1 }, limit }],
         }, 'find').catch(() => []);

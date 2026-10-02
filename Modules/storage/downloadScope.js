@@ -13,6 +13,7 @@ const { REPORT, scopeMode: mode, countReported: countCategory, reportedCounts } 
 const logger = require('../../Config/loggerConfig');
 const { narrowingFor } = require('../../Config/tokenNarrowing');
 const { canUsePage } = require('../Pages/helpers/pageAccess');
+const { inConversation, withoutConversationsOfOthers } = require('../Comments/helpers/conversationReaders');
 
 const SERVER_STORAGE = 'server';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -52,8 +53,10 @@ const privileged = async (ctx) => isPrivileged(await roleOf(ctx));
 const mayReadProject = async (ctx, projectId) => OBJECT_ID.test(String(projectId || ''))
     && (await canReadProject(ctx.companyId, ctx.uid, String(projectId))).allowed === true;
 
-/* What the task screen asks before it shows a task: its project, and its sprint when that is private. */
+/* What the task screen asks before it shows a task: its project, its sprint when that is private, and whether
+ * the caller is in it when it is a conversation. */
 const mayOpenTask = async (ctx, task) => Boolean(task)
+    && (task.mainChat !== true || inConversation(task, ctx.uid))
     && await mayReadProject(ctx, task.ProjectID)
     && (await privileged(ctx) || await canSeeSprintById(ctx.companyId, ctx.uid, task.sprintId));
 
@@ -64,20 +67,20 @@ const mayOpenTaskFiles = async (ctx, task) => await mayOpenTask(ctx, task)
     && (await privileged(ctx) || await mayReadTaskFilesIn(ctx, task.ProjectID));
 
 const taskById = (ctx, id) => (OBJECT_ID.test(String(id || ''))
-    ? find(ctx, SCHEMA_TYPE.TASKS, { _id: oid(id) }, 'ProjectID sprintId origin AssigneeUserId')
+    ? find(ctx, SCHEMA_TYPE.TASKS, { _id: oid(id) }, 'ProjectID sprintId origin AssigneeUserId mainChat')
     : Promise.resolve(null));
 
 /* The tasks whose files the caller may open, as a filter, so a key many tasks list is matched
  * against those first; null when there are none. */
 const openTaskFilesFilter = async (ctx) => {
-    if (await privileged(ctx)) return {};
+    if (await privileged(ctx)) return withoutConversationsOfOthers(ctx.uid);
     const projectIds = [];
     for (const projectId of (await visibleProjectIds(ctx.companyId, ctx.uid)).map(String)) {
         if (OBJECT_ID.test(projectId) && await mayReadTaskFilesIn(ctx, projectId)) projectIds.push(projectId);
     }
     if (!projectIds.length) return null;
     const hidden = (await hiddenSprintIds(ctx.companyId, ctx.uid, projectIds)).map(String).filter((id) => OBJECT_ID.test(id));
-    return { ProjectID: { $in: projectIds.map(oid) }, ...(hidden.length ? { sprintId: { $nin: hidden.map(oid) } } : {}) };
+    return { ProjectID: { $in: projectIds.map(oid) }, ...(hidden.length ? { sprintId: { $nin: hidden.map(oid) } } : {}), ...withoutConversationsOfOthers(ctx.uid) };
 };
 
 /* A file that reached a task other than through that task's own folder (a voice note, a clip, a

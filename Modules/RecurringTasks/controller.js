@@ -8,10 +8,16 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const { cleanDescription, RichTextLimitError } = require('../Tasks/helpers/cleanRichText');
+const { actingUser } = require('../Sprints/helpers/actingUser');
+const { namedPeopleRefusal } = require('../../Config/projectPeople');
+
+const ASSIGNEES_MAX = 50;
+const idList = (value) => value === undefined || value === null
+    || (Array.isArray(value) && value.length <= ASSIGNEES_MAX && value.every((id) => typeof id === 'string'));
 
 // Build a valid task `data` template from the request (mirrors the defaults in
 // taskMongo.createSubTaskWithAi so taskMongo.create accepts it).
-function buildTemplateFromBody(body) {
+function buildTemplateFromBody(body, creatorId) {
     const project = body.projectData || {};
     return cleanDescription({
         TaskName: body.taskName,
@@ -27,7 +33,7 @@ function buildTemplateFromBody(body) {
         CompanyId: project.CompanyId,
         status: { text: 'To Do', key: 1, type: 'default_active' },
         isParentTask: true,
-        Task_Leader: (body.userData && body.userData.id) || '',
+        Task_Leader: creatorId,
         Task_Priority: body.priority || 'MEDIUM',
         deletedStatusKey: 0,
         statusType: 'default_active',
@@ -45,6 +51,11 @@ exports.createDefinition = async (req, res) => {
         if (!companyId || !b.name || !b.taskName || !b.projectData || !b.projectData._id || !b.freq) {
             return res.send({ status: false, statusText: 'Missing required fields (name, taskName, projectData, freq)' });
         }
+        const creator = await actingUser(req);
+        if (!creator) return res.status(401).send({ status: false, statusText: 'A signed-in user is required.' });
+        if (!idList(b.assignees)) return res.status(400).send({ status: false, statusText: `assignees is a list of at most ${ASSIGNEES_MAX} member ids.` });
+        const refusal = await namedPeopleRefusal(companyId, b.projectData._id, b.assignees || []);
+        if (refusal) return res.status(400).send({ status: false, statusText: refusal });
         const def = {
             _id: new mongoose.Types.ObjectId(),
             name: b.name,
@@ -60,20 +71,16 @@ exports.createDefinition = async (req, res) => {
             missedPolicy: rules.MISSED_POLICIES.includes(b.missedPolicy) ? b.missedPolicy : (b.skipIfOpen ? 'skip' : 'create'),
             until: b.until ? new Date(b.until) : undefined,
             runCount: 0,
-            templateSnapshot: buildTemplateFromBody(b),
+            templateSnapshot: buildTemplateFromBody(b, creator.id),
             projectSnapshot: {
                 _id: b.projectData._id,
                 CompanyId: b.projectData.CompanyId,
                 ProjectCode: b.projectData.ProjectCode,
                 ProjectName: b.projectData.ProjectName,
             },
-            userSnapshot: {
-                id: b.userData && b.userData.id,
-                Employee_Name: b.userData && b.userData.Employee_Name,
-                companyOwnerId: b.userData && b.userData.companyOwnerId,
-            },
+            userSnapshot: { id: creator.id, Employee_Name: creator.Employee_Name, companyOwnerId: '' },
             sprintArray: b.sprintArray || {},
-            createdBy: (b.userData && b.userData.id) || '',
+            createdBy: creator.id,
             deletedStatusKey: 0,
         };
         def.nextRunAt = helper.computeNextRun(def, new Date());

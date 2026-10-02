@@ -13,8 +13,8 @@ const SETUP = 'project.setup';
 const DENIED = permissions.REASON;
 const NO_PROJECT = 'project not found';
 const REFUSED = Object.freeze({
-    parts: `${DENIED}: the person behind this token may not make these parts of the plan by hand`,
-    project: `${DENIED}: the person behind this token may not create a project by hand`,
+    parts: `${DENIED}: the person you act for is not allowed to make these parts of the plan themselves. Leave them out, or ask someone who can.`,
+    project: `${DENIED}: the person you act for is not allowed to create a project themselves. Ask someone who can.`,
 });
 
 const objectOf = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});

@@ -13,6 +13,34 @@ const count = (text, needle) => text.split(needle).length - 1;
 const jobsRunning = (command) => Object.entries(jobs).filter(([, block]) => block.includes(command));
 const shardJobs = () => jobsRunning('npm run e2e -- --shard=');
 
+const WORKFLOWS = path.resolve(__dirname, '../../.github/workflows');
+const stepsOf = (file) => fs.readFileSync(path.join(WORKFLOWS, file), 'utf8').split(/^ +- (?=[a-z-]+:)/m);
+const pathsOf = (step) => {
+    const found = /^( +)path: *(\|?)(.*)\n((?:\1 +.*\n?)*)/m.exec(step);
+    if (!found) return [];
+    return (found[2] ? found[4].split('\n') : [found[3]]).map((line) => line.trim()).filter(Boolean);
+};
+const underDotDirectory = (uploaded) => uploaded.split('/').some((part) => /^\.[^./]/.test(part));
+const uploads = fs.readdirSync(WORKFLOWS).filter((file) => /\.ya?ml$/.test(file))
+    .flatMap((file) => stepsOf(file).filter((step) => step.includes('uses: actions/upload-artifact@')).map((step) => ({ file, paths: pathsOf(step), step })));
+
+// upload-artifact@v4 skips files under a dot directory unless it is told not to, so the logs of a failed job never arrive.
+describe('a step that uploads from a dot directory', () => {
+    test('is read from every workflow', () => {
+        expect(uploads.length).toBeGreaterThanOrEqual(6);
+        expect(uploads.filter((upload) => !upload.paths.length).map((upload) => upload.file)).toEqual([]);
+        expect(underDotDirectory('e2e/.state/*.log')).toBe(true);
+        expect(underDotDirectory('./e2e/report')).toBe(false);
+        expect(underDotDirectory('../dist')).toBe(false);
+    });
+
+    test('includes hidden files', () => {
+        const hidden = uploads.filter((upload) => upload.paths.some(underDotDirectory));
+        expect(hidden.length).toBeGreaterThanOrEqual(3);
+        expect(hidden.filter((upload) => !/^ +include-hidden-files: true$/m.test(upload.step)).map((upload) => `${upload.file}: ${upload.paths.join(', ')}`)).toEqual([]);
+    });
+});
+
 describe('the browser tests in CI', () => {
     test('run in shards that share no database and no server', () => {
         expect(shardJobs()).toHaveLength(1);

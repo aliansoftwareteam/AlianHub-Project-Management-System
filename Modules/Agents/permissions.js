@@ -31,7 +31,7 @@ const holderMay = async (companyId, actor, action, params = {}, { byWorkspaceRul
     const required = registry.permissionsFor(action, params);
     if (!required.length) return { allowed: true, reason: '', permission: null };
     const uid = String((actor && actor.userId) || '');
-    if (!OBJECT_ID.test(uid)) return denied(required[0].key, 'cannot be checked — no person is behind this agent');
+    if (!OBJECT_ID.test(uid)) return denied(required[0].key, 'cannot be checked, because no person is behind this connection. Ask the person to connect you again.');
     try {
         const projectId = byWorkspaceRules ? null : await projectOf(companyId, params);
         const holds = async (key, write) => {
@@ -41,10 +41,10 @@ const holderMay = async (companyId, actor, action, params = {}, { byWorkspaceRul
         for (const { key, write, anyOf } of required) {
             let granted = false;
             for (const option of anyOf || [key]) granted = granted || await holds(option, write);
-            if (!granted) return denied(key, 'is not granted to the person behind this agent');
+            if (!granted) return denied(key, 'is not allowed for the person you act for. Tell the person, and ask them to change it in AlianHub or do it themselves.');
         }
     } catch (e) {
-        return denied(required[0].key, `could not be evaluated (${e.message})`);
+        return denied(required[0].key, 'could not be checked just now. Try again, and tell the person if it keeps failing.');
     }
     return { allowed: true, reason: '', permission: null };
 };

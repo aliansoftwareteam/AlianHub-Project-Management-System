@@ -82,16 +82,16 @@ const launch = async (companyId, { agent, task, trigger, startedBy, note, depth 
 
 /* A saved comment that @names agents starts each one its author may run on that task,
  * with the comment as the brief. Never throws: the comment is already posted.
- * `postedBy` is the agent that posted it on a comment route, which the task's project then answers for (./runStart);
- * a comment made through an agent's MCP tool has been through that answer already and names none. */
-const fromComment = async (companyId, { authorId, taskId, message, depth = 0, postedBy = null, path = '', ip = '' }) => {
+ * `postedBy` is the agent that posted it, which the task's project then answers for (./runStart); `asked` says the
+ * project's rule for the comment itself was asked already, as it is for one made through an agent's MCP tool. */
+const fromComment = async (companyId, { authorId, taskId, message, depth = 0, postedBy = null, asked = false, path = '', ip = '' }) => {
     const mentioned = parseAgentMentionIds(message);
     if (!mentioned.length) return [];
     try {
         const task = await workTask(companyId, taskId);
         if (!task) return [];
         const agents = (await runnableAgents(companyId, authorId, task)).filter((agent) => mentioned.includes(String(agent._id)));
-        if (agents.length && postedBy && !(await require('./runStart').admits(companyId, postedBy, task, { path, ip }))) return [];
+        if (agents.length && postedBy && !(await require('./runStart').admits(companyId, postedBy, task, { path, ip, asked }))) return [];
         const note = mentionsAsNames(message).trim();
         const out = [];
         for (const agent of agents) {

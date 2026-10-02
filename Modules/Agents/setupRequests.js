@@ -25,7 +25,7 @@ const VALUES_MAX = 50;
 const VALUE_TEXT_MAX = 4000;
 const VALUE_PARTS_MAX = 50;
 const FIELD_SET = 'task.field.set';
-const NO_TASK = 'that task was not found in this project';
+const NO_TASK = 'That task was not found in this project. Check the id.';
 
 /* The `tab` of each kind of view a project can keep a saved copy of (Modules/ViewTemplates/templateRules.js). */
 const VIEW_KINDS = Object.freeze({ list: 'ProjectListView', board: 'ProjectKanban', table: 'TableView', calendar: 'Calendar', workload: 'Workload' });
@@ -134,7 +134,7 @@ const draftOf = (given) => {
 
 const draftProblem = (draft) => {
     if (!draft.name) return 'needs a name';
-    if (!draft.type) return `needs a type: one of ${CREATE_TYPES.join(', ')}`;
+    if (!draft.type) return `needs a type, which is one of ${CREATE_TYPES.join(', ')}`;
     if (draft.type === 'dropdown' && !draft.options.length) return 'is a dropdown, which needs at least one option';
     return computed.problemOf(draft);
 };
@@ -253,7 +253,7 @@ const setValue = async ({ companyId, actor, depth, approvedBy, projectId, held, 
     const permissions = require('./permissions');
     const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
     const definition = held.find((field) => sameName(field.fieldTitle, entry.field));
-    if (!definition) throw refuse(`this project has no field "${entry.field}"`);
+    if (!definition) throw refuse(`This project has no field called "${entry.field}". Check fields.list.`);
     const task = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS, data: [{ _id: tools.oid(entry.taskId), ProjectID: { $in: idForms(projectId) }, deletedStatusKey: { $ne: 1 } }, { _id: 1 }],
     }, 'findOne');
@@ -263,7 +263,7 @@ const setValue = async ({ companyId, actor, depth, approvedBy, projectId, held, 
     }
     for (const person of people) {
         const may = await permissions.holderMay(companyId, person, FIELD_SET, { taskId: entry.taskId });
-        if (!may.allowed) throw refuse(person === actor ? may.reason : `the approver may not set a field on this task: ${may.reason}`);
+        if (!may.allowed) throw refuse(person === actor ? may.reason : `The person approving may not set a field on this task: ${may.reason}`);
     }
     const fieldId = idOf(definition._id);
     const out = await require('./taskRequests').executors[FIELD_SET]({ companyId, actor, params: { taskId: entry.taskId, fieldId, value: entry.value }, depth });
@@ -279,7 +279,7 @@ const setValues = async ({ values, ...context }) => {
     const undos = [];
     for (const entry of values) {
         try {
-            if (!usable) throw refuse(`${FIELD_SET} is switched off here`);
+            if (!usable) throw refuse(`${FIELD_SET} is not available here, so values cannot be set. Leave values out.`);
             const done = await setValue({ ...context, held, entry });
             items.push(done.item);
             undos.push(done.undo);
@@ -456,14 +456,14 @@ const addressOf = (companyId, made) => {
 const createView = async ({ companyId, who, projectId, name, kind = 'list', look }) => {
     const project = await storedProject(companyId, projectId);
     const inProject = idOf(project._id);
-    if (!Object.hasOwn(VIEW_KINDS, kind)) throw refuse(`kind needs one of ${Object.keys(VIEW_KINDS).join(', ')}`);
+    if (!Object.hasOwn(VIEW_KINDS, kind)) throw refuse(`The kind of view must be one of ${Object.keys(VIEW_KINDS).join(', ')}.`);
     const problem = lookProblem(look);
     if (problem) throw refuse(problem);
     const source = sourceView(project, kind);
     if (!source) throw refuse(noSource(kind));
     const fitted = await settingsFor(companyId, project, lookOf(look));
     const answer = await answerOf('viewCreate', { companyId, who, params: { id: inProject }, body: { sourceViewId: viewIdOf(source), title: viewNameOf(name), settings: fitted.settings } });
-    if (answer.code !== 200 || !answer.body || answer.body.status !== true) throw refuse(reasonOf(answer, 'the view was not added'));
+    if (answer.code !== 200 || !answer.body || answer.body.status !== true) throw refuse(reasonOf(answer, 'The view was not added. Try again, or tell the person.'));
     const view = answer.body.data;
     return { project, projectId: inProject, viewId: viewIdOf(view), name: view.title, kind, keyName: view.keyName, leftOut: fitted.leftOut };
 };
@@ -475,7 +475,7 @@ const withdrawView = async ({ companyId, who, projectId, viewId }) => {
     const view = viewsOf(project).find((entry) => viewIdOf(entry) === idOf(viewId));
     if (!view) return { removed: false };
     const answer = await answerOf('projectUpdate', { companyId, who, params: { id: inProject }, body: { key: '$pull', updateObject: { ProjectRequiredComponent: { _id: view._id } } } });
-    if (answer.code !== 200) throw refuse(reasonOf(answer, 'the view was not removed'));
+    if (answer.code !== 200) throw refuse(reasonOf(answer, 'The view was not removed. Try again, or tell the person.'));
     socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: await storedProject(companyId, inProject), updatedFields: { ProjectRequiredComponent: 'remove' }, module: 'project' });
     return { removed: true, name: view.title || '' };
 };

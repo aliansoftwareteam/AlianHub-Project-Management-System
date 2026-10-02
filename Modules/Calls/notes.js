@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { generateMeetingNotes } = require('../AI/meetingNotes');
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
+const { activeMemberIds } = require('../notification/activeMembers');
 
 const companyOf = (req) => req.headers['companyid'];
 const isObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ''));
@@ -37,7 +38,9 @@ exports.createNotes = async (req, res) => {
         const callId = String(body.callId || '').trim();
         if (!callId) return res.send({ status: false, statusText: 'callId is required.' });
 
-        const participants = [...new Set([String(req.uid), ...(Array.isArray(body.participants) ? body.participants.map(String) : [])])].filter(Boolean);
+        /* A participant reads and edits the notes, so only people of this workspace are kept. */
+        const named = (Array.isArray(body.participants) ? body.participants : []).filter((id) => typeof id === 'string' && isObjectId(id));
+        const participants = [...new Set([String(req.uid), ...(await activeMemberIds(companyId, named))])];
         const transcript = typeof body.transcript === 'string' ? body.transcript.trim() : '';
         const durationSec = Math.max(0, Number(body.durationSec) || 0);
 
@@ -126,21 +129,42 @@ exports.listNotes = async (req, res) => {
     }
 };
 
-const EDITABLE = ['title', 'summary', 'actionItems', 'status', 'recapPostedAt', 'transcript'];
+const TITLE_MAX = 200;
+const SUMMARY_MAX = 20000;
+const ACTION_ITEMS_MAX = 200;
+const STATUSES = ['ready', 'discarded'];
+const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-/** PATCH /api/v2/calls/notes/:id  { summary?, actionItems?, status?, title?, recapPostedAt? } */
+/* What a participant may change, each with the shape it is stored in. The transcript is what was said on the
+ * call: it is written once, when the notes are saved, and no edit reaches it. */
+const EDITABLE = {
+    title: (value) => typeof value === 'string' && value.length <= TITLE_MAX,
+    summary: (value) => typeof value === 'string' && value.length <= SUMMARY_MAX,
+    actionItems: (value) => Array.isArray(value) && value.length <= ACTION_ITEMS_MAX && value.every(isPlainObject),
+    status: (value) => STATUSES.includes(value),
+};
+
+/** PATCH /api/v2/calls/notes/:id  { summary?, actionItems?, status?, title? } */
 exports.updateNotes = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
         if (!isObjectId(req.params.id)) return res.send({ status: false, statusText: 'Invalid id.' });
 
+        const body = isPlainObject(req.body) ? req.body : {};
+        if (body.transcript !== undefined) {
+            return res.status(400).send({ status: false, statusText: 'The transcript is what was said on the call and cannot be changed.' });
+        }
         const patch = {};
-        EDITABLE.forEach((key) => {
-            if (req.body && req.body[key] !== undefined) patch[key] = req.body[key];
-        });
+        for (const [key, fits] of Object.entries(EDITABLE)) {
+            if (body[key] === undefined) continue;
+            if (!fits(body[key])) return res.status(400).send({ status: false, statusText: `${key} is not valid.` });
+            patch[key] = body[key];
+        }
         if (patch.status === 'discarded') patch.deletedStatusKey = 1;
         if (!Object.keys(patch).length) return res.send({ status: false, statusText: 'Nothing to update.' });
+        patch.editedBy = String(req.uid);
+        patch.editedAt = new Date();
 
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.CALLS,

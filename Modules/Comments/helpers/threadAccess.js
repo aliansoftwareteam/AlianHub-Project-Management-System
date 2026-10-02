@@ -7,6 +7,7 @@ const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard')
 const { canSeeSprintById, hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
 const { agentOf } = require('../../../Config/agentRequest');
 const { DIRECT, CHANNEL, conversationOf } = require('./conversation');
+const { inConversation } = require('./conversationReaders');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const isId = (value) => OBJECT_ID.test(String(value || ''));
@@ -23,7 +24,7 @@ const chatSpace = (companyId, id) => findOne(companyId, SCHEMA_TYPE.MAIN_CHATS, 
 /* The answer GET /api/v1/task/:id and the comment room join give; a direct message is only its
  * participants', owners included. */
 const canOpenTask = async (companyId, uid, task, privileged) => {
-    if (task.mainChat === true) return (task.AssigneeUserId || []).map(String).includes(uid);
+    if (task.mainChat === true) return inConversation(task, uid);
     const project = await canReadProject(companyId, uid, task.ProjectID);
     if (!project.allowed && !project.missing) return false;
     if (privileged) return true;

@@ -224,4 +224,11 @@ describe('AGT-08, AGT-09 and AGT-10 status codes and validation', () => {
         expect(r.body.statusText).toMatch(/^what is required/);
         expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toHaveLength(0);
     });
+
+    it.each(['undefined', 'null', '[object Object]', '   '])('refuses a proposal whose summary is %p', async (what) => {
+        const r = await call(ctrl.createProposal, req('owner1', { agentToken: { agentId: AGENT_ID }, body: { agentId: AGENT_ID, taskId: TASK_ID, what, changes: comment('x') } }));
+        expect(r.code).toBe(400);
+        expect(r.body.statusText).toMatch(/^what is required/);
+        expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toHaveLength(0);
+    });
 });

@@ -51,7 +51,7 @@ const listed = listedThrough(server);
 const TOOL = 'screen.link';
 const BASE = 'https://hub.example.test';
 const AT = `${BASE}/#/${CID}`;
-const NOT_FOUND = { error: 'not found' };
+const NOT_FOUND = { error: 'That place was not found, or the person cannot open it.' };
 const ADDRESS_KEYS = ['WEBURL', 'APIURL'];
 const savedAddress = Object.fromEntries(ADDRESS_KEYS.map((key) => [key, process.env[key]]));
 

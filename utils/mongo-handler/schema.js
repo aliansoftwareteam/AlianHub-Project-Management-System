@@ -5103,6 +5103,8 @@ const schema = {
         status: { type: String, default: 'ready', required: false },
         recapPostedAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
+        editedBy: { type: String, required: false },
+        editedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false }
     },
     folders:{

@@ -2,11 +2,11 @@
     <div v-if="modelValue" class="recent-visits__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="recent-visits__card">
             <div class="d-flex align-items-center justify-content-between recent-visits__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.recent_tasks') }}</span>
-                <span class="cursor-pointer font-size-16 recent-visits__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="recent-visits-dropdown-font-size-16 recent-visits-dropdown-font-weight-700">{{ $t('Projects.recent_tasks') }}</span>
+                <span class="cursor-pointer recent-visits-dropdown-font-size-16 recent-visits__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
-            <div v-if="isLoading" class="gray81 font-size-12 recent-visits__empty">{{ $t('Projects.searching') }}</div>
-            <div v-else-if="!items.length" class="gray81 font-size-12 recent-visits__empty">{{ $t('Projects.no_recent_tasks') }}</div>
+            <div v-if="isLoading" class="recent-visits-dropdown-gray81 recent-visits-dropdown-font-size-12 recent-visits__empty">{{ $t('Projects.searching') }}</div>
+            <div v-else-if="!items.length" class="recent-visits-dropdown-gray81 recent-visits-dropdown-font-size-12 recent-visits__empty">{{ $t('Projects.no_recent_tasks') }}</div>
             <div
                 v-else
                 v-for="item in items"
@@ -14,9 +14,9 @@
                 class="d-flex align-items-center cursor-pointer recent-visits__row"
                 @click="openTask(item.task)"
             >
-                <span class="font-size-12 font-weight-600 blue mr-5px">{{ item.task.TaskKey }}</span>
-                <span class="font-size-13 recent-visits__name">{{ item.task.TaskName }}</span>
-                <span v-if="item.task.status && item.task.status.text" class="font-size-11 recent-visits__status">{{ item.task.status.text }}</span>
+                <span class="recent-visits-dropdown-font-size-12 recent-visits-dropdown-font-weight-600 recent-visits-dropdown-blue mr-5px">{{ item.task.TaskKey }}</span>
+                <span class="recent-visits-dropdown-font-size-13 recent-visits__name">{{ item.task.TaskName }}</span>
+                <span v-if="item.task.status && item.task.status.text" class="recent-visits-dropdown-font-size-11 recent-visits__status">{{ item.task.status.text }}</span>
             </div>
         </div>
     </div>
@@ -78,17 +78,44 @@ function openTask(task) {
 </script>
 
 <style scoped>
+.recent-visits-dropdown-font-size-11 {
+    font-size: 11px;
+}
+.recent-visits-dropdown-font-size-12 {
+    font-size: 12px;
+}
+.recent-visits-dropdown-font-size-13 {
+    font-size: 13px;
+}
+.recent-visits-dropdown-font-size-16 {
+    font-size: 16px;
+}
+.recent-visits-dropdown-font-weight-600 {
+    font-weight: 600 !important;
+}
+.recent-visits-dropdown-font-weight-700 {
+    font-weight: 700 !important;
+}
+.recent-visits-dropdown-gray81 {
+    color: var(--ink-2);
+}
+.recent-visits-dropdown-blue {
+    color: var(--brand) !important;
+}
+</style>
+
+<style scoped>
 .recent-visits__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .recent-visits__card {
-    background: #fff;
+    background: var(--surface);
     border-radius: 10px;
     width: min(440px, 92vw);
     max-height: 64vh;
@@ -97,15 +124,15 @@ function openTask(task) {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
 }
 .recent-visits__head { margin-bottom: 8px; }
-.recent-visits__close { color: #9a9a9a; }
-.recent-visits__close:hover { color: #e84a4a; }
+.recent-visits__close { color: var(--ink-2); }
+.recent-visits__close:hover { color: var(--danger); }
 .recent-visits__row {
     padding: 7px 8px;
     border-radius: 6px;
     min-width: 0;
 }
 .recent-visits__row:hover {
-    background: #f7f9fc;
+    background: var(--surface-hover);
 }
 .recent-visits__name {
     overflow: hidden;
@@ -114,12 +141,12 @@ function openTask(task) {
     flex: 1;
 }
 .recent-visits__status {
-    background: #f0f0f0;
+    background: var(--fill);
     border-radius: 10px;
     padding: 1px 7px;
     margin-left: 8px;
     white-space: nowrap;
-    color: #6a6a6a;
+    color: var(--ink-2);
 }
 .recent-visits__empty {
     padding: 18px 12px;

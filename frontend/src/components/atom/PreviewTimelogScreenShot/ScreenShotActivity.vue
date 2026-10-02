@@ -72,25 +72,25 @@
     font-size: 16px;
 }
 .activity_discription{
-    color: #535358;
+    color: var(--ink-2);
 }
 .actvity_table--header{
     font-weight: 500;
     font-size: 16px;
-    color: #000000;
+    color: var(--ink);
     border-radius: 4px;
-    border: 1px solid #CFCFCF;
-    background: #DFE1E6;
+    border: 1px solid var(--border);
+    background: var(--fill);
     height: 44px;
     justify-content: space-between;
     align-items: center;
 }
 .actvity_table--body{
-    border: 1px solid #CFCFCF;
+    border: 1px solid var(--border);
     height: 38px;
     font-weight: 400;
     font-size: 16px;
-    color: #535358;
+    color: var(--ink-2);
 }
 .actvity_table_time{
     padding-left: 30px;

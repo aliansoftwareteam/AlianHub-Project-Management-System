@@ -14,6 +14,25 @@ const logger = require('../../Config/loggerConfig');
 const COMPANY_CONCURRENCY = 5;
 const LOG_PREFIX = '[reminders]';
 
+/* One reminder for `userId`, who is also its author; `reminderAt` is a Date. */
+function createReminder(companyId, userId, { taskId, projectId, reminderAt, reminderText }) {
+    return MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.REMINDERS,
+        data: {
+            _id: new mongoose.Types.ObjectId(),
+            userId: String(userId),
+            companyId: String(companyId),
+            taskId: taskId ? new mongoose.Types.ObjectId(String(taskId)) : undefined,
+            projectId: projectId ? new mongoose.Types.ObjectId(String(projectId)) : undefined,
+            reminderText: reminderText || '',
+            reminderAt,
+            fired: false,
+            createdBy: String(userId),
+            deletedStatusKey: 0,
+        },
+    }, 'save');
+}
+
 // updateOne $set on a reminder.
 async function updateReminder(companyId, id, patch) {
     return MongoDbCrudOpration(companyId, {
@@ -123,6 +142,7 @@ async function runRemindersForAllCompanies() {
 }
 
 module.exports = {
+    createReminder,
     updateReminder,
     fireReminderNotification,
     processDueForCompany,

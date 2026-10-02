@@ -14,9 +14,11 @@ const { updateUserFun } = require("../../Users/controller.js");
 const { ACCOUNT_MAIL_ANSWER } = require("../helpers/accountMail");
 const { PASSWORD_RULE_MESSAGE, meetsPasswordRule } = require("../helpers/passwordRule");
 const { hashPassword, verifyPassword } = require("../helpers/passwordHash");
+const { signedInPersonOnly } = require("../helpers/accountSecurity");
 
 exports.changePassword = async (req, res) => {
     try {
+        if (!(await signedInPersonOnly(req, res))) return;
         const reqData = req.body;
         if (!(req.params && req.params.id)) {
             res.status(400).json({message: "user id is require"});

@@ -17,7 +17,7 @@ const { addCommentCollection, updateCommentCollection } = require('../../../Comm
 const { updateMainChat } = require('../../../MainChats/controller');
 const { replaceObjectKey } = require("../../../Auth/helper");
 const { emitListener } = require("../../../Company/eventController.js");
-const { createCustomFields } = require("../helper.js");
+const { hasFieldColumns, fieldsFromColumns } = require('../importedFields');
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { TaskWriteRefusal } = require('../taskWriteFields');
@@ -230,10 +230,8 @@ module.exports = {
      * `storedParents` maps an id a row may name as its parent to a task already stored, so a row can go under it. */
     createMultipleTasks({ tasks, userData, projectData, indexObj, statusArray, sprint, eventId, importMark = null, storedParents = new Map() }) {
         return new Promise((resolve, reject) => {
-            // Check if any task contains a custom field
-            const hasCustomFields = tasks.some(task => Object.keys(task).some(key => key.startsWith("custom_")));
             let createdCustomFields;
-            // Function to handle actual task creation logic
+            let skippedFields = [];
             const processTasks = (tasks) => {
                 const { levels: [parentTasks, ...subtaskLevels], parentIdOf, storedParentOf, adjusted } = levelRows(tasks, storedParents);
                 const totalTasks = tasks.length;
@@ -364,7 +362,7 @@ module.exports = {
                 Promise.all(parentPromises)
                 .then(() => subtaskLevels.reduce((created, level) => created.then(() => Promise.all(level.map(createSubtask))), Promise.resolve()))
                 .then(() => {
-                    resolve({ status: true, statusText: "Tasks created successfully", createdTasks: tasks, customFields: createdCustomFields, adjusted, droppedFieldValues });
+                    resolve({ status: true, statusText: "Tasks created successfully", createdTasks: tasks, customFields: createdCustomFields, adjusted, droppedFieldValues, ...(skippedFields.length ? { skippedFields } : {}) });
                     emitListener(eventId, { step: "STOP" });
                 }).catch(error => {
                     console.error("Error while creating tasks:", error);
@@ -372,10 +370,11 @@ module.exports = {
                 });
             };
     
-            if (hasCustomFields) {
-                createCustomFields({ tasks, userData, projectData })
+            if (hasFieldColumns(tasks)) {
+                fieldsFromColumns({ tasks, userData, projectData })
                     .then(response => {
                         createdCustomFields = response.customFields;
+                        skippedFields = response.skippedFields || [];
                         processTasks(response.tasks)
                     })
                     .catch(error => {

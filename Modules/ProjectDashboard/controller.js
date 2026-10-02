@@ -41,6 +41,7 @@ exports.getProjectDashboard = async (req, res) => {
         const filter = {
             ProjectID: projectId,
             deletedStatusKey: { $in: [0, undefined] },
+            mainChat: { $ne: true },
         };
         if (!seeAll) filter.AssigneeUserId = String(req.uid);
         Object.assign(filter, await hiddenSprintFilter(companyId, req.uid, [String(projectId)]));

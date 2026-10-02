@@ -8,7 +8,7 @@ const { requireSprintAccess } = require('./helpers/sprintVisibility');
 const { sprintUpdateFrom, sprintWriteKinds, folderUpdateFrom, writtenStatus } = require('./helpers/listWrites');
 const { withActingUser } = require('./helpers/actingUser');
 const { newSprintNamesOnlyMembers, sprintPatchNamesOnlyMembers } = require('./helpers/sprintPeople');
-const { CHAT_CHANNEL, CHAT_CATEGORY, isChatSpace, requireChatAccess } = require('./helpers/chatAccess');
+const { CHAT_CHANNEL, CHAT_CATEGORY, isChatSpace, requireChatAccess, serverListFlags } = require('./helpers/chatAccess');
 const { agentsRefused } = require('../Agents/guard');
 const { backlogsIn } = require('./helpers/backlogs');
 
@@ -46,7 +46,7 @@ const backlogMadeByPeople = async (req, res, next) => {
 // Chat channels and categories share the sprint and folder collections; their container is a chat space, not a project.
 const guard = (mode, projectIds, permissions = () => [], chatPermission = () => CHAT_CHANNEL) => (mode === READ
     ? [requireProjectAccess({ mode, projectIds, permissions })]
-    : [requireProjectAccess({ mode, projectIds, permissions, passMissing: isChatSpace }), requireChatAccess({ containers: projectIds, permission: chatPermission })]);
+    : [requireProjectAccess({ mode, projectIds, permissions, passMissing: isChatSpace }), requireChatAccess({ containers: projectIds, permission: chatPermission }), serverListFlags(projectIds)]);
 
 // An update the handler will refuse still has to pass a permission first.
 const orRefused = (build, fallback) => {

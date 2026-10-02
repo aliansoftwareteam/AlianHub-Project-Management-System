@@ -140,6 +140,24 @@ const namesOnlyOpenThings = async (companyId, uid, body) => {
         && reachesTargets(companyId, uid, body);
 };
 
+const projectsOf = async (companyId, type, ids, field) => (ids.length
+    ? ((await MongoDbCrudOpration(companyId, { type, data: [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }, { [field]: 1 }] }, 'find')) || []).map((row) => row[field])
+    : []);
+
+/* An agent that works in some projects files nothing that reaches another: not a project the proposal names, nor
+ * the project of a task, list or doc it names. A doc that belongs to no project reaches none. */
+const insideAgentScope = async (companyId, agent, body) => {
+    const scope = (agent.projectIds || []).map((id) => String(id).toLowerCase());
+    if (!scope.length) return true;
+    const reached = (await Promise.all([
+        namedUnder(body, PROJECTS),
+        projectsOf(companyId, SCHEMA_TYPE.TASKS, namedUnder(body, TASKS), 'ProjectID'),
+        projectsOf(companyId, SCHEMA_TYPE.SPRINTS, namedUnder(body, LISTS), 'projectId'),
+        projectsOf(companyId, SCHEMA_TYPE.PAGES, namedUnder(body, PAGES), 'ProjectID'),
+    ])).flat().filter(Boolean);
+    return reached.every((id) => scope.includes(String(id).toLowerCase()));
+};
+
 /* The run a proposal is filed from is the filing agent's own, and one its person can open. */
 const ownRun = async (companyId, uid, agentId, runId) => {
     if (!OBJECT_ID.test(String(runId || ''))) return false;
@@ -170,4 +188,4 @@ const stoppedPlan = async (companyId, actor, agent, body) => {
 /* A gate is what the changes carry; the filer may ask for the stricter one, never for a lighter one. */
 const gateAsked = (gate) => (gate === access.GATE_OWNER_ADMIN ? gate : undefined);
 
-module.exports = { namesOnlyOpenThings, ownRun, refusedChange, stoppedPlan, gateAsked };
+module.exports = { namesOnlyOpenThings, insideAgentScope, ownRun, refusedChange, stoppedPlan, gateAsked };

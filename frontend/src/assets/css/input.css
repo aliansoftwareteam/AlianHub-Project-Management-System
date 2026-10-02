@@ -2,25 +2,25 @@
     height: 30px;
     max-width: 100%;
     width: 100%;
-    border: 1px solid #E0E0E0;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0px 10px;
     font-family: var(--font-ui);
     font-weight: 400;
-    color: #949DA8;
+    color: var(--ink-2);
     font-size: 13px;
 }
 .form-control:focus-visible {
-    outline-color: #2F3990
+    outline-color: var(--brand)
 }
 .form-control::placeholder {
     font-weight: 400;
     font-size: 13px;
-    color: #818181;
+    color: var(--ink-2);
     line-height: 19.24px;
 }
 
 @media(max-width: 767px){
-    .form-control {font-size: 14px;line-height: 22px;color: #535358 !important;}
-    .form-control::placeholder {color: #B3B3B3 !important;line-height: 22px !important;}
+    .form-control {font-size: 14px;line-height: 22px;color: var(--ink-label) !important;}
+    .form-control::placeholder {color: var(--ink-2) !important;line-height: 22px !important;}
 }

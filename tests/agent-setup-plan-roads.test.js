@@ -300,14 +300,14 @@ describe('the web road asks of a plan what the connected road asks', () => {
     it('refuses a first task that closes itself where the project has people close its tasks', async () => {
         await projectPolicy.save(CID, P_OPEN, { done: 'never' }, OWNER);
         const { connected, web } = await answeredAlike(INSIDER, { projectId: P_OPEN, tasks: [{ name: 'Already done', status: 'Done' }] });
-        expect(connected).toMatchObject({ refused: true, reason: expect.stringMatching(/people close its tasks/) });
+        expect(connected).toMatchObject({ refused: true, reason: expect.stringMatching(/only people close tasks/) });
         expect(web).toMatchObject({ code: 403, body: { statusText: connected.reason } });
     });
 
     it('refuses a part the person behind the agent may not make by hand', async () => {
         setRule('project_sprint_create', false, [3]);
         const { connected, web } = await answeredAlike(INSIDER, { projectId: P_OPEN, lists: ['Backlog'] });
-        expect(connected).toMatchObject({ refused: true, reason: expect.stringMatching(/may not make these parts of the plan by hand/) });
+        expect(connected).toMatchObject({ refused: true, reason: expect.stringMatching(/not allowed to make these parts of the plan themselves/) });
         expect(web).toMatchObject({ code: 403, body: { statusText: connected.reason } });
     });
 

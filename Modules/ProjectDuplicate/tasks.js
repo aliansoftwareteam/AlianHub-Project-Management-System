@@ -23,7 +23,7 @@ const planTasks = async (companyId, sourceId, sourceListIds) => {
     if (!sourceListIds.length) return planOf([]);
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ ProjectID: asId(sourceId), sprintId: { $in: sourceListIds.map(asId) }, deletedStatusKey: rules.LIVE }, { ParentTaskId: 1 }, { lean: true }],
+        data: [{ ProjectID: asId(sourceId), sprintId: { $in: sourceListIds.map(asId) }, deletedStatusKey: rules.LIVE, mainChat: { $ne: true } }, { ParentTaskId: 1 }, { lean: true }],
     }, 'find') || [];
     return planOf(rows);
 };

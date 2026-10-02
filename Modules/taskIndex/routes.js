@@ -1,6 +1,10 @@
 const ctrl = require('./controller');
 const { requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_WRITE_ROUTES } = require('../../Config/taskWritePermissions');
+const { plainIdOf } = require('../Tasks/helpers/taskWriteFields');
+const { projectAsked } = require('../Agents/guard');
+
+const reordered = projectAsked((req, body) => ({ action: 'task.reorder', params: { taskId: plainIdOf(body.taskId).id || '', projectId: plainIdOf(body.projectId).id || '' } }));
 exports.init = (app) => {
      /**
      * @swagger
@@ -87,6 +91,6 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post("/api/v1/taskIndex", requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/taskIndex'].entry), ctrl.updateTaskIndex);
+    app.post("/api/v1/taskIndex", requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/taskIndex'].entry), reordered, ctrl.updateTaskIndex);
     app.post("/api/v1/updateTaskIndexOnload", requireTaskWritePermission(TASK_WRITE_ROUTES['POST /api/v1/updateTaskIndexOnload'].entry), ctrl.updateTaskIndexWhenLoad);
 }

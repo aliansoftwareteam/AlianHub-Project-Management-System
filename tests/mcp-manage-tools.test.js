@@ -130,9 +130,9 @@ describe('who lists and runs the write tools', () => {
 
     it('a token created without the grant lists exactly what it listed before, and is refused the reads too', async () => {
         expect(await listed(olderToken(OWNER))).toEqual(BEFORE);
-        expect((await rpc(olderToken(OWNER), 'subtasks.list', { taskId: fx.top._id }))).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
-        expect(await rpc(olderToken(OWNER), 'members.list', {})).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
-        expect(await rpc(olderToken(OWNER), 'fields.list', { projectId: P_OPEN })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
+        expect((await rpc(olderToken(OWNER), 'subtasks.list', { taskId: fx.top._id }))).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
+        expect(await rpc(olderToken(OWNER), 'members.list', {})).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
+        expect(await rpc(olderToken(OWNER), 'fields.list', { projectId: P_OPEN })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
         const search = await rpc(olderToken(OWNER), 'tasks.search', { projectId: P_OPEN, assigneeId: MEMBER });
         expect(search.tasks.length).toBeGreaterThan(1);
         expect(Object.keys(search.tasks[0])).not.toContain('assigneeIds');
@@ -144,7 +144,7 @@ describe('who lists and runs the write tools', () => {
         expect((await listed(caller)).filter((name) => [...READS, ...WRITES].includes(name))).toEqual([]);
         const before = snapshot();
         for (const name of WRITES) {
-            expect(await rpc(caller, name, CALLS[name](fx.top._id))).toMatchObject({ isError: true, error: expect.stringMatching(/grant|read-only/) });
+            expect(await rpc(caller, name, CALLS[name](fx.top._id))).toMatchObject({ isError: true, error: expect.stringMatching(/permission|only read/) });
         }
         expect(snapshot()).toBe(before);
     });
@@ -223,7 +223,7 @@ describe('an outside client under a person\'s grant', () => {
         const before = snapshot();
         const plain = outside(OWNER, PLAIN_SCOPES);
         expect(await rpc(plain, 'task.create', { projectId: P_OPEN, title: 'From outside' })).toMatchObject({ isError: true, refused: true, reason: expect.stringMatching(/outside client/) });
-        expect(await rpc(plain, 'task.archive', { taskId: fx.top._id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
+        expect(await rpc(plain, 'task.archive', { taskId: fx.top._id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
         expect(proposals.create).not.toHaveBeenCalled();
         expect(snapshot()).toBe(before);
     });
@@ -302,12 +302,12 @@ describe('every write tool keeps to what the person behind the token can open', 
     });
 
     it('the reads answer "not found" outside the same filter', async () => {
-        expect(await rpc(ctx(MEMBER), 'subtasks.list', { taskId: fx.private._id })).toEqual({ error: 'task not found' });
-        expect(await rpc(ctx(OWNER), 'subtasks.list', { taskId: fx.personal._id })).toEqual({ error: 'task not found' });
-        expect(await rpc(ctx(MEMBER), 'fields.list', { projectId: P_PRIVATE })).toEqual({ error: 'project not found' });
-        expect(await rpc(ctx(OWNER), 'fields.list', { projectId: PL_OTHER })).toEqual({ error: 'project not found' });
-        expect(await rpc(ctx(MEMBER), 'members.list', { projectId: P_PRIVATE })).toEqual({ error: 'project not found' });
-        expect(await rpc(ctx(OWNER, { projectIds: [P_DEST] }), 'fields.list', { projectId: P_OPEN })).toEqual({ error: 'project not found' });
+        expect(await rpc(ctx(MEMBER), 'subtasks.list', { taskId: fx.private._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+        expect(await rpc(ctx(OWNER), 'subtasks.list', { taskId: fx.personal._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+        expect(await rpc(ctx(MEMBER), 'fields.list', { projectId: P_PRIVATE })).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
+        expect(await rpc(ctx(OWNER), 'fields.list', { projectId: PL_OTHER })).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
+        expect(await rpc(ctx(MEMBER), 'members.list', { projectId: P_PRIVATE })).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
+        expect(await rpc(ctx(OWNER, { projectIds: [P_DEST] }), 'fields.list', { projectId: P_OPEN })).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
     });
 
     it('a member whose role lacks the permission is refused, as on the task route', async () => {
@@ -374,9 +374,9 @@ describe('task.update', () => {
         expect(cleared.result.changed).toEqual(['DueDate']);
         expect(stored(fx.top._id).DueDate).toBeNull();
         const bad = await rpc(ctx(OWNER), 'task.update', { taskId: fx.top._id, dueDate: 'next tuesday', title: 'Never' });
-        expect(bad).toMatchObject({ isError: true, error: expect.stringMatching(/dueDate needs a date/) });
+        expect(bad).toMatchObject({ isError: true, error: expect.stringMatching(/due date must be a day/) });
         expect(stored(fx.top._id).TaskName).toBe('Task OPN-1');
-        expect((await rpc(ctx(OWNER), 'task.update', { taskId: fx.top._id, startDate: '2026-12-02', dueDate: '2026-12-01' })).error).toMatch(/startDate is after dueDate/);
+        expect((await rpc(ctx(OWNER), 'task.update', { taskId: fx.top._id, startDate: '2026-12-02', dueDate: '2026-12-01' })).error).toMatch(/start date is after the due date/);
     });
 });
 
@@ -402,7 +402,7 @@ describe('task.assign', () => {
 
     it('refuses a person who cannot open the task\'s project, and one who is not a member', async () => {
         const closed = await rpc(ctx(OWNER), 'task.assign', { taskId: fx.private._id, mode: 'add', userIds: [OWNER, MEMBER] });
-        expect(closed).toMatchObject({ isError: true, error: 'A person named here cannot open this project.' });
+        expect(closed).toMatchObject({ isError: true, error: 'Someone named here cannot open this project. Pick people who are on the project, or ask the person to add them first.' });
         expect(stored(fx.private._id).AssigneeUserId).toEqual([OTHER]);
         expect((await rpc(ctx(OWNER), 'task.assign', { taskId: fx.private._id, mode: 'add', userIds: [OWNER] })).ok).toBe(true);
 
@@ -440,10 +440,10 @@ describe('task.field.set and fields.list', () => {
         ['text for a rating', () => ({ fieldId: F.rating, value: 'high' }), /whole number from 1 to 5/],
         ['text for a number', () => ({ fieldId: F.number, value: 'lots' }), /Budget needs a number/],
         ['an option the dropdown does not have', () => ({ fieldId: F.choice, value: 'Mobile' }), /needs one of its options: Web, API/],
-        ['a field not used for the task\'s type', () => ({ fieldId: F.bugOnly, value: 'x' }), /not used for this task's type/],
-        ['a field of another project', () => ({ fieldId: F.elsewhere, value: 'x' }), /not one this task's project has/],
-        ['a field that is switched off', () => ({ fieldId: F.off, value: 'x' }), /not one this task's project has/],
-        ['a field that does not exist', () => ({ fieldId: '6f0000000000000000000fff', value: 'x' }), /not one this task's project has/],
+        ['a field not used for the task\'s type', () => ({ fieldId: F.bugOnly, value: 'x' }), /does not apply to this type of task/],
+        ['a field of another project', () => ({ fieldId: F.elsewhere, value: 'x' }), /does not belong to this task's project/],
+        ['a field that is switched off', () => ({ fieldId: F.off, value: 'x' }), /does not belong to this task's project/],
+        ['a field that does not exist', () => ({ fieldId: '6f0000000000000000000fff', value: 'x' }), /does not belong to this task's project/],
     ])('refuses %s', async (_what, args, message) => {
         const before = snapshot();
         const out = await rpc(ctx(OWNER), 'task.field.set', { taskId: fx.top._id, ...args() });
@@ -489,7 +489,7 @@ describe('subtasks.list, members.list and tasks.search', () => {
         expect(due.tasks.map((task) => task.key)).toEqual(['OPN-4']);
         expect((await rpc(ctx(OWNER), 'tasks.search', { sprintId: S_SECRET })).tasks.map((task) => task.key)).toEqual(['OPN-9']);
         expect((await rpc(ctx(MEMBER), 'tasks.search', { sprintId: S_SECRET })).tasks).toEqual([]);
-        expect(await rpc(ctx(OWNER), 'tasks.search', { dueFrom: 'soon' })).toEqual({ error: 'dueFrom and dueTo must be YYYY-MM-DD' });
+        expect(await rpc(ctx(OWNER), 'tasks.search', { dueFrom: 'soon' })).toEqual({ error: 'dueFrom and dueTo must be written YYYY-MM-DD.' });
         expect(Object.keys(tools.manifest(ctx(OWNER)).find((tool) => tool.name === 'tasks.search').inputSchema.properties)).toEqual(expect.arrayContaining(['assigneeId', 'sprintId', 'dueFrom', 'dueTo']));
         expect(Object.keys(tools.manifest().find((tool) => tool.name === 'tasks.search').inputSchema.properties)).toEqual(['query', 'projectId', 'status', 'limit']);
     });
@@ -522,7 +522,7 @@ describe('task.move', () => {
         mockDb.store[SCHEMA_TYPE.PROJECTS].find((project) => String(project._id) === P_OPEN).taskTypeCounts = [{ key: 1, name: 'Task', value: 'task' }];
         const before = snapshot();
         const out = await onceApproved(ctx(OWNER), 'task.move', { taskId: fx.bug._id, projectId: P_DEST, sprintId: S_DEST });
-        expect(out).toMatchObject({ isError: true, error: expect.stringMatching(/cannot be carried into another project/) });
+        expect(out).toMatchObject({ isError: true, error: expect.stringMatching(/does not exist in the other project/) });
         expect(snapshot()).toBe(before);
     });
 
@@ -585,7 +585,7 @@ describe('task.archive and task.restore', () => {
         expect(await undoStateOf(CID, { ...row, meta: { ...row.meta, undo: { ...row.meta.undo, taskId: fx.private._id } }, entityId: fx.private._id }, { userId: MEMBER }, { undoHours: 24, run: null })).toMatchObject({ undoable: false });
 
         expect((await rpc(ctx(MEMBER), 'task.archive', { taskId: fx.top._id })).error).toMatch(/already archived/);
-        expect((await rpc(ctx(MEMBER), 'task.restore', { taskId: fx.child._id })).error).toMatch(/restore the parent/);
+        expect((await rpc(ctx(MEMBER), 'task.restore', { taskId: fx.child._id })).error).toMatch(/Restore the parent task/);
 
         const restored = await onceApproved(ctx(MEMBER), 'task.restore', { taskId: fx.top._id });
         expect(restored).toMatchObject({ ok: true, undoable: true, result: { archived: false } });
