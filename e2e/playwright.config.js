@@ -10,7 +10,7 @@ module.exports = defineConfig({
     workers: process.env.CI ? 2 : undefined,
     timeout: 60000,
     expect: { timeout: 15000 },
-    reporter: [['list'], ['html', { outputFolder: 'report', open: 'never' }]],
+    reporter: [['list'], ['html', { outputFolder: 'report', open: 'never' }], ...(process.env.CI ? [[require.resolve('./support/summaryReporter.js')]] : [])],
     use: {
         trace: 'on-first-retry',
         screenshot: 'only-on-failure',
