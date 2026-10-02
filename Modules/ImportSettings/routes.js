@@ -1,5 +1,9 @@
 const ctrl = require('./controller');
 const { requireProjectAccess, SECURITY_SETTINGS } = require('../../Config/projectAccess');
+const { agentsRefused } = require('../Agents/guard');
+
+/* Both imports write permission rules: the company's, with its roles, or one project's. */
+const rulesByPeople = agentsRefused('permissions.edit');
 
 exports.init = (app) => {
 
@@ -49,7 +53,7 @@ exports.init = (app) => {
      *              description: status:true/false, statusText:message
      */
 
-    app.post('/api/v1/importSettings', ctrl.importSettings);
+    app.post('/api/v1/importSettings', rulesByPeople, ctrl.importSettings);
 
     app.post('/api/v1/importTemplate', ctrl.importTemplate);
 
@@ -93,7 +97,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v1/importSettingsProjectFunction', requireProjectAccess({ projectIds: (req) => (req.body && req.body.type === 'project' ? req.body.projectId : []), permissions: () => [SECURITY_SETTINGS] }), ctrl.importSettingsProjectFunction);
+    app.post('/api/v1/importSettingsProjectFunction', rulesByPeople, requireProjectAccess({ projectIds: (req) => (req.body && req.body.type === 'project' ? req.body.projectId : []), permissions: () => [SECURITY_SETTINGS] }), ctrl.importSettingsProjectFunction);
 
     /**
      * @swagger

@@ -8,8 +8,9 @@ const { addSprintFun } = require("../Sprints/controller")
 const config = require("../../Config/config");
 const { getCachedGlobalTemplateData } = require("../../utils/enterpriseHelper");
 const { removeCache } = require('../../utils/commonFunctions');
+const { announceProject } = require('../Project/helpers/projectEvents');
 const { tenantOf } = require("../../Config/tenant");
-const { agentFieldNamed } = require("../../Config/projectAgentFields");
+const { fieldKeptFromNewProject, withoutStartingFields } = require("../../Config/projectAccess");
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const projectTemplate = require("../../utils/projectTemplates.json");
 const { pickKnownApps } = require("./apps");
@@ -135,12 +136,12 @@ exports.createProjectFun = async(req, res) => {
     if (!OBJECT_ID.test(creator)) {
         return res.status(401).send({ status: false, statusText: 'A signed-in user is required.', message: 'A signed-in user is required.' });
     }
-    const agentField = agentFieldNamed(body);
-    if (agentField) {
-        const refusal = `${agentField} cannot be set here.`;
+    const keptField = fieldKeptFromNewProject(body);
+    if (keptField) {
+        const refusal = `${keptField} cannot be set here.`;
         return res.status(400).send({ status: false, statusText: refusal, message: refusal });
     }
-    req.body = { ...body, CompanyId: companyId, projectCreatedBy: creator };
+    req.body = { ...withoutStartingFields(body), CompanyId: companyId, projectCreatedBy: creator };
     const { isPrivateSpace } = req.body;
     try {
         exports.checkProjectPlan(req).then((data) => {
@@ -149,6 +150,7 @@ exports.createProjectFun = async(req, res) => {
                     removeCache("UserProjectData:", true);
                     res.send(cData);
                     if (cData && cData.status === true && cData.data) {
+                        announceProject(companyId, 'insert', cData.data);
                         recordProjectCreated({ companyId, project: cData.data, actorId: creator })
                             .catch((error) => logger.error(`project created history failed: ${(error && error.message) || error}`));
                     }

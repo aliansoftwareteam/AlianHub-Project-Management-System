@@ -218,7 +218,7 @@ import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 import taskClass from '@/utils/TaskOperations';
 import * as env from '@/config/env';
 import { apiRequest } from '@/services';

@@ -40,6 +40,7 @@ beforeEach(() => {
 describe('what an approval and an undo say about projects', () => {
     it('names the projects an approval made, and none it failed to make', () => {
         expect(madeProjectIds({ applied: [made, { action: 'task.comment', ok: true, result: { projectId: 'other' } }, { ...made, ok: false, error: 'no' }] })).toEqual([PROJECT]);
+        expect(madeProjectIds({ applied: [{ action: 'project.duplicate', ok: true, result: { projectId: 'copy', copiedFrom: PROJECT } }] })).toEqual(['copy']);
         expect(madeProjectIds({ applied: [] })).toEqual([]);
         expect(madeProjectIds(undefined)).toEqual([]);
     });

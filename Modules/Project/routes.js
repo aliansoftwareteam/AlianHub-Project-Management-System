@@ -32,14 +32,15 @@ const sprintUpdateContainers = projectIdsFrom({ records: [[SCHEMA_TYPE.SPRINTS, 
 
 const readsProject = (projectIds) => requireProjectAccess({ mode: READ, projectIds });
 const editsProjectViews = requireProjectAccess({ projectIds: (req) => req.params.id, permissions: () => [FIELD_PERMISSIONS.ProjectRequiredComponent] });
+const viewsByPeople = agentsRefused('view.create');
 
 exports.init = (app) => {
     app.post('/api/v1/project/search',projectFilterCtrl.projectFilter);
     app.get('/api/v1/project/:id', readsProject((req) => req.params.id), Projectctrl.getProjectById);
     app.get('/api/v1/project', projectListCtrl.getProjectList);
     app.put('/api/v1/project/:id', requireSupportedProjectUpdate, projectUpdateGuard, requireProjectAccess({ projectIds: (req) => req.params.id, permissions: (req) => permissionsForProjectUpdate(req.body && req.body.updateObject, req.uid) }), projectUpdateNamesOnlyMembers, updateProjectCtrl.updateProject);
-    app.put('/api/v1/project/:id/view-settings', editsProjectViews, viewSettingsCtrl.saveViewSettings);
-    app.post('/api/v1/project/:id/views', editsProjectViews, viewSettingsCtrl.createView);
+    app.put('/api/v1/project/:id/view-settings', viewsByPeople, editsProjectViews, viewSettingsCtrl.saveViewSettings);
+    app.post('/api/v1/project/:id/views', viewsByPeople, editsProjectViews, viewSettingsCtrl.createView);
     app.put('/api/v1/project/allTask/:id', agentsRefused('project.delete'), requireProjectAccess({ projectIds: (req) => req.params.id, permissions: () => [DELETE_OR_CLOSE] }), projectAlltaskUpdateCtrl.projectAlltaskUpdate);
     app.get('/api/v1/project/sprintFolder/:id', readsProject((req) => req.params.id), projectSprintFolderCtrl.getSprintFolder);
     app.put('/api/v1/project/sprint/:id', requireProjectAccess({

@@ -343,75 +343,75 @@ onMounted(load);
 <style scoped>
 .mrc { height: 100%; width: 100%; padding: 10px 12px; overflow: hidden; display: flex; flex-direction: column; }
 .mrc-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: 12px; padding-right: 8px; }
-.mrc-msg { color: #9aa0b4; font-size: 12px; padding: 8px 0; }
-.mrc-section-title { font-size: 12px; font-weight: 600; color: #3a3f52; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mrc-msg { color: var(--ink-2); font-size: 12px; padding: 8px 0; }
+.mrc-section-title { font-size: 12px; font-weight: 600; color: var(--ink-label); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .mrc-clear { border: none; background: none; padding: 0; font-size: 11px; font-weight: 600; color: #0d9488; cursor: pointer; white-space: nowrap; }
 .mrc-clear:hover { text-decoration: underline; }
 
 /* Hero: single consolidated receivable tile + received/outstanding split. */
-.mrc-hero { background: #f5f7fb; border-radius: 10px; padding: 14px; }
+.mrc-hero { background: var(--surface-2); border-radius: 10px; padding: 14px; }
 .mrc-hero-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.mrc-hero-label { font-size: 12px; font-weight: 600; color: #3a3f52; text-transform: uppercase; letter-spacing: .02em; }
+.mrc-hero-label { font-size: 12px; font-weight: 600; color: var(--ink-label); text-transform: uppercase; letter-spacing: .02em; }
 .mrc-hero-period { font-size: 11px; font-weight: 600; color: #0d9488; white-space: nowrap; }
 .mrc-hero-amount { font-size: 28px; font-weight: 700; color: #0f766e; line-height: 1.15; margin-top: 2px; word-break: break-word; }
-.mrc-hero-sub { font-size: 11px; color: #6b7280; margin-top: 2px; }
+.mrc-hero-sub { font-size: 11px; color: var(--ink-2); margin-top: 2px; }
 .mrc-split-track { position: relative; height: 8px; border-radius: 5px; background: #f0a54a; overflow: hidden; margin-top: 12px; }
-.mrc-split-fill { height: 100%; background: #28c76f; }
+.mrc-split-fill { height: 100%; background: var(--ok); }
 .mrc-split-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; }
-.mrc-leg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #3a3f52; }
+.mrc-leg { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-label); }
 .mrc-leg b { font-weight: 700; }
 .mrc-leg-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-.mrc-leg-dot--received { background: #28c76f; }
+.mrc-leg-dot--received { background: var(--ok); }
 .mrc-leg-dot--outstanding { background: #f0a54a; }
 
 .mrc-bars { display: flex; flex-direction: column; gap: 6px; }
 .mrc-bar-row { display: flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; padding: 2px 4px; margin: 0 -4px; border-radius: 6px; transition: background .12s ease, opacity .12s ease; }
-.mrc-bar-row:hover { background: #f5f7fb; }
+.mrc-bar-row:hover { background: var(--surface-2); }
 .mrc-bar-row--active { background: #eaf5f2; }
 .mrc-bar-row--dim { opacity: .5; }
 .mrc-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
-.mrc-status-label { width: 30%; font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mrc-track { flex: 1; height: 12px; background: #eef0f6; border-radius: 4px; overflow: hidden; }
+.mrc-status-label { width: 30%; font-size: 12px; color: var(--ink-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrc-track { flex: 1; height: 12px; background: var(--fill); border-radius: 4px; overflow: hidden; }
 .mrc-fill { height: 100%; background: #0d9488; }
-.mrc-val { width: 34px; text-align: right; font-size: 12px; color: #3a3f52; }
+.mrc-val { width: 34px; text-align: right; font-size: 12px; color: var(--ink-label); }
 /* Timeline table: dedicated Milestone / Date / Amount columns. */
 .mrc-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.mrc-th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; color: #9aa0b4; text-align: left; padding: 0 8px 6px 0; border-bottom: 1px solid #eef0f6; }
+.mrc-th { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; color: var(--ink-2); text-align: left; padding: 0 8px 6px 0; border-bottom: 1px solid var(--hairline); }
 /* Date + Amount are fixed-width; Milestone (no width) absorbs the rest. */
 .mrc-th--date { width: 92px; }
 .mrc-th--amount { width: 96px; text-align: right; padding-right: 0; }
-.mrc-tr { border-bottom: 1px solid #f4f5f9; }
+.mrc-tr { border-bottom: 1px solid var(--hairline); }
 .mrc-tr:last-child { border-bottom: none; }
-.mrc-td { padding: 7px 8px 7px 0; vertical-align: middle; font-size: 12px; color: #3a3f52; }
+.mrc-td { padding: 7px 8px 7px 0; vertical-align: middle; font-size: 12px; color: var(--ink-label); }
 .mrc-td--name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .mrc-td--amount { text-align: right; font-weight: 600; color: #0f766e; white-space: nowrap; padding-right: 0; }
 .mrc-item-main { display: flex; flex-direction: column; min-width: 0; }
-.mrc-item-name { font-size: 12px; color: #3a3f52; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrc-item-name { font-size: 12px; color: var(--ink-label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrc-item-name--link { cursor: pointer; }
 .mrc-item-name--link:hover { color: #0d9488; text-decoration: underline; }
 /* The project name takes the slack and ellipsises; the Closed marker never shrinks, so a
    long project name cannot squeeze it out of the row. */
 .mrc-item-sub { display: flex; align-items: center; gap: 5px; min-width: 0; }
-.mrc-item-project { font-size: 11px; color: #9aa0b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrc-item-project { font-size: 11px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mrc-closed {
     flex: 0 0 auto;
     font-size: 9px; font-weight: 600; line-height: 1.6;
     padding: 0 5px; border-radius: 8px;
-    color: #5b6472; background: #eef0f6;
+    color: var(--ink-2); background: var(--fill);
     text-transform: uppercase; letter-spacing: .03em;
     /* Deliberately the same neutral as the "Past" temporal pill: it is context, not a
        warning. Overdue money stays the only red thing in the row. */
 }
-.mrc-due { display: block; font-size: 12px; color: #3a3f52; white-space: nowrap; }
+.mrc-due { display: block; font-size: 12px; color: var(--ink-label); white-space: nowrap; }
 
 /* Temporal pill: past → present → future within the selected range. */
 .mrc-when { display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 600; line-height: 1.4; padding: 1px 6px; border-radius: 9px; white-space: nowrap; }
-.mrc-when--overdue { color: #b42318; background: #fde8e6; }
-.mrc-when--past { color: #5b6472; background: #eef0f6; }
+.mrc-when--overdue { color: var(--danger); background: var(--danger-bg); }
+.mrc-when--past { color: var(--ink-2); background: var(--fill); }
 .mrc-when--present { color: #0f766e; background: #d5f2ec; }
 .mrc-when--future { color: #2f52c4; background: #e6ecfb; }
-.mrc-footer { flex: 0 0 auto; margin-top: 8px; border-top: 1px solid #eef0f6; padding-top: 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.mrc-alltime { font-size: 11px; color: #9aa0b4; }
+.mrc-footer { flex: 0 0 auto; margin-top: 8px; border-top: 1px solid var(--hairline); padding-top: 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.mrc-alltime { font-size: 11px; color: var(--ink-2); }
 .mrc-link { font-size: 12px; color: #0d9488; cursor: pointer; text-decoration: none; }
 .mrc-link:hover { text-decoration: underline; }
 </style>

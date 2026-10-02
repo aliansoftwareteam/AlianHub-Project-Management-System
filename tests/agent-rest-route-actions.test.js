@@ -38,6 +38,9 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn()
 const { EventEmitter } = require('events');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/accessWorld');
+const registry = require('../Modules/Agents/registry');
+const registryGroups = require('../Modules/Agents/registryGroups');
+const { agentPerimeter } = require('../Modules/Agents/guard');
 
 const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, L_OPEN, L_PRIVATE, T_OPEN, T_PRIVATE, settle } = world;
 const { seed, rows } = world.create(mockDb);
@@ -47,27 +50,35 @@ const P_NOWHERE = '6f0000000000000000000aff';
 const PAGE = '6f0000000000000000000e01';
 const COMMENT = '6f0000000000000000000e02';
 const FOLDER = '6f0000000000000000000c01';
+const CONNECTION = '6f0000000000000000000c02';
 const REACHED = 'reached its handler';
 
 const routes = {};
 const register = (method) => (routePath, ...handlers) => { routes[`${method} ${routePath}`] = handlers; };
 const app = { get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: register('USE') };
-['Tasks', 'Sprints', 'Pages', 'Importers'].forEach((name) => require(`../Modules/${name}/routes`).init(app));
+[
+    'Tasks', 'Sprints', 'Pages', 'Importers', 'createProject', 'CustomField', 'Project', 'projectSetting', 'settings/templates', 'settings/ProjectStatusTemplate',
+    'ProjectDuplicate', 'ProjectSnapshots', 'AIProjectGenerator', 'Automations', 'projectRules', 'ImportSettings', 'PublicShares', 'trackerUserPermission',
+    'settings/Members', 'settings/Roles', 'settings/securityPermissions', 'Milestone', 'Auth', 'Integrations', 'UserDashboard',
+].forEach((name) => require(`../Modules/${name}/routes`).init(app));
 
 const session = (uid) => ({ uid });
 const agentToken = (uid, extra = {}) => ({ uid, apiToken: { _id: '6f0000000000000000000101', kind: 'agent', name: 'Claude', userId: uid, scopes: ['read', 'write'], ...extra } });
 const personalToken = (uid) => ({ uid, apiToken: { _id: '6f0000000000000000000102', name: 'A script', userId: uid, scopes: ['read', 'write'] } });
+const agentRun = (uid) => ({ uid, agentRun: { _id: '6f0000000000000000000103', agentId: '6f0000000000000000000104', agentName: 'Triage' } });
 
-/* Runs every guard of the route and stops in front of its handler. */
+const pathOf = (route, params = {}) => Object.entries(params).reduce((text, [name, value]) => text.replace(`:${name}`, value), route);
+
+/* Runs what stands in front of every route, then every guard of the route, and stops in front of its handler. */
 const through = (route, caller, body = {}, params = {}) => new Promise((resolve) => {
-    const [method, url] = route.split(' ');
+    const [method, url] = pathOf(route, params).split(' ');
     const res = new EventEmitter();
     res.statusCode = 200;
     res.status = (code) => { res.statusCode = code; return res; };
     res.send = (answer) => { res.emit('finish'); resolve({ code: res.statusCode, body: answer }); return res; };
     res.json = res.send;
-    const req = { ...caller, method, originalUrl: url, url, baseUrl: '', route: { path: url }, query: {}, params, headers: { companyid: CID }, aud: CID, ip: '1.1.1.1', body };
-    const guards = routes[route].slice(0, -1);
+    const req = { ...caller, method, originalUrl: url, url, baseUrl: '', route: { path: route.split(' ')[1] }, query: {}, params, headers: { companyid: CID }, aud: CID, ip: '1.1.1.1', body };
+    const guards = [agentPerimeter, ...routes[route].slice(0, -1)];
     const step = (at) => (at === guards.length ? (res.emit('finish'), resolve(REACHED)) : Promise.resolve(guards[at](req, res, () => step(at + 1))));
     step(0);
 }).then(async (result) => { await settle(); return result; });
@@ -106,6 +117,11 @@ const NO_ACTION = {
     'approving a drafted doc': ['PUT /api/v2/pages/:id/approve', {}, { id: PAGE }],
     'sharing a doc with someone': ['PUT /api/v2/pages/:id/shares/:userId', { role: 'view' }, { id: PAGE, userId: INSIDER }],
     'ending a share of a doc': ['DELETE /api/v2/pages/:id/shares/:userId', {}, { id: PAGE, userId: INSIDER }],
+    'creating a project': ['POST /api/v1/createproject', { ProjectName: 'New', ProjectCode: 'NEW', AssigneeUserId: [], LeadUserId: [] }],
+    'having the workspace\'s AI draft an automation': ['POST /api/v2/automations/draft', { sentence: 'When a task is created, assign it' }],
+    'creating the tasks of a generated plan': ['POST /api/v1/ai/project/:projectId/tasks/execute', { plan: {} }, { projectId: P_OPEN }],
+    'connecting an outside service': ['POST /api/v1/integrations/connections', { type: 'webhook', name: 'Hook', config: {} }],
+    'changing a connection to an outside service': ['PUT /api/v1/integrations/connections/:id', { name: 'Hook' }, { id: CONNECTION }],
 };
 
 /* New tasks that carry more than a filed task does. */
@@ -145,7 +161,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task_create', name: 'task_create', isParent: false, parentId: String(taskRules._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'sub_task_create', name: 'sub_task_create', isParent: false, parentId: String(taskRules._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
 });
-afterEach(() => { delete process.env.MCP_TOOLS_MANAGE; });
+afterEach(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK'].forEach((flag) => { delete process.env[flag]; }); });
 
 describe('a token created for an agent, on the write routes beside the task route', () => {
     it.each(Object.keys(NO_ACTION).flatMap((name) => AGENTS_OF.map(([label, uid]) => [name, label, uid])))('%s is refused for the agent of %s, and recorded', async (name, label, uid) => {
@@ -156,12 +172,13 @@ describe('a token created for an agent, on the write routes beside the task rout
         expect(answer.code).toBe(403);
         expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
         expect(audits('agent.action_refused')).toHaveLength(1);
-        expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: route, onBehalfOf: uid });
+        expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: pathOf(route, params), onBehalfOf: uid });
         expect(audits('agent.action')).toHaveLength(0);
     });
 
     it('keeps refusing them whatever a flag or a grant on the token says', async () => {
         process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.MCP_TOOLS_WORK = 'on';
         const granted = agentToken(OWNER, { grants: ['tasks:manage'] });
 
         for (const [route, body, params] of Object.values(NO_ACTION)) {
@@ -269,5 +286,215 @@ describe('the task a hidden one is not told apart from', () => {
         const open = await through(RELATIONS, agentToken(OUTSIDER), { action: 'list', taskId: T_OPEN });
 
         expect(hidden).toBe(open);
+    });
+});
+
+const FIELD = '6f0000000000000000000f01';
+const RULE = '6f0000000000000000000f02';
+const TEMPLATE = '6f0000000000000000000f03';
+const SHARE = '6f0000000000000000000f04';
+const UPDATE = 'PUT /api/v1/project/:id';
+const inProject = { id: P_OPEN };
+const projectUpdate = (updateObject, key) => [UPDATE, { updateObject, ...(key ? { key } : {}) }, inProject];
+const fieldUpdate = (updateObject) => ['PUT /api/v1/customField', { type: 'updateOne', key: '$set', id: FIELD, updateObject }];
+const rule = { name: 'Rule', projectId: P_OPEN, trigger: { type: 'task.created' }, steps: [] };
+const closing = { action: 'updateStatus', newStatus: { statusKey: 3, statusType: 'close', status: { text: 'Done', key: 3, type: 'close' } }, prevStatus: { taskId: T_OPEN }, projectData: {}, task: { _id: T_OPEN }, isUpdateTask: true };
+
+/* [route, body, params, the name the refusal is recorded under when it is not the action the row sits under]:
+ * the web app's own routes for each change an agent may only propose through its MCP tools. */
+const PROPOSED_ON_THE_WEB = {
+    'fields.create': {
+        'adding a field': ['POST /api/v1/customField', { type: 'save', updateObject: { fieldTitle: 'Risk', fieldType: 'text', type: 'task', global: false, projectId: [P_OPEN] } }],
+        'changing a field': fieldUpdate({ fieldTitle: 'Renamed' }),
+        'removing a field': fieldUpdate({ isDelete: true }),
+    },
+    'folder.create': {
+        'adding a folder': ['POST /api/v1/folder', { projectId: P_OPEN, name: 'Design' }],
+    },
+    'list.sprint.set': {
+        'making a list a sprint': ['POST /api/v2/sprints/scrum', { projectId: P_OPEN, sprintId: L_OPEN }, {}, 'sprint.scrum'],
+    },
+    'view.create': {
+        'adding a saved view': ['POST /api/v1/project/:id/views', { sourceViewId: 'view-1', title: 'Mine', settings: {} }, inProject],
+        'changing a saved view': ['PUT /api/v1/project/:id/view-settings', { viewId: 'view-1', settings: {} }, inProject],
+        'replacing the views of a project': projectUpdate({ ProjectRequiredComponent: [] }),
+        'changing one view of a project': projectUpdate({ 'ProjectRequiredComponent.0.name': 'Renamed' }),
+        'removing a view of a project': projectUpdate({ ProjectRequiredComponent: { _id: 'view-1' } }, '$pull'),
+        'choosing the view a project opens in': projectUpdate({ ProjectRequiredDefaultComponent: 'view-1' }),
+        'changing the columns of the list': projectUpdate({ viewColumn: [] }),
+    },
+    'project.setup': {
+        'replacing the statuses of a project': projectUpdate({ taskStatusData: [] }),
+        'changing one status of a project': projectUpdate({ 'taskStatusData.0.name': 'Renamed' }),
+        'choosing another status template': projectUpdate({ TemplateTaskStatusId: TEMPLATE }),
+        'changing the states a project can be in': projectUpdate({ projectStatusData: [], projectStatusTemplateId: TEMPLATE }),
+        'moving the tasks of a removed status': ['POST /api/v1/projectSetting/taskStatus', { projectId: P_OPEN, taskStatusKey: [2], oldTaskStatus: [] }],
+        'limiting a status': ['POST /api/v1/projectSetting/taskStatus/wipLimit', { projectId: P_OPEN, statusKey: 2, wipLimit: 3 }],
+        'changing the company list of task statuses': ['PUT /api/v1/setting/taskStatus', { name: 'Blocked' }],
+        'changing the company list of project states': ['PUT /api/v1/setting/projectStatus', { name: 'On hold' }],
+        'adding a status template': ['POST /api/v1/templates/taskStatus', { TemplateName: 'Ours' }],
+        'changing a status template': ['PUT /api/v1/templates/taskStatus', { id: TEMPLATE }],
+        'adding a project state template': ['POST /api/v1/project-status-template', { TemplateName: 'Ours' }],
+        'changing a project state template': ['PUT /api/v1/project-status-template', { id: TEMPLATE }],
+    },
+    'project.create': {
+        'creating a project': NO_ACTION['creating a project'],
+        'copying a project': ['POST /api/v2/projects/:id/duplicate', { name: 'Copy' }, inProject],
+        'creating a project from a saved one': ['POST /api/v2/projects/templates/:id/use', { name: 'From a saved one' }, { id: TEMPLATE }],
+        'creating a project from a generated plan': ['POST /api/v1/ai/project/execute', { plan: {} }],
+        'importing a ClickUp space as a project': [...NO_ACTION['importing a ClickUp space as a project'], {}, 'tasks.import'],
+    },
+    'project.duplicate': {
+        'copying a project with its tasks': ['POST /api/v2/projects/:id/duplicate', { name: 'Copy', withTasks: true }, inProject, 'project.create'],
+    },
+    'dashboard.card.add': {
+        'changing the cards of the home dashboard': ['POST /api/v1/dashboard', { op: 'add', card: { key: 'DueSoonCard' } }],
+        'changing the cards of a dashboard': ['PUT /api/v1/dashboards/:id/cards', { cards: [] }, { id: TEMPLATE }],
+    },
+    'automation.create': {
+        'adding an automation': ['POST /api/v2/automations', rule],
+        'changing an automation': ['PUT /api/v2/automations/:id', rule, { id: RULE }, 'automation.update'],
+        'switching an automation on or off': ['PATCH /api/v2/automations/:id/enabled', { enabled: true }, { id: RULE }, 'automation.enable'],
+        'removing an automation': ['DELETE /api/v2/automations/:id', {}, { id: RULE }, 'project.delete'],
+        'adding an automation the earlier way': ['POST /api/v1/automations', rule],
+        'changing an automation the earlier way': ['PUT /api/v1/automations/:id', rule, { id: RULE }, 'automation.update'],
+        'running an automation over the tasks it matches': ['POST /api/v1/automations/:id/apply', {}, { id: RULE }, 'automation.apply'],
+    },
+};
+
+/* The same for each change on the never-list. */
+const NEVER_ON_THE_WEB = {
+    'project.delete': {
+        'moving a project to the trash': projectUpdate({ deletedStatusKey: 1 }),
+        'changing every task of a project': ['PUT /api/v1/project/allTask/:id', { deletedStatusKey: 1 }, inProject],
+    },
+    'task.delete': {
+        'changing many tasks at once': ['POST /api/v2/tasks/bulk', { action: 'bulkDelete', taskIds: [T_OPEN] }],
+    },
+    'billing.*': {
+        'refunding a milestone': ['POST /api/v1/refundamount', {}],
+    },
+    'member.remove': {
+        'changing a member': ['PUT /api/v1/members', {}],
+        'inviting people': ['POST /api/v2/sendInvitationEmail', {}, {}, 'member.invite'],
+        'importing people': ['POST /api/v1/importUser', {}, {}, 'member.invite'],
+        'replacing the people on a project': projectUpdate({ AssigneeUserId: [OWNER, INSIDER] }),
+        'adding someone to a project': projectUpdate({ AssigneeUserId: INSIDER }, '$addToSet'),
+        'taking someone off a project': projectUpdate({ AssigneeUserId: INSIDER }, '$pull'),
+        'changing who leads a project': projectUpdate({ LeadUserId: [INSIDER] }),
+    },
+    'permissions.edit': {
+        'changing the company permission rules': ['PUT /api/v1/securityPermissions', {}],
+        'changing a role': ['PUT /api/v1/setting/roles/update', {}],
+        'changing the permission rules of a project': ['PUT /api/v1/projectRules/update', { projectId: P_OPEN }],
+        'giving a project its own permission rules': ['POST /api/v1/importSettingsProjectFunction', { type: 'project', projectId: P_OPEN }],
+        'importing the company settings again': ['POST /api/v1/importSettings', {}],
+        'changing who uses the time tracker': ['POST /api/v1/manageTrackerUserPermission', {}, {}, 'member.seat'],
+        'making a project private or open': projectUpdate({ isPrivateSpace: false }),
+        'choosing which permission rules a project follows': projectUpdate({ isGlobalPermission: false }),
+        'sharing by a public link': ['POST /api/v2/public-shares', { entityType: 'project', entityId: P_OPEN }, {}, 'share.public'],
+        'changing a public link': ['PUT /api/v2/public-shares/:id', { password: '' }, { id: SHARE }, 'share.public'],
+    },
+    'status.set("Done")': {
+        'closing a task': ['PATCH /api/v2/tasks', closing, {}, 'task.status.set'],
+    },
+};
+
+/* Changes the web app has no route for. A Slack message is sent by an approved proposal alone, and the connector's
+ * own settings take no token of any kind. */
+const NO_WEB_ROUTE = ['deploy.staging', 'deploy.production', 'git.merge', 'slack.message.post'];
+
+const rowsOf = (table) => Object.entries(table).flatMap(([action, changes]) => Object.entries(changes).map(([name, [route, body, params, recordedAs]]) => [name, route, body, params, recordedAs || action]));
+const HELD_FOR_PEOPLE = [...rowsOf(PROPOSED_ON_THE_WEB), ...rowsOf(NEVER_ON_THE_WEB)];
+const proposeOnly = () => [...registry.ACTIONS, ...registryGroups.flatMap((group) => group.entries.map((entry) => entry.action))].filter((action) => action.proposeOnly).map((action) => action.key);
+const withoutRoute = (table) => (key) => !Object.keys(table[key] || {}).length && !NO_WEB_ROUTE.includes(key);
+
+describe('what an agent proposes, or never does, on the web app\'s own routes', () => {
+    it('has a route here for every action an agent may only propose', () => {
+        expect(proposeOnly()).toEqual(expect.arrayContaining(Object.keys(PROPOSED_ON_THE_WEB)));
+        expect(proposeOnly().filter(withoutRoute(PROPOSED_ON_THE_WEB))).toEqual([]);
+    });
+
+    it('has a route here for every change on the never-list', () => {
+        expect(registry.NEVER.filter(withoutRoute(NEVER_ON_THE_WEB))).toEqual([]);
+    });
+
+    it.each(HELD_FOR_PEOPLE.flatMap(([name, ...row]) => [['a token created for an agent', name, agentToken, ...row], ['an agent run', name, agentRun, ...row]]))('%s is refused %s, and recorded', async (label, name, as, route, body, params, recordedAs) => {
+        const answer = await through(route, as(OWNER), body, params);
+
+        expect(answer.code).toBe(403);
+        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(audits('agent.action_refused')).toHaveLength(1);
+        expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, action: recordedAs, path: pathOf(route, params), onBehalfOf: OWNER });
+        expect(audits('agent.action')).toHaveLength(0);
+    });
+
+    it('refuses them the same with the proposing tools switched on, and for the agent of an admin or a member', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.MCP_TOOLS_WORK = 'on';
+
+        for (const [, route, body, params] of HELD_FOR_PEOPLE) {
+            for (const uid of [OWNER, ADMIN, INSIDER]) {
+                expect([route, (await through(route, agentToken(uid, { grants: ['tasks:manage'] }), body, params)).code]).toEqual([route, 403]);
+            }
+        }
+    });
+
+    it('has no route that deploys, merges or posts to Slack, and closes a path of such a name to an agent', async () => {
+        expect(Object.keys(routes).filter((route) => /deploy|git\/merge|slack\/(message|post)/i.test(route))).toEqual([]);
+
+        for (const url of ['/api/v2/deploy/staging', '/api/v2/deploy/production', '/api/v2/git/merge']) {
+            const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json() { return this; } };
+            let passed = false;
+            await agentPerimeter({ ...agentToken(OWNER), method: 'POST', originalUrl: url, headers: { companyid: CID }, body: {} }, res, () => { passed = true; });
+
+            expect([url, passed, res.statusCode]).toEqual([url, false, 403]);
+        }
+    });
+
+    it.each([
+        ['a signed-in owner', session(OWNER)],
+        ['a signed-in admin', session(ADMIN)],
+    ])('%s reaches every one of them, and nothing is recorded as an agent\'s', async (label, caller) => {
+        const stopped = [];
+        for (const [name, route, body, params] of HELD_FOR_PEOPLE) {
+            const answer = await through(route, caller, body, params);
+            if (answer !== REACHED) stopped.push([name, answer.code, JSON.stringify(answer.body).slice(0, 120)]);
+        }
+        expect(stopped).toEqual([]);
+        expect(agentAudits()).toHaveLength(0);
+    });
+
+    it.each([
+        ['a signed-in member', session(INSIDER)],
+        ['a signed-in guest', session(GUEST)],
+        ['a personal token of an owner', personalToken(OWNER)],
+        ['a personal token of a member', personalToken(INSIDER)],
+    ])('%s is not stopped as an agent on any of them', async (label, caller) => {
+        for (const [, route, body, params] of HELD_FOR_PEOPLE) {
+            const answer = await through(route, caller, body, params);
+            expect([route, answer === REACHED ? '' : JSON.stringify(answer.body)]).toEqual([route, expect.not.stringMatching(/Agents cannot/)]);
+        }
+        expect(agentAudits()).toHaveLength(0);
+    });
+
+    it.each([
+        ['naming a project', { ProjectName: 'Renamed' }],
+        ['describing a project', { descriptionBlock: { blocks: [] } }],
+        ['giving a project a due date', { DueDate: '2026-11-01T00:00:00.000Z' }],
+    ])('%s is still an agent\'s to change as its person may', async (label, updateObject) => {
+        expect(await through(UPDATE, agentToken(OWNER), { updateObject }, inProject)).toBe(REACHED);
+        expect(agentAudits()).toHaveLength(0);
+    });
+
+    it.each([
+        ['what a sentence would make', 'POST /api/v2/automations/compile', { sentence: 'When a task is created, assign it' }, {}],
+        ['what a rule would have done', 'POST /api/v2/automations/backtest', { rule }, {}],
+        ['a dry run of a rule', 'POST /api/v2/automations/:id/dry-run', {}, { id: RULE }],
+        ['the tasks a rule would match', 'POST /api/v1/automations/preview', rule, {}],
+        ['the automations of a company', 'GET /api/v2/automations', {}, {}],
+    ])('%s, which saves nothing, still goes through for an agent', async (label, route, body, params) => {
+        expect(await through(route, agentToken(OWNER), body, params)).toBe(REACHED);
+        expect(agentAudits()).toHaveLength(0);
     });
 });

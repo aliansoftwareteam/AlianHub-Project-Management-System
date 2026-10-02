@@ -1,7 +1,7 @@
 import * as env from '@/config/env';
 import { apiRequest } from "../../services";
 import Store from '@/store/index'
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 import { instantEdit } from '@/utils/instantTaskEdit';
 
 const actorOf = (userData) => ({
