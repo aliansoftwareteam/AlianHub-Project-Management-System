@@ -386,4 +386,4 @@ const grammar = () => ({
     shape: 'When <event>, if <condition> and <condition>, <action> and <action>.',
 });
 
-module.exports = { parseSentence, describeRule, grammar, splitClauses, CANON_TRIGGERS };
+module.exports = { parseSentence, describeRule, actionSentence, grammar, splitClauses, CANON_TRIGGERS };

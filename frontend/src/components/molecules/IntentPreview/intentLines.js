@@ -2,6 +2,8 @@
 // names only what the viewer may see; every entry here turns one kind of line into a label and a text, both drawn
 // as text. A new kind of change is one more entry in LINE_KINDS and, for a new heading, one in HEADINGS.
 
+import { AUTOMATION_HEADING, AUTOMATION_LINE_KINDS } from './automationLines';
+
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T/;
 const PRIORITIES = Object.freeze(['urgent', 'high', 'medium', 'low']);
@@ -121,6 +123,7 @@ export const LINE_KINDS = {
         const text = shown || (others ? t('IntentPreview.fields_not_shown', { n: others }, others) : '');
         return text ? { label: t('IntentPreview.line_columns'), text } : null;
     },
+    ...AUTOMATION_LINE_KINDS,
 };
 
 const HEADINGS = Object.freeze({
@@ -129,6 +132,7 @@ const HEADINGS = Object.freeze({
     fields: { kind: 'IntentPreview.new_fields', wants: 'IntentPreview.wants_fields' },
     view: { kind: 'IntentPreview.new_view', wants: 'IntentPreview.wants_view' },
     setup: { kind: 'IntentPreview.new_setup', wants: 'IntentPreview.wants_setup' },
+    automation: AUTOMATION_HEADING,
 });
 
 const headingOf = (preview) => (preview && Object.hasOwn(HEADINGS, preview.kind) ? HEADINGS[preview.kind] : null);

@@ -351,6 +351,7 @@ const executors = {
 
     ...require('./setupRequests').executors,
     ...require('./projectSetup').executors,
+    ...require('./automationRequests').executors,
 };
 
 module.exports = {

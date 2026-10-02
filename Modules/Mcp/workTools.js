@@ -11,6 +11,7 @@ const { loadProject, NO_PROJECT, NO_TASK, NO_PAGE } = require('./dataTools');
 const { taskRow } = require('./taskRows');
 const goalTools = require('./goalTools');
 const setupTools = require('./setupTools');
+const automationTools = require('./automationTools');
 const queueTools = require('./queueTools');
 const v2 = require('./v2Flag');
 const cursor = require('./cursor');
@@ -328,6 +329,7 @@ const TOOLS = [
     },
     ...goalTools.TOOLS,
     ...setupTools.TOOLS,
+    ...automationTools.TOOLS,
     ...queueTools.TOOLS,
 ];
 
@@ -340,6 +342,7 @@ const SCOPES = Object.freeze({
     'page.comments.list': 'docs:read',
     ...goalTools.READ_SCOPES,
     ...queueTools.READ_SCOPES,
+    ...automationTools.READ_SCOPES,
     ...Object.fromEntries(TOOLS.filter((tool) => !tool.run).map((tool) => [tool.name, 'tasks:write'])),
 });
 
