@@ -35,3 +35,21 @@ export function positionPanel(panelEl, triggerRect, { belowOffset } = {}) {
     panelEl.style.left = `${left}px`;
     panelEl.style.top = `${top}px`;
 }
+
+// A panel is measured the moment it opens, before content that arrives later (a catalogue fetched on mount) has given it its real size, so it is placed again whenever that size changes.
+export function followPanelSize(panelEl, locate) {
+    if (typeof ResizeObserver === 'undefined') return () => {};
+    const sizeOf = () => {
+        const { width, height } = panelEl.getBoundingClientRect();
+        return `${width}x${height}`;
+    };
+    let placedSize = sizeOf();
+    const observer = new ResizeObserver(() => {
+        if (sizeOf() === placedSize) return;
+        const { rect, options } = locate();
+        positionPanel(panelEl, rect, options);
+        placedSize = sizeOf();
+    });
+    observer.observe(panelEl);
+    return () => observer.disconnect();
+}

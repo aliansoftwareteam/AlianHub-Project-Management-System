@@ -1,7 +1,7 @@
 <template>
     <div v-if="items.length || canHandOver || error" class="tac" data-test="task-agent-claim">
         <p v-for="item in items" :key="item.id" class="tac__line" data-test="claim-line" role="status">
-            <span class="tac__text">{{ item.claim ? $t('ProjectManager.claimed_by', { name: item.claim.name }) : $t('ProjectManager.waiting_for_agent') }}</span>
+            <span class="tac__text">{{ lineOf(item) }}</span>
             <span class="ah-chip">{{ $t(`ProjectManager.rule_${item.rule}`) }}</span>
             <button
                 v-if="item.canTakeBack"
@@ -33,7 +33,8 @@ import * as env from "@/config/env";
 defineOptions({ name: "TaskAgentClaim" });
 
 const props = defineProps({
-    taskId: { type: String, required: true }
+    taskId: { type: String, required: true },
+    round: { type: Number, default: 0 }
 });
 
 const { t } = useI18n();
@@ -42,6 +43,11 @@ const canHandOver = ref(false);
 const busy = ref(false);
 const error = ref("");
 let asked = 0;
+
+function lineOf(item) {
+    if (item.claim) return t("ProjectManager.claimed_by", { name: item.claim.name });
+    return item.to ? t("ProjectManager.handed_to", { name: item.to }) : t("ProjectManager.waiting_for_agent");
+}
 
 function take(data) {
     items.value = Array.isArray(data?.items) ? data.items : [];
@@ -81,7 +87,7 @@ async function send(path, fallback) {
 const takeBack = (item) => send(`${env.AGENT_WORK_QUEUE}/${encodeURIComponent(item.id)}/take-back`, "ProjectManager.take_back_failed");
 const handOver = () => send(`${env.AGENT_WORK_QUEUE}/task/${encodeURIComponent(props.taskId)}/hand-over`, "ProjectManager.hand_over_failed");
 
-watch(() => props.taskId, load, { immediate: true });
+watch(() => [props.taskId, props.round], () => load(props.taskId), { immediate: true });
 </script>
 
 <style scoped>

@@ -48,7 +48,7 @@
 <script setup>
 import {Comment, Fragment, computed, defineProps, h, isVNode, nextTick, onBeforeUnmount, provide, ref, watch} from "vue";
 import { useCustomComposable } from "@/composable";
-import { positionPanel } from "./panelPlacement";
+import { followPanelSize, positionPanel } from "./panelPlacement";
 
 const {debounce, makeUniqueId} = useCustomComposable();
 
@@ -369,7 +369,13 @@ function stopWatchingForLostFocus() {
     focusKeeper = null;
     lastFocus = null;
 }
-onBeforeUnmount(stopWatchingForLostFocus);
+
+let stopFollowingPanel = () => {};
+
+onBeforeUnmount(() => {
+    stopWatchingForLostFocus();
+    stopFollowingPanel();
+});
 
 function onPanelKeyup(event) {
     if (props.mode && event.key === " " && optionActionOf(event.target)) event.preventDefault();
@@ -478,6 +484,7 @@ watch(dropdownVisible, (val) => {
         }
     } else {
         stopWatchingForLostFocus();
+        stopFollowingPanel();
         stopClickListener();
         if(props.hover) {
             stopMouseListener();
@@ -514,7 +521,13 @@ function buttonClick(flag = false) {
             if(props.keepSameWidth){
                 childNode.style.width = rect.width + "px";
             }
-            positionPanel(childNode, rect, { belowOffset: rect.top + (rect.height < 25 ? 25 : rect.height) });
+            const placement = (triggerRect) => ({ belowOffset: triggerRect.top + (triggerRect.height < 25 ? 25 : triggerRect.height) });
+            positionPanel(childNode, rect, placement(rect));
+            stopFollowingPanel();
+            stopFollowingPanel = followPanelSize(childNode, () => {
+                const current = element.getBoundingClientRect();
+                return { rect: current, options: placement(current) };
+            });
         })
     }
 

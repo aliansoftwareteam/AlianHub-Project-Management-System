@@ -292,7 +292,7 @@ import * as env from '@/config/env';
 import { permittedAssignees, scopedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import Modal from '@/components/atom/Modal/Modal.vue';
 import { showUndoToast } from '@/composable/useUndoToast';
-import { assignAgent, fetchRunnableAgents } from '@/views/Ai/useRunnableAgents';
+import { fetchOwnAi, fetchRunnableAgents, pickAgent } from '@/views/Ai/useRunnableAgents';
 import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vue';
 import { useEscapeLayer } from '@/composable/useEscapeLayer';
 import TaskRepeatControl from '@/components/organisms/TaskDetailOverlay/TaskRepeatControl.vue';
@@ -351,21 +351,28 @@ const props = defineProps({
     clientWidth: Number,
 })
 
-const emit = defineEmits(["agent-run"]);
+const emit = defineEmits(["agent-run", "agent-handed"]);
 
 const runnableAgents = ref([]);
 watch(() => props.task?._id, async (taskId) => {
-    const agents = await fetchRunnableAgents(taskId);
+    const agents = (await Promise.all([fetchRunnableAgents(taskId), fetchOwnAi(taskId)])).flat();
     if (taskId === props.task?._id) runnableAgents.value = agents;
 }, { immediate: true });
 
 async function startAgent(option) {
+    const taskId = props.task._id;
     try {
-        await assignAgent(option.agentId, props.task._id);
-        $toast.success(t('TaskPanel.agent_assigned', { name: option.label }), { position: 'top-right' });
-        emit('agent-run');
+        const { handed } = await pickAgent(option, taskId);
+        if (!handed) {
+            $toast.success(t('TaskPanel.agent_assigned', { name: option.label }), { position: 'top-right' });
+            emit('agent-run');
+            return;
+        }
+        $toast.success(t('TaskPanel.agent_handed', { name: option.shownAs }), { position: 'top-right' });
+        if (taskId === props.task?._id) runnableAgents.value = runnableAgents.value.filter((agent) => !agent.connected);
+        emit('agent-handed');
     } catch (error) {
-        $toast.error(error?.response?.data?.statusText || error.message || t('TaskPanel.agent_assign_failed'), { position: 'top-right' });
+        $toast.error(error?.response?.data?.statusText || error.message || t(option.connected ? 'TaskPanel.agent_hand_failed' : 'TaskPanel.agent_assign_failed'), { position: 'top-right' });
     }
 }
 

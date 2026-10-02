@@ -17,7 +17,7 @@ const { isThreadFile, mayCarryMedia, refuseMedia } = require("./helpers/commentF
 const { judge: judgeDownload } = require("../storage/downloadScope");
 const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers/commentThreads");
 const { notifyReply } = require("./helpers/threadNotices");
-const { parseAgentMentionIds } = require("./helpers/parseMentions");
+const { parseAgentMentionIds, parseOwnAiMentionIds } = require("./helpers/parseMentions");
 const { withoutAiFields } = require("./helpers/aiActor");
 const { withoutImportFields } = require("./helpers/importFields");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
@@ -31,6 +31,12 @@ const startMentionedAgents = async (req, companyId, comment) => {
     const actor = await require("../Agents/actor").resolveActor(req);
     if (actor.runId) return;
     await require("../Agents/triggers").fromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
+};
+
+/* Only a signed-in person names their own connected AI: a comment written through a token or by an agent hands nothing over. */
+const handToOwnAi = async (req, companyId, comment) => {
+    if (req.apiToken || req.mcp || req.agentRun || !parseOwnAiMentionIds(comment.message).length) return;
+    await require("../Agents/manager/workQueue").handOverFromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
 };
 
 /* A summary kept for a task was made from its comments: it goes when one of them is deleted, and is marked as
@@ -80,6 +86,8 @@ exports.save = async (req, res) => {
         if (response && response._id) {
             await startMentionedAgents(req, companyId, { ...thread, userId: convertData.userId, message: convertData.message })
                 .catch((err) => logger.error(`[mentions] agents not started: ${err.message}`));
+            await handToOwnAi(req, companyId, { ...thread, userId: convertData.userId, message: convertData.message })
+                .catch((err) => logger.error(`[mentions] task not handed over: ${err.message}`));
         }
         if (placement.parent || (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId)) {
             socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });

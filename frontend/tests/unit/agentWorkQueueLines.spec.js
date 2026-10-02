@@ -98,7 +98,7 @@ describe('the line on a task', () => {
     });
 
     it('is on the task panel, colours with tokens only and wraps on a narrow screen', () => {
-        expect(fs.readFileSync(PANEL, 'utf8')).toMatch(/<TaskAgentClaim v-if="task\._id" :task-id="String\(task\._id\)" \/>/);
+        expect(fs.readFileSync(PANEL, 'utf8')).toMatch(/<TaskAgentClaim v-if="task\._id" :task-id="String\(task\._id\)" :round="claimRound" \/>/);
         const source = fs.readFileSync(LINE, 'utf8');
         const style = source.slice(source.indexOf('<style'));
         expect(style).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);

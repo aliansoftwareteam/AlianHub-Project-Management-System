@@ -253,7 +253,7 @@ import { ROLE_ADMIN } from "@/utils/roles";
 import { isOnViewerSide } from "@/utils/commentSide";
 import CommentThread from "@/components/molecules/CommentThread/CommentThread.vue";
 import { applyCommentEvent, isTaskThread } from "@/composable/commentThreads";
-import { fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
+import { fetchOwnAi, fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
 import { maskOf } from "@/utils/iconMask";
 
 const { t } = useI18n();
@@ -461,7 +461,7 @@ const mentionAgents = ref([]);
 /* Only a task's own thread gives an agent something to work on; chat and project threads do not. */
 watch(() => [props.taskId, props.mainChat, props.newChat], async ([taskId]) => {
     const onTask = !props.mainChat && !props.newChat && /^[0-9a-fA-F]{24}$/.test(String(taskId || ""));
-    const agents = onTask ? await fetchRunnableAgents(taskId) : [];
+    const agents = onTask ? (await Promise.all([fetchRunnableAgents(taskId), fetchOwnAi(taskId)])).flat() : [];
     if (taskId === props.taskId) mentionAgents.value = agents;
 }, { immediate: true });
 const unreadMessages = ref(0);
