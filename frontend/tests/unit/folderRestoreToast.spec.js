@@ -12,6 +12,7 @@ const CALLERS = [
     'plugins/tasklistDashboard/components/organisms/SprintListing/SprintListing.vue'
 ];
 const KINDS = ['Folder', 'Sprint'];
+const SAID_AS = { Folder: 'Folder', Sprint: 'List' };
 const OUTCOMES = ['restored', 'archived', 'deleted'];
 
 describe('the message after a folder or a list is restored, archived or deleted', () => {
@@ -21,7 +22,7 @@ describe('the message after a folder or a list is restored, archived or deleted'
     });
 
     it.each(KINDS.flatMap((kind) => OUTCOMES.map((outcome) => [kind, outcome])))('has words for "%s %s successfully"', (kind, outcome) => {
-        expect(en.Toast[`${kind} ${outcome} successfully`]).toBe(`${kind} ${outcome} successfully`);
+        expect(en.Toast[`${kind} ${outcome} successfully`]).toBe(`${SAID_AS[kind]} ${outcome} successfully`);
     });
 
     it('is not kept under a misspelled key in any language', () => {

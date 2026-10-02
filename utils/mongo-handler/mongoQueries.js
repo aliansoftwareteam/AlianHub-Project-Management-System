@@ -116,6 +116,7 @@ const {
     aiReplaysSchema,
     aiAlertsSchema,
     agentProposalsSchema,
+    agentStandingApprovalsSchema,
     agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,
@@ -381,6 +382,8 @@ exports.checkType = (type) => {
             return aiAlertsSchema
         case SCHEMA_TYPE.AGENT_PROPOSALS:
             return agentProposalsSchema
+        case SCHEMA_TYPE.AGENT_STANDING_APPROVALS:
+            return agentStandingApprovalsSchema
         case SCHEMA_TYPE.AGENT_SKILLS:
             return agentSkillsSchema
         case SCHEMA_TYPE.CALLS:
@@ -685,6 +688,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AI_ALERTS}`
         case SCHEMA_TYPE.AGENT_PROPOSALS:
                 return `${dbCollections.AGENT_PROPOSALS}`
+        case SCHEMA_TYPE.AGENT_STANDING_APPROVALS:
+                return `${dbCollections.AGENT_STANDING_APPROVALS}`
         case SCHEMA_TYPE.AGENT_SKILLS:
                 return `${dbCollections.AGENT_SKILLS}`
         case SCHEMA_TYPE.CALLS:

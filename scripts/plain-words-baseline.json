@@ -1,0 +1,247 @@
+{
+  "keys": {
+    "Accounts.rule_allow_list_where": [
+      "params"
+    ],
+    "Accounts.self_hosted_note": [
+      "endpoint"
+    ],
+    "Accounts.undecided_1_body": [
+      "endpoint"
+    ],
+    "AgentClients.private_label": [
+      "sprint"
+    ],
+    "AgentClients.private_off": [
+      "sprint"
+    ],
+    "AgentClients.private_on": [
+      "sprint"
+    ],
+    "Ai.low_risk_note": [
+      "sprint"
+    ],
+    "Ai.schedule_shared_scope_note": [
+      "sprint"
+    ],
+    "AiTask.create_sprints": [
+      "sprint"
+    ],
+    "AiTask.creating_sprints": [
+      "sprint"
+    ],
+    "AiTask.example_api_prompt": [
+      "endpoint"
+    ],
+    "AiTask.example_mobile_prompt": [
+      "endpoint"
+    ],
+    "AiTask.generate_sprints": [
+      "sprint"
+    ],
+    "AiTask.input_label_sprints": [
+      "sprint"
+    ],
+    "AiTask.mode_full": [
+      "sprint"
+    ],
+    "AiTask.mode_sprints": [
+      "sprint"
+    ],
+    "AiTask.no_sprints_hint": [
+      "sprint"
+    ],
+    "AiTask.placeholder_tasks": [
+      "endpoint"
+    ],
+    "AiTask.sprint_count": [
+      "sprint"
+    ],
+    "AiTask.sprint_fallback": [
+      "sprint"
+    ],
+    "AiTask.subtitle": [
+      "sprint"
+    ],
+    "AiTask.success_sprints": [
+      "sprint"
+    ],
+    "AiTask.target_sprint": [
+      "sprint"
+    ],
+    "Auth.sample_tasks_label": [
+      "sprint"
+    ],
+    "Channel.confirm_delete_channel": [
+      "setting name"
+    ],
+    "CustomReport.d_sprint": [
+      "sprint"
+    ],
+    "Enforcement.kill_switch": [
+      "setting name"
+    ],
+    "Enforcement.known_difference_help": [
+      "null"
+    ],
+    "Enforcement.known_difference_lead": [
+      "null"
+    ],
+    "Enforcement.reason_null_global_flag": [
+      "null"
+    ],
+    "GoogleConnection.problem_google_client_missing": [
+      "setting name"
+    ],
+    "GoogleConnection.problem_secrets_key_invalid": [
+      "setting name"
+    ],
+    "GoogleConnection.problem_secrets_store_off": [
+      "setting name"
+    ],
+    "GoogleConnection.problem_taint_routing_off": [
+      "setting name"
+    ],
+    "Instance.cron_disabled": [
+      "setting name"
+    ],
+    "Instance.h_OPENAI_BASE_URL": [
+      "endpoint"
+    ],
+    "Instance.test_models": [
+      "endpoint"
+    ],
+    "Integrations.desc": [
+      "endpoint"
+    ],
+    "Integrations.url": [
+      "payload"
+    ],
+    "Knowledge.code_figures_timed_out": [
+      "setting name"
+    ],
+    "Knowledge.vector_index_mismatch": [
+      "setting name"
+    ],
+    "Members.close_all_done": [
+      "sprint"
+    ],
+    "Members.close_decide": [
+      "sprint"
+    ],
+    "Members.close_reversible": [
+      "sprint"
+    ],
+    "Members.close_sprint": [
+      "sprint"
+    ],
+    "Members.dest_next_new": [
+      "sprint"
+    ],
+    "Members.dest_pick": [
+      "sprint"
+    ],
+    "Members.new_sprint": [
+      "sprint"
+    ],
+    "Members.sprints": [
+      "sprint"
+    ],
+    "Members.start_sprint": [
+      "sprint"
+    ],
+    "Notification.project_sprint_create": [
+      "sprint"
+    ],
+    "Parity.ask_placeholder": [
+      "sprint"
+    ],
+    "Permissions.when_user_enable_sprint": [
+      "sprint"
+    ],
+    "ProjectSlider.sprint_name": [
+      "sprint"
+    ],
+    "Projects.col_sprint": [
+      "sprint"
+    ],
+    "Projects.health_by_signals": [
+      "sprint"
+    ],
+    "Projects.health_note": [
+      "sprint"
+    ],
+    "Projects.no_burndown_data": [
+      "sprint"
+    ],
+    "Projects.why_sprint_over": [
+      "sprint"
+    ],
+    "Provenance.velocity_line": [
+      "sprint"
+    ],
+    "Providers.unpriced_warning": [
+      "setting name"
+    ],
+    "SecurityAndPermission.project_sprint_create": [
+      "sprint"
+    ],
+    "SecurityAndPermission.project_sprint_name_edit": [
+      "sprint"
+    ],
+    "SecurityAndPermission.sprint_archive": [
+      "sprint"
+    ],
+    "SecurityAndPermission.sprint_delete": [
+      "sprint"
+    ],
+    "SecurityAndPermission.sprint_restore": [
+      "sprint"
+    ],
+    "SecurityAndPermission.sprint_type_change": [
+      "sprint"
+    ],
+    "Settings.sso_env_hint": [
+      "setting name"
+    ],
+    "SlackConnector.problem_secrets_key_invalid": [
+      "setting name"
+    ],
+    "SlackConnector.problem_secrets_store_off": [
+      "setting name"
+    ],
+    "SlackConnector.problem_taint_routing_off": [
+      "setting name"
+    ],
+    "Toast.Sprint closed successfully": [
+      "sprint"
+    ],
+    "Upgrades.You_have_reached_the_free_plan_limit": [
+      "setting name"
+    ],
+    "Upgrades.require_upgrade_message": [
+      "setting name"
+    ],
+    "ViewListdescription.reports_view": [
+      "sprint"
+    ],
+    "Views.filter_sprints": [
+      "sprint"
+    ],
+    "WorkflowBuilder.engine_off_sub": [
+      "setting name"
+    ],
+    "Workflows.engine_off_body": [
+      "setting name"
+    ],
+    "conformationmsg.sprintclosemsg": [
+      "sprint"
+    ],
+    "subProjectRulesNames.Project_Sprint_Create": [
+      "sprint"
+    ],
+    "subProjectRulesNames.Project_sprint_Name_Edit": [
+      "sprint"
+    ]
+  }
+}

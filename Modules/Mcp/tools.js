@@ -15,7 +15,7 @@ const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
 const { annotationsFor, isDestructive } = require('./annotations');
-const { propose, outsideMayFile } = require('./propose');
+const { propose, outsideMayFile, declinedNotes } = require('./propose');
 const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
 const screenTools = require('./screenTools');
@@ -124,7 +124,9 @@ const TOOLS = [
             const brief = await buildBrief(ctx, str(args.taskId, 40), vis);
             if (!brief || brief.error) return brief;
             const named = v2.enabled() ? await briefWithNames(ctx, brief) : brief;
-            return managesTasks(ctx) ? manageTools.planBrief(ctx, named) : named;
+            const out = await (managesTasks(ctx) ? manageTools.planBrief(ctx, named) : named);
+            const declined = await declinedNotes(ctx, brief.project && brief.project.id);
+            return declined ? { ...out, declined } : out;
         },
     },
     {
@@ -384,7 +386,7 @@ const call = async (ctx, name, args = {}) => {
         throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: tainted, ip: ctx.ip, taint: ctx.taint });
     }
     // A refusal by the project is left to perform(), which gives the registry's and the holder's refusals first.
-    const rule = await projectPolicy.ask({ companyId: ctx.companyId, actor: ctx.actor, action: tool.action, params });
+    const rule = await projectPolicy.ask({ companyId: ctx.companyId, actor: ctx.actor, action: tool.action, params, taint: ctx.taint, standing: true });
     const held = tainted || (rule.decision === projectPolicy.DECISION.PROPOSE ? rule.reason : '');
     if (rule.decision !== projectPolicy.DECISION.REFUSE && (held || (v2.enabled() && isDestructive(actions.rating(tool.action))))) {
         return propose(ctx, tool, params, str(args.reason, 500) || `${tool.name} via MCP`, held);
@@ -399,7 +401,7 @@ const call = async (ctx, name, args = {}) => {
         allowedActions: ctx.allowedActions,
         ...(ctx.taint ? { taint: ctx.taint } : {}),
     });
-    return { ok: true, auditId: out.auditId, result: out.result || null, undoable: Boolean(out.undo) };
+    return { ok: true, auditId: out.auditId, result: out.result || null, undoable: Boolean(out.undo), ...(out.standing ? { standingApprovalId: out.standing.id } : {}) };
 };
 
 /* One operation of a batch: a write tool this caller has, run exactly as a call of its own, with its outcome instead of a throw. */

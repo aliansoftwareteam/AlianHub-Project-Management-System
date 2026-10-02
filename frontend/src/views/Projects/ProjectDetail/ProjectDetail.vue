@@ -31,6 +31,10 @@
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
                 :projectId="String(projectData._id)"
             />
+            <ProjectStandingApprovalsCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
             <ProjectManagerCard
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
                 :projectId="String(projectData._id)"
@@ -107,6 +111,7 @@
     import ProjectMemoryCard from './ProjectMemoryCard.vue';
     import ProjectDefaultTemplateCard from './ProjectDefaultTemplateCard.vue';
     import ProjectAgentPolicyCard from './ProjectAgentPolicyCard.vue';
+    import ProjectStandingApprovalsCard from './ProjectStandingApprovalsCard.vue';
     import ProjectManagerCard from './ProjectManagerCard.vue';
     import AssignmentRulesCard from './AssignmentRulesCard.vue';
     import Attachments from '@/components/atom/Attachments/Attachments.vue';

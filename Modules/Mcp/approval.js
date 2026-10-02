@@ -98,4 +98,4 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     return null;
 };
 
-module.exports = { refusalFor, targetOf };
+module.exports = { refusalFor, targetOf, reachable, liveToken };

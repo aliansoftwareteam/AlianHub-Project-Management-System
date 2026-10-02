@@ -6,6 +6,7 @@ const { callerOf, canManageAgents } = require('./access');
 const { agentsRefused } = require('./guard');
 const agentAudit = require('./agentAudit');
 const projectPolicy = require('./projectPolicy');
+const standingApprovals = require('./standingApprovals');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const EDIT_ACTION = 'project.agent_policy.edit';
@@ -53,6 +54,7 @@ const saveProjectPolicy = async (req, res) => {
         const saved = await projectPolicy.save(companyId, at.projectId, req.body, caller.actor.userId);
         if (saved.error) return fail(res, saved.status, saved.error);
         await agentAudit.recordProjectPolicyChange(companyId, caller.actor, { projectId: at.projectId, projectName: saved.project.ProjectName, from: saved.from, to: saved.to, ip: req.ip || '' });
+        if (projectPolicy.tightened(saved.from, saved.to)) await standingApprovals.endForProject(companyId, at.projectId, standingApprovals.ENDED.POLICY, caller.actor.userId, req.ip || '');
         removeCache('UserProjectData:', true);
         socketEmitter.emit('update', { type: 'update', data: saved.project, updatedFields: { agentPolicy: saved.agentPolicy }, module: 'project' });
         return res.json({ status: true, statusText: 'Policy updated.', data: await answer(companyId, at.projectId, true) });
