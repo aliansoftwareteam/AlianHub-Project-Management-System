@@ -45,6 +45,7 @@ import {
     rememberLastProject,
     submitIntent
 } from '@/components/organisms/QuickCreateTask/quickCreateTask';
+import { readCreated, rememberCreated } from '@/components/organisms/QuickCreateTask/placeInference';
 import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue';
 import { bindShortcut, handleShortcutKey } from '@/composable/shortcuts';
 
@@ -393,6 +394,67 @@ describe('QuickCreateTask', () => {
         expect(readDraft()).toBe('Half a thought');
         await open(wrapper);
         expect(title(wrapper).element.value).toBe('Half a thought');
+    });
+});
+
+describe('the place filled in for the person', () => {
+    const visits = (data) => apiRequest.mockImplementation((type, url) => {
+        if (url.startsWith('/api/v2/recent-visits')) return Promise.resolve({ data: { status: true, data } });
+        if (url.includes('collection=sprints')) {
+            const pid = url.split('/').slice(-1)[0].split('?')[0];
+            return Promise.resolve({ data: [{ _id: `${pid}-s1`, name: `${pid} list`, value: 1 }, { _id: `${pid}-s2`, name: `${pid} second`, value: 2 }] });
+        }
+        if (url.includes('collection=folders')) return Promise.resolve({ data: [] });
+        if (url.includes('/api/v1/projectRules/')) return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: {} });
+    });
+
+    it('is the project and list the person last had open, when they are not in a project', async () => {
+        visits([{ type: 'sprint', id: 'beta-s2', projectId: 'beta', route: { projectId: 'beta', sprintId: 'beta-s2' } }]);
+        const wrapper = await mountDialog();
+        await open(wrapper);
+        expect(field(wrapper, 'project').element.value).toBe('beta');
+        expect(field(wrapper, 'list').element.value).toBe('beta-s2');
+    });
+
+    it('is the project and list the person is in, ahead of where they were before', async () => {
+        visits([{ type: 'sprint', id: 'beta-s2', projectId: 'beta', route: { projectId: 'beta', sprintId: 'beta-s2' } }]);
+        Object.assign(route, { name: 'ProjectSprint', params: { id: 'alpha', sprintId: 'alpha-s2' } });
+        const wrapper = await mountDialog();
+        await open(wrapper);
+        expect(field(wrapper, 'project').element.value).toBe('alpha');
+        expect(field(wrapper, 'list').element.value).toBe('alpha-s2');
+        expect(apiRequest.mock.calls.some(([, url]) => url.startsWith('/api/v2/recent-visits'))).toBe(false);
+    });
+
+    it('is the project, list, assignee and date of the task made a moment ago', async () => {
+        const soon = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+        const due = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, '0')}-${String(soon.getDate()).padStart(2, '0')}`;
+        rememberCreated('company-1', 'user-1', { projectId: 'alpha', sprintId: 'alpha-s2', assigneeId: 'user-2', due });
+        const wrapper = await mountDialog();
+        await open(wrapper);
+        expect(field(wrapper, 'project').element.value).toBe('alpha');
+        expect(field(wrapper, 'list').element.value).toBe('alpha-s2');
+        expect(field(wrapper, 'assignee').element.value).toBe('user-2');
+        expect(field(wrapper, 'due').element.value).toBe(due);
+    });
+
+    it('remembers the list, assignee and date it just made a task with', async () => {
+        Object.assign(route, { name: 'ProjectSprint', params: { id: 'beta', sprintId: 'beta-s2' } });
+        const wrapper = await mountDialog();
+        await open(wrapper);
+        await field(wrapper, 'assignee').setValue('user-2');
+        await field(wrapper, 'due').setValue('2099-01-05');
+        await title(wrapper).setValue('Write the brief');
+        await enter(wrapper);
+        await flushPromises();
+        expect(readCreated('company-1', 'user-1')).toMatchObject({ projectId: 'beta', sprintId: 'beta-s2', assigneeId: 'user-2', due: '2099-01-05' });
+    });
+
+    it('starts with the name the palette typed', async () => {
+        const wrapper = await mountDialog();
+        await open(wrapper, { name: 'Call supplier' });
+        expect(title(wrapper).element.value).toBe('Call supplier');
     });
 });
 

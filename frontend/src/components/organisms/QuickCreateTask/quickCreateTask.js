@@ -5,11 +5,12 @@ import { peopleOptions } from "@/plugins/customFieldView/fieldTypes/people";
 const LAST_PROJECT_KEY = "ah.quickCreate.lastProject";
 const DRAFT_KEY = "ah.quickCreate.draft";
 
-export const quickCreate = reactive({ open: false, projectId: "", sprintId: "" });
+export const quickCreate = reactive({ open: false, projectId: "", sprintId: "", name: "" });
 
-export function openQuickCreate({ projectId = "", sprintId = "" } = {}) {
+export function openQuickCreate({ projectId = "", sprintId = "", name = "" } = {}) {
     quickCreate.projectId = projectId ? String(projectId) : "";
     quickCreate.sprintId = sprintId ? String(sprintId) : "";
+    quickCreate.name = name ? String(name) : "";
     quickCreate.open = true;
 }
 
@@ -17,6 +18,7 @@ export function closeQuickCreate() {
     quickCreate.open = false;
     quickCreate.projectId = "";
     quickCreate.sprintId = "";
+    quickCreate.name = "";
 }
 
 /* Enter creates; Shift+Enter, or Enter with "Create another" on, creates and stays;
@@ -96,10 +98,11 @@ export function creatableProjects(projects, check) {
     return [...personal, ...others];
 }
 
-export function pickDefaultProject({ requestedId = "", routeProjectId = "", lastUsedId = "", projects = [] } = {}) {
+export function pickDefaultProject({ requestedId = "", routeProjectId = "", recentId = "", lastUsedId = "", projects = [] } = {}) {
     const has = (id) => id && projects.some((p) => String(p._id) === String(id));
     if (has(requestedId)) return String(requestedId);
     if (has(routeProjectId)) return String(routeProjectId);
+    if (has(recentId)) return String(recentId);
     if (has(lastUsedId)) return String(lastUsedId);
     const personal = projects.find((p) => p.isPersonal);
     if (personal) return String(personal._id);
