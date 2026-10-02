@@ -28,3 +28,16 @@ describe('the status a new task starts in', () => {
         expect(source(file)).not.toMatch(/findIndex\(\(x\) => x\.type === "default_active"\)/);
     });
 });
+
+describe('the other composers', () => {
+    test.each([
+        'components/organisms/MainChat/MakeTaskSheet.vue',
+        'components/organisms/MainChat/MainChatPanel.vue',
+        'components/molecules/TalkToText/TalkToTextPopover.vue',
+        'components/molecules/Notepad/ConvertNoteToTask.vue',
+        'views/Projects/Comments/Comments.vue',
+    ])('%s picks the opening status by the shared rule', (file) => {
+        expect(source(file)).toMatch(/defaultStatus\((project|projectData\.value)\)/);
+        expect(source(file)).not.toMatch(/x\.type === ["']default_active["']/);
+    });
+});

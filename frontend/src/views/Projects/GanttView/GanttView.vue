@@ -51,9 +51,18 @@
                 </div>
                 <template v-else>
                     <div ref="ganttEl" class="gv__chart"></div>
-                    <div v-if="!scheduled.length && !loading" class="gv__empty ah-empty">
-                        {{ $t('Views.gantt_empty') }}
-                    </div>
+                    <EmptyState
+                        v-if="!scheduled.length && !loading"
+                        class="gv__empty"
+                        compact
+                        illustration="tasks"
+                        data-test="gantt-empty"
+                        :title="$t(noTasks ? 'Views.gantt_no_tasks_title' : 'Views.gantt_empty_title')"
+                        :message="$t(noTasks ? 'Views.gantt_no_tasks_msg' : 'Views.gantt_empty')"
+                        :actionLabel="noTasks ? $t('Views.add_a_task') : ''"
+                        :actionAllowed="canAddFirstTask"
+                        @action="goToList"
+                    />
                 </template>
 
                 <aside v-if="unscheduled.length" class="gv__tray ah-scroll">
@@ -146,6 +155,9 @@ import { shiftDependants } from '@/views/Projects/composables/ganttShift';
 import { workingDaysFor, countsEveryDay } from '@workingDays';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { showUndoToast } from '@/composable/useUndoToast';
+import { snappedBack } from './dragSnap';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import { useAddFirstTask } from '@/views/Projects/composables/useAddFirstTask';
 import { useToast } from 'vue-toast-notification';
 
 defineOptions({ name: 'GanttView' });
@@ -162,6 +174,7 @@ const { getUser } = useGetterFunctions();
 const { groupBy } = taskListHelper();
 const toast = useToast();
 const selectedProject = inject('selectedProject', ref({}));
+const { canAddFirstTask, goToList } = useAddFirstTask(selectedProject);
 const companyId = inject('$companyId', ref(''));
 const clientWidth = inject('$clientWidth', ref(1440));
 
@@ -218,6 +231,7 @@ const tasks = computed(() => {
 
 // active = not deleted (0 active, 2 archived, undefined legacy)
 const activeTasks = computed(() => tasks.value.filter((task) => task && [0, 2, undefined, null].includes(task.deletedStatusKey)));
+const noTasks = computed(() => !activeTasks.value.length);
 const scheduled = computed(() => activeTasks.value.filter((task) => task.startDate && task.DueDate));
 const unscheduled = computed(() => activeTasks.value.filter((task) => !(task.startDate && task.DueDate)));
 
@@ -420,6 +434,10 @@ function onTaskDragged(id) {
     const g = gantt.getTask(id);
     const task = findTask(id);
     if (!g || !task) return;
+    if (zoom.value !== 'Day' && snappedBack(task, g)) {
+        toast.info(t('Views.drag_snapped_back'));
+        return;
+    }
     const to = { startDate: g.start_date, DueDate: g.end_date };
     const plan = shiftDependants(
         scheduled.value.map((row) => ({ id: String(row._id), startDate: row.startDate, DueDate: row.DueDate })),
