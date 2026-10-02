@@ -127,6 +127,10 @@ exports.disconnect = async (req, res) => {
 };
 
 // Public route: authenticated by the per-workspace Slack verification token, not a JWT.
+/* The command answers anyone in the Slack workspace, who is not matched to a person here: it names
+ * only what every member can open. */
+const EVERY_MEMBERS_PROJECTS = { isPrivateSpace: { $ne: true }, isPersonal: { $ne: true }, deletedStatusKey: { $nin: [1, 2] }, status: { $ne: 'close' } };
+
 exports.slackCommand = async (req, res) => {
     try {
         const companyId = String(req.params.companyId || '');
@@ -143,7 +147,7 @@ exports.slackCommand = async (req, res) => {
         }
         const { sub } = S.parseCommand(req.body && req.body.text);
         if (sub === 'projects') {
-            const projects = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{}, 'ProjectName', { limit: 50 }] }, 'find').catch(() => []);
+            const projects = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [EVERY_MEMBERS_PROJECTS, 'ProjectName', { limit: 50 }] }, 'find').catch(() => []);
             return res.json(S.ephemeral(S.projectsText((projects || []).map((p) => p.ProjectName).filter(Boolean))));
         }
         return res.json(S.ephemeral(S.helpText()));

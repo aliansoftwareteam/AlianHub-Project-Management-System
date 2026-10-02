@@ -14,6 +14,7 @@ const { dbCollections } = require('../../../Config/collections');
 const logger = require('../../../Config/loggerConfig');
 const rules = require('../helpers/twoFactorRules');
 const loginSessionCtrl = require('./loginSession');
+const { signedInPersonOnly } = require('../helpers/accountSecurity');
 
 // ── DB helpers (userAuth lives in the global DB, keyed by _id) ───────────
 const findUserAuthById = (uid) => mongoC.MongoDbCrudOpration(
@@ -52,6 +53,7 @@ exports.twoFaStatus = async (req, res) => {
 // POST /api/v2/auth/2fa/setup (authed) — start enrollment.
 exports.twoFaSetup = async (req, res) => {
     try {
+        if (!(await signedInPersonOnly(req, res))) return undefined;
         const uid = req.uid;
         const user = await findUserAuthById(uid);
         if (!user?._id) return res.status(404).json({ status: false, message: 'User not found' });
@@ -76,6 +78,7 @@ exports.twoFaSetup = async (req, res) => {
 // POST /api/v2/auth/2fa/verify (authed) { code } — confirm a code, enable, return recovery codes.
 exports.twoFaVerify = async (req, res) => {
     try {
+        if (!(await signedInPersonOnly(req, res))) return undefined;
         const uid = req.uid;
         const code = req.body?.code;
         const user = await findUserAuthById(uid);
@@ -103,6 +106,7 @@ exports.twoFaVerify = async (req, res) => {
 // POST /api/v2/auth/2fa/disable (authed) { code } — needs a current TOTP or a recovery code.
 exports.twoFaDisable = async (req, res) => {
     try {
+        if (!(await signedInPersonOnly(req, res))) return undefined;
         const uid = req.uid;
         const code = req.body?.code;
         const user = await findUserAuthById(uid);

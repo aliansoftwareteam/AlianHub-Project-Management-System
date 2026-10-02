@@ -12,6 +12,7 @@ const { previousPlanOf, recordPlanChange } = require("./helpers/planHistory");
 const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
 const { evaluatePermission, isWritable } = require("../../Config/permissionGuard");
 const { visibleTask, TASK_NOT_FOUND } = require("../AI/taskAccess");
+const { actingUser } = require("../Sprints/helpers/actingUser");
 
 /* The same grant that decides who may plan another person's time decides who may read it. */
 const ESTIMATE_SCOPE_PERMISSIONS = [SHEET_PERMISSION.workload, SHEET_PERMISSION.project];
@@ -166,8 +167,7 @@ exports.generateAiEstimate = async (req, res) => {
         const input = await estimateInput(req);
         if (input.refused) return res.status(input.refused.code).json(input.refused.body);
 
-        const { userName, userId } = req.body || {};
-        const userData = userId ? { id: String(userId), Employee_Name: userName || 'AlianHub AI' } : undefined;
+        const userData = (await actingUser(req)) || undefined;
         const result = await estimateTaskTimeWithAI({ companyId: input.companyId, taskId: input.taskId, task: input.task, force: true, userData });
         if (!result.status) {
             return res.status(400).json({ status: false, statusText: result.reason || 'estimate not generated' });

@@ -126,6 +126,8 @@ describe('every writer of these project ids stores an ObjectId through the schem
         jest.clearAllMocks();
         mockCrud.mockImplementation(async (companyId, { type, data }, method) => {
             if (type === SCHEMA_TYPE.USERDASHBOARD && method === 'findOne') return { _id: oid(ROW), ownerId: ME, userId: ME, title: 'Team', visibility: 'private', projectId: '' };
+            if (type === SCHEMA_TYPE.COMPANY_USERS && method === 'findOne') return { userId: ME, roleType: 1 };
+            if (type === SCHEMA_TYPE.PROJECTS && method === 'find') return [{ _id: oid(PROJECT) }];
             if (method === 'insertMany') return data[0].map((row, at) => ({ ...row, _id: `${row.key}-${at}` }));
             if (method === 'save') return { _id: oid(ROW), ...data };
             if (method === 'findOneAndUpdate') return { _id: oid(ROW) };

@@ -10,6 +10,7 @@ const { resolvePublic } = require('../Agents/engine/safeFetch');
 const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
 const { storeSigningSecret, revokeSigningSecret } = require('./helpers/signingSecret');
 const { requestAddress } = require('../../utils/requestAddress');
+const { managedBy } = require('./helpers/hookAudience');
 
 const PRIVATE_DESTINATION = 'The webhook url must resolve to a public address, or to a private host the instance owner allows.';
 
@@ -43,23 +44,6 @@ const resolvesPublicly = async (url, allowlist) => {
 const callerId = (req) => String((req && req.uid) || '');
 
 const actorOf = (req) => ({ id: callerId(req), ip: requestAddress(req) });
-
-/**
- * Match only what this caller owns.
- *
- * Rows with no owner stay visible to everyone. They are webhooks that predate ownership
- * being recorded, and hiding them would leave an ACTIVE integration nobody can see, edit
- * or delete while it keeps posting company data to whatever URL it holds. Visible and
- * removable beats invisible and running.
- */
-const ownedBy = (uid) => ({
-    $or: [
-        { createdBy: uid },
-        { createdBy: '' },
-        { createdBy: null },
-        { createdBy: { $exists: false } },
-    ],
-});
 
 const maskHook = (hook) => ({
     _id: hook._id,
@@ -134,7 +118,7 @@ exports.listWebhooks = async (req, res) => {
         }
         const hooks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
-            data: [ownedBy(callerId(req))],
+            data: [await managedBy(companyId, callerId(req))],
         }, 'find');
         return res.send({ status: true, statusText: 'Webhooks fetched.', data: (hooks || []).map(maskHook) });
     } catch (error) {
@@ -184,7 +168,7 @@ exports.updateWebhook = async (req, res) => {
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
             data: [
-                { _id: new mongoose.Types.ObjectId(id), ...ownedBy(callerId(req)) },
+                { _id: new mongoose.Types.ObjectId(id), ...(await managedBy(companyId, callerId(req))) },
                 { $set: update },
                 { returnDocument: 'after' },
             ],
@@ -213,7 +197,7 @@ exports.deleteWebhook = async (req, res) => {
         // would let one member remove another's integration, and the logs with it.
         const owned = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
-            data: [{ _id: webhookId, ...ownedBy(callerId(req)) }],
+            data: [{ _id: webhookId, ...(await managedBy(companyId, callerId(req))) }],
         }, 'findOne');
         if (!owned) {
             return res.send({ status: false, statusText: 'Webhook not found.' });
@@ -256,7 +240,7 @@ exports.listWebhookLogs = async (req, res) => {
         const webhookId = new mongoose.Types.ObjectId(id);
         const owned = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.WEBHOOKS,
-            data: [{ _id: webhookId, ...ownedBy(callerId(req)) }],
+            data: [{ _id: webhookId, ...(await managedBy(companyId, callerId(req))) }],
         }, 'findOne');
         if (!owned) {
             return res.send({ status: false, statusText: 'Webhook not found.' });

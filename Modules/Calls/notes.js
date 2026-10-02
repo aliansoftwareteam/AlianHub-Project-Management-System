@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { generateMeetingNotes } = require('../AI/meetingNotes');
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
+const { activeMemberIds } = require('../notification/activeMembers');
 
 const companyOf = (req) => req.headers['companyid'];
 const isObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ''));
@@ -37,7 +38,9 @@ exports.createNotes = async (req, res) => {
         const callId = String(body.callId || '').trim();
         if (!callId) return res.send({ status: false, statusText: 'callId is required.' });
 
-        const participants = [...new Set([String(req.uid), ...(Array.isArray(body.participants) ? body.participants.map(String) : [])])].filter(Boolean);
+        /* A participant reads and edits the notes, so only people of this workspace are kept. */
+        const named = (Array.isArray(body.participants) ? body.participants : []).filter((id) => typeof id === 'string' && isObjectId(id));
+        const participants = [...new Set([String(req.uid), ...(await activeMemberIds(companyId, named))])];
         const transcript = typeof body.transcript === 'string' ? body.transcript.trim() : '';
         const durationSec = Math.max(0, Number(body.durationSec) || 0);
 

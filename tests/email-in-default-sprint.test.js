@@ -15,16 +15,21 @@ jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({ taskMongo: { cre
 
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { myCache } = require('../Config/config');
 const controller = require('../Modules/EmailIn/controller');
 
 const COMPANY = '6f0000000000000000000c01';
 const PROJECT = '6f0000000000000000000701';
+const OWNER = '6f0000000000000000000a01';
 const oid = (hex) => new mongoose.Types.ObjectId(hex);
 
-const seedProject = () => mockDbFor(COMPANY).crud(COMPANY, {
-    type: SCHEMA_TYPE.PROJECTS,
-    data: { _id: oid(PROJECT), ProjectName: 'Shop', ProjectCode: 'SHP', deletedStatusKey: 0 },
-}, 'save');
+const seedProject = () => {
+    mockDbFor(COMPANY).seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
+    return mockDbFor(COMPANY).crud(COMPANY, {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: { _id: oid(PROJECT), ProjectName: 'Shop', ProjectCode: 'SHP', deletedStatusKey: 0 },
+    }, 'save');
+};
 
 const seedSprint = (hex, extra = {}) => mockDbFor(COMPANY).crud(COMPANY, {
     type: SCHEMA_TYPE.SPRINTS,
@@ -34,19 +39,19 @@ const seedSprint = (hex, extra = {}) => mockDbFor(COMPANY).crud(COMPANY, {
 const createInbox = async (body) => {
     const sent = {};
     await controller.createInbox(
-        verified({ headers: { companyid: COMPANY }, uid: 'u1', body }),
-        { send: (payload) => { sent.payload = payload; } },
+        verified({ headers: { companyid: COMPANY }, uid: OWNER, body }),
+        { send: (payload) => { sent.payload = payload; }, status() { return this; } },
     );
     return sent.payload;
 };
 
-const body = { projectId: PROJECT, userData: { id: 'u1', Employee_Name: 'Owner' } };
+const body = { projectId: PROJECT, userData: { id: OWNER, Employee_Name: 'Owner' } };
 
 /* The project document's sprintsObj is a legacy copy no sprint write maintains, so an
  * inbox resolving its target sprint from it refused every project whose sprints were
  * created through the API. */
 describe('POST /api/v1/email-in/inboxes default sprint', () => {
-    beforeEach(() => { Object.keys(mockDbs).forEach((k) => delete mockDbs[k]); });
+    beforeEach(() => { myCache.flushAll(); Object.keys(mockDbs).forEach((k) => delete mockDbs[k]); });
 
     it('takes the sprint from the sprints collection when the project embeds none', async () => {
         await seedProject();
@@ -102,7 +107,7 @@ describe('POST /api/v1/email-in/inbound/:token origin', () => {
     const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
     const R = require('../Modules/EmailIn/helpers/emailInRules');
 
-    beforeEach(() => { Object.keys(mockDbs).forEach((k) => delete mockDbs[k]); taskMongo.create.mockReset(); });
+    beforeEach(() => { myCache.flushAll(); Object.keys(mockDbs).forEach((k) => delete mockDbs[k]); taskMongo.create.mockReset(); });
 
     it('stamps the task with an email origin whose reference identifies the message without keeping it', async () => {
         await seedProject();
