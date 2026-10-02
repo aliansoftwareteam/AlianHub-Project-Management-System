@@ -59,10 +59,10 @@ exports.handleNotification = async (req, res) => {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const fields = requestFields(body);
+    const notFound = () => res.status(404).json({ status: false, message: 'Project not found.' });
+    if (!(await canReadProject(companyId, req.uid, fields.projectId)).allowed) return notFound();
     const thread = await threadNamedBy(companyId, fields);
-    if (!(await canReadProject(companyId, req.uid, fields.projectId)).allowed || !(await opensThread(companyId, String(req.uid), thread))) {
-      return res.status(404).json({ status: false, message: 'Project not found.' });
-    }
+    if (!(await opensThread(companyId, String(req.uid), thread))) return notFound();
     const claimed = (Array.isArray(body.assigneeUsers) ? body.assigneeUsers : []).filter((id) => typeof id === 'string');
     const leader = typeof body.task_leader_ID === 'string' ? body.task_leader_ID : '';
     const members = await activeMemberIds(companyId, [...claimed, leader]);

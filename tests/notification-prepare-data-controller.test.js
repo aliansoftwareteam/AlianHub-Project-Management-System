@@ -4,6 +4,7 @@ const mockCount = jest.fn();
 const mockWasabi = jest.fn();
 const mockWake = jest.fn();
 const mockCanRead = jest.fn();
+const mockOpensThread = jest.fn();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../Config/config.js', () => ({}));
@@ -15,6 +16,7 @@ jest.mock('../Modules/storage/wasabi/controller.js', () => ({ getUserProfilePres
 jest.mock('../Modules/Inbox/helpers/inboxState', () => ({ wakeOnActivity: (...a) => mockWake(...a) }));
 jest.mock('../event/socketEventEmitter.js', () => ({ emit: jest.fn() }));
 jest.mock('../Config/projectAccess', () => ({ canReadProject: (...a) => mockCanRead(...a) }));
+jest.mock('../Modules/Comments/helpers/threadAccess', () => ({ commentThreadAccess: (...a) => mockOpensThread(...a) }));
 
 const verified = require('./fixtures/verifiedRequest');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
@@ -33,6 +35,8 @@ const LEAD = '6f0000000000000000000004';
 const PROJECT = '6f0000000000000000000701';
 const HIDDEN_PROJECT = '6f0000000000000000000702';
 const TASK = '6f0000000000000000000801';
+const LIST = '6f0000000000000000000901';
+const OTHER_LIST = '6f0000000000000000000902';
 const MENTION = "comments_I'm_@mentioned_in";
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 25));
@@ -51,12 +55,17 @@ const savedTo = (scope) => MongoDbCrudOpration.mock.calls.filter((c) => c[0] ===
 
 let seats;
 let readers;
+/* The people who can open the list or task a notice names; everyone who can open its project, unless a case says otherwise. */
+let threadReaders;
 beforeEach(() => {
     jest.clearAllMocks();
     seats = [ME, BOB, LEAD];
     readers = { [PROJECT]: [ME, BOB, EVE, LEAD], [HIDDEN_PROJECT]: [BOB] };
+    threadReaders = null;
     mockCanRead.mockImplementation(async (companyId, uid, projectId) => ({ allowed: companyId === C && (readers[projectId] || []).includes(String(uid)) }));
+    mockOpensThread.mockImplementation(async (companyId, uid, thread) => ({ allowed: companyId === C && (threadReaders || readers[thread.projectId] || []).includes(String(uid)) }));
     MongoDbCrudOpration.mockImplementation(async (scope, obj, method) => {
+        if (method === 'findOne' && obj.type === SCHEMA_TYPE.TASKS) return { _id: TASK, sprintId: LIST };
         if (method === 'find' && obj.type === SCHEMA_TYPE.COMPANY_USERS) {
             const wanted = obj.data[0].userId.$in;
             return wanted.filter((id) => seats.includes(id)).map((userId) => ({ userId }));
@@ -167,6 +176,39 @@ describe('handleNotification (the HTTP entry)', () => {
         await flush();
         expect(mockSettings).toHaveBeenCalledTimes(1);
         expect(mockSettings).toHaveBeenCalledWith([BOB], C);
+    });
+
+    it('answers 404 for a list or task the caller cannot open, as for a project, reading no seats and notifying nobody', async () => {
+        threadReaders = [BOB];
+        const res = await post({});
+        await flush();
+        expect(res.statusCode).toBe(404);
+        expect(res.body).toEqual({ status: false, message: 'Project not found.' });
+        expect(MongoDbCrudOpration.mock.calls.filter((c) => c[1].type === SCHEMA_TYPE.COMPANY_USERS)).toEqual([]);
+        expect(mockSettings).not.toHaveBeenCalled();
+    });
+
+    it('drops members who can open the project but not the list or task', async () => {
+        threadReaders = [ME, BOB];
+        await post({ body: validBody({ assigneeUsers: [BOB, EVE, LEAD], task_leader_ID: LEAD }) });
+        await flush();
+        expect(mockSettings).toHaveBeenCalledTimes(1);
+        expect(mockSettings).toHaveBeenCalledWith([BOB], C);
+    });
+
+    it('names the list the task is stored in, whatever list the request names, and asks about that one', async () => {
+        mockSettings.mockResolvedValue([setting(BOB, 'task_status', { browser: true })]);
+        await post({ body: validBody({ sprintId: OTHER_LIST }) });
+        await flush();
+        expect(mockOpensThread.mock.calls.every(([, , thread]) => thread.sprintId === LIST && thread.taskId === TASK && thread.projectId === PROJECT)).toBe(true);
+        expect(savedTo(C)[0]).toMatchObject({ projectId: PROJECT, taskId: TASK, sprintId: LIST });
+    });
+
+    it('keeps the words as text, so nothing in them is read as markup', async () => {
+        mockSettings.mockResolvedValue([setting(BOB, 'task_status', { browser: true })]);
+        await post({ body: validBody({ message: '<img src=x onerror="go()"><b>Look</b> & see (it\'s here)' }) });
+        await flush();
+        expect(savedTo(C)[0].message).toBe('&lt;img src=x onerror="go()"&gt;&lt;b&gt;Look&lt;/b&gt; &amp; see (it\'s here)');
     });
 
     it('builds the notice from the listed fields only, leaving out the ones the server fills in', async () => {
