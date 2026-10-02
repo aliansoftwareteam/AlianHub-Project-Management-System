@@ -9,8 +9,12 @@ const { requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_ACTIONS } = require('../../Config/taskWritePermissions');
 const { fieldInsertFrom, fieldUpdateFrom, isCompanyWide, widensToCompany, requireFieldSettings, requireSameKind, checkFieldWrite } = require('./helpers/fieldWrite');
 const { linkPlan, listOf } = require('./helpers/fieldProjects');
+const { agentsRefused } = require('../Agents/guard');
 
 const CUSTOM_FIELD_EDIT = [['project.project_custom_field', 'task.task_custom_field']];
+
+/* An agent proposes a field through its MCP tool; a person approves it, and it is then made here as that person. */
+const fieldsByPeople = agentsRefused('fields.create');
 
 /* Storing a computed value on a task is held to what editing a field value on it is held to. */
 const COMPUTED_VALUES = Object.freeze({ needs: TASK_ACTIONS.updateTaskCustomField.needs, tasks: [['taskIds', '*']] });
@@ -46,12 +50,14 @@ const updateTouchesCompanyWide = async (req) => {
 exports.init = (app) => {
     app.get('/api/v1/customField', ctrl.getCustomField)
     app.put('/api/v1/customField',
+        fieldsByPeople,
         checkFieldWrite(fieldUpdateFrom),
         requireProjectAccess({ projectIds: updatedFieldProjects, permissions: () => CUSTOM_FIELD_EDIT }),
         requireFieldSettings(updateTouchesCompanyWide),
         requireSameKind(storedField),
         ctrl.updateCustomField)
     app.post('/api/v1/customField',
+        fieldsByPeople,
         checkFieldWrite(({ updateObject }) => fieldInsertFrom(updateObject)),
         requireProjectAccess({ projectIds: insertedFieldProjects, permissions: () => CUSTOM_FIELD_EDIT }),
         requireFieldSettings(insertIsCompanyWide),

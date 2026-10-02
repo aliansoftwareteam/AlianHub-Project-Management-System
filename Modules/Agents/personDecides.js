@@ -3,6 +3,7 @@ const { resolveActor, isAgent } = require('./actor');
 const logger = require('../../Config/loggerConfig');
 
 const SESSION_ONLY = 'Only a person signed in to AlianHub can decide this; an API token cannot.';
+const SESSION_SETS = 'Only a person signed in to AlianHub can change this; an API token cannot.';
 
 const refuse = async (req, res, actor, { action, reason, params, entityId }) => {
     const companyId = req.headers['companyid'] || '';
@@ -16,23 +17,26 @@ const isSignedInSession = (req) => !req.apiToken && !req.agentRun && !req.mcp;
 
 /* A decision is a person's, made in a signed-in session. Anything else is answered here and false comes back:
  * a token of any kind is refused whoever holds it, and an agent's attempt is recorded under `action`. */
-const personDecides = async (req, res, action) => {
+const personDecides = async (req, res, action, refusal = SESSION_ONLY) => {
     if (isSignedInSession(req)) return true;
     const actor = req.agentActor || await resolveActor(req);
     req.agentActor = actor;
     if (isAgent(actor)) await refuse(req, res, actor, { action, reason: `Agents cannot perform ${action}`, params: {} });
-    else res.status(403).json({ status: false, message: SESSION_ONLY, statusText: SESSION_ONLY });
+    else res.status(403).json({ status: false, message: refusal, statusText: refusal });
     return false;
 };
 
 /* The same rule in front of a handler, for a route that mounts it. */
-const decidedByPerson = (action) => async (req, res, next) => {
+const decidedByPerson = (action, refusal) => async (req, res, next) => {
     try {
-        return (await personDecides(req, res, action)) ? next() : undefined;
+        return (await personDecides(req, res, action, refusal)) ? next() : undefined;
     } catch (e) {
         logger.error(`decidedByPerson: ${e.message}`);
         return res.status(500).json({ status: false, message: 'The check failed.', statusText: 'The check failed.' });
     }
 };
 
-module.exports = { SESSION_ONLY, refuse, isSignedInSession, personDecides, decidedByPerson };
+/* What an agent may do, and what runs with no person there, is a decision too: the routes that set either mount this. */
+const setByPerson = (action) => decidedByPerson(action, SESSION_SETS);
+
+module.exports = { SESSION_ONLY, SESSION_SETS, refuse, isSignedInSession, personDecides, decidedByPerson, setByPerson };
