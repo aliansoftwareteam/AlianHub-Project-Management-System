@@ -77,6 +77,9 @@ const folderUpdateFrom = (updateObject) => {
     return { $set: { deletedStatusKey: set.deletedStatusKey } };
 };
 
+const changesSharing = (update) => ['private', 'AssigneeUserId'].some((field) => field in (update.$set || {}))
+    || ONE_PERSON_OPERATORS.some((operator) => 'AssigneeUserId' in (update[operator] || {}));
+
 const findOne = (companyId, type, filter, fields) => MongoDbCrudOpration(companyId, { type, data: [filter, fields] }, 'findOne');
 
 const mayOpenSprint = async (companyId, uid, sprint) => canSeeSprint(sprint, await sprintIdentities(companyId, uid))
@@ -85,7 +88,8 @@ const mayOpenSprint = async (companyId, uid, sprint) => canSeeSprint(sprint, awa
 /*
  * Builds the write for PATCH /api/v1/sprint/:id type updateSprint from the stored sprint: a private
  * sprint answers 404 to anyone it is not shared with, a move lands only in a live folder of the
- * sprint's own project, and the project the cascades run in is the stored one.
+ * sprint's own project, and the project the cascades run in is the stored one. A change to who the
+ * sprint is shared with answers how it was shared before, for the people the change takes it from.
  */
 const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     const update = sprintUpdateFrom(updateObject);
@@ -100,7 +104,8 @@ const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     } else if ('folderId' in set) {
         Object.assign(set, { folderId: null, folderName: '' });
     }
-    return { update, projectId: String(sprint.projectId) };
+    const sharedBefore = changesSharing(update) ? { private: sprint.private === true, AssigneeUserId: (sprint.AssigneeUserId || []).map(String) } : undefined;
+    return { update, projectId: String(sprint.projectId), sharedBefore };
 };
 
 /* An archive, delete or restore cascades onto the folder's own sprints and those of the subfolders that follow it, not the ones the client lists. */

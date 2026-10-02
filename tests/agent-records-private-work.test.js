@@ -210,8 +210,13 @@ describe('the person the work belongs to', () => {
         const r = await call(ctrl.declineProposal, req(OTHER, { params: { id: String(proposal.list._id) } }));
         expect(r.code).toBe(404);
         expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS).find((p) => String(p._id) === String(proposal.list._id)).status).toBe('pending');
-        const open = await call(ctrl.declineProposal, req(OTHER, { params: { id: String(proposal.open._id) } }));
-        expect(open.body).toMatchObject({ status: true });
+    });
+
+    it('a member who can open the project is told an owner-or-admin proposal is not theirs to decline, and it keeps waiting', async () => {
+        const r = await call(ctrl.declineProposal, req(OTHER, { params: { id: String(proposal.open._id) } }));
+        expect(r.code).toBe(403);
+        expect(r.body).toMatchObject({ status: false, reason: 'not_permitted' });
+        expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS).find((p) => String(p._id) === String(proposal.open._id)).status).toBe('pending');
     });
 });
 
@@ -250,11 +255,13 @@ describe('a proposal on a thread the approver cannot open, and a comment that wo
     it.each([
         ['a member, a private sprint they are not on', OTHER, T_SPRINT],
         ['an admin, a direct message they are not in', ADMIN, T_CHAT],
-    ])('still answers 200 with the change not applied when the approver sees the proposal but its comment targets a thread they cannot open (%s)', async (_who, uid, target) => {
+    ])('refuses the approval and leaves the proposal waiting when the approver sees it but its comment targets a thread they cannot open (%s)', async (_who, uid, target) => {
         const p = seedOn({ taskId: T_OPEN, projectId: P_OPEN, changes: commentOn(target) });
         const r = await call(ctrl.approveProposal, req(uid, { params: { id: String(p._id) } }));
-        expect(r.code).toBe(200);
-        expect(r.body.data.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: false, error: expect.stringMatching(/^not_visible/) })]);
+        expect(r.code).toBe(403);
+        expect(r.body).toMatchObject({ status: false, reason: 'not_permitted', statusText: expect.stringMatching(/cannot open what this change touches/) });
+        expect(stored(p)).toMatchObject({ status: 'pending' });
+        expect(stored(p).decidedBy).toBeUndefined();
         expect(rows(SCHEMA_TYPE.COMMENTS)).toHaveLength(0);
     });
 });

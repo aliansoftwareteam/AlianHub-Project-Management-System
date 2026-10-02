@@ -55,7 +55,7 @@ exports.init = (app) => {
 
     app.post('/api/v1/importSettings', rulesByPeople, ctrl.importSettings);
 
-    app.post('/api/v1/importTemplate', ctrl.importTemplate);
+    app.post('/api/v1/importTemplate', agentsRefused('template.import'), ctrl.importTemplate);
 
     /**
      * @swagger

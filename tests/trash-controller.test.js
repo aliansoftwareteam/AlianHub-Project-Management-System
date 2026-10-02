@@ -8,7 +8,6 @@ jest.mock('../Modules/Project/controller/updateProject', () => ({ updateProjectI
 jest.mock('../Modules/Sprints/controller', () => ({
     updateSprintFun: jest.fn(async () => ({ status: true })),
     updateFolderFun: jest.fn(async () => ({ answer: { status: true }, cascade: Promise.resolve() })),
-    announceFolders: jest.fn(),
 }));
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({
     taskMongo: { bulkRestore: jest.fn(async () => ({ totals: { updated: 1 } })) },

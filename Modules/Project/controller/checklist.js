@@ -4,6 +4,22 @@ const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueri
 const { removeCache } = require('../../../utils/commonFunctions');
 const logger = require('../../../Config/loggerConfig');
 const { recordChecklistChange } = require('../helpers/projectItemHistory');
+const { isItemId, badRequest } = require('../../Company/helpers/callerQueryRules');
+
+const ITEM_KEYS = ['name', 'assigneeAdd', 'assigneeRemove'];
+const ITEM_VALUE_OF_KEY = { name: 'name', assigneeAdd: 'uid', assigneeRemove: 'uid' };
+
+/* A checklist write names its rows by id and sets text: none of these reaches the update as an operator object. */
+const checklistRefusal = ({ checklistItem, operation, key }) => {
+    if (operation === 'delete') {
+        return Array.isArray(checklistItem) && checklistItem.every(isItemId) ? null : `Checklist item ids must be a list of ids.`;
+    }
+    if (operation !== 'update') return null;
+    if (key === 'isChecked') return Array.isArray(checklistItem) ? null : 'The checklist must be a list of items.';
+    if (!ITEM_KEYS.includes(key)) return null;
+    if (!checklistItem || !isItemId(checklistItem.id)) return `Checklist item 'id' parameter is required.`;
+    return typeof checklistItem[ITEM_VALUE_OF_KEY[key]] === 'string' ? null : `Checklist item '${ITEM_VALUE_OF_KEY[key]}' must be text.`;
+};
 
 /**
  * Helper function for build update query object based on the specific key
@@ -36,18 +52,15 @@ exports.handleChecklist = async (req, res) => {
     try {
         const { id, checklistItem, operation, key } = req.body;
 
+        const refusal = checklistRefusal(req.body);
+        if (refusal) return badRequest(res, refusal);
+
         let update = {};
         if (operation === 'push') {
             update = {
                 $push: { checklistArray: checklistItem }
             };
         } else if (operation === 'update') {
-            if(!checklistItem.id && ["name", "assigneeAdd", "assigneeRemove"].includes(key)) {
-                return res.status(400).json({
-                    status: false,
-                    message: `Checklist item 'id' parameter is required.`
-                });
-            }
             update = buildQuery(key, checklistItem)
         } else if (operation === 'delete') {
             update = {
@@ -60,7 +73,7 @@ exports.handleChecklist = async (req, res) => {
             });
         }
 
-        const options = (operation === 'update' && (["name", "assigneeAdd", "assigneeRemove"].includes(key))) ? { arrayFilters: [{ "elem.id": checklistItem.id }] } : undefined;
+        const options = (operation === 'update' && ITEM_KEYS.includes(key)) ? { arrayFilters: [{ "elem.id": checklistItem.id }] } : undefined;
 
         const params = {
             type: SCHEMA_TYPE.PROJECTS,

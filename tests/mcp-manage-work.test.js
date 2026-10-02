@@ -437,12 +437,12 @@ describe('tasks.batch', () => {
             { tool: 'tasks.search', arguments: {} },
             { tool: 'tasks.batch', arguments: { operations: [] } },
             { tool: 'page.create', arguments: { title: 'Notes' } },
-            { tool: 'subtask.create', arguments: { taskId: fx.bug._id, title: 'Follow up' } },
+            { tool: 'task.update', arguments: { taskId: fx.bug._id, title: 'Renamed' } },
         ] });
         expect(out).toMatchObject({ ok: false, applied: 3, notApplied: 4, undoable: true });
         expect(out.items.map((item) => [item.index, item.tool, item.ok])).toEqual([
             [0, 'task.status.set', true], [1, 'task.assign', true], [2, 'task.update', false],
-            [3, 'tasks.search', false], [4, 'tasks.batch', false], [5, 'page.create', false], [6, 'subtask.create', true],
+            [3, 'tasks.search', false], [4, 'tasks.batch', false], [5, 'page.create', false], [6, 'task.update', true],
         ]);
         expect(out.items[2].error).toMatch(/colour is not an argument/);
         expect(out.items[3].error).toMatch(/not a write tool a batch can run/);
@@ -454,7 +454,7 @@ describe('tasks.batch', () => {
 
         const [group] = audits('tasks.batch');
         const applied = [out.items[0].auditId, out.items[1].auditId, out.items[6].auditId];
-        expect(group).toMatchObject({ action: 'agent.action', meta: { state: 'applied', reason: 'weekly tidy', undo: { kind: 'batch', auditIds: applied }, params: { tools: ['task.status.set', 'task.assign', 'subtask.create'] } } });
+        expect(group).toMatchObject({ action: 'agent.action', meta: { state: 'applied', reason: 'weekly tidy', undo: { kind: 'batch', auditIds: applied }, params: { tools: ['task.status.set', 'task.assign', 'task.update'] } } });
         expect(String(group._id)).toBe(String(out.auditId));
 
         const undone = await inverses.batch(CID, group.meta.undo, person(OWNER));
@@ -462,7 +462,7 @@ describe('tasks.batch', () => {
         expect(undone).toMatchObject({ undone: 3 });
         expect(stored(fx.bug._id).statusType).toBe('active');
         expect(stored(fx.bug._id).AssigneeUserId).toEqual([OTHER]);
-        expect(stored(out.items[6].result.subtaskId).deletedStatusKey).toBe(1);
+        expect(stored(fx.bug._id).TaskName).toBe('Task OPN-4');
     });
 
     it('on more than one task, runs nothing and files the operations a call could make as one proposal', async () => {

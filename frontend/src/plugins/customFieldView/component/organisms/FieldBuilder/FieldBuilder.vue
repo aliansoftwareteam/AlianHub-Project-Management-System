@@ -150,13 +150,6 @@
                         <div class="fb__seg">
                             <button v-for="fn in rollupFunctions" :key="fn" type="button" :class="{ 'is-active': draft.rollupFunction === fn }" @click="draft.rollupFunction = fn">{{ fn.toUpperCase() }}</button>
                         </div>
-                    </div>
-                    <div class="ah-field">
-                        <label class="ah-field__label">{{ $t('Fields.rollup_scope') }}</label>
-                        <div class="fb__seg">
-                            <button type="button" :class="{ 'is-active': draft.rollupScope !== 'sprint' }" @click="draft.rollupScope = 'subtask'">{{ $t('Fields.rollup_scope_subtasks') }}</button>
-                            <button type="button" :class="{ 'is-active': draft.rollupScope === 'sprint' }" @click="draft.rollupScope = 'sprint'">{{ $t('Fields.rollup_scope_sprint') }}</button>
-                        </div>
                         <p class="ah-field__hint" data-test="fb-rollup-help">{{ $t('Fields.rollup_help') }}</p>
                     </div>
                 </template>
@@ -364,7 +357,6 @@ function openNew(fieldType) {
         formulaExpression: "",
         rollupSourceFieldId: "",
         rollupFunction: "sum",
-        rollupScope: "subtask",
         fieldTaskTypes: []
     };
     errors.value = {};
@@ -400,7 +392,6 @@ function openField(field) {
         formulaExpression: field.formulaExpression || "",
         rollupSourceFieldId: field.rollupSourceFieldId || "",
         rollupFunction: field.rollupFunction || "sum",
-        rollupScope: field.rollupScope || "subtask",
         fieldTaskTypes: fieldTaskTypes(field)
     };
     errors.value = {};
@@ -503,8 +494,7 @@ async function save({ another = false } = {}) {
             fieldValidation: draft.value.fieldValidation,
             formulaExpression: draft.value.fieldType === "formula" ? String(draft.value.formulaExpression).trim() : "",
             rollupSourceFieldId: draft.value.fieldType === "rollup" ? draft.value.rollupSourceFieldId : "",
-            rollupFunction: draft.value.fieldType === "rollup" ? draft.value.rollupFunction : "",
-            rollupScope: draft.value.fieldType === "rollup" ? draft.value.rollupScope : ""
+            rollupFunction: draft.value.fieldType === "rollup" ? draft.value.rollupFunction : ""
         };
         const payload = {
             fieldTitle: draft.value.fieldTitle,

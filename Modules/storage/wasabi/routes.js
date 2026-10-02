@@ -20,6 +20,8 @@ const upload = multer({
     limits: DEFAULT_LIMITS,
     fileFilter: refuseBeforeWrite(wasabiUploadRefusal),
 });
+const { agentsRefused } = require('../../Agents/guard');
+
 exports.init = (app) => {
 
     /**
@@ -225,7 +227,7 @@ exports.init = (app) => {
     /**
      * delete file from wasabi api.
      */
-	app.post("/api/v1/wasabi/deleteFile", requireOwnBucket(bodyField('companyId')), requireStoredFileChange(REMOVE, bodyField('path'), { storage: 'wasabi' }), ctrl.deleteFileWasabi);
+	app.post("/api/v1/wasabi/deleteFile", agentsRefused('file.delete'), requireOwnBucket(bodyField('companyId')), requireStoredFileChange(REMOVE, bodyField('path'), { storage: 'wasabi' }), ctrl.deleteFileWasabi);
     app.post("/api/v1/getUserProfile", requireSafeObjectPath(bodyField('path')), requireProfileImageRead(bodyField('path')), handleProfileGetForUser);
     app.post("/api/v1/getTaskTypeImage", ...signedRead, handleTaskTypeImageGet);
 }

@@ -107,10 +107,9 @@ const proposalScopeClause = ({ projectIds, hiddenTaskIds, privateWork: privateSc
     ...(privateScope ? privateWork.proposalClause(privateScope) : {}),
 });
 
-/* Approving, declining or undoing: a person holding a member's seat. A guest's seat decides none. */
+/* Approving, declining or undoing: a person holding a member's seat. A guest's seat decides none.
+ * Whether one proposal is theirs to approve or decline is ./approverRights. */
 const decidesProposals = (caller) => Boolean(caller && caller.human && caller.member);
-
-const mayDecideProposal = (caller, proposal) => decidesProposals(caller) && (proposal.gate !== GATE_OWNER_ADMIN || Boolean(caller.privileged));
 
 const PROJECT_PARAMS = Object.freeze(['projectId', 'listProjectId']);
 
@@ -122,6 +121,12 @@ const namedProjects = (proposal) => (Array.isArray(proposal.changes) ? proposal.
 /* A change that reaches into a project is read only by who may open that project too. projectIds is null for an owner or admin. */
 const staysInside = (projectIds) => (proposal) => !Array.isArray(projectIds)
     || namedProjects(proposal).every((id) => projectIds.includes(id));
+
+/* The rows staysInside leaves out, as a clause: a count takes them off without reading every row. */
+const reachesOutsideClause = (projectIds) => {
+    const open = [...idForms(projectIds.map(String)), null, ''];
+    return { changes: { $elemMatch: { $or: PROJECT_PARAMS.map((key) => ({ [`params.${key}`]: { $exists: true, $nin: open } })) } } };
+};
 
 const inOpenProject = async (companyId, caller, record) => {
     const visible = await visibleProjectIdsFor(companyId, caller);
@@ -145,12 +150,27 @@ const startedBy = async (companyId, runId) => {
     return String((run && run.startedBy) || '');
 };
 
+/* The person an agent asked for: whose connection filed it, or who started the run that did. */
+const askedFor = async (companyId, uid, proposal) => Boolean(uid)
+    && [String(proposal.requestedBy || ''), await startedBy(companyId, proposal.runId)].includes(String(uid));
+
+const inOwnPersonalList = async (companyId, uid, proposal) => {
+    if (!uid || !OBJECT_ID.test(String(proposal.projectId || ''))) return false;
+    const list = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: String(proposal.projectId), isPersonal: true, personalOwner: String(uid) }, '_id'],
+    }, 'findOne').catch(() => null);
+    return Boolean(list);
+};
+
+/* A proposal is the person's own to take back when their agent asked for it, or it sits in their personal list. */
+const isOwnProposal = async (companyId, uid, proposal) => (await askedFor(companyId, uid, proposal)) || inOwnPersonalList(companyId, uid, proposal);
+
 /* A proposal is seen by whoever may open its project, and by the person the agent worked for. */
 const canSeeProposal = async (companyId, caller, proposal) => {
     const uid = String(caller.actor.userId || '');
     if (caller.privileged) return privateWork.readsProposal(await privateWork.privateWorkOf(companyId, uid), proposal);
     if (await inOpenProject(companyId, caller, proposal)) return true;
-    return Boolean(uid) && [String(proposal.requestedBy || ''), await startedBy(companyId, proposal.runId)].includes(uid);
+    return askedFor(companyId, uid, proposal);
 };
 
 const REFUSAL = Object.freeze({
@@ -166,5 +186,5 @@ module.exports = {
     privileged, humanActor, callerOf, personOf, canManageAgents, canControlRun, canUndoDecision, canActAsAgent,
     visibleProjectIdsFor, agentProjectsFor, hiddenTaskIdsFor, canSeeTaskOf, projectScope, REFUSAL,
     privateWorkFor, readScopeOf, canSeeRun, readableRuns, canSeeProposal,
-    GATE_OWNER_ADMIN, proposalScopeClause, decidesProposals, mayDecideProposal, staysInside,
+    GATE_OWNER_ADMIN, proposalScopeClause, decidesProposals, staysInside, reachesOutsideClause, isOwnProposal,
 };

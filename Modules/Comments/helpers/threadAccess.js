@@ -5,6 +5,8 @@ const { canReadProject } = require('../../../Config/projectAccess');
 const { mayListTasksIn } = require('../../Tasks/helpers/taskListProjects');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprintById, hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
+const { agentOf } = require('../../../Config/agentRequest');
+const { DIRECT, CHANNEL, conversationOf } = require('./conversation');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const isId = (value) => OBJECT_ID.test(String(value || ''));
@@ -29,6 +31,15 @@ const canOpenTask = async (companyId, uid, task, privileged) => {
     return canSeeSprintById(companyId, uid, task.sprintId);
 };
 
+/* A thread an agent's request is kept from, as that agent's person: every direct message, and a channel unless the
+ * agent's token was given chat. */
+const keptFromAgent = async (companyId, uid, thread) => {
+    const agent = agentOf(uid);
+    if (!agent) return false;
+    const kind = await conversationOf(companyId, thread);
+    return kind === DIRECT || (kind === CHANNEL && !agent.chat);
+};
+
 /*
  * Decides a comment read addressed by project, sprint and task ids. Each id the read filters on is
  * checked against its stored record, and a task must sit in the named project, so a readable
@@ -40,6 +51,7 @@ const commentThreadAccess = async (companyId, uid, { projectId, sprintId, taskId
     const user = String(uid || '');
     if (!isId(projectId)) return INVALID;
     if (!isId(company) || !isId(user)) return NOT_FOUND;
+    if (await keptFromAgent(company, user, { projectId, sprintId, taskId })) return NOT_FOUND;
 
     const project = await canReadProject(company, user, projectId);
     if (!project.allowed) {

@@ -57,6 +57,17 @@ const jwt = require('../Config/jwt');
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 
+/* A move, and an archive or a restore that takes subtasks with it, wait for a person. This makes the change the way an approval does. */
+const onceApproved = async (caller, action, params) => {
+    try {
+        const out = await actions.perform({ companyId: CID, actor: caller.actor, action, params, approved: true, ip: caller.ip, allowedActions: caller.allowedActions });
+        await settle();
+        return { ok: true, auditId: out.auditId, result: out.result || null, undoable: Boolean(out.undo) };
+    } catch (error) {
+        return { isError: true, error: error.message };
+    }
+};
+
 const READS = ['fields.list', 'subtasks.list', 'members.list'];
 const WRITES = ['task.update', 'task.assign', 'task.field.set', 'task.move', 'task.archive', 'task.restore'];
 
@@ -486,7 +497,7 @@ describe('subtasks.list, members.list and tasks.search', () => {
 
 describe('task.move', () => {
     it('moves a top-level task to another list of its project, and every level of its subtasks follows', async () => {
-        const out = await rpc(ctx(MEMBER), 'task.move', { taskId: fx.top._id, projectId: P_OPEN, sprintId: S_NEXT });
+        const out = await onceApproved(ctx(MEMBER), 'task.move', { taskId: fx.top._id, projectId: P_OPEN, sprintId: S_NEXT });
         expect(out).toMatchObject({ ok: true, undoable: false, result: { projectId: P_OPEN, sprintId: S_NEXT, moved: 3 } });
         [fx.top, fx.child, fx.grandchild].forEach((task) => {
             expect(stored(task._id)).toMatchObject({ deletedStatusKey: 0, statusKey: 2, sprintArray: { id: S_NEXT, name: 'Sprint 2' } });
@@ -502,7 +513,7 @@ describe('task.move', () => {
         mockDb.store[SCHEMA_TYPE.PROJECTS].find((project) => String(project._id) === P_DEST).AssigneeUserId = [OTHER];
         stored(fx.bug._id).TaskType = 'task';
         stored(fx.bug._id).AssigneeUserId = [OTHER, MEMBER];
-        const out = await rpc(ctx(OWNER), 'task.move', { taskId: fx.bug._id, projectId: P_DEST, sprintId: S_DEST });
+        const out = await onceApproved(ctx(OWNER), 'task.move', { taskId: fx.bug._id, projectId: P_DEST, sprintId: S_DEST });
         expect(out).toMatchObject({ ok: true, result: { projectId: P_DEST, sprintId: S_DEST, moved: 1 } });
         expect(stored(fx.bug._id)).toMatchObject({ ProjectID: P_DEST, sprintId: S_DEST, statusKey: 8, statusType: 'active', status: { key: 8, text: 'in progress', type: 'active' }, TaskType: 'task', TaskTypeKey: 5, deletedStatusKey: 0, AssigneeUserId: [OTHER] });
     });
@@ -510,14 +521,14 @@ describe('task.move', () => {
     it('refuses a task whose type the other project cannot take before anything is written', async () => {
         mockDb.store[SCHEMA_TYPE.PROJECTS].find((project) => String(project._id) === P_OPEN).taskTypeCounts = [{ key: 1, name: 'Task', value: 'task' }];
         const before = snapshot();
-        const out = await rpc(ctx(OWNER), 'task.move', { taskId: fx.bug._id, projectId: P_DEST, sprintId: S_DEST });
+        const out = await onceApproved(ctx(OWNER), 'task.move', { taskId: fx.bug._id, projectId: P_DEST, sprintId: S_DEST });
         expect(out).toMatchObject({ isError: true, error: expect.stringMatching(/cannot be carried into another project/) });
         expect(snapshot()).toBe(before);
     });
 
     it('refuses a subtask on its own, with a message that says what to move instead', async () => {
         const before = snapshot();
-        const out = await rpc(ctx(OWNER), 'task.move', { taskId: fx.child._id, projectId: P_OPEN, sprintId: S_NEXT });
+        const out = await onceApproved(ctx(OWNER), 'task.move', { taskId: fx.child._id, projectId: P_OPEN, sprintId: S_NEXT });
         expect(out).toMatchObject({ isError: true, error: 'A subtask moves with its parent: move the top-level task instead.' });
         expect(snapshot()).toBe(before);
     });
@@ -543,18 +554,20 @@ describe('task.move', () => {
         const into = await rpc(ctx(MEMBER), 'task.move', { taskId: fx.bug._id, projectId: LOCKED_PROJECT, sprintId: lockedList._id });
         expect(into).toMatchObject({ isError: true, refused: true, reason: expect.stringMatching(/^permission_denied: task\.task_move/) });
         const outOf = await rpc(ctx(MEMBER), 'task.move', { taskId: LOCKED_TASK, projectId: P_OPEN, sprintId: S_NEXT });
-        expect(outOf).toMatchObject({ isError: true, error: expect.stringMatching(/^permission_denied: task\.task_move/) });
+        expect(outOf).toMatchObject({ isError: true, refused: true, reason: expect.stringMatching(/^permission_denied: task\.task_move/) });
         expect(snapshot()).toBe(before);
-        expect((await rpc(ctx(OWNER), 'task.move', { taskId: fx.bug._id, projectId: LOCKED_PROJECT, sprintId: lockedList._id })).ok).toBe(true);
+        expect(proposals.create).not.toHaveBeenCalled();
+        expect((await onceApproved(ctx(MEMBER), 'task.move', { taskId: LOCKED_TASK, projectId: P_OPEN, sprintId: S_NEXT })).error).toMatch(/^permission_denied: task\.task_move/);
+        expect((await onceApproved(ctx(OWNER), 'task.move', { taskId: fx.bug._id, projectId: LOCKED_PROJECT, sprintId: lockedList._id })).ok).toBe(true);
     });
 
-    it('is filed for a person to approve, not run, where destructive calls are proposals', async () => {
-        process.env.MCP_TOOLS_V2 = 'on';
+    it.each([['off', ''], ['on', 'on']])('is filed for a person to approve, not run, with the newer tool format %s', async (_label, flag) => {
+        if (flag) process.env.MCP_TOOLS_V2 = flag;
         const before = snapshot();
         const out = await rpc(ctx(OWNER), 'task.move', { taskId: fx.top._id, projectId: P_OPEN, sprintId: S_NEXT, reason: 'next sprint' });
         expect(out).toMatchObject({ ok: false, pending: true, proposalId: 'proposal-1' });
         expect(proposals.create).toHaveBeenCalledWith(CID, expect.objectContaining({
-            source: 'mcp', requestedBy: OWNER, tokenId: TOKEN, why: 'next sprint',
+            source: 'mcp', requestedBy: OWNER, tokenId: TOKEN, why: 'next sprint (this change cannot be undone)',
             changes: [expect.objectContaining({ action: 'task.move', params: { taskId: fx.top._id, projectId: P_OPEN, sprintId: S_NEXT } })],
         }));
         expect(snapshot()).toBe(before);
@@ -563,7 +576,7 @@ describe('task.move', () => {
 
 describe('task.archive and task.restore', () => {
     it('archives a task with its subtasks, restores it, and each can be undone by a person who can open it', async () => {
-        const archived = await rpc(ctx(MEMBER), 'task.archive', { taskId: fx.top._id });
+        const archived = await onceApproved(ctx(MEMBER), 'task.archive', { taskId: fx.top._id });
         expect(archived).toMatchObject({ ok: true, undoable: true, result: { archived: true } });
         expect([stored(fx.top._id).deletedStatusKey, stored(fx.child._id).deletedStatusKey]).toEqual([2, 3]);
         const [row] = audits('task.archive');
@@ -574,7 +587,7 @@ describe('task.archive and task.restore', () => {
         expect((await rpc(ctx(MEMBER), 'task.archive', { taskId: fx.top._id })).error).toMatch(/already archived/);
         expect((await rpc(ctx(MEMBER), 'task.restore', { taskId: fx.child._id })).error).toMatch(/restore the parent/);
 
-        const restored = await rpc(ctx(MEMBER), 'task.restore', { taskId: fx.top._id });
+        const restored = await onceApproved(ctx(MEMBER), 'task.restore', { taskId: fx.top._id });
         expect(restored).toMatchObject({ ok: true, undoable: true, result: { archived: false } });
         expect([stored(fx.top._id).deletedStatusKey, stored(fx.child._id).deletedStatusKey]).toEqual([0, 0]);
         expect(audits('task.restore', 'applied')[0].meta.undo).toEqual({ kind: 'archive', taskId: fx.top._id, previous: 2 });
