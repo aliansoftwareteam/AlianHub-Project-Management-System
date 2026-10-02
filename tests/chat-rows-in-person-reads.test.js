@@ -90,13 +90,13 @@ beforeEach(() => { jest.clearAllMocks(); seedRows(); });
 describe('the files of a thread', () => {
     const cases = Object.entries(THREADS).flatMap(([name, [thread, kind]]) => EVERYONE.map(([who, uid]) => [name, who, uid, thread, kind]));
 
-    it.each(cases)('of %s are listed for %s when the comment routes open that thread for them, and are none otherwise', async (name, who, uid, thread, kind) => {
+    it.each(cases)('of %s are listed for %s when the comment routes open that thread for them, and are refused as its comments are otherwise', async (name, who, uid, thread, kind) => {
         const opens = (await commentThreadAccess(CID, uid, thread)).allowed;
         /* The two ways of asking for the conversation read the same thread, so each lists the files of both. */
         const inThread = Object.entries(THREADS).filter(([, [other]]) => JSON.stringify(other) === JSON.stringify(thread)).map(([other]) => other);
 
-        expect(await gallery(uid, thread, kind)).toEqual({ code: 200, files: opens ? inThread.map((other) => `image of ${other}`).sort() : [] });
-        expect(await voices(uid, thread, kind)).toEqual({ code: 200, files: opens ? inThread.map((other) => `audio of ${other}`).sort() : [] });
+        expect(await gallery(uid, thread, kind)).toEqual(opens ? { code: 200, files: inThread.map((other) => `image of ${other}`).sort() } : { code: 404, files: [] });
+        expect(await voices(uid, thread, kind)).toEqual(opens ? { code: 200, files: inThread.map((other) => `audio of ${other}`).sort() } : { code: 404, files: [] });
     });
 
     it.each(EVERYONE)('of a project are listed for %s when they can open it', async (who, uid) => {
@@ -105,7 +105,7 @@ describe('the files of a thread', () => {
     });
 
     it.each(EVERYONE)('are none for %s when the request names no kind of thread the panel has', async (who, uid) => {
-        expect(await gallery(uid, { projectId: P_OPEN, sprintId: L_OPEN, taskId: T_OPEN }, 'everything')).toEqual({ code: 200, files: [] });
+        expect(await gallery(uid, { projectId: P_OPEN, sprintId: L_OPEN, taskId: T_OPEN }, 'everything')).toEqual({ code: 400, files: [] });
         expect(await voices(uid, { projectId: P_OPEN, sprintId: L_OPEN, taskId: T_OPEN }, 'everything')).toEqual({ code: 400, files: [] });
     });
 });
