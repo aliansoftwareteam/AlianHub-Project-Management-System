@@ -25,7 +25,7 @@
                                             <img v-if="viewCurrentPassword === 'password'" src="@/assets/images/password_view_hide.png" class="password-view"/>
                                             <img v-else src="@/assets/images/password_view_show.png" class="password-view"/>
                                         </span>
-                                        <div class="invalid-feedback red pt-5px error-capitalize">{{ formDataChangePassword.currentPassword.error }}
+                                        <div class="invalid-feedback change-password-red pt-5px error-capitalize">{{ formDataChangePassword.currentPassword.error }}
                                         </div>
                                     </div>
                                     <div class="inputfield position-re">
@@ -45,7 +45,7 @@
                                             <img v-if="viewPassword === 'password'" src="@/assets/images/password_view_hide.png" class="password-view"/>
                                             <img v-else src="@/assets/images/password_view_show.png" class="password-view"/>
                                         </span>
-                                        <div class="invalid-feedback red pt-5px error-capitalize">{{ formDataChangePassword.newPassword.error }}</div>
+                                        <div class="invalid-feedback change-password-red pt-5px error-capitalize">{{ formDataChangePassword.newPassword.error }}</div>
                                     </div>
                                     <div class="inputfield position-re">
                                         <label>
@@ -64,7 +64,7 @@
                                             <img v-if="viewConfirmPassword === 'password'" src="@/assets/images/password_view_hide.png" class="password-view"/>
                                             <img v-else src="@/assets/images/password_view_show.png" class="password-view"/>
                                         </span>
-                                        <div class="invalid-feedback red pt-5px error-capitalize">{{ confirmationErr }}</div>
+                                        <div class="invalid-feedback change-password-red pt-5px error-capitalize">{{ confirmationErr }}</div>
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center justify-content-start mysetiing_save">
@@ -237,4 +237,10 @@
 
 <style scoped>
 @import '../MySettings/style.css';
+</style>
+
+<style scoped>
+.change-password-red {
+    color: var(--danger-ink);
+}
 </style>

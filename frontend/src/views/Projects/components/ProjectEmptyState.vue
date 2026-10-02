@@ -1,11 +1,11 @@
 <template>
-    <div class="bg-light-gray d-flex align-items-center justify-content-center flex-column w-100 h-100">
+    <div class="project-empty-state-bg-light-gray d-flex align-items-center justify-content-center flex-column w-100 h-100">
         <img :src="noProjectsIcon" alt="noProjectsIcon">
         <template v-if="!showArchivedProjects">
             <h2>{{ $t('ProjectSlider.you_dont') }}</h2>
             <div v-if="canCreate && !isFilterHasData" class="d-flex justify-content-center align-items-center mt-2">
-                <button class="outline-primary font-size-16 p0x-13px" @click="$emit('createProject')">+ {{ $t('ProjectSlider.new_project') }}</button>
-                <button v-if="canUseAi()" class="outline-primary ml-1 font-size-16 p0x-13px" @click="$emit('createAiProject')">✦ {{ $t('Projects.create_with_ai') }}</button>
+                <button class="outline-primary project-empty-state-font-size-16 p0x-13px" @click="$emit('createProject')">+ {{ $t('ProjectSlider.new_project') }}</button>
+                <button v-if="canUseAi()" class="outline-primary ml-1 project-empty-state-font-size-16 p0x-13px" @click="$emit('createAiProject')">✦ {{ $t('Projects.create_with_ai') }}</button>
             </div>
         </template>
         <template v-else>
@@ -30,3 +30,12 @@ defineEmits(['createProject', 'createAiProject', 'hideArchive']);
 
 const noProjectsIcon = require('@/assets/images/svg/No-Search-Result.svg');
 </script>
+
+<style scoped>
+.project-empty-state-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.project-empty-state-font-size-16 {
+    font-size: 16px;
+}
+</style>

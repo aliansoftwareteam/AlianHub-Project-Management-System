@@ -5,8 +5,8 @@
         :role="role"
         :tabindex="role ? -1 : undefined"
         :aria-selected="role === 'option' ? String(selected) : undefined"
-        class="d-flex align-items-center  hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px"
-        :class="{'bg-gray91 border-radius-8-px': clientWidth <= 767 , 'border-radius-4-px' : clientWidth > 767,'bg-blue white': highlight}"
+        class="d-flex align-items-center  drop-down-option-hover-bg-lighter-gray-dropdown drop-down-option-hover-purple cursor-pointer text-nowrap drop-down-item drop-down-option-gray81 p-7px"
+        :class="{'drop-down-option-bg-gray91 border-radius-8-px': clientWidth <= 767 , 'border-radius-4-px' : clientWidth > 767,'drop-down-option-bg-blue drop-down-option-white': highlight}"
         @click.prevent="$emit('click')"
     >
         <slot>
@@ -71,4 +71,25 @@ onUpdated(hideInnerCheckboxes);
 
 <style>
 @import "./style.css";
+</style>
+
+<style scoped>
+.drop-down-option-hover-bg-lighter-gray-dropdown:hover {
+    background-color: var(--surface-hover) !important;
+}
+.drop-down-option-hover-purple:hover {
+    color: var(--brand) !important;
+}
+.drop-down-option-gray81 {
+    color: var(--ink-2);
+}
+.drop-down-option-bg-gray91 {
+    background-color: var(--fill);
+}
+.drop-down-option-bg-blue {
+    background-color: var(--brand);
+}
+.drop-down-option-white {
+    color: var(--on-brand) !important;
+}
 </style>

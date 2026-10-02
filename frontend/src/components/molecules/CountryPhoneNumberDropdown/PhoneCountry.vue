@@ -5,7 +5,7 @@
                 <span class="imageCountry text-ellipsis">
                 <span class="ah-sr-only">{{ $t('Common.country_code_of', { country: activeCountry?.name || '' }) }}</span>
                 <div class="vti__flag" :class="activeCountry?.isoCode.toLowerCase()"></div>
-                <span v-if="enabledCountryCode" class="black activeCountrydialCode">+{{ activeCountry?.dialCode }}</span>
+                <span v-if="enabledCountryCode" class="phone-country-black activeCountrydialCode">+{{ activeCountry?.dialCode }}</span>
                 </span>
                 <img v-if="enabledArrowIcon" :src="arrow" alt="" class="dropdown-arrow">
             </div>
@@ -180,4 +180,10 @@
     }
 </script>
 <style src="./style.css">
+</style>
+
+<style scoped>
+.phone-country-black {
+    color: var(--ink);
+}
 </style>

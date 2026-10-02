@@ -16,8 +16,8 @@
                         <img :src="item.image">
                     </div>
                     <div>
-                        <span class="d-block black ostype">{{item.type}}</span>
-                        <span class="gray osversion">{{ item.version }}</span>
+                        <span class="d-block time-tracking-black ostype">{{item.type}}</span>
+                        <span class="time-tracking-gray osversion">{{ item.version }}</span>
                     </div>
                 </div>
             </div>
@@ -75,4 +75,13 @@ onMounted(() => {
 
 <style scoped>
 @import './style.css';
+</style>
+
+<style scoped>
+.time-tracking-black {
+    color: var(--ink);
+}
+.time-tracking-gray {
+    color: var(--ink-2);
+}
 </style>

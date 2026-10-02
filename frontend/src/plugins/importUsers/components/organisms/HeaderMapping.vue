@@ -5,7 +5,7 @@
         </div>
         <div class="ml-10px mr-10px mh-60vh overflow-y-auto mt-20px d-flex flex-column scrollable-container">
             <div v-for="(header, index) in headerData" :key="index"
-                class="d-flex justify-content-between border-radius-5-px bg-white">
+                class="d-flex justify-content-between border-radius-5-px header-mapping-bg-white">
                 <!-- If the header is ignored, display IgnoredField component -->
                 <template v-if="header?.isIgnored">
                     <IgnoredField :header="header?.userHeader" @editIgnoredField="toggleIgnoreField(index)" />
@@ -349,5 +349,11 @@ defineExpose({
 <style scoped>
 .scrollable-container {
     gap: 20px;
+}
+</style>
+
+<style scoped>
+.header-mapping-bg-white {
+    background-color: var(--surface);
 }
 </style>
