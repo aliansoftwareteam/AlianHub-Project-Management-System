@@ -242,4 +242,47 @@ const labelOf = (row) => {
     return AGENT_ROWS.includes(row.action) ? actionLabel(tried) || happened : happened;
 };
 
-module.exports = { EVENTS, ACTIONS, AGENT_ROWS, labelOf };
+const TYPED_MAX = 120;
+const SENT_MAX = 60;
+const CODE = /^[a-z][a-z0-9_]*$/;
+const NO_KEYS = Object.freeze({ events: [], actions: [], reasons: [] });
+
+const slugOf = (key) => String(key).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+
+const sent = (list) => (typeof list === 'string' ? list.split(',') : []).map((slug) => slug.trim()).filter((slug) => CODE.test(slug)).slice(0, SENT_MAX);
+
+const registryLabels = () => {
+    const registry = require('../Agents/registry');
+    return Object.fromEntries(registry.keys().map((key) => [key, String(registry.get(key).label || '')]));
+};
+
+const labelled = (labels, typed, slugs) => Object.keys(labels).filter((key) => labels[key].toLowerCase().includes(typed) || slugs.includes(slugOf(key)));
+
+/* The keys whose words hold what was typed: the English words here, and the keys the reader's own language matched,
+ * which the web app sends as slugs (frontend/src/views/Ai/auditWords.js). A sent slug is only ever compared with a
+ * key held here, and a reason code is letters, digits and underscores, so nothing sent is read as a pattern.
+ * An agent's row is shown by what the agent did, never by the words of its event. */
+const keysFor = (typed, { qEvents, qActions, qReasons } = {}) => {
+    const text = String(typed || '').trim().toLowerCase().slice(0, TYPED_MAX);
+    if (!text) return NO_KEYS;
+    return {
+        events: labelled(EVENTS, text, sent(qEvents)).filter((key) => !AGENT_ROWS.includes(key)),
+        actions: labelled({ ...registryLabels(), ...ACTIONS }, text, sent(qActions)),
+        reasons: sent(qReasons),
+    };
+};
+
+const codeOf = (reason) => String(reason || '').split(':')[0];
+
+const rowHolds = (row, keys) => {
+    const meta = (row && row.meta) || {};
+    return keys.events.includes(row && row.action) || keys.actions.includes(meta.action) || keys.reasons.includes(codeOf(meta.reason));
+};
+
+const clausesFor = (keys) => [
+    ...(keys.events.length ? [{ action: { $in: keys.events } }] : []),
+    ...(keys.actions.length ? [{ 'meta.action': { $in: keys.actions } }] : []),
+    ...(keys.reasons.length ? [{ 'meta.reason': { $regex: `^(${keys.reasons.join('|')})(:|$)` } }] : []),
+];
+
+module.exports = { EVENTS, ACTIONS, AGENT_ROWS, labelOf, keysFor, rowHolds, clausesFor };

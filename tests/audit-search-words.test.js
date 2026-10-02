@@ -74,7 +74,8 @@ describe('searching the audit log by the words on screen', () => {
 
     it('reads what was typed as text, not as a pattern', async () => {
         expect(await list({ q: '(.*' })).toEqual([]);
-        expect(await list({ q: '.' })).toEqual([]);
+        expect(await list({ q: 'M.ra' })).toEqual([]);
+        expect(await list({ q: 'Mira' })).toEqual(['Mira']);
     });
 
     it('asks the workspace\'s own rows only', async () => {
