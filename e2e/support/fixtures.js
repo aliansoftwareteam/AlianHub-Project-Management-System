@@ -133,8 +133,8 @@ async function firstSprint(api, projectId, { timeoutMs = 15000, intervalMs = 100
 }
 
 /* Same payload the create-task forms send (see ConvertNoteToTask.vue). */
-async function createTask(api, { project, name, user, companyOwnerId, assigneeIds = [] }) {
-    const sprint = await firstSprint(api, project._id);
+async function createTask(api, { project, name, user, companyOwnerId, assigneeIds = [], sprint: inSprint }) {
+    const sprint = inSprint || await firstSprint(api, project._id);
     if (!sprint) throw new Error(`project ${project._id} has no sprint to hold a task`);
     const sprintId = String(sprint._id || sprint.id);
     const status = project.taskStatusData.find((x) => x.type === 'default_active');
