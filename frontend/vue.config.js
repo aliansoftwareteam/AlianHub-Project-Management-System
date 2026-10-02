@@ -4,6 +4,7 @@ const path = require('path');
 const webpack = require('webpack');
 const { FIRST_PAINT_BUDGET_BYTES } = require('./firstPaintBudget');
 const brandSettings = require('../brandSettings.json');
+const { ShellWorkerPlugin } = require('./shellWorkerPlugin');
 const imageURL = `/api/v1/getlogo?key=logo&type=web`;
 
 module.exports = defineConfig({
@@ -123,7 +124,10 @@ module.exports = defineConfig({
             content: '315'
           },
         }
-      })
+      }),
+      // The dev server gets no sw.js, and the app does not register one there.
+      // "login" is the webpackChunkName of the sign-in page in src/router/auth: it has to open with no network.
+      ...(process.env.NODE_ENV === 'production' ? [new ShellWorkerPlugin({ firstPaintChunks: ['login'] })] : [])
     ]
   },
   chainWebpack: config => {

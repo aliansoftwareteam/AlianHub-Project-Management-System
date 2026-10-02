@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installChunkRecovery, isChunkLoadError } from '@/config/chunkRecovery';
+import { away, isOnline, unreachable, pageUnavailable } from '@/offline';
 
 const chunkError = () => Object.assign(new Error('Loading chunk project-list-view failed.'), { name: 'ChunkLoadError' });
 
@@ -32,6 +33,9 @@ describe('installChunkRecovery', () => {
     let listeners;
 
     beforeEach(() => {
+        isOnline.value = true;
+        unreachable.value = false;
+        pageUnavailable.value = false;
         window.sessionStorage.clear();
         reload = vi.fn();
         vi.spyOn(window, 'location', 'get').mockReturnValue({ ...window.location, reload });
@@ -50,6 +54,42 @@ describe('installChunkRecovery', () => {
         installChunkRecovery({ config: {} }, router);
         router.handler(chunkError());
         expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reload while the app is away: the same file would be missing again', () => {
+        isOnline.value = false;
+        const router = fakeRouter();
+        installChunkRecovery({ config: {} }, router);
+        router.handler(chunkError());
+        expect(reload).not.toHaveBeenCalled();
+    });
+
+    it('says the page cannot open when the first page of a visit fails that way', () => {
+        isOnline.value = false;
+        const router = { ...fakeRouter(), currentRoute: { value: { matched: [] } } };
+        router.onError = (fn) => { router.handler = fn; };
+        installChunkRecovery({ config: {} }, router);
+        router.handler(chunkError());
+        expect(pageUnavailable.value).toBe(true);
+    });
+
+    it('leaves a page that is already on screen in place when a later one fails that way', () => {
+        isOnline.value = false;
+        const router = { currentRoute: { value: { matched: [{}] } } };
+        router.onError = (fn) => { router.handler = fn; };
+        installChunkRecovery({ config: {} }, router);
+        router.handler(chunkError());
+        expect(pageUnavailable.value).toBe(false);
+    });
+
+    it('leaves the offline banner to speak when a lazy panel chunk is missing while away', () => {
+        isOnline.value = false;
+        const app = { config: {} };
+        installChunkRecovery(app, fakeRouter());
+        app.config.errorHandler(chunkError(), null, 'async component loader');
+        expect(reload).not.toHaveBeenCalled();
+        expect(pageUnavailable.value).toBe(false);
+        expect(away.value).toBe(true);
     });
 
     it('does not reload a second time within the guard window', () => {

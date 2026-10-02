@@ -61,6 +61,7 @@
                             <ShellIcon :name="shellState.theme === 'dark' ? 'sun' : 'moon'" :size="16" />
                             <span>{{ shellState.theme === 'dark' ? $t('Shell.theme_light') : $t('Shell.theme_dark') }}</span>
                         </button>
+                        <InstallAppItem :size="16" @done="sheet = false" />
                         <button type="button" class="ah-pop__item" @click="logout()">
                             <ShellIcon name="logout" :size="16" /><span>{{ $t('Shell.logout') }}</span>
                         </button>
@@ -75,6 +76,7 @@
 import { computed, inject, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import ShellIcon from "./ShellIcon.vue";
+import InstallAppItem from "./InstallAppItem.vue";
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
 import { useGetterFunctions } from "@/composable/index.js";
 import { useAuth } from "@/services";

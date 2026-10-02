@@ -4,6 +4,7 @@ import Cookies from 'js-cookie';
 import Store from "@/store/index";
 import { useCustomComposable } from '@/composable';
 import * as offline from '@/offline';
+import { dropWorkerRuntimeCaches } from '@/serviceWorker/registration';
 import { forgetLocalePrefs } from '@/views/Settings/Language/localePrefs';
 import { installBusyHandling } from './busy';
 const { logOut } = useAuth();
@@ -329,6 +330,7 @@ export function useAuth() {
         localStorage.removeItem('logged');
         forgetLocalePrefs();
         try { offline.clearOffline(); } catch (e) { /* offline cleanup best-effort */ }
+        dropWorkerRuntimeCaches();
         if(value?.withOutRefresh !== true){
             window.location.reload();
         }

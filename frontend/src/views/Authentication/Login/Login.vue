@@ -9,9 +9,9 @@
             <h1 class="auth__title">{{ $t('Auth.welcome_back') }}</h1>
             <p class="auth__lead">{{ $t('Auth.login_to_workspace') }}</p>
 
-            <div v-if="banner" class="auth__banner" :class="`auth__banner--${banner.kind}`">
-                <ShellIcon :name="banner.kind === 'ok' ? 'check' : 'alert'" :size="15" />
-                <span>{{ banner.text }}</span>
+            <div v-if="shownBanner" class="auth__banner" :class="`auth__banner--${shownBanner.kind}`">
+                <ShellIcon :name="shownBanner.kind === 'ok' ? 'check' : 'alert'" :size="15" />
+                <span>{{ shownBanner.text }}</span>
             </div>
 
             <div v-if="providers.length" class="auth__providers">
@@ -178,6 +178,7 @@ import { apiRequestWithoutCompnay, apiRequestWithoutSecure, getAuth, SESSION_EXP
 import * as env from "@/config/env";
 import { publicConfig, enabledProviders } from "@/config/publicConfig";
 import { forgetRememberedEmail, readRememberedEmail, saveRememberedEmail } from "@/utils/rememberedLogin";
+import { away } from "@/offline";
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -198,6 +199,7 @@ const busy = ref(false);
 const showPassword = ref(false);
 const rememberMe = ref(false);
 const banner = ref(null);
+const shownBanner = computed(() => (away.value ? { kind: "warn", text: t("Auth.offline_sign_in") } : banner.value));
 const emailInput = ref(null);
 const form = reactive({ email: localStorage.getItem("ForgotEmail") || "", password: "" });
 const errors = reactive({ email: "", password: "" });
