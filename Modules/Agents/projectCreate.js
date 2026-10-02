@@ -188,24 +188,24 @@ const liveIn = (companyId, type, projectId) => MongoDbCrudOpration(companyId, {
     type, data: [{ ProjectID: { $in: idForms(projectId) }, deletedStatusKey: { $ne: TRASHED } }, { _id: 1 }],
 }, 'findOne');
 
-const whyKept = async (companyId, projectId) => {
-    if (await liveIn(companyId, SCHEMA_TYPE.TASKS, projectId)) return 'it holds a task now; delete the project in AlianHub if it should go';
-    if (await liveIn(companyId, SCHEMA_TYPE.PAGES, projectId)) return 'it holds a doc now; delete the project in AlianHub if it should go';
-    return '';
+const heldIn = async (companyId, projectId) => {
+    if (await liveIn(companyId, SCHEMA_TYPE.TASKS, projectId)) return 'a task';
+    return await liveIn(companyId, SCHEMA_TYPE.PAGES, projectId) ? 'a doc' : '';
 };
 
 /* Taking a project back moves it to the trash through the project's own route, as the person undoing, who must be
- * allowed to delete it by hand. A person restores it from the trash. A project that holds work by then stays. */
+ * allowed to delete it by hand. A person restores it from the trash. A project that holds work by then stays, and
+ * the undo is refused with the reason, so the person is told and can undo again once the work is moved. */
 const withdraw = async ({ companyId, who, projectId }) => {
     const project = await storedProject(companyId, projectId);
     const inProject = idOf(project._id);
     const name = project.ProjectName || '';
-    const reason = await whyKept(companyId, inProject);
-    if (reason) return { projectId: inProject, removed: false, kept: [{ part: UNDO_KIND, name, reason }] };
+    const held = await heldIn(companyId, inProject);
+    if (held) throw refuse(`the project "${name}" holds ${held} now, so it stays; delete it in AlianHub if it should go`);
     const answer = await setup.answerOf('projectUpdate', { companyId, who, params: { id: inProject }, body: { updateObject: { deletedStatusKey: TRASHED } } });
-    if (answer.code !== 200) throw refuse(answer.code === 403 ? 'you may not delete this project, so it was not moved to the trash' : setup.reasonOf(answer, 'the project was not moved to the trash'));
+    if (answer.code !== 200) throw refuse(answer.code === 403 ? `you may not delete the project "${name}", so it stays` : setup.reasonOf(answer, 'the project was not moved to the trash'));
     socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: { ...plain(project), deletedStatusKey: TRASHED }, updatedFields: { deletedStatusKey: TRASHED }, module: 'project' });
-    return { projectId: inProject, removed: true, name, kept: [] };
+    return { projectId: inProject, name, trashed: true };
 };
 
 const executors = {

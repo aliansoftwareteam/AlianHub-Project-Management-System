@@ -332,9 +332,10 @@ describe('undo moves the project to the trash', () => {
         const projectId = String(made()._id);
         const out = await undo(id);
         expect(out.error).toBeUndefined();
-        expect(out.results[0]).toMatchObject({ ok: true, result: { projectId, removed: true, kept: [] } });
+        expect(out.results[0]).toMatchObject({ ok: true, result: { projectId, name: NAME, trashed: true } });
         expect(projectsNamed()).toHaveLength(1);
         expect(Number(made().deletedStatusKey)).toBe(1);
+        expect(audits(TOOL, 'applied')[0].meta.undoneAt).toBeTruthy();
         expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', companyId: CID, updatedFields: { deletedStatusKey: 1 } }));
         expect(rows(SCHEMA_TYPE.SPRINTS).filter((row) => String(row.projectId) === projectId)).toHaveLength(3);
     });
@@ -343,15 +344,15 @@ describe('undo moves the project to the trash', () => {
         const first = await filed(as(INSIDER));
         await approve(first);
         mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Draft the brief', ProjectID: String(made()._id), CompanyId: CID, statusKey: 1, deletedStatusKey: 0 });
-        const kept = (await undo(first)).results[0];
-        expect(kept).toMatchObject({ ok: true, result: { removed: false, kept: [{ part: 'project', name: NAME, reason: expect.stringMatching(/task/) }] } });
+        expect((await undo(first)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/"Website relaunch" holds a task now, so it stays/) });
         expect(Number(made().deletedStatusKey || 0)).toBe(0);
+        expect(audits(TOOL, 'applied')[0].meta.undoneAt).toBeFalsy();
 
         const second = await filed(as(INSIDER), { name: 'Hiring' });
         await approve(second);
         const [hiring] = projectsNamed('Hiring');
         mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Role notes', ProjectID: String(hiring._id), createdBy: INSIDER, deletedStatusKey: 0 });
-        expect((await undo(second)).results[0].result).toMatchObject({ removed: false, kept: [{ part: 'project', reason: expect.stringMatching(/doc/) }] });
+        expect((await undo(second)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/holds a doc now/) });
         expect(Number(projectsNamed('Hiring')[0].deletedStatusKey || 0)).toBe(0);
     });
 
@@ -361,7 +362,7 @@ describe('undo moves the project to the trash', () => {
         setRule('project_delete', false, [3]);
         setRule('project_close', false, [3]);
         const out = await undo(id);
-        expect(out.results[0].ok).toBe(false);
+        expect(out.results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/may not delete/) });
         expect(Number(made().deletedStatusKey || 0)).toBe(0);
     });
 });
