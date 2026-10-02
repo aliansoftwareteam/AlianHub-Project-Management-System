@@ -1466,11 +1466,11 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
             // truth). The project doc's denormalized `sprintsObj` can be empty on
             // a freshly-loaded doc, which is why the earlier id lookup missed.
             const sprintRow = await withTimeout(loadSprintForTasks(companyId, targetSprintId), 45000, 'loadSprintForTasks');
-            if (!sprintRow) throw new Error('Target sprint not found in this project');
+            if (!sprintRow) throw new Error('Target list not found in this project');
             // Defensive: keep the tasks in the project they were requested for.
             const sprintProjectId = String(sprintRow.projectId || sprintRow.ProjectID || sprintRow.projectID || '');
             if (sprintProjectId && sprintProjectId !== String(projectDoc._id)) {
-                throw new Error('Target sprint is not in this project');
+                throw new Error('Target list is not in this project');
             }
             const sprintDoc = { _id: sprintRow._id, name: sprintRow.name || sprintRow.sprintName || 'Sprint' };
             const tasks = Array.isArray(tasksPlan.tasks) ? tasksPlan.tasks : [];

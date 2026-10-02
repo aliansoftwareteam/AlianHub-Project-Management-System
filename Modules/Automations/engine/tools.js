@@ -340,7 +340,7 @@ const createTask = async (companyId, projectId, { title, description = '', sprin
         const _sid = oid(sprintId);
         sprintDoc = _sid ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: _sid }] }, 'findOne').catch(() => null) : null;
         const owner = sprintDoc && (sprintDoc.projectId || sprintDoc.ProjectID || sprintDoc.ProjectId);
-        if (!sprintDoc || (owner && String(owner) !== String(project._id))) throw new DeterministicError(`sprint ${sprintId} is not in this project`);
+        if (!sprintDoc || (owner && String(owner) !== String(project._id))) throw new DeterministicError(`list ${sprintId} is not in this project`);
     } else {
         // The schema requires a list; without a choice the task goes into the project's oldest live one.
         const lists = await Promise.resolve(MongoDbCrudOpration(companyId, {

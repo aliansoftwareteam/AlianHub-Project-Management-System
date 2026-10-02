@@ -41,14 +41,14 @@ const sprintUpdateFrom = (updateObject) => {
     Object.entries(updateObject).forEach(([operator, fields]) => {
         if (operator === '$set') {
             fieldsOf(operator, fields).forEach(([field, value]) => {
-                if (!SPRINT_SET_FIELDS[field] || !SPRINT_SET_FIELDS[field](value)) throw new ListWriteError(`A sprint update cannot set ${field} to that value.`);
+                if (!SPRINT_SET_FIELDS[field] || !SPRINT_SET_FIELDS[field](value)) throw new ListWriteError(`A list update cannot set ${field} to that value.`);
             });
         } else if (ONE_PERSON_OPERATORS.includes(operator)) {
             fieldsOf(operator, fields).forEach(([field, value]) => {
                 if (!PEOPLE.includes(field) || !isPerson(value)) throw new ListWriteError(`${operator} takes one member or watcher at a time.`);
             });
         } else {
-            throw new ListWriteError(`A sprint update cannot use ${operator}.`);
+            throw new ListWriteError(`A list update cannot use ${operator}.`);
         }
         update[operator] = { ...fields };
     });
@@ -89,7 +89,7 @@ const mayOpenSprint = async (companyId, uid, sprint) => canSeeSprint(sprint, awa
  */
 const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     const update = sprintUpdateFrom(updateObject);
-    if (!OBJECT_ID.test(String(sprintId || ''))) throw new ListWriteError('A valid sprint id is required.');
+    if (!OBJECT_ID.test(String(sprintId || ''))) throw new ListWriteError('A valid list id is required.');
     const sprint = await findOne(companyId, SCHEMA_TYPE.SPRINTS, { _id: oid(sprintId) }, { projectId: 1, private: 1, AssigneeUserId: 1 });
     if (!sprint) return null;
     if (!(await mayOpenSprint(companyId, uid, sprint))) throw new ListWriteError('Sprint not found.', 404);

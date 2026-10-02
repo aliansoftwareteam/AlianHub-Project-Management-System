@@ -96,7 +96,7 @@ exports.createInbox = async (req, res) => {
         let folderObjId = '';
         if (!sprintId || !sprintArray) {
             const def = await resolveDefaultSprint(companyId, projectId);
-            if (!def) return res.send({ status: false, statusText: 'This project has no sprint to receive tasks — create a sprint first.' });
+            if (!def) return res.send({ status: false, statusText: 'This project has no list to receive tasks — create a list first.' });
             sprintId = def.sprintId; sprintArray = def.sprintArray; folderObjId = def.folderObjId || '';
         }
 
