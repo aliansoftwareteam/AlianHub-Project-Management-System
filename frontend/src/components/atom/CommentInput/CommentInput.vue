@@ -44,6 +44,7 @@
                                 <span class="ah-avatar ah-avatar--sm ah-avatar--agent mr-10px" aria-hidden="true">{{ agent.name.slice(0, 1).toUpperCase() }}</span>
                                 <span>{{ agent.name }}</span>
                                 <span class="ah-chip ah-chip--agent ah-chip--mono ml-10px">{{ $t('TaskPanel.agent_tag') }}</span>
+                                <span v-if="agent.note" class="comment-input__agent-note font-size-12 ml-10px">{{ agent.note }}</span>
                             </li>
                         </ul>
                     </li>
@@ -128,6 +129,7 @@ import {defineProps, defineEmits, computed, onMounted, onBeforeUnmount, watch, r
 // COMPONENTS
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue"
 import { agentMentionKey, mentionName } from "@/utils/agentMention";
+import { twinNotes } from "@/utils/agentTwins";
 import { AI_MENTION_KEY, AI_MENTION_NAME } from "@/utils/aiMention";
 import { canUseAi } from "@/composable/aiAvailability";
 
@@ -239,9 +241,12 @@ const filteredUsers = computed(() => {
     return users.value.filter((x) => !x.ghost && x.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase()))
 });
 
-const filteredAgents = computed(() => props.agents
-    .map((agent) => (agent.mentionKey ? { name: mentionName(agent.name), key: agent.mentionKey } : { name: agent.name, key: agentMentionKey(agent._id) }))
-    .filter((agent) => agent.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase())));
+const filteredAgents = computed(() => {
+    const noteOf = twinNotes(props.agents.filter((agent) => !agent.mentionKey));
+    return props.agents
+        .map((agent) => (agent.mentionKey ? { name: mentionName(agent.name), key: agent.mentionKey } : { name: agent.name, key: agentMentionKey(agent._id), note: noteOf(agent) }))
+        .filter((agent) => agent.name.replaceAll(" ", "").toLowerCase().includes(mentionSearch.value.toLowerCase()));
+});
 
 const aiOption = { name: AI_MENTION_NAME, key: AI_MENTION_KEY };
 const showAiOption = computed(() => props.aiMention && canUseAi()
