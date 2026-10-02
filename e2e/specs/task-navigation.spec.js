@@ -1,5 +1,5 @@
 /* eslint-env browser */
-const { test, expect, asRole, skipConsoleGuard } = require('../support/test');
+const { test, expect, asRole } = require('../support/test');
 const { createProject, createTask, uniqueSuffix } = require('../support/fixtures');
 
 const skipFirstRun = (page) => page.addInitScript(() => {
@@ -12,7 +12,6 @@ test.describe('task detail navigation', () => {
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
     test('j and k walk the list the task was opened from, and history and reload follow', async ({ page, state, loginAs }) => {
-        skipConsoleGuard('Stepping between tasks throws "Cannot read properties of null (reading \'style\')" in the page.');
         const owner = await loginAs('owner');
         const suffix = uniqueSuffix();
         const project = await createProject(owner.api, { name: `NAV ${suffix}`, assigneeIds: [owner.uid], createdBy: owner.uid });
