@@ -1,5 +1,6 @@
 'use strict';
 
+const { AsyncResource } = require('async_hooks');
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
@@ -55,8 +56,12 @@ const cancel = (companyId, pageId) => {
     return true;
 };
 
+/* What waits for a doc to be left alone is told for its last editor, long after the save that started the wait: bound
+ * here, where no request is running, it runs under no token's project list, no agent's mark and no request. */
+const runOutsideAnyRequest = AsyncResource.bind((what, run) => run().catch(logged(what)));
+
 const after = (ms, what, run) => {
-    const timer = setTimeout(() => run().catch(logged(what)), ms);
+    const timer = setTimeout(() => runOutsideAnyRequest(what, run), ms);
     if (typeof timer.unref === 'function') timer.unref();
     return timer;
 };
