@@ -1780,6 +1780,7 @@ export default {
         "empty_title": "Docs hold what your team writes down",
         "empty_msg": "Use a doc for a brief, a decision or meeting notes, then link the tasks that carry it out. Add the first one and it will appear here.",
         "docs": "Docs",
+        "view_select": "Show docs",
         "wiki": "Wiki",
         "new_doc": "New doc",
         "new_wiki_page": "New wiki page",

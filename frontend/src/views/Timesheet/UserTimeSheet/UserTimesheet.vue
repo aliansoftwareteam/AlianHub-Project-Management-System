@@ -408,7 +408,7 @@ onMounted(() => {
 .ut2-row--total .ut2-task { font: 600 var(--row-font, 12.5px)/1.2 var(--font-ui); }
 .ut2-row--total .is-today { color: var(--brand); }
 .ut2-row .is-empty { color: var(--ink-2); }
-.ut2-row .is-off { opacity: .7; }
+.ut2-row .is-off { color: var(--ink-2); }
 .ut2-task { text-align: left; font: 400 var(--row-font, 12.5px)/1.3 var(--font-ui); display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ut2-task__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ut2-bill { margin-left: auto; flex: none; height: 20px; padding: 0 7px; border-radius: var(--r-chip); border: 1px solid var(--border); background: transparent; color: var(--ink-2); font: 600 10.5px/1 var(--font-ui); cursor: pointer; transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
