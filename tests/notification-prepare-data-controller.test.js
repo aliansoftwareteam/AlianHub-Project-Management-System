@@ -3,6 +3,7 @@ const mockUsers = jest.fn();
 const mockCount = jest.fn();
 const mockWasabi = jest.fn();
 const mockWake = jest.fn();
+const mockCanRead = jest.fn();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../Config/config.js', () => ({}));
@@ -13,6 +14,7 @@ jest.mock('../Modules/notification-count/controller', () => ({ updateUnReadComme
 jest.mock('../Modules/storage/wasabi/controller.js', () => ({ getUserProfilePresignedUrlCallBackFunction: (...a) => mockWasabi(...a) }));
 jest.mock('../Modules/Inbox/helpers/inboxState', () => ({ wakeOnActivity: (...a) => mockWake(...a) }));
 jest.mock('../event/socketEventEmitter.js', () => ({ emit: jest.fn() }));
+jest.mock('../Config/projectAccess', () => ({ canReadProject: (...a) => mockCanRead(...a) }));
 
 const verified = require('./fixtures/verifiedRequest');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
@@ -29,6 +31,7 @@ const BOB = '6f0000000000000000000002';
 const EVE = '6f0000000000000000000003';
 const LEAD = '6f0000000000000000000004';
 const PROJECT = '6f0000000000000000000701';
+const HIDDEN_PROJECT = '6f0000000000000000000702';
 const TASK = '6f0000000000000000000801';
 const MENTION = "comments_I'm_@mentioned_in";
 
@@ -47,9 +50,12 @@ const user = (id, over = {}) => ({ _id: id, Employee_Email: `${id}@x.io`, Employ
 const savedTo = (scope) => MongoDbCrudOpration.mock.calls.filter((c) => c[0] === scope && c[2] === 'save').map((c) => c[1].data);
 
 let seats;
+let readers;
 beforeEach(() => {
     jest.clearAllMocks();
     seats = [ME, BOB, LEAD];
+    readers = { [PROJECT]: [ME, BOB, EVE, LEAD], [HIDDEN_PROJECT]: [BOB] };
+    mockCanRead.mockImplementation(async (companyId, uid, projectId) => ({ allowed: companyId === C && (readers[projectId] || []).includes(String(uid)) }));
     MongoDbCrudOpration.mockImplementation(async (scope, obj, method) => {
         if (method === 'find' && obj.type === SCHEMA_TYPE.COMPANY_USERS) {
             const wanted = obj.data[0].userId.$in;
@@ -101,16 +107,36 @@ describe('handleNotification (the HTTP entry)', () => {
         expect(mockSettings).not.toHaveBeenCalled();
     });
 
-    it('answers key, project, message and task errors in the body, like the inner function', async () => {
+    it('answers key, message and task errors in the body, like the inner function', async () => {
         expect((await post({ body: validBody({ key: '' }) })).body).toEqual({ status: false, message: 'key is required.' });
-        expect((await post({ body: validBody({ projectId: '' }) })).body).toEqual({ status: false, message: 'projectId is required.' });
         expect((await post({ body: validBody({ message: '' }) })).body).toEqual({ status: false, message: 'message is required.' });
         expect((await post({ body: validBody({ key: 'tasks', taskId: '' }) })).body).toEqual({ status: false, message: 'taskId is required.' });
+        expect(mockSettings).not.toHaveBeenCalled();
     });
 
-    it('treats a body that is not an object as empty and asks for the key', async () => {
+    it.each([
+        ['an empty project', { projectId: '' }],
+        ['a project that is not text', { projectId: { $ne: '' } }],
+        ['a project the caller cannot open', { projectId: HIDDEN_PROJECT }],
+    ])('answers 404 for %s, reading no seats and notifying nobody', async (_name, over) => {
+        const res = await post({ body: validBody(over) });
+        await flush();
+        expect(res.statusCode).toBe(404);
+        expect(res.body).toEqual({ status: false, message: 'Project not found.' });
+        expect(MongoDbCrudOpration).not.toHaveBeenCalled();
+        expect(mockSettings).not.toHaveBeenCalled();
+    });
+
+    it('asks whether the signed-in person can open the project, in the caller\'s company', async () => {
+        await post({ body: validBody({ userId: BOB }) });
+        expect(mockCanRead.mock.calls[0]).toEqual([C, ME, PROJECT]);
+    });
+
+    it('treats a body that is not an object as empty: no project, so 404', async () => {
         const res = await post({ body: 'oops' });
-        expect(res.body).toEqual({ status: false, message: 'key is required.' });
+        expect(res.statusCode).toBe(404);
+        expect(res.body).toEqual({ status: false, message: 'Project not found.' });
+        expect(mockSettings).not.toHaveBeenCalled();
     });
 
     it('takes the sender from the session, whatever the body claims', async () => {
@@ -133,6 +159,23 @@ describe('handleNotification (the HTTP entry)', () => {
         await post({ body: validBody({ assigneeUsers: [BOB, EVE, BOB] }) });
         await flush();
         expect(mockSettings).toHaveBeenCalledWith([BOB], C);
+    });
+
+    it('drops members who cannot open the project, assignee or leader', async () => {
+        readers[PROJECT] = [ME, BOB];
+        await post({ body: validBody({ assigneeUsers: [BOB, LEAD], task_leader_ID: LEAD }) });
+        await flush();
+        expect(mockSettings).toHaveBeenCalledTimes(1);
+        expect(mockSettings).toHaveBeenCalledWith([BOB], C);
+    });
+
+    it('builds the notice from the listed fields only, leaving out the ones the server fills in', async () => {
+        mockSettings.mockResolvedValue([setting(BOB, 'task_status', { browser: true })]);
+        await post({ body: validBody({ receiverID: EVE, notificationType: 'email', isSeen: true, Employee_Email: 'x@example.test', changeData: ['a'] }) });
+        await flush();
+        const saved = savedTo(C)[0];
+        expect(saved).toMatchObject({ userId: ME, receiverID: BOB, notificationType: 'push', isSeen: false, companyId: C, changeData: {} });
+        expect(saved.Employee_Email).toBe(`${BOB}@x.io`);
     });
 
     it('drops a leader who holds no seat and adds an active one to the receivers', async () => {
