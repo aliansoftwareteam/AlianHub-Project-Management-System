@@ -3,6 +3,7 @@ const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const { getRoleType } = require('../../Config/permissionGuard');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 const access = require('../Agents/access');
+const { personDecides } = require('../Agents/personDecides');
 const revert = require('../Agents/revert');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
@@ -612,6 +613,7 @@ const approvalAnswer = async (companyId, request, caller, statusText, res, extra
  * body: { decision: 'approved' | 'rejected', comment? } */
 exports.decideApproval = async (req, res) => {
     try {
+        if (!(await personDecides(req, res, 'workflow.approval.decide'))) return undefined;
         const ctx = await approvalContext(req, res);
         if (!ctx) return undefined;
         const decision = String((req.body || {}).decision || '');

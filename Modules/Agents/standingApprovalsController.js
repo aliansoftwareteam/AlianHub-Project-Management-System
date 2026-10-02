@@ -4,6 +4,7 @@ const { ROLE_GUEST } = require('../../Config/roleTypes');
 const { canReadProject } = require('../../Config/projectAccess');
 const { callerOf } = require('./access');
 const { agentsRefused } = require('./guard');
+const { isSignedInSession } = require('./personDecides');
 const standingApprovals = require('./standingApprovals');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -18,7 +19,7 @@ const personAt = async (req, res) => {
     const companyId = String(req.headers.companyid || '');
     const projectId = String((req.params && req.params.projectId) || '');
     if (!companyId || !req.uid) { fail(res, 401, 'Unauthorized.'); return null; }
-    if (req.apiToken) { fail(res, 403, TOKEN_REFUSAL); return null; }
+    if (!isSignedInSession(req)) { fail(res, 403, TOKEN_REFUSAL); return null; }
     const caller = await callerOf(req, companyId);
     if (!caller.human) { fail(res, 403, TOKEN_REFUSAL); return null; }
     const role = await getRoleType(companyId, req.uid);

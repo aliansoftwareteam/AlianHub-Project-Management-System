@@ -7598,6 +7598,7 @@
     "Projects.unread_comments_open": "Unread comments: {n}, open",
     "Projects.untitled_page": "Untitled page",
     "Projects.view_options": "Options for the {view} view",
+    "Projects.view_toolbar": "Task view options",
     "Projects.views_tablist": "Project views",
     "Projects.watchers_count": "{n} watcher | {n} watchers",
     "Projects.why_burndown": "Work is {drift}% behind where the dates say it should be ({done}% done, {elapsed}% of the time gone)",

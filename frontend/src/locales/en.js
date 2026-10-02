@@ -6457,6 +6457,7 @@ export default {
         col_none: "— none —",
         auto_archive: "Auto-archive",
         more_features: "More",
+        view_toolbar: "Task view options",
         export_hint: "Download this project's tasks as a file.",
         auto_archive_hint: "Completed tasks untouched for the chosen number of days are archived automatically every night.",
         auto_archive_enable: "Enable auto-archive for this project",

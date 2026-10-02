@@ -3,6 +3,7 @@ const comments = require('./comments');
 const versions = require('./versions');
 const shares = require('./shares');
 const { agentsRefused, pageCreateGuard } = require('../Agents/guard');
+const { decidedByPerson } = require('../Agents/personDecides');
 
 const commentsByPeople = agentsRefused('page.comment');
 const sharesByPeople = agentsRefused('page.share');
@@ -27,7 +28,7 @@ exports.init = (app) => {
     app.put('/api/v2/pages/:id/shares/:userId', sharesByPeople, shares.putShare);
     app.delete('/api/v2/pages/:id/shares/:userId', sharesByPeople, shares.removeShare);
     app.put('/api/v2/pages/:id/review', agentsRefused('page.review'), ctrl.markReviewed);
-    app.put('/api/v2/pages/:id/approve', agentsRefused('page.approve'), ctrl.approvePage);
+    app.put('/api/v2/pages/:id/approve', decidedByPerson('page.approve'), ctrl.approvePage);
     app.put('/api/v2/pages/:id/restore', agentsRefused('page.restore'), ctrl.restorePage);
     app.post('/api/v2/pages/:id/images', agentsRefused('page.image'), ctrl.uploadImage);
     app.get('/api/v2/pages/:id', ctrl.getPage);

@@ -33,6 +33,7 @@ const confidence = require('./engine/confidence');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const triggers = require('./triggers');
 const { agentsRefused } = require('./guard');
+const { personDecides } = require('./personDecides');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
 const companyOf = (req) => String(req.headers['companyid'] || '');
@@ -632,8 +633,9 @@ exports.createProposal = async (req, res) => {
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
-const decide = (fn) => async (req, res) => {
+const decide = (action, fn) => async (req, res) => {
     try {
+        if (!(await personDecides(req, res, action))) return undefined;
         const companyId = companyOf(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid proposal id are required.');
         const caller = await callerOf(req, companyId);
@@ -649,9 +651,9 @@ const decide = (fn) => async (req, res) => {
 
 const approveOnceOrAlways = (companyId, id, { always, ...decision }) => (always ? standingApprovals.approveAlways(companyId, id, decision) : proposals.approve(companyId, id, decision));
 
-exports.approveProposal = decide(approveOnceOrAlways);
-exports.declineProposal = decide(proposals.decline);
-exports.undoProposal = decide(proposals.undoApproval);
+exports.approveProposal = decide('proposal.approve', approveOnceOrAlways);
+exports.declineProposal = decide('proposal.decline', proposals.decline);
+exports.undoProposal = decide('proposal.undo', proposals.undoApproval);
 
 /* GET / PUT / DELETE /api/v2/agents/account — my personal coding-agent link */
 exports.getAccount = async (req, res) => {
