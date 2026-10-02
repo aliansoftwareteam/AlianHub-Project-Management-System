@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { defineComponent, h, ref } from 'vue';
+import { defineComponent, h } from 'vue';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -10,7 +10,7 @@ import DragDropField from '@/components/atom/DragDropField/DragDropField.vue';
 
 // Renders the item slot per element and exposes the props the real library would receive.
 const Draggable = defineComponent({
-    name: 'draggable',
+    name: 'DraggableStub',
     props: ['modelValue', 'handle', 'group', 'move', 'itemKey', 'tag'],
     emits: ['update:modelValue', 'change'],
     setup(props, { slots }) {
