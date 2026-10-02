@@ -15,7 +15,7 @@ const BASELINE = path.join(__dirname, 'plain-words-baseline.json');
 /* `rightIn` lists key prefixes where the word names the thing itself: a Scrum
    sprint is a sprint, the people directory is a directory. */
 const WORDS = [
-    { word: 'sprint', say: 'list', pattern: /\bsprints?\b/i, rightIn: ['Scrum.', 'Reports.', 'Dash.', 'PermissionDesc.', 'Docs.template_retro', 'Projects.list_plain_text', 'TaskLists.refusal_scrum_list'] },
+    { word: 'sprint', say: 'list', pattern: /\bsprints?\b/i, rightIn: ['Scrum.', 'Reports.', 'Dash.', 'PermissionDesc.', 'Docs.template_retro', 'Projects.list_plain_text', 'TaskLists.refusal_scrum_list', 'AuditActions.sprint_scrum', 'AuditActions.sprint_start', 'AuditActions.sprint_complete'] },
     { word: 'directory', say: 'folder', pattern: /\bdirector(?:y|ies)\b/i, rightIn: ['Org.'] },
     { word: 'payload', say: 'content', pattern: /\bpayloads?\b/i },
     { word: 'endpoint', say: 'address', pattern: /\bendpoints?\b/i },
