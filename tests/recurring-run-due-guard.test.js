@@ -9,7 +9,6 @@ jest.mock('../Modules/MainChats/controller', () => ({ updateMainChat: jest.fn() 
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { myCache } = require('../Config/config');
-const { requireRole } = require('../Config/permissionGuard');
 const routes = require('../Modules/RecurringTasks/routes');
 
 const C = '6f00000000000000000000c1';
@@ -38,23 +37,26 @@ const res = () => {
     return r;
 };
 
+const runDueHandlers = () => {
+    const posts = [];
+    const app = {};
+    ['get', 'post', 'patch', 'put', 'delete'].forEach((method) => {
+        app[method] = (path, ...handlers) => { if (method === 'post') posts.push({ path, handlers }); };
+    });
+    routes.init(app);
+    return posts.find((route) => route.path === '/api/v1/recurring-tasks/run-due').handlers;
+};
+
 const through = async (uid, over = {}) => {
     const r = res();
     let passed = false;
-    await requireRole()({ headers: { companyid: C }, uid, ...over }, r, () => { passed = true; });
+    await runDueHandlers()[0]({ headers: { companyid: C }, uid, ...over }, r, () => { passed = true; });
     return { passed, code: r.code, body: r.body };
 };
 
 describe('recurring run-due is an owner/admin act', () => {
     it('wires a role guard in front of the handler', () => {
-        const posts = [];
-        const app = {};
-        ['get', 'post', 'patch', 'put', 'delete'].forEach((method) => {
-            app[method] = (path, ...handlers) => { if (method === 'post') posts.push({ path, handlers }); };
-        });
-        routes.init(app);
-        const runDue = posts.find((route) => route.path === '/api/v1/recurring-tasks/run-due');
-        expect(runDue.handlers.length).toBe(2);
+        expect(runDueHandlers().length).toBe(2);
     });
 
     it.each([[OWNER], [MEMBER]])('lets an owner through and refuses a member (%s)', async (uid) => {
@@ -72,8 +74,9 @@ describe('recurring run-due is an owner/admin act', () => {
         expect(await through(MEMBER, { apiToken: { _id: 't' } })).toMatchObject({ passed: false, code: 403 });
     });
 
-    it('lets browser sessions through while enforcement is off, as before', async () => {
+    it('answers the same while enforcement is off', async () => {
         delete process.env.PERMISSION_ENFORCEMENT_MODE;
-        expect((await through(MEMBER)).passed).toBe(true);
+        expect((await through(OWNER)).passed).toBe(true);
+        expect(await through(MEMBER)).toMatchObject({ passed: false, code: 403 });
     });
 });

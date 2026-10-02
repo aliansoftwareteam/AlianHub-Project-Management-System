@@ -2,7 +2,7 @@ const controller = require('./controller');
 const taskRule = require('./taskRule');
 const logger = require('../../Config/loggerConfig');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
-const { requireRole } = require('../../Config/permissionGuard');
+const { requireCompanyAdmin } = require('../../Config/permissionGuard');
 const { READ, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
 
 const CREATES_TASKS = ['task.task_create'];
@@ -27,8 +27,7 @@ exports.init = (app) => {
     app.patch('/api/v1/recurring-tasks/:id', changesDefinitions(ofDefinition), controller.updateDefinition);
     app.delete('/api/v1/recurring-tasks/:id', changesDefinitions(ofDefinition), controller.deleteDefinition);
     app.post('/api/v1/recurring-tasks/:id/run-now', changesDefinitions(ofDefinition, CREATES_TASKS), controller.runNow);
-    // Process every due definition for the caller's company (manual; cron does this in prod).
-    // Company-wide task creation has no one project to judge, so it is an owner/admin act.
-    app.post('/api/v1/recurring-tasks/run-due', requireRole(), controller.runDueForCompany);
+    // Company-wide task creation has no one project to judge, so it is an owner/admin act for every caller.
+    app.post('/api/v1/recurring-tasks/run-due', requireCompanyAdmin(), controller.runDueForCompany);
     logger.info('RecurringTasks routes initialised');
 };
