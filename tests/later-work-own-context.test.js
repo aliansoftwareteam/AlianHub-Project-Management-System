@@ -1,6 +1,7 @@
 /* Work that waits on a timer after a write belongs to no request: when it runs, it runs under no token's project
    list, no agent's mark and no request, whichever request started the wait. */
 const mockReads = [];
+const mockFound = {};
 const mockContext = () => {
     const { narrowingFor } = require('../Config/tokenNarrowing');
     const { agentOf } = require('../Config/agentRequest');
@@ -15,7 +16,7 @@ const mockContext = () => {
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     MongoDbCrudOpration: async (companyId, query, method) => {
         mockReads.push({ type: query.type, ...mockContext() });
-        return method === 'find' ? [] : null;
+        return method === 'find' ? [] : (mockFound[query.type] || null);
     },
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
@@ -72,6 +73,7 @@ beforeEach(() => {
     myCache.flushAll();
     dispatcher.invalidateCompanyCache(C);
     mockReads.length = 0;
+    Object.keys(mockFound).forEach((type) => delete mockFound[type]);
 });
 
 afterEach(async () => {
@@ -113,5 +115,19 @@ describe('work that runs after the wait', () => {
     it('a doc settled after its last autosave', async () => {
         await afterTheWait(() => pageSettle.settleLater(C, PAGE));
         expect(readsOf(SCHEMA_TYPE.PAGES)).toEqual([NO_REQUEST, NO_REQUEST]);
+    });
+
+    it('a settled doc is announced as a doc always is, naming no writer, whoever saved it', async () => {
+        mockFound[SCHEMA_TYPE.PAGES] = { _id: PAGE, title: 'Notes', mentionsTold: [], editedBy: PERSON };
+        const announced = [];
+        const hear = (payload) => announced.push(Object.keys(payload).sort());
+        socketEmitter.on('pages:update', hear);
+        await afterTheWait(() => pageSettle.settleLater(C, PAGE));
+        mockReads.length = 0;
+        pageSettle.settleLater(C, PAGE);
+        await settle(WAIT_MS * 5);
+        socketEmitter.off('pages:update', hear);
+
+        expect(announced).toEqual([['companyId', 'data', 'module', 'type'], ['companyId', 'data', 'module', 'type']]);
     });
 });
