@@ -92,7 +92,7 @@ beforeEach(() => {
     process.env.MCP_TOOLS_DATA = 'on';
     const parent = rows(SCHEMA_TYPE.RULES).find((rule) => rule.isParent && rule.key === 'project');
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'project_custom_field', name: 'project_custom_field', isParent: false, parentId: String(parent._id), roles: [{ key: 3, permission: true }, { key: 0, permission: false }] });
-    setRule('task_custom_field', true, [3]);
+    setRule('task_custom_field', false, [0]);
     PEOPLE.forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, { _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], grants: [GRANT], projectIds: [], expiresAt: new Date(Date.now() + 86400000) }));
     seedField(COST, 'Cost', 'number');
     seedField(CLIENT_NAME, 'Client', 'text');

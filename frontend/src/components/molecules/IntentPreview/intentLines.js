@@ -3,6 +3,7 @@
 // as text. A new kind of change is one more entry in LINE_KINDS and, for a new heading, one in HEADINGS.
 
 import { AUTOMATION_HEADING, AUTOMATION_LINE_KINDS } from './automationLines';
+import { COMPUTED_LINE_KINDS } from './computedLines';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T/;
@@ -117,6 +118,7 @@ export const LINE_KINDS = {
         if (!type) return { label: t('IntentPreview.line_field'), text: name };
         return { label: t('IntentPreview.line_field'), text: options ? t('IntentPreview.field_with_options', { name, type, options }) : t('IntentPreview.field_named', { name, type }) };
     },
+    ...COMPUTED_LINE_KINDS,
     fieldValue: (t, line) => {
         const [field, task] = [textOf(line.field), textOf(line.task)];
         if (!field || !task) return null;

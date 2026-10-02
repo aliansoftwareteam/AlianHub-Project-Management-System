@@ -5,6 +5,7 @@ const names = require('../Mcp/names');
 const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 const { isTaskFieldOf } = require('../CustomField/helpers/fieldValueInput');
 const setup = require('./setupRequests');
+const computed = require('./computedFields');
 const plans = require('./projectSetup');
 const projects = require('./projectCreate');
 const automation = require('./automationPreview');
@@ -93,6 +94,7 @@ const fieldLine = (given) => {
     const field = objectOf(given);
     const name = textOf(field.name, setup.FIELD_NAME_MAX);
     if (!name) return null;
+    if (computed.isComputed(field.type)) return computed.lineOf(name, field);
     return {
         kind: 'field', name, type: setup.FIELD_TYPES.includes(field.type) ? field.type : '',
         options: listOf(field.options).map((option) => textOf(option, setup.OPTION_MAX)).filter(Boolean).slice(0, setup.OPTIONS_MAX),

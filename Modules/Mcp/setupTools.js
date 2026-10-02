@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { oid } = require('../Automations/engine/tools');
 const registry = require('../Agents/registry');
 const setup = require('../Agents/setupRequests');
+const computed = require('../Agents/computedFields');
 const actions = require('../Agents/actions');
 const permissions = require('../Agents/permissions');
 const plans = require('../Agents/projectSetup');
@@ -48,6 +49,24 @@ const FIELD = Object.freeze({
     required: ['name', 'type'],
 });
 
+/* A field of fields.create, which also takes the two kinds AlianHub works out. */
+const CREATE_FIELD = Object.freeze({
+    ...FIELD,
+    properties: {
+        ...FIELD.properties,
+        type: { type: 'string', enum: [...setup.CREATE_TYPES] },
+        function: { type: 'string', enum: [...computed.FUNCTIONS], description: 'For a rollup: what it works out from the subtasks under each task, on every level' },
+        source: {
+            type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX,
+            description: `For a rollup: the name of the field it reads on those subtasks, one of this call or of the project, of type ${computed.SOURCE_TYPES.join(', ')}. Left out, count counts the subtasks`,
+        },
+        expression: {
+            type: 'string', minLength: 1, maxLength: computed.EXPRESSION_MAX,
+            description: 'For a formula: numbers, the task\'s own number fields by name in braces, + - * / and brackets, as in {Price} - {Cost}',
+        },
+    },
+});
+
 const VALUE = Object.freeze({
     type: 'object',
     additionalProperties: false,
@@ -62,13 +81,15 @@ const VALUE = Object.freeze({
 const NO_FIELD_SET = `${DENIED}: values are set as ${setup.FIELD_SET} sets one, which this connection may not use`;
 
 /* Values are refused at once where the caller could not set one by itself, where a task is not one of the project
- * the caller can open, or where a field would not take its value, so nobody is asked to approve a value that cannot
- * be set. A project the caller cannot open is left to the target check. */
+ * the caller can open, or where a field would not take its value, and a rollup or a formula where the field form
+ * would not save it, so nobody is asked to approve what cannot be made. A project the caller cannot open is left to the target check. */
 const fieldsToFile = async (ctx, args, vis) => {
-    if (args.values === undefined) return { args };
     const project = await loadProject(ctx, vis, args.projectId);
     if (!project) return { args };
     const projectId = String(project._id);
+    const unsaved = await setup.draftsMisfit({ companyId: ctx.companyId, projectId, definitions: args.fields });
+    if (unsaved) return { answer: { ok: false, error: unsaved } };
+    if (args.values === undefined) return { args };
     const refuse = async (reason) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'fields.create', params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId }); };
     const usable = registry.has(setup.FIELD_SET) && manageFlag.mayUse(ctx, GRANT)
         && registry.evaluate(setup.FIELD_SET, { __proposal: true }, { allowedActions: ctx.allowedActions }).allowed;
@@ -180,14 +201,16 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: projectTarget,
-        description: `Add up to ${setup.FIELDS_MAX} custom fields to one project in a single call, each with a name and a type: ${setup.FIELD_TYPES.join(', ')}. `
+        description: `Add up to ${setup.FIELDS_MAX} custom fields to one project in a single call, each with a name and a type: ${setup.CREATE_TYPES.join(', ')}. `
             + 'A dropdown takes its options as plain text. A field the project already has by that name is kept, not made twice, so read fields.list first. '
+            + `A rollup works a number out for each task from the subtasks under it (function: ${computed.FUNCTIONS.join(', ')}; source: the number field it reads), and a formula from the task's own number fields (expression). `
+            + 'Neither takes a value: AlianHub works the number out and task.fields.list reads it, a rollup\'s once it is approved, a formula\'s on a task once a field value of that task is next saved. '
             + `To give the fields their first values in the same approval, name them in values (at most ${setup.VALUES_MAX}): each a task of this project, a field by its name and the value. `
             + 'A value is set only on a task the person and the approver may both edit, and the answer says which were set. '
             + `${WAITS} Set or change a value later with task.field.set.`,
         input: input({
             projectId: ID,
-            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
+            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: CREATE_FIELD },
             values: { type: 'array', minItems: 1, maxItems: setup.VALUES_MAX, items: VALUE },
             ...REASON,
         }, ['projectId', 'fields']),
