@@ -43,8 +43,7 @@
             <div v-for="u in users" :key="u.userId" class="wl__row">
                 <div class="wl__person">
                     <span class="ah-avatar" :style="{ background: colorFor(u.userId) }">
-                        <img v-if="u.avatar" :src="u.avatar" :alt="u.name" />
-                        <template v-else>{{ initial(u.name) }}</template>
+                        <AvatarImage :src="u.avatar" :alt="u.name">{{ initial(u.name) }}</AvatarImage>
                     </span>
                     <div class="wl__person-text">
                         <div class="wl__name">{{ u.name }}</div>
@@ -104,6 +103,7 @@
 </template>
 
 <script setup>
+import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import { ref, computed, inject, onMounted, watch } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useStore } from 'vuex';

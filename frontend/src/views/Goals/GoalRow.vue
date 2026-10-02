@@ -22,8 +22,7 @@
                 <span class="ah-sr-only">{{ visibility }}</span>
             </span>
             <span class="ah-avatar ah-avatar--sm gls__owner" data-test="gls-owner" :title="ownedBy">
-                <img v-if="owner.image" :src="owner.image" alt="" />
-                <span v-else aria-hidden="true">{{ owner.initial }}</span>
+                <AvatarImage :src="owner.image"><span aria-hidden="true">{{ owner.initial }}</span></AvatarImage>
                 <span class="ah-sr-only">{{ ownedBy }}</span>
             </span>
             <span class="gls__progress">
@@ -35,6 +34,7 @@
 </template>
 
 <script setup>
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";

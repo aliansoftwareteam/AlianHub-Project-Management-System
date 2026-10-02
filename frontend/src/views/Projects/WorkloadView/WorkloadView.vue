@@ -80,8 +80,7 @@
                 <div v-for="u in rows" :key="u.userId" class="wv__row">
                     <div class="wv__person">
                         <span class="ah-avatar wv__avatar">
-                            <img v-if="u.avatar" :src="u.avatar" :alt="u.name" />
-                            <template v-else>{{ initial(u.name) }}</template>
+                            <AvatarImage :src="u.avatar" :alt="u.name">{{ initial(u.name) }}</AvatarImage>
                         </span>
                         <div class="wv__person-text">
                             <div class="wv__name" :title="u.name">{{ u.name }}</div>
@@ -155,6 +154,7 @@
 
 <script setup>
     import { onMounted, ref, computed, inject, watch } from "vue";
+    import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
     import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
     import { useStore } from "vuex";
     import { useI18n } from "vue-i18n";

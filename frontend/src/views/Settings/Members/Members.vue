@@ -151,9 +151,10 @@
                 </div>
                 <div v-if="agentUnder(item)" class="mbv__agent" data-test="member-agent">
                     <span class="ah-avatar ah-avatar--agent ah-avatar--sm" aria-hidden="true"><ShellIcon name="agent" :size="11" /></span>
-                    <span class="mbv__agent-name">{{ agentUnder(item).name }}</span>
+                    <span class="mbv__agent-name">{{ agentUnder(item).mine ? $t('TaskPanel.my_ai', { name: agentUnder(item).name }) : agentUnder(item).name }}</span>
                     <span class="ah-chip ah-chip--agent">{{ $t('Members.agent_tag') }}</span>
                     <span class="mbv__agent-note">{{ $t('Members.agent_connected_by', { name: agentUnder(item).ownerName || item.Employee_Name }) }} · {{ lastWorked(agentUnder(item)) }} · {{ $t('Members.agent_no_seat') }}</span>
+                    <span v-if="agentUnder(item).mine" class="mbv__agent-note mbv__agent-where" data-test="member-agent-where">{{ $t('Members.agent_hand_where') }}</span>
                 </div>
                 </template>
 
