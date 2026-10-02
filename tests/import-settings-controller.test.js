@@ -2,6 +2,8 @@ const mockImports = { fns: {} };
 
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
+// What a template may hold is asked in tests/project-template-role-rule.test.js; here the handler's own steps are.
+jest.mock('../Modules/ImportSettings/templateWrite', () => ({ templatesProblem: jest.fn(() => '') }));
 jest.mock('../Config/permissionGuard', () => {
     const roles = jest.requireActual('../Config/roleTypes');
     return {
@@ -24,6 +26,7 @@ const logger = require('../Config/loggerConfig');
 const { removeCache } = require('../utils/commonFunctions');
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const ctrl = require('../Modules/ImportSettings/controller');
+const { templatesProblem } = require('../Modules/ImportSettings/templateWrite');
 
 const COMPANY = '6f0000000000000000000c01';
 const OTHER_COMPANY = '6f0000000000000000000c02';
@@ -317,6 +320,15 @@ describe('importTemplate', () => {
         expect(getRoleType).toHaveBeenCalledWith(COMPANY, ME);
         expect(importer('importSettingTemplate')).toHaveBeenCalledWith(COMPANY, templates, expect.any(Function));
         expect(res.body).toEqual({ status: true, statusText: 'done' });
+    });
+
+    it('answers 400 with the reason, and imports nothing, when a template is refused', async () => {
+        getRoleType.mockResolvedValue(OWNER);
+        templatesProblem.mockReturnValueOnce('A template needs TemplateName.');
+        const res = await asHandler(signedIn({ body: { templates } }));
+        expect(res.statusCode).toBe(400);
+        expect(res.body).toMatchObject({ status: false, statusText: 'A template needs TemplateName.' });
+        expect(importer('importSettingTemplate')).not.toHaveBeenCalled();
     });
 
     it('answers 500 with the reason when the importer throws', async () => {
