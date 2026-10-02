@@ -72,7 +72,7 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
             if (count >= userIds.length) {
                 cb({
                     status: true,
-                    data: 'Count update succesfully'
+                    data: 'Count update successfully'
                 });
             } else {
                 const obj = {
@@ -85,7 +85,7 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
                         // first counts for them, and this collection is empty for a
                         // company that has never had one written. Without it every
                         // count write matched nothing, changed nothing, and STILL
-                        // reported "Count update succesfully" — so unread badges
+                        // reported "Count update successfully" — so unread badges
                         // (incoming messages, mark-as-unread, mentions) silently
                         // did nothing at all for that user.
                         {returnDocument: 'after', upsert: true, setDefaultsOnInsert: true}

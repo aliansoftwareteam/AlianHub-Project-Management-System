@@ -98,7 +98,7 @@ exports.changeTaskType = async (req, res) => {
         Promise.allSettled(promisesArr).then(() => {
             res.send({
                 status: true,
-                statusText: "TASK UPDATE SUCCESFULLY"
+                statusText: "TASK UPDATE SUCCESSFULLY"
             })
         }).catch((error) => {
             logger.error(`TASK type Error: ${error}`);
@@ -202,7 +202,7 @@ exports.changeTaskStatus = async (req, res) => {
         Promise.allSettled(promisesArr).then(() => {
             res.send({
                 status: true,
-                statusText: "TASK UPDATE SUCCESFULLY"
+                statusText: "TASK UPDATE SUCCESSFULLY"
             })
         }).catch((error) => {
             logger.error(`TASK status Error: ${error}`);

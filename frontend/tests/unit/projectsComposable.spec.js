@@ -2,23 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({
     apiRequest: vi.fn(),
-    getUser: vi.fn(),
-    userId: { value: 'u1' },
-    company: { value: undefined },
-    convertDateFormat: vi.fn()
+    company: { value: undefined }
 }));
 
-vi.mock('vue', async (orig) => ({ ...(await orig()), inject: () => m.userId }));
 vi.mock('vuex', () => ({ useStore: () => ({ getters: { get 'settings/selectedCompany'() { return m.company.value; } } }) }));
 vi.mock('@/services', () => ({ apiRequest: m.apiRequest }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (k) => k } } }));
 vi.mock('@/config/env', () => ({ PROJECTACTIONS: 'projects' }));
-vi.mock('@/composable', () => ({
-    useConvertDate: () => ({ convertDateFormat: m.convertDateFormat }),
-    useGetterFunctions: () => ({ getUser: m.getUser })
-}));
 
 import { useProjects } from '@/composable/projects';
+import { clockText, followClockPrefs, fullText } from '@/utils/clockText';
 
 // 2024-03-05 15:07 local time
 const AT = new Date(2024, 2, 5, 15, 7).getTime();
@@ -28,8 +21,6 @@ describe('useProjects', () => {
     let p;
     beforeEach(() => {
         m.apiRequest.mockReset();
-        m.getUser.mockReset().mockReturnValue({ timeFormat: '12' });
-        m.convertDateFormat.mockReset().mockReturnValue('05 Mar 2024');
         m.company.value = undefined;
         p = useProjects();
     });
@@ -66,42 +57,36 @@ describe('useProjects', () => {
     });
 
     describe('time display', () => {
-        it('shows 12-hour time when the user chose 12', () => {
-            expect(p.getDateType(AT)).toBe('03:07 PM');
+        beforeEach(() => followClockPrefs({ timeFormat: '12', dateFormat: 'DD MMM YYYY' }));
+
+        it('shows 12-hour time when the person chose 12', () => {
+            expect(p.getDateType(AT)).toBe('3:07 PM');
         });
-        it('shows 24-hour time for any other choice', () => {
-            m.getUser.mockReturnValue({ timeFormat: '24' });
+        it('shows 24-hour time when the person chose 24', () => {
+            followClockPrefs({ timeFormat: '24' });
             expect(p.getDateType(AT)).toBe('15:07');
         });
-        it('shows 24-hour time when the user is unknown', () => {
-            m.getUser.mockReturnValue(undefined);
-            expect(p.getDateType(AT)).toBe('15:07');
+        it('shows 12-hour time when the person has chosen nothing', () => {
+            followClockPrefs();
+            expect(p.getDateType(AT)).toBe('3:07 PM');
         });
-        it('shows 12-hour time when the user has no preference', () => {
-            m.getUser.mockReturnValue({});
-            expect(p.getDateType(AT)).toBe('03:07 PM');
-        });
-        it('returns nothing and logs when the lookup blows up', () => {
-            const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-            m.getUser.mockImplementation(() => { throw new Error('x'); });
-            expect(p.getDateType(AT)).toBeUndefined();
-            expect(spy).toHaveBeenCalled();
-            spy.mockRestore();
+        it('gives no text for a time that is no time', () => {
+            expect([p.getDateType(undefined), p.getDateType('not a date'), p.getDateAndTime(undefined)]).toEqual(['', '', '']);
         });
 
-        it('joins the formatted date and 12-hour time', () => {
-            expect(p.getDateAndTime(AT)).toBe('05 Mar 2024, 03:07 PM');
-            expect(m.convertDateFormat).toHaveBeenCalledWith(AT, '', { showDayName: false });
+        it('joins the workspace date and the 12-hour time', () => {
+            expect(p.getDateAndTime(AT)).toBe('05 Mar 2024, 3:07 PM');
         });
-        it('joins the formatted date and 24-hour time', () => {
-            m.getUser.mockReturnValue({ timeFormat: '24' });
+        it('joins the workspace date and the 24-hour time', () => {
+            followClockPrefs({ timeFormat: '24', dateFormat: 'DD MMM YYYY' });
             expect(p.getDateAndTime(AT)).toBe('05 Mar 2024, 15:07');
         });
-        it('returns nothing when formatting throws', () => {
-            const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-            m.convertDateFormat.mockImplementation(() => { throw new Error('x'); });
-            expect(p.getDateAndTime(AT)).toBeUndefined();
-            spy.mockRestore();
+        it('writes the date day first when the workspace has set none', () => {
+            followClockPrefs({ timeFormat: '24' });
+            expect(p.getDateAndTime(AT)).toBe('05/03/2024, 15:07');
+        });
+        it('is the one helper every other screen writes a time with', () => {
+            expect([p.getDateType, p.getDateAndTime]).toEqual([clockText, fullText]);
         });
     });
 

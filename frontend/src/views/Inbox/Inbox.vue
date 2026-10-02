@@ -138,7 +138,7 @@
                                 </template>
                             </span>
                             <span v-if="it.agent" class="ah-chip ah-chip--agent ibx__agent">{{ $t('Inbox.agent_tag') }}</span>
-                            <time class="ibx__when" :title="it.createdAt">{{ stamp(it.createdAt) }}</time>
+                            <time class="ibx__when" :datetime="it.createdAt" :title="fullText(it.createdAt)">{{ stamp(it.createdAt) }}</time>
                         </div>
 
                         <div class="ibx__body">
@@ -298,6 +298,7 @@ import { shortcutPrefs } from '@/composable/shortcuts';
 import { onTaskClosed, openTask, overlayState } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { noticeTextOf } from '@/views/Ai/rateAlerts';
 import { escapeHtml } from '@/utils/notificationHtml';
+import { clockText, dayText, fullText } from '@/utils/clockText';
 import { renderNotice } from './renderNotice';
 import { SNOOZE_PRESETS, formatWhen, resolveTimeZone, snoozeTarget, toZonedInput } from './snoozePresets';
 import { laterStorageKey, migrateLegacyLater } from './laterMigration';
@@ -407,13 +408,12 @@ const stamp = (iso) => {
     const now = new Date();
     const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
     const days = Math.round((startOf(now) - startOf(d)) / 86400000);
-    if (days <= 0) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (days <= 0) return clockText(d);
     if (days < 7) return `${days}d`;
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return dayText(d);
 };
 const dateRange = (it) => {
-    const f = (v) => { const d = new Date(v); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }); };
-    const a = f(it.startDate); const b = f(it.endDate);
+    const a = dayText(it.startDate); const b = dayText(it.endDate);
     return a === b || !b ? a : `${a}–${b}`;
 };
 const ptoLabel = (type) => t(`Pto.types.${type}`, type);
