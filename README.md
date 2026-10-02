@@ -334,6 +334,8 @@ A quick tour of AlianHub. [Try the live demo](https://demo.alianhub.com) to expl
 
 Coming from ClickUp? [docs/MOVING-FROM-CLICKUP.md](docs/MOVING-FROM-CLICKUP.md) says what to export, what comes across and what does not.
 
+Using Claude or ChatGPT with AlianHub? [docs/guide/agents/](docs/guide/agents/README.md) says how to connect it, what it can do, what waits for your approval, how to undo a change and how to pause it.
+
 For development:
 
 - 🤝 [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute
