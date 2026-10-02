@@ -21,7 +21,7 @@ const chatQuestions = require('./chatQuestions');
 
 // The work a connected agent pulls: the findings that need judgement and the tasks a person handed over, in
 // projects whose project manager is on, and the questions its own person asked it in chat (./chatQuestions),
-// wherever they were asked. An item is a project_findings row, and a claim is a field on it, so
+// in such a project's channels and anywhere outside a project. An item is a project_findings row, and a claim is a field on it, so
 // taking one is a single conditional write. A claim marks who is working; it grants nothing, and whatever
 // the agent then changes goes through the usual tools and the project's policy.
 
@@ -150,7 +150,8 @@ const itemsFor = async ({ companyId, uid, connection, projectId, allowsProject =
 
 /* One waiting item the person may read, in a project whose manager is on; null for every other id, a hidden one and a missing one alike.
  * `asAgent` is the person's connection asking: an item handed to someone else's AI is a missing one too. A question
- * asked in chat is an item for the AI it was asked of and for nobody else, the person who asked included. */
+ * asked in chat is an item for the AI it was asked of and for nobody else, the person who asked included; it is
+ * judged by its own rule, which asks the same switch of a project's channel (./chatQuestions). */
 const itemFor = async ({ companyId, uid, itemId, allowsProject = () => true, allowsTask, reach = null, asAgent = false, now = new Date() }) => {
     if (!isId(itemId)) return null;
     const [row] = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [{ ...waiting, _id: oid(itemId) }]);

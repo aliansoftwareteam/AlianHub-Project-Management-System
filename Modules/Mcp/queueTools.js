@@ -12,7 +12,8 @@ const scopes = require('./scopes');
 // Where the project holds a connected agent's writes for a person, a claim is refused instead of filed: a marker
 // waiting in the Inbox would ask a person to approve twice, once for the claim and once for the change itself.
 // A question the person asked this AI in chat is given with its own text whatever the connection may read: the person
-// wrote it to the AI. No other message comes with it, and what else of the chat a connection reads is the chat tools' rule.
+// wrote it to the AI, and only words its author wrote are given. No other message comes with it, and what else of the
+// chat a connection reads is the chat tools' rule.
 
 const NO_ITEM = Object.freeze({ ok: false, error: workQueue.REFUSAL.NO_ITEM });
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -119,9 +120,10 @@ const TOOLS = [
     {
         name: 'queue.list',
         action: 'queue.list',
-        description: 'Shows work waiting for an agent: questions the person asked you by name in chat, and, in projects where the project manager is switched on, tasks a person handed over and things the daily check found that need a decision '
-            + '(a task with no owner or no estimate, a new task nobody sorted, a person with too much planned). It shows only items about tasks the person can open, and leaves out items another agent holds. '
-            + 'A question comes with its own text, where it was asked and who asked; it brings no other message of the chat. '
+        description: 'Shows work waiting for an agent: questions the person asked you by name in chat, tasks a person handed over, and things the daily check found that need a decision '
+            + '(a task with no owner or no estimate, a new task nobody sorted, a person with too much planned). Work in a project is shown only where its project manager is switched on; a question asked outside every project needs no switch. '
+            + 'It shows only items about tasks the person can open, and leaves out items another agent holds. '
+            + 'A question comes with its own text as the person last wrote it, where it was asked and who asked; it brings no other message of the chat. '
             + 'Take one with queue.claim before you work on it. Changes nothing.',
         input: input({ projectId: { ...ID, description: 'Only this project' }, limit: { type: 'integer', minimum: 1, maximum: workQueue.LISTED_MAX } }, []),
         visibility: 'filtered',

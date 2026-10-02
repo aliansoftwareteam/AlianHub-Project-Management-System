@@ -42,6 +42,7 @@
                 :disabled-reason="disabledReason"
                 :user-ids="userIds"
                 :agents="agents"
+                :agents-note="agentsNote"
                 :conversation-key="draftKey"
                 :placeholder="$t('MainChat.reply_in_thread')"
                 @send="onSend"
@@ -80,6 +81,7 @@ const props = defineProps({
     where: { type: String, default: '' },
     userIds: { type: Array, default: () => [] },
     agents: { type: Array, default: () => [] },
+    agentsNote: { type: String, default: '' },
     conversationKey: { type: String, default: '' },
     disabled: { type: Boolean, default: false },
     disabledReason: { type: String, default: '' },

@@ -54,7 +54,9 @@ vi.mock('@/views/Projects/Comments/helper', () => ({
     checkFile: vi.fn(),
     renderFiles: vi.fn(),
 }));
-vi.mock('@/views/Ai/useRunnableAgents', () => ({ fetchChatAgents: vi.fn(() => Promise.resolve([])), fetchOwnAiInChat: vi.fn(() => Promise.resolve([])) }));
+vi.mock('@/views/Ai/useRunnableAgents', () => ({
+    fetchChatAgents: vi.fn(() => Promise.resolve([])), fetchOwnAiInChat: vi.fn(() => Promise.resolve({ agents: [], why: '' })), fetchConnectedAgents: vi.fn(() => Promise.resolve([])),
+}));
 
 import { useMainChatConversation } from '@/components/organisms/MainChat/useMainChatConversation';
 import MainChatMessage from '@/components/organisms/MainChat/MainChatMessage.vue';

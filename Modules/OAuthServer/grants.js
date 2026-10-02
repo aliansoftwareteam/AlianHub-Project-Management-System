@@ -51,12 +51,17 @@ const audit = (grant, action, meta = {}) => {
     }
 };
 
+/* What waited in the work queue for a person's AI goes when their last connection does (Agents/manager/chatQuestions).
+ * Required on use: that module reads the grants through this one's store. */
+const connectionEnded = (grant, now) => require('../Agents/manager/chatQuestions').connectionEnded(grant.companyId, grant.userId, now);
+
 /* Revoking a grant revokes every code and token issued under it: the refresh token family of OAuth 2.1
  * section 4.3.1 is the grant. */
 async function revokeGrant(grantId, reason, now = new Date()) {
     const grant = await store.grants.revoke(grantId, reason, now);
     await store.tokens.revokeGrant(grantId, now);
     if (grant) audit(grant, 'oauth.grant_revoked', { reason });
+    if (grant) await connectionEnded(grant, now);
     return Boolean(grant);
 }
 
@@ -238,8 +243,10 @@ async function introspect(accessToken, now = new Date()) {
 
 /* Every grant of a client, or only those in one workspace when an approval there is revoked. */
 async function revokeClientGrants(clientId, now = new Date(), { companyId = null, reason = REVOKED.CLIENT_REVOKED } = {}) {
+    const ending = await store.grants.endingForClient(clientId, companyId);
     await store.grants.revokeForClient(clientId, reason, now, companyId);
     await store.tokens.revokeClient(clientId, now, companyId);
+    await Promise.all(ending.map((grant) => connectionEnded(grant, now)));
 }
 
 /* A grant keeps only the scopes still allowed, and so does every token issued under it; left with none, it is

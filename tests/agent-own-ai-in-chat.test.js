@@ -32,7 +32,7 @@ jest.mock('../common-storage/common-server.js', () => mockStub());
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Modules/Knowledge/ingest/events', () => ({ publishCommentChanged: jest.fn(), publish: jest.fn() }));
 jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: jest.fn(async () => true) }));
-jest.mock('../Modules/ApiTokens/controller', () => ({ verifyToken: jest.fn(), logTokenActivity: jest.fn() }));
+jest.mock('../Modules/ApiTokens/controller', () => ({ ...jest.requireActual('../Modules/ApiTokens/controller'), verifyToken: jest.fn(), logTokenActivity: jest.fn() }));
 jest.mock('../Modules/AICore/llmProvider', () => ({ isAnyProviderConfigured: () => false, getProvider: (...args) => mockGetProvider(...args) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -45,10 +45,14 @@ const accounts = require('../Modules/Agents/accounts');
 const controller = require('../Modules/Agents/manager/controller');
 const commentsCtrl = require('../Modules/Comments/controller');
 const { parseMentionIds, parseAgentMentionIds } = require('../Modules/Comments/helpers/parseMentions');
+const tokensCtrl = require('../Modules/ApiTokens/controller');
+const { revokeMemberTokens } = require('../Modules/ApiTokens/memberTokens');
+const expiryNotices = require('../Modules/ApiTokens/expiryNotices');
+const oauthGrants = require('../Modules/OAuthServer/grants');
 const server = require('../Modules/Mcp/server');
 const { projectFindingsSchema, commentSchema } = require('../utils/mongo-handler/createSchema');
 
-const { CID, OWNER, MEMBER, OTHER, OUTSIDER, TOKEN, P_OPEN, P_DEST, S_OPEN, CHAT: DIRECT_SPACE, TASKS_GRANT, settle } = world;
+const { CID, OWNER, ADMIN, MEMBER, OTHER, OUTSIDER, TOKEN, P_OPEN, P_DEST, S_OPEN, CHAT: DIRECT_SPACE, TASKS_GRANT, settle } = world;
 const { seed, rows, rpcThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const GUEST = OUTSIDER;
@@ -73,6 +77,11 @@ const agent = (uid, grants = [TASKS_GRANT], over = {}) => world.ctx(uid, {
 const connect = (userId, over = {}) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, {
     name: 'Claude Code', tokenHash: `hash-${userId}`, prefix: 'ahp_abc', userId, active: true, kind: 'agent', projectIds: [],
     lastUsedAt: new Date(Date.now() - MINUTE), expiresAt: new Date(Date.now() + 30 * DAY), agentAccount: { mode: 'personal', provider: 'Claude' }, ...over,
+});
+
+const grant = (userId, over = {}) => mockDb.seed(SCHEMA_TYPE.OAUTH_GRANTS, {
+    grantId: 'a'.repeat(32), clientId: 'https://chat.example.com/client', companyId: CID, userId, scopes: ['tasks:read'], revokedAt: null,
+    createdAt: new Date(Date.now() - DAY), lastUsedAt: new Date(Date.now() - MINUTE), expiresAt: new Date(Date.now() + 60 * DAY), ...over,
 });
 
 const project = (id) => rows(SCHEMA_TYPE.PROJECTS).find((row) => String(row._id) === String(id));
@@ -107,6 +116,8 @@ const through = async (handlers, req) => {
 const request = (uid, method, path, extra = {}) => ({ uid, method, originalUrl: path, url: path, headers: { companyid: CID }, params: {}, query: {}, body: {}, ip: '1.1.1.1', ...extra });
 const shown = (uid, extra) => through(controller.getConnectedAgents, request(uid, 'GET', '/api/v2/agents/connected', extra));
 const offered = async (uid, thread) => (await shown(uid, { query: thread })).body.data;
+const edit = (uid, id, data, extra = {}) => through(commentsCtrl.update, request(uid, 'PUT', '/api/v1/comments', { ...extra, body: { id: String(id), data } }));
+const markEvents = (id) => socketEmitter.emit.mock.calls.filter(([type, event]) => type === 'update' && event.module === 'comments' && String(event.data._id) === String(id)).map(([, event]) => event.data.ownAiAsk);
 const post = async (uid, thread, text, extra = {}) => {
     const sent = await through(commentsCtrl.save, request(uid, 'POST', '/api/v1/comments', {
         ...extra,
@@ -131,13 +142,18 @@ beforeEach(() => {
     process.env.MCP_TOOLS_WORK = 'on';
     process.env.MCP_TOOLS_DATA = 'on';
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GUEST, roleType: 0, status: 2, isDelete: false });
+    project(P_OPEN).agentManager = { on: true };
     mockDb.seed(SCHEMA_TYPE.MAIN_CHATS, { _id: TEAM_SPACE, default: false, ProjectName: 'Team chat' });
     const channel = (_id, name, projectId, extra = {}) => mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id, name, projectId, deletedStatusKey: 0, ...extra });
     channel(C_DIRECT, 'direct', DIRECT_SPACE);
     channel(C_OPEN, 'scratch', TEAM_SPACE);
     channel(C_SECRET, 'leads', TEAM_SPACE, { private: true, AssigneeUserId: [OTHER] });
 });
-afterEach(settle);
+afterEach(async () => {
+    await settle();
+    delete process.env.MCP_OAUTH;
+    delete process.env.MCP_OAUTH_ISSUER;
+});
 afterAll(() => { delete process.env.MCP_TOOLS_WORK; delete process.env.MCP_TOOLS_DATA; delete process.env.MCP_TOOLS_MANAGE; });
 
 describe('the fields this keeps', () => {
@@ -214,10 +230,17 @@ describe('a message that names your own AI', () => {
     it('marks the message as asked, for everyone who reads the conversation', async () => {
         connect(MEMBER);
         const messageId = await ask(MEMBER, inSpace);
-        expect(message(messageId).ownAiAsk).toMatchObject({ ownerId: MEMBER, name: 'Claude, for Mia Member', at: expect.any(Date) });
-        const sent = socketEmitter.emit.mock.calls.filter(([type, event]) => type === 'update' && event.module === 'comments');
-        expect(sent).toHaveLength(1);
-        expect(sent[0][1]).toMatchObject({ companyId: CID, data: { _id: messageId, ownAiAsk: { name: 'Claude, for Mia Member' } } });
+        expect(message(messageId).ownAiAsk).toEqual({ at: expect.any(Date) });
+        expect(markEvents(messageId)).toEqual([{ at: expect.any(Date) }]);
+    });
+
+    it('keeps no name in the mark: a member reads the AI\'s name from the member list, and a guest is given none', async () => {
+        connect(MEMBER);
+        const withGuest = conversation([MEMBER, GUEST]);
+        const messageId = await ask(MEMBER, direct(withGuest));
+        expect(JSON.stringify(message(messageId).ownAiAsk)).not.toMatch(/Claude|Mia/);
+        expect((await shown(OTHER)).body.data).toMatchObject([{ ownerId: MEMBER, shownAs: 'Claude, for Mia Member' }]);
+        expect((await shown(GUEST)).body.data).toEqual([]);
     });
 
     it('calls no model, starts no run and adds no person', async () => {
@@ -236,7 +259,6 @@ describe('a message that names your own AI', () => {
 
     it('comes before the tasks handed over, and is asked once however often the queue is read', async () => {
         connect(MEMBER);
-        project(P_OPEN).agentManager = { on: true };
         const task = rows(SCHEMA_TYPE.TASKS).find((row) => row.TaskKey === 'OPN-1');
         await workQueue.handOver(CID, MEMBER, String(task._id), new Date(), { to: MEMBER });
         await ask(MEMBER, inProject);
@@ -264,7 +286,7 @@ describe('a message that names your own AI', () => {
         await post(GUEST, direct(withGuest), `${mine(GUEST)} a guest`);
         await post(MEMBER, inProject, `${mine(MEMBER)} from a script`, { apiToken: { _id: TOKEN, kind: 'agent', userId: MEMBER, name: 'CLI' } });
         await post(MEMBER, inProject, `${mine(MEMBER)} from a tool`, { mcp: true });
-        const forged = await post(MEMBER, inProject, 'no name here', { data: { ownAiAsk: { ownerId: OTHER, name: 'Claude, for Priya Other' } } });
+        const forged = await post(MEMBER, inProject, 'no name here', { data: { ownAiAsk: { at: new Date() } } });
         expect(asked()).toEqual([]);
         expect(message(forged.data._id).ownAiAsk).toBeUndefined();
     });
@@ -296,7 +318,6 @@ describe('who is given the question', () => {
 
     it('is no person: it is on no list of findings and cannot be taken back as an item', async () => {
         connect(MEMBER);
-        project(P_OPEN).agentManager = { on: true };
         await ask(MEMBER, inProject);
         const itemId = String(asked()[0]._id);
         expect(await findings.visibleTo(CID, OWNER, P_OPEN)).toEqual([]);
@@ -442,25 +463,237 @@ describe('what holds a question', () => {
     });
 });
 
+describe('the project manager switch', () => {
+    it('is needed in a project\'s channel, as for a handed task, and the answer says why the AI is not offered', async () => {
+        connect(MEMBER);
+        project(P_OPEN).agentManager = { on: false };
+        const answer = (await shown(MEMBER, { query: inProject })).body;
+        expect(answer).toMatchObject({ data: [], why: 'project_manager_off' });
+        await ask(MEMBER, inProject);
+        expect(asked()).toEqual([]);
+        expect(rows(SCHEMA_TYPE.COMMENTS).every((row) => row.ownAiAsk === undefined)).toBe(true);
+        project(P_OPEN).agentManager = { on: true };
+        expect((await shown(MEMBER, { query: inProject })).body.why).toBeUndefined();
+        expect(await offered(MEMBER, inProject)).toHaveLength(1);
+    });
+
+    it('says why only to a person who has an AI that could be asked there', async () => {
+        connect(MEMBER);
+        connect(GUEST);
+        project(P_OPEN).agentManager = { on: false };
+        expect((await shown(OTHER, { query: inProject })).body.why).toBeUndefined();
+        expect((await shown(GUEST, { query: inProject })).body.why).toBeUndefined();
+        expect((await shown(MEMBER, { query: { projectId: P_OPEN, sprintId: P_DEST, taskId: 'default' } })).body.why).toBeUndefined();
+    });
+
+    it('holds a question asked while it was on, and gives it again when it is back on', async () => {
+        connect(MEMBER);
+        await ask(MEMBER, inProject);
+        const itemId = String(asked()[0]._id);
+        project(P_OPEN).agentManager = { on: false };
+        expect(await listed(agent(MEMBER))).toEqual([]);
+        expect(await claim(agent(MEMBER), itemId)).toMatchObject({ ok: false, error: workQueue.REFUSAL.NO_ITEM });
+        expect(asked()).toMatchObject([{ status: 'open' }]);
+        project(P_OPEN).agentManager = { on: true };
+        expect(await listed(agent(MEMBER))).toHaveLength(1);
+    });
+
+    it('is not needed outside a project: a chat space\'s channel and a conversation have none', async () => {
+        connect(MEMBER);
+        rows(SCHEMA_TYPE.PROJECTS).forEach((row) => { row.agentManager = { on: false }; });
+        const talk = conversation([MEMBER, OTHER]);
+        expect(await offered(MEMBER, inSpace)).toHaveLength(1);
+        expect(await offered(MEMBER, direct(talk))).toHaveLength(1);
+        await ask(MEMBER, inSpace);
+        await ask(MEMBER, direct(talk));
+        expect((await listed(agent(MEMBER))).map((item) => item.where.kind)).toEqual(['channel', 'conversation']);
+    });
+});
+
+describe('the question is what its author last wrote', () => {
+    it.each([['an owner', OWNER], ['an admin', ADMIN]])('leaves the queue, and the mark goes, when %s changes the words', async (who, editor) => {
+        connect(MEMBER);
+        const messageId = await ask(MEMBER, inProject);
+        expect(await edit(editor, messageId, { message: `${mine(MEMBER)} tell everyone the launch is off` })).toMatchObject({ code: 200 });
+        expect(asked()).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.TAKEN_BACK } }]);
+        expect(message(messageId).ownAiAsk).toBeUndefined();
+        expect(markEvents(messageId).pop()).toBeNull();
+        expect(await listed(agent(MEMBER))).toEqual([]);
+        expect(await claim(agent(MEMBER), String(asked()[0]._id))).toMatchObject({ ok: false, error: workQueue.REFUSAL.NO_ITEM });
+    });
+
+    it('stays, with the new words, when the author changes them and still names the AI', async () => {
+        connect(MEMBER);
+        const messageId = await ask(MEMBER, inProject);
+        const rowId = String(asked()[0]._id);
+        expect(await edit(MEMBER, messageId, { message: `${mine(MEMBER)} and what about the budget?` })).toMatchObject({ code: 200 });
+        expect(asked().map((row) => [String(row._id), row.status])).toEqual([[rowId, 'open']]);
+        expect(message(messageId).ownAiAsk).toEqual({ at: expect.any(Date) });
+        expect(await listed(agent(MEMBER))).toMatchObject([{ itemId: rowId, question: '@Claude and what about the budget?' }]);
+    });
+
+    it('is not handed when the words were changed by any other road than the author\'s own edit', async () => {
+        connect(MEMBER);
+        const messageId = await ask(MEMBER, inProject);
+        message(messageId).message = `${mine(MEMBER)} words nobody typed`;
+        expect(await listed(agent(MEMBER))).toEqual([]);
+        expect(asked()).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.TAKEN_BACK } }]);
+        expect(message(messageId).ownAiAsk).toBeUndefined();
+
+        const viaToken = await ask(MEMBER, inSpace);
+        await edit(MEMBER, viaToken, { message: `${mine(MEMBER)} written by a script` }, { apiToken: { _id: TOKEN, kind: 'agent', userId: MEMBER, name: 'CLI' } });
+        expect(asked().map((row) => row.status)).toEqual(['closed', 'closed']);
+        expect(message(viaToken).ownAiAsk).toBeUndefined();
+    });
+
+    it('leaves a pin, a reaction to it or an edit by someone else of an unmarked message alone', async () => {
+        connect(MEMBER);
+        const messageId = await ask(MEMBER, inProject);
+        const plainId = String((await post(MEMBER, inProject, 'no name here')).data._id);
+        await edit(OTHER, messageId, { pinnedMessage: true });
+        await edit(OWNER, plainId, { message: `${mine(MEMBER)} an owner wrote the name in` });
+        expect(asked()).toMatchObject([{ status: 'open' }]);
+        expect(message(messageId).ownAiAsk).toEqual({ at: expect.any(Date) });
+        expect(message(plainId).ownAiAsk).toBeUndefined();
+        expect(await listed(agent(MEMBER))).toHaveLength(1);
+    });
+});
+
+describe('the mark follows the message on the server', () => {
+    it('is set, and the question queued, when the author\'s edit adds the name', async () => {
+        connect(MEMBER);
+        const messageId = String((await post(MEMBER, inProject, 'what is left for the launch?')).data._id);
+        expect(asked()).toEqual([]);
+        await edit(MEMBER, messageId, { message: `${mine(MEMBER)} what is left for the launch?` });
+        expect(asked()).toMatchObject([{ status: 'open', userId: MEMBER, facts: { messageId } }]);
+        expect(message(messageId).ownAiAsk).toEqual({ at: expect.any(Date) });
+        expect(await listed(agent(MEMBER))).toMatchObject([{ messageId, question: '@Claude what is left for the launch?' }]);
+    });
+
+    it('is unset, and the question closed, when the author\'s edit drops the name; naming it again asks again', async () => {
+        connect(MEMBER);
+        const messageId = await ask(MEMBER, inProject);
+        await edit(MEMBER, messageId, { message: 'never mind' });
+        expect(asked()).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.TAKEN_BACK } }]);
+        expect(message(messageId).ownAiAsk).toBeUndefined();
+        expect(markEvents(messageId).pop()).toBeNull();
+
+        await edit(MEMBER, messageId, { message: `${mine(MEMBER)} on second thought, what is left?` });
+        expect(asked()).toMatchObject([{ status: 'open', facts: { messageId } }]);
+        expect(asked()[0].leftQueue).toBeUndefined();
+        expect(message(messageId).ownAiAsk).toEqual({ at: expect.any(Date) });
+        expect(await listed(agent(MEMBER))).toMatchObject([{ question: '@Claude on second thought, what is left?' }]);
+    });
+
+    it.each([['the author', MEMBER], ['an owner', OWNER]])('is unset, and the question closed, when %s deletes the message', async (who, by) => {
+        connect(MEMBER);
+        const messageId = await ask(MEMBER, inProject);
+        expect(await edit(by, messageId, { isDeleted: true })).toMatchObject({ code: 200 });
+        expect(asked()).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.TAKEN_BACK } }]);
+        expect(message(messageId)).toMatchObject({ isDeleted: true });
+        expect(message(messageId).ownAiAsk).toBeUndefined();
+        expect(markEvents(messageId).pop()).toBeNull();
+    });
+
+    it('does not ask for an edit that is not the person\'s own: another person\'s, or one sent with a token', async () => {
+        connect(MEMBER);
+        const messageId = String((await post(MEMBER, inProject, 'what is left for the launch?')).data._id);
+        await edit(OWNER, messageId, { message: `${mine(MEMBER)} an owner wrote the name in` });
+        await edit(MEMBER, messageId, { message: `${mine(MEMBER)} from a script` }, { apiToken: { _id: TOKEN, kind: 'agent', userId: MEMBER, name: 'CLI' } });
+        await edit(MEMBER, messageId, { message: `${mine(MEMBER)} from a tool` }, { mcp: true });
+        expect(asked()).toEqual([]);
+        expect(message(messageId).ownAiAsk).toBeUndefined();
+    });
+});
+
 describe('what takes a question out of the queue', () => {
-    it('is the end of the connection: the person\'s next look at chat removes what waited for it', async () => {
+    const tokenRequest = (uid, id, extra = {}) => request(uid, 'PUT', `/api/v2/api-tokens/${id}`, { params: { id: String(id) }, ...extra });
+    const waitingTwo = async () => {
         const token = connect(MEMBER);
         await ask(MEMBER, inProject);
         await ask(MEMBER, inSpace);
+        return token;
+    };
+    const allWithdrawn = () => expect(asked().map((row) => [row.status, row.leftQueue && row.leftQueue.why])).toEqual([['closed', LEFT.WITHDRAWN], ['closed', LEFT.WITHDRAWN]]);
+
+    it('is never a look at chat: the menu\'s read writes nothing', async () => {
+        const token = await waitingTwo();
         token.active = false;
+        const before = snapshot([SCHEMA_TYPE.PROJECT_FINDINGS, SCHEMA_TYPE.COMMENTS]);
         expect(await offered(MEMBER, inProject)).toEqual([]);
-        expect(asked().map((row) => [row.status, row.leftQueue.why])).toEqual([['closed', LEFT.WITHDRAWN], ['closed', LEFT.WITHDRAWN]]);
-        token.active = true;
-        expect(await listed(agent(MEMBER))).toEqual([]);
+        expect(await offered(MEMBER, inSpace)).toEqual([]);
+        expect(snapshot([SCHEMA_TYPE.PROJECT_FINDINGS, SCHEMA_TYPE.COMMENTS])).toBe(before);
     });
 
-    it('is never handed to a connection made after it was asked', async () => {
+    it('is the person switching their token off', async () => {
+        const token = await waitingTwo();
+        await through(tokensCtrl.updateToken, tokenRequest(MEMBER, token._id, { body: { active: false } }));
+        expect(token.active).toBe(false);
+        allWithdrawn();
+    });
+
+    it('is the person deleting their token', async () => {
+        const token = await waitingTwo();
+        await through(tokensCtrl.deleteToken, tokenRequest(MEMBER, token._id));
+        expect(rows(SCHEMA_TYPE.API_TOKENS)).toEqual([]);
+        allWithdrawn();
+    });
+
+    it('is the person unlinking their account, and a member being removed', async () => {
+        await waitingTwo();
+        await accounts.unlink(CID, MEMBER);
+        allWithdrawn();
+
+        connect(OTHER);
+        await ask(OTHER, inSpace);
+        await revokeMemberTokens(CID, OTHER);
+        expect(asked().filter((row) => row.userId === OTHER)).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.WITHDRAWN } }]);
+    });
+
+    it('is a connected app being taken back, by the person or with its client', async () => {
+        process.env.MCP_OAUTH = 'on';
+        process.env.MCP_OAUTH_ISSUER = 'https://hub.example.com';
+        const app = grant(MEMBER);
+        await ask(MEMBER, inSpace);
+        expect(await oauthGrants.revokeOwnGrant(MEMBER, app.grantId)).toBe(true);
+        expect(asked()).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.WITHDRAWN } }]);
+
+        const other = grant(OTHER, { grantId: 'b'.repeat(32) });
+        await ask(OTHER, inSpace);
+        await oauthGrants.revokeClientGrants(other.clientId, new Date(), { companyId: CID });
+        expect(asked().filter((row) => row.userId === OTHER)).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.WITHDRAWN } }]);
+    });
+
+    it('stays while the person has another connection left', async () => {
+        const token = await waitingTwo();
+        connect(MEMBER, { tokenHash: 'hash-second' });
+        await through(tokensCtrl.updateToken, tokenRequest(MEMBER, token._id, { body: { active: false } }));
+        expect(asked().map((row) => row.status)).toEqual(['open', 'open']);
+        expect(await listed(agent(MEMBER))).toHaveLength(2);
+    });
+
+    it('is the connection running out: the daily check of what is about to end closes what waited', async () => {
+        const token = await waitingTwo();
+        token.expiresAt = new Date(Date.now() - MINUTE);
+        await expiryNotices.runForCompany(CID, new Date());
+        allWithdrawn();
+    });
+
+    it('is, for a row that slipped through, the next time the queue is read: the connections there now were not asked', async () => {
         const old = connect(MEMBER, { createdAt: new Date(Date.now() - DAY) });
         await ask(MEMBER, inProject);
         old.active = false;
         connect(MEMBER, { createdAt: new Date(Date.now() + MINUTE), tokenHash: 'hash-new' });
         expect(await listed(agent(MEMBER))).toEqual([]);
         expect(asked()).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.WITHDRAWN } }]);
+    });
+
+    it('is, for a row that slipped through, a message found deleted when the queue is read', async () => {
+        connect(MEMBER);
+        const messageId = await ask(MEMBER, inProject);
+        message(messageId).isDeleted = true;
+        expect(await listed(agent(MEMBER))).toEqual([]);
+        expect(asked()).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.TAKEN_BACK } }]);
     });
 
     it('is the person leaving the workspace', async () => {
@@ -470,14 +703,11 @@ describe('what takes a question out of the queue', () => {
         expect(await workQueue.itemsFor({ companyId: CID, uid: MEMBER, connection: `token:${TOKEN}` })).toEqual([]);
         expect(asked()).toMatchObject([{ status: 'closed', leftQueue: { why: LEFT.WITHDRAWN } }]);
     });
+});
 
-    it('is the message being deleted, or no longer naming the AI', async () => {
-        connect(MEMBER);
-        const deleted = await ask(MEMBER, inProject);
-        const reworded = await ask(MEMBER, inSpace);
-        message(deleted).isDeleted = true;
-        message(reworded).message = 'never mind';
-        expect(await listed(agent(MEMBER))).toEqual([]);
-        expect(asked().map((row) => [row.status, row.leftQueue.why])).toEqual([['closed', LEFT.TAKEN_BACK], ['closed', LEFT.TAKEN_BACK]]);
+describe('the index the two reads use', () => {
+    it('is declared on the collection, kept to the questions', () => {
+        const declared = projectFindingsSchema.indexes().find(([, options]) => options.name === 'asked_in_chat_by_person');
+        expect(declared).toEqual([{ userId: 1, status: 1, openedAt: 1 }, expect.objectContaining({ partialFilterExpression: { rule: ASKED_IN_CHAT } })]);
     });
 });

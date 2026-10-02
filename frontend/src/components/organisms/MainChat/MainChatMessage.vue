@@ -49,7 +49,7 @@
                 </li>
             </ul>
             <div v-if="agentAskNote" class="mc-agent-note" :data-test="`agent-ask-${agentAskState}`">{{ agentAskNote }}</div>
-            <div v-if="askedOwnAi" class="mc-agent-note" data-test="own-ai-asked" :title="$t('AgentChat.asked_own_ai_hint')">{{ $t('AgentChat.asked_own_ai', { name: askedOwnAi }) }}</div>
+            <div v-if="askedOwnAi" class="mc-agent-note" data-test="own-ai-asked" :title="$t('AgentChat.asked_own_ai_hint')">{{ askedOwnAiNote }}</div>
 
             <div v-if="actionable" class="mc-msg-acts">
                 <button type="button" class="mc-act" @click="$emit('reply', message)">{{ $t('Chat.reply') }}</button>
@@ -150,7 +150,7 @@ import MainChatMessageBody from './MainChatMessageBody.vue';
 import MainChatThreadFooter from './MainChatThreadFooter.vue';
 import { isAgentComment } from '@/utils/commentSide';
 import { AI_MENTION_NAME, aiAuthorOf } from '@/utils/aiMention';
-import { mentionsOwnAi } from '@/utils/agentMention';
+import { connectedAiNameOf, loadConnectedAiNames } from '@/views/Ai/connectedAiNames';
 
 const props = defineProps({
     message: { type: Object, required: true },
@@ -216,11 +216,14 @@ const agentAskNote = computed(() => {
     return '';
 });
 
-/* A message edited so that it no longer names the AI is no longer a question for it. */
-const askedOwnAi = computed(() => {
-    const { isDeleted, ownAiAsk, message } = props.message;
-    return (!isDeleted && ownAiAsk && mentionsOwnAi(message) && ownAiAsk.name) || '';
+/* The server sets the mark and takes it off; it names nobody. A member reads the AI's name from the member list;
+ * a guest is given no colleague's AI, so a guest reads that an AI was asked and not whose or which. */
+const askedOwnAi = computed(() => Boolean(props.message.ownAiAsk));
+const askedOwnAiNote = computed(() => {
+    const name = connectedAiNameOf(companyId.value, String(props.message.userId || ''));
+    return name ? t('AgentChat.asked_own_ai', { name }) : t('AgentChat.asked_their_ai');
 });
+watch(askedOwnAi, (asked) => { if (asked) loadConnectedAiNames(companyId.value); }, { immediate: true });
 
 const isAi = computed(() => !!aiAuthorOf(props.message));
 const isAgent = computed(() => isAgentComment(props.message) || !!props.message.agentName || isAi.value);

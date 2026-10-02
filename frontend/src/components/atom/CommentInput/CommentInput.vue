@@ -70,6 +70,7 @@
                     </li>
                 </template>
             </ul>
+            <p v-if="agentsNote" class="comment-input__menu-note" data-test="mention-note">{{ agentsNote }}</p>
         </div>
         <div class="d-flex flex-column w-100">
             <div v-if="reply && Object.keys(reply).length" class="d-flex align-items-center justify-content-between overflow-y-auto bg-white style-scroll border-top-radius-5-px reply-box bg-gainsboro">
@@ -177,6 +178,10 @@ const props = defineProps({
     agents: {
         type: Array,
         default: () => []
+    },
+    agentsNote: {
+        type: String,
+        default: ""
     },
     aiMention: {
         type: Boolean,
