@@ -79,10 +79,10 @@ export default {
         "currentPassword": "le password attuali devono essere lunghe almeno 8 caratteri e contenere almeno 1 carattere alfabetico, 1 maiuscolo, 1 numerico e 1 carattere speciale",
         "newPassword": "le nuove password devono essere lunghe almeno 8 caratteri e contenere almeno 1 carattere alfabetico, 1 maiuscolo, 1 numerico e 1 carattere speciale",
         "currentPasswordValid": "Il campo della password corrente deve contenere almeno 8 caratteri",
-        "newPasswordValid": "Il campo della nuova password deve contenere almeno 8 caratteri",
+        "newPasswordValid": "Il campo della nuova password deve contenere almeno 8 caratteri"
     },
     "companyErrorMessage": {
-        "phoneNumberValid": "Il campo numero di telefono deve contenere almeno 10 caratteri",
+        "phoneNumberValid": "Il campo numero di telefono deve contenere almeno 10 caratteri"
     },
     "errorPage": {
         "project_name": "Nome del progetto",
@@ -2419,6 +2419,9 @@ export default {
         "slack_message_post": "Post a Slack message",
         "automation_create": "Add an automation",
         "project_create": "Create a project",
+        "project_duplicate": "Copy a project",
+        "folder_create": "Create a folder",
+        "list_sprint_set": "Give a list start and end dates",
         "project_setup": "Set up a project",
         "queue_claim": "Take an item from the work queue",
         "queue_release": "Give back an item from the work queue",
@@ -3743,7 +3746,7 @@ export default {
         "has_value": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
-        "date_past": "Past",
+        "date_past": "Past"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -6866,7 +6869,7 @@ export default {
         "mic_denied": "Microphone access was denied or is unavailable.",
         "no_audio": "No audio captured. Please try again.",
         "unsupported": "Recording isn't supported in this browser.",
-        "select_project_first": "Select a project first.",
+        "select_project_first": "Select a project first."
     },
     "call": {
         "start_audio": "Start an audio call",
@@ -8925,6 +8928,18 @@ export default {
         "wants_setup": "set up the project “{title}”",
         "new_project": "New project",
         "wants_project": "create the project “{title}”",
+        "new_project_copy": "Project copy",
+        "wants_project_copy": "copy a project as “{title}”",
+        "line_copy_of": "Copy of",
+        "line_copy_parts": "Copied",
+        "copy_parts": "Its folders, lists, statuses, fields, views and settings. Its automations come too, switched off, where you may manage them.",
+        "line_copy_tasks": "Tasks",
+        "copy_tasks_none": "None. Only the setup is copied.",
+        "copy_tasks_zero": "None: it has no task you can open.",
+        "copy_tasks_count": "{n} task you can open, without its assignees | {n} tasks you can open, without their assignees",
+        "copy_tasks_too_many": "{n} tasks, and a copy made this way takes at most {limit}. Approving it makes nothing: decline it, then ask for the copy without its tasks or duplicate the project yourself.",
+        "line_copy_dates": "Dates",
+        "copy_dates_kept": "Kept as they are in the project",
         "new_folder": "New folder",
         "wants_folder": "create the folder “{title}”",
         "line_inside": "Inside",
@@ -9622,7 +9637,7 @@ export default {
     "Tour": {
         "Tag_name_required": "Tag name is required.",
         "tour_completed": "Tour Completato",
-        "watch_video": "Guarda il Video",
+        "watch_video": "Guarda il Video"
     },
     "TaskStatus": {
         "To_Do": "Da fare"
@@ -10209,7 +10224,7 @@ export default {
         "missing_fields_title": "Campi obbligatori mancanti",
         "missing_fields_text": "Devi assegnare e confermare tutti i campi obbligatori prima di procedere.",
         "incomplete_mapping_title": "Mappatura incompleta",
-        "incomplete_mapping_text": "Si prega di mappare almeno tutti i valori univoci a un valore in Alian Hub prima di procedere.",
+        "incomplete_mapping_text": "Si prega di mappare almeno tutti i valori univoci a un valore in Alian Hub prima di procedere."
     },
     "importTaskButton": {
         "import_title": "Importa attività",
@@ -10246,7 +10261,7 @@ export default {
     },
     "valueMapping": {
         "user_dropdown_text": "Seleziona utente",
-        "status_dropdown_text": "Seleziona stato",
+        "status_dropdown_text": "Seleziona stato"
     },
     "Affiliate": {
         "refferal_code_placeholder": "Inserisci il codice di riferimento",
@@ -10611,7 +10626,7 @@ export default {
     },
     "importUserKeywords": {
         "user_email_description": "ID e-mail dell'utente",
-        "user_role_description": "Il ruolo o il titolo di lavoro assegnato all'utente all'interno dell'organizzazione.",
+        "user_role_description": "Il ruolo o il titolo di lavoro assegnato all'utente all'interno dell'organizzazione."
     },
     "userSelection": {
         "title": "Selezione Utente",

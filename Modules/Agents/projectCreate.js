@@ -184,24 +184,25 @@ const addressOf = (companyId, projectId) => {
     return base ? `${base}/#/${encodeURIComponent(String(companyId))}/project/${projectId}/p` : '';
 };
 
-const liveIn = (companyId, type, projectId) => MongoDbCrudOpration(companyId, {
-    type, data: [{ ProjectID: { $in: idForms(projectId) }, deletedStatusKey: { $ne: TRASHED } }, { _id: 1 }],
+const liveIn = (companyId, type, projectId, except = []) => MongoDbCrudOpration(companyId, {
+    type, data: [{ ProjectID: { $in: idForms(projectId) }, deletedStatusKey: { $ne: TRASHED }, ...(except.length ? { _id: { $nin: except.map(tools.oid) } } : {}) }, { _id: 1 }],
 }, 'findOne');
 
-const heldIn = async (companyId, projectId) => {
-    if (await liveIn(companyId, SCHEMA_TYPE.TASKS, projectId)) return 'a task';
-    return await liveIn(companyId, SCHEMA_TYPE.PAGES, projectId) ? 'a doc' : '';
+const heldIn = async (companyId, projectId, startedWith) => {
+    if (await liveIn(companyId, SCHEMA_TYPE.TASKS, projectId, startedWith)) return startedWith.length ? 'a task that was not part of the copy' : 'a task now';
+    return await liveIn(companyId, SCHEMA_TYPE.PAGES, projectId) ? 'a doc now' : '';
 };
 
 /* Taking a project back moves it to the trash through the project's own route, as the person undoing, who must be
  * allowed to delete it by hand. A person restores it from the trash. A project that holds work by then stays, and
- * the undo is refused with the reason, so the person is told and can undo again once the work is moved. */
-const withdraw = async ({ companyId, who, projectId }) => {
+ * the undo is refused with the reason, so the person is told and can undo again once the work is moved. The tasks a
+ * copy was made with (`startedWith`) are not work made since. */
+const withdraw = async ({ companyId, who, projectId, startedWith = [] }) => {
     const project = await storedProject(companyId, projectId);
     const inProject = idOf(project._id);
     const name = project.ProjectName || '';
-    const held = await heldIn(companyId, inProject);
-    if (held) throw refuse(`the project "${name}" holds ${held} now, so it stays; delete it in AlianHub if it should go`);
+    const held = await heldIn(companyId, inProject, startedWith);
+    if (held) throw refuse(`the project "${name}" holds ${held}, so it stays; delete it in AlianHub if it should go`);
     const answer = await setup.answerOf('projectUpdate', { companyId, who, params: { id: inProject }, body: { updateObject: { deletedStatusKey: TRASHED } } });
     if (answer.code !== 200) throw refuse(answer.code === 403 ? `you may not delete the project "${name}", so it stays` : setup.reasonOf(answer, 'the project was not moved to the trash'));
     socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: { ...plain(project), deletedStatusKey: TRASHED }, updatedFields: { deletedStatusKey: TRASHED }, module: 'project' });
@@ -239,4 +240,4 @@ const inverses = {
     [UNDO_KIND]: (companyId, made, actor) => withdraw({ companyId, who: whoOf(actor), projectId: made.projectId }),
 };
 
-module.exports = { executors, inverses, draftOf, problemIn, refusedFor, viewKinds, startingStatuses, ACTION, UNDO_KIND, NAME_MIN, NAME_MAX, DESCRIPTION_MAX };
+module.exports = { executors, inverses, draftOf, problemIn, refusedFor, mayCreate, withdraw, addressOf, viewKinds, startingStatuses, ACTION, UNDO_KIND, NAME_MIN, NAME_MAX, DESCRIPTION_MAX };

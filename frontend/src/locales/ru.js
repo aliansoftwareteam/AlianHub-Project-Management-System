@@ -79,10 +79,10 @@ export default {
         "currentPassword": "текущие пароли должны иметь длину не менее 8 символов и содержать как минимум 1 буквенный, 1 верхний регистр, 1 цифровой и 1 специальный символ",
         "newPassword": "новые пароли должны иметь длину не менее 8 символов и содержать не менее 1 алфавита, 1 верхнего регистра, 1 цифры и 1 специального символа",
         "currentPasswordValid": "Поле текущего пароля должно содержать не менее 8 символов",
-        "newPasswordValid": "Поле нового пароля должно содержать не менее 8 символов",
+        "newPasswordValid": "Поле нового пароля должно содержать не менее 8 символов"
     },
     "companyErrorMessage": {
-        "phoneNumberValid": "Поле номера телефона должно содержать не менее 10 символов",
+        "phoneNumberValid": "Поле номера телефона должно содержать не менее 10 символов"
     },
     "errorPage": {
         "project_name": "Название проекта",
@@ -2419,6 +2419,9 @@ export default {
         "slack_message_post": "Post a Slack message",
         "automation_create": "Add an automation",
         "project_create": "Create a project",
+        "project_duplicate": "Copy a project",
+        "folder_create": "Create a folder",
+        "list_sprint_set": "Give a list start and end dates",
         "project_setup": "Set up a project",
         "queue_claim": "Take an item from the work queue",
         "queue_release": "Give back an item from the work queue",
@@ -3743,7 +3746,7 @@ export default {
         "has_value": "Has a value",
         "checked": "Checked",
         "unchecked": "Not checked",
-        "date_past": "Past",
+        "date_past": "Past"
     },
     "ViewColumns": {
         "title": "Columns",
@@ -6866,7 +6869,7 @@ export default {
         "mic_denied": "Microphone access was denied or is unavailable.",
         "no_audio": "No audio captured. Please try again.",
         "unsupported": "Recording isn't supported in this browser.",
-        "select_project_first": "Select a project first.",
+        "select_project_first": "Select a project first."
     },
     "call": {
         "start_audio": "Start an audio call",
@@ -8925,6 +8928,18 @@ export default {
         "wants_setup": "set up the project “{title}”",
         "new_project": "New project",
         "wants_project": "create the project “{title}”",
+        "new_project_copy": "Project copy",
+        "wants_project_copy": "copy a project as “{title}”",
+        "line_copy_of": "Copy of",
+        "line_copy_parts": "Copied",
+        "copy_parts": "Its folders, lists, statuses, fields, views and settings. Its automations come too, switched off, where you may manage them.",
+        "line_copy_tasks": "Tasks",
+        "copy_tasks_none": "None. Only the setup is copied.",
+        "copy_tasks_zero": "None: it has no task you can open.",
+        "copy_tasks_count": "{n} task you can open, without its assignees | {n} tasks you can open, without their assignees",
+        "copy_tasks_too_many": "{n} tasks, and a copy made this way takes at most {limit}. Approving it makes nothing: decline it, then ask for the copy without its tasks or duplicate the project yourself.",
+        "line_copy_dates": "Dates",
+        "copy_dates_kept": "Kept as they are in the project",
         "new_folder": "New folder",
         "wants_folder": "create the folder “{title}”",
         "line_inside": "Inside",
@@ -9622,7 +9637,7 @@ export default {
     "Tour": {
         "Tag_name_required": "Tag name is required.",
         "tour_completed": "Тур завершён",
-        "watch_video": "Посмотреть видео",
+        "watch_video": "Посмотреть видео"
     },
     "TaskStatus": {
         "To_Do": "К выполнению"
@@ -10209,7 +10224,7 @@ export default {
         "missing_fields_title": "Отсутствуют обязательные поля",
         "missing_fields_text": "Перед продолжением необходимо сопоставить и подтвердить обязательные поля.",
         "incomplete_mapping_title": "Неполное сопоставление",
-        "incomplete_mapping_text": "Для продолжения сопоставьте все уникальные значения хотя бы с одним значением Alian Hub.",
+        "incomplete_mapping_text": "Для продолжения сопоставьте все уникальные значения хотя бы с одним значением Alian Hub."
     },
     "importTaskButton": {
         "import_title": "Импорт задач",
@@ -10246,7 +10261,7 @@ export default {
     },
     "valueMapping": {
         "user_dropdown_text": "Выберите пользователя",
-        "status_dropdown_text": "Выберите статус",
+        "status_dropdown_text": "Выберите статус"
     },
     "Affiliate": {
         "refferal_code_placeholder": "Введите реферальный код",
@@ -10611,7 +10626,7 @@ export default {
     },
     "importUserKeywords": {
         "user_email_description": "Электронная почта пользователя",
-        "user_role_description": "Роль или должность, назначенная пользователю в организации.",
+        "user_role_description": "Роль или должность, назначенная пользователю в организации."
     },
     "userSelection": {
         "title": "Выбор Пользователей",
