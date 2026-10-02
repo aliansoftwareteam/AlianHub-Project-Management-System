@@ -654,7 +654,7 @@ describe('stats and companies', () => {
 
 describe('auditExport', () => {
     const asOwner = (over = {}) => ({ instanceAdmin: 'owner', uid: USER, aud: COMPANY, headers: { companyid: COMPANY }, query: {}, body: {}, ...over });
-    const lines = (res) => res.body.replace(/^﻿/, '').split('\r\n');
+    const lines = (res) => res.body.replace(/^\uFEFF/, '').split('\r\n');
 
     it('reads the history of the named company, newest first, capped at 50000 rows', async () => {
         MongoDbCrudOpration.mockResolvedValue([]);
@@ -713,7 +713,7 @@ describe('auditExport', () => {
         const res = await run(ctrl.auditExport, asOwner());
         expect(res.headers['Content-Type']).toBe('text/csv; charset=utf-8');
         expect(res.headers['Content-Disposition']).toBe(`attachment; filename="audit-${COMPANY}.csv"`);
-        expect(res.body.startsWith('﻿')).toBe(true);
+        expect(res.body.startsWith('\uFEFF')).toBe(true);
         expect(lines(res)).toEqual([
             'CreatedAt,Type,Key,UserId,ProjectId,TaskId,Message',
             `2026-01-02T03:04:05.000Z,task,task_create,${USER},p1,t1,Created`,
