@@ -42,8 +42,8 @@ const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGE
 const LIST_KINDS = Object.freeze(['list', 'listName', 'listFolder']);
 /* A goal belongs to no project: whoever can edit the goal may undo a change to it. */
 const GOAL_KINDS = Object.freeze(['goalValue', 'goalSource']);
-/* A field or a view is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
-const SETUP_KINDS = Object.freeze(['fields', 'view']);
+/* A field, a view or a whole setup is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
+const SETUP_KINDS = Object.freeze(['fields', 'view', 'setup']);
 const work = () => require('./workRequests');
 const goalWork = () => require('./goalRequests');
 const setupWork = () => require('./setupRequests');
@@ -217,6 +217,7 @@ const inverses = {
         return { projectId: u.projectId, viewId: u.viewId, ...out };
     },
     ...require('./manager/workQueue').inverses,
+    ...require('./projectSetup').inverses,
 };
 
 const isUndoable = (row) => Boolean(row && row.meta && row.meta.undo && inverses[row.meta.undo.kind] && !row.meta.undoneAt);

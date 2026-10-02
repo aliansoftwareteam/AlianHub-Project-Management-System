@@ -496,8 +496,9 @@ const liveStep = async (companyId, actor, { action, params, ip, taint }) => {
  * last, with nothing written yet.
  * A policy `decision` of refuse is honoured before the registry check, so a
  * policy refusal leaves the same audit row as a registry one. `approved` is an
- * argument and never read from `params`, so only the approval of a proposal sets it. */
-const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false }) => {
+ * argument and never read from `params`, so only the approval of a proposal sets it; `approvedBy` is the person who
+ * approved, for an executor that holds each of its parts to that person's rights too. */
+const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false, approvedBy = '' }) => {
     await liveStep(companyId, actor, { action, params, ip, taint });
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip, taint });
     const check = registry.evaluate(action, params, { allowedActions });
@@ -527,7 +528,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
         });
         let out;
         try {
-            out = await exec({ companyId, actor, params, depth: clampDepth(depth) });
+            out = await exec({ companyId, actor, params, depth: clampDepth(depth), approvedBy: approved ? String(approvedBy || '') : '' });
         } catch (e) {
             await audit.failAction(companyId, auditId, e.message);
             throw e;

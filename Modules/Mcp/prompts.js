@@ -29,6 +29,25 @@ const series = (parts) => {
     return kept.length > 1 ? `${kept.slice(0, -1).join(', ')} and ${kept[kept.length - 1]}` : kept[0] || '';
 };
 
+const tasksAfter = (has) => [
+    'tasks with `task.create`',
+    has('subtask.create') && 'subtasks with `subtask.create`',
+    has('task.assign') && 'owners with `task.assign`',
+    has('task.update') && 'dates with `task.update`',
+];
+
+/* The setup steps for a connection that can send a whole plan: one call, which waits for the person in AlianHub. */
+const planThroughOneCall = (has) => [
+    'Show me the whole setup as one plan before you make anything: the statuses, the lists, the fields, the views, and the first tasks in each list. Leave out what the project already has. Say that automations are a part I have to make myself in AlianHub.',
+    'Wait for my yes. Then send the statuses, lists, fields and views together in one call of `project.setup`. Nothing is made by that call: tell me the plan is waiting for my approval in AlianHub, where I see every part of it before I approve, and wait until I say I have approved it.',
+    `Then make the rest of what I approved: ${series([listsTool(has) && `find the new lists with \`${listsTool(has)}\``, ...tasksAfter(has)])}.`,
+];
+
+const planPartByPart = (has) => [
+    'Show me the whole setup as one plan before you make anything: the lists, and the first tasks in each. Say which parts you will make and which parts I have to make myself in AlianHub, such as statuses, fields, views and automations.',
+    `Wait for my yes. Then make only what I approved: ${series([has('list.create') && 'lists with `list.create`', ...tasksAfter(has)])}.${has('list.create') ? '' : ' You cannot make lists here: tell me which lists to make, and put the tasks in the lists that are there.'}`,
+];
+
 const PROJECT = (description) => ({ name: 'project', description, required: false });
 const ASKED_PROJECT = PROJECT('The name of the project. Leave it empty and you are asked.');
 
@@ -57,14 +76,7 @@ const PROMPTS = Object.freeze([
                     has('members.list') && 'its people with `members.list`',
                     'its tasks with `tasks.search`',
                 ])}.`,
-                'Show me the whole setup as one plan before you make anything: the lists, and the first tasks in each. Say which parts you will make and which parts I have to make myself in AlianHub, such as statuses, fields, views and automations.',
-                `Wait for my yes. Then make only what I approved: ${series([
-                    has('list.create') && 'lists with `list.create`',
-                    'tasks with `task.create`',
-                    has('subtask.create') && 'subtasks with `subtask.create`',
-                    has('task.assign') && 'owners with `task.assign`',
-                    has('task.update') && 'dates with `task.update`',
-                ])}.${has('list.create') ? '' : ' You cannot make lists here: tell me which lists to make, and put the tasks in the lists that are there.'}`,
+                ...(has('project.setup') ? planThroughOneCall(has) : planPartByPart(has)),
                 has('screen.link')
                     ? 'Finish with a short list of what you made, what is left for me, and the link to the project from `screen.link`.'
                     : 'Finish with a short list of what you made and what is left for me.',
