@@ -26,6 +26,7 @@ vi.mock('@/components/atom/UserProfile/UserProfile.vue', () => ({ default: { nam
 import { SHORTCUTS, closeShortcutSheet, setSingleKeyShortcuts, shortcutSheet } from '@/composable/shortcuts';
 import { closePopovers, shellState } from '@/components/organisms/Shell/shellState';
 import KeyboardShortcuts from '@/components/organisms/KeyboardShortcuts/KeyboardShortcuts.vue';
+import { closeQuickCreate, quickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import GlobalRail from '@/components/organisms/Shell/GlobalRail.vue';
 
 const store = () => createStore({
@@ -162,6 +163,27 @@ describe('the ? sheet', () => {
         await press('Escape', document.activeElement);
         await press('?', document.body, { shiftKey: true });
         expect(sheet().querySelector('[data-test="shortcut-search"]').value).toBe('');
+    });
+});
+
+describe('the c key', () => {
+    afterEach(() => closeQuickCreate());
+
+    it('opens the new task dialog from the shell, before the dialog itself has loaded', async () => {
+        await mountInBody(KeyboardShortcuts);
+        const input = add('<input type="text" class="typing" />').querySelector('.typing');
+        await press('c', input);
+        expect(quickCreate.open).toBe(false);
+        await press('c');
+        expect(quickCreate.open).toBe(true);
+    });
+
+    it('leaves an open new task dialog as it is', async () => {
+        await mountInBody(KeyboardShortcuts);
+        await press('c');
+        quickCreate.name = 'Half typed';
+        await press('c');
+        expect(quickCreate).toMatchObject({ open: true, name: 'Half typed' });
     });
 });
 

@@ -93,7 +93,7 @@ describe('the data tools on /mcp with a personal access token', () => {
         expect(ownerSees).toEqual(expect.arrayContaining([fx.open, fx.closed]));
 
         const memberToken = await personalToken(member);
-        expect(payloadOf(await mcp(memberToken, call('project.get', { projectId: fx.closed })))).toEqual({ error: 'project not found' });
+        expect(payloadOf(await mcp(memberToken, call('project.get', { projectId: fx.closed })))).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
         const statuses = payloadOf(await mcp(memberToken, call('statuses.list', { projectId: fx.open })));
         expect(statuses.statuses.length).toBeGreaterThan(0);
     });

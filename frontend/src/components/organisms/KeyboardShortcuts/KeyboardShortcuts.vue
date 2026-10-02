@@ -68,6 +68,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useNavItems } from "@/components/organisms/Shell/navItems";
 import { openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
+import { openQuickCreate, quickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 import { useFocusTrap } from "@/composable/useFocusTrap";
 import { onboardingRecord, saveOnboarding } from "@/composable/onboardingState";
 import {
@@ -170,6 +171,11 @@ onMounted(() => {
         openShortcutSheet();
     }));
     unbinds.push(bindShortcut("search", focusSearch));
+    // Bound here because the new task dialog is fetched after the shell: a key pressed before it arrives would be lost.
+    unbinds.push(bindShortcut("create-task", () => {
+        if (quickCreate.open) return false;
+        openQuickCreate();
+    }));
     SHORTCUTS.filter((s) => s.nav).forEach((s) => unbinds.push(bindShortcut(s.id, () => go(s.nav))));
 });
 onBeforeUnmount(() => {
