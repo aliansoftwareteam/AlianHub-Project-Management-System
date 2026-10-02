@@ -23,6 +23,8 @@ const alwaysOf = (standing, proposal) => {
     return offered ? { always: true, alwaysKind: standingApprovals.labelOf(proposal.changes[0].action) } : { always: false };
 };
 
+/* A change is shown through its card, which is built for the viewer. The change as filed goes only with a proposal
+ * a person can edit, to a person who may decide it: approving an edit sends the kept changes back. */
 const toRow = (previews, batches = new Map()) => (proposal, standing) => ({
     sourceType: 'proposal',
     sourceId: String(proposal._id),
@@ -37,7 +39,8 @@ const toRow = (previews, batches = new Map()) => (proposal, standing) => ({
     why: proposal.why || '',
     changes: (Array.isArray(proposal.changes) ? proposal.changes : []).map((change, at) => {
         const preview = (previews.get(String(proposal._id)) || [])[at];
-        return { action: change.action, params: change.params || {}, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}), ...changeLabels.markOf(change) };
+        const asFiled = proposal.source !== SOURCE_MCP && !standing.locked ? { params: change.params || {} } : {};
+        return { action: change.action, ...asFiled, label: change.label || change.action, reversible: Boolean(change.reversible), ...(preview ? { preview } : {}), ...changeLabels.markOf(change) };
     }),
     ...(batches.has(String(proposal._id)) ? { batch: batches.get(String(proposal._id)) } : {}),
     cost: proposal.cost || null,
@@ -65,7 +68,7 @@ const readQueue = async (companyId, userId) => {
     }, 'find');
     const listed = (rows || []).map(plain).filter(access.staysInside(scope.projectIds));
     // The queue is still worth showing without its cards.
-    const cards = (build) => build(companyId, userId, listed).catch((error) => {
+    const cards = (build) => build(companyId, userId, listed, { bareChanges: true }).catch((error) => {
         logger.error(`[inbox] proposal previews: ${error.message}`);
         return new Map();
     });

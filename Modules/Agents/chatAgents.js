@@ -337,7 +337,7 @@ const answerAll = async (companyId, { started, questionRow, askerId, forAll, con
 };
 
 const startRun = async (companyId, { agent, questionRow, askerId, trigger, question }) => {
-    const check = await lazy.runs.canStart(agent, { trigger, companyId, depth: 0 });
+    const check = await lazy.runs.canStart(agent, { trigger, companyId, depth: 0, projectId: questionRow.projectId });
     if (!check.ok) return { agentId: String(agent._id), started: false, ...(check.code ? { code: check.code } : {}) };
     const { run, deduplicated } = await lazy.runs.start(companyId, {
         agent, taskId: null, projectId: null, skill: lazy.runs.skillSlugOf(agent), trigger, startedBy: askerId, viaAccount: agent.account,

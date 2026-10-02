@@ -345,7 +345,7 @@ exports.pauseAll = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         if (refuseUnlessManager(res, await callerOf(req, companyId), 'Agents cannot pause agents.')) return undefined;
-        const out = await runs.pauseAll(companyId, `pause all by ${req.uid}`);
+        const out = await runs.pauseAll(companyId, `pause all by ${req.uid}`, req.uid);
         return res.send({ status: true, statusText: 'All agents paused.', data: out });
     } catch (e) { logger.error(`pauseAll: ${e.message}`); return fail(res, e.message, 500); }
 };
@@ -713,7 +713,7 @@ const saveWorkspacePolicy = async (req, res) => {
         if (req.apiToken) return fail(res, 'An API token cannot change the workspace\'s agent settings.', 403);
         const caller = await callerOf(req, companyId);
         if (!canManageAgents(caller)) return fail(res, 'Owner/admin only.', 403);
-        const out = await accounts.setPolicy(companyId, req.body || {});
+        const out = await accounts.setPolicy(companyId, req.body || {}, caller.actor.userId);
         if (out.error) return fail(res, out.error, out.status || 400);
         await agentAudit.recordWorkspacePolicyChange(companyId, caller.actor, { from: out.from, to: out.policy, ip: req.ip || '' });
         socketEmitter.emit('update', { type: 'update', module: 'agent', companyId, data: { kind: POLICY_CHANGE }, updatedFields: { kind: POLICY_CHANGE }, actor: { kind: 'human' }, depth: 1 });

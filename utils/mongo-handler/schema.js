@@ -2886,7 +2886,7 @@ const schema = {
     companies: {
         // { by, anchor } — set only by scripts/seed-scale.js, which writes to and drops no company without it.
         scaleSeed: { type: Object, required: false },
-        // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone }
+        // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone, connectedPaused, connectedPausedBy, connectedPausedAt }
         agentPolicy: {
             type: Object,
             required: false

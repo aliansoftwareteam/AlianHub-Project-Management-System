@@ -455,6 +455,19 @@ describe('limits', () => {
         expect(reportRuns()).toHaveLength(0);
     });
 
+    it.each([
+        ['the project its page is filed in', {}, { deliver: { email: false, pageProjectId: OPEN_PROJECT } }],
+        ['a project the agent is kept to', { projectIds: [OPEN_PROJECT] }, {}],
+    ])('stops while agents are paused in %s', async (_where, agent, schedule) => {
+        store().seed(SCHEMA_TYPE.PROJECTS, { _id: OPEN_PROJECT, agentLimits: { paused: true } });
+        seedAgent(agent);
+        seedSchedule(schedule);
+        await scheduler.tickCompany(A, { now: NOW });
+        expect(reportRuns()).toHaveLength(0);
+        expect(skippedWith()).toMatchObject({ status: 'skipped', code: 'project_paused' });
+        expect(askModel).not.toHaveBeenCalled();
+    });
+
     it('does not run for an agent below L3', async () => {
         seedAgent({ autonomy: 2 });
         seedSchedule();
