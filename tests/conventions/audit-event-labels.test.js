@@ -21,7 +21,7 @@ const QUOTED = new RegExp(String.raw`(['"\`])(${KEY})\1`, 'g');
 /* A file that writes a row: every dotted key it quotes is read. */
 const ROW_WRITER = /\b(recordAudit|recordAuditFromReq|recordAutomationAudit|saveAuditRow|recordRefusal|recordLoopRefusal|auditRefusal|auditTransition)\(|\bagentAudit\b|\baudit\.(record[A-Z]\w*|openAction)\(|idempotency\.once\(|\.\.\.context, action:|\.\.\.forTool\(context\)/;
 /* A route that names what only a person may do: an agent's attempt is recorded under that name. */
-const PERSON_ONLY = new RegExp(String.raw`\b(?:decidedByPerson|setByPerson|agentsRefused)\(\s*(['"\`])(${KEY})\1|\bpersonDecides\([^,()]+,[^,()]+,\s*(['"\`])(${KEY})\3|\bconst [A-Z_]*ACTION[A-Z_]* = (['"\`])(${KEY})\5`, 'g');
+const PERSON_ONLY = new RegExp(String.raw`\b(?:decidedByPerson|setByPerson|agentsRefused|agentsReadAlone)\(\s*(['"\`])(${KEY})\1|\bpersonDecides\([^,()]+,[^,()]+,\s*(['"\`])(${KEY})\3|\bconst [A-Z_]*ACTION[A-Z_]* = (['"\`])(${KEY})\5`, 'g');
 
 const walk = (dir, out = []) => {
     if (!fs.existsSync(dir)) return out;

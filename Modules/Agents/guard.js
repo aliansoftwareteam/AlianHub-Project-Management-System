@@ -284,6 +284,16 @@ const projectAsked = (checksOf) => routeGuard(checksOf, evaluateTaken);
  * its audit row. `refusesAs` is read by the perimeter, which answers before a route is chosen. */
 const agentsRefused = (action) => Object.assign(routeGuard(() => ({ action, params: {} })), { refusesAs: action });
 
+/* For a read that makes what it does not find. An agent's request is marked before anything else on the route to
+ * read alone; where there is nothing to read, the handler answers it through `req.refuseMaking`, as `action` refused. */
+const agentsReadAlone = (action) => {
+    const refused = agentsRefused(action);
+    return Object.assign(withActor((req, res, next) => {
+        req.refuseMaking = () => refused(req, res, () => {});
+        return next();
+    }), { refusesAs: action });
+};
+
 /* The reminder an agent sets is the registry's: on a task its person can open, in that task's project. Any other,
  * one with no task or with a task that is hidden or missing alike, is a person's to set. */
 const reminderChecks = async (req, body, companyId) => {
@@ -422,4 +432,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refusedAs(hit.action);
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, projectAsked, reminderCreateGuard, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, agentsReadAlone, projectAsked, reminderCreateGuard, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };

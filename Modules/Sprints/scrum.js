@@ -117,11 +117,12 @@ const oldest = (rows) => (rows || []).slice().sort((a, b) => String(a._id).local
 
    Not a Scrum sprint itself (isScrum stays false): it has no time box, so it can
    never be started, completed, or counted in velocity. */
-async function ensureBacklog(companyId, projectId, userData) {
+async function ensureBacklog(companyId, projectId, userData, { readsAlone = false } = {}) {
     if (!OBJECT_ID_PATTERN.test(String(projectId || ''))) return { error: 'A valid projectId is required.' };
 
     const found = oldest(await backlogsIn(companyId, projectId));
     if (found) return { backlog: found };
+    if (readsAlone) return {};
 
     const project = await projectOf(companyId, projectId).catch(() => null);
     if (!project) return { error: 'Project not found.' };
@@ -163,8 +164,9 @@ exports.getBacklog = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         if (!companyId) return fail(res, 'companyId is required.');
         const body = req.body || {};
-        const { backlog, error } = await ensureBacklog(companyId, body.projectId, await actingUser(req));
+        const { backlog, error } = await ensureBacklog(companyId, body.projectId, await actingUser(req), { readsAlone: Boolean(req.refuseMaking) });
         if (error) return fail(res, error);
+        if (!backlog) return await req.refuseMaking();
         return res.send({ status: true, statusText: 'Backlog ready.', data: backlog });
     } catch (err) {
         logger.error(`getBacklog: ${err.message}`);

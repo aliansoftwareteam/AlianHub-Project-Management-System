@@ -32,6 +32,8 @@ const upload = multer({
 });
 const captureGuard = refuseUpload(captureRefusal);
 const { agentsRefused } = require('../Agents/guard');
+/* A capture is what the desktop tracker sees on its person's screen; it stands before the file is read. */
+const capturedByPeople = agentsRefused('timelog.capture');
 const { logged, started, stopped, edited } = require('./askedWrites');
 
 exports.init = (app) => {
@@ -498,9 +500,9 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/timetracker/capture', upload.single("file"), captureGuard, ctrlV2.captureTimetracker);
-    app.post('/api/v3/timetracker/capture', upload.single("file"), captureGuard, ctrlV2.captureTimetracker2);
-    app.post('/api/v4/timetracker/capture', upload.single("file"), captureGuard, ctrlV2.captureTimetracker3);
+    app.post('/api/v2/timetracker/capture', capturedByPeople, upload.single("file"), captureGuard, ctrlV2.captureTimetracker);
+    app.post('/api/v3/timetracker/capture', capturedByPeople, upload.single("file"), captureGuard, ctrlV2.captureTimetracker2);
+    app.post('/api/v4/timetracker/capture', capturedByPeople, upload.single("file"), captureGuard, ctrlV2.captureTimetracker3);
 
 
 /* TIME SHEET DETAILS GET */

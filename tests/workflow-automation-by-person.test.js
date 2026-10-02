@@ -210,6 +210,44 @@ describe('running an automation on the tasks it matches', () => {
     });
 });
 
+describe('starting a workflow', () => {
+    const START = 'POST /api/v2/workflows/runs';
+    const AGENT_RUN_CALLER = { uid: OWNER, agentRun: { _id: AGENT_RUN, agentId: AGENT_ID, agentName: 'Triage' } };
+    const saved = () => { mockDb.seed(SCHEMA_TYPE.WORKFLOW_DEFINITIONS, { _id: WORKFLOW, name: 'Ship it', steps: STEPS, enabled: true, createdBy: OWNER, deletedStatusKey: 0 }); return { definitionId: WORKFLOW }; };
+    const runs = () => rows(SCHEMA_TYPE.WORKFLOW_RUNS);
+
+    it.each([['a signed-in person', SESSION], ['a person\'s own API token', PERSONAL]])('is done by %s, and the run is theirs', async (_who, caller) => {
+        expect(await send(START, caller, {}, saved())).toMatchObject({ code: 200, body: { status: true } });
+        expect(runs().map((run) => String(run.startedBy))).toEqual([OWNER]);
+        expect(refusals()).toHaveLength(0);
+    });
+
+    it.each([['an agent\'s token', AGENT], ['an agent run', AGENT_RUN_CALLER]])('is refused to %s by the route, and the attempt is recorded as the agent\'s', async (_who, caller) => {
+        const out = await send(START, caller, {}, saved());
+
+        expect(out).toMatchObject({ code: 403, body: { status: false, statusText: expect.stringContaining('(workflow.run.start)') } });
+        expect(runs()).toHaveLength(0);
+        expect(refusals().map((row) => [row.meta.action, row.meta.onBehalfOf, row.meta.path])).toEqual([['workflow.run.start', OWNER, START]]);
+    });
+
+    it('has the refusal of an agent in front of everything else on the route', () => {
+        expect(routes[START][0].refusesAs).toBe('workflow.run.start');
+    });
+});
+
+describe('a step of a workflow that runs an agent', () => {
+    const workflowAgent = require('../Modules/Workflows/agentRun');
+    const step = (taskId) => ({ companyId: CID, workflowRunId: WORKFLOW_RUN, stepId: 'sAgent', agentId: AGENT_ID, taskId, startedBy: OWNER, depth: 0 });
+
+    it('starts no run on a task of a project where agents are paused', async () => {
+        mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: AGENT_ID, name: 'Triage', account: 'workspace', projectIds: [], skills: [], deletedStatusKey: 0 });
+        rows(SCHEMA_TYPE.PROJECTS).find((project) => String(project._id) === P_OPEN).agentLimits = { paused: true };
+
+        await expect(workflowAgent.runAgent(step(String(fx.top._id)))).rejects.toMatchObject({ deterministic: true, message: expect.stringContaining('Agents are paused in this project') });
+        expect(rows(SCHEMA_TYPE.AGENT_RUNS)).toHaveLength(0);
+    });
+});
+
 /* A write under these routes that is not listed is one a token is refused: a route added later is closed until it is named. */
 const OPEN_TO_TOKENS = [
     'POST /api/v2/workflows/dry-run',

@@ -6,6 +6,7 @@
 const ROUTE_ONLY = Object.freeze([
     'project.comment', 'comment.assign', 'comment.resolve', 'reaction.set', 'timelog.edit', 'time.plan',
     'epic.create', 'epic.update', 'epic.assign', 'project.update', 'whiteboard.update', 'task.reorder',
+    'sprint.favourite', 'task.fields.compute',
 ]);
 
 // The registry's own names for the same change, which a route takes whatever the flag of the MCP tool says.
