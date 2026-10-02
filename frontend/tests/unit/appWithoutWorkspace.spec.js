@@ -14,6 +14,7 @@ vi.mock('vuex', () => ({
         commit: vi.fn()
     })
 }));
+vi.mock('@/store', () => ({ default: { getters: {}, dispatch: vi.fn(() => Promise.resolve()), commit: vi.fn() } }));
 vi.mock('@/composable/index', () => ({
     languageTranslateHelper: () => ({ selectedLanguageCode: { value: 'en' }, changeLanguage: vi.fn(() => Promise.resolve({})) }),
     useCustomComposable: () => ({ setTitle: vi.fn() })
@@ -102,9 +103,20 @@ describe('a signed-in person', () => {
             wrapper.unmount();
         });
 
+        it.each(PAGES_THAT_NEED_NO_WORKSPACE)('reaches %s from the page that asks for a workspace name', async (label, path, name) => {
+            const wrapper = await openAppAt('/business');
+            expect(router.currentRoute.value.name).toBe('Create_Company');
+
+            await router.push(path);
+            for (let turn = 0; turn < 6; turn += 1) await flushPromises();
+
+            expect(router.currentRoute.value.name).toBe(name);
+            wrapper.unmount();
+        });
+
         it.each([
             ['the sign-in page', '/login'],
-            ['an address that leads nowhere', '/nowhere'],
+            ['the bare address', '/'],
         ])('is still sent to name a workspace from %s', async (label, path) => {
             const wrapper = await openAppAt(path);
 

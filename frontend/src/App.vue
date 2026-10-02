@@ -105,6 +105,7 @@ import { CommandPalette, QuickCreateTask, TaskTemplateDialogHost, AiFieldFillDia
 const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
 import { aiAvailability, loadAiAvailability, trackAiPlan } from '@/composable/aiAvailability';
 import { AI_GATE, aiGateFor } from '@/router/ai/gate';
+import { opensWithoutWorkspace } from '@/router/withoutWorkspace';
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 
@@ -154,8 +155,15 @@ watch(() => currentUser.value, (val) => {
 watch(() => getters['settings/rules'], (val) => {
 	rules.value = val;
 })
+// A mail's link opens with no workspace; from any other page a person without one is sent to name it.
+const askForWorkspace = async () => {
+    await router.isReady().catch(() => {});
+    if (!opensWithoutWorkspace(router.currentRoute.value)) router.push({name : 'Create_Company'});
+};
+
 watch(route, (newVal) => {
 	const hasSession = !!localStorage.getItem("userId");
+    if(opensWithoutWorkspace(newVal)) return;
     if(newVal?.name === 'Support'){
         if(hasSession && !companyId.value){
             return router.push({name : 'Create_Company'});
@@ -181,7 +189,7 @@ function checkUserCompany (uid,forDisable = false) {
                         localStorage.removeItem("selectedCompany");
                         commit("settings/mutateSelectedCompany", companyId.value);
                         companyId.value = '';
-                        router.push('/business');
+                        askForWorkspace();
                         return;
                     }else{
                         if(forDisable){
@@ -310,11 +318,11 @@ async function getFirebaseData() {
                         if(findCompany.length > 0){
                             await changeCompany(findCompany[0]._id)
                         }else{
-                            router.push('/business');
+                            askForWorkspace();
                         }
                     }
                 }else{
-                    router.push('/business');
+                    askForWorkspace();
                 }
 
 
