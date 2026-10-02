@@ -30,7 +30,7 @@ Where things come from:
 | 4 | Subtasks to three levels | The parent task | Under "[AI bench] Parent" add a subtask "Child", under that "Grandchild", and under that "Great-grandchild". | `person.place` or `tasks.search`, then `subtask.create` three times. The third call is refused: a task tree holds a task, a subtask and a sub-subtask, no deeper (`Modules/Tasks/helpers/taskTreeRules.js`) | None | Reserve | |
 | 5 | Folder, subfolder, list, and move a task | The list | In QA Sandbox make a folder "[AI bench] folder", inside it a subfolder "[AI bench] subfolder", inside that a list "[AI bench] inner list", and move "[AI bench] Write release note" into that list. | Folder and subfolder: missing. `lists.list`, `list.create` (it can put a list in a folder that exists), `tasks.search`, `task.move` | None. One if `MCP_TOOLS_V2` is on, because `task.move` cannot be undone | Reserve | |
 | 6 | Duplicate a project | The project | Duplicate the project QA Sandbox as "[AI bench] Sandbox copy", with its lists, statuses and views. | Missing | Not reached | No | |
-| 7 | Bulk-edit twenty tasks | The list | Set "[AI bench] bulk 01" to "bulk 20" to high priority and assign them all to (the teammate). | `person.place`, `tasks.search`, `members.list`, then `tasks.batch` running `task.update` and `task.assign`. That is 40 changes and a batch takes 25, so two batch calls | None | 15 | |
+| 7 | Bulk-edit twenty tasks | The list | Set "[AI bench] bulk 01" to "bulk 20" to high priority and assign them all to (the teammate). | `person.place`, `tasks.search`, `members.list`, then `tasks.batch` running `task.update` and `task.assign`. That is 40 changes and a batch takes 25, so two batch calls | Two since #1427: each batch call waits as one proposal. See "Job 7: how many approvals" | 15 | |
 | 8 | Group by a custom field | The list | Show me this list grouped by Stage. | `person.place`, `fields.list`, `view.create` with the field as the grouping. `screen.link` opens a list but cannot carry a grouping | One. It saves a view that everyone on the project sees | 15 | |
 | 9 | Filter and save a view | The list | Show my tasks due this week and save it as a view called "[AI bench] Mine this week". | `person.place`, `view.create` with `mine`. Missing: `view.create` has no filter on the due date | One | 15 | |
 | 10 | Everything list | Home | Show me all my tasks across every project. | `screen.link` (screen `everything`), or `tasks.search` to answer in the conversation. The link cannot switch on "Me" | None | 15 | |
@@ -59,7 +59,7 @@ Listed from the most likely to pass to the least. "Today" is what the code says 
 3. **Job 24, search.** Two reads and two links. Nothing changes, so nothing waits.
 4. **Job 23, workload view.** One link. The person picks the unit on the screen.
 5. **Job 10, Everything list.** One link, or the answer in the conversation. "Me" on the page is the person's click.
-6. **Job 7, bulk-edit twenty.** Every change is a single-task change, so all 40 apply with no approval.
+6. **Job 7, bulk-edit twenty.** The tools exist. Since #1427 a batch that names more than one task waits, and the 40 changes do not fit one batch, so today it asks for two approvals and misses the pass rule by one. See "Job 7: how many approvals".
 7. **Job 1, create a task.** One call carries the assignee, the date and the priority. The risk is "for me": no tool tells the agent who its person is.
 8. **Job 17, time.** Three small tools. The risk is the timer: in the web app a timer under one minute logs nothing.
 9. **Job 19, dependency and shift.** The link and both date changes have tools. The agent has to work out the working days by itself.
@@ -70,7 +70,19 @@ Listed from the most likely to pass to the least. "Today" is what the code says 
 14. **Job 13, totals.** Part (a) should work through a view with the Cost column: run 2 saw a Total row per group once the column is shown. Today part (b) has no tool.
 15. **Job 3, message to task.** The tool exists and fills the task from the message. Today the agent cannot find the message.
 
-Expected today: jobs 11, 2, 24, 23, 10, 7, 1, 17, 19 and 8 can pass. That is ten at best. Jobs 12, 15, 9, 13 and 3 each need one small piece first. Those pieces are in "Gaps found while writing".
+Expected today: jobs 11, 2, 24, 23, 10, 1, 17, 19 and 8 can pass. That is nine at best. Job 7 needs one approval fewer (see "Job 7: how many approvals"). Jobs 12, 15, 9, 13 and 3 each need one small piece first. Those pieces are in "Gaps found while writing".
+
+## Job 7: how many approvals
+
+Read from the code on 2026-10-02, after #1427. `tests/agent-proposal-cards.test.js` ("benchmark job 7") runs the same numbers.
+
+- **Two tools for each task.** `task.update` sets the priority; it does not take assignees (`EDITED` in `Modules/Mcp/manageTools.js`). `task.assign` sets the assignee. Twenty tasks with two fields each are 40 operations.
+- **One batch call takes 25.** `BATCH_MAX` in `Modules/Mcp/manageTools.js` is the `maxItems` of `tasks.batch`. A call with 40 operations is refused before anything is read, and nothing is filed.
+- **A call that names more than one task runs nothing.** `runBatch` in `Modules/Mcp/tools.js` counts the tasks the operations name; above one it goes to `fileBatch`, which files every change of that call as one proposal, approved or declined whole. This holds on both project settings.
+- **So today: two batch calls, two proposals, two approvals.** For example 25 and 15, or 20 and 20. Each approval applies its changes one by one; nothing changes before it.
+- **Against the pass rule** (at most one approval) job 7 fails today, and only because of the cap. Each proposal is one card and one click.
+- **The cap that would make it one: 40.** With `BATCH_MAX` at 40 the job is one call, one proposal and one approval. Nothing else stands in the way: a proposal's list of changes has no size limit of its own (`create` in `Modules/Agents/proposals.js`), and the card names the first five tasks and counts the rest.
+- **The cap is not changed here.** It is the owner's call: a bigger batch is a bigger change behind one click. The other way to one approval, also not built, is a `task.update` that takes assignees, which makes the job 20 operations.
 
 ## The three reserves
 
@@ -215,7 +227,7 @@ Each line is a job where a tool is missing or a rule would stop the agent. A coo
 **Rules that would refuse, or that do less than the plan says**
 
 18. **Job 4.** The task tree stops at task, subtask, sub-subtask. The job asks for one level more, so the third `subtask.create` is refused. Either the job is rewritten or the rule changes.
-19. **Job 7.** Twenty tasks change with no preview and no approval, because a batch is 25 single-task changes and each is applied at once. Decision 6 in `task.md` says anything wider than one task waits.
+19. **Job 7.** Closed by #1427 for the rule: a batch that names more than one task now waits as one proposal, as decision 6 in `task.md` says. What is left is the count: 40 changes, 25 to a batch, so two proposals and two approvals. See "Job 7: how many approvals".
 20. **Job 8.** A saved view shows to everyone on the project. The pass rule fails a run that changes something the sentence did not ask for. To settle: whether "show me" may save a view.
 21. **Job 17.** In the web app a timer under one minute logs nothing. To check: whether `timelog.stop` leaves an entry. `timelog.create` reads the day in UTC, which is not always the person's "today".
 22. **Jobs 5 and 20.** `task.move` cannot be undone. With `MCP_TOOLS_V2` on, each move is its own proposal, so five moves ask for five approvals.
