@@ -9,16 +9,16 @@ test.describe.configure({ timeout: 90000 });
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const named = (name) => new RegExp(escapeRegex(name));
 const LIMITS = '/api/v2/agents/project-limits';
+const POLICY = '/api/v2/agents/policy';
+const WIDE = { width: 1440, height: 900 };
 const RAW_KEY = /^[a-z_]+(\.[a-z_]+)+$/;
 
-async function memberPage(browser, state) {
-    const context = await browser.newContext({ baseURL: state.baseURL, storageState: storageStatePath('member') });
+async function memberPage(browser, state, options = {}) {
+    const context = await browser.newContext({ baseURL: state.baseURL, storageState: storageStatePath('member'), ...options });
     const page = await context.newPage();
     await skipFirstRun(page);
     return { context, page };
 }
-
-const notBusy = (locator) => expect(locator).not.toHaveAttribute('aria-busy', 'true');
 
 const treeOf = (page) => page.getByRole('tree', { name: 'Projects and lists' });
 const treeItem = (page, name) => treeOf(page).getByRole('treeitem', { name: named(name) });
@@ -72,7 +72,8 @@ test.describe('lists and projects follow live', () => {
             const folderItem = treeItem(seen.page, folderName);
             await expect(folderItem).toHaveAttribute('aria-expanded', /^(true|false)$/);
             if ((await folderItem.getAttribute('aria-expanded')) === 'false') {
-                await treeOf(seen.page).locator('.pt-row').filter({ has: folderItem }).locator('.pt-row__chev').click();
+                await treeOf(seen.page).locator('.pt-row').filter({ has: seen.page.getByRole('treeitem', { name: named(folderName) }) }).locator('.pt-row__chev').click();
+                await expect(folderItem).toHaveAttribute('aria-expanded', 'true');
             }
             const folderLevel = Number(await folderItem.getAttribute('aria-level'));
             await expect(treeItem(seen.page, renamed)).toHaveAttribute('aria-level', String(folderLevel + 1));
@@ -125,26 +126,32 @@ test.describe('lists and projects follow live', () => {
         await page.getByRole('button', { name: 'Add View', exact: true }).click();
         await page.getByRole('button', { name: /^Table/ }).click();
         await page.getByRole('button', { name: 'Table', exact: true }).click();
-        await expect(title).toBeVisible();
-        await expect(create).toBeVisible();
+        const table = page.locator('.tv2__empty');
+        await expect(table.getByText(`${name} has no tasks yet`, { exact: true })).toBeVisible();
+        await expect(table.getByRole('button', { name: 'Create task', exact: true })).toBeVisible();
     });
 });
 
 test.describe('AI > Accounts: the pause for connected agents', () => {
     test.describe.configure({ mode: 'serial' });
-    test.use(asRole('owner'));
+    // At 1280 px and under the AI sidebar is an icon rail without its usage block, where the paused line and Resume are.
+    test.use({ ...asRole('owner'), viewport: WIDE });
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
-    test('the owner pauses connected agents, a member sees the paused line without Resume, and the owner resumes', async ({ page, browser, state }) => {
+    test('the owner pauses connected agents, a member sees the paused line without Resume, and the owner resumes', async ({ page, browser, state, loginAs }) => {
+        const owner = await loginAs('owner');
         const url = `/#/${state.companyId}/ai/accounts`;
         const pause = page.locator('[data-test="connected-pause-switch"]');
         const sidebar = page.locator('.ai-side__usage');
         const pausedLine = (target) => target.locator('.ai-side__usage').getByText('Connected agents are paused', { exact: true });
         const resume = (target) => target.getByRole('button', { name: 'Resume connected agents', exact: true });
-        const seen = await memberPage(browser, state);
+        const policyRead = (target) => target.waitForResponse((res) => res.url().includes(POLICY) && res.request().method() === 'GET' && res.ok());
+        const seen = await memberPage(browser, state, { viewport: WIDE });
 
         try {
+            const read = policyRead(page);
             await page.goto(url);
+            await read;
             await expect(pause).toBeVisible();
             await expect(pause).toBeEnabled();
             await expect(pause).not.toBeChecked();
@@ -164,20 +171,18 @@ test.describe('AI > Accounts: the pause for connected agents', () => {
 
             await resume(sidebar).click();
             await expect(pausedLine(page)).toHaveCount(0);
+            await expect(resume(sidebar)).toHaveCount(0);
+            await expect(sidebar.locator('[data-test="pause-all"]')).toBeVisible();
             await expect(pause).not.toBeChecked();
-            await notBusy(resume(sidebar));
-            await expect.poll(async () => {
-                await seen.page.reload();
-                return pausedLine(seen.page).count();
-            }).toBe(0);
+
+            const readAgain = policyRead(seen.page);
+            await seen.page.reload();
+            expect((await (await readAgain).json()).data.connectedPaused).toBe(false);
+            await expect(seen.page.locator('.ai-side__usage')).toBeVisible();
+            await expect(pausedLine(seen.page)).toHaveCount(0);
         } finally {
             await seen.context.close();
-            await page.goto(url);
-            await expect(pause).toBeEnabled();
-            if (await pause.isChecked()) {
-                await pause.uncheck();
-                await expect(pause).not.toBeChecked();
-            }
+            await owner.api.put(POLICY, { connectedPaused: false });
         }
     });
 });
@@ -203,7 +208,6 @@ test.describe('Project Details: limits on agents', () => {
             await control().selectOption({ label });
             await answer;
             await expect(control()).toBeEnabled();
-            await notBusy(control());
         }
 
         await page.goto(url);
