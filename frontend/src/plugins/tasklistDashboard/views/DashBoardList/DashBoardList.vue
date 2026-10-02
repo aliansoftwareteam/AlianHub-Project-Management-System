@@ -177,6 +177,7 @@ import { ref, defineProps, defineEmits, nextTick, inject, watch,
 } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import { searchTextPattern } from '@/utils/searchText';
 import { useRoute } from 'vue-router';
 
 // COMPONENTS
@@ -801,14 +802,15 @@ async function searchMongoDB(parentId = '') {
             let searchStr = taskSearch.value ? taskSearch.value.toString(): "";
             let andOr = '$or';
             query_by[andOr] = [];
+            const typedText = { $regex: searchTextPattern(searchStr), $options: 'i' };
             if(taskNameSearch.value) {
-                query_by[andOr].push({'TaskName':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'TaskName': typedText});
             }
             if(taskKeySearch.value) {
-                query_by[andOr].push({'TaskKey':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'TaskKey': typedText});
             }
             if(taskDescriptionSearch.value) {
-                query_by[andOr].push({'rawDescription':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'rawDescription': typedText});
             }
             let sprintIds = groupById.value === 4 ? allSprintsFlat.value : filterSprintsId || [];
             searchTask.value = true;
@@ -1108,14 +1110,15 @@ function filterSprintsIdQuery () {
             let searchStr = taskSearch.value ? taskSearch.value.toString(): "";
             let andOr = '$or';
             query_by[andOr] = [];
+            const typedText = { $regex: searchTextPattern(searchStr), $options: 'i' };
             if(taskNameSearch.value) {
-                query_by[andOr].push({'TaskName':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'TaskName': typedText});
             }
             if(taskKeySearch.value) {
-                query_by[andOr].push({'TaskKey':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'TaskKey': typedText});
             }
             if(taskDescriptionSearch.value) {
-                query_by[andOr].push({'rawDescription':{ $regex: searchStr, $options: 'i' }});
+                query_by[andOr].push({'rawDescription': typedText});
             }
 
             if (filterQuery.value && Object.keys(filterQuery.value).length > 0) {

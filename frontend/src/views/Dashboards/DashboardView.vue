@@ -187,13 +187,23 @@
                     </select>
                 </label>
                 <div class="dash__modal-actions">
-                    <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" @click="destroy">{{ $t('Dash.delete') }}</button>
+                    <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" @click="askingDelete = true">{{ $t('Dash.delete') }}</button>
                     <span class="ah-toolbar__spacer"></span>
                     <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="settingsOpen = false">{{ $t('Dash.cancel') }}</button>
                     <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="saveSettings">{{ $t('Dash.save') }}</button>
                 </div>
             </div>
         </div>
+
+        <ConfirmDelete
+            v-if="askingDelete"
+            :title="$t('Dash.delete_title', { name: dashboard.title })"
+            :description="$t('Dash.delete_text')"
+            :confirmLabel="$t('Dash.delete')"
+            :busy="deleteBusy"
+            @confirm="destroy"
+            @cancel="askingDelete = false"
+        />
     </div>
 </template>
 
@@ -208,6 +218,8 @@ import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import DashboardCard from '@/components/organisms/DashboardCard/DashboardCard.vue';
 import CardPicker from './CardPicker.vue';
 import CardSettings from './CardSettings.vue';
+import ConfirmDelete from '@/components/atom/ConfirmDelete/ConfirmDelete.vue';
+import { showUndoToast } from '@/composable/useUndoToast';
 import { catalogEntry, PERIOD_OPTIONS } from '@/plugins/dashboard/cardCatalog';
 import { cardComponent } from '@/plugins/dashboard/cardRegistry';
 import { useLookLength } from '@/utils/lookTokens';
@@ -398,8 +410,18 @@ const addCard = (entry) => {
 };
 
 const removeCard = (item) => {
+    const before = cards.value;
     cards.value = cards.value.filter((c) => c.i !== item.i);
     persist();
+    showUndoToast({
+        message: t('Dash.card_removed', { card: cardTitle(item) }),
+        undo: () => {
+            if (cards.value.some((c) => c.i === item.i)) return;
+            const at = Math.min(before.findIndex((c) => c.i === item.i), cards.value.length);
+            cards.value = [...cards.value.slice(0, at), item, ...cards.value.slice(at)];
+            persist();
+        },
+    });
 };
 
 const setPeriod = (item, value) => {
@@ -444,12 +466,21 @@ const duplicate = async () => {
     }
 };
 
+const askingDelete = ref(false);
+const deleteBusy = ref(false);
+
 const destroy = async () => {
+    if (deleteBusy.value) return;
+    deleteBusy.value = true;
     try {
         await removeDashboard(route.params.dashboardId);
+        $toast.success(t('Dash.deleted', { name: dashboard.value.title }), { position: 'top-right' });
         router.push({ name: 'Dashboards', params: { cid: companyId.value } });
     } catch (e) {
-        formError.value = t('Dash.save_failed');
+        formError.value = t('Dash.delete_failed');
+    } finally {
+        deleteBusy.value = false;
+        askingDelete.value = false;
     }
 };
 

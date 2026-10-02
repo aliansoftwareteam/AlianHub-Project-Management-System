@@ -1033,7 +1033,7 @@ function addToCheckList(msg) {
         }
         let localUpdateArray = [...new Set([...JSON.parse(JSON.stringify(props.checklistArray)) || [], ...updateObj])];
 
-        taskClass.updateChecklistsv2({localUpdateArray:localUpdateArray,data:updateObj, projectId:projectData.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: {folderObjId:props.folderId,sprintId:props.sprintId}}).then(()=>{
+        taskClass.updateChecklistsv2({localUpdateArray:localUpdateArray,data:updateObj, projectId:projectData.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: {folderObjId:props.folderId,sprintId:props.sprintId,checklistArray:props.checklistArray}}).then(()=>{
             $toast.success(t('Toast.Item_added_to_checklist'), {position: 'top-right'})
         }).catch((error) => {
             console.error("ERROR in delete: ", error.message);

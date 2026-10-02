@@ -3,7 +3,7 @@ const { toObjectIds, companyWideMatch } = require('../../Tasks/helpers/taskQuery
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { dbCollections } = require('../../../Config/collections');
 const { privateWorkOf } = require('../../Agents/privateWork');
-const { FORBIDDEN_OPERATORS, isPlainObject } = require('../../Company/helpers/callerQueryRules');
+const { FORBIDDEN_OPERATORS, isPlainObject, withPlainSearchText, SearchTextRefused } = require('../../Company/helpers/callerQueryRules');
 const { withoutConversationsOfOthers } = require('../../Comments/helpers/conversationReaders');
 
 const REFUSED_OPERATORS = Object.freeze(FORBIDDEN_OPERATORS.filter((operator) => operator !== '$lookup'));
@@ -92,10 +92,19 @@ const walk = (value, scope, joinable = PROJECT_FIELD_OF_JOINABLE) => {
 
 const checkStages = (stages, scope) => walk(stages, scope);
 
+const withPlainText = (stages) => {
+    try {
+        return withPlainSearchText(stages);
+    } catch (error) {
+        if (error instanceof SearchTextRefused) throw new TimesheetQueryRefused(error.message);
+        throw error;
+    }
+};
+
 const scopePipeline = (query, scope, ownRowsMatch) => {
     const stages = isPlainObject(query) ? [query] : query;
     if (!Array.isArray(stages) || !stages.length) throw new TimesheetQueryRefused('queryeta must be an aggregation pipeline.');
-    const checked = walk(stages, scope);
+    const checked = walk(withPlainText(stages), scope);
     const own = ownRowsMatch(scope);
     return Object.keys(own).length ? [{ $match: own }, ...checked] : checked;
 };
