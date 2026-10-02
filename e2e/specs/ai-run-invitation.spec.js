@@ -145,6 +145,9 @@ test.describe('joining by invitation with an account and no workspace', () => {
         const answers = watchApiAnswers(page);
         await page.getByRole('button', { name: 'Accept invitation' }).click();
         await joinedWorkspaceOpens(page, state, answers);
+        // The welcome page hides the rail; past it, the person is on the joined workspace's Home.
+        await page.getByRole('button', { name: 'Skip for now' }).click();
+        await expect(page).toHaveURL(new RegExp(`#/${state.companyId}(\\?.*)?$`));
         await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
     });
 
