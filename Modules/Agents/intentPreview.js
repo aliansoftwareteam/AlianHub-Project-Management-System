@@ -11,6 +11,7 @@ const projects = require('./projectCreate');
 const planChoice = require('./planChoice');
 const planFiling = require('./planFiling');
 const planLocks = require('./planLocks');
+const planShown = require('./planShown');
 const planWorkPreview = require('./planWorkPreview');
 const automation = require('./automationPreview');
 const listSetup = require('./listSetupPreview');
@@ -26,7 +27,8 @@ const dashboards = require('./dashboardRequests');
 // A card for a dashboard is previewed only for a viewer who can open that dashboard (./dashboardRequests.js).
 // A kind of change with no entry in BUILDERS has none.
 // A connected agent's batch is several changes on one card (forBatches): how many tasks, what changes on them, the
-// first few tasks by name, and a line for each change whose value the lines above do not already say.
+// first few tasks by name with the rest behind "show all", and a line for each change whose value the lines above
+// do not already say.
 
 const DESCRIPTION_MAX = 280;
 const TEXT_MAX = 250;
@@ -225,24 +227,34 @@ const planLines = (change, context) => {
     const params = paramsOf(change);
     return [
         namesLine('newStatuses', 'statuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
-        namesLine('newLists', 'lists', params.lists, plans.LISTS_MAX, TEXT_MAX),
+        namesLine('newLists', 'lists', params.lists, plans.LISTS_MAX, planShown.NAME_MAX),
         ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map((field, at) => picked(fieldLine(field), keyOf('fields', at))),
         ...planViews(change).flatMap((view, at) => planViewLines(view, at, idOf(params.projectId), context)),
     ];
 };
 
-/* The plan of a project that exists also lists its automations and first tasks, each a part of its own
- * (./planWorkPreview.js), and says which parts the viewer may not approve (./planLocks.js). */
-const planPreview = async (change, context) => {
+/* What a plan's card says beside its lines: which part needs which, which parts the viewer may not approve and
+ * why (./planLocks.js), and which parts have nothing to show (./planShown.js). */
+const planMarks = async (change, context, filed) => {
+    const locks = await planLocks.locksIn(context.companyId, await context.viewer(), change, filed, context.locks);
+    const blank = planShown.blankIn(change.action, paramsOf(change));
+    return {
+        needs: planChoice.needsOf(paramsOf(change)),
+        ...(locks.size ? { locked: [...locks.keys()], lockedWhy: Object.fromEntries(locks) } : {}),
+        ...(blank.length ? { blank } : {}),
+    };
+};
+
+/* The plan of a project that exists also lists its automations and first tasks, each a part of its own (./planWorkPreview.js). */
+const planPreview = async (change, context, filed) => {
     const place = placeLine(paramsOf(change), context.named);
     if (!place) return null;
     const lines = [place, ...planLines(change, context), ...(await planWorkPreview.lines(change, context))].filter(Boolean);
-    const locked = await planLocks.lockedIn(context.companyId, await context.viewer(), change);
-    return { kind: 'setup', title: place.project, lines, needs: planChoice.needsOf(paramsOf(change)), ...(locked.length ? { locked } : {}) };
+    return { kind: 'setup', title: place.project, lines, ...(await planMarks(change, context, filed)) };
 };
 
 /* A project that is not there yet: its name, who will be on it, what it is for, and the plan that comes with it. */
-const projectPreview = (change, context) => {
+const projectPreview = async (change, context, filed) => {
     const params = paramsOf(change);
     const title = textOf(params.name, projects.NAME_MAX);
     if (!title) return null;
@@ -250,7 +262,7 @@ const projectPreview = (change, context) => {
         kind: 'project',
         title,
         lines: [{ kind: 'members', only: 'approver' }, descriptionLine({ rawDescription: params.description }), ...planLines(change, context)].filter(Boolean),
-        needs: planChoice.needsOf(params),
+        ...(await planMarks(change, context, filed)),
     };
 };
 
@@ -288,9 +300,10 @@ const readableTasks = async (companyId, uid, changes) => {
     return new Map((tasks || []).map((task) => [String(task._id), { name: task.TaskName || '', projectId: idOf(task.ProjectID) }]));
 };
 
-/* For each proposal id, one entry per change, in order: its preview, or null where it has none. */
-const forProposals = async (companyId, uid, proposals) => {
-    const list = (Array.isArray(proposals) ? proposals : []).map((proposal) => ({ id: String(proposal._id), changes: changesOf(proposal) }));
+/* For each proposal id, one entry per change, in order: its preview, or null where it has none. `locks` is the
+ * request's memory of the rights it has read (./planLocks.js). */
+const forProposals = async (companyId, uid, proposals, { locks = null } = {}) => {
+    const list = (Array.isArray(proposals) ? proposals : []).map((proposal) => ({ id: String(proposal._id), changes: changesOf(proposal), filed: proposal }));
     const filed = list.flatMap((proposal) => proposal.changes);
     if (!filed.some(builderOf)) return new Map();
     const changes = filed.filter(isCreate);
@@ -304,10 +317,10 @@ const forProposals = async (companyId, uid, proposals) => {
     const fieldNames = await fieldNamesFor(companyId, setups.filter((change) => named.project(idOf(paramsOf(change).projectId)).name));
     let seat = null;
     const viewer = () => { seat = seat || planLocks.personOf(companyId, uid); return seat; };
-    const built = { named, tasks, fieldNames, companyId, uid, viewer };
+    const built = { named, tasks, fieldNames, companyId, uid, viewer, locks };
     return new Map(await Promise.all(list.map(async (proposal) => [
         proposal.id,
-        await Promise.all(proposal.changes.map((change) => (builderOf(change) ? builderOf(change)(change, built) : null))),
+        await Promise.all(proposal.changes.map((change) => (builderOf(change) ? builderOf(change)(change, built, proposal.filed) : null))),
     ])));
 };
 
@@ -431,9 +444,10 @@ const setFieldNames = async (companyId, changes, tasks) => {
 };
 
 /* For each batch among the proposals, by proposal id: its one card. A task is named, and can be opened from the
- * card, only when the viewer can read it; the rest are a count. A person, a place and a field are named as the
- * viewer may see them (../Mcp/names.js), and a text is the proposal's own. With `bareChanges`, a screen that shows
- * a change through its card alone gets the same card for one change that has none of its own. */
+ * card, only when the viewer can read it; the rest are a count. `others` counts every task past the first few, and
+ * `rest` holds those of them the viewer can read. A person, a place and a field are named as the viewer may see
+ * them (../Mcp/names.js), and a text is the proposal's own. With `bareChanges`, a screen that shows a change
+ * through its card alone gets the same card for one change that has none of its own. */
 const forBatches = async (companyId, uid, proposals, { bareChanges = false } = {}) => {
     const batches = (Array.isArray(proposals) ? proposals : []).filter((proposal) => isBatch(proposal) || (bareChanges && isBareChange(proposal)));
     if (!batches.length) return new Map();
@@ -454,13 +468,15 @@ const forBatches = async (companyId, uid, proposals, { bareChanges = false } = {
     return new Map(batches.map((proposal) => {
         const changes = changesOf(proposal);
         const ids = taskIdsOf(changes);
-        const shown = ids.map((id) => tasks.get(id)).filter((row) => row && row.name).slice(0, BATCH_NAMES);
+        const readable = ids.map((id) => tasks.get(id)).filter((row) => row && row.name);
+        const shown = readable.slice(0, BATCH_NAMES);
+        const rest = readable.slice(BATCH_NAMES);
         const { summary, spelledOut } = changeLinesOf(changes, context);
         return [String(proposal._id), {
             kind: 'batch',
             tasks: ids.length,
             changes: changes.length,
-            lines: [...summary, ids.length > 0 && { kind: 'batchTasks', tasks: shown, others: ids.length - shown.length }, ...spelledOut].filter(Boolean),
+            lines: [...summary, ids.length > 0 && { kind: 'batchTasks', tasks: shown, others: ids.length - shown.length, ...(rest.length ? { rest } : {}) }, ...spelledOut].filter(Boolean),
         }];
     }));
 };

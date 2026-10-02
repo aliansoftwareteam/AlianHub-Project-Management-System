@@ -11,6 +11,7 @@ import { snapshotTasks, undoRequests } from "./bulkUndo.js";
 import { taskMenuRights } from "@/views/Projects/composables/taskMenu";
 import { placedSprint } from "@/views/Projects/composables/taskPlacement";
 import { peopleCarried } from "@/utils/duplicatePeople";
+import { holdOwnBulkLeave } from "@/utils/taskUpdateMarker";
 import { MAX_EXTRA_LISTS, refusalCodeOf, refusalKey } from "@/components/organisms/TaskDetailOverlay/taskLists";
 
 const TOAST = { position: "top-right" };
@@ -44,9 +45,14 @@ export function useListRowMenu(projectSource, showArchived) {
     }
 
     async function send(body) {
-        const response = await apiRequest("post", env.V2_TASKS_BULK, { ...body, userData: userData() });
-        if (response?.data?.status === false) throw new Error(response.data.statusText || t("List.bulk_failed"));
-        return response?.data?.data || {};
+        const answered = holdOwnBulkLeave(body.action, body.taskIds);
+        try {
+            const response = await apiRequest("post", env.V2_TASKS_BULK, { ...body, userData: userData() });
+            if (response?.data?.status === false) throw new Error(response.data.statusText || t("List.bulk_failed"));
+            return response?.data?.data || {};
+        } finally {
+            answered();
+        }
     }
 
     function offerUndo(message, requests) {

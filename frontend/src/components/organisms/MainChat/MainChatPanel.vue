@@ -81,6 +81,7 @@
             :disabled-reason="composerLockReason"
             :user-ids="watchers"
             :agents="mentionableAgents"
+            :agents-note="mentionNote"
             :conversation-key="conversationKey"
             @typing="setTyping"
             @send="onSend"
@@ -133,6 +134,7 @@
         :where="sourceLabel"
         :user-ids="watchers"
         :agents="mentionableAgents"
+        :agents-note="mentionNote"
         :conversation-key="conversationKey"
         :disabled="!sendMessageAllowed"
         :disabled-reason="composerLockReason"
@@ -240,7 +242,7 @@ import { shellState } from '@/components/organisms/Shell/shellState';
 import CallIcon from '@/components/organisms/CallOverlay/CallIcon.vue';
 import { useCall } from '@/composable/useCall';
 import { useMainChatConversation } from './useMainChatConversation';
-import { fetchChatAgents } from '@/views/Ai/useRunnableAgents';
+import { fetchChatAgents, fetchOwnAiInChat } from '@/views/Ai/useRunnableAgents';
 
 const props = defineProps({
     // conversation target
@@ -316,15 +318,24 @@ const effectiveTaskId = computed(() => {
 const conversationKey = computed(() => `${(projectData && projectData.value && projectData.value._id) || ''}:${props.sprintId}:${effectiveTaskId.value || props.taskId}`);
 
 const mentionableAgents = ref([]);
+const ownAiHeldBy = ref('');
+const WHY_NO_OWN_AI = { project_manager_off: 'AgentChat.own_ai_manager_off' };
+const mentionNote = computed(() => (WHY_NO_OWN_AI[ownAiHeldBy.value] ? t(WHY_NO_OWN_AI[ownAiHeldBy.value]) : ''));
+const listOf = (value) => (Array.isArray(value) ? value : []);
 async function loadMentionableAgents() {
     const taskId = effectiveTaskId.value;
     const key = conversationKey.value;
-    if (props.agentId || !canUseAi() || !projectId.value || !props.sprintId || !taskId) {
+    if (props.agentId || !projectId.value || !props.sprintId || !taskId) {
         mentionableAgents.value = [];
+        ownAiHeldBy.value = '';
         return;
     }
-    const agents = await fetchChatAgents({ projectId: projectId.value, sprintId: props.sprintId, taskId });
-    if (key === conversationKey.value) mentionableAgents.value = agents;
+    const thread = { projectId: projectId.value, sprintId: props.sprintId, taskId };
+    // An in-product agent needs a model on the server; the person's own connected AI does not.
+    const [inProduct, own] = await Promise.all([canUseAi() ? fetchChatAgents(thread) : [], fetchOwnAiInChat(thread)]);
+    if (key !== conversationKey.value) return;
+    mentionableAgents.value = [...listOf(inProduct), ...listOf(own && own.agents)];
+    ownAiHeldBy.value = (own && own.why) || '';
 }
 watch([conversationKey, () => canUseAi()], loadMentionableAgents, { immediate: true });
 

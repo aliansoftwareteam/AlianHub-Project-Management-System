@@ -68,35 +68,49 @@ What it is not: a walk of all twelve kinds through their real routes. The list, 
 
 ## LEFT, with the question
 
-1. **The create-project banner.** The server now gives a sentence, in English. Should the banner show it, or should each cause get its own translated line? Today: "The project couldn't be created. Try again."
+Read again on 2026-10-02 against `beta` at a24135f. Questions 4 and 8 are closed: both were built (`composerOpeningStatus.spec.js`, `ganttDragSnap.spec.js`). The other eight are still open. For each one: what the product does today, and one proposed answer that needs no new feature. Where the answer is "leave it", the cost is said.
 
-   **Answer (second pass, for the owner to review): keep the translated banner; add one translated line per cause later.** Reason: the server's sentence is English, and every sentence a person reads goes through i18n. Not built: it needs the server to answer a cause code.
-2. **Billing type of a project.** The web always sends `ProjectType: "Fix"`. Should the server take that as the default for a caller that names none, or should it be a company setting?
+1. **The create-project banner.** The server now gives a sentence, in English. Should the banner show it, or should each cause get its own translated line?
 
-   **Answer: the server takes `Fix` when a caller names none.** Reason: it is what the web form always sends, so an API caller gets what the form gives, and no new company setting is needed. Not built: server change.
-3. **No template named.** Should a create with no template mean the Blank template? It is one line, but it changes what an API caller gets.
+   **Today:** the server names the missing fields in a sentence (`Modules/createProject/controller.js:107`). The web form shows the translated line "The project couldn't be created. Try again." for every failure (`CreateProjectSidebar.vue:410` and `:423`, `Auth.project_failed` at `frontend/src/locales/en.js:573`). The path from a saved template shows the server's message when it sends one (`CreateProjectSidebar.vue:359`).
 
-   **Answer: yes, no template named means the Blank template.** Reason: the form already treats Blank as the default; refusing a caller who names nothing helps nobody. Not built: server change.
-4. **The other five composers** (voice, note, message, chat, comments). Apply the same opening-status rule? No risk seen; left out to keep this slice to the first hour.
+   **Proposed:** keep the translated banner on the web, because a person reads only translated text. API callers read the server's sentence. Nothing to build.
+2. **Billing type of a project.** Should the server take `Fix` as the default for a caller that names none, or should it be a company setting?
 
-   **Answer: yes, the same opening-status rule.** Reason: no risk was seen and the other composers already agree with it. Built: voice, note, message, chat and comment composers use `defaultStatus` (`composerOpeningStatus.spec.js`).
+   **Today:** `ProjectType` is required with no default (`utils/mongo-handler/schema.js:3650`). The web form sends `Fix` (`CreateProjectSidebar.vue:381`), and so does the agent path (`Modules/Agents/projectCreate.js:129`). A caller that sends none is told the field is missing (`Modules/createProject/controller.js:112`).
+
+   **Proposed:** leave it required, and name `ProjectType: "Fix"` in the API note, with `bodyFor` in `Modules/Agents/projectCreate.js:127` as the sample body. The cost: an API caller must send one more field.
+3. **No template named.** Should a create with no template mean the Blank template?
+
+   **Today:** a body with no template answers "error in getting template without category" (`Modules/createProject/controller.js:511` to `:531`). The web form and the agent path always name the Blank template (`Modules/Agents/projectCreate.js:131`).
+
+   **Proposed:** leave the refusal, and point API callers at the same sample body, which names Blank. The cost: the refusal names no cause, which is its own small dead end that only a change to the answer would remove.
+4. **The other five composers** (voice, note, message, chat, comments). **Closed.** They use the same opening-status rule as the first-hour composers (`defaultStatus`, `composerOpeningStatus.spec.js`).
 5. **Timer in an approved week.** Refuse at Start instead of at Stop?
 
-   **Answer: refuse at Start, naming the week.** Reason: a person should not run a timer that will be refused later. Not built: the web does not know the week is approved without a server answer.
-6. **Desktop tracker and `companyOwnerId`.** Look the owner up there too? Better still: stop taking the owner from the request anywhere, since project history already ignores it.
+   **Today:** it already refuses at Start. The web timer asks first (`frontend/src/components/organisms/TaskDetailOverlay/useTaskTimer.js:139` and `:155`), and the Home timer uses the same start (`frontend/src/components/molecules/Home/useTimer.js:35`). The server answers at `Modules/LogTime/controllerV2/webTimer.js:18`. The desktop tracker refuses at `Modules/LogTime/controllerV2/tracker.js:69` and `:170`, and a connected agent at `Modules/Agents/actions.js:352`. A stop in an approved week keeps the timer and says why (`Time.timer_kept_period_locked`).
 
-   **Answer: yes, look the owner up there too, and stop taking it from the request.** Reason: project history already ignores the request's value. Not built: the desktop app is a separate client.
-7. **Storage.** What does a person see when they attach a file and storage is not set up? Not read here.
+   **Proposed:** close the question. The earlier line "Not built" is out of date, and nothing is left to build.
+6. **Desktop tracker and `companyOwnerId`.** Look the owner up there too?
 
-   **Answer: say that storage is not set up, and who can set it up, in the same place as the attachment.** Reason: the person should read the cause where they met it. Not built: the web has no signal that storage is missing; it needs the server to answer a cause code.
-8. **Gantt drag on the Weeks scale.** Say why it snaps back, or allow it?
+   **Today:** the manual log looks the owner up when the request names none (`Modules/LogTime/controllerV2/manualLogtime.js:38`). The tracker still answers "companyOwnerId is required" (`Modules/LogTime/controllerV2/tracker.js:260`) and passes the request's value on (`:373`).
 
-   **Answer: say why, do not allow it.** Reason: a week-wide scale cannot place a bar on a day; letting it would move dates by guess. Built: a drag that ends on the dates it began on tells the person "the bar went back because this scale moves it a week or more at a time. Switch to Days to move it by a day" (`ganttDragSnap.spec.js`).
-9. **Choosing the company's default currency.** No screen changes `isDefault`; it stays on the seeded INR. The lookup above gets the right answer for a company that uses one currency. A company that uses several and has switched INR off still gets INR. Should the currencies screen let an owner mark the default?
+   **Proposed:** leave it. The desktop app always sends the owner, and a caller that does not is told which field is missing. The cost: the tracker keeps taking a value project history already ignores.
+7. **Storage.** What does a person see when they attach a file and storage is not set up?
 
-   **Answer: yes, the currencies screen lets an owner mark the default.** Reason: the lookup already reads `isDefault`, so the screen is the only missing piece. Not built: needs a server route.
-10. **`isDelete` on a currency.** The name says the opposite of what it means. Rename it (a migration), or leave it and keep the comment in the two helpers?
+   **Today:** `STORAGE_TYPE` defaults to `wasabi` (`.env.example:109`, `docs/ENV.md:71`). With `server`, files go to disk (`common-storage/putLocalFile.js:36` to `:45`). With Wasabi and no working bucket, the upload answers `Error while upload file: <code>: <message>`, and the log keeps the bucket and key (`Modules/storage/wasabi/controller.js:37`).
 
-   **Answer: leave the name, keep the comment in the two helpers.** Reason: a rename is a migration for no change a person sees; the cost is a confusing name. Not built.
+   **Proposed:** say in the setup guide to install with `STORAGE_TYPE=server` until Wasabi is set up. An admin reads the cause in the upload answer and the log. The cost: a person who is not an admin sees only the upload error.
+8. **Gantt drag on the Weeks scale.** **Closed.** A drag that ends on the dates it began on says why (`ganttDragSnap.spec.js`).
+9. **Choosing the company's default currency.** Should the currencies screen let an owner mark the default?
 
-These ten answers were made without the owner, by choosing the least surprising option. They are reversible; the owner may overrule any of them.
+   **Today:** the lookup takes the default the company uses, else the one currency it uses, else the default it switched off (`Modules/Company/helpers/companyCurrency.js:11` to `:14`). The settings screen adds and removes currencies (`frontend/src/components/molecules/Setting/SettingCurrencys.vue:114`). No screen changes `isDefault`.
+
+   **Proposed:** an owner keeps one currency switched on, and the lookup then picks it. The cost: a company that uses several still gets the seeded default.
+10. **`isDelete` on a currency.** Rename it, or leave it and keep the comment in the two helpers?
+
+    **Today:** `isDelete: true` means the company uses the currency. The comment is at `Modules/Company/helpers/companyCurrency.js:6`, and the screen sets it at `SettingCurrencys.vue:114`.
+
+    **Proposed:** leave the name and keep the comment. A rename is a migration for no change a person sees. The cost: a name that says the opposite.
+
+The proposals for the open questions were made on 2026-10-02 without the owner. Each needs no new feature, and each can be overruled. The earlier answers that needed a build (a server default, a cause code, a route) are replaced by them. Where the owner wants the build instead, the earlier answers are in the git history of this file.

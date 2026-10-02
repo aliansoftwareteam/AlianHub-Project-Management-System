@@ -10,7 +10,7 @@ const logger = require('../../Config/loggerConfig');
 
 const SOURCE_MCP = 'mcp';
 const NOT_PERMITTED = 'not_permitted';
-const WHY = Object.freeze({ SEAT: 'seat', OWNER_ADMIN: 'owner_admin', OWN_RIGHTS: 'own_rights' });
+const WHY = Object.freeze({ SEAT: 'seat', OWNER_ADMIN: 'owner_admin', OWN_RIGHTS: 'own_rights', FIRST_APPROVER: 'first_approver' });
 const KEEPS_WAITING = 'It stays waiting for someone who can.';
 const REFUSAL = Object.freeze({
     OWNER_ADMIN: 'This proposal needs an Owner or Admin.',
@@ -18,6 +18,7 @@ const REFUSAL = Object.freeze({
     CANNOT_OPEN: `You cannot approve this: you cannot open what this change touches. ${KEEPS_WAITING}`,
     NOT_THEIRS: `You cannot approve this: it was asked for someone else, and only they can. ${KEEPS_WAITING}`,
     DECLINE: 'You can decline a proposal you could approve, or one your own agent asked for.',
+    FIRST_APPROVER: 'You cannot approve this: only the person who approved the plan can try these parts again. It stays waiting for them.',
 });
 
 const held = (error, why) => ({ error, status: 403, reason: NOT_PERMITTED, why });
@@ -61,30 +62,39 @@ const UNREAD = Object.freeze({ locked: true, lockedWhy: WHY.OWN_RIGHTS, mayDecli
 const asksWhoeverApproves = (proposal) => proposal.source === SOURCE_MCP
     && (Array.isArray(proposal.changes) ? proposal.changes : []).some((change) => require('../Mcp/approval').approvedByRequesterAlone(change));
 
+/* A plan can hold a part it cannot make for anyone (./planLocks.js), which is read for an owner or an admin too. */
+const holdsPlan = (proposal) => (Array.isArray(proposal.changes) ? proposal.changes : []).some((change) => change && require('./planChoice').isPlan(change.action));
+
+/* null unless the proposal holds parts of a plan that were not made the first time (./planFollowUp.js): those are
+ * tried once more by the person who approved the plan, and by nobody else. */
+const retryRefusal = (userId, proposal) => (proposal.retryBy && String(proposal.retryBy) !== String(userId) ? held(REFUSAL.FIRST_APPROVER, WHY.FIRST_APPROVER) : null);
+
 /* What a list shows of a waiting proposal for the person reading it. An owner or an admin holds every right, so
  * their rights are not read: what can still stop their approval is a task or a list that is gone, which the approve
- * route answers, and a change asked for someone else, which is read here. They may decline either way. A plan is
- * a person's to approve while it holds a part they may approve (./planLocks.js). */
-const standingOf = async (companyId, caller, proposal) => {
+ * route answers, a change asked for someone else, and a plan that can make nothing for anyone, which are read here.
+ * They may decline either way. A plan is a person's to approve while it holds a part they may approve (./planLocks.js). */
+const standingOf = async (companyId, caller, proposal, seen = null) => {
     if (!access.decidesProposals(caller)) return { locked: true, lockedWhy: WHY.SEAT, mayDecline: false };
     const privileged = Boolean(caller.privileged);
-    if (privileged && !asksWhoeverApproves(proposal)) return OPEN;
     const uid = String(caller.actor.userId);
+    const notTheirs = retryRefusal(uid, proposal);
     const person = { userId: uid, privileged };
-    const open = await require('./planLocks').withoutLocked(companyId, person, proposal.changes);
-    const refusal = open ? await approveRefusal(companyId, person, proposal, open) : held(REFUSAL.OWNER_ADMIN, WHY.OWNER_ADMIN);
+    const holdsEveryRight = privileged && !asksWhoeverApproves(proposal);
+    if (holdsEveryRight && !notTheirs && !holdsPlan(proposal)) return OPEN;
+    const open = notTheirs ? {} : await require('./planLocks').withoutLocked(companyId, person, proposal.changes, proposal, seen);
+    const refusal = notTheirs || open.refusal || (holdsEveryRight ? null : await approveRefusal(companyId, person, proposal, open.changes));
     if (!refusal) return OPEN;
     return { locked: true, lockedWhy: refusal.why, mayDecline: privileged || await access.isOwnProposal(companyId, uid, proposal) };
 };
 
 const READ_AT_ONCE = 20;
 
-/* The standing of each proposal of a list, a few at a time. */
-const standingsOf = async (companyId, caller, proposals) => {
+/* The standing of each proposal of a list, a few at a time. `seen` is the request's memory of the rights it has read (./planLocks.js). */
+const standingsOf = async (companyId, caller, proposals, seen = null) => {
     const standings = [];
     for (let at = 0; at < proposals.length; at += READ_AT_ONCE) {
         // eslint-disable-next-line no-await-in-loop
-        standings.push(...await Promise.all(proposals.slice(at, at + READ_AT_ONCE).map((proposal) => standingOf(companyId, caller, proposal).catch((error) => {
+        standings.push(...await Promise.all(proposals.slice(at, at + READ_AT_ONCE).map((proposal) => standingOf(companyId, caller, proposal, seen).catch((error) => {
             logger.error(`[agent-proposal] standing of ${proposal._id}: ${error.message}`);
             return UNREAD;
         }))));
@@ -97,4 +107,4 @@ const declineRefusal = async (companyId, caller, proposal) => ((await standingOf
     ? null
     : { error: REFUSAL.DECLINE, status: 403, reason: NOT_PERMITTED });
 
-module.exports = { WHY, REFUSAL, OPEN, approveRefusal, standingOf, standingsOf, declineRefusal };
+module.exports = { WHY, REFUSAL, OPEN, approveRefusal, retryRefusal, standingOf, standingsOf, declineRefusal };

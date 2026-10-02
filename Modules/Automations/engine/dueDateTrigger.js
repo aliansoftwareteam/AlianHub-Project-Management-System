@@ -81,7 +81,7 @@ const tickCompany = async (companyId, { now = new Date() } = {}) => {
             return null;
         });
         if (!claimed) continue;
-        domainEventBus.publishTaskEvent({ companyId, type: EVENT, doc: claimed, actor: SYSTEM, depth: 0 });
+        domainEventBus.publishTaskEvent({ companyId, type: EVENT, doc: claimed, actor: SYSTEM, depth: 0, narrowing: null });
         fired += 1;
     }
     return { scanned: (due || []).length, fired };

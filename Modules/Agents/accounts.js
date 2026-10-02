@@ -74,6 +74,7 @@ const unlink = async (companyId, userId) => {
         type: SCHEMA_TYPE.API_TOKENS, data: [{ userId: String(userId), $or: [{ kind: 'agent' }, { 'agentAccount.mode': { $exists: true } }] }, { $set: { active: false } }],
     }, 'updateMany').catch(() => ({ modifiedCount: 0 }));
     invalidateAgentAccountCache(userId);
+    await require('./manager/chatQuestions').connectionEnded(companyId, userId);
     return { revokedTokens: (revoked && (revoked.modifiedCount || revoked.nModified)) || 0 };
 };
 

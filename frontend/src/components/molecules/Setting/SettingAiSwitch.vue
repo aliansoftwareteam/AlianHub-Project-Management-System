@@ -4,7 +4,7 @@
         <p class="ai-switch-card__lead">{{ $t('AiAvailability.switch_lead') }}</p>
         <div class="ai-switch-card__row">
             <label class="ai-switch-card__label" for="workspace-ai-switch">
-                <span class="font-weight-500">{{ $t('AiAvailability.switch_label') }}</span>
+                <span class="setting-ai-switch-font-weight-500">{{ $t('AiAvailability.switch_label') }}</span>
                 <span class="ai-switch-card__hint">{{ hint }}</span>
             </label>
             <label class="ai-switch-card__toggle">
@@ -73,5 +73,11 @@ watch(canManage, (value) => {
 .ai-switch-card__note { margin: 12px 0 0; font: var(--text-small); color: var(--ink-2); }
 @media (max-width: 480px) {
     .ai-switch-card__label { max-width: 100%; }
+}
+</style>
+
+<style scoped>
+.setting-ai-switch-font-weight-500 {
+    font-weight: 500 !important;
 }
 </style>

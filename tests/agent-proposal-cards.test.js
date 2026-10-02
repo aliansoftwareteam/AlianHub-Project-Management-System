@@ -159,20 +159,31 @@ describe('a change filed with no words of its own', () => {
 describe('benchmark job 7: twenty tasks, two fields each', () => {
     const job = () => [...twenty.map((task) => setPriority(task, 'HIGH')), ...twenty.map((task) => assign(task, MEMBER))];
 
-    it('is forty operations, which one batch call does not take', async () => {
-        expect(BATCH_MAX).toBe(25);
+    it('is forty operations, which one batch call takes: one proposal, on one card', async () => {
         expect(job()).toHaveLength(2 * TWENTY);
+        expect(2 * TWENTY).toBeLessThanOrEqual(BATCH_MAX);
         const out = await batch(ctx(OWNER), job());
-        expect(out.rpcError || out.isError).toBeTruthy();
-        expect(proposalRows()).toHaveLength(0);
+        expect(out).toMatchObject({ pending: true, waiting: 2 * TWENTY, applied: 0 });
+        expect(proposalRows()).toHaveLength(1);
+
+        const [row] = await queue.readQueue(CID, OWNER);
+        expect(row.batch).toMatchObject({ kind: 'batch', tasks: TWENTY, changes: 2 * TWENTY });
+        expect(row.batch.lines.slice(0, 2)).toEqual([
+            { kind: 'batchChange', what: 'priority', count: TWENTY, value: 'HIGH', mixed: false },
+            { kind: 'batchChange', what: 'assignees', count: TWENTY, value: '', mixed: false },
+        ]);
+        const named = row.batch.lines.find((line) => line.kind === 'batchTasks');
+        expect([...named.tasks, ...named.rest].map((task) => task.name)).toEqual(twenty.map((task, at) => `Bulk ${at + 1}`));
+        expect(row.batch.lines.filter((line) => line.kind === 'batchItem')).toEqual(twenty.map((task, at) => ({ kind: 'batchItem', task: `Bulk ${at + 1}`, what: 'assignees', mode: 'set', names: ['Mia Member'], others: 0 })));
     });
 
-    it('is two batch calls today, so two proposals and two approvals', async () => {
-        const first = await batch(ctx(OWNER), job().slice(0, BATCH_MAX));
-        const second = await batch(ctx(OWNER), job().slice(BATCH_MAX));
-        expect(first).toMatchObject({ pending: true, waiting: BATCH_MAX });
-        expect(second).toMatchObject({ pending: true, waiting: 2 * TWENTY - BATCH_MAX });
-        expect(proposalRows()).toHaveLength(2);
-        expect((await queue.readQueue(CID, OWNER)).map((row) => row.batch.changes).sort()).toEqual([2 * TWENTY - BATCH_MAX, BATCH_MAX].sort());
+    it('is one approval, which sets both on all twenty', async () => {
+        const out = await batch(ctx(OWNER), job());
+        const approved = await proposals.approve(CID, out.proposalId, { decider: { kind: 'human', userId: MEMBER }, isPrivileged: false, ip: '' });
+        await settle();
+        expect(approved.error).toBeUndefined();
+        expect(approved.applied.map((change) => change.ok)).toEqual(Array(2 * TWENTY).fill(true));
+        expect(twenty.map((task) => [stored(task._id).Task_Priority, stored(task._id).AssigneeUserId])).toEqual(Array(TWENTY).fill(['HIGH', [MEMBER]]));
+        expect(proposalRows()).toHaveLength(1);
     });
 });

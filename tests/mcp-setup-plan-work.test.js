@@ -329,7 +329,7 @@ describe('approving makes each automation and each task as its own action, after
     it('makes no task for an approver who may not create one', async () => {
         ['project_custom_field', 'view_list', 'project_details', 'project_sprint_create'].forEach((key) => setRule(key, true, [3, 0]));
         const id = await filed(tasksOnly([TASKS[2]]), as(INSIDER));
-        expect(await approve(id, GUEST)).toMatchObject({ status: 403, error: expect.stringMatching(/owner or admin approves a part of this plan/) });
+        expect(await approve(id, GUEST)).toMatchObject({ status: 403, error: expect.stringMatching(/Your role may not make a part of this plan/) });
         expect(proposal(id).status).toBe('pending');
         const out = await approve(id, GUEST, { 0: { lists: [0], statuses: [0], tasks: [] } });
         expect(partOf(out, 'lists').ok).toBe(true);
@@ -352,7 +352,7 @@ describe('approving makes each automation and each task as its own action, after
         await projectPolicy.save(CID, P_OPEN, { done: 'never' }, OWNER);
         const out = await approve(id);
         expect(partOf(out, 'tasks').items).toEqual([
-            { name: 'Already done', made: false, error: expect.stringMatching(/only people close tasks/) },
+            { name: 'Already done', made: false, refused: true, error: expect.stringMatching(/only people close tasks/) },
             { name: 'Collect the logins', made: true, taskId: expect.any(String), auditId: expect.any(String) },
         ]);
         expect(taskNamed('Already done')).toBeUndefined();

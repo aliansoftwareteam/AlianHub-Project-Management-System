@@ -39,6 +39,7 @@ const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, descrip
 const input = (properties, required) => ({ type: 'object', additionalProperties: false, properties, required });
 const projectTarget = (args) => ({ projectId: str(args.projectId, 40) });
 
+const ONE_PLAN = 'When the same request also needs something else that waits, a field and a view that shows it for example, use project.setup: it files them as one plan, which the person approves once.';
 const WAITS = 'Nothing is made by this call: it answers that the change is waiting, and the person approves it in AlianHub, where they see exactly what will be made. They can undo it afterwards.';
 
 const FIELD = Object.freeze({
@@ -56,7 +57,7 @@ const FIELD = Object.freeze({
     required: ['name', 'type'],
 });
 
-/* A field of fields.create, which also takes the two kinds AlianHub works out. */
+/* A field of fields.create or of a plan for a project that exists, which also takes the two kinds AlianHub works out. */
 const CREATE_FIELD = Object.freeze({
     ...FIELD,
     properties: {
@@ -272,7 +273,7 @@ const TOOLS = [
             + `A rollup works out a number for each task from the subtasks under it (function: ${computed.FUNCTIONS.join(', ')}; source: the number field it reads). A formula works out a number from the task's own number fields (expression). `
             + 'Neither takes a value, because AlianHub works the number out and task.fields.list shows it. A rollup shows its number once the person approves it. A formula shows its number on a task after a field value on that task is next saved. '
             + `To give the fields their first values in the same approval, name them in values (at most ${setup.VALUES_MAX}): each a task of this project, a field by its name and the value. `
-            + `${WAITS} Set or change a value later with task.field.set.`,
+            + `${WAITS} Set or change a value later with task.field.set. ${ONE_PLAN}`,
         input: input({
             projectId: ID,
             fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: CREATE_FIELD },
@@ -292,7 +293,8 @@ const TOOLS = [
         target: projectTarget,
         description: `Adds a saved view to one project: a ${Object.keys(setup.VIEW_KINDS).join(', ')} view with its own name, grouping, sorting, filters and columns. `
             + 'Everyone on the project sees it. A status or a field the project does not have is left out, and the answer says which part. '
-            + `${WAITS} To only show the person a view that exists, give them a link with screen.link instead.`,
+            + 'A list or table view totals each number column it shows, group by group. '
+            + `${WAITS} To only show the person a view that exists, give them a link with screen.link instead. ${ONE_PLAN}`,
         input: input({
             projectId: ID,
             name: { type: 'string', minLength: 1, maxLength: setup.VIEW_NAME_MAX },
@@ -315,6 +317,8 @@ const TOOLS = [
             + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields, ${plans.VIEWS_MAX} saved views, ${planWork.RULES_MAX} automations (rules) and ${planWork.TASKS_MAX} first tasks (tasks). Name only the parts you need. `
             + 'A status is added before the statuses that close a task; a status the company does not have yet needs an owner or an admin to approve the plan. '
             + 'Anything the project already has by that name is kept, not made twice, so read statuses.list, lists.list and fields.list first. '
+            + 'A field is written the way fields.create takes one, a rollup or a formula included, without first values. A view shows a field of this plan by its name (showFields) and a field the project already has by its id (showFieldIds). '
+            + 'When one request needs more than one of these, for example a view and a rollup field, send them as one plan here, not as a call for each: the person then approves once. '
             + 'Write a rule the way automation.create takes one, without the project (read automation.catalogue first). A rule can use a status from this plan. It always starts switched off, and only an owner or an admin can ask for one and approve it. '
             + 'A first task has a name and, if wanted, a list and a status from this plan or the project, one assignee and a due day. It is made the way task.create makes a task with its details, so the plan is refused if this connection could not make that call. '
             + 'The parts are made in this order: statuses and lists, fields, views, automations, tasks. It cannot make a project. '
@@ -323,7 +327,7 @@ const TOOLS = [
             projectId: ID,
             statuses: NAMES(plans.STATUSES_MAX, plans.STATUS_NAME_MAX, 'Statuses to add, by name'),
             lists: NAMES(plans.LISTS_MAX, LIST_NAME_MAX, 'Lists to create, by name'),
-            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
+            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: CREATE_FIELD },
             views: { type: 'array', minItems: 1, maxItems: plans.VIEWS_MAX, items: PLAN_VIEW },
             rules: { type: 'array', minItems: 1, maxItems: planWork.RULES_MAX, items: PLAN_RULE, description: 'Automations to add, each made of a trigger, optional conditions and steps' },
             tasks: { type: 'array', minItems: 1, maxItems: planWork.TASKS_MAX, items: PLAN_TASK, description: 'First tasks to create' },

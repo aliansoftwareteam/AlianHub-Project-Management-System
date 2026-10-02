@@ -45,3 +45,23 @@ export function holdOwnEdit(taskId, fields, before) {
 export const ownEditsInFlight = (taskId) => Object.assign({}, ...(editsInFlight.get(String(taskId)) || [])
     .filter((edit) => Date.now() - edit.at < HOLD_MS)
     .map((edit) => edit.fields));
+
+/* A move or a convert takes the task off its list first, and that event can reach the tab before
+   or just after the answer. The tab that asked for it says what happened itself. */
+const AFTER_ANSWER_MS = 5000;
+const leavesAskedHere = new Map();
+
+export function holdOwnLeave(taskId) {
+    const id = String(taskId);
+    leavesAskedHere.set(id, Date.now() + HOLD_MS);
+    return () => leavesAskedHere.set(id, Date.now() + AFTER_ANSWER_MS);
+}
+
+const LEAVING_BULK_ACTIONS = new Set(["bulkMove", "bulkConvertToTask", "bulkConvertToSubTask"]);
+
+export function holdOwnBulkLeave(action, taskIds) {
+    const answered = LEAVING_BULK_ACTIONS.has(action) ? (taskIds || []).map(holdOwnLeave) : [];
+    return () => answered.forEach((done) => done());
+}
+
+export const isOwnLeave = (taskId) => (leavesAskedHere.get(String(taskId)) || 0) > Date.now();

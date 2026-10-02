@@ -9,7 +9,7 @@
                 <div class="d-flex align-items-center w-85">
                     <img src="@/assets/images/table_arrow.png" alt="" class="cursor-pointer mr-10-px" :style="`transform: rotateZ(${item.isExpand ? '90' : '0'}deg); opacity: ${item.level <= 4 && item.subItems && item.subItems.length ? '1' : '0'}`" @click="handleCollapseExpand(item), item.isExpand=!item.isExpand"/>
                     <input type="checkbox" :id="'checkbox_sub_'+item.id" @click="$emit('check', item)" v-model="item.isChecked"/>
-                    <label class="font-weight-normal font-size-15 ml-10-px checklist__label-main text-ellipsis" :class="[{'w-90': item.name.length > 200}]">
+                    <label class="sub-check-list-font-weight-normal sub-check-list-font-size-15 ml-10-px checklist__label-main text-ellipsis" :class="[{'w-90': item.name.length > 200}]">
                         <InputText v-if="item.isEdit"
                             v-model.trim="oldItemName"
                             :placeHolder="$t('PlaceHolder.Add_an_item')"
@@ -19,7 +19,7 @@
                             class="input-edit-checklist"
                             :class="[{'border-bottom-red': isInvalid}]"
                         />
-                        <span v-else class="label-item-name text-ellipsis font-size-14 d-block" :class="{'text-strike': item.isChecked}" :title="item.name">{{ item.name }}</span>
+                        <span v-else class="label-item-name text-ellipsis sub-check-list-font-size-14 d-block" :class="{'text-strike': item.isChecked}" :title="item.name">{{ item.name }}</span>
                     </label>
                     <div class="d-flex align-items-center hover-action" v-if="from === 'task' ? checkPermission('task.task_checklist',project?.isGlobalPermission) == true : checkPermission('project.project_checklist',project?.isGlobalPermission) == true">
                         <img v-if="item.level <= 4" class="ml-10-px mr-5-px cursor-pointer action-img-border" src="@/assets/images/svg/pluss.svg" alt="Add" @click="$emit('showInput', item)" />
@@ -177,3 +177,15 @@ function changeAssignee(type, {user, data}) {
 }
 </script>
 <style> @import "./style.css"; </style>
+
+<style scoped>
+.sub-check-list-font-weight-normal {
+    font-weight: normal;
+}
+.sub-check-list-font-size-15 {
+    font-size: 15px;
+}
+.sub-check-list-font-size-14 {
+    font-size: 14px;
+}
+</style>

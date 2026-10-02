@@ -19,7 +19,7 @@
 <script setup>
 import { defineProps, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import moment from "moment";
+import { fullText } from "@/utils/clockText";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import ImportUndo from "./ImportUndo.vue";
@@ -37,7 +37,7 @@ const jobs = ref([]);
 const failed = ref(false);
 
 const sourceName = (job) => (IMPORT_SOURCES.some((source) => source.key === job.source) ? t(`Projects.import_${job.source}_title`) : job.source);
-const startedAt = (job) => (job.createdAt ? moment(job.createdAt).format("lll") : "");
+const startedAt = (job) => fullText(job.createdAt);
 const statusKey = (job) => (KNOWN_STATUSES.includes(job.status) ? job.status : "processing");
 const markUndone = (job) => { job.status = "undone"; };
 

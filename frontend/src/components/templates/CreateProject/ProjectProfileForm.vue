@@ -14,7 +14,7 @@
         </div>
         <div class="ProjectShareGraphicColorContent">
             <div class="imageColorPickerDiv">
-                <h5 class="projectColor" :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}">{{$t("Projects.project_color")}}</h5>
+                <h5 class="projectColor" :class="{'project-profile-form-taskstatustitle-desktop': clientWidth > 767 , 'project-profile-form-taskstatustitle-mobile': clientWidth <= 767}">{{$t("Projects.project_color")}}</h5>
                 <ul class="ul-colors" :style="{'display': 'flex', 'list-style-type':'none','flex-wrap': 'wrap','align-items': 'center'}">
                     <li class="border-radius-2-px d-inline-block project__selected-color"  @click="selectedColor('#7c828d'), theModel.previewImage.value = ''"><button class="cursor-pointer" type="button"><span><img :src="disableIcon" /></span></button></li>
                     <li class="status_square" v-for="(color, index) in colorsList" :key="index" @click="selectedColor(color), theModel.previewImage.value = ''" :style="{'cursor':'pointer', 'background-color': color, 'padding':'4px', 'margin': '0 7px 10px 7px'}">
@@ -144,6 +144,7 @@ const { t } = useI18n();
     }
 </script>
 <style>
+.imageColorPickerDiv button { background: transparent; border: 0; padding: 0; }
 .project__graphic-img{
     width: 64px; 
     height: 64px; 
@@ -159,5 +160,22 @@ const { t } = useI18n();
 .project__selected-color{
     margin: 0px 7px 11px 7px;
     width: 8px;
+}
+</style>
+
+<style scoped>
+.project-profile-form-taskstatustitle-desktop {
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    line-height: 21px !important;
+    color: var(--ink) !important;
+}
+@media (max-width: 767px) {
+    .project-profile-form-taskstatustitle-mobile {
+        font-size: 16px !important;
+        line-height: 21px !important;
+        font-weight: 500 !important;
+        color: var(--ink) !important;
+    }
 }
 </style>

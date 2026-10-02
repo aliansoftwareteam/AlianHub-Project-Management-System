@@ -36,7 +36,7 @@
             @close="dropReason"
         >
             <template #header>
-                <h3 class="m-0 font-size-16 font-weight-600">{{ $t('TaskPanel.estimate_reason_title') }}</h3>
+                <h3 class="m-0 estimate-cell-font-size-16 estimate-cell-font-weight-600">{{ $t('TaskPanel.estimate_reason_title') }}</h3>
             </template>
             <template #body>
                 <textarea
@@ -144,4 +144,13 @@ function dropReason() {
     background: var(--surface); color: var(--ink); font: inherit;
 }
 .est-cell__error { color: var(--danger-ink); font-size: 12px; }
+</style>
+
+<style scoped>
+.estimate-cell-font-size-16 {
+    font-size: 16px;
+}
+.estimate-cell-font-weight-600 {
+    font-weight: 600 !important;
+}
 </style>

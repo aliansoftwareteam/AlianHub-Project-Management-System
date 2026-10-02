@@ -51,4 +51,24 @@ const readGroupTotals = (items, facets, totals) => Object.fromEntries(
     )])
 );
 
-module.exports = { groupCondition, sprintTaskMatch, groupCountsQuery, readGroupCounts, readGroupTotals };
+const IN_TRASH = 1;
+
+/* An archived list keeps its tasks under more than one key (archived with it, archived before it), so every
+   task of it that is not in the trash counts. The server adds what the asker may open. */
+const listTaskCountsQuery = ({ pid, sprintIds, showAllTasks, userId }) => [
+    {
+        $match: {
+            objId: { ProjectID: pid },
+            sprintId: { objId: { $in: sprintIds } },
+            deletedStatusKey: { $ne: IN_TRASH },
+            ...(seesEveryTask(showAllTasks) ? {} : { AssigneeUserId: { $in: [userId] } }),
+        },
+    },
+    { $group: { _id: '$sprintId', count: { $sum: 1 } } },
+];
+
+const readListTaskCounts = (sprintIds, rows) => Object.fromEntries(
+    (sprintIds || []).map((id) => [id, Number((rows || []).find((row) => String(row._id) === String(id))?.count) || 0])
+);
+
+module.exports = { groupCondition, sprintTaskMatch, groupCountsQuery, readGroupCounts, readGroupTotals, listTaskCountsQuery, readListTaskCounts };

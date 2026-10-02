@@ -1,6 +1,7 @@
 const { AsyncResource } = require('async_hooks');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const { originOf } = require('../../../event/domainEventBus');
+const writerLimits = require('../../../event/writerLimits');
 const logger = require('../../../Config/loggerConfig');
 const { myCache } = require('../../../Config/config');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
@@ -83,14 +84,28 @@ function run(key) {
 const runOutsideAnyRequest = AsyncResource.bind(run);
 
 /* The refill runs outside the request, so whose edit it follows is read here, as the edit is made, and kept with the
- * wait: an agent's edit and its depth in a chain, which the refill's own event then states, so a rule that did not ask
- * for automated changes is not woken by it. A person's edit names nobody, and the refill's event names nobody. */
-const agentOrigin = (payload) => {
+ * wait: an agent's or a rule's edit and its depth in a chain, which the refill's own event then states, so a rule
+ * that did not ask for automated changes is not woken by it and the chain is counted. A person's edit names nobody,
+ * and the refill's event names nobody. The project list of a token that made the edit is kept the same way
+ * (event/writerLimits). */
+const COUNTED_KINDS = Object.freeze(['agent', 'automation']);
+
+const originOfEdit = (payload) => {
     const { actor, depth } = originOf(payload);
-    return actor.kind === 'agent' ? { actor, depth } : null;
+    const narrowing = writerLimits.handedOrHere(payload.narrowing);
+    if (!COUNTED_KINDS.includes(actor.kind)) return narrowing ? { narrowing } : null;
+    return { actor, depth, ...(narrowing ? { narrowing } : {}) };
 };
 
-const deeper = (kept, origin) => (origin && (!kept || origin.depth >= kept.depth) ? origin : kept || null);
+const depthOf = (origin) => (origin && origin.actor ? origin.depth : -1);
+
+/* The deepest edit of the wait says who and how deep; limits once named stay. */
+const deeper = (kept, origin) => {
+    if (!origin) return kept || null;
+    const { narrowing: _replaced, ...lead } = !kept || depthOf(origin) >= depthOf(kept) ? origin : kept;
+    const narrowing = (kept && kept.narrowing) || origin.narrowing;
+    return { ...lead, ...(narrowing ? { narrowing } : {}) };
+};
 
 /* Edits come in bursts (typing in the description saves many times), so one refill runs after the last. */
 function schedule(companyId, taskId, parts, origin) {
@@ -112,19 +127,19 @@ function onTaskUpdate(payload) {
     if (!doc || !doc._id) return;
     const companyId = doc.CompanyId;
     const updated = Object.keys((payload && payload.updatedFields) || {});
-    const origin = agentOrigin(payload);
+    const origin = originOfEdit(payload);
     schedule(companyId, doc._id, changedParts(payload.updatedFields), origin);
     if (doc.ParentTaskId && updated.some((name) => SUBTASK_FIELDS.includes(name))) schedule(companyId, doc.ParentTaskId, ['subtasks'], origin);
 }
 
 function onTaskInsert(payload) {
     const doc = payload && payload.data;
-    if (doc && doc.ParentTaskId) schedule(doc.CompanyId, doc.ParentTaskId, ['subtasks'], agentOrigin(payload));
+    if (doc && doc.ParentTaskId) schedule(doc.CompanyId, doc.ParentTaskId, ['subtasks'], originOfEdit(payload));
 }
 
 function onCommentInsert(payload) {
     const doc = payload && payload.data;
-    if (doc && payload.companyId) schedule(payload.companyId, doc.taskId, ['comments'], agentOrigin(payload));
+    if (doc && payload.companyId) schedule(payload.companyId, doc.taskId, ['comments'], originOfEdit(payload));
 }
 
 function start({ debounceMs: given } = {}) {

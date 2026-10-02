@@ -5,6 +5,7 @@
             <li v-for="list in lists" :key="list.id" class="al__row" data-test="archived-list">
                 <ShellIcon name="book" :size="14" class="al__icon" />
                 <span class="al__name" :title="list.path">{{ list.path }}</span>
+                <span v-if="counts[list.id] !== undefined" class="al__count ah-mono" :title="t('Projects.archived_list_tasks_hint')">{{ t('Projects.archived_list_tasks', { n: counts[list.id] }, counts[list.id]) }}</span>
                 <button
                     v-if="mayRestore(list)"
                     type="button"
@@ -21,18 +22,22 @@
 
 <script setup>
 /**
- * The archived lists of the project in view, shown while "Show Archive" is on, each with Restore.
+ * The archived lists of the project in view, shown while "Show Archive" is on, each with Restore and the
+ * number of its tasks this person can open.
  *
  * Props
  *   project   Object   the lists' project; handed, because the page that provides `selectedProject` cannot inject it
  *   lists     Array    archivedListsOf(project), narrowed to the lists this person may see
  */
-import { defineProps, inject, ref } from 'vue';
+import { defineProps, inject, ref, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
 import { useCustomComposable } from '@/composable';
+import { apiRequest } from '@/services';
+import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import { listTaskCountsQuery, readListTaskCounts } from '@/store/ProjectData/taskQueries';
 import { listMenuRights } from '@/views/Projects/composables/listMenu';
 import { setSprintStatus } from '@/views/Projects/sprintActions';
 
@@ -48,12 +53,38 @@ const { t } = useI18n();
 const store = useStore();
 const $toast = useToast();
 const companyId = inject('$companyId', null);
+const userId = inject('$userId', null);
 const { checkPermission } = useCustomComposable();
 
 const busy = ref('');
+const counts = ref({});
 
 const check = (key) => checkPermission(key, props.project?.isGlobalPermission);
 const mayRestore = (list) => listMenuRights({ project: props.project, list, check }).restore;
+
+/* Whose tasks the person sees is decided as the task list decides it: only a project with rules of its own narrows it. */
+const showAllTasks = () => (props.project?.isGlobalPermission === false
+    ? checkPermission('task.show_tasks', false, { gettersVal: store.getters })
+    : true);
+
+async function readCounts() {
+    const sprintIds = props.lists.map((list) => list.id);
+    if (!sprintIds.length || !props.project?._id) {
+        counts.value = {};
+        return;
+    }
+    try {
+        const findQuery = listTaskCountsQuery({ pid: props.project._id, sprintIds, showAllTasks: showAllTasks(), userId: userId?.value });
+        const { data } = await apiRequest('post', `${env.TASK}/find`, { findQuery });
+        if (sprintIds.join() !== props.lists.map((list) => list.id).join()) return;
+        counts.value = readListTaskCounts(sprintIds, Array.isArray(data) ? data : []);
+    } catch (error) {
+        console.error('ERROR in counting the tasks of archived lists: ', error);
+        counts.value = {};
+    }
+}
+
+watch(() => `${props.project?._id}|${props.lists.map((list) => list.id).join()}`, readCounts, { immediate: true });
 
 async function restore(list) {
     if (busy.value) return;
@@ -77,5 +108,6 @@ async function restore(list) {
 .al__row { display: flex; align-items: center; gap: var(--sp-4); min-height: var(--row-h); }
 .al__icon { flex: none; color: var(--ink-2); }
 .al__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); }
+.al__count { flex: none; color: var(--ink-2); }
 .al__restore { flex: none; }
 </style>

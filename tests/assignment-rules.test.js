@@ -617,6 +617,20 @@ describe('assignment rules: the task events that wake the engine', () => {
         expect(adapter.chat).toHaveBeenCalledTimes(1);
     });
 
+    it('passes on the limits of the change it answers', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await saveRules(project, { mode: 'apply', onChange: true });
+        const limits = { userId: SAM, projectIds: [String(project._id)], chat: false };
+
+        domainEventBus.bus.emit('domain.event', { ...envelope(seedTask(project), 'task.created'), narrowing: limits });
+        await engine.idle();
+        domainEventBus.bus.emit('domain.event', envelope(seedTask(project), 'task.created'));
+        await engine.idle();
+
+        expect(mockUpdateAssignee.mock.calls.map(([sent]) => sent.eventNarrowing)).toEqual([limits, null]);
+    });
+
     it('writes one level deeper than the event it answers, and never wakes on its own assignee write', async () => {
         seedRules(GRANTS);
         const project = seedProject();

@@ -34,6 +34,14 @@ const REFUSED = Object.freeze({
 });
 
 const refuse = (message) => new tools.DeterministicError(message);
+/* A part that was not made because of who asked or who approved, which asking again does not change. */
+const withheld = (message) => Object.assign(refuse(message), { refused: true });
+const REFUSED_BY_RULES = 'RefusedError';
+const failedItem = (name, error) => ({
+    name, made: false, error: error.message,
+    ...(error.refused || error.name === REFUSED_BY_RULES ? { refused: true } : {}),
+    ...(require('./projectSetup').mayPassLater(error) ? { tryAgain: true } : {}),
+});
 const idOf = (value) => (value === undefined || value === null ? '' : String(value));
 const listOf = (value) => (Array.isArray(value) ? value : []);
 const objectOf = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
@@ -204,10 +212,10 @@ const isAdmin = async (companyId, uid) => {
 const performPart = async ({ companyId, actor, depth, approvedBy, within }, action, params) => {
     const entry = registry.get(action);
     if (!entry) throw refuse(`${action} is switched off on this server, so this part was not made.`);
-    if (!OBJECT_ID.test(idOf(approvedBy))) throw refuse(REFUSED.unapproved);
-    if (entry.gate === GATE_OWNER_ADMIN && !(await isAdmin(companyId, approvedBy))) throw refuse(REFUSED.needsAdmin);
+    if (!OBJECT_ID.test(idOf(approvedBy))) throw withheld(REFUSED.unapproved);
+    if (entry.gate === GATE_OWNER_ADMIN && !(await isAdmin(companyId, approvedBy))) throw withheld(REFUSED.needsAdmin);
     const own = await permissions.holderMay(companyId, { kind: 'human', userId: approvedBy }, action, params);
-    if (!own.allowed) throw refuse(`The person approving may not make this part: ${own.reason}`);
+    if (!own.allowed) throw withheld(`The person approving may not make this part: ${own.reason}`);
     const given = objectOf(within);
     return require('./actions').perform({
         companyId, actor, action, params: { ...params, __proposal: true }, reason: `part of a plan approved by ${approvedBy}`, ip: given.ip || '',
@@ -223,7 +231,7 @@ const addRules = async ({ projectId, plan, ...context }) => {
             const out = await performPart(context, RULE, { ...rule, projectId, enabled: false });
             items.push({ name: out.result.sentence || out.result.name || ruleNameAt(at), made: true, ruleId: out.result.ruleId, auditId: idOf(out.auditId) });
         } catch (error) {
-            items.push({ name: ruleNameAt(at), made: false, error: error.message });
+            items.push(failedItem(ruleNameAt(at), error));
         }
     }
     return items;
@@ -242,7 +250,7 @@ const addTasks = async ({ projectId, plan, made, who, ...context }) => {
             const out = await performPart(context, TASK, { projectId, sprintId, title: task.name, fields: fieldsOf(task) });
             items.push({ name: task.name, made: true, taskId: out.result.taskId, auditId: idOf(out.auditId) });
         } catch (error) {
-            items.push({ name: task.name, made: false, error: error.message });
+            items.push(failedItem(task.name, error));
         }
     }
     return items;
@@ -251,4 +259,4 @@ const addTasks = async ({ projectId, plan, made, who, ...context }) => {
 const MAKERS = Object.freeze({ rules: addRules, tasks: addTasks });
 const namesOf = (plan, part) => (part === 'rules' ? listOf(plan.rules).map((rule, at) => ruleNameAt(at)) : listOf(plan.tasks).map((task) => task.name));
 
-module.exports = { RULE, TASK, RULES_MAX, TASKS_MAX, MAKERS, ruleOf, taskOf, fieldsOf, partsOf, isAsked, problemIn, needsIn, actionsIn, filingProblem, namesOf };
+module.exports = { RULE, TASK, RULES_MAX, TASKS_MAX, MAKERS, ruleOf, taskOf, fieldsOf, statusNamesOf, partsOf, isAsked, problemIn, needsIn, actionsIn, filingProblem, namesOf };

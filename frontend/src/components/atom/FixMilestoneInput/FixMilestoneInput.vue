@@ -15,7 +15,7 @@
                         'type':formData.fixMilestone.type,
                         'event':$event.event})"
                 ></InputText>
-                <small class="red" v-if="formData.fixMilestone.error">{{formData.fixMilestone.error}}</small>
+                <small class="fix-milestone-input-red" v-if="formData.fixMilestone.error">{{formData.fixMilestone.error}}</small>
             </div>
         </td>
         <td>
@@ -76,8 +76,8 @@
                         class="amountCurr"
                     ></InputText>
                 </div>
-                <small class="red" v-if="formData.amount.error">{{formData.amount.error}}</small>
-                <small class="red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
+                <small class="fix-milestone-input-red" v-if="formData.amount.error">{{formData.amount.error}}</small>
+                <small class="fix-milestone-input-red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
             </div>
         </td>
         <td>
@@ -287,3 +287,9 @@
         setTimeout(() => {document.getElementById(`statusDateFocus`).focus();});
     }
 </script>
+
+<style scoped>
+.fix-milestone-input-red {
+    color: var(--danger-ink);
+}
+</style>

@@ -1,6 +1,7 @@
 const executors = require('../executors');
 const registry = require('../../Automations/engine/registry');
 const { deterministic } = require('./graph');
+const writerLimits = require('../../../event/writerLimits');
 
 // One registry action, called as a step.
 //
@@ -36,7 +37,7 @@ const execute = async ({ companyId, run, step, context = {} }) => {
     if (absent.length) throw deterministic(`tool call ${step.stepId}: "${tool.key}" needs ${absent.join(', ')}`);
 
     const entity = run.entity || {};
-    const result = await tool.run({
+    const result = await writerLimits.judgedAfter(run.envelope, () => tool.run({
         companyId,
         entity,
         config: params,
@@ -50,7 +51,7 @@ const execute = async ({ companyId, run, step, context = {} }) => {
             traceId: run.traceId || null,
             action: `workflow.${tool.key}`,
         },
-    });
+    }));
     return { tool: tool.key, result: result || {} };
 };
 

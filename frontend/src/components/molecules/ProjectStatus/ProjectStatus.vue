@@ -2,7 +2,7 @@
     <div>
         <span
             class="project-status-name cursor-pointer d-inline-block text-ellipsis ah-status-ink"
-            :class="{'font-size-13 font-weight-400 border-radius-7-px' : clientWidth > 767 ,'font-size-16 font-weight-500 border-radius-6-px d-block align-items-center justify-content-center text-ellipsis' : clientWidth <=767}"
+            :class="{'project-status-font-size-13 project-status-font-weight-400 border-radius-7-px' : clientWidth > 767 ,'project-status-font-size-16 project-status-font-weight-500 border-radius-6-px d-block align-items-center justify-content-center text-ellipsis' : clientWidth <=767}"
             :style="chipStyle"
             @click="isVisible = true"
 
@@ -79,5 +79,20 @@
 }
 @media(max-width: 767px){
     .project-status-name{min-width: 100%;height: 38px;width: 100%;border-radius: 6px;padding: 7px 8px;text-align: center;}
+}
+</style>
+
+<style scoped>
+.project-status-font-size-13 {
+    font-size: 13px;
+}
+.project-status-font-weight-400 {
+    font-weight: 400 !important;
+}
+.project-status-font-size-16 {
+    font-size: 16px;
+}
+.project-status-font-weight-500 {
+    font-weight: 500 !important;
 }
 </style>

@@ -35,14 +35,25 @@ const problemIn = (action, params) => (isPlan(action) ? kindOf(action).problem(o
 
 const partsRefused = (refused) => `${REFUSED.parts}: ${refused.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`;
 
+/* The parts refused, with the statuses of the plan among them where one would be new to the company and the person
+ * is neither an owner nor an admin: nobody could then make it for them. `held` are the statuses the project starts with. */
+const withNewStatuses = async (companyId, uid, refused, held, statuses) => {
+    if (refused.some((entry) => entry.part === 'statuses')) return refused;
+    const reason = await plans.newStatusRefusal(companyId, uid, held, statuses);
+    return reason ? [...refused, { part: 'statuses', reason }] : refused;
+};
+
 /* What stops a plan for a project that exists from being filed for this caller: { refused } where its person may
  * not make one of its parts by hand, or could not ask for one of its automations or first tasks in a call of its
- * own; { error } where a view has nothing to start from or a rule or a task names what is in neither the plan nor
- * the project; null where nothing does. `mayManage` says whether the caller holds what the task tools need. */
+ * own; { error } where the field form would not save a rollup or a formula of it, a view has nothing to start from,
+ * or a rule or a task names what is in neither the plan nor the project; null where nothing does. `mayManage` says
+ * whether the caller holds what the task tools need. */
 const setupStopped = async ({ companyId, actor, uid, allowedActions, mayManage, project, params }) => {
     const plan = plans.setupPlanOf(params);
-    const refused = await plans.refusedParts(companyId, uid, String(project._id), plan);
+    const refused = await withNewStatuses(companyId, uid, await plans.refusedParts(companyId, uid, String(project._id), plan), planWork.statusNamesOf(project), plan.statuses);
     if (refused.length) return { refused: partsRefused(refused) };
+    const unsaved = await setup.draftsMisfit({ companyId, projectId: String(project._id), definitions: plan.definitions });
+    if (unsaved) return { error: unsaved };
     const kind = (plan.views || []).map((view) => view.kind).find((wanted) => !setup.sourceView(project, wanted));
     if (kind) return { error: setup.noSource(kind) };
     return planWork.filingProblem({ companyId, actor, uid: String(uid), allowedActions, mayManage, project, plan });
@@ -50,9 +61,11 @@ const setupStopped = async ({ companyId, actor, uid, allowedActions, mayManage, 
 
 /* { refused } where the person may not create a project by hand, or may not make a part of its plan; otherwise null. */
 const projectStopped = async ({ companyId, uid, params }) => {
-    const refused = await projects.refusedFor(companyId, uid, projects.draftOf(params));
-    const reason = (refused.project && `${REFUSED.project} (${refused.project})`) || (refused.parts.length && partsRefused(refused.parts));
-    return reason ? { refused: reason } : null;
+    const draft = projects.draftOf(params);
+    const refused = await projects.refusedFor(companyId, uid, draft);
+    if (refused.project) return { refused: `${REFUSED.project} (${refused.project})` };
+    const parts = await withNewStatuses(companyId, uid, refused.parts, projects.startingStatuses(), draft.statuses);
+    return parts.length ? { refused: partsRefused(parts) } : null;
 };
 
 /* The same questions for a change filed with no tool call around it: what is wrong with the plan, then what stops it. */

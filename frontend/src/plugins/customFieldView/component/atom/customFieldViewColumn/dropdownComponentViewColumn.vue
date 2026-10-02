@@ -4,7 +4,7 @@
         <div class="d-flex justify-content-between w-100">
             <a v-if="!items?.length && !checkDefault.length" class="formkit-input cursor-pointer text-ellipse d-block text-center custom-ellipse-text" @click="isVisible = true">{{ detail.fieldPlaceholder }}</a>
             <div class="d-flex" v-else>
-                <div class="font-size-12 font-weight-400 cursor-pointer" v-for="(item) in items && items.length ? items || [] : checkDefault || []" :key="item.id" @click="isVisible = true">
+                <div class="dropdown-component-view-column-font-size-12 dropdown-component-view-column-font-weight-400 cursor-pointer" v-for="(item) in items && items.length ? items || [] : checkDefault || []" :key="item.id" @click="isVisible = true">
                     <p class="d-block border-radius-15-px p3x-14px text-ellipse d-block text-center custom-ellipse-text" :style="[{ color: item.color, backgroundColor: item.color + '20' }]">
                         {{ item.label }}
                     </p>
@@ -76,3 +76,12 @@ const selectedObj = (obj) => {
     emit('blurUpdate', obj, props.detail, "");
 }
 </script>
+
+<style scoped>
+.dropdown-component-view-column-font-size-12 {
+    font-size: 12px;
+}
+.dropdown-component-view-column-font-weight-400 {
+    font-weight: 400 !important;
+}
+</style>

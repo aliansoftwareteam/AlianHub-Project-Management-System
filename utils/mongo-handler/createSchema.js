@@ -286,6 +286,8 @@ const projectFindingsSchema = new Schema(schema.projectFindings, {strict: true, 
 // One row per project and cause. Unique, so two servers looking at once cannot file the same finding twice.
 projectFindingsSchema.index({ projectId: 1, key: 1 }, { unique: true, name: 'project_cause' });
 projectFindingsSchema.index({ projectId: 1, status: 1, openedAt: -1 });
+// The questions waiting for one person's AI (Modules/Agents/manager/chatQuestions.js), read on every look at the work queue.
+projectFindingsSchema.index({ userId: 1, status: 1, openedAt: 1 }, { name: 'asked_in_chat_by_person', partialFilterExpression: { rule: 'asked_in_chat' } });
 
 const agentWorkMarksSchema = new Schema(schema.agentWorkMarks, {strict: true, timestamps: true});
 // Unique, so of two agents reaching for one place, one turn or one item at the same moment, the insert of exactly one lands.

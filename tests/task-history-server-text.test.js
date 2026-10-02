@@ -382,7 +382,7 @@ describe('display names come from stored rows, and what the request must supply 
         const result = await call(PATCH, { action: 'updateAttachments', companyId: CID, sprintId: SPRINT, taskId: OPEN_TASK, taskData: { _id: OPEN_TASK, sprintId: SPRINT }, operation: 'remove', data: { id: 'a1', filename: HTML }, userData: USER, projectData: { id: OPEN_PROJECT } });
         expect(result).toMatchObject({ code: 200, body: { status: true } });
         expect(storedTask().attachments).toEqual([]);
-        expect(historyRows().map((row) => row.Message)).toEqual(['<b>plan.pdf</b> removed from <b>Task 01</b>&apos;s attchments.']);
+        expect(historyRows().map((row) => row.Message)).toEqual(['<b>plan.pdf</b> removed from <b>Task 01</b>&apos;s attachments.']);
         expect(messages()).toEqual([templates.taskAttachmentRemove({ ProjectName: 'Parity', TaskName: 'Task 01', removeFileName: 'plan.pdf' })]);
     });
 

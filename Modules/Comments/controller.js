@@ -39,9 +39,25 @@ const startMentionedAgents = async (req, companyId, comment) => {
 };
 
 /* Only a signed-in person names their own connected AI: a comment written through a token or by an agent hands nothing over. */
+const namesOwnAi = (req, message) => !req.apiToken && !req.mcp && !req.agentRun && parseOwnAiMentionIds(message).length > 0;
+
 const handToOwnAi = async (req, companyId, comment) => {
-    if (req.apiToken || req.mcp || req.agentRun || !parseOwnAiMentionIds(comment.message).length) return;
+    if (!namesOwnAi(req, comment.message)) return;
     await require("../Agents/manager/workQueue").handOverFromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
+};
+
+const askOwnAi = async (req, companyId, saved) => {
+    if (!namesOwnAi(req, saved.message)) return;
+    await require("../Agents/manager/chatQuestions").fromChatMessage(companyId, saved);
+};
+
+/* A question for a person's own AI is what its author last wrote as a signed-in person: any other change of a
+ * message that asked one, an owner's or an admin's included, takes the question back. */
+const ownAiFollowsChange = async (req, companyId, before, after) => {
+    const concerned = Boolean(before.ownAiAsk) || [before.message, after.message].some((message) => parseOwnAiMentionIds(message).length > 0);
+    if (!concerned) return;
+    const byAuthor = String(before.userId) === String(req.uid) && !req.apiToken && !req.mcp && !req.agentRun;
+    await require("../Agents/manager/chatQuestions").afterMessageChange(companyId, { before, after, byAuthor });
 };
 
 /* A summary kept for a task was made from its comments: it goes when one of them is deleted, and is marked as
@@ -96,6 +112,9 @@ exports.save = async (req, res) => {
         }
         socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: placement.parent ? 'comments' : liveModuleOf(response || convertData), companyId });
         const saved = response && response._id && (typeof response.toObject === "function" ? response.toObject() : response);
+        if (saved) {
+            await askOwnAi(req, companyId, saved).catch((err) => logger.error(`[mentions] own AI not asked: ${err.message}`));
+        }
         if (saved && !placement.parent) {
             bumpUnreadCounts(companyId, saved, mentionIds)
                 .catch((err) => logger.error(`[comments] unread counts not raised: ${err.message}`));
@@ -207,6 +226,9 @@ exports.update = async (req, res) => {
         const response = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
         socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: liveModuleOf(existingComment), companyId });
         const deletionChanged = changedKeys.includes('isDeleted') && Boolean(data.isDeleted) !== Boolean(existingComment.isDeleted);
+        if (response && (deletionChanged || changes.message !== undefined)) {
+            await ownAiFollowsChange(req, companyId, existingComment, response).catch((err) => logger.error(`[mentions] own AI did not follow the change: ${err.message}`));
+        }
         if (response) await keptSummaryFollows(companyId, existingComment, { deleted: deletionChanged && Boolean(data.isDeleted), edited: changes.message !== undefined });
         if (response && existingComment.parentId && deletionChanged && await isChatMessage(companyId, existingComment)) {
             await announceThread(companyId, existingComment.parentId)

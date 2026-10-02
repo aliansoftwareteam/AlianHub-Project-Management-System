@@ -9,7 +9,7 @@
 <script setup>
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import moment from "moment";
+import { recentClockText } from "@/utils/clockText";
 import { agentWorkFor } from "@/views/Projects/composables/agentWork";
 
 defineOptions({ name: "TaskAgentMark" });
@@ -22,11 +22,7 @@ const { t } = useI18n();
 
 const work = computed(() => agentWorkFor(props.taskId));
 
-const since = computed(() => {
-    const started = work.value?.since ? moment(work.value.since) : null;
-    if (!started || !started.isValid()) return "";
-    return started.format(started.isSame(moment(), "day") ? "HH:mm" : "D MMM, HH:mm");
-});
+const since = computed(() => recentClockText(work.value?.since));
 
 const label = computed(() => (since.value
     ? t("AgentWork.mark_label", { name: work.value.name, time: since.value })

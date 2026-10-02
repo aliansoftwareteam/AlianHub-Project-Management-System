@@ -63,6 +63,51 @@ describe('the card for a batch that names several tasks', () => {
         expect(wrapper.emitted('open-task')).toEqual([[task(2)]]);
     });
 
+    it('holds the rest of the tasks behind "show all", and names every one of them once it is pressed', async () => {
+        mountCard(batch({ tasks: 10, lines: [{ kind: 'batchTasks', tasks: [1, 2, 3, 4, 5].map(task), others: 5, rest: [6, 7, 8].map(task) }] }));
+        const names = () => wrapper.findAll('[data-test="intent-open-task"]').map((el) => el.text());
+        const all = wrapper.find('[data-test="intent-show-all"]');
+        expect(names()).toEqual(['Bulk 1', 'Bulk 2', 'Bulk 3', 'Bulk 4', 'Bulk 5']);
+        expect(wrapper.find('[data-test="intent-more"]').text()).toBe('and 5 more');
+        expect([all.text(), all.attributes('aria-expanded')]).toEqual(['Show all 8 tasks', 'false']);
+
+        await all.trigger('click');
+        expect(names()).toEqual([1, 2, 3, 4, 5, 6, 7, 8].map((n) => `Bulk ${n}`));
+        expect(wrapper.find('[data-test="intent-more"]').text()).toBe('2 tasks you cannot open');
+        expect([all.text(), all.attributes('aria-expanded')]).toEqual(['Show fewer', 'true']);
+        await wrapper.findAll('[data-test="intent-open-task"]')[6].trigger('click');
+        expect(wrapper.emitted('open-task')).toEqual([[task(7)]]);
+
+        await all.trigger('click');
+        expect(names()).toHaveLength(5);
+        expect(wrapper.find('[data-test="intent-more"]').text()).toBe('and 5 more');
+    });
+
+    it('names all twenty tasks of a batch the person can open every task of, and nothing past them', async () => {
+        const rest = Array.from({ length: 15 }, (unused, at) => task(at + 6));
+        mountCard(batch({ lines: [{ kind: 'batchTasks', tasks: [1, 2, 3, 4, 5].map(task), others: 15, rest }] }));
+        await wrapper.find('[data-test="intent-show-all"]').trigger('click');
+        expect(wrapper.findAll('[data-test="intent-open-task"]')).toHaveLength(20);
+        expect(wrapper.find('[data-test="intent-more"]').exists()).toBe(false);
+    });
+
+    it('offers "show all" only where there is a task the card does not name yet', async () => {
+        mountCard(batch());
+        expect(wrapper.find('[data-test="intent-show-all"]').exists()).toBe(false);
+        await wrapper.setProps({ preview: batch({ lines: [{ kind: 'batchTasks', tasks: [1, 2].map(task), others: 0, rest: [] }] }) });
+        expect(wrapper.find('[data-test="intent-show-all"]').exists()).toBe(false);
+    });
+
+    it('starts closed again when the card is given another batch', async () => {
+        const withRest = (n) => batch({ lines: [{ kind: 'batchTasks', tasks: [1, 2, 3, 4, 5].map(task), others: n, rest: Array.from({ length: n }, (unused, at) => task(at + 6)) }] });
+        mountCard(withRest(2));
+        await wrapper.find('[data-test="intent-show-all"]').trigger('click');
+        expect(wrapper.findAll('[data-test="intent-open-task"]')).toHaveLength(7);
+        await wrapper.setProps({ preview: withRest(3) });
+        expect(wrapper.findAll('[data-test="intent-open-task"]')).toHaveLength(5);
+        expect(wrapper.find('[data-test="intent-show-all"]').text()).toBe('Show all 8 tasks');
+    });
+
     it('writes a priority, a date and an estimate the way a single change shows them, and counts a kind with no value', () => {
         mountCard(batch({ lines: [
             { kind: 'batchChange', what: 'priority', count: 4, value: 'HIGH', mixed: false },

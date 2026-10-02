@@ -1167,7 +1167,7 @@ const schema = {
         closedAt: { type: Date, required: false },
         // The connected agent that holds the item in the work queue: { by, userId, name, at, until }. Absent, or past `until`, the item is free.
         claim: { type: Object, required: false },
-        // { why: 'taken_back' | 'finished', userId, name, at }: not handed to an agent again while the row stays open.
+        // { why: 'taken_back' | 'finished' | 'withdrawn', userId, name, at }: not handed to an agent again while the row stays open.
         leftQueue: { type: Object, required: false },
     },
     // What agents leave while they work (Modules/Agents/workMarks.js): one row per scope and key, taken by a conditional write.
@@ -1234,6 +1234,12 @@ const schema = {
         idempotencyKey: { type: String, required: false },
         viaAccount: { type: String, required: false },
         startedBy: { type: String, required: false },
+        // What the request that started the run was held to (event/writerLimits.js); the run's skill executes under it
+        startedUnder: {
+            agent: { type: Boolean, required: false },
+            chat: { type: Boolean, required: false },
+            projectIds: { type: [String], default: undefined, required: false },
+        },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
         // set with the terminal status; the TTL index deletes the run once it passes
@@ -1518,6 +1524,13 @@ const schema = {
         allowedActions: { type: Array, required: false },
         // Set on a change a standing approval applied: it is filed already approved, by the person who made that approval.
         standingApprovalId: { type: String, required: false },
+        // Set on the parts of a plan an approval left to be made later (Agents/planFollowUp.js): the proposal they came from.
+        splitFrom: { type: String, required: false },
+        // Set where those parts were tried and not made: the person who approved, who alone may try them once more, and why they were not made.
+        retryBy: { type: String, required: false },
+        retryWhy: { type: String, required: false },
+        // [{ part, name, error }] — what an approved change answered that it did not make, kept so the finished proposal says why
+        notMade: { type: Array, default: undefined, required: false },
     },
     // "Always do this": one kind of change, by one connection, in one project — managed by Modules/Agents/standingApprovals.js.
     agentStandingApprovals: {
@@ -4587,6 +4600,8 @@ const schema = {
         agentAsk: { type: Object, required: false },
         agentCitations: { type: Array, required: false },
         agentChanges: { type: Array, required: false },
+        // A chat message that asked its author's own connected AI (Modules/Agents/manager/chatQuestions.js): { at }. It names nobody.
+        ownAiAsk: { type: Object, required: false },
         // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
         importedFrom: { type: String, required: false },
         // The import job that saved the comment, and its time and author in the file, by which the same file imported

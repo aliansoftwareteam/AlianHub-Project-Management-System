@@ -50,7 +50,7 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import moment from "moment";
+import { fullText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
@@ -82,7 +82,7 @@ const jobs = ref([]);
 let timer = null;
 
 const hasRunning = computed(() => jobs.value.some((job) => job.status === "queued" || job.status === "processing"));
-const startedAt = (job) => (job.createdAt ? moment(job.createdAt).format("lll") : "");
+const startedAt = (job) => fullText(job.createdAt);
 const markImported = () => saveOnboarding({ importedWork: true });
 
 async function loadJobs() {

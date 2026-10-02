@@ -27,7 +27,7 @@
                         :inputId="`milestonename`+hourlyMilestoneIndex"
                         @keyup="checkErrors({'field':formData.milestoneName,'name':'name','validations':formData.milestoneName.rules,'type':formData.milestoneName.type,'event':$event.event})"
                     ></InputText>
-                    <small class="red" v-if="formData.milestoneName.error">{{formData.milestoneName.error}}</small>
+                    <small class="hourly-milestone-tr-red" v-if="formData.milestoneName.error">{{formData.milestoneName.error}}</small>
                 </div>
             </td>
             <!-- startdate and endDate -->
@@ -69,7 +69,7 @@
                             class="hourminutes minutesMilestone"
                         ></InputText>
                     </div>
-                    <small class="red" v-if="error">{{$t(`Milestone.${error.replaceAll(' ',"_")}`)}}</small>
+                    <small class="hourly-milestone-tr-red" v-if="error">{{$t(`Milestone.${error.replaceAll(' ',"_")}`)}}</small>
                 </div>
             </td>
             <!-- amountPerHours -->
@@ -94,8 +94,8 @@
                         class="amountCurr amountperhours"
                     ></InputText>
                 </div>
-                <small class="red" v-if="formData.amountPerHours.error">{{formData.amountPerHours.error}}</small>
-                <small class="red" v-if="errAmountPer">{{$t(`Milestone.${errAmountPer.replaceAll(' ',"_")}`)}}</small>
+                <small class="hourly-milestone-tr-red" v-if="formData.amountPerHours.error">{{formData.amountPerHours.error}}</small>
+                <small class="hourly-milestone-tr-red" v-if="errAmountPer">{{$t(`Milestone.${errAmountPer.replaceAll(' ',"_")}`)}}</small>
             </td>
             <!-- amount -->
             <td>
@@ -119,8 +119,8 @@
                         class="amountCurr amountperhours"
                     ></InputText>
                 </div>
-                <small class="red" v-if="formData.amount.error">{{formData.amount.error}}</small>
-                <small class="red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
+                <small class="hourly-milestone-tr-red" v-if="formData.amount.error">{{formData.amount.error}}</small>
+                <small class="hourly-milestone-tr-red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
             </td>
             <td></td>
             <td></td>
@@ -539,3 +539,9 @@
         removeKeyUpListener();
     });
 </script>
+
+<style scoped>
+.hourly-milestone-tr-red {
+    color: var(--danger-ink);
+}
+</style>

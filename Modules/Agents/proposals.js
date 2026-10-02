@@ -18,6 +18,8 @@ const aiFeedback = require('../AI/feedback');
 const slackPost = require('./connectors/slackPost');
 const planFiling = require('./planFiling');
 const planLocks = require('./planLocks');
+const planShown = require('./planShown');
+const planFollowUp = require('./planFollowUp');
 const proposalText = require('./proposalText');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
@@ -204,19 +206,20 @@ const countsByStatus = async (companyId, scoped, projectIds) => {
 const WAITING_READ_LIMIT = 500;
 
 /* Every waiting proposal in the scope with what `viewer` may do with it; with no viewer each is taken as theirs to decide. */
-const waitingFor = async (companyId, scoped, projectIds, viewer) => {
+const waitingFor = async (companyId, scoped, projectIds, viewer, locks) => {
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ ...scoped, status: STATUS.PENDING }, {}, { sort: { createdAt: -1 }, limit: WAITING_READ_LIMIT }],
     }, 'find').catch(() => []);
     const seen = (rows || []).map(plain).filter(access.staysInside(projectIds));
-    const standings = viewer ? await approverRights.standingsOf(companyId, viewer, seen) : seen.map(() => approverRights.OPEN);
+    const standings = viewer ? await approverRights.standingsOf(companyId, viewer, seen, locks) : seen.map(() => approverRights.OPEN);
     return new Map(seen.map((p, at) => [String(p._id), { ...standings[at], bucket: bucketOf(p) }]));
 };
 
 /* projectIds, when given, is the caller's visible set, hiddenTaskIds the tasks in it they cannot read,
  * and privateWork what is someone else's alone; the counts follow the same scope. `viewer` is the person reading:
- * each waiting row says whether it is theirs to approve, and only those are counted as waiting. */
-const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork, askedBy, viewer } = {}) => {
+ * each waiting row says whether it is theirs to approve, and only those are counted as waiting. `locks` is the
+ * request's memory of the rights it has read (./planLocks.js). */
+const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork, askedBy, viewer, locks = null } = {}) => {
     const scoped = access.proposalScopeClause({ projectIds, hiddenTaskIds, privateWork, askedBy });
     const match = { ...scoped };
     if (status) match.status = String(status);
@@ -226,7 +229,7 @@ const list = async (companyId, { status, bucket, agentId, limit = 100, projectId
             type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [match, {}, { sort: { createdAt: -1 }, limit: Math.min(500, Number(limit) || 100) }],
         }, 'find'),
         countsByStatus(companyId, scoped, projectIds),
-        waitingFor(companyId, scoped, projectIds, viewer),
+        waitingFor(companyId, scoped, projectIds, viewer, locks),
     ]);
     const listed = (rows || []).map(plain).filter(access.staysInside(projectIds));
     const sources = await skillSourcesOfRuns(companyId, listed);
@@ -253,6 +256,38 @@ const partAudits = (result) => (Array.isArray(result && result.parts) ? result.p
     .flatMap((part) => (Array.isArray(part && part.items) ? part.items : []).map((item) => item && item.auditId).filter(Boolean).map(String));
 
 const get = (companyId, id) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: oid(id) }] }, 'findOne');
+
+const CARRIED_OVER = Object.freeze(['agentId', 'agentName', 'runId', 'what', 'why', 'gate', 'priority', 'taint', 'source', 'finding', 'requestedBy', 'tokenId', 'tokenProjectIds', 'oauthClientId', 'oauthGrantId', 'allowedActions']);
+
+/* The parts of a plan an approval left to be made later (./planFollowUp.js), each kept as a proposal that waits
+ * for a person: filed for whoever the first was filed for, and held to everything a proposal is held to. A part
+ * that is tried once more is kept for the person who approved the plan. null where nothing was left. */
+const fileLeft = async (companyId, p, id, { decider, left }) => {
+    if (!left.waiting.length && !left.retry.length) return null;
+    const from = plain(p);
+    const carried = Object.fromEntries(CARRIED_OVER.filter((key) => from[key] !== undefined && from[key] !== null).map((key) => [key, from[key]]));
+    const sameKind = (change) => (Array.isArray(from.changes) ? from.changes : []).some((filed) => filed && filed.action === change.action);
+    const stored = (change) => ({
+        action: change.action, params: planFiling.storedParams(change.action, change.params), label: proposalText.labelOf(change),
+        reversible: Boolean(registry.get(change.action) && registry.get(change.action).undoable), rating: change.rating || actions.rating(change.action),
+    });
+    const file = async ({ projectId, change }, more = {}) => {
+        const saved = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AGENT_PROPOSALS,
+            data: {
+                ...carried, what: sameKind(change) ? from.what : proposalText.titleOf('', [change]),
+                taskId: null, projectId, status: STATUS.PENDING, cost: null, auditIds: [], splitFrom: String(id), ...more, changes: [stored(change)],
+            },
+        }, 'save');
+        emit(companyId, saved);
+        return String(saved._id);
+    };
+    const waiting = [];
+    for (const entry of left.waiting) waiting.push(await file(entry));
+    const retry = [];
+    for (const entry of left.retry) retry.push(await file(entry, { retryBy: String(decider.userId), retryWhy: entry.why }));
+    return { waiting, retry };
+};
 
 const setStatus = async (companyId, id, set, { onlyIf } = {}) => {
     const filter = onlyIf ? { _id: oid(id), status: onlyIf } : { _id: oid(id) };
@@ -302,13 +337,15 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         }
         status = STATUS.EDITED;
     }
-    const partHeld = await planLocks.approveRefusal(companyId, { userId: decider.userId, privileged: Boolean(isPrivileged) }, changes);
+    const person = { userId: decider.userId, privileged: Boolean(isPrivileged) };
+    const partHeld = approverRights.retryRefusal(decider.userId, p) || await planLocks.approveRefusal(companyId, person, changes, p) || planShown.approveRefusal(changes);
     if (partHeld) return partHeld;
     // A connected agent's change was asked of the approver above; these run on the approver's own rights.
     if (!fromMcp) {
-        const lacking = await approverRights.approveRefusal(companyId, { userId: decider.userId, privileged: Boolean(isPrivileged) }, p, changes);
+        const lacking = await approverRights.approveRefusal(companyId, person, p, changes);
         if (lacking) return lacking;
     }
+    const held = kept ? await planFollowUp.heldBack(companyId, person, p, kept.keptKeys) : [];
 
     const runs = require('./runs');
     const fromSystem = p.source === SOURCE_SYSTEM;
@@ -338,12 +375,13 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
             if (out.auditId) auditIds.push(out.auditId, ...partAudits(out.result));
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
-            applied.push({ action: c.action, ok: false, error: e.message });
+            applied.push({ action: c.action, ok: false, error: e.message, ...(Array.isArray(e.parts) ? { parts: e.parts } : {}) });
         }
     }
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
     const delivery = slackPost.deliveryOf(changes, applied);
-    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}) });
+    const notMade = planFollowUp.notMadeBy(changes, applied);
+    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}), ...(notMade.length ? { notMade } : {}) });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
     const row = typeof p.toObject === 'function' ? p.toObject() : p;
     await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: { ...row, changes, decidedBy: decider.userId }, applied }));
@@ -356,7 +394,10 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     // "waiting_approval" — and in every running count — after the work was done.
     const okCount = applied.filter((a) => a.ok).length;
     await settleRun(companyId, p, { decision: status, applied, reason: null, outcome: `${status} by a person — ${okCount} of ${applied.length} change(s) applied` });
-    return { proposal: updated, applied, undoToken: String(id), undoUntil };
+    const left = await quietly(`keep what ${id} left to be made`, () => fileLeft(companyId, p, id, {
+        decider, left: planFollowUp.leftBy({ stored: p.changes, changes, applied, held, secondTry: Boolean(p.retryBy) }),
+    }));
+    return { proposal: updated, applied, undoToken: String(id), undoUntil, ...(left ? { left } : {}) };
 };
 
 const decline = async (companyId, id, { decider, ip, reason }) => {
@@ -403,6 +444,21 @@ const withdraw = async (companyId, id, reason) => setStatus(companyId, id, {
     status: STATUS.DECLINED, decidedBy: SYSTEM_DECIDER, decidedAt: new Date(), declineReason: String(reason || '').slice(0, DECLINE_REASON_MAX),
 }, { onlyIf: STATUS.PENDING });
 
+const LEFT_BY_UNDONE = 'The approval that left these parts to be made later was undone.';
+
+/* What an approval left to be made later (./planFollowUp.js) goes with it when it is undone, before its own changes
+ * are, so nothing is left that names what the undo removes: a row still waiting is taken back, and a second try
+ * that ran is undone too. What someone else approved from it stays theirs. Answers what the second tries' undo did. */
+const takeBackLeft = async (companyId, id, undoing) => {
+    const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ splitFrom: String(id) }, { status: 1, retryBy: 1 }] }, 'find');
+    const results = [];
+    for (const row of rows || []) {
+        if (row.status === STATUS.PENDING) await withdraw(companyId, row._id, LEFT_BY_UNDONE);
+        else if (row.retryBy && [STATUS.APPROVED, STATUS.EDITED].includes(row.status)) results.push(...((await undoApproval(companyId, String(row._id), undoing)).results || []));
+    }
+    return results;
+};
+
 /* Undo within the window: every audited action, newest first. */
 const undoApproval = async (companyId, id, { decider, isPrivileged, ip }) => {
     const p = await get(companyId, id);
@@ -413,7 +469,7 @@ const undoApproval = async (companyId, id, { decider, isPrivileged, ip }) => {
     if (!undoUntil || new Date(undoUntil).getTime() < Date.now()) return { error: 'The undo window has closed. Use the audit log to undo individual actions.', status: 410, reason: undo.REASON.WINDOW_PASSED, undoUntil };
     const ctx = await undo.undoContext(companyId, decider);
     if (p.projectId && !ctx.visibleProjectIds.includes(String(p.projectId))) return { error: 'You cannot see the project this proposal touched.', status: 403, reason: undo.REASON.NOT_VISIBLE, undoUntil };
-    const results = [];
+    const results = await quietly(`take back what ${id} left to be made`, () => takeBackLeft(companyId, id, { decider, isPrivileged, ip })) || [];
     for (const auditId of [...(p.auditIds || [])].reverse()) {
         // eslint-disable-next-line no-await-in-loop
         const row = await audit.findById(companyId, auditId);

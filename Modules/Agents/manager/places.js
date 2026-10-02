@@ -42,10 +42,12 @@ const takePlace = async ({ companyId, projectId, connection, itemId, open, now, 
 const giveBack = (companyId, itemId, connection) => marks.giveUp(companyId, { ref: String(itemId), ...(connection ? { by: connection } : {}) });
 
 /* For a claim just written. `holds(itemId, connection)` says whether that connection's claim on that item still
- * stands. Answers which rule holds the caller back, if one does; the caller then takes its claim back. */
+ * stands. Answers which rule holds the caller back, if one does; the caller then takes its claim back. An item
+ * outside every project, a question asked in a conversation, takes the connection's hand and no project's place. */
 const takeFor = async ({ companyId, projectId, connection, itemId, now, holds }) => {
     const ref = String(itemId);
     if (!(await takeHand({ companyId, connection, itemId: ref, now, holds }))) return { held: 'one_at_a_time' };
+    if (!projectId) return { held: '' };
     const [{ atOnce }, running] = await Promise.all([projectLimits.read(companyId, projectId), runningIn(companyId, projectId)]);
     if (await takePlace({ companyId, projectId, connection, itemId: ref, open: atOnce - running, now, holds })) return { held: '' };
     await giveBack(companyId, ref, connection);

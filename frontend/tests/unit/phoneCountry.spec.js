@@ -69,7 +69,7 @@ describe('PhoneCountry keyboard selection', () => {
         await press(DOWN, 5);
         await typeSearch('ind');
 
-        expect(document.querySelector('#item0').classList).toContain('bg-blue');
+        expect(document.querySelector('#item0').classList).toContain('drop-down-option-bg-blue');
     });
 
     it('keeps the current country when Enter finds no match', async () => {

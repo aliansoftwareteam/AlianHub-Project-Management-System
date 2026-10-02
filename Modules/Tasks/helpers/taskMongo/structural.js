@@ -23,7 +23,7 @@ const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, plainIdOf, TaskWriteRefusal } = require('../taskWriteFields');
 const keptAiValues = require('../../../AI/taskAiValues');
-const { cascadeStatus, sprintCountChange, loadSubtree, storedTask, slotUnder } = require('../taskTree');
+const { cascadeStatus, sprintCountChange, loadSubtree, storedTask, slotUnder, LEFT_BECAUSE } = require('../taskTree');
 const { removeLinksOfTasks } = require('../../../CustomField/helpers/fieldLinkStore');
 const { listLeftBy } = require('../taskWritePlacement');
 const { folderForList } = require('../../../Sprints/helpers/folderTree');
@@ -336,7 +336,7 @@ module.exports = {
                         ]
                     }
                     await MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate").then((result)=>{
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: { deletedStatusKey: 1 }, module: 'task', companyId });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: { deletedStatusKey: 1 }, module: 'task', companyId, leftBecause: LEFT_BECAUSE.LIST });
                     }).catch((error) => logger.error(`convert to list, hiding the task: ${error && error.message}`));
 
                     resolve({status: true, statusText: "List added successfully", data: res.data});
@@ -428,7 +428,7 @@ module.exports = {
                     ]
                 }
                 MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate").then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId, leftBecause: LEFT_BECAUSE.TASK });
                     let object = {
                         type: dbCollections.TASKS,
                         data: [

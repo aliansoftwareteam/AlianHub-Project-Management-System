@@ -52,6 +52,27 @@ const labelOf = (params, key) => {
 };
 
 const partsIn = (params) => plans.ALL_PARTS.filter((part) => itemsOf(params, part).length > 0);
+const keysIn = (params) => partsIn(params).flatMap((part) => itemsOf(params, part).map((item, at) => keyOf(part, at)));
+
+/* The plan with only the parts `keys` name, each kind in the order the plan holds it; a kind none of them names is gone. */
+const keep = (params, keys) => {
+    const kept = { ...params };
+    for (const part of partsIn(params)) {
+        const items = itemsOf(params, part).filter((item, at) => keys.includes(keyOf(part, at)));
+        if (items.length) kept[plans.PLAN_KEY[part]] = items;
+        else delete kept[plans.PLAN_KEY[part]];
+    }
+    return kept;
+};
+
+/* `keys`, and with them every part of the plan that cannot be made without one of them. */
+const withDependents = (params, keys) => {
+    const needs = needsOf(params);
+    const out = new Set(keys);
+    const pull = () => keysIn(params).find((key) => !out.has(key) && (needs[key] || []).some((needed) => out.has(needed)));
+    for (let key = pull(); key; key = pull()) out.add(key);
+    return keysIn(params).filter((key) => out.has(key));
+};
 
 /* The places of one kind of part to keep, or why the choice is not one of this plan. */
 const placesOf = (params, part, chosen) => {
@@ -86,24 +107,17 @@ const narrowOne = (change, chosen) => {
     if (!kept.length && !plan.mayBeEmpty) return { error: REFUSED.nothing };
     const problem = unmet(params, kept);
     if (problem) return { error: problem };
-    const narrowed = { ...params };
-    let held = 0;
-    for (const part of partsIn(params)) {
-        const items = (places[part] || []).map((at) => itemsOf(params, part)[at]);
-        held += itemsOf(params, part).length;
-        if (items.length) narrowed[plans.PLAN_KEY[part]] = items;
-        else delete narrowed[plans.PLAN_KEY[part]];
-    }
-    return { change: { ...change, params: narrowed }, leftOut: held - kept.length };
+    return { change: { ...change, params: keep(params, kept) }, leftOut: keysIn(params).length - kept.length, kept };
 };
 
 const given = (choice) => choice !== undefined && choice !== null;
 
-/* The changes of a proposal with each plan kept to its chosen parts, and how many parts that left out; or why the
- * choice cannot be followed. */
+/* The changes of a proposal with each plan kept to its chosen parts, how many parts that left out, and for each
+ * change the choice names the parts it kept, by their place in the stored plan; or why the choice cannot be followed. */
 const narrow = (stored, choice) => {
     if (!isRecord(choice)) return { error: REFUSED.shape };
     const changes = listOf(stored).map(plain);
+    const keptKeys = {};
     let leftOut = 0;
     for (const [index, chosen] of Object.entries(choice)) {
         const at = /^\d+$/.test(index) ? Number(index) : -1;
@@ -111,9 +125,13 @@ const narrow = (stored, choice) => {
         const read = narrowOne(changes[at], chosen);
         if (read.error) return read;
         changes[at] = read.change;
+        keptKeys[at] = read.kept;
         leftOut += read.leftOut;
     }
-    return { changes, leftOut };
+    return { changes, leftOut, keptKeys };
 };
 
-module.exports = { given, narrow, needsOf, keyOf, REFUSED };
+const isPlan = (action) => Object.hasOwn(PLANS, String(action));
+const mayBeEmpty = (action) => isPlan(action) && PLANS[String(action)].mayBeEmpty;
+
+module.exports = { given, narrow, needsOf, keyOf, keysIn, keep, withDependents, isPlan, mayBeEmpty, REFUSED };

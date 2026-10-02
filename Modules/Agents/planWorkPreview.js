@@ -7,6 +7,7 @@ const planWork = require('./planWork');
 // only where the viewer may see them.
 
 const SENTENCE_MAX = 600;
+const NOT_READ = 'It could not be read as an automation.';
 
 const listOf = (value) => (Array.isArray(value) ? value : []);
 const paramsOf = (change) => (change && change.params && typeof change.params === 'object' ? change.params : {});
@@ -19,7 +20,7 @@ const ruleLine = async (given, at, { companyId, uid, projectId, planned }) => {
     const built = problem
         ? { rule: null, rejected: [problem] }
         : await rules.ruleFor({ companyId, uid, draft: { ...planWork.ruleOf(given), projectId, enabled: false }, planned });
-    if (!built.rule) return { kind: 'planRule', problem: String(built.rejected[0] || '').slice(0, SENTENCE_MAX), pick };
+    if (!built.rule) return { kind: 'planRule', problem: String(built.rejected[0] || NOT_READ).slice(0, SENTENCE_MAX), pick };
     const { describeRule } = require('../Automations/helpers/sentenceRules');
     return { kind: 'planRule', text: describeRule(built.rule, { people: built.people }).slice(0, SENTENCE_MAX), pick };
 };

@@ -113,6 +113,7 @@ import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import moment from 'moment';
+import { clockText } from '@/utils/clockText';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { typedSearchText } from '@/utils/searchText';
@@ -190,7 +191,7 @@ const overnightSessions = computed(() => {
     return list.map((s) => {
         const started = moment(s.startedAt);
         const when = started.isSame(moment(), 'day') ? t('Time.today') : (started.isSame(moment().subtract(1, 'day'), 'day') ? t('Time.yesterday') : started.format('MMM D'));
-        return { ...s, startClock: started.format('HH:mm'), whenLabel: when, error: sessionErrors.value[s.key] || '' };
+        return { ...s, startClock: clockText(started), whenLabel: when, error: sessionErrors.value[s.key] || '' };
     });
 });
 

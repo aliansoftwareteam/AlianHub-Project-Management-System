@@ -21,7 +21,7 @@
             </button>
         </div>
 
-        <div class="mc-srch-body style-scroll" ref="body" @scroll.passive="onScroll">
+        <div class="mc-srch-body main-chat-search-style-scroll" ref="body" @scroll.passive="onScroll">
             <!-- search only: nothing typed yet -->
             <p v-if="!isPinned && !term" class="mc-srch-hint">{{ $t('MainChat.search_hint') }}</p>
 
@@ -292,3 +292,19 @@ function snippet(message) {
     return highlight(capped);
 }
 </script>
+
+<style scoped>
+.main-chat-search-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.main-chat-search-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.main-chat-search-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
+</style>

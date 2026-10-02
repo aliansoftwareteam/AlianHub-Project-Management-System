@@ -140,10 +140,22 @@
                         <IntentPreview :preview="selected.batch" @open-task="openBatchTask" />
                         <span v-if="!allReversible" class="ah-chip ah-chip--warn ai-batch__mark" data-test="batch-permanent">{{ $t('Ai.not_reversible') }}</span>
                     </div>
+                    <p v-if="retryNote" class="ah-small ai-retry" data-test="retry-note">{{ retryNote }}</p>
                     <template v-for="(change, i) in selected.batch ? [] : editable" :key="i">
-                        <div class="ai-change">
+                        <div class="ai-change" :class="{ 'ai-change--card': change.preview }">
                             <ShellIcon :name="change.reversible ? 'check' : 'alert'" :size="14" :class="change.reversible ? 'ah-muted' : ''" />
-                            <span class="ai-change__label">{{ changeLabel(t, change) }}</span>
+                            <IntentPreview
+                                v-if="change.preview"
+                                class="ai-change__card"
+                                data-test="change-card"
+                                :preview="change.preview"
+                                :choosable="canPick"
+                                :left-out="leftOut[i] || []"
+                                :disabled="busy"
+                                @update:left-out="leftOut[i] = $event"
+                                @open-task="openBatchTask"
+                            />
+                            <span v-else class="ai-change__label">{{ changeLabel(t, change) }}</span>
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ $t('Ai.not_reversible') }}</span>
                             <button v-if="editing" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="editable.splice(i, 1)">{{ $t('Ai.drop') }}</button>
                         </div>
@@ -158,6 +170,21 @@
                     <div v-if="lockedByRights" class="auth__banner auth__banner--warn ai-locked" data-test="rights-locked">
                         <ShellIcon name="shield" :size="15" />
                         <span>{{ $t('Ai.rights_locked') }}</span>
+                    </div>
+
+                    <div v-if="lockedForRetry" class="auth__banner auth__banner--warn ai-locked" data-test="retry-locked">
+                        <ShellIcon name="shield" :size="15" />
+                        <span>{{ $t('Inbox.queue_retry_locked') }}</span>
+                    </div>
+
+                    <div v-if="lockedForPlan" class="auth__banner auth__banner--warn ai-locked" data-test="plan-locked">
+                        <ShellIcon name="shield" :size="15" />
+                        <span>{{ $t('Inbox.queue_plan_locked') }}</span>
+                    </div>
+
+                    <div v-if="notMade.length" class="ai-notmade" data-test="not-made">
+                        <div class="ah-label">{{ $t('Ai.not_made_title') }}</div>
+                        <p v-for="(line, i) in notMade" :key="i" class="ah-small ai-notmade__line" data-test="not-made-line">{{ line }}</p>
                     </div>
 
                     <div v-if="selected.taint" class="auth__banner auth__banner--warn" style="margin-top:14px" data-test="taint-reason">
@@ -213,6 +240,7 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiFeedback from "@/components/molecules/AiFeedback/AiFeedback.vue";
 import IntentPreview from "@/components/molecules/IntentPreview/IntentPreview.vue";
 import { intentSummary } from "@/components/molecules/IntentPreview/intentLines";
+import { partsChoice } from "@/components/molecules/IntentPreview/planPicks";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { dropProjects, showProjects } from "@/composable/approvedProjects";
 import { madeProjectIds, trashedProjectIds } from "@/composable/approvedProjectIds";
@@ -229,6 +257,7 @@ import { taintSourcesLine, taintSourcesOf } from "./taintText";
 import { skillSourceLabel } from "./skillSourceText";
 import { proposalTitle, sortProposals, waitingDaysOf } from "./plainLabels";
 import { useAgentAccess } from "./agentAccess";
+import { unappliedOf } from "@/views/Inbox/approvalQueue";
 import { changeLabel } from "./agentActionLabels";
 import { plainReason } from "./auditWords";
 
@@ -236,6 +265,8 @@ defineOptions({ name: "AiInboxPage" });
 
 const GATE_OWNER_ADMIN = "owner_admin";
 const LOCKED_BY_RIGHTS = "own_rights";
+const LOCKED_FOR_RETRY = "first_approver";
+const LOCKED_FOR_PLAN = "not_this_plan";
 
 const { t, te } = useI18n();
 const store = useStore();
@@ -292,6 +323,31 @@ const canDecide = computed(() => {
 });
 const canDecline = computed(() => canDecide.value || selected.value?.mayDecline === true);
 const lockedByRights = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_BY_RIGHTS);
+const lockedForRetry = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_FOR_RETRY);
+const lockedForPlan = computed(() => selected.value?.status === "pending" && selected.value?.lockedWhy === LOCKED_FOR_PLAN);
+// What a finished proposal did not make, each with the reason the server kept.
+const notMade = computed(() => {
+    const p = selected.value;
+    if (!p || p.status === "pending" || !Array.isArray(p.notMade)) return [];
+    return p.notMade
+        .filter((entry) => entry && typeof entry.error === "string" && entry.error)
+        .map((entry) => (typeof entry.name === "string" && entry.name ? t("Ai.not_made_line", { name: entry.name, why: plain(entry.error) }) : plain(entry.error)));
+});
+const retryNote = computed(() => {
+    const p = selected.value;
+    return p?.status === "pending" && p.retryBy && canDecide.value ? t("Inbox.queue_retry_note", { why: p.retryWhy || t("Time.why_no_reason") }) : "";
+});
+// The parts of a plan the person unticked, by the change they belong to. Only their places in the stored plan are sent back.
+const leftOut = ref({});
+const leftOutAt = (i) => leftOut.value[i];
+const wholeChanges = computed(() => editable.value.length === (selected.value?.changes || []).length);
+const canPick = computed(() => selected.value?.status === "pending" && canDecide.value && !editing.value && !selected.value?.batch && wholeChanges.value);
+// The card is the server's reading of a change for this viewer, never part of the change sent back.
+const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== "preview"));
+const laterLine = (out) => [
+    out?.left?.waiting?.length ? t("Inbox.queue_left_waiting") : "",
+    out?.left?.retry?.length ? t("Inbox.queue_left_retry") : ""
+].filter(Boolean).join(" ");
 const taintLine = (marker) => taintSourcesLine(t, taintSourcesOf(marker));
 const selectedSkillSource = computed(() => skillSourceLabel(t, selected.value?.skillSource));
 const sortedProposals = computed(() => sortProposals(proposals.value, sortOrder.value));
@@ -342,6 +398,7 @@ watch(selected, (p) => {
     editing.value = false;
     declining.value = false;
     error.value = "";
+    leftOut.value = {};
     editable.value = p ? (p.changes || []).map((c) => ({ ...c })) : [];
 });
 
@@ -400,13 +457,14 @@ const onApprove = async () => {
     busy.value = true;
     error.value = "";
     try {
-        const original = selected.value.changes || [];
-        const changed = editable.value.length !== original.length;
-        const out = await decide(selected.value._id, "approve", changed ? { changes: editable.value } : {});
-        const unapplied = (out?.applied || []).filter((a) => !a.ok);
+        const body = wholeChanges.value ? (canPick.value && partsChoice(editable.value, leftOutAt)) || {} : { changes: editable.value.map(asFiled) };
+        const out = await decide(selected.value._id, "approve", body);
+        const unapplied = unappliedOf(out);
+        const later = laterLine(out);
         showProjects(store, madeProjectIds(out));
         const id = await afterDecision(unapplied.length ? "" : t("Ai.applied"));
         if (unapplied.length) $toast.error(t("Ai.applied_with_failures", { n: unapplied.length, error: plain(unapplied[0].error) }), { position: "top-right" });
+        if (later) $toast.info(later, { position: "top-right" });
         if (out?.undoUntil && mayUndo({ decidedBy: out.decidedBy || userId.value })) {
             undo.value = { id, until: new Date(out.undoUntil).getTime() };
             setTimeout(() => { if (undo.value && undo.value.id === id) undo.value = null; }, Math.max(0, new Date(out.undoUntil).getTime() - Date.now()));
@@ -482,4 +540,9 @@ onMounted(() => Promise.all([reload(), loadApprovals(), route?.query?.report ? o
 .ai-locked { margin-top: 14px; }
 .ai-batch { display: flex; flex-direction: column; gap: 6px; margin-bottom: 7px; min-width: 0; }
 .ai-batch__mark { align-self: flex-start; }
+.ai-change--card { align-items: flex-start; flex-wrap: wrap; }
+.ai-change__card { flex: 1 1 16ch; min-width: 0; }
+.ai-retry { margin: 0 0 7px; }
+.ai-notmade { margin-top: 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ai-notmade__line { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
 </style>
