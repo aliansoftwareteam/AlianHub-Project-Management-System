@@ -257,7 +257,7 @@ describe('only a task the person can open, and only fields that person is shown'
         expect((await read(ctx(OWNER), T_OPEN)).fields.length).toBeGreaterThan(0);
     });
 
-    it('a project\'s own rules decide for its tasks, and say nothing to a person who cannot open them', async () => {
+    it('a project\'s own rules decide for its tasks, and a task the person cannot open still answers as a missing one', async () => {
         lockFieldsOfThePrivateProject();
         expect(await read(ctx(INSIDER), T_PRIVATE)).toMatchObject({ refused: true });
         expect((await read(ctx(INSIDER), T_OPEN)).fields.length).toBeGreaterThan(0);

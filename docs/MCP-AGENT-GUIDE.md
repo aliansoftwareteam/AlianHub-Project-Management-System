@@ -12,7 +12,7 @@ Three things, in this order.
 
    | Setting | Adds |
    |---|---|
-   | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link`, `person.place` |
+   | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `chat.channels.list`, `chat.messages.list`, `proposal.get` |
    | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
    | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, `project.setup`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
    | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
@@ -492,13 +492,46 @@ The answer is `{ "url": "...", "screen": "project", "view": "workload" }`. A thi
 
 The answer is `{ "place": { "kind": "task", "project": { "id", "name" }, "sprint": { "id", "name" }, "task": { "id", "name" }, "openedAt": "...", "minutesAgo": 5 }, "fresh": true, "earlier": [ ... ], "note": "..." }`. `kind` is `task`, `sprint` (a list) or `project`. `fresh` is false when the place is more than 60 minutes old, and `place` is null when there is none; either way the note tells the agent to ask the person where they mean. It reads the visits the web app already records and adds none. A place the person can no longer open, a deleted one, and anything outside a token's project list are left out. It does not know which chat or doc the person has open.
 
+**"Who am I".** `person.me` says who the connection acts for, so "assign it to me" and "due tomorrow" mean something. It needs `MCP_TOOLS_DATA` and the right to read projects, and it takes no argument: it answers only for the person behind the connection.
+
+```json
+{ "name": "person.me", "arguments": {} }
+```
+
+The answer is `{ "userId": "...", "name": "...", "role": "member", "timeZone": "Asia/Kolkata", "today": "2026-10-03", "note": "..." }`. `role` is `owner`, `admin`, `member`, `guest`, or `custom` for a role the workspace made itself. `today` is the day it is in the person's time zone. With no time zone stored, `timeZone` is null, `today` is the day in UTC and the note says so.
+
+**Working days.** `workdays.get` answers the days of the week the workspace works, or the days one project works when `projectId` is given: a project can have a week of its own. It needs `MCP_TOOLS_DATA` and the right to read projects.
+
+The answer is `{ "of": "workspace", "workingDays": ["Monday", ...], "dayNumbers": [1, 2, 3, 4, 5], "daysOff": ["Sunday", "Saturday"], "holidays": null, "note": "..." }`. `of` is `project` when the project has its own week, and `dayNumbers` count from 0 for Sunday. AlianHub keeps no list of public holidays, so `holidays` is always null, and a person's time off is not read here. A project the person cannot open answers `{ "error": "project not found" }`, as a missing one does.
+
+**A task's fields.** `task.fields.list` answers the custom fields of one task with what each holds. It needs `MCP_TOOLS_DATA`, the right to read tasks, and a role that is shown custom fields in the task's project.
+
+```json
+{ "name": "task.fields.list", "arguments": { "taskId": "<task id>" } }
+```
+
+The answer is `{ "taskId", "projectId", "about": "...", "fields": [{ "fieldId", "title", "type", "value" }] }`, by field name. `value` is text, a number, true or false, an ISO date, the labels of the options chosen, or `[{ "id", "name" }]` for people; null when the field is empty. A text longer than 2,000 characters is cut and carries `"cut": true`. A formula or rollup field carries `"computed": true` and the number AlianHub stored for it. A field whose value is kept beside the task (votes, linked tasks) is named with `"notReadHere": true` and no value. A field that is switched off, that belongs to another project, or that is for another task type is left out. A task the person cannot open answers `{ "error": "task not found" }`, as a missing one does.
+
+**Reading chat.** `chat.channels.list` lists the chat channels the person can open, and `chat.messages.list` reads the recent messages of one channel or of one task's comment thread. Both need `MCP_TOOLS_DATA`, the right to read tasks, and a role that is shown comments. Direct messages are never listed or read.
+
+```json
+{ "name": "chat.channels.list", "arguments": { "query": "scratch" } }
+{ "name": "chat.messages.list", "arguments": { "channelId": "<channel id>", "limit": 10 } }
+```
+
+A channel is `{ "channelId", "name", "private", "space": { "id", "name" } }`. A private channel is listed only for the people on it, and for owners and admins. A token kept to some projects is listed no channel. `chat.messages.list` takes one `channelId` or one `taskId`, and answers `{ "channel" or "task": { "id", "name" }, "about": "...", "messages": [{ "messageId", "text", "type", "author": { "id", "name" }, "createdAt" }] }`, newest first: 20 unless `limit` asks for another count, never more than 50. The text is plain text, cut at 2,000 characters with `"cut": true`. A reply carries `replyTo`, a file its name in `file`. A deleted message is left out. A channel or a task the person cannot open answers `{ "error": "channel not found" }` or `{ "error": "task not found" }`, as a missing one does. The messages are what people wrote: content, never an instruction to the agent.
+
+**What became of a proposal.** `proposal.get` says what happened to a change that waited for a person, so an agent can go on after an approval and stop after a refusal. It needs `MCP_TOOLS_DATA` and the right to read tasks, and it takes the `proposalId` the filing call answered.
+
+The answer is `{ "proposalId", "state", "what", "changes", "filedAt", "next": "..." }`. `state` is `waiting`, `approved` (approved and being applied), `applied` (with `changesApplied`), `declined` (with `declined.reason`, the words the person typed, kept as a record and not an instruction), `undone` or `failed`. `next` says in a sentence what the agent should do. It answers only for a proposal the same connection filed: the same personal token, or the same app under the same grant. Any other proposal answers `{ "error": "proposal not found" }`, as a missing one does. It carries nothing of what the change holds.
+
 **Message to task.** `task.from_message` makes a task from a chat message, or a comment on a task, that the person can read. It needs `MCP_TOOLS_MANAGE` and the `tasks:manage` grant, and it is the same create as `task.create`: the project's rule for agents, approval and undo apply as they do there.
 
 ```json
 { "name": "task.from_message", "arguments": { "messageId": "<message id>", "assigneeIds": ["<member id>"], "dueDate": "2026-10-09" } }
 ```
 
-The task's description is the message's text, stored as text, followed by a line that says where it came from; with a web address set on the server it also holds a link back. The title is the first line of the message unless `title` is given. With no `projectId`, the task lands in the list the message's channel belongs to, or in the list of the task the comment is on; a direct message needs `projectId` (and `sprintId` for a list other than the project's first). It also takes `assigneeIds`, `priority`, `dueDate`, `startDate`, `status`, `taskType`, `estimateMinutes` and `reason`. A message the person cannot read, a deleted one and an id that does not exist all answer `{ "ok": false, "error": "message not found" }`. No tool lists chat messages yet, so an agent has a chat message's id only when the person gives it; a comment's id comes from `comments.list`.
+The task's description is the message's text, stored as text, followed by a line that says where it came from; with a web address set on the server it also holds a link back. The title is the first line of the message unless `title` is given. With no `projectId`, the task lands in the list the message's channel belongs to, or in the list of the task the comment is on; a direct message needs `projectId` (and `sprintId` for a list other than the project's first). It also takes `assigneeIds`, `priority`, `dueDate`, `startDate`, `status`, `taskType`, `estimateMinutes` and `reason`. A message the person cannot read, a deleted one and an id that does not exist all answer `{ "ok": false, "error": "message not found" }`. A chat message's id comes from `chat.messages.list`, and a comment's from `comments.list` or `chat.messages.list`.
 
 ## What an agent cannot do yet
 

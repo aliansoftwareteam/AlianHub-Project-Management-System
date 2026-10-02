@@ -121,7 +121,7 @@ describe('the tool exists with the read tools', () => {
         expect(registry.permissionsFor(TOOL)).toEqual([{ key: 'task.task_list', write: false }]);
         expect(actions.rating(TOOL)).toMatchObject({ write: false, money: false });
         expect(scopes.scopeForTool(TOOL)).toBe('tasks:read');
-        expect(tools.registered().find((tool) => tool.name === TOOL)).toMatchObject({ visibility: 'filtered', strict: true });
+        expect(tools.registered().find((tool) => tool.name === TOOL)).toMatchObject({ strict: true, visibility: 'none', visibilityReason: expect.stringMatching(/only for a proposal this same connection filed/) });
     });
 
     it('is marked read-only for a client that reads the hints', async () => {

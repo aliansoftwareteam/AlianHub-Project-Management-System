@@ -92,7 +92,12 @@ describe('the tools exist with the read tools', () => {
         expect(registry.permissionsFor(name)).toEqual([{ key: 'project.project_list', write: false }]);
         expect(actions.rating(name)).toMatchObject({ write: false, money: false });
         expect(scopes.scopeForTool(name)).toBe('projects:read');
-        expect(tools.registered().find((tool) => tool.name === name)).toMatchObject({ visibility: 'filtered', strict: true });
+        expect(tools.registered().find((tool) => tool.name === name).strict).toBe(true);
+    });
+
+    it('the working days go through the caller\'s filter; who the caller is reads nothing a filter could judge, and says so', () => {
+        expect(tools.registered().find((tool) => tool.name === DAYS).visibility).toBe('filtered');
+        expect(tools.registered().find((tool) => tool.name === ME)).toMatchObject({ visibility: 'none', visibilityReason: expect.stringMatching(/only the caller's own record/) });
     });
 
     it.each(BOTH)('%s is marked read-only for a client that reads the hints', async (name) => {

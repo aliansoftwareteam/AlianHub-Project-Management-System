@@ -80,7 +80,6 @@ const idOf = (row) => String(row._id);
 const channels = (caller, args = {}) => rpc(caller, CHANNELS, args);
 const inChannel = (caller, channelId, extra = {}) => rpc(caller, MESSAGES, { channelId, ...extra });
 const inTask = (caller, taskId, extra = {}) => rpc(caller, MESSAGES, { taskId, ...extra });
-const idsOf = (answer) => answer.messages.map((row) => row.messageId);
 const everything = () => JSON.stringify([rows(SCHEMA_TYPE.COMMENTS), rows(SCHEMA_TYPE.SPRINTS), rows(SCHEMA_TYPE.TASKS)]);
 
 const seedChat = () => {
@@ -125,7 +124,12 @@ describe('the tools exist with the read tools', () => {
         expect(registry.permissionsFor(name)).toEqual([{ key: 'task.task_comment', write: false }]);
         expect(actions.rating(name)).toMatchObject({ write: false, money: false });
         expect(scopes.scopeForTool(name)).toBe('tasks:read');
-        expect(tools.registered().find((tool) => tool.name === name)).toMatchObject({ visibility: 'filtered', strict: true });
+        expect(tools.registered().find((tool) => tool.name === name).strict).toBe(true);
+    });
+
+    it('messages go through the caller\'s filter; channels sit in no project, and the list says how it is kept to the person', () => {
+        expect(tools.registered().find((tool) => tool.name === MESSAGES).visibility).toBe('filtered');
+        expect(tools.registered().find((tool) => tool.name === CHANNELS)).toMatchObject({ visibility: 'none', visibilityReason: expect.stringMatching(/the rule the chat sidebar lists it by/) });
     });
 
     it.each(BOTH)('%s is marked read-only for a client that reads the hints', async (name) => {
@@ -237,7 +241,15 @@ describe('the recent messages of a channel', () => {
         expect(answer.messages[2]).not.toHaveProperty('replyTo');
     });
 
-    it('names no author who has no seat in the workspace now', async () => {
+    it('marks a message an agent wrote', async () => {
+        message({ message: 'Done, see the task', actorType: 'agent' });
+        message({ message: 'By a person' });
+        const [person, agent] = (await inChannel(ctx(OWNER), C_OPEN)).messages;
+        expect(agent.byAgent).toBe(true);
+        expect(person).not.toHaveProperty('byAgent');
+    });
+
+    it('names no author who never had a seat in the workspace', async () => {
         message({ userId: '6f00000000000000000000ee' });
         mockDb.seed(SCHEMA_TYPE.USERS, { _id: '6f00000000000000000000ee', Employee_Name: 'Someone Elsewhere' });
         expect((await inChannel(ctx(OWNER), C_OPEN)).messages[0].author).toEqual({ id: '6f00000000000000000000ee', name: null });
@@ -301,6 +313,12 @@ describe('a channel the person cannot open answers exactly as one that does not 
         expect(await inChannel(ctx(uid), C_DIRECT)).toEqual(missing);
         expect(await inTask(ctx(uid), T_DM)).toEqual(NO_TASK);
         expect(await inTask(ctx(uid), MISSING)).toEqual(NO_TASK);
+    });
+
+    it('an owner who is in a direct message reads none of it either', async () => {
+        stored(SCHEMA_TYPE.TASKS, T_DM).AssigneeUserId = [OWNER, OUTSIDER];
+        expect(await inTask(ctx(OWNER), T_DM)).toEqual(NO_TASK);
+        expect(await inChannel(ctx(OWNER), C_DIRECT)).toEqual(NO_CHANNEL);
     });
 
     it('a token kept to some projects reads no chat channel, and a list\'s channel only inside them', async () => {

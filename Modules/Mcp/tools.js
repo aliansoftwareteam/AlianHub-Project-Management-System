@@ -21,6 +21,7 @@ const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
 const screenTools = require('./screenTools');
 const intentTools = require('./intentTools');
+const contextTools = require('./contextTools');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
@@ -266,9 +267,9 @@ const FLAGGED_TOOLS = [
 const SEARCH_BY_LIST = 'Search tasks you can see by text, status, project or list. A list answers the tasks that live in it and the tasks added to it.';
 const SEARCH_FOR_PLANNING = 'Search tasks you can see by text, status, project, list, assignee or due date. Each task carries its assignees, dates, estimate, subtask count and the tasks above it.';
 
-const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...intentTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
+const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...intentTools.offered(), ...contextTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
 
-const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...intentTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
+const registered = () => [...TOOLS, ...FLAGGED_TOOLS, ...dataTools.TOOLS, ...screenTools.TOOLS, ...intentTools.TOOLS, ...contextTools.TOOLS, ...manageTools.TOOLS, ...Object.values(manageTools.VARIANTS), ...workTools.TOOLS, ...sessionTools.TOOLS];
 
 /* A tool that needs a grant is one only a caller holding that grant lists or runs. */
 const holdsGrantFor = (ctx, tool) => !tool.grant || manageFlag.mayUse(ctx, tool.grant);
