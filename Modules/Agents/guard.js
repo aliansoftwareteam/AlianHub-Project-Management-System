@@ -343,7 +343,7 @@ const PERIMETER = [
     { test: (m, p) => /chargebee|subscription|invoice|billing|milestone|refundamount|paymentplan|customer-update/i.test(p), action: 'billing.*' },
     { test: (m, p) => m !== 'GET' && /\/api\/v1\/members|\/teams|\/company-invitation|\/root-members/i.test(p), action: 'member.remove' },
     // The same handler as /company-invitation. POST on this path and on /find below it are reads.
-    { test: (m, p) => m === 'PUT' && /\/api\/v1\/admin\/company$/i.test(p), action: 'member.remove' },
+    { test: (m, p) => m === 'PUT' && /\/api\/v1\/admin\/company$/i.test(p), action: 'workspace.settings' },
     { test: (m, p) => m !== 'GET' && /securityPermissions|\/setting\/roles|\/sso\/|\/scim\//i.test(p), action: 'permissions.edit' },
     { test: (m, p) => m !== 'GET' && /\/projectRules\/|\/importSettings(ProjectFunction)?$/i.test(p), action: 'permissions.edit' },
     { test: (m, p) => m !== 'GET' && /\/manageTrackerUserPermission/i.test(p), action: 'member.seat' },
