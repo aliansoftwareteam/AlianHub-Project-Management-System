@@ -48,7 +48,8 @@ test.describe('opening a notification from the Inbox', () => {
         await client.db(state.companyId).collection('notifications').insertOne(doc);
         seeded.push({ _id: doc._id, companyId: state.companyId });
 
-        await page.goto(`/#/${state.companyId}/inbox`);
+        // The Inbox opens on "Needs your approval" whenever another spec has a change waiting for the owner.
+        await page.goto(`/#/${state.companyId}/inbox?tab=primary`);
         const card = page.getByRole('article').filter({ hasText: suffix });
         await expect(card).toHaveCount(1);
         await card.getByRole('button', { name: /^Open( task)?$/ }).click();

@@ -243,6 +243,13 @@ describe('the automations and first tasks of a plan on its card', () => {
         expect(wrapper.find('[data-test="intent-pick-also"]').text()).toBe('“When a task moves to In Review, notify its assignees” is back too: it was left out with “In Review”.');
     });
 
+    it('names an automation that went with a status without the full stop of its sentence', async () => {
+        const preview = { ...withWork(), lines: withWork().lines.map((line) => (line.pick === 'rules:0' ? { ...line, text: 'When a task moves to In Review, notify its assignees.' } : line)) };
+        mountCard({ choosable: true, preview, leftOut: ['tasks:0'] });
+        await wrapper.find('[data-pick="statuses:0"]').trigger('change');
+        expect(wrapper.find('[data-test="intent-pick-also"]').text()).toBe('“When a task moves to In Review, notify its assignees” is left out too: it needs “In Review”.');
+    });
+
     it('heads the automations and the first tasks once each', () => {
         mountCard({ choosable: true });
         const heads = (kind) => wrapper.findAll(`[data-test="intent-line"][data-kind="${kind}"]`).map((el) => [el.find('dt').text(), el.classes().includes('is-more')]);
