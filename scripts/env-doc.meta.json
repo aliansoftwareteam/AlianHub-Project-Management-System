@@ -893,10 +893,6 @@
     "description": "service.name reported on exported spans.",
     "default": "alianhub"
   },
-  "PAYMENTMETHOD": {
-    "group": "billing",
-    "description": "Payment provider used at sign-up (chargebee or paddle)."
-  },
   "PERMISSION_ENFORCEMENT_CACHE_TTL_SECONDS": {
     "group": "security",
     "description": "Seconds a workspace's own permissionEnforcement.mode is cached before the company row is read again; 0 reads it on every guarded request. A failed read inherits the instance default for 5 seconds whatever this is set to.",
