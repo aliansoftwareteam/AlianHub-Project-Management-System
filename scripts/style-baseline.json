@@ -156,7 +156,7 @@
     "frontend/src/components/molecules/Setting/SettingCompanyDetails.vue": { "colours": 1, "legacyClasses": 12 },
     "frontend/src/components/molecules/Setting/SettingFileExtensions.vue": { "colours": 0, "legacyClasses": 2 },
     "frontend/src/components/molecules/Setting/SettingMilestoneStatus.vue": { "colours": 0, "legacyClasses": 2 },
-    "frontend/src/components/molecules/Setting/SettingProjectSkills.vue": { "colours": 1, "legacyClasses": 4 },
+    "frontend/src/components/molecules/Setting/SettingProjectSkills.vue": { "colours": 0, "legacyClasses": 4 },
     "frontend/src/components/molecules/Setting/SettingScreenshotRetention.vue": { "colours": 0, "legacyClasses": 2 },
     "frontend/src/components/molecules/Setting/SettingTaskPriority.vue": { "colours": 0, "legacyClasses": 3 },
     "frontend/src/components/molecules/Setting/SettingTimeReminder.vue": { "colours": 0, "legacyClasses": 4 },
