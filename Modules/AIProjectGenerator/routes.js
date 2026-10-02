@@ -1,5 +1,6 @@
 const ctrl = require('./controller');
 const guideCtrl = require('./guideController');
+const { agentsRefused } = require('../Agents/guard');
 
 exports.init = (app) => {
     /**
@@ -65,7 +66,7 @@ exports.init = (app) => {
      *     summary: Execute an approved plan and create the full project bootstrap
      *     tags: [AI Project Generator]
      */
-    app.post('/api/v1/ai/project/execute', ctrl.execute);
+    app.post('/api/v1/ai/project/execute', agentsRefused('project.create'), ctrl.execute);
 
     /**
      * @swagger
@@ -96,7 +97,7 @@ exports.init = (app) => {
      *     summary: Persist an approved AI task plan into an EXISTING project (AHE-3777)
      *     tags: [AI Project Generator]
      */
-    app.post('/api/v1/ai/project/:projectId/tasks/execute', ctrl.tasksExecute);
+    app.post('/api/v1/ai/project/:projectId/tasks/execute', agentsRefused('tasks.import'), ctrl.tasksExecute);
 
     /**
      * @swagger

@@ -9,7 +9,7 @@ exports.init = (app) => {
     // literal path is never swallowed by the param route.
     app.get('/api/v2/automations/registry', ctrl.getRegistry);
     app.post('/api/v2/automations/compile', ctrl.compileSentence);
-    app.post('/api/v2/automations/draft', aiDraft.draftHandler);
+    app.post('/api/v2/automations/draft', agentsRefused('automation.draft'), aiDraft.draftHandler);
     app.post('/api/v2/automations/backtest', ctrl.backtest);
     app.get('/api/v2/automations', ctrl.listRulesV2);
     app.post('/api/v2/automations', setByPerson('automation.create'), ctrl.createRuleV2);
