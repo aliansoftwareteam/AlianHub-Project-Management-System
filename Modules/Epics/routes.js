@@ -21,7 +21,7 @@ const assigned = projectAsked(async (req, body) => ({ action: 'epic.assign', par
 
 exports.init = (app) => {
     app.post('/api/v2/epics/assign', changesEpics(ofAssignment), assigned, ctrl.assignTask);
-    app.post('/api/v2/epics/:id/recount', changesEpics(ofEpic), ctrl.recountEpic);
+    app.post('/api/v2/epics/:id/recount', changesEpics(ofEpic), updated, ctrl.recountEpic);
     app.post('/api/v2/epics', changesEpics((req) => req.body && req.body.projectId), created, ctrl.createEpic);
     app.get('/api/v2/epics', requireProjectAccess({ mode: READ, projectIds: (req) => req.query && req.query.projectId }), ctrl.listEpics);
     app.put('/api/v2/epics/:id', changesEpics(ofEpic), updated, ctrl.updateEpic);

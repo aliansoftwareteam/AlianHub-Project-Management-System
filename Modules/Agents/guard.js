@@ -284,6 +284,16 @@ const projectAsked = (checksOf) => routeGuard(checksOf, evaluateTaken);
  * its audit row. `refusesAs` is read by the perimeter, which answers before a route is chosen. */
 const agentsRefused = (action) => Object.assign(routeGuard(() => ({ action, params: {} })), { refusesAs: action });
 
+/* For a read that makes what it does not find. An agent's request is marked before anything else on the route to
+ * read alone; where there is nothing to read, the handler answers it through `req.refuseMaking`, as `action` refused. */
+const agentsReadAlone = (action) => {
+    const refused = agentsRefused(action);
+    return Object.assign(withActor((req, res, next) => {
+        req.refuseMaking = () => refused(req, res, () => {});
+        return next();
+    }), { refusesAs: action });
+};
+
 /* What the project update takes from an agent, as its person may: what the project is called and says, when it is
  * due, where the work came from, what is attached to it, and the person's own marks on it. */
 const AGENT_PROJECT_FIELDS = new Set([
@@ -413,4 +423,4 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, projectAsked, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, agentsReadAlone, projectAsked, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };

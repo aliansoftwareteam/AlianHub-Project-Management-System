@@ -1,3 +1,4 @@
+const fs = require('fs');
 const mongoose = require('mongoose');
 const { verifyCompanyMembership } = require('../../Config/jwt');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
@@ -172,12 +173,22 @@ function refuseBeforeWrite(findRefusal) {
     };
 }
 
+const removeQuietly = (filePath) => fs.promises.unlink(filePath).catch(() => {});
+
+/* What this request stored: the fields that follow the file part are read after it is written, and can turn the answer. */
+const discardStored = (req) => Promise.all([req.file, ...[].concat(req.files || [])]
+    .filter((file) => file && file.path)
+    .map((file) => removeQuietly(file.path)));
+
 function refuseUpload(findRefusal) {
     return async (req, res, next) => {
         try {
             const found = req.uploadRefusal || await findRefusal(req);
-            return found ? refuse(res, found.code, found.statusText, found.reason) : next();
+            if (!found) return next();
+            await discardStored(req);
+            return refuse(res, found.code, found.statusText, found.reason);
         } catch (error) {
+            await discardStored(req);
             return refuse(res, 500, error.message);
         }
     };

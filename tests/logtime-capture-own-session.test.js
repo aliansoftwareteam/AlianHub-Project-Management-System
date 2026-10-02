@@ -1,12 +1,17 @@
 process.env.STORAGE_TYPE = 'server';
 
-const mockDb = { sessions: {}, seats: {}, updates: [] };
+const mockDb = { sessions: {}, seats: {}, updates: [], audits: [] };
 const mockUploads = [];
 
 jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: async () => true }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     MongoDbCrudOpration: async (dbName, { type, data }, method) => {
+        if (type === 'audit_logs') {
+            if (method !== 'save') return null;
+            mockDb.audits.push(data);
+            return { _id: 'audit', ...data };
+        }
         const [query] = data;
         if (type === 'company_users') {
             if (query.status === 2) return (mockDb.seats[dbName] || []).includes(String(query.userId)) ? { _id: 'seat' } : null;
@@ -50,6 +55,7 @@ const ME = hex();
 const COLLEAGUE = hex();
 const COMPANY = hex();
 const OTHER_COMPANY = hex();
+const TOKEN = hex();
 const STORAGE_ROOT = path.resolve(__dirname, '..', 'storage');
 const WASABI_TEMP = path.resolve('wasabiUploads');
 const SCREENSHOT = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
@@ -108,6 +114,7 @@ beforeAll(async () => {
     app.use((req, _res, next) => {
         req.uid = ME;
         req.aud = `${COMPANY},${OTHER_COMPANY}`;
+        if (req.headers['x-token-kind']) req.apiToken = { _id: TOKEN, userId: ME, name: 'A token', scopes: ['read', 'write'], ...(req.headers['x-token-kind'] === 'agent' ? { kind: 'agent' } : {}) };
         next();
     });
     routes.init(app);
@@ -126,18 +133,19 @@ beforeEach(() => {
     mockDb.sessions = {};
     mockDb.seats = { [COMPANY]: [ME, COLLEAGUE], [OTHER_COMPANY]: [ME] };
     mockDb.updates = [];
+    mockDb.audits = [];
     mockUploads.length = 0;
 });
 
-const capture = (version, timeSheetId, filePath, type) => (version === 'v2'
+const capture = (version, timeSheetId, filePath, type, headers = {}) => (version === 'v2'
     ? fetch(`${baseURL}/api/v2/timetracker/capture`, {
         method: 'POST',
-        headers: { companyid: COMPANY, 'content-type': 'application/json' },
+        headers: { companyid: COMPANY, 'content-type': 'application/json', ...headers },
         body: base64Body(timeSheetId, filePath, type),
     })
     : fetch(`${baseURL}/api/${version}/timetracker/capture`, {
         method: 'POST',
-        headers: { companyid: COMPANY },
+        headers: { companyid: COMPANY, ...headers },
         body: trackerForm(timeSheetId, filePath, type),
     }));
 
@@ -196,6 +204,43 @@ describe.each(['v2', 'v3', 'v4'])('a %s tracker capture', (version) => {
         expect(res.status).toBe(403);
         expect(mockDb.updates).toHaveLength(0);
         expect(storedFile(filePath)).toBe(false);
+    });
+});
+
+describe.each(['v2', 'v3', 'v4'])('a %s tracker capture sent with a token', (version) => {
+    it('is refused for a token created for an agent before the file is read, and recorded', async () => {
+        const timeSheetId = addSession(ME);
+        const filePath = trackerPath(timeSheetId);
+        const res = await capture(version, timeSheetId, filePath, 'timesheets', { 'x-token-kind': 'agent' });
+
+        expect(res.status).toBe(403);
+        expect(await res.json()).toMatchObject({ status: false, statusText: 'Agents cannot perform timelog.capture' });
+        expect(mockDb.updates).toHaveLength(0);
+        expect(mockUploads).toHaveLength(0);
+        expect(storedFile(filePath)).toBe(false);
+        expect(mockDb.audits.map((row) => [row.action, row.meta.action])).toEqual([['agent.action_refused', 'timelog.capture']]);
+    });
+
+    it('is taken from a person\'s own token as from the person', async () => {
+        const timeSheetId = addSession(ME);
+        const res = await capture(version, timeSheetId, trackerPath(timeSheetId), 'timesheets', { 'x-token-kind': 'personal' });
+
+        expect(res.status).toBe(200);
+        expect(mockDb.updates).toHaveLength(1);
+        expect(mockDb.audits).toHaveLength(0);
+    });
+});
+
+describe('what stands in front of a tracker capture', () => {
+    it('has the refusal of an agent before the file is read', () => {
+        const stacks = {};
+        const keep = (route, ...handlers) => { stacks[route] = handlers; };
+        require('../Modules/LogTime/routes').init({ get: () => {}, post: keep, put: () => {}, patch: () => {}, delete: () => {}, use: () => {} });
+
+        for (const version of ['v2', 'v3', 'v4']) {
+            const names = stacks[`/api/${version}/timetracker/capture`].map((handler) => handler.refusesAs || handler.name);
+            expect(names.slice(0, 2)).toEqual(['timelog.capture', 'multerMiddleware']);
+        }
     });
 });
 
