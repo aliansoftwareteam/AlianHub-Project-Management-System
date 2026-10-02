@@ -65,7 +65,7 @@ import { ref, computed, watch, inject } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 
 import { apiRequest } from '@/services';
 import { isOwnerOrAdmin } from "@/utils/roles";

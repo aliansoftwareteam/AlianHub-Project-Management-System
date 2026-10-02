@@ -192,7 +192,7 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
-import Swal from "sweetalert2";
+import Swal from '@/utils/lazySwal';
 import AppState from "@/components/molecules/AppState/AppState.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";

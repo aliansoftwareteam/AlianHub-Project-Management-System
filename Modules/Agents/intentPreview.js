@@ -10,13 +10,14 @@ const plans = require('./projectSetup');
 const projects = require('./projectCreate');
 const automation = require('./automationPreview');
 const listSetup = require('./listSetupPreview');
+const projectCopy = require('./projectDuplicatePreview');
 const dashboards = require('./dashboardRequests');
 
 // What a waiting change will make, as the lines its card shows (frontend IntentPreview). It is built for one viewer:
 // a project, list, parent task, person or custom field is named only when that viewer may see it, and everything
 // else on a line is the proposal's own text, handed over as text. Fields, a view and a whole plan are the project's own,
 // so for a viewer who cannot open the project they have no preview at all, and neither has a rule (./automationPreview.js),
-// a folder or a list made a sprint (./listSetupPreview.js).
+// a folder or a list made a sprint (./listSetupPreview.js), or a copy of a project (./projectDuplicatePreview.js).
 // A project that is not there yet has no project to open: its card is the proposal's own text, for whoever is shown the proposal.
 // A card for a dashboard is previewed only for a viewer who can open that dashboard (./dashboardRequests.js).
 // A kind of change with no entry in BUILDERS has none.
@@ -237,7 +238,7 @@ const projectPreview = (change, context) => {
     };
 };
 
-const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview, ...listSetup.BUILDERS, [dashboards.ACTION]: dashboards.preview });
+const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview, ...listSetup.BUILDERS, ...projectCopy.BUILDERS, [dashboards.ACTION]: dashboards.preview });
 const BUILDERS = Object.freeze({ ...Object.fromEntries(Object.keys(CREATES).map((action) => [action, createPreview])), ...SETUPS });
 const builderOf = (change) => (change && Object.hasOwn(BUILDERS, change.action) ? BUILDERS[change.action] : null);
 const isSetup = (change) => Boolean(change) && Object.hasOwn(SETUPS, change.action);
@@ -277,7 +278,7 @@ const forProposals = async (companyId, uid, proposals) => {
     const setups = list.flatMap(changesOf).filter(isSetup);
     const tasks = await readableTasks(companyId, uid, [...changes, ...setups]);
     const named = await names.resolver({ companyId, userId: String(uid), projectIds: [] }, {
-        projectIds: [...[...changes, ...setups].map((change) => idOf(paramsOf(change).projectId)), ...[...tasks.values()].map((task) => task.projectId)].filter(Boolean),
+        projectIds: [...[...changes, ...setups].map((change) => idOf(paramsOf(change).projectId)), ...setups.map(projectCopy.sourceIdOf), ...[...tasks.values()].map((task) => task.projectId)].filter(Boolean),
         sprintIds: changes.map((change) => idOf(paramsOf(change).sprintId)).filter(Boolean),
         userIds: [...changes.flatMap((change) => peopleOf(CREATES[change.action].fields(paramsOf(change)))), ...setups.flatMap((change) => looksOf(change).flatMap((look) => peopleOf({ AssigneeUserId: look.assigneeIds }))), ...setups.flatMap(valuesIn).flatMap((entry) => peopleIn(entry.value))],
     });

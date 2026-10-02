@@ -130,7 +130,7 @@
 
 <script setup>
 // PACKAGES
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import { computed, defineProps, inject, ref, nextTick,onMounted, watch } from 'vue';

@@ -62,6 +62,7 @@ const ROUTES = Object.freeze({
     folderCreate: { routes: () => require('../Sprints/routes'), method: 'post', path: '/api/v1/folder' },
     folderUpdate: { routes: () => require('../Sprints/routes'), method: 'patch', path: '/api/v1/folder/:id' },
     sprintScrum: { routes: () => require('../Sprints/routes'), method: 'post', path: '/api/v2/sprints/scrum' },
+    projectDuplicate: { routes: () => require('../ProjectDuplicate/routes'), method: 'post', path: '/api/v2/projects/:id/duplicate' },
     dashboardRead: { routes: () => require('../UserDashboard/routes'), method: 'get', path: '/api/v1/dashboards/:id' },
     dashboardCreate: { routes: () => require('../UserDashboard/routes'), method: 'post', path: '/api/v1/dashboards' },
     dashboardCards: { routes: () => require('../UserDashboard/routes'), method: 'put', path: '/api/v1/dashboards/:id/cards' },
@@ -90,14 +91,15 @@ const chainOf = (name) => {
     return chains.get(name);
 };
 
-/* What that route answers to `who`, with the status it set and no HTTP around it. */
-const answerOf = (name, { companyId, who, params = {}, body = {} }) => runAs(who.mark, () => new Promise((resolve, reject) => {
+/* What that route answers to `who`, with the status it set and no HTTP around it. `set` is what the server itself
+ * puts on the request, which no client can send. */
+const answerOf = (name, { companyId, who, params = {}, body = {}, set = {} }) => runAs(who.mark, () => new Promise((resolve, reject) => {
     const chain = chainOf(name);
     const res = { statusCode: 200 };
     res.status = (code) => { res.statusCode = code; return res; };
     res.json = (sent) => { resolve({ code: res.statusCode, body: sent }); return res; };
     res.send = res.json;
-    const req = { uid: who.uid, aud: String(companyId), headers: { companyid: String(companyId) }, params, query: {}, body };
+    const req = { ...set, uid: who.uid, aud: String(companyId), headers: { companyid: String(companyId) }, params, query: {}, body };
     const step = (at) => Promise.resolve().then(() => chain[at](req, res, () => step(at + 1))).catch(reject);
     step(0);
 }));

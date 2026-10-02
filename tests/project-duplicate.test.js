@@ -808,6 +808,10 @@ describe('the request', () => {
         expect(await bad({ name: 'Launch (copy)', include: { ...STRUCTURE_ONLY, comments: true } })).toMatch(/include\.comments/);
     });
 
+    it('cannot be asked, in the body, for a copy that is the caller\'s alone', async () => {
+        expect(await bad({ name: 'Launch (copy)', include: STRUCTURE_ONLY, onlyCaller: true })).toMatch(/onlyCaller/);
+    });
+
     it('trims the name', async () => {
         const res = await run(DUPLICATE, { id: launch.id, body: { name: '  Launch two  ', include: STRUCTURE_ONLY } });
         expect(res.body.data.project.ProjectName).toBe('Launch two');

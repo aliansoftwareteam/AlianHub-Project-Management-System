@@ -1,6 +1,6 @@
 import { computed, inject } from "vue";
 import { useCustomComposable } from ".";
-import Swal from "sweetalert2";
+import Swal from '@/utils/lazySwal';
 import { apiRequest } from "@/services";
 import * as env from '@/config/env';
 import { useRouter } from "vue-router";

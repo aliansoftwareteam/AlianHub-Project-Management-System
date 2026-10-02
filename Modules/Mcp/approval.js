@@ -10,6 +10,7 @@ const manageTools = require('./manageTools');
 const workTools = require('./workTools');
 const goalTokens = require('../Goals/goalTokens');
 const { ACTION: NEW_PROJECT } = require('../Agents/projectCreate');
+const { ACTION: PROJECT_COPY } = require('../Agents/projectDuplicate');
 const dashboards = require('../Agents/dashboardRequests');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
@@ -22,10 +23,12 @@ const GATE_OWNER_ADMIN = 'owner_admin';
 
 const refused = (error, status = 403) => ({ error, status });
 
-/* A new project sits in no project yet, and a dashboard in none at all: like a goal each is the workspace's, which a token kept to some projects is refused. */
-const WORKSPACE_WIDE = Object.freeze([NEW_PROJECT, dashboards.ACTION]);
+/* A new project sits in no project yet, and a dashboard in none at all: like a goal each is the workspace's, which a
+ * token kept to some projects is refused. So is a copy of a project, which also needs the project it is copied from to be one that can be opened. */
+const WORKSPACE_WIDE = Object.freeze([NEW_PROJECT, PROJECT_COPY, dashboards.ACTION]);
 const targetOf = (params = {}, action = '') => {
     const target = WORKSPACE_WIDE.includes(action) ? { ...goalTokens.WRITE_TARGET } : {};
+    if (action === PROJECT_COPY) target.projectId = String(params.sourceProjectId || '');
     if (params.taskId) target.taskId = String(params.taskId);
     if (params.relatedTaskId) target.relatedTaskId = String(params.relatedTaskId);
     if (params.projectId) target.projectId = String(params.projectId);
