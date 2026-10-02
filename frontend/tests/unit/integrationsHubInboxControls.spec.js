@@ -47,6 +47,13 @@ describe('the controls of an email inbox on the Integrations screen', () => {
         expect(wrapper.find('[data-test="inbox-readonly"]').text()).toBe(en.IntegrationsHub.email_change_by);
     });
 
+    it('says in one line when mail is no longer being filed, and nothing while it is', async () => {
+        const wrapper = await openHub([inbox({ _id: 'i1', canManage: true, filing: false }), inbox({ _id: 'i2', canManage: true, filing: true }), inbox({ _id: 'i3', canManage: true })]);
+        const said = wrapper.findAll('[data-test="inbox-not-filing"]');
+        expect(said).toHaveLength(1);
+        expect(said[0].text()).toBe(en.IntegrationsHub.email_not_filing);
+    });
+
     it.each([403, 404])('says why when the server answers %s to a change', async (status) => {
         const wrapper = await openHub([inbox({ canManage: true })], refusedWith(status));
         await wrapper.find('[data-test="inbox-toggle"]').trigger('click');

@@ -5810,6 +5810,7 @@
     "IntegrationsHub.email_help_title": "How to connect your email provider",
     "IntegrationsHub.email_intro": "Create a unique email address for a project. Anything sent to it becomes a task — great for forwarding requests, bug reports or supplier emails.",
     "IntegrationsHub.email_none": "No inboxes yet. Pick a project above to create one.",
+    "IntegrationsHub.email_not_filing": "Mail sent here is not being filed: the person who made this inbox can no longer open its project or list.",
     "IntegrationsHub.email_note": "Tasks land in the project's first list, created as the inbox owner.",
     "IntegrationsHub.email_pick_project": "Project",
     "IntegrationsHub.email_select": "Select a project…",

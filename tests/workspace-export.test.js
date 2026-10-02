@@ -106,7 +106,7 @@ describe('running a workspace export', () => {
         await runWith();
         const reads = calls('find');
         expect(reads.every(([companyId]) => companyId === COMPANY)).toBe(true);
-        expect(reads[0][1].data[0]).toMatchObject({ deletedStatusKey: { $nin: [1] } });
+        expect(reads[0][1].data[0]).toEqual({ deletedStatusKey: { $nin: [1] }, $or: [{ isPersonal: { $ne: true } }, { personalOwner: OWNER }] });
         expect(reads[1][1].data[0].ProjectID.$in.map(String)).toEqual([PROJECT_A, PROJECT_B]);
         const csv = fs.promises.writeFile.mock.calls[0][1];
         expect(csv).toContain('Alpha');
