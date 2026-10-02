@@ -285,14 +285,14 @@ function convert() {
 .convert__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: var(--scrim);
     z-index: 1200;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .convert__dialog {
-    background: #fff;
+    background: var(--surface);
     width: min(440px, 92vw);
     border-radius: 10px;
     padding: 18px 20px;
@@ -301,38 +301,38 @@ function convert() {
     flex-direction: column;
 }
 .convert__head { margin-bottom: 12px; }
-.convert__close { color: #9a9a9a; }
-.convert__close:hover { color: #e84a4a; }
+.convert__close { color: var(--ink-2); }
+.convert__close:hover { color: var(--danger); }
 .convert__label {
     font-size: 12px;
     font-weight: 600;
-    color: #5b5b6b;
+    color: var(--ink-label);
     margin: 10px 0 4px;
 }
 .convert__input {
     width: 100%;
-    border: 1px solid #e0e0e6;
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     padding: 8px 10px;
     font-size: 13px;
-    color: #2b2b2b;
+    color: var(--ink);
     outline: none;
-    background: #fff;
+    background: var(--surface);
 }
 .convert__input:focus { border-color: #5b5b6b; }
 .convert__error {
-    color: #e84a4a;
+    color: var(--danger);
     font-size: 11px;
     margin-top: 4px;
 }
 .convert__actions { margin-top: 18px; gap: 10px; }
 .convert__btn-ghost {
-    background: #f0f0f3;
+    background: var(--fill);
     border: none;
     border-radius: 6px;
     padding: 8px 16px;
     font-size: 13px;
-    color: #3a3a3a;
+    color: var(--ink-label);
     cursor: pointer;
 }
 .convert__btn-primary {

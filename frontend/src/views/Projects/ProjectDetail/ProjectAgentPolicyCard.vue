@@ -36,7 +36,7 @@ import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { AGENTS_CHANGED_EVENT, POLICY_CHANGE } from "@/views/Ai/agentFeed";
-import { useProjectChanged } from "@/views/Projects/liveProjects";
+import { useStoredProjectPart } from "@/views/Projects/liveProjects";
 
 defineOptions({ name: "ProjectAgentPolicyCard" });
 
@@ -136,7 +136,7 @@ watch(() => socket?.value, (next, previous) => {
     next?.on?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
 }, { immediate: true });
 onBeforeUnmount(() => socket?.value?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged));
-useProjectChanged(() => props.projectId, follow);
+useStoredProjectPart(() => props.projectId, "agentPolicy", saved, follow);
 
 async function save(key) {
     busy.value = true;

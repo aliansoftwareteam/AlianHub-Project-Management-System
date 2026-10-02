@@ -56,6 +56,9 @@ const ROUTES = Object.freeze({
     projectUpdate: { routes: () => require('../Project/routes'), method: 'put', path: '/api/v1/project/:id' },
     projectCreate: { routes: () => require('../createProject/routes'), method: 'post', path: '/api/v1/createproject' },
     statusInsert: { routes: () => require('../settings/templates/routes'), method: 'put', path: '/api/v1/setting/taskStatus' },
+    folderCreate: { routes: () => require('../Sprints/routes'), method: 'post', path: '/api/v1/folder' },
+    folderUpdate: { routes: () => require('../Sprints/routes'), method: 'patch', path: '/api/v1/folder/:id' },
+    sprintScrum: { routes: () => require('../Sprints/routes'), method: 'post', path: '/api/v2/sprints/scrum' },
 });
 
 const refuse = (message) => new tools.DeterministicError(message);

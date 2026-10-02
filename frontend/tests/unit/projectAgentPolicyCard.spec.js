@@ -7,11 +7,13 @@ import path from 'node:path';
 const { apiRequest, toast } = vi.hoisted(() => ({ apiRequest: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('@/composable/index.js', () => ({ useCustomComposable: () => ({ checkPermission: () => 0 }) }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: (key) => key }) }));
 
 import ProjectAgentPolicyCard from '@/views/Projects/ProjectDetail/ProjectAgentPolicyCard.vue';
-import { GATHER_MS } from '@/views/Projects/liveProjects';
+import { createStore } from 'vuex';
+import { replaceProject } from '@/store/ProjectData/mutations';
 import en from '@/locales/en';
 
 const URL = '/api/v2/agents/project-policy/p1';
@@ -114,34 +116,32 @@ describe('ProjectAgentPolicyCard', () => {
         expect(listeners.agentsChanged).toBeUndefined();
     });
 
-    it('follows a choice made for this project in another tab or by another person', async () => {
-        const listeners = {};
-        const socket = { on: vi.fn((event, handler) => { listeners[event] = handler; }), off: vi.fn((event, handler) => { if (listeners[event] === handler) delete listeners[event]; }) };
-        let data = answer();
-        apiRequest.mockImplementation(() => ok(data));
-        vi.useFakeTimers();
-        try {
-            const wrapper = mount(ProjectAgentPolicyCard, { props: { projectId: 'p1' }, global: { mocks: { $t: (key) => key }, provide: { $socket: ref(socket) } } });
-            await flushPromises();
-            expect(checked(wrapper)).toEqual(['done-approval', 'connected-single_task']);
+    it('follows a choice made for this project in another tab or by another person, and its own save costs no second read', async () => {
+        const held = { done: 'approval', connected: 'single_task' };
+        apiRequest.mockImplementation((type, url, body) => ok(answer({ project: Object.assign(held, body || {}) })));
+        const store = createStore({
+            modules: { projectData: { namespaced: true, state: () => ({ allProjects: { data: [{ _id: 'p1' }, { _id: 'p2' }] } }), getters: { allProjects: (state) => state.allProjects }, mutations: { replaceProject } } }
+        });
+        const wrapper = mount(ProjectAgentPolicyCard, { props: { projectId: 'p1' }, global: { plugins: [store], mocks: { $t: (key) => key } } });
+        await flushPromises();
+        expect(checked(wrapper)).toEqual(['done-approval', 'connected-single_task']);
 
-            listeners.projectChanged({ kind: 'changed', companyId: 'c1', projectId: 'p2' });
-            await vi.advanceTimersByTimeAsync(GATHER_MS);
-            await flushPromises();
-            expect(apiRequest).toHaveBeenCalledTimes(1);
+        store.commit('projectData/replaceProject', { _id: 'p2', agentPolicy: { done: 'never', connected: 'propose_all' } });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(1);
 
-            data = answer({ project: { done: 'never', connected: 'propose_all' } });
-            listeners.projectChanged({ kind: 'changed', companyId: 'c1', projectId: 'p1' });
-            await vi.advanceTimersByTimeAsync(GATHER_MS);
-            await flushPromises();
-            expect(apiRequest).toHaveBeenCalledTimes(2);
-            expect(checked(wrapper)).toEqual(['done-never', 'connected-propose_all']);
+        Object.assign(held, { done: 'never', connected: 'propose_all' });
+        store.commit('projectData/replaceProject', { _id: 'p1', agentPolicy: { done: 'never', connected: 'propose_all', updatedBy: 'u2' } });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(2);
+        expect(checked(wrapper)).toEqual(['done-never', 'connected-propose_all']);
 
-            wrapper.unmount();
-            expect(listeners.projectChanged).toBeUndefined();
-        } finally {
-            vi.useRealTimers();
-        }
+        await radio(wrapper, 'done-yes').setValue(true);
+        await flushPromises();
+        const asked = apiRequest.mock.calls.length;
+        store.commit('projectData/replaceProject', { _id: 'p1', agentPolicy: { done: 'yes', connected: 'propose_all', updatedBy: 'u1' } });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(asked);
     });
 
     it('shows the reason when the settings cannot be read, and no choices', async () => {

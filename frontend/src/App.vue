@@ -333,13 +333,6 @@ async function getFirebaseData() {
                     logged.value = true;
                     console.error("ERROR in setUsers: ", error);
                 }); 
-                if (getters['ToursData/Tours'] && !(getters['ToursData/Tours'])?.length) {
-                      dispatch('ToursData/getTours',userData.tour)
-                         .catch((error) => {
-                         console.error('ERROR in getTours:', error);
-                         });
-                      } 
-
 
                 if(getters['settings/rules'] && !getters['settings/rules'].length) {
                     dispatch("settings/setRules", companyId.value).then(() => {

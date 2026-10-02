@@ -29,7 +29,7 @@
             ><ShellIcon name="plus" :size="13" /> {{ $t('TaskPanel.time_add') }}</button>
         </div>
 
-        <form v-if="formOpen" class="ah-time__form" :aria-label="form.timeSheetId ? $t('TaskPanel.time_edit_entry') : $t('TaskPanel.time_add')" @submit.prevent="submit">
+        <form v-if="formOpen" class="ah-time__form" novalidate :aria-label="form.timeSheetId ? $t('TaskPanel.time_edit_entry') : $t('TaskPanel.time_add')" @submit.prevent="submit">
             <div class="ah-time__grid">
                 <label class="ah-time__field">
                     <span class="ah-time__caption">{{ $t('TaskPanel.time_date') }}</span>
@@ -45,7 +45,11 @@
                 </label>
                 <label class="ah-time__field">
                     <span class="ah-time__caption">{{ $t('TaskPanel.time_minutes') }}</span>
-                    <input v-model.number="form.minutes" type="number" min="0" max="59" step="5" class="ah-time__input" data-test="time-minutes" />
+                    <input
+                        v-model.number="form.minutes" type="number" min="0" max="59" class="ah-time__input" data-test="time-minutes"
+                        @keydown.up.prevent="form.minutes = nudgedMinutes(form.minutes, 1)"
+                        @keydown.down.prevent="form.minutes = nudgedMinutes(form.minutes, -1)"
+                    />
                 </label>
             </div>
             <label class="ah-time__field">
@@ -113,7 +117,7 @@ import { useGetterFunctions } from "@/composable";
 import { useEscapeLayer } from "@/composable/useEscapeLayer";
 import { timeLogFailureKey } from "@/composable/timeLogFailure";
 import TaskTimerChip from "./TaskTimerChip.vue";
-import { formatMinutes, emptyTimeForm, timeFormFromEntry, timeFormProblem, manualLogBody, deleteLogBody } from "./taskTime";
+import { formatMinutes, emptyTimeForm, timeFormFromEntry, timeFormProblem, nudgedMinutes, manualLogBody, deleteLogBody } from "./taskTime";
 
 defineOptions({ name: "TaskTimeSection" });
 

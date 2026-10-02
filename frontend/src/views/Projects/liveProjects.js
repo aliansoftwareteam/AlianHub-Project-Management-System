@@ -1,4 +1,4 @@
-import { inject, onBeforeUnmount, unref, watch } from "vue";
+import { onBeforeUnmount, unref, watch } from "vue";
 import { useStore } from "vuex";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
@@ -115,25 +115,18 @@ export function useLiveProjects(socket, companyId) {
     });
 }
 
-/* For a card that reads a project's settings through its own route: `follow` runs once a burst of changes to
- * that project has passed. */
-export function useProjectChanged(projectId, follow) {
-    const socket = inject("$socket", null);
-    let timer = null;
-
-    const onChanged = (change) => {
+/* For a card that shows part of a project through its own route. The stored project follows `projectChanged`;
+ * `follow` runs when it comes to hold something else under `field` than the card shows. What the card saved
+ * itself it already shows, so its own save costs no second read. */
+export function useStoredProjectPart(projectId, field, shown, follow) {
+    const store = useStore();
+    const stored = () => {
         const id = String(projectId() || "");
-        if (!id || String(change?.projectId || "") !== id) return;
-        clearTimeout(timer);
-        timer = setTimeout(follow, GATHER_MS);
+        const project = (store?.getters["projectData/allProjects"]?.data || []).find((item) => String(item._id) === id);
+        return project?.[field] || null;
     };
-
-    watch(() => socket?.value, (next, previous) => {
-        previous?.off?.(PROJECT_CHANGED_EVENT, onChanged);
-        next?.on?.(PROJECT_CHANGED_EVENT, onChanged);
-    }, { immediate: true });
-    onBeforeUnmount(() => {
-        clearTimeout(timer);
-        socket?.value?.off?.(PROJECT_CHANGED_EVENT, onChanged);
+    watch(() => JSON.stringify(Object.keys(shown).map((key) => stored()?.[key])), () => {
+        const part = stored();
+        if (part && Object.keys(shown).some((key) => part[key] !== undefined && part[key] !== shown[key])) follow();
     });
 }

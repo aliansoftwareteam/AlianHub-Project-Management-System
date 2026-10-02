@@ -72,7 +72,7 @@
                         <td>
                             <div class="al__event">
                                 <span v-if="isRefusal(row)" class="al__blocked">{{ $t('Audit.blocked_by_policy') }}</span>
-                                <span class="ah-mono al__action">{{ eventAction(row) }}</span>
+                                <span class="al__action" :class="{ 'ah-mono': !plainAction(row) }" :title="plainAction(row) ? eventAction(row) : null">{{ plainAction(row) || eventAction(row) }}</span>
                                 <span v-if="row.entityName || row.entityId" class="al__entity">{{ row.entityName || row.entityId }}</span>
                             </div>
                             <div v-if="showsHashedIds(row) && row.entityId && row.entityName && row.entityName !== row.entityId" class="ah-mono ah-small al__id" data-test="entity-id" :title="$t('Audit.names_not_checked')">{{ row.entityId }}</div>
@@ -126,6 +126,7 @@ import { apiRequest } from "@/services";
 import { useGetterFunctions } from "@/composable";
 import * as env from "@/config/env";
 import { taintSourcesLine, taintSourcesOf } from "@/views/Ai/taintText";
+import { agentActionLabel } from "@/views/Ai/agentActionLabels";
 
 defineOptions({ name: "AuditLogPage" });
 
@@ -177,6 +178,7 @@ const actorName = (row) => {
 };
 const initial = (row) => actorName(row).charAt(0).toUpperCase();
 const eventAction = (row) => (row.meta && row.meta.action) || row.action;
+const plainAction = (row) => (isAgent(row) && row.meta.action ? agentActionLabel(t, row.meta.action) : "");
 const isRefusal = (row) => REFUSALS.includes(row.action);
 const taintTitle = (row) => taintSourcesLine(t, taintSourcesOf(row.meta));
 const showsIntegrity = (row) => Boolean(chainOn.value && row.integrity && row.integrity.state in INTEGRITY_CHIPS);

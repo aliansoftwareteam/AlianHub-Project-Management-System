@@ -116,6 +116,12 @@ export const replaceProject = (state, project) => {
     projects[index] = { ...project, id: id ?? project._id, isExpanded, sprintsObj, sprintsfolders };
 }
 
+/* What the limits route answered for a project, so the header chip does not wait for `projectChanged` after a save here. */
+export const noteAgentLimits = (state, { projectId, limits }) => {
+    const project = (state.allProjects?.data || []).find((x) => String(x._id) === String(projectId));
+    if(project) project.agentLimits = { ...project.agentLimits, ...limits };
+}
+
 export const mutateCurrentProjectTasks = (state, payload) => {
     if(JSON.stringify(state.currentProjectTasks) !== JSON.stringify(payload)) {
         state.currentProjectTasks = payload;
