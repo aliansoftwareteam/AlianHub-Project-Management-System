@@ -208,10 +208,18 @@ exports.addSprintFun = (req) => {
  * `prevData.id` renamed nothing whenever a client handed the server its own object back,
  * and answered success anyway. History names the sprint's stored name, not `prevData`.
  */
+const LIST_NAME_LIMIT = 50;
+
 exports.editSprintName = (req, res) => {
     try {
-        const {companyId, projectId, sprintName, userData, mainChat = false} = req.body;
+        const { projectId, userData, mainChat = false } = req.body;
+        const companyId = String(req.headers['companyid'] || '');
         const { id } = req.params;
+        const sprintName = typeof req.body.sprintName === 'string' ? req.body.sprintName.trim() : '';
+        if (!sprintName || sprintName.length > LIST_NAME_LIMIT) {
+            res.status(400).send({ status: false, statusText: `A name of 1 to ${LIST_NAME_LIMIT} characters is required.` });
+            return;
+        }
 
         const object = {
             type: SCHEMA_TYPE.SPRINTS,
@@ -327,6 +335,8 @@ exports.deleteChannel = (req, res) => {
     }
 };
 
+const SPRINT_UPDATE_FAILED = 'The sprint could not be updated.';
+
 const refuseListWrite = (res, error) => {
     if (!(error instanceof ListWriteError)) return false;
     res.status(error.statusCode).json({ status: false, statusText: error.message, message: error.message });
@@ -347,7 +357,7 @@ exports.updateSprint = async (req, res) => {
             body: { ...req.body, companyId, projectId, projectData: { ...(req.body.projectData || {}), id: projectId }, updateObject: update },
         }));
     } catch (error) {
-        if (!refuseListWrite(res, error)) res.json(error);
+        if (!refuseListWrite(res, error)) res.status(500).json({ status: false, statusText: SPRINT_UPDATE_FAILED });
     }
 };
 
@@ -550,16 +560,19 @@ exports.updateSprintFun = (req) => {
                     return;
                 }
                 logger.error(`ERROR in update sprint function => ${error}`);
+                // After the answer above this is a no-op; before it, the caller would otherwise wait for ever.
+                reject({ status: false, statusText: SPRINT_UPDATE_FAILED });
             })
         } catch (error) {
             logger.error(`ERROR ${error.message}`);
-            reject({ status: false, statusText: error.message });
+            reject({ status: false, statusText: SPRINT_UPDATE_FAILED });
         }
     });
 };
 
 /* Other tabs learn only that the company's folders changed, and read them again: see socket/controller/folderSocket.js. */
 const announceFolders = (type, companyId) => socketEmitter.emit(type, { type, companyId, module: 'folders' });
+exports.announceFolders = announceFolders;
 
 const recordFolderHistory = (companyId, projectId, message, userData) => HandleHistoryref
     .HandleHistory('project', companyId, projectId, null, { message, key: 'Create_Folder' }, userData)
@@ -567,23 +580,27 @@ const recordFolderHistory = (companyId, projectId, message, userData) => HandleH
         logger.error("ERROR in handle history", error.message);
     });
 
+exports.addFolderFun = async ({ companyId, projectId, folderName, parentFolderId }) => {
+    const parent = await parentForNewFolder(companyId, projectId, parentFolderId);
+    const doc = await MongoQ.MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.FOLDERS,
+        data: {
+            name: folderName,
+            projectId : new mongoose.Types.ObjectId(projectId),
+            deletedStatusKey : 0,
+            ...(parent ? { parentFolderId: parent._id } : {}),
+        },
+    }, "save");
+    announceFolders('insert', companyId);
+    return { doc, parent };
+};
+
 exports.addFolder = async (req, res) => {
     try {
         const {projectId, folderName, userData, mainChat = false} = req.body;
         const companyId = String(req.headers['companyid'] || '');
-        const parent = await parentForNewFolder(companyId, projectId, req.body.parentFolderId);
-
-        const doc = await MongoQ.MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.FOLDERS,
-            data: {
-                name: folderName,
-                projectId : new mongoose.Types.ObjectId(projectId),
-                deletedStatusKey : 0,
-                ...(parent ? { parentFolderId: parent._id } : {}),
-            },
-        }, "save");
+        const { doc, parent } = await exports.addFolderFun({ companyId, projectId, folderName, parentFolderId: req.body.parentFolderId });
         res.send({status: true, statusText: "Folder added successfully",data:doc});
-        announceFolders('insert', companyId);
         if(mainChat) return;
 
         notifyFolderCreated({ companyId, projectId, folderName, actorId: req.uid })

@@ -113,7 +113,7 @@
             </div>
         </section>
 
-        <section class="ah-card">
+        <section ref="lookSection" class="ah-card" tabindex="-1" data-test="look">
             <div class="ah-card__body ms__theme">
                 <div>
                     <h2 class="ah-h3">{{ $t('Settings.theme') }}</h2>
@@ -155,7 +155,9 @@
                     </button>
                 </div>
             </div>
+            <AccentPicker />
             <DesignVariantPicker />
+            <NavModePicker />
         </section>
 
         <section class="ah-card" data-test="keyboard-prefs">
@@ -266,12 +268,14 @@
 <script setup>
 import { ref, inject, computed, onMounted, reactive } from "vue";
 import { useStore } from "vuex";
+import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import * as env from "@/config/env";
 import timeZoneOption from "./timezoneArray.js";
 import languageOptions from "@/utils/languagesName.json";
 import { useGetterFunctions, languageTranslateHelper } from "@/composable";
+import { switchLocale } from "@/locales/main";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
 import { unitCapacity as cleanUnitCapacity } from "@/views/Projects/WorkloadView/workloadUnits";
 import { storageQueryBuilder, generateFileName } from "@/utils/storageQueryBuild.js";
@@ -283,7 +287,9 @@ import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import CroppingTool from "@/components/atom/CroppingTool/CroppingTool.vue";
 import AhSwitch from "@/components/molecules/Setting/AhSwitch.vue";
+import AccentPicker from "./AccentPicker.vue";
 import DesignVariantPicker from "./DesignVariantPicker.vue";
+import NavModePicker from "./NavModePicker.vue";
 import AskMemoryButton from "@/views/Ai/AskMemoryButton.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useAgentPreferences } from "@/views/Ai/useAgentPreferences";
@@ -291,11 +297,13 @@ import { DECLINE_REASONS } from "@/views/Ai/episodeText";
 
 defineOptions({ name: "MySettingsView" });
 
-const { t, locale, setLocaleMessage } = useI18n();
+const { t } = useI18n();
 const $toast = useToast();
+const openAtSection = useRoute()?.query?.section;
+const lookSection = ref(null);
 const { getters, commit } = useStore();
 const { getUser } = useGetterFunctions();
-const { selectedLanguageCode, changeLanguage } = languageTranslateHelper();
+const { selectedLanguageCode } = languageTranslateHelper();
 const userId = inject("$userId");
 
 const DEFAULT_HOURS = { days: [1, 2, 3, 4, 5], start: "09:30", end: "18:00", capacity: 8 };
@@ -438,14 +446,13 @@ async function uploadPhotoIfChanged() {
 async function applyLanguage() {
     const previous = localStorage.getItem("language");
     if (selectedLanguageCode.value === previous) return;
-    const messages = await changeLanguage(selectedLanguageCode.value);
-    if (!messages) {
+    try {
+        await switchLocale(selectedLanguageCode.value);
+    } catch (error) {
         selectedLanguageCode.value = previous;
         throw new Error(t("Toast.Language_not_updated!"));
     }
     localStorage.setItem("language", selectedLanguageCode.value);
-    locale.value = selectedLanguageCode.value;
-    setLocaleMessage(selectedLanguageCode.value, messages);
 }
 
 async function saveChanges() {
@@ -555,6 +562,10 @@ onMounted(() => {
     init();
     loadSessions();
     agentPrefs.load();
+    if (openAtSection === "look" && lookSection.value) {
+        lookSection.value.scrollIntoView({ block: "start" });
+        lookSection.value.focus({ preventScroll: true });
+    }
 });
 </script>
 

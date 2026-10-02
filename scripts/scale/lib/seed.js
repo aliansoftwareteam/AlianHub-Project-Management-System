@@ -162,4 +162,4 @@ async function seedScale({ tasks: requested, adapter = require('./adapter'), log
     return { companyId: db.companyId, projectId: String(project._id), ownerId, created, inserted, generated, counters, lists: lists.map((list) => ({ id: String(list._id), name: list.name })) };
 }
 
-module.exports = { seedScale, taskCountFrom };
+module.exports = { seedScale, taskCountFrom, writeCounters };

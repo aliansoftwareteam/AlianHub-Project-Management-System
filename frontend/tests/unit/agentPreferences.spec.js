@@ -7,7 +7,7 @@ const { apiRequest, apiRequestWithoutCompnay } = vi.hoisted(() => ({ apiRequest:
 
 vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => `t:${key}` } } }));
-vi.mock('@/components/organisms/Shell/shellState', () => ({ shellState: { theme: 'light', agentsRunning: 0 }, applyTheme: vi.fn() }));
+vi.mock('@/components/organisms/Shell/shellState', () => ({ shellState: { theme: 'light', agentsRunning: 0 }, applyTheme: vi.fn(), resolveContrast: () => 'standard' }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
 vi.mock('@/components/atom/SpinnerComp/SpinnerComp.vue', () => ({ default: { name: 'SpinnerComp', render: () => null } }));
 vi.mock('@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue', () => ({ default: { name: 'WasabiImage', render: () => null } }));

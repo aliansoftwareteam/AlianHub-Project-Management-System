@@ -267,7 +267,7 @@ async function decide({ companyId, taskId, trigger = 'create', depth = 0 }) {
 const triggerOf = (envelope) => {
     if (!envelope || !envelope.entity || envelope.entity.kind !== 'task' || !envelope.companyId) return null;
     if (envelope.type === 'task.created') return 'create';
-    if (envelope.actor && envelope.actor.kind === 'automation') return null;
+    if (envelope.actor && ['automation', 'import'].includes(envelope.actor.kind)) return null;
     const changed = Array.isArray(envelope.changedFields) ? envelope.changedFields : [];
     return changed.some((field) => WATCHED_FIELDS.includes(field)) ? 'change' : null;
 };

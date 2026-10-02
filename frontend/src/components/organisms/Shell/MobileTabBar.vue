@@ -81,6 +81,7 @@ import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
 import { useGetterFunctions } from "@/composable/index.js";
 import { useAuth } from "@/services";
 import { useNavItems } from "./navItems";
+import { PHONE_TABS } from "./navMode";
 import { shellState, openPanel, toggleTheme } from "./shellState";
 import { openQuickCreate } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 import { useInboxUnread } from "./inboxUnread";
@@ -90,7 +91,7 @@ const userId = inject("$userId");
 const route = useRoute();
 const { getUser } = useGetterFunctions();
 const { logOut } = useAuth();
-const { rail, more, isActive } = useNavItems(companyId);
+const { rail, more, isActive, simple } = useNavItems(companyId);
 
 const sheet = ref(false);
 watch(() => route.fullPath, () => { sheet.value = false; });
@@ -99,8 +100,8 @@ const { unread, badge } = useInboxUnread();
 
 // Inbox is the phone's triage surface, so it takes Planner's slot; Planner's week grid
 // needs a wide screen and stays one tap further away in More.
-const PRIMARY = ["home", "inbox", "chat", "ai"];
-const tabs = computed(() => rail.value.filter((i) => PRIMARY.includes(i.key)).slice(0, 4));
+const primary = computed(() => (simple.value ? PHONE_TABS.simple : PHONE_TABS.full));
+const tabs = computed(() => rail.value.filter((i) => primary.value.includes(i.key)).slice(0, 4));
 const overflowRail = computed(() => rail.value.filter((i) => !tabs.value.includes(i)));
 const me = computed(() => getUser(userId.value) || {});
 const logout = () => logOut({ islogOut: true });

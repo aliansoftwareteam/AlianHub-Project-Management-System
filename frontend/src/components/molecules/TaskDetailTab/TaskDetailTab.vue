@@ -21,7 +21,7 @@
             <Description
                 v-if="show.description && checkPermission('task.task_description',projectData?.isGlobalPermission) !== null && checkPermission('task.task_description',projectData?.isGlobalPermission) !== undefined && Object.keys(projectData).length > 0"
                 :isShowAi="canUseAi({ project: projectData, permitted: checkPermission('task.task_description',projectData?.isGlobalPermission) == true })"
-                :description="task?.descriptionBlock ? task.descriptionBlock : task.description"
+                :description="taskDescription"
                 :editPermission="checkPermission('task.task_description',projectData?.isGlobalPermission)"
                 :minlength="10"
                 :projectData="projectData"
@@ -51,6 +51,7 @@
                 class="mt-1"
                 @open="$emit('openDoc', $event)"
             />
+            <TaskLinks v-if="show.linkedDocs" :links="task.links" />
             <EpicPicker
                 v-if="show.epic"
                 :task="task"
@@ -121,7 +122,7 @@
         @closeSidebar="handleCloseSidebar"
         :componentDetail="componentDetail && Object.keys(componentDetail).length ? componentDetail : {}"
         :customFieldObject="componentDetail && Object.keys(componentDetail).length ? customFieldObject : {}"
-        :isCustomField="isCustomField"
+        v-model:isCustomField="isCustomField"
         @handleClose="handleClose()"
     />
     <PromptSidebar v-if="isOpenPromptDeatil" @closePrompt="isOpenPromptDeatil = false" :selectedPrompt="selectedPrompt" @closeMainSidebar="isOpenPromptDeatil = false" :project="projectData" :task="task" />
@@ -141,6 +142,8 @@ import CheckListComponent from '@/components/molecules/CheckList/CheckList.vue'
 import SubTasks from '@/components/organisms/SubTasks/SubTasks.vue'
 import LinkedTasks from '@/components/organisms/LinkedTasks/LinkedTasks.vue'
 import LinkedDocs from '@/components/molecules/Pages/LinkedDocs.vue'
+import TaskLinks from '@/components/molecules/TaskLinks/TaskLinks.vue'
+import { shownDescription } from '@/utils/taskDescription'
 import EpicPicker from '@/components/molecules/Epics/EpicPicker.vue'
 import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
 import TagChip from '@/components/atom/TagChip/TagChip.vue'
@@ -148,7 +151,6 @@ import PromptSidebar from "@/components/molecules/PromptSidebar/PromptSidebar.vu
 import { apiRequest, apiRequestWithoutCompnay } from '../../../services';
 import * as env from '@/config/env';
 
-// UTILS
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { canUseAi } from '@/composable/aiAvailability';
 import taskClass from '@/utils/TaskOperations';
@@ -170,7 +172,6 @@ const { getUser } = useGetterFunctions();
 const { checkPermission, makeUniqueId, checkBucketStorage,checkApps,getAppState } = useCustomComposable();
 const { openRecorder } = useClipRecorder();
 
-// props
 const props = defineProps({
     task: {
         type: Object,
@@ -206,10 +207,8 @@ const show = computed(() => ({
     ...(props.sections || {})
 }));
 
-// emit
 const emit = defineEmits(["openSeeAll", 'openDoc']);
 
-//computed
 const fileExtentions = computed(() => {
     return getters['settings/fileExtentions'];
 });
@@ -217,11 +216,11 @@ const companyOwner = computed(() => {
     return getters["settings/companyOwnerDetail"];
 });
 const checkList = computed(() => props.task.checklistArray);
+const taskDescription = computed(() => shownDescription(props.task));
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
 const projectsGetter = computed(() => getters["projectData/onlyActiveProjects"]);
 const showCustomField = computed(() => checkPermission("task.task_custom_field", projectData.value?.isGlobalPermission, {gettersVal: getters}));
 
-// ref
 const ids = ref();
 const tagChipArray = ref();
 const isSpinner = ref(false);
@@ -229,13 +228,12 @@ const submitted = ref(false);
 const componentDetail = ref({});
 const customFieldObject = ref({});
 const isCustomField = ref(false);
-const allProjectsArrayFilter = ref([]);
+const allProjectsArrayFilter = computed(() => (props.isSupport ? [] : projectsGetter.value?.data || []));
 const CustomFieldData = ref(JSON.parse(JSON.stringify(getters["settings/customFields"])));
 const isOpenPromptDeatil = ref(false);
 const selectedPrompt = ref({})
 const isSpinnerAi = ref(false);
 
-// inject
 const userId = inject('$userId');
 
 // Recently-visited tracking — fire-and-forget on every task open.
@@ -255,12 +253,7 @@ watch(() => props.task?._id, recordRecentVisit);
 const companyId = inject('$companyId');
 const projectData = inject("selectedProject");
 
-//getUser
 const user = getUser(userId.value);
-
-onMounted(() => {
-    allProjectsArrayFilter.value = props.isSupport ? [] : JSON.parse(JSON.stringify(projectsGetter.value.data));
-})
 
 const newAttachments = (files) => {
     if(!files.length) {
@@ -520,8 +513,7 @@ const deleteAttachments = (attachment) => {
         text: `${t('Toast.Are_you_sure_to_delete_this_file')} ?`,
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
+        customClass: { confirm: 'swal2-deny' },
         cancelButtonText: t('Projects.cancel'),
         confirmButtonText: t('conformationmsg.yes_delete')
     }).then((result)=>{

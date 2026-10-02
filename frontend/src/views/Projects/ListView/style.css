@@ -65,6 +65,7 @@
 .lv2__cols > .lv2__head-title { display: flex; align-items: center; gap: 6px; overflow: visible; }
 .lv2__chooser { margin-left: auto; }
 .lv2__c-field { justify-self: stretch; min-width: 0; }
+.lv2__cols > .lv2__c-done { justify-self: start; }
 .lv2__group-points::before { content: "\00b7"; margin-right: 6px; }
 
 .lv2__sprint { display: flex; flex-direction: column; gap: var(--gap-stack, 12px); }
@@ -83,6 +84,8 @@
 .lv2__sprint-name { font: var(--fw-title, 600) calc(var(--fs-xl, 20px) - 1px)/var(--lh-tight, 1.2) var(--font-ui); letter-spacing: -.3px; }
 .lv2__sprint-meta { font: 500 var(--fs-sm, 11.5px)/1.2 var(--font-mono); color: var(--ink-label); }
 .lv2__aria-row { display: contents; }
+.lv2__sprint-bar { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.lv2__sprint-bar .lv2__sprint-head { width: auto; min-width: 0; }
 .lv2__sprint > .lv2__group,
 .lv2__sprint .lv2__collapsed-item { margin-left: 16px; }
 
@@ -256,6 +259,21 @@
 .lv2__more-btn:hover:not(:disabled) { text-decoration: underline; }
 .lv2__more-btn:disabled { color: var(--ink-2); cursor: default; }
 .lv2__more-hint { color: var(--ink-2); }
+.lv2__totals {
+    --lv2-row-tint: transparent;
+    display: grid;
+    grid-template-columns: var(--lv2-cols);
+    gap: 10px;
+    padding: var(--cell-pad-y) var(--cell-pad-x, 12px);
+    align-items: center;
+    justify-items: end;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface);
+    font: 600 var(--fs-sm, 11.5px)/1.2 var(--font-mono);
+    color: var(--ink);
+}
+.lv2__totals-label { color: var(--ink-2); }
+.lv2__totals-cell { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv2__add-plus { color: var(--brand); }
 .lv2__create { padding: calc(var(--cell-pad-y) - 1px) var(--cell-pad-x, 12px); }
 .lv2__template { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 6px; max-width: 100%; color: var(--ink-label); font: 500 var(--fs-xs, 11px)/1.2 var(--font-ui); }
@@ -409,7 +427,7 @@ button.lv2__status.is-done:hover .lv2__status-dot { background: var(--lv2-status
 }
 @media (max-width: 1024px) {
     .lv2 { --lv2-cols: 28px var(--lv2-title-track) minmax(56px, .45fr) 56px 64px 72px; }
-    .lv2__c-est, .lv2__c-risk, .lv2__c-extra { display: none; }
+    .lv2__c-est, .lv2__c-risk, .lv2__c-extra, .lv2__totals { display: none; }
 }
 /* At phone width the title takes the whole first line and assignee, due date and priority
    fold into a meta line under it, one max-content track each, with the tags in what is left. */

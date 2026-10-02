@@ -24,6 +24,8 @@
 }
 .formkit__content-wrapper .formkit-inner {
     width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     box-shadow: none;
     border-left: 1px solid var(--hairline);
     border-radius: 0px;

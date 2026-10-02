@@ -147,6 +147,6 @@ onMounted(load);
 
 <style scoped src="@/components/organisms/DashboardCard/cardBody.css"></style>
 <style scoped>
-.frc__rows { display: flex; flex-direction: column; gap: 7px; }
+.frc__rows { display: flex; flex-direction: column; gap: calc(var(--sp-2) + 1px); }
 .frc__note { margin: auto 0 0; }
 </style>

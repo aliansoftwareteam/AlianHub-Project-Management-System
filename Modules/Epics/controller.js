@@ -238,7 +238,7 @@ exports.assignTask = async (req, res) => {
             data: [{ _id: taskObjId }, updateObj, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
 
-        socketEmitter.emit('update', { type: "update", data: updated, updatedFields: { epicId: updated?.epicId || null }, module: 'task' });
+        socketEmitter.emit('update', { type: "update", data: updated, updatedFields: { epicId: updated?.epicId || null }, module: 'task', companyId });
 
         const deltas = countDeltas({
             oldEpicId: task.epicId,

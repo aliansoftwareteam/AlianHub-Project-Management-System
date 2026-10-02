@@ -1,5 +1,5 @@
 const {
-    shortSelector, widestOffenders, overflowOf, smallTargets, cutControls, clippedText, coveringLayers, layoutFindings, summaryOf,
+    shortSelector, widestOffenders, overflowOf, smallTargets, cutControls, clippedText, coveringLayers, layoutFindings, summaryOf, cssImpact,
 } = require('../scripts/atlas/layout');
 
 const el = (tag, classes = [], extra = {}) => ({ tag, id: '', classes, role: '', parent: null, ...extra });
@@ -222,5 +222,31 @@ describe('atlas layout: the findings of one screen', () => {
         expect(summaryOf(layoutFindings(raw))).toBe('document 110px too wide, 30 small targets');
         expect(summaryOf(layoutFindings({ viewport: VIEWPORT, scopes: [], controls: [], texts: [], layers: [] }))).toBe('');
         expect(summaryOf(null)).toBe('');
+    });
+});
+
+describe('atlas layout: what a patched stylesheet moved', () => {
+    const box = (left, top, width, height) => ({ left, top, width, height });
+    const pair = (classes, before, after) => ({ el: el('div', classes), before, after });
+
+    test('counts what changed size apart from what was only pushed along, and names the biggest changes', () => {
+        const impact = cssImpact({
+            total: 900,
+            changed: [
+                pair(['filter'], box(15, 170, 400, 38), box(15, 170, 358, 38)),
+                pair(['row'], box(15, 220, 358, 40), box(15, 218, 358, 40)),
+                pair(['cell'], box(20, 300, 120, 44), box(20, 298, 96, 34)),
+            ],
+        });
+        expect(impact).toEqual({
+            total: 900,
+            resized: 2,
+            shifted: 1,
+            biggest: [{ selector: 'div.filter', width: -42, height: 0 }, { selector: 'div.cell', width: -24, height: -10 }],
+        });
+    });
+
+    test('a stylesheet that moves nothing says so', () => {
+        expect(cssImpact({ total: 900, changed: [] })).toEqual({ total: 900, resized: 0, shifted: 0, biggest: [] });
     });
 });

@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
-const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const socketEmitter = require('../../event/socketEventEmitter');
 const registry = require('./registry');
 const actions = require('./actions');
@@ -12,9 +11,10 @@ const findingMemory = require('./engine/findingMemory');
 const persistence = require('../AICore/persistence');
 const logger = require('../../Config/loggerConfig');
 const access = require('./access');
-const { proposalClause } = require('./privateWork');
 const taint = require('./taint');
+const { externalClientActor } = require('./actor');
 const aiFeedback = require('../AI/feedback');
+const slackPost = require('./connectors/slackPost');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -33,7 +33,7 @@ const REAPER = Object.freeze({ kind: 'human', userId: 'system', personName: 'Sys
 // descriptor either way, so a longer window costs nothing.
 const UNDO_WINDOW_MS = 15 * 60 * 1000;
 const PRIMARY_AGE_MS = 24 * 60 * 60 * 1000;
-const GATE_OWNER_ADMIN = 'owner_admin';
+const { GATE_OWNER_ADMIN } = access;
 // The canned decline reasons the Inbox offers; only these can grow into a user preference.
 const DECLINE_REASONS = Object.freeze(Object.keys(memory.DECLINE_REASON_TEXT));
 const DECLINE_REASON_MAX = 200;
@@ -122,25 +122,42 @@ const projectOfTask = async (companyId, taskId) => {
 // A proposal filed by an MCP call names the token's person, not a workspace agent,
 // and runs as that person once approved.
 const SOURCE_MCP = 'mcp';
+// A proposal a project's daily look filed (Modules/Agents/manager). No agent and no person is behind it: once
+// approved it runs on the approver's own rights, inside the actions it was filed with.
+const SOURCE_SYSTEM = 'system';
+const SYSTEM_DECIDER = 'system';
 const asStrings = (list) => (Array.isArray(list) ? list.map(String) : []);
-const mcpFields = ({ source, requestedBy, tokenId, tokenProjectIds, allowedActions }) => (source === SOURCE_MCP
-    ? { source, requestedBy: String(requestedBy || ''), tokenId: String(tokenId || ''), tokenProjectIds: asStrings(tokenProjectIds), allowedActions: asStrings(allowedActions) }
+const systemFields = ({ source, allowedActions, finding }) => (source === SOURCE_SYSTEM
+    ? { source, allowedActions: asStrings(allowedActions), ...(finding ? { finding } : {}) }
+    : {});
+const mcpFields = ({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }) => (source === SOURCE_MCP
+    ? {
+        source, requestedBy: String(requestedBy || ''), tokenId: String(tokenId || ''), tokenProjectIds: asStrings(tokenProjectIds), allowedActions: asStrings(allowedActions),
+        ...(oauthGrantId ? { oauthClientId: String(oauthClientId || ''), oauthGrantId: String(oauthGrantId) } : {}),
+    }
     : {});
 
-const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions }) => {
+/* Who an approved MCP proposal runs as: the person behind the token, or the outside client acting for the person who granted it. */
+const mcpActor = async (p) => (p.oauthGrantId
+    ? { ...(await externalClientActor({ userId: p.requestedBy, clientId: p.oauthClientId, clientName: p.agentName, grantId: p.oauthGrantId })), source: SOURCE_MCP }
+    : { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP });
+
+const create = async (companyId, { agent, runId, taskId, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding }) => {
     if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
+    const prepared = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
     const scopedProjectId = projectId || await projectOfTask(companyId, taskId);
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
             agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
             what: what.trim().slice(0, 300), why: String(why || '').slice(0, 2000),
-            changes: changes.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
+            changes: prepared.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
-            ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions }),
+            ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
+            ...systemFields({ source, allowedActions, finding }),
         },
     }, 'save');
     emit(companyId, saved);
@@ -163,11 +180,7 @@ const skillSourcesOfRuns = async (companyId, rows) => {
 /* projectIds, when given, is the caller's visible set, hiddenTaskIds the tasks in it they cannot read,
  * and privateWork what is someone else's alone; the counts follow the same scope. */
 const list = async (companyId, { status, bucket, agentId, limit = 100, projectIds, hiddenTaskIds, privateWork } = {}) => {
-    const scoped = {
-        ...(Array.isArray(projectIds) ? { projectId: { $in: idForms(projectIds.map(String)) } } : {}),
-        ...(Array.isArray(hiddenTaskIds) && hiddenTaskIds.length ? { taskId: { $nin: hiddenTaskIds.map(String) } } : {}),
-        ...(privateWork ? proposalClause(privateWork) : {}),
-    };
+    const scoped = access.proposalScopeClause({ projectIds, hiddenTaskIds, privateWork });
     const match = { ...scoped };
     if (status) match.status = String(status);
     if (agentId) match.agentId = String(agentId);
@@ -230,11 +243,15 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         const check = validateChanges(edited);
         if (!check.valid) return { error: check.reason, status: 400 };
         changes = edited.map((c) => ({ action: c.action, params: c.params || {}, label: c.label || c.action }));
+        if (slackPost.hasSlackChange(changes)) {
+            try { changes = await slackPost.prepareChanges(companyId, changes); } catch (e) { return { error: e.message, status: e.status || 400 }; }
+        }
         status = STATUS.EDITED;
     }
 
     const runs = require('./runs');
-    const agent = fromMcp ? { allowedActions: p.allowedActions || [] } : await runs.getAgent(companyId, p.agentId);
+    const fromSystem = p.source === SOURCE_SYSTEM;
+    const agent = fromMcp || fromSystem ? { allowedActions: p.allowedActions || [] } : await runs.getAgent(companyId, p.agentId);
     if (!agent) return { error: 'This agent was deleted — decline the proposal instead.', status: 409 };
     const run = p.runId ? await runOf(companyId, p.runId) : null;
     if (p.runId && !run) return { error: 'The run behind this proposal no longer exists — decline it instead.', status: 409, reason: REASON.RUN_MISSING };
@@ -245,16 +262,18 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     if (!claimed) return alreadyDecided(companyId, id);
 
     const runTrace = run && run.traceId ? { traceId: run.traceId } : {};
-    const marker = taint.record(run);
+    const marker = taint.record(run) || (fromMcp && p.oauthGrantId
+        ? { tainted: true, taintSources: [{ kind: taint.KINDS.CLIENT, ref: String(p.oauthClientId || '').slice(0, 200), at: new Date() }] }
+        : null);
     const agentActor = fromMcp
-        ? { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP }
-        : { kind: 'agent', userId: decider.userId, agentId: p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null, ...runTrace };
+        ? await mcpActor(p)
+        : { kind: 'agent', userId: decider.userId, agentId: fromSystem ? null : p.agentId, agentName: p.agentName, runId: p.runId, viaAccount: 'workspace', tokenId: null, ...runTrace };
     const auditIds = [];
     const applied = [];
     for (const c of changes) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, ...(marker ? { taint: marker } : {}) });
+            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, ...(marker ? { taint: marker } : {}) });
             if (out.auditId) auditIds.push(out.auditId);
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {
@@ -262,7 +281,8 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
         }
     }
     const undoUntil = new Date(Date.now() + UNDO_WINDOW_MS);
-    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds });
+    const delivery = slackPost.deliveryOf(changes, applied);
+    const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}) });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
     const row = typeof p.toObject === 'function' ? p.toObject() : p;
     await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: { ...row, changes, decidedBy: decider.userId }, applied }));
@@ -289,10 +309,38 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
     if (DECLINE_REASONS.includes(declineReason)) {
         await quietly(`preference candidate for ${decider.userId}`, () => memory.preferenceCandidate({ companyId, userId: decider.userId, reasonKey: declineReason }));
     }
+    if (declineReason && !DECLINE_REASONS.includes(declineReason)) {
+        await quietly(`keep the typed reason of ${id}`, () => memory.rememberDeclined({ companyId, proposal: p, text: declineReason, userId: decider.userId }));
+    }
     await settleRun(companyId, p, { decision: STATUS.DECLINED, applied: [], reason: declineReason || null, outcome: 'declined by a person' });
     await quietly(`decline feedback for ${id}`, () => aiFeedback.fromDecline(companyId, decider.userId, { proposalId: id, runId: p.runId, reason: declineReason }));
     return { proposal: updated };
 };
+
+/* A change a standing approval applied (./standingApprovals) is kept as a proposal its maker already approved,
+ * so it is listed as done and undone the way an approval made by hand is. */
+const fileApplied = async (companyId, { rule, action, params, auditId, why }) => {
+    const asAsked = { ...params };
+    delete asAsked.__proposal;
+    const label = String((registry.get(action) && registry.get(action).label) || action).slice(0, 300);
+    const saved = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_PROPOSALS,
+        data: {
+            agentId: String(rule.agentId || ''), agentName: rule.agentName, runId: null, taskId: asAsked.taskId ? String(asAsked.taskId) : null, projectId: rule.projectId,
+            what: label, why: String(why || '').slice(0, 2000), changes: [{ action, params: asAsked, label, reversible: true, rating: actions.rating(action) }],
+            status: STATUS.APPROVED, gate: null, priority: 'normal', decidedBy: String(rule.madeBy), decidedAt: new Date(), undoUntil: new Date(Date.now() + UNDO_WINDOW_MS),
+            auditIds: [String(auditId)], source: SOURCE_MCP, requestedBy: String(rule.requestedBy), standingApprovalId: String(rule._id),
+            ...(rule.oauthGrantId ? { oauthClientId: rule.oauthClientId, oauthGrantId: rule.oauthGrantId } : { tokenId: rule.tokenId }),
+        },
+    }, 'save');
+    emit(companyId, saved);
+    return saved;
+};
+
+/* Takes back a proposal nobody has decided, when what it answered is gone. It is not a person's refusal, so nothing learns from it. */
+const withdraw = async (companyId, id, reason) => setStatus(companyId, id, {
+    status: STATUS.DECLINED, decidedBy: SYSTEM_DECIDER, decidedAt: new Date(), declineReason: String(reason || '').slice(0, DECLINE_REASON_MAX),
+}, { onlyIf: STATUS.PENDING });
 
 /* Undo within the window: every audited action, newest first. */
 const undoApproval = async (companyId, id, { decider, isPrivileged, ip }) => {
@@ -352,4 +400,4 @@ const reapStuck = async (companyId, { olderThanMs = stuckThresholdMs(), now = ne
     return { reaped };
 };
 
-module.exports = { STATUS, REASON, SOURCE_MCP, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, undoApproval, bucketOf, reapStuck, stuckThresholdMs };
+module.exports = { STATUS, REASON, SOURCE_MCP, SOURCE_SYSTEM, SYSTEM_DECIDER, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, withdraw, undoApproval, fileApplied, bucketOf, reapStuck, stuckThresholdMs };

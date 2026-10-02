@@ -1,9 +1,9 @@
 <template>
     <ContextSidebar :open="homeState.sidebarOpen" :label="$t('Shell.home')" @close="homeState.sidebarOpen = false">
-        <button type="button" class="hs-search" :aria-keyshortcuts="mac ? 'Meta+K' : 'Control+K'" @click="openPalette">
+        <button type="button" class="hs-search" :aria-keyshortcuts="ariaKeyShortcuts('palette')" @click="openPalette">
             <ShellIcon name="search" :size="14" />
             <span>{{ $t('Shell.search') }}</span>
-            <span class="hs-search__kbd" aria-hidden="true">{{ mac ? '⌘K' : $t('Palette.key_ctrl_k') }}</span>
+            <KeyHint shortcut="palette" class="hs-search__kbd" />
         </button>
 
         <nav class="hs-group" :aria-label="$t('Inbox.title')">
@@ -79,7 +79,9 @@ import { useCustomComposable } from "@/composable";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { homeState } from "./homeState";
-import { isMacPlatform, openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
+import { openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
+import KeyHint from "@/components/atom/KeyHint/KeyHint.vue";
+import { ariaKeyShortcuts } from "@/composable/shortcuts";
 import { wakeTimer } from "@/views/Inbox/snoozeWake";
 
 defineOptions({ name: "HomeSidebar" });
@@ -103,7 +105,6 @@ const personalProject = computed(() => getters["projectData/personalProject"]);
 const canCreate = computed(() => checkPermission("project.project_create") === true);
 const hidden = computed(() => shellState.nav.hidden || []);
 
-const mac = isMacPlatform();
 const to = (name, query) => ({ name, params: { cid: companyId.value }, query });
 function toggleSection(key) {
     shellState.nav.hidden = hidden.value.includes(key) ? hidden.value.filter((k) => k !== key) : [...hidden.value, key];

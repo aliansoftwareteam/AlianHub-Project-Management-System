@@ -1,10 +1,16 @@
 <template>
-    <div class="pd" :class="`pd--${layout}`">
+    <div class="pd" :class="`pd--${layout}`" @focusout="onFocusOut">
         <template v-if="page">
+            <div v-if="isBehind" class="pd__banner" role="alert">
+                <ShellIcon name="alert" :size="14" />
+                <span class="pd__banner-text">{{ $t('Docs.conflict_banner') }}</span>
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :disabled="isResolving" @click="keepMineAsCopy">{{ $t('Docs.conflict_keep_copy') }}</button>
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :disabled="isResolving" @click="reloadSaved">{{ $t('Docs.conflict_reload') }}</button>
+            </div>
             <div v-if="needsAttention" class="pd__banner" :class="`pd__banner--${reviewStateValue}`">
                 <ShellIcon name="alert" :size="14" />
                 <span class="pd__banner-text">{{ $t('Docs.stale_banner') }}</span>
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="markReviewed">{{ $t('Docs.mark_reviewed') }}</button>
+                <button v-if="!propsLocked" type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="markReviewed">{{ $t('Docs.mark_reviewed') }}</button>
             </div>
 
             <div class="pd__head">
@@ -15,16 +21,17 @@
                             rows="1"
                             class="pd__title"
                             :placeholder="$t('Docs.untitled')"
+                            :readonly="readOnly"
                             @input="onTitleInput"
                             @keydown.enter="onTitleEnter"
                         ></textarea>
                     </div>
                     <div class="pd__actions">
-                        <div class="ah-tabs">
+                        <div v-if="!readOnly" class="ah-tabs">
                             <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'edit' }" @click="openEditor">{{ $t('Docs.edit') }}</button>
                             <button type="button" class="ah-tab" :class="{ 'is-active': mode === 'preview' }" @click="openPreview">{{ $t('Docs.preview') }}</button>
                         </div>
-                        <button v-if="projectId" type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="showLinker = !showLinker">
+                        <button v-if="projectId && !propsLocked" type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="showLinker = !showLinker">
                             <ShellIcon name="link" :size="13" />{{ $t('Docs.link_tasks') }}
                             <span v-if="linkedTasks.length" class="pd__count">{{ linkedTasks.length }}</span>
                         </button>
@@ -43,10 +50,10 @@
                                 <ShellIcon name="share" :size="13" />{{ $t('Docs.share') }}
                             </button>
                         </template>
-                        <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="!isDirty || isSaving" @click="savePage">
+                        <button v-if="!readOnly" type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="!isDirty || isSaving || isBehind" :title="$t('Docs.save_now_hint')" @click="savePage">
                             {{ isSaving ? $t('Docs.saving') : $t('Docs.save') }}
                         </button>
-                        <button type="button" class="pd__icon pd__icon--danger" :title="$t('Docs.delete')" @click="deletePage">
+                        <button v-if="!propsLocked" type="button" class="pd__icon pd__icon--danger" :title="$t('Docs.delete')" @click="deletePage">
                             <ShellIcon name="trash" :size="15" />
                         </button>
                         <button v-if="closable" type="button" class="pd__icon" :title="$t('Docs.close')" @click="requestClose">
@@ -56,7 +63,10 @@
                 </div>
 
                 <div class="pd__props">
-                    <label class="pd__prop">
+                    <span v-if="readOnly" class="pd__prop" data-test="doc-view-only" :title="$t('Docs.view_only_hint')">
+                        <span class="ah-chip"><ShellIcon name="eye" :size="11" />{{ $t('Docs.view_only') }}</span>
+                    </span>
+                    <label v-else-if="!propsLocked" class="pd__prop">
                         <span class="pd__k">{{ $t('Docs.owner') }}</span>
                         <select class="pd__select" :value="page.ownerId || ''" @change="setOwner($event.target.value)">
                             <option value="">{{ $t('Docs.no_owner') }}</option>
@@ -67,17 +77,17 @@
                         <span class="pd__k">{{ $t('Docs.project') }}</span>
                         <span class="ah-chip">{{ projectName }}</span>
                     </span>
-                    <button type="button" class="pd__prop pd__prop--btn" :disabled="privateLocked" :title="privateHint" @click="togglePrivate">
+                    <button type="button" class="pd__prop pd__prop--btn" :disabled="privateLocked || propsLocked" :title="propsLocked ? null : privateHint" @click="togglePrivate">
                         <span class="pd__k">{{ $t('Docs.visibility') }}</span>
                         <span class="ah-chip" :class="{ 'ah-chip--warn': isPrivate }">
                             <ShellIcon :name="isPrivate ? 'lock' : 'members'" :size="11" />{{ isPrivate ? $t('Docs.private') : $t('Docs.shared') }}
                         </span>
                     </button>
-                    <label class="pd__prop" :title="$t('Docs.wiki_toggle_hint')">
+                    <label v-if="!propsLocked" class="pd__prop" :title="$t('Docs.wiki_toggle_hint')">
                         <input type="checkbox" class="ah-check" :checked="isWiki" @change="toggleWiki($event.target.checked)" />
                         <span class="pd__k pd__k--strong">{{ $t('Docs.wiki_page') }}</span>
                     </label>
-                    <label v-if="isWiki" class="pd__prop">
+                    <label v-if="isWiki && !propsLocked" class="pd__prop">
                         <span class="pd__k">{{ $t('Docs.review_date') }}</span>
                         <input type="date" class="pd__date" :value="toDateInput(page.reviewDate)" @change="setReviewDate($event.target.value)" />
                     </label>
@@ -85,12 +95,15 @@
                         <span class="pd__k">{{ $t('Docs.linked_to') }}</span>
                         <span v-for="task in linkedTasks" :key="'lt-' + task.id" class="ah-chip ah-chip--brand ah-chip--mono">
                             {{ task.key || task.id.slice(-6) }}
-                            <button type="button" class="pd__unlink" :title="$t('Docs.unlink')" @click="unlinkTask(task.id)">✕</button>
+                            <button v-if="!propsLocked" type="button" class="pd__unlink" :title="$t('Docs.unlink')" @click="unlinkTask(task.id)">✕</button>
                         </span>
                     </span>
-                    <span class="pd__prop pd__prop--muted">
-                        <span class="ah-dot" :class="isDirty ? 'ah-dot--warn' : 'ah-dot--ok'"></span>
-                        {{ isDirty ? $t('Docs.unsaved') : $t('Docs.updated', { when: relativeTime(page.updatedAt, t) }) }}
+                    <span v-if="sharedLine" class="pd__prop pd__shared-line" data-test="doc-shared-line">
+                        <ShellIcon name="members" :size="11" />{{ sharedLine }}
+                    </span>
+                    <span v-if="!readOnly" class="pd__prop pd__prop--muted pd__save-state" role="status" :title="saveError || null">
+                        <span class="ah-dot" :class="saveDot"></span>
+                        {{ saveLabel }}
                     </span>
                 </div>
 
@@ -101,7 +114,7 @@
                         {{ $t(reviewLabelKey(reviewStateValue)) }}
                     </span>
                     <span class="pd__review-text">{{ reviewLine }}</span>
-                    <button v-if="!needsAttention" type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="markReviewed">{{ $t('Docs.mark_reviewed') }}</button>
+                    <button v-if="!needsAttention && !propsLocked" type="button" class="ah-btn ah-btn--sm ah-btn--ghost" @click="markReviewed">{{ $t('Docs.mark_reviewed') }}</button>
                 </div>
 
                 <TaskChipPicker
@@ -122,7 +135,8 @@
                     :editor-key="editorKey"
                     :project-id="projectId"
                     :page-id="String(page._id)"
-                    :before-leave="confirmDiscard"
+                    :read-only="readOnly"
+                    :before-leave="saveBeforeLeaving"
                     @change="onBlockChange"
                     @ready="onEditorReady"
                 />
@@ -141,7 +155,7 @@
                     :blocks="contentBlocks && contentBlocks.blocks"
                     :focus-id="focusCommentId"
                     :pick-block="mode === 'edit' ? currentBlock : null"
-                    :before-leave="confirmDiscard"
+                    :before-leave="saveBeforeLeaving"
                     @count="openComments = $event"
                     @threads="markCommented"
                     @jump="jumpToBlock"
@@ -150,7 +164,7 @@
             </div>
 
             <PageComposeRail
-                v-if="mode === 'edit' && canUseAi()"
+                v-if="mode === 'edit' && canUseAi() && !readOnly"
                 ref="composeRail"
                 :page-id="String(page._id)"
                 :title="draftTitle"
@@ -169,13 +183,13 @@
                     </div>
                     <div class="ah-card__body pd__share-body">
                         <p class="pd__share-sub"><ShellIcon name="docs" :size="14" /><b>{{ draftTitle || $t('Docs.untitled') }}</b></p>
-                        <div class="pd__share-row">
+                        <div class="pd__share-row" data-test="doc-share-scope">
                             <ShellIcon :name="isPrivate ? 'lock' : 'members'" :size="16" class="pd__share-ico" />
                             <div class="pd__share-copy">
-                                <div class="pd__share-label">{{ isPrivate ? $t('Docs.private') : $t('Docs.shared') }}</div>
-                                <div class="ah-small">{{ isPrivate ? $t('Projects.doc_private_hint') : $t('Projects.doc_shared_hint') }}</div>
+                                <div id="pd-share-scope" class="pd__share-label">{{ $t('Projects.doc_share_scope') }}</div>
+                                <div class="ah-small">{{ isPrivate ? privateScopeHint : $t('Projects.doc_shared_hint') }}</div>
                             </div>
-                            <button type="button" class="pd__switch" :class="{ 'is-on': !isPrivate }" :disabled="privateLocked" :title="privateLocked ? privateHint : null" @click="togglePrivate"><i></i></button>
+                            <button type="button" class="pd__switch" role="switch" aria-labelledby="pd-share-scope" :aria-checked="!isPrivate" :class="{ 'is-on': !isPrivate }" :disabled="privateLocked || propsLocked" :title="privateLocked ? privateHint : null" @click="togglePrivate"><i></i></button>
                         </div>
                         <div class="pd__share-row">
                             <ShellIcon name="globe" :size="16" class="pd__share-ico" />
@@ -183,12 +197,13 @@
                                 <div class="pd__share-label">{{ $t('Projects.doc_public_link') }}</div>
                                 <div class="ah-small">{{ isPrivate ? $t('Projects.doc_public_needs_shared') : $t('Projects.doc_public_link_hint') }}</div>
                             </div>
-                            <button type="button" class="pd__switch" :class="{ 'is-on': isPublic }" :disabled="isPrivate || isSharing" @click="togglePublicLink"><i></i></button>
+                            <button type="button" class="pd__switch" :class="{ 'is-on': isPublic }" :disabled="isPrivate || isSharing || propsLocked" @click="togglePublicLink"><i></i></button>
                         </div>
                         <template v-if="isPublic">
                             <input class="ah-input pd__share-url" type="text" readonly :value="shareUrl" @focus="$event.target.select()" />
                             <button type="button" class="ah-btn ah-btn--primary ah-btn--block" @click="copyShareLink">{{ $t('Projects.doc_copy_public_link') }}</button>
                         </template>
+                        <PageSharePeople v-if="page.canManageShares" :page-id="String(page._id)" @changed="onSharesChanged" />
                         <button type="button" class="ah-btn ah-btn--secondary ah-btn--block pd__who" @click="showWhoCanSee = true">
                             <ShellIcon name="eye" :size="13" />{{ $t('WhoCanSee.menu_doc') }}
                         </button>
@@ -202,8 +217,9 @@
                 :current-title="draftTitle"
                 :current-blocks="currentBlocks"
                 :doc-private="isPrivate"
+                :read-only="readOnly"
                 :save-pending="savePending"
-                :before-restore="confirmDiscard"
+                :before-restore="savePending"
                 @close="showHistory = false"
                 @restored="onRestored"
             />
@@ -239,6 +255,7 @@ import PageComposeRail from '@/components/molecules/Pages/PageComposeRail.vue';
 import PagePresenter from '@/components/molecules/Pages/PagePresenter.vue';
 import PageComments from '@/components/molecules/Pages/PageComments.vue';
 import PageHistory from '@/components/molecules/Pages/PageHistory.vue';
+import PageSharePeople from '@/components/molecules/Pages/PageSharePeople.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
@@ -249,6 +266,7 @@ import { relativeTime, shortDate, toDateInput, reviewChipClass, reviewLabelKey, 
 import { decorateMentions } from './docMentions';
 import { hydrateDocImages } from './docImages';
 import { useMentionLinks } from './useMentionLinks';
+import { createDocAutosave } from './docAutosave';
 
 const { contentToEditorData, blocksToRawText, TASK_TOKEN_PATTERN } = pageContent.default || pageContent;
 
@@ -269,7 +287,7 @@ const props = defineProps({
     closable: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['loaded', 'saved', 'deleted', 'close', 'outline', 'dirty']);
+const emit = defineEmits(['loaded', 'saved', 'deleted', 'close', 'outline']);
 
 const page = ref(null);
 const loadFailed = ref(false);
@@ -278,6 +296,8 @@ const contentHtml = ref('');
 const contentBlocks = ref(null);
 const savedSnapshot = ref({ title: '', html: '' });
 const isSaving = ref(false);
+const isResolving = ref(false);
+const savedHere = ref(false);
 const blockEditor = ref(null);
 const composeRail = ref(null);
 const editorSeed = ref(null);
@@ -315,17 +335,77 @@ const isWiki = computed(() => Boolean(page.value && page.value.isWiki));
 const reviewStateValue = computed(() => (page.value && page.value.reviewState) || 'none');
 const needsAttention = computed(() => isWiki.value && (reviewStateValue.value === 'due' || reviewStateValue.value === 'stale'));
 const isPublic = computed(() => !!share.value && share.value.enabled !== false);
-// The server lets only the author make a doc private: nobody else could read it afterwards.
-const privateLocked = computed(() => !isPrivate.value && String((page.value && page.value.createdBy) || '') !== String(unref(userId) || ''));
+/* The server says what the person may do with the doc. One who may only read it gets no title, property or
+   Save control, a read-only editor, and no autosave. */
+const readOnly = computed(() => Boolean(page.value) && page.value.canEdit === false);
+/* A doc shared with a person to edit is theirs to write in; its properties stay with the people who reach it otherwise. */
+const propsLocked = computed(() => readOnly.value || (Boolean(page.value) && page.value.canChangeProperties === false));
+const isAuthor = computed(() => String((page.value && page.value.createdBy) || '') === String(unref(userId) || ''));
+// The server lets only the author make a doc private.
+const privateLocked = computed(() => !isPrivate.value && !isAuthor.value);
+const privateDocHint = computed(() => (isAuthor.value ? t('Projects.doc_private_hint') : t('Projects.doc_private_hint_reader')));
+const privateScopeHint = computed(() => (isAuthor.value ? t('Projects.doc_share_scope_off_hint') : t('Projects.doc_share_scope_off_hint_reader')));
 const privateHint = computed(() => {
     if (privateLocked.value) return t('Projects.doc_private_author_only');
-    return isPrivate.value ? t('Projects.doc_private_hint') : t('Projects.doc_shared_hint');
+    return isPrivate.value ? privateDocHint.value : t('Projects.doc_shared_hint');
 });
 const shareUrl = computed(() => (share.value ? `${window.location.origin}/share/${share.value.token}` : ''));
+const sharedLine = computed(() => {
+    if (!page.value) return '';
+    if (page.value.sharedWithMe) return t('Docs.shared_with_you');
+    const count = page.value.canManageShares ? Number(page.value.sharedCount) || 0 : 0;
+    if (!count) return '';
+    return count === 1 ? t('Docs.shared_with_one') : t('Docs.shared_with_n', { n: count });
+});
+const onSharesChanged = (count) => { if (page.value) page.value = { ...page.value, sharedCount: count }; };
 
-// Saving is deliberate: Save button or Ctrl/Cmd+S, never an autosave.
+// The server refuses an empty title, so a doc with none is stored under the fallback; the editor shows that as a placeholder.
+const FALLBACK_TITLE = 'Untitled';
+const bareTitle = (title) => {
+    const text = String(title || '').trim();
+    return !text || text === FALLBACK_TITLE || text === t('Docs.untitled') ? '' : String(title);
+};
+const titleToSave = () => bareTitle(draftTitle.value) || t('Docs.untitled');
+
 const isDirty = computed(() => !!page.value
-    && (draftTitle.value !== savedSnapshot.value.title || contentHtml.value !== savedSnapshot.value.html));
+    && (bareTitle(draftTitle.value) !== savedSnapshot.value.title || contentHtml.value !== savedSnapshot.value.html));
+
+const autosave = createDocAutosave({
+    draft: () => (page.value
+        ? { pageId: String(page.value._id), title: titleToSave(), html: contentHtml.value, blocks: contentBlocks.value }
+        : null),
+    isDirty: () => isDirty.value && !readOnly.value,
+    send: (pageId, body) => apiRequest('put', `${env.PAGES}/${pageId}`, body),
+    onSaved,
+});
+const { saveState } = autosave;
+const isBehind = computed(() => saveState.value === 'conflict');
+const saveError = computed(() => (saveState.value === 'failed' ? autosave.lastError.value : ''));
+const saveDot = computed(() => {
+    if (saveState.value === 'saved') return 'ah-dot--ok';
+    return saveState.value === 'saving' ? 'ah-dot--warn' : 'ah-dot--danger';
+});
+const saveLabel = computed(() => {
+    if (saveState.value === 'saving') return t('Docs.saving');
+    if (saveState.value === 'offline') return t('Docs.autosave_offline');
+    if (saveState.value === 'failed' || saveState.value === 'conflict') return t('Docs.autosave_not_saved');
+    return savedHere.value ? t('Docs.saved') : t('Docs.updated', { when: relativeTime(page.value.updatedAt, t) });
+});
+
+/* The doc tree and the page header follow a save through `saved`; an autosave that leaves the title alone tells
+   them nothing new, and would have the tree fetched again on every pause. */
+function onSaved(sent, data, { settled }) {
+    if (!page.value || String(page.value._id) !== sent.pageId) return;
+    const renamed = bareTitle(sent.title) !== savedSnapshot.value.title;
+    savedSnapshot.value = { title: bareTitle(sent.title), html: sent.html };
+    page.value = { ...page.value, ...data, content: page.value.content };
+    savedHere.value = true;
+    if (settled || renamed) emit('saved', page.value);
+}
+
+watch([draftTitle, contentHtml], () => {
+    if (page.value && !readOnly.value && !baselinePending.value && isDirty.value) autosave.changed();
+});
 
 const nameOf = (id) => (id ? (getUser(String(id))?.Employee_Name || '—') : '—');
 
@@ -338,14 +418,20 @@ const reviewLine = computed(() => {
     return t('Docs.review_due_line', { when: shortDate(page.value.reviewDate), who: owner });
 });
 
-watch(isDirty, (dirty) => emit('dirty', dirty));
 watch(contentBlocks, (blocks) => emit('outline', headingsOf(blocks)), { deep: true });
 
-function confirmDiscard() {
-    return !isDirty.value || window.confirm(t('Projects.page_discard_confirm'));
+/* Nothing asks before leaving any more: the doc is saved on the way out, and what cannot be saved stays on
+   this device for the next time the doc is opened. */
+function saveBeforeLeaving() {
+    autosave.flush({ settled: true });
+    return true;
 }
 
-const { onMentionClick, onMentionKeydown } = useMentionLinks({ beforeLeave: confirmDiscard });
+function onFocusOut(event) {
+    if (!event.currentTarget.contains(event.relatedTarget)) autosave.flush({ settled: true });
+}
+
+const { onMentionClick, onMentionKeydown } = useMentionLinks({ beforeLeave: saveBeforeLeaving });
 
 const personName = (id) => {
     const user = getUser(String(id));
@@ -375,13 +461,23 @@ function loadPage(id) {
                 return;
             }
             page.value = response.data.data;
-            draftTitle.value = page.value.title || '';
+            draftTitle.value = bareTitle(page.value.title);
             contentHtml.value = (page.value.content && page.value.content.html) || '';
             contentBlocks.value = contentToEditorData(page.value.content);
             savedSnapshot.value = { title: draftTitle.value, html: contentHtml.value };
             editorSeed.value = page.value.content || { html: contentHtml.value };
             editorKey.value = reloads ? `${id}-r${reloads}` : String(id);
             baselinePending.value = true;
+            savedHere.value = false;
+            const unsaved = readOnly.value ? null : autosave.opened(page.value);
+            if (unsaved) {
+                draftTitle.value = bareTitle(unsaved.title);
+                contentHtml.value = unsaved.html || '';
+                contentBlocks.value = unsaved.blocks || contentToEditorData({ html: contentHtml.value });
+                editorSeed.value = { blocks: contentBlocks.value };
+                baselinePending.value = false;
+                autosave.changed();
+            }
             isPrivate.value = String(page.value.visibility || '') === 'private';
             linkedTasks.value = (page.value.linkedTasks || []).map((x) => ({ id: String(x), key: '' }));
             mode.value = 'edit';
@@ -399,6 +495,7 @@ function loadPage(id) {
 }
 
 watch(() => props.pageId, (id) => {
+    autosave.flush({ settled: true });
     reloads = 0;
     loadPage(id);
 }, { immediate: true });
@@ -426,34 +523,55 @@ function onTitleEnter(event) {
     if (!event.isComposing) event.preventDefault();
 }
 
-function savePage() {
-    if (!page.value || isSaving.value || !isDirty.value) return Promise.resolve(false);
+/* Save now: the same save the doc makes by itself, without waiting for a pause. */
+async function savePage() {
+    if (!page.value || isSaving.value || !isDirty.value || isBehind.value) return false;
     isSaving.value = true;
-    const sent = { title: draftTitle.value, html: contentHtml.value };
-    return apiRequest('put', `${env.PAGES}/${page.value._id}`, {
-        title: sent.title,
-        contentHtml: sent.html,
-        contentBlocks: contentBlocks.value,
-    }).then((response) => {
-        if (response.data?.status) {
-            // Compare against what was SENT: anything typed during the request stays dirty.
-            savedSnapshot.value = sent;
-            if (response.data.data) page.value = { ...page.value, ...response.data.data, content: page.value.content };
-            $toast.success(response.data.statusText, { position: 'top-right' });
-            emit('saved', page.value);
-            return true;
-        }
-        $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
-        return false;
-    }).catch((error) => {
-        console.error('ERROR in save page: ', error);
-        return false;
-    }).finally(() => { isSaving.value = false; });
+    const saved = await autosave.flush({ settled: true });
+    isSaving.value = false;
+    if (saved) $toast.success(t('Docs.saved'), { position: 'top-right' });
+    else if (!isBehind.value) $toast.error(autosave.lastError.value || t('Docs.autosave_not_saved'), { position: 'top-right' });
+    return saved;
 }
 
-/* A version holds the saved doc, so edits still in the editor are saved before one is kept. */
+/* A version holds the saved doc, so edits still in the editor are saved before one is kept or restored over. */
 function savePending() {
-    return isDirty.value ? savePage() : Promise.resolve(true);
+    return autosave.flush({ settled: true });
+}
+
+function reloadSaved() {
+    if (!page.value) return Promise.resolve();
+    autosave.discardUnsaved(String(page.value._id));
+    reloads += 1;
+    return loadPage(String(page.value._id));
+}
+
+/* The doc on the server is someone else's newer text and is left as it is; this person's text becomes a doc of
+   its own beside it. */
+async function keepMineAsCopy() {
+    if (!page.value || isResolving.value) return;
+    isResolving.value = true;
+    try {
+        const response = await apiRequest('post', env.PAGES, {
+            title: t('Docs.conflict_copy_title', { title: draftTitle.value || t('Docs.untitled') }).slice(0, 200),
+            contentBlocks: contentBlocks.value,
+            ...(page.value.ProjectID ? { projectId: String(page.value.ProjectID) } : {}),
+            ...(page.value.parentPageId ? { parentPageId: String(page.value.parentPageId) } : {}),
+            ...(isPrivate.value ? { visibility: 'private' } : {}),
+        });
+        if (!response.data?.status) {
+            $toast.error(response.data?.statusText || t('Toast.something_went_wrong'), { position: 'top-right' });
+            return;
+        }
+        $toast.success(t('Docs.conflict_copy_kept', { title: response.data.data.title }), { position: 'top-right' });
+        await reloadSaved();
+        if (page.value) emit('saved', page.value);
+    } catch (error) {
+        console.error('ERROR in keeping a copy of the doc: ', error);
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+    } finally {
+        isResolving.value = false;
+    }
 }
 
 function deletePage() {
@@ -470,7 +588,7 @@ function deletePage() {
 }
 
 function requestClose() {
-    if (!confirmDiscard()) return;
+    saveBeforeLeaving();
     emit('close');
 }
 
@@ -710,7 +828,7 @@ function jumpToBlock(blockId) {
 
 watch(focusCommentId, (id) => { if (id) showComments.value = true; }, { immediate: true });
 
-defineExpose({ openShare, present, askAi, scrollToHeading, confirmDiscard, isDirty });
+defineExpose({ openShare, present, askAi, scrollToHeading, saveBeforeLeaving, isDirty });
 
 function onKeydown(e) {
     if (!page.value) return;
@@ -726,8 +844,29 @@ function onKeydown(e) {
         if (props.closable) requestClose();
     }
 }
-onMounted(() => document.addEventListener('keydown', onKeydown));
-onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
+function onPageHide() {
+    autosave.keepNow();
+    autosave.flush({ settled: true });
+}
+
+function onVisibility() {
+    if (document.visibilityState === 'hidden') autosave.flush({ settled: true });
+}
+
+onMounted(() => {
+    document.addEventListener('keydown', onKeydown);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('beforeunload', onPageHide);
+    window.addEventListener('online', autosave.online);
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('keydown', onKeydown);
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('beforeunload', onPageHide);
+    window.removeEventListener('online', autosave.online);
+    autosave.flush({ settled: true });
+    autosave.dispose();
+});
 </script>
 
 <style scoped>
@@ -745,7 +884,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
     border-bottom: 1px solid var(--hairline);
 }
 .pd__banner--stale { background: var(--danger-bg); color: var(--danger-ink); }
-.pd__banner-text { flex: 1; }
+.pd__banner { flex-wrap: wrap; }
+.pd__banner-text { flex: 1 1 220px; }
 
 .pd__head { padding: 18px 20px 6px; display: flex; flex-direction: column; gap: 10px; flex: none; }
 .pd--page .pd__head { padding: 26px 40px 8px; }
@@ -779,6 +919,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
 .pd__prop--btn:disabled { opacity: .6; cursor: not-allowed; }
 .pd__prop--wrap { flex-wrap: wrap; }
 .pd__prop--muted { margin-left: auto; }
+.pd__shared-line { color: var(--ink-2); }
 .pd__k { color: var(--ink-label); }
 .pd__k--strong { color: var(--ink); font-weight: 500; }
 .pd__select, .pd__date {

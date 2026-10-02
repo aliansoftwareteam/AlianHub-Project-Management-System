@@ -39,8 +39,8 @@
                 @keydown="onGridKey"
             >
                 <div class="tv2__head" role="row">
-                    <span role="columnheader"></span>
-                    <span role="columnheader" class="tv2__head-name" :aria-sort="ariaSort('TaskName')">
+                    <span role="columnheader" class="tv2__c-select"></span>
+                    <span role="columnheader" class="tv2__head-name tv2__c-name" :aria-sort="ariaSort('TaskName')">
                         <button
                             type="button"
                             class="tv2__sort"
@@ -68,6 +68,9 @@
                             >
                                 {{ $t('Projects.status') }}<span class="tv2__sort-caret" :class="{ 'is-on': sortOf('statusKey') }" aria-hidden="true">{{ sortGlyph('statusKey') }}</span>
                             </button>
+                        </span>
+                        <span v-else-if="column.ai && column.id !== 'risk'" role="columnheader" class="tv2__head-col">
+                            <AiColumnHead :column="column" :tasks="aiColumnTasks" />
                         </span>
                         <span v-else-if="column.ai" role="columnheader" :class="{ 'tv2__head-ai': column.id !== 'risk' }" :title="$t(column.id === 'risk' ? 'List.risk_formula' : 'List.ai_source_hint')">{{ column.id === 'risk' ? '' : '✦ ' }}{{ $t(column.labelKey) }}</span>
                         <span v-else-if="column.field && isAiField(column.field)" role="columnheader" class="tv2__head-col" :aria-sort="ariaSort(sortFieldOf(column))">
@@ -103,9 +106,11 @@
                                 :aria-expanded="isSprintOpen(sprint)"
                                 @click="toggleSprint(sprint)"
                             >
-                                <span class="tv2__caret" :class="{ 'tv2__caret--open': isSprintOpen(sprint) }" aria-hidden="true">▸</span>
-                                <span class="tv2__sprint-name">{{ sprint.name }}</span>
-                                <span class="tv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
+                                <span class="tv2__sprint-label">
+                                    <span class="tv2__caret" :class="{ 'tv2__caret--open': isSprintOpen(sprint) }" aria-hidden="true">▸</span>
+                                    <span class="tv2__sprint-name">{{ sprint.name }}</span>
+                                    <span class="tv2__sprint-meta" :title="$t('List.sprint_total_hint')">{{ sprint.tasks || 0 }}</span>
+                                </span>
                             </button>
                         </span>
                     </div>
@@ -126,12 +131,13 @@
                 </template>
             </div>
 
-            <div v-else class="d-flex align-items-center justify-content-center flex-column">
+            <div v-else class="tv2__empty">
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
                     :title="$t(emptyTitleKey)"
                     :message="$t(emptyMessageKey)"
                     :actionLabel="canCreate ? $t('EmptyState.no_tasks_action') : ''"
+                    :sentence="canCreate && emptySentenceKey ? $t(emptySentenceKey) : ''"
                     helpPath="tasks"
                     @action="createTask = true"
                 />
@@ -150,6 +156,7 @@ import ListBulkBar from '@/views/Projects/ListView/ListBulkBar.vue';
 import ViewColumnChooser from '@/views/Projects/components/columns/ViewColumnChooser.vue';
 import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
 import AiFieldColumnHead from '@/views/Projects/components/columns/AiFieldColumnHead.vue';
+import AiColumnHead from './AiColumnHead.vue';
 import { isAiField, loadedViewTasks } from '@/views/Projects/composables/aiFields';
 
 // UTILS
@@ -162,15 +169,16 @@ import { useViewSettings } from '@/views/Projects/composables/viewSettingsContex
 import { useListRowEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
 import { columnCatalogue, gridMinWidth, gridTracks, useViewColumns } from '@/views/Projects/composables/viewColumns';
 import { handleGridKey } from './gridKeyboard';
+import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
 import { isSortableField, valuePath } from '@/views/Projects/composables/customFieldQuery';
 
 // PACKAGES
 import { useStore } from 'vuex';
-import { computed, inject, onMounted, provide, ref, watch } from "vue";
+import { computed, inject, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 
 defineOptions({ name: "ProjectTableView" });
 
-const { groupBy } = taskListHelper();
+const { groupBy, getGroupCounts } = taskListHelper();
 const { getters } = useStore();
 const { checkApps, checkPermission } = useCustomComposable();
 
@@ -200,7 +208,7 @@ const tagsOn = computed(() => checkApps('tags') && checkPermission('task.task_ta
 const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');
 const showArchiveVar = inject("showArchived");
-const { emptyTitleKey, emptyMessageKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
 
 const rowEdit = useListRowEdit(project, showArchiveVar);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { table: true, searched: Boolean(searchedTask?.value) }));
@@ -216,6 +224,26 @@ const catalogue = computed(() => columnCatalogue('table', {
 const columnState = useViewColumns(computed(() => project.value?._id), 'table', catalogue);
 provide('tableColumns', columnState.visibleColumns);
 const columnCount = computed(() => columnState.visibleColumns.value.length + 2);
+
+const totalColumns = computed(() => totalColumnsOf(columnState.visibleColumns.value));
+const COUNT_SETTLE_MS = 400;
+let countTimer = null;
+
+function refreshGroupCounts() {
+    if (searchedTask?.value || !project.value?._id) return;
+    groupedTasks.value.filter(isSprintOpen).forEach((sprint) => {
+        getGroupCounts({ projectId: project.value._id, sprintId: sprintKey(sprint), items: sprint.items || [], projectData: project.value, totals: totalColumns.value, table: true })
+            .catch((error) => console.error("ERROR in table group counts: ", error));
+    });
+}
+
+function scheduleGroupCounts() {
+    clearTimeout(countTimer);
+    countTimer = setTimeout(refreshGroupCounts, COUNT_SETTLE_MS);
+}
+provide('tableTotals', { columns: totalColumns, refresh: scheduleGroupCounts });
+watch(() => totalColumns.value.map((column) => column.id).join(), scheduleGroupCounts);
+onBeforeUnmount(() => clearTimeout(countTimer));
 const gridStyle = computed(() => {
     const tracks = gridTracks('table', columnState.visibleColumns.value);
     return { '--tv2-cols': tracks, minWidth: `${gridMinWidth(tracks)}px` };

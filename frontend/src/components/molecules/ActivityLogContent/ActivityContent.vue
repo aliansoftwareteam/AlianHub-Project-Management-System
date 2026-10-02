@@ -3,6 +3,7 @@
         <UserProfile decorative class="log-use-profile" :data="data.userData" :show-dot="false" :width="'30px'" :thumbnail="'30x30'" />
         <div class="ml-015 wrapperNameImage">
             <span v-html="activityHtml(data.Message)"></span>
+            <span v-if="data.actorType === 'agent'" class="ah-chip ah-chip--agent ah-chip--mono ah-chip--sm activity-agent-mark" data-test="activity-agent-mark" :title="$t('ActivityLog.agent_mark_title', { agent: data.agentName })">{{ $t('ActivityLog.agent_mark') }}</span>
             <span>&nbsp;{{getDateAndTime(data.createdAt == undefined ? new Date().getTime(): new Date(data?.createdAt).getTime())}}</span>
         </div>
     </div>

@@ -10,6 +10,7 @@ vi.mock('@/components/organisms/TaskDetailOverlay/useTaskTimer', () => ({ initTi
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => stub('ShellIcon'));
 vi.mock('@/components/molecules/UndoToast/UndoToast.vue', () => stub('UndoToast'));
 vi.mock('@/components/organisms/TaskDetailOverlay/TaskDetailPanel.vue', () => ({
+    __esModule: true,
     default: {
         name: 'TaskDetailPanel',
         props: ['taskId'],
@@ -61,6 +62,9 @@ describe('the task panel when you move to another page', () => {
         const rows = viewRows(['t1', 't2', 't3']);
         unregister = registerTaskSequence(() => rows);
         openTask({ companyId: 'c1', projectId: 'p1', sprintId: 's1', taskId: 't1' });
+        await flushPromises();
+        // The panel arrives in a chunk of its own the first time a task opens.
+        await vi.dynamicImportSettled();
         await flushPromises();
     });
 

@@ -6,6 +6,7 @@ const { addAndRemoveUserInMongodbNotificationCount } = require("../Auth/controll
 const logger = require("../../Config/loggerConfig");
 const { SEAT_ACTIVE } = require('../../Config/seatStatus');
 const { domainOfEmail, isVerifiedDomain } = require('./helpers/ssoRules');
+const { newAccountNavPreferences } = require('../Users/helpers/navPreferencesRules');
 
 const SSO_NOT_ALLOWED = 'SSO_NOT_ALLOWED';
 
@@ -48,6 +49,7 @@ const jitProvisionUser = async ({ companyId, email, firstName, lastName, externa
                 Employee_Name: `${firstName || normEmail.split('@')[0]} ${lastName || ''}`.trim(),
                 Time_Format: '12',
                 isDeleted: false, isActive: true, isOnline: false, isEmailVerified: true,
+                navPreferences: newAccountNavPreferences(),
             },
         }, 'save');
     }

@@ -10,6 +10,7 @@ jest.mock('../Config/permissionGuard', () => ({
     isWritable: () => true,
     fineGrainedEnforced: () => false,
 }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(), visibleProjects: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');

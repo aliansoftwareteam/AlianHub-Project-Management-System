@@ -77,24 +77,15 @@ describe('the fields of the form', () => {
 });
 
 describe('saving a date field from the Limits tab', () => {
-    it('shows the General tab and focuses the description when it is missing', async () => {
+    it.each([['no description', {}], ['a short description', { fieldDescription: 'Short' }]])('saves a field that has a name and %s', async (label, more) => {
         const wrapper = await dateForm();
         await openLimits(wrapper);
-        await submit(wrapper, { fieldTitle: 'Due' });
-        await vi.waitFor(() => expect(selected(wrapper)).toEqual(['true', 'false', 'false', 'false']));
-        await vi.waitFor(() => expect(document.activeElement).toBe(wrapper.get('textarea[name="fieldDescription"]').element));
-        expect(wrapper.emitted('customFieldStore')).toBeUndefined();
+        await submit(wrapper, { fieldTitle: 'Due', ...more });
+        await vi.waitFor(() => expect(wrapper.emitted('customFieldStore')).toBeTruthy(), { timeout: 3000 });
+        expect(selected(wrapper)).toEqual(['false', 'false', 'false', 'true']);
     });
 
-    it('does the same for a description that is filled in but too short', async () => {
-        const wrapper = await dateForm();
-        await openLimits(wrapper);
-        await submit(wrapper, { fieldTitle: 'Due', fieldDescription: 'Too short' });
-        await vi.waitFor(() => expect(selected(wrapper)).toEqual(['true', 'false', 'false', 'false']));
-        await vi.waitFor(() => expect(document.activeElement).toBe(wrapper.get('textarea[name="fieldDescription"]').element));
-    });
-
-    it('focuses the label when that is the first field in error', async () => {
+    it('shows the General tab and focuses the label when it is missing', async () => {
         const wrapper = await dateForm();
         await openLimits(wrapper);
         await submit(wrapper, { fieldDescription: 'The date the work is due' });

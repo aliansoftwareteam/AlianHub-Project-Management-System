@@ -39,13 +39,13 @@ const tokens = [];
 
 const form = (body) => new URLSearchParams(Object.entries(body).filter(([, v]) => v !== undefined)).toString();
 
-const authorizeAndExchange = async (clientId, scope) => {
+const authorizeAndExchange = async (clientId, scope, grant = []) => {
     const verifier = newVerifier();
     const query = new URLSearchParams({
         response_type: 'code', client_id: clientId, redirect_uri: REDIRECT, scope, state: 's10s4',
         code_challenge: challengeOf(verifier), code_challenge_method: 'S256', resource: `${server.baseURL}/mcp`,
     });
-    const authorized = await consentFlow.consentThrough(`${server.baseURL}/oauth/authorize?${query}`, { session: `accessToken=${owner.accessToken}`, workspace: state.companyId });
+    const authorized = await consentFlow.consentThrough(`${server.baseURL}/oauth/authorize?${query}`, { session: `accessToken=${owner.accessToken}`, workspace: state.companyId, grant });
     expect(authorized.status).toBe(303);
     const code = authorized.location.searchParams.get('code');
     const res = await fetch(`${server.baseURL}/oauth/token`, {
@@ -91,7 +91,7 @@ beforeAll(async () => {
     server = await startServer({
         mongoUrl: resolveMongoUrl(),
         logFile: path.join(STATE_DIR, 'mcp-oauth-tokens-server.log'),
-        env: { MCP_OAUTH: 'both', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000' },
+        env: { MCP_OAUTH: 'both', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000', MCP_TOOLS_MANAGE: 'on' },
     });
     owner = await login(server.baseURL, emailFor('owner'));
 }, BOOT_TIMEOUT_MS);
@@ -218,6 +218,37 @@ describe('an OAuth client on /mcp with MCP_OAUTH=both', () => {
 
         expect((await approvals('revoke', {})).status).toBe(200);
         expect((await mcp(writer, call('tasks.search', {}))).status).toBe(401);
+    });
+
+    it('holds a manage scope only once the client asked, the person ticked it and the approval names it, and loses it on the next call', async () => {
+        const res = await fetch(`${server.baseURL}/oauth/register`, {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ client_name: 'S10 manage scope on mcp', redirect_uris: [REDIRECT], token_endpoint_auth_method: 'none' }),
+        });
+        const manageId = (await res.json()).client_id;
+        const approve = (scopes) => fetch(`${server.baseURL}/api/v2/oauth-client-approvals/approve`, {
+            method: 'POST', headers: { authorization: `Bearer ${owner.accessToken}`, companyid: state.companyId, 'content-type': 'application/json' }, body: JSON.stringify({ clientId: manageId, scopes }),
+        });
+        const listed = async (token) => (await mcp(token, { jsonrpc: '2.0', id: 1, method: 'tools/list' })).body.result.tools.map((tool) => tool.name);
+        const asked = 'tasks:read tasks:write tasks:manage';
+
+        expect((await approve(['tasks:read', 'tasks:write'])).status).toBe(200);
+        const plain = await authorizeAndExchange(manageId, asked);
+        expect(await listed(plain)).not.toContain('task.archive');
+        const refused = await mcp(plain, call('task.archive', { taskId: '6f0000000000000000000001' }));
+        expect(refused.status).toBe(403);
+        expect(refused.body.error.data.requiredScopes).toEqual(['tasks:manage']);
+
+        expect((await approve(['tasks:read', 'tasks:write', 'tasks:manage'])).status).toBe(200);
+        const unticked = await authorizeAndExchange(manageId, asked);
+        expect(await listed(unticked)).not.toContain('task.archive');
+        const managing = await authorizeAndExchange(manageId, asked, ['tasks:manage']);
+        expect(await listed(managing)).toContain('task.archive');
+        expect(await listed(plain)).not.toContain('task.archive');
+
+        expect((await approve(['tasks:read', 'tasks:write'])).status).toBe(200);
+        expect(await listed(managing)).not.toContain('task.archive');
+        expect((await mcp(managing, call('tasks.search', {}))).status).toBe(200);
     });
 
     it('refuses a token of a client that is not approved in the workspace', async () => {

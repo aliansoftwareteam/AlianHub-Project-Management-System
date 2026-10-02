@@ -2,6 +2,8 @@ import { reactive, watch } from "vue";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 import { DEFAULT_VARIANT, VARIANT_CHOICES, lookOf } from "./looks";
+import { DEFAULT_ACCENT, accentOf } from "./accents";
+import { SIMPLE_PLACES, isNavMode, navModeOf } from "./navMode";
 
 export { DEFAULT_VARIANT, VARIANT_CHOICES };
 
@@ -10,6 +12,7 @@ const CONTRAST_KEY = "ah.contrast";
 const CONTRAST_CHOICES = ["auto", "standard", "high"];
 const VARIANT_KEY = "ah.variant";
 const VARIANT_OFF = "off";
+const ACCENT_KEY = "ah.accent";
 const NAV_KEY = "ah.nav";
 const NAV_SAVE_DELAY_MS = 800;
 
@@ -27,19 +30,30 @@ function localPinsOf(userId) {
     }
 }
 
+function localModeOf(userId) {
+    try {
+        const stored = JSON.parse(localStorage.getItem(NAV_KEY) || "null");
+        return navModeOf(userId && stored && stored.uid === userId ? stored.mode : "");
+    } catch {
+        return navModeOf("");
+    }
+}
+
 export const shellState = reactive({
     notepad: false,
     clips: false,
     reminders: false,
     talkToText: false,
     tour: false,
+    tourAsked: false,
     moreOpen: false,
     profileOpen: false,
     sidebarCollapsed: false,
     theme: localStorage.getItem(THEME_KEY) || "light",
     contrast: CONTRAST_CHOICES.includes(localStorage.getItem(CONTRAST_KEY)) ? localStorage.getItem(CONTRAST_KEY) : "auto",
     variant: "",
-    nav: { pinned: localPinsOf(signedInUserId()) },
+    accent: DEFAULT_ACCENT,
+    nav: { pinned: localPinsOf(signedInUserId()), mode: localModeOf(signedInUserId()) },
     agentsRunning: 0
 });
 
@@ -107,10 +121,33 @@ function initVariant() {
     else applyVariant(localStorage.getItem(VARIANT_KEY));
 }
 
+/* The default stores nothing and sets no attribute, so this browser keeps following whatever the default is. */
+export function applyAccent(choice) {
+    shellState.accent = accentOf(choice);
+    if (shellState.accent === DEFAULT_ACCENT) {
+        localStorage.removeItem(ACCENT_KEY);
+        document.documentElement.removeAttribute("data-accent");
+    } else {
+        localStorage.setItem(ACCENT_KEY, shellState.accent);
+        document.documentElement.setAttribute("data-accent", shellState.accent);
+    }
+}
+
+/* True once this browser holds a choice of theme, contrast, look or accent. */
+export function hasChosenLook() {
+    void [shellState.theme, shellState.contrast, shellState.variant, shellState.accent];
+    try {
+        return [THEME_KEY, CONTRAST_KEY, VARIANT_KEY, ACCENT_KEY].some((key) => localStorage.getItem(key) !== null);
+    } catch {
+        return false;
+    }
+}
+
 export function initTheme() {
     document.documentElement.setAttribute("data-theme", resolveTheme(shellState.theme));
     paintContrast();
     initVariant();
+    applyAccent(localStorage.getItem(ACCENT_KEY));
     if (systemDark && systemDark.addEventListener) {
         systemDark.addEventListener("change", () => {
             if (shellState.theme === "system") document.documentElement.setAttribute("data-theme", resolveTheme("system"));
@@ -145,6 +182,7 @@ export function syncNavPreferences(userId, stored) {
     clearTimeout(navSync.timer);
     navSync.timer = null;
     navSync.userId = userId;
+    shellState.nav.mode = navModeOf(stored && stored.mode);
     if (stored && Array.isArray(stored.pinned)) {
         navSync.saved = JSON.stringify(pinnedBody(stored));
         shellState.nav = { ...shellState.nav, pinned: [...stored.pinned] };
@@ -162,6 +200,30 @@ watch(() => shellState.nav, (val) => {
     clearTimeout(navSync.timer);
     navSync.timer = setTimeout(saveNav, NAV_SAVE_DELAY_MS);
 }, { deep: true });
+
+/* Saved at once and on its own, so a switch never waits behind the kept places. */
+export function applyNavMode(choice) {
+    if (!isNavMode(choice)) return Promise.resolve(false);
+    const previous = shellState.nav.mode;
+    if (choice === previous) return Promise.resolve(true);
+    shellState.nav.mode = choice;
+    return apiRequestWithoutCompnay("put", env.USER_NAV_PREFERENCES, { mode: choice })
+        .then((res) => {
+            if (!res?.data?.status) throw new Error(res?.data?.message || "refused");
+            return true;
+        })
+        .catch((error) => {
+            if (shellState.nav.mode === choice) shellState.nav.mode = previous;
+            console.warn("nav mode not saved", error);
+            return false;
+        });
+}
+
+export function keepOnRail(key) {
+    const pinned = shellState.nav.pinned || [];
+    if (shellState.nav.mode !== "simple" || SIMPLE_PLACES.includes(key) || pinned.includes(key)) return;
+    shellState.nav.pinned = [...pinned, key];
+}
 
 export function openPanel(name) {
     shellState.moreOpen = false;

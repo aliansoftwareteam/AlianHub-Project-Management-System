@@ -30,6 +30,9 @@ const AGENT_DELETED = 'agent.deleted';
 const RUN_REVERTED = 'agent.run_reverted';
 const REVISION_PROMOTED = 'agent.revision_promoted';
 const REVISION_ROLLED_BACK = 'agent.revision_rolled_back';
+const PROJECT_POLICY_CHANGED = 'agent.project_policy_changed';
+const STANDING_APPROVAL_MADE = 'agent.standing_approval_made';
+const STANDING_APPROVAL_ENDED = 'agent.standing_approval_ended';
 
 const clip = (v, n = 2000) => {
     try { const s = JSON.stringify(v); return s.length > n ? JSON.parse(s.slice(0, n - 1) + '"') : v; } catch (e) { return String(v).slice(0, n); }
@@ -113,7 +116,7 @@ const baseMeta = (actor) => {
 
 /* Opens the row for an allowed agent call before anything is mutated. Throws
  * AuditUnavailableError, and the caller must not act. */
-const openAction = async (companyId, actor, { action, reason, params, cost, entityType, entityId, entityName, ip, idempotencyKey, taint }) => {
+const openAction = async (companyId, actor, { action, reason, params, cost, entityType, entityId, entityName, ip, idempotencyKey, taint, standing }) => {
     const a = attribution(actor);
     try {
         return await write(companyId, {
@@ -122,7 +125,8 @@ const openAction = async (companyId, actor, { action, reason, params, cost, enti
             entityType: entityType || 'task', entityId: entityId ? String(entityId) : '', entityName: entityName || '',
             meta: { ...baseMeta(actor), action, reason: reason || '', params: safeParams(params), cost: cost || null,
                     state: STATE.PENDING, undo: null, undoable: false, undoneAt: null, undoneBy: null,
-                    ...(idempotencyKey ? { idempotencyKey: String(idempotencyKey) } : {}), ...taintMeta(taint) },
+                    ...(idempotencyKey ? { idempotencyKey: String(idempotencyKey) } : {}), ...taintMeta(taint),
+                    ...(standing ? { standingApproval: { id: String(standing.id), madeBy: String(standing.madeBy) } } : {}) },
         });
     } catch (e) {
         logger.error(`agent audit: ${AUDIT_UNAVAILABLE} for ${action}: ${e.message}`);
@@ -219,6 +223,30 @@ const recordRevisionChange = async (companyId, actor, { kind, agentId, agentName
     });
 };
 
+const recordProjectPolicyChange = async (companyId, actor, { projectId, projectName, from, to, ip }) => {
+    const a = attribution(actor);
+    return writeQuietly(companyId, {
+        actorId: a.actorId, actorName: a.label, ip,
+        action: PROJECT_POLICY_CHANGED,
+        entityType: 'project', entityId: String(projectId), entityName: projectName || '',
+        meta: { ...baseMeta(actor), from, to },
+    });
+};
+
+const recordStandingApproval = async (companyId, actor, { ended = false, row, because, ip }) => {
+    const a = attribution(actor);
+    return writeQuietly(companyId, {
+        actorId: a.actorId, actorName: a.label, ip: ip || '',
+        action: ended ? STANDING_APPROVAL_ENDED : STANDING_APPROVAL_MADE,
+        entityType: 'project', entityId: String(row.projectId),
+        meta: {
+            ...baseMeta(actor), standingApprovalId: String(row._id), action: row.action, agentName: row.agentName || null,
+            connection: row.oauthGrantId ? { oauthClientId: row.oauthClientId, oauthGrantId: row.oauthGrantId } : { tokenId: row.tokenId },
+            onBehalfOf: row.requestedBy, madeBy: row.madeBy, expiresAt: row.expiresAt, ...(ended ? { because } : {}),
+        },
+    });
+};
+
 const markUndone = async (companyId, auditId, byActorId) => {
     const filter = rowFilter(auditId);
     if (!filter) return;
@@ -261,8 +289,8 @@ const findById = async (companyId, auditId) => {
 };
 
 module.exports = {
-    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
+    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, PROJECT_POLICY_CHANGED, STANDING_APPROVAL_MADE, STANDING_APPROVAL_ENDED, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
     AuditUnavailableError, AuditUnmarkedError,
-    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, markUndone, findById, findByIdempotencyKey,
+    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, recordProjectPolicyChange, recordStandingApproval, markUndone, findById, findByIdempotencyKey,
     undoneBefore, canRecordChange,
 };

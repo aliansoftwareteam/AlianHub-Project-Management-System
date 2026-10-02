@@ -33,9 +33,14 @@ const holderMay = async (companyId, actor, action, params = {}) => {
     if (!OBJECT_ID.test(uid)) return denied(required[0].key, 'cannot be checked — no person is behind this agent');
     try {
         const projectId = await projectOf(companyId, params);
-        for (const { key, write } of required) {
+        const holds = async (key, write) => {
             const value = await evaluatePermission(companyId, uid, key, { projectId });
-            if (!(write ? isWritable(value) : isReadable(value))) return denied(key, 'is not granted to the person behind this agent');
+            return write ? isWritable(value) : isReadable(value);
+        };
+        for (const { key, write, anyOf } of required) {
+            let granted = false;
+            for (const option of anyOf || [key]) granted = granted || await holds(option, write);
+            if (!granted) return denied(key, 'is not granted to the person behind this agent');
         }
     } catch (e) {
         return denied(required[0].key, `could not be evaluated (${e.message})`);

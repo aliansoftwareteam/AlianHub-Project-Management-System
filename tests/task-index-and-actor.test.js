@@ -138,7 +138,7 @@ const reset = () => {
     logger.warn.mockClear();
     HandleBothNotification.mockClear();
     updateSprintFun.mockClear();
-    [OPEN_PROJECT, OTHER_PROJECT].forEach((_id) => mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id, ProjectName: 'Parity', ProjectCode: 'PAR', CompanyId: CID, lastTaskId: 4, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST }));
+    [OPEN_PROJECT, OTHER_PROJECT].forEach((_id) => mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id, ProjectName: 'Parity', ProjectCode: 'PAR', CompanyId: CID, lastTaskId: 4, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST, tagsArray: [{ uid: 'tag-1', tagName: 'Urgent' }] }));
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: OWNER_NAME });
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: MEMBER, Employee_Name: 'Max Member' });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
@@ -171,6 +171,9 @@ const CRAFTED = {
     openBlockers: () => ({ action: 'openBlockers', taskId: OPEN_TASK }),
     bulkUpdateStartDate: () => ({ action: 'bulkUpdateStartDate', taskIds: [OPEN_TASK], userData: USER, startDate: '2026-10-01' }),
     bulkRestore: () => ({ action: 'bulkRestore', taskIds: [OPEN_TASK], userData: USER }),
+    addToList: () => ({ action: 'addToList', taskId: OPEN_TASK, sprintId: OTHER_SPRINT }),
+    removeFromList: () => ({ action: 'removeFromList', taskId: OPEN_TASK, sprintId: OTHER_SPRINT }),
+    bulkAddToList: () => ({ action: 'bulkAddToList', taskIds: [OPEN_TASK], sprintId: OTHER_SPRINT }),
     bulkDuplicate: () => ({ action: 'bulkDuplicate', taskIds: [OPEN_TASK], userData: USER, projectData: projectData(), sprintObj: { id: SPRINT, name: 'Sprint 1', folderId: null }, oldProject: projectData(), duplicateData: [], taskName: 'Copy', oldSprintObj: { id: SPRINT } }),
 };
 
@@ -496,6 +499,7 @@ describe('history and notifications go to the stored task\'s project', () => {
         const body = bodyFor(PATCH, 'moveTask');
         body.projectData = { id: OTHER_PROJECT, ProjectCode: 'PAR', ProjectName: 'Parity' };
         body.oldProject = { id: OPEN_PROJECT, ProjectName: 'Parity', taskTypeCounts: TYPE_LIST, taskStatusData: STATUS_LIST };
+        mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: OTHER_SPRINT, name: 'Sprint 2', projectId: OTHER_PROJECT, deletedStatusKey: 0 });
         const result = await call(PATCH, body);
         expect(result).toMatchObject({ code: 200, body: { status: true } });
         expect(String(storedTask().ProjectID)).toBe(OTHER_PROJECT);

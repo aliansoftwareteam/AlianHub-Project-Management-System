@@ -9,8 +9,11 @@ const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { recordProjectChanges } = require('../helpers/projectHistory');
 const { checkWorkingDays } = require('../../Company/helpers/workingDays');
 const socketEmitter = require('../../../event/socketEventEmitter');
+const { holdProjectDescription, ProjectDescriptionRefused } = require('../helpers/projectDescription');
+const { RichTextLimitError } = require('../../Tasks/helpers/cleanRichText');
 
 exports.updateProjectInternal = async (companyId, projectId, updateObject, key, arrayFilters) => {
+    holdProjectDescription(updateObject, key);
     // Trashing and restoring a project are the only writes that change what a company
     // owns, and every client reaches them through here. A counter failure must not block
     // the delete: a stuck count is recoverable, a project nobody can remove is not.
@@ -204,6 +207,9 @@ exports.updateProject = async (req, res) => {
                 .catch((error) => logger.error(`project history after update failed: ${(error && error.message) || error}`));
             return res.status(200).json(project);
         }).catch((error) => {
+            if (error instanceof ProjectDescriptionRefused || error instanceof RichTextLimitError) {
+                return res.status(error.statusCode).json({ status: false, statusText: error.message, message: error.message });
+            }
             return res.status(500).json({ message: "An error occurred while fetching the project",error:error });
         })
     } catch (error) {

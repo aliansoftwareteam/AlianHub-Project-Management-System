@@ -8,6 +8,8 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const socketEmitter = require('../../event/socketEventEmitter');
 const tools = require('../Automations/engine/tools');
 const permissions = require('./permissions');
+const { runAs, byline, toolNameOf } = require('./actingAgent');
+const { descriptionBlockFrom } = require('../Tasks/helpers/descriptionBlock');
 
 // Task changes an agent makes the way a person makes them: each goes through the task routes' own
 // preparation (Modules/Tasks/helpers/taskWriteFields) and handler (taskMongo), as the person behind
@@ -29,6 +31,7 @@ const ARCHIVED_WITH_PARENT = 3;
 const ASSIGN_MODES = Object.freeze(['set', 'add', 'remove']);
 const LINK_KINDS = Object.freeze(['pr', 'branch', 'doc', 'url']);
 const LINKS_MAX = 10;
+const AGENT_NAME_MAX = 60;
 const NO_KEY = '--';
 const KEY_READS = 10;
 const KEY_WAIT_MS = 30;
@@ -45,8 +48,17 @@ const personOf = (actor) => {
     return uid;
 };
 
-/* Who a change is made as, and the agent it was made through: the activity log names both. */
-const whoOf = (actor) => ({ uid: personOf(actor), via: actor && actor.kind === 'agent' ? String(actor.agentName || actor.provider || 'an agent').slice(0, 60) : '' });
+/* Who a change is made as, and the agent it was made through: the activity log names both. `mark` is what the
+ * history rows and the events of that change carry; `depth` is the depth of the event the agent answered. */
+const whoOf = (actor, depth = 0) => {
+    const uid = personOf(actor);
+    if (!actor || actor.kind !== 'agent') return { uid, via: '', mark: null };
+    const via = String(toolNameOf(actor)).slice(0, AGENT_NAME_MAX);
+    return { uid, via, mark: { userId: uid, agentId: idOf(actor.agentId || actor.clientId) || null, agentName: via, depth: Math.max(0, Number(depth) || 0) } };
+};
+
+/* The person's name arrives escaped from the route's own preparation; the agent's is escaped here. */
+const namedWith = (who, person, escapeText) => ({ ...person, Employee_Name: byline(escapeText(who.via), person.Employee_Name) });
 
 const liveTask = async (companyId, taskId) => {
     const task = await tools.getTask(companyId, taskId);
@@ -86,9 +98,9 @@ const asRoute = async (companyId, who, action, body, beside = {}) => {
     try {
         const { payload } = await prepareTaskRequest(request, TASK_ACTION_FIELDS[action], action);
         if (who.via) {
-            [payload.userData, payload.user].filter(Boolean).forEach((person) => { person.Employee_Name = `${person.Employee_Name} (via ${escapeText(who.via)})`; });
+            ['userData', 'user'].filter((key) => payload[key]).forEach((key) => { payload[key] = namedWith(who, payload[key], escapeText); });
         }
-        const out = await taskMongo[action]({ ...payload, ...beside });
+        const out = await runAs(who.mark, () => taskMongo[action]({ ...payload, ...beside }));
         if (out && out.status === false) throw refuse(out.statusText || out.message || `${action} changed nothing`);
         return out;
     } catch (error) {
@@ -118,8 +130,7 @@ const EDITS = Object.freeze({
         same: (task, value) => (task.rawDescription || '') === value,
         previous: (task) => ({ rawDescription: task.rawDescription === undefined ? null : task.rawDescription, descriptionBlock: task.descriptionBlock === undefined ? null : task.descriptionBlock }),
         write: ({ companyId, who, task, value }) => {
-            const { buildDescriptionBlock } = require('../Forms/helpers/submissionRules');
-            return asRoute(companyId, who, 'updateDescription', { companyId, task: { _id: idOf(task._id) }, text: { blocks: buildDescriptionBlock(value), text: value } });
+            return asRoute(companyId, who, 'updateDescription', { companyId, task: { _id: idOf(task._id) }, text: { blocks: descriptionBlockFrom(value), text: value } });
         },
     },
     Task_Priority: {
@@ -285,7 +296,7 @@ const recordAgentStatus = async (companyId, task, from, patch, agent) => {
     const outcome = await completionStore.forStatusChange(companyId, task._id, { toStatus: { statusType: patch.statusType, name: patch.status.text }, fromStatus: from, actor: agent });
     if (!outcome || outcome.error || !outcome.completion) return;
     const saved = await completionStore.save(companyId, task._id, addWork(outcome.completion, agent));
-    if (saved) socketEmitter.emit('update', { type: 'update', data: saved, updatedFields: { completion: saved.completion }, module: 'task' });
+    if (saved) socketEmitter.emit('update', { type: 'update', data: saved, updatedFields: { completion: saved.completion }, module: 'task', companyId });
 };
 
 /* One status change through the task route, to any status the task's project defines. `agent` is the work entry of an agent making it for `who`. */
@@ -294,9 +305,6 @@ const setStatus = async ({ companyId, who, taskId, name, agent = null }) => {
     const patch = await tools.resolveStatus(companyId, task.ProjectID, name);
     const from = { name: (task.status && task.status.text) || '', statusType: task.statusType || '' };
     if (patch.statusKey === task.statusKey) return { task, from, patch, changed: false };
-    if (agent && require('./registry').DONE_STATUS_TYPES.includes(String(patch.statusType)) && (await require('./accounts').getPolicy(companyId)).requireCheckBeforeDone) {
-        throw refuse('this workspace has a person check an agent\'s work before it is closed, so a person closes this task');
-    }
     const rows = flatStatuses(await storedProject(companyId, task.ProjectID));
     const current = rows.find((row) => row.key === task.statusKey) || {};
     const next = rows.find((row) => row.key === patch.statusKey) || {};
@@ -305,7 +313,7 @@ const setStatus = async ({ companyId, who, taskId, name, agent = null }) => {
         prevStatus: { backColor: current.bgColor || '', color: current.textColor || '', statusName: current.name || from.name, bgColor: next.bgColor || '', textColor: next.textColor || '', updatedTaskName: patch.status.text },
         projectData: {}, task: { ...taskRef(task), statusType: task.statusType || '', status: task.status || {} }, isUpdateTask: true,
     }, agent ? { recordsCompletion: false } : {});
-    if (agent) await recordAgentStatus(companyId, task, from, patch, { ...agent, onBehalfOf: who.uid });
+    if (agent) await runAs(who.mark, () => recordAgentStatus(companyId, task, from, patch, { ...agent, onBehalfOf: who.uid }));
     return { task, from, patch, changed: true };
 };
 
@@ -338,9 +346,8 @@ const createFieldsOf = async ({ companyId, actor, who, project, fields }) => {
     const zone = await zoneOf(who.uid);
     const set = {};
     if (given.rawDescription !== undefined) {
-        const { buildDescriptionBlock } = require('../Forms/helpers/submissionRules');
         set.rawDescription = EDITS.rawDescription.clean(given.rawDescription);
-        set.descriptionBlock = buildDescriptionBlock(set.rawDescription);
+        set.descriptionBlock = descriptionBlockFrom(set.rawDescription);
     }
     if (given.Task_Priority !== undefined) set.Task_Priority = EDITS.Task_Priority.clean(given.Task_Priority);
     if (given.DueDate !== undefined && given.DueDate !== null) {
@@ -413,8 +420,8 @@ const createThroughRoute = async ({ companyId, who, project, placement, parent, 
 };
 
 const executors = {
-    async 'task.status.change'({ companyId, actor, params }) {
-        const who = whoOf(actor);
+    async 'task.status.change'({ companyId, actor, params, depth }) {
+        const who = whoOf(actor, depth);
         const { workEntry } = require('./actions');
         const name = params.status && (params.status.name || params.status.text);
         const { task, from, patch, changed } = await setStatus({ companyId, who, taskId: params.taskId, name, agent: who.via ? workEntry(actor) : null });
@@ -424,8 +431,8 @@ const executors = {
         };
     },
 
-    async 'task.add'({ companyId, actor, params }) {
-        const who = whoOf(actor);
+    async 'task.add'({ companyId, actor, params, depth }) {
+        const who = whoOf(actor, depth);
         const title = EDITS.TaskName.clean(params.title);
         const project = await storedProject(companyId, params.projectId);
         const list = await sprintRef(companyId, await listFor(companyId, who.uid, project, params.sprintId));
@@ -435,8 +442,8 @@ const executors = {
         return { result: made, undo: { kind: 'task', taskId: made.taskId, projectId: idOf(project._id) }, entityId: made.taskId, entityName: title };
     },
 
-    async 'subtask.add'({ companyId, actor, params }) {
-        const who = whoOf(actor);
+    async 'subtask.add'({ companyId, actor, params, depth }) {
+        const who = whoOf(actor, depth);
         const parent = await liveTask(companyId, params.taskId);
         const title = EDITS.TaskName.clean(params.title);
         const project = await storedProject(companyId, parent.ProjectID);
@@ -446,8 +453,8 @@ const executors = {
         return { result: { subtaskId: made.taskId, key: made.key, title }, undo: { kind: 'subtask', subtaskId: made.taskId, parentTaskId: idOf(parent._id) }, entityId: params.taskId };
     },
 
-    async 'task.edit'({ companyId, actor, params }) {
-        const who = whoOf(actor);
+    async 'task.edit'({ companyId, actor, params, depth }) {
+        const who = whoOf(actor, depth);
         const { uid } = who;
         const task = await liveTask(companyId, params.taskId);
         const given = params.fields && typeof params.fields === 'object' ? params.fields : {};
@@ -471,8 +478,8 @@ const executors = {
         return { result: { changed }, undo: changed.length ? { kind: 'update', taskId: idOf(task._id), previous } : null, entityId: task._id, entityName: task.TaskName };
     },
 
-    async 'task.assignees.set'({ companyId, actor, params }) {
-        const who = whoOf(actor);
+    async 'task.assignees.set'({ companyId, actor, params, depth }) {
+        const who = whoOf(actor, depth);
         const task = await liveTask(companyId, params.taskId);
         const mode = String(params.mode || '');
         if (!ASSIGN_MODES.includes(mode)) throw refuse(`mode needs one of ${ASSIGN_MODES.join(', ')}`);
@@ -493,8 +500,8 @@ const executors = {
         return { result: { assignees, added, removed }, undo: touched ? { kind: 'assign', taskId: idOf(task._id), previous: held } : null, entityId: task._id, entityName: task.TaskName };
     },
 
-    async 'task.field.set'({ companyId, actor, params }) {
-        const who = whoOf(actor);
+    async 'task.field.set'({ companyId, actor, params, depth }) {
+        const who = whoOf(actor, depth);
         const { uid } = who;
         const task = await liveTask(companyId, params.taskId);
         const fieldId = idOf(params.fieldId);
@@ -514,8 +521,8 @@ const executors = {
         return { result: { fieldId, title: definition.fieldTitle || '' }, undo: { kind: 'update', taskId: idOf(task._id), previous: { [`customField.${fieldId}`]: held } }, entityId: task._id, entityName: task.TaskName };
     },
 
-    async 'task.move'({ companyId, actor, params }) {
-        const who = whoOf(actor);
+    async 'task.move'({ companyId, actor, params, depth }) {
+        const who = whoOf(actor, depth);
         const { uid } = who;
         const task = await liveTask(companyId, params.taskId);
         if (task.ParentTaskId) throw refuse(SUBTASK_MOVES_WITH_PARENT);
@@ -546,15 +553,15 @@ const executors = {
         return { result: { projectId: destinationId, sprintId: idOf(destination.sprint._id), moved: 1 + subtree.length }, undo: null, entityId: task._id, entityName: task.TaskName };
     },
 
-    async 'task.archive'({ companyId, actor, params }) {
-        const { task, from } = await setArchived({ companyId, who: whoOf(actor), taskId: params.taskId, to: ARCHIVED });
+    async 'task.archive'({ companyId, actor, params, depth }) {
+        const { task, from } = await setArchived({ companyId, who: whoOf(actor, depth), taskId: params.taskId, to: ARCHIVED });
         return { result: { archived: true }, undo: { kind: 'archive', taskId: idOf(task._id), previous: from }, entityId: task._id, entityName: task.TaskName };
     },
 
-    async 'task.restore'({ companyId, actor, params }) {
-        const { task, from } = await setArchived({ companyId, who: whoOf(actor), taskId: params.taskId, to: LIVE });
+    async 'task.restore'({ companyId, actor, params, depth }) {
+        const { task, from } = await setArchived({ companyId, who: whoOf(actor, depth), taskId: params.taskId, to: LIVE });
         return { result: { archived: false }, undo: { kind: 'archive', taskId: idOf(task._id), previous: from }, entityId: task._id, entityName: task.TaskName };
     },
 };
 
-module.exports = { executors, setArchived, setStatus, whoOf, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };
+module.exports = { executors, setArchived, setStatus, whoOf, asRoute, liveTask, storedProject, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };

@@ -21,17 +21,17 @@ import { USER_ONBOARDING } from '@/config/env';
 
 const ROLE = { guest: 0, owner: 1, admin: 2, member: 3 };
 
-const store = (roleType) => createStore({
+const store = (roleType, projects) => createStore({
     modules: {
-        projectData: { namespaced: true, getters: { projects: () => ({ data: [{ _id: 'p2', ProjectCode: 'OPS', ProjectName: 'Ops' }] }) } },
+        projectData: { namespaced: true, getters: { projects: () => ({ data: projects }) } },
         settings: { namespaced: true, getters: { companyUsers: () => [{ userId: 'user-1' }], companyUserDetail: () => ({ roleType }) } },
         users: { namespaced: true, getters: { users: () => [] } }
     }
 });
 
-const useChecklist = (roleType) => {
+const useChecklist = (roleType, projects = [{ _id: 'p2', ProjectCode: 'OPS', ProjectName: 'Ops' }]) => {
     let api;
-    mount(defineComponent({ setup() { api = useOnboardingChecklist(); return () => h('div'); } }), { global: { plugins: [store(roleType)] } });
+    mount(defineComponent({ setup() { api = useOnboardingChecklist(); return () => h('div'); } }), { global: { plugins: [store(roleType, projects)] } });
     return api;
 };
 
@@ -42,19 +42,17 @@ beforeEach(() => {
     apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true } });
 });
 
-describe('the "Bring your work in" step', () => {
-    it.each(['owner', 'admin'])('is offered to an %s, right after the first project', (role) => {
+describe('the import on the project step', () => {
+    it.each(['owner', 'admin'])('is offered to an %s as the second action of the project step', (role) => {
         const steps = useChecklist(ROLE[role]).steps.value;
-        const keys = steps.map((s) => s.key);
-        expect(keys.indexOf('import')).toBe(keys.indexOf('project') + 1);
-        expect(steps.find((s) => s.key === 'import')).toMatchObject({ label: 'Home.step_import', cta: 'Home.bring_work_in', done: false });
+        expect(steps.find((s) => s.key === 'project')).toMatchObject({ alt: { key: 'import', label: 'Home.import_from' } });
     });
 
     it.each(['member', 'guest'])('is never shown to a %s', (role) => {
-        expect(useChecklist(ROLE[role]).steps.value.map((s) => s.key)).not.toContain('import');
-        expect(MEMBER_STEPS).not.toContain('import');
-        expect(WORKSPACE_STEPS).toContain('import');
-        expect(ADMIN_STEPS).toContain('import');
+        expect(useChecklist(ROLE[role]).steps.value.filter((s) => s.alt?.key === 'import')).toEqual([]);
+        expect(MEMBER_STEPS).not.toContain('project');
+        expect(WORKSPACE_STEPS).toContain('project');
+        expect(ADMIN_STEPS).toContain('project');
     });
 
     it('opens the workspace import dialog', () => {
@@ -64,19 +62,20 @@ describe('the "Bring your work in" step', () => {
         expect(workspaceImport.open).toBe(true);
     });
 
-    it('is done once an import has run, on any device', () => {
+    it('ticks the project step once an import has run, on any device', () => {
         me.value = { ...me.value, homeChecklist: { importedWork: true } };
-        expect(useChecklist(ROLE.admin).steps.value.find((s) => s.key === 'import').done).toBe(true);
+        expect(useChecklist(ROLE.admin, []).steps.value.find((s) => s.key === 'project').done).toBe(true);
+        expect(useChecklist(ROLE.admin, []).steps.value.find((s) => s.key === 'task').done).toBe(false);
     });
 });
 
 describe('the checklist hosts the dialog', () => {
-    const steps = [{ key: 'import', label: 'Home.step_import', cta: 'Home.bring_work_in', done: false }];
+    const steps = [{ key: 'project', label: 'Home.step_start_project', cta: 'Home.create_project', alt: { key: 'import', label: 'Home.import_from' }, done: false }];
 
     it('mounts it only while it is open', async () => {
         const wrapper = mount(SetupChecklist, { props: { steps } });
         expect(wrapper.find('.wim-stub').exists()).toBe(false);
-        await wrapper.find('.hc-setup__cta').trigger('click');
+        await wrapper.find('.hc-setup__alt').trigger('click');
         expect(wrapper.emitted('action')[0]).toEqual(['import']);
         workspaceImport.open = true;
         await flushPromises();

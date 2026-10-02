@@ -3,6 +3,7 @@
         <div class="tv-head">
             <h1 class="tv-title">{{ $t('Time.approvals') }}</h1>
             <span v-if="count" class="ap__count">{{ count }}</span>
+            <TimesheetTabs active="approvals" />
             <nav class="tv-tabs ap__tabs" :aria-label="$t('Time.approval_types')">
                 <button v-for="f in filters" :key="f.key" type="button" class="tv-tab" :class="{ 'is-active': filter === f.key }" @click="filter = f.key">{{ $t(f.label) }}</button>
             </nav>
@@ -81,6 +82,7 @@
                             <div class="ap__sub">{{ card.sub }}</div>
                         </div>
                         <span v-if="card.kind === 'agent'" class="ah-chip ah-chip--agent">{{ $t('Time.agent_tag') }}</span>
+                        <span v-if="card.own" class="ah-chip ah-chip--warn" data-test="own-week" :title="$t('Time.own_week_hint')">{{ $t('Time.own_week') }}</span>
                     </div>
 
                     <div v-if="card.kind === 'timesheet'" class="ap__facts">
@@ -144,7 +146,8 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import { formatHm } from '@/composable/useTimer';
-import { isOwnerOrAdmin } from "@/utils/roles";
+import { canApprove } from './approvalAccess';
+import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
 import ProposalWhyDialog from './ProposalWhyDialog.vue';
 import { proposalTitle } from '@/views/Ai/plainLabels';
@@ -171,7 +174,7 @@ const currentUserId = inject('$userId');
 
 const cid = computed(() => (companyId && companyId.value) || '');
 const uid = computed(() => (currentUserId && currentUserId.value) || localStorage.getItem('userId') || '');
-const isManager = computed(() => isOwnerOrAdmin((getters['settings/companyUserDetail'] || {}).roleType));
+const isManager = computed(() => canApprove(getters['settings/companyUserDetail']));
 
 const filters = [
     { key: 'all', label: 'Time.filter_all' },
@@ -212,12 +215,18 @@ const overlapText = (row) => {
     return names.length ? t('Time.leave_overlap', { names: [...new Set(names)].join(', ') }) : '';
 };
 
+// The stored total is the week as first submitted; the split beside it is the week as it stands, so the card shows their sum.
+const weekMinutes = (row) => (row.billableMinutes == null && row.nonBillableMinutes == null
+    ? row.totalMinutes
+    : (Number(row.billableMinutes) || 0) + (Number(row.nonBillableMinutes) || 0));
+const oldestFirst = (list) => list.sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
+
 const cards = computed(() => {
     const ts = timesheets.value.map((row) => ({
-        kind: 'timesheet', key: `ts-${row._id}`, row, at: row.submittedAt,
+        kind: 'timesheet', key: `ts-${row._id}`, row, at: row.submittedAt, own: String(row.userId) === String(uid.value),
         name: row.userName || nameOf(row.userId), avatar: row.userAvatar, color: colorFor(row.userId),
         title: t('Time.ts_card_title', { name: row.userName || nameOf(row.userId) }),
-        sub: t('Time.week_of', { date: moment(row.periodStart).format('MMM D'), h: formatHm(row.totalMinutes) }),
+        sub: t('Time.week_of', { date: moment(row.periodStart).format('MMM D'), h: formatHm(weekMinutes(row)) }),
     }));
     const lv = leave.value.map((row) => {
         const days = Number(row.totalDays) || 0;
@@ -234,7 +243,7 @@ const cards = computed(() => {
         kind: 'agent', key: `ag-${row.id}`, row, at: row.createdAt, name: row.agentName, avatar: '', color: 'var(--agent)',
         title: row.summary, sub: `${row.agentName}${row.reversible ? ` · ${t('Time.reversible')}` : ''}`,
     }));
-    return [...ts, ...lv, ...ag].sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0));
+    return [ts, lv, ag].flatMap(oldestFirst);
 });
 const visibleCards = computed(() => cards.value.filter((c) => filter.value === 'all' || c.kind === filter.value));
 const count = computed(() => cards.value.length);
@@ -432,7 +441,7 @@ onMounted(() => { if (isManager.value) load(); });
 <style scoped>
 .ap { max-width: 720px; }
 .ap__count { background: var(--brand); color: var(--on-brand); font: 700 10px/1 var(--font-ui); padding: 4px 7px; border-radius: 9px; }
-.ap__tabs { margin-left: 4px; }
+.ap__tabs { margin-left: auto; }
 .ap__list { display: flex; flex-direction: column; gap: 10px; }
 .ap__card { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-radius: 14px; }
 .ap__card--agent { border-color: rgba(107, 92, 231, .35); }

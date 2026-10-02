@@ -39,7 +39,7 @@
                     :layout="cards"
                     :col-num="12"
                     :row-height="30"
-                    :margin="[12, 12]"
+                    :margin="gridMargin"
                     :is-draggable="!locked && dashboard.canEdit"
                     :is-resizable="!locked && dashboard.canEdit"
                     :vertical-compact="true"
@@ -210,6 +210,7 @@ import CardPicker from './CardPicker.vue';
 import CardSettings from './CardSettings.vue';
 import { catalogEntry, PERIOD_OPTIONS } from '@/plugins/dashboard/cardCatalog';
 import { cardComponent } from '@/plugins/dashboard/cardRegistry';
+import { useLookLength } from '@/utils/lookTokens';
 import {
     fetchDashboard, patchDashboard, saveDashboardCards, duplicateDashboard, removeDashboard, makeCardUid,
 } from '@/plugins/dashboard/dashboardsApi';
@@ -225,6 +226,8 @@ const $toast = useToast();
 const companyId = inject('$companyId', ref(''));
 const clientWidth = inject('$clientWidth', ref(1440));
 const wide = computed(() => Number(clientWidth.value) > 768);
+const gridGap = useLookLength('--gap-stack', 12);
+const gridMargin = computed(() => [gridGap.value, gridGap.value]);
 
 const companyUserDetail = computed(() => getters['settings/companyUserDetail']);
 const taskStatusArray = computed(() => getters['settings/AllTaskStatus']);

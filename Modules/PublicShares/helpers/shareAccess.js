@@ -3,6 +3,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { projectAccess, isCompanyAdmin, isCompanyMember } = require('../../../Config/contentAccess');
 const { pageVisibleTo } = require('../../Pages/helpers/pageRules');
+const { readsDocsOnly } = require('../../Pages/helpers/pageAccess');
 const { canSeeSprint, sprintIdentities } = require('../../Sprints/helpers/sprintVisibility');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -36,6 +37,7 @@ const canManageShare = async ({ companyId, uid, entityType, entityId }) => {
         const decision = page.ProjectID
             ? await fromProject(companyId, user, page.ProjectID)
             : ((await isCompanyMember(companyId, user)) ? ALLOWED : NOT_FOUND);
+        if (decision.ok && (await readsDocsOnly(companyId, user))) return { ok: false, statusCode: 403 };
         return String(page.visibility || '') === 'private' && decision.ok ? { ...decision, privateDoc: true } : decision;
     }
     if (entityType === 'sprint') {

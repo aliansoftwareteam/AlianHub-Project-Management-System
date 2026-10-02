@@ -5,18 +5,26 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const socketEmitter = require('../../event/socketEventEmitter');
 const tools = require('../Automations/engine/tools');
 const registry = require('./registry');
+const groups = require('./registryGroups');
+const { SCOPE, read, write } = require('./registryKit');
 const permissions = require('./permissions');
+const projectPolicy = require('./projectPolicy');
 const audit = require('./agentAudit');
 const { attribution, isAgent } = require('./actor');
+const { shownAs } = require('./actingAgent');
 const stepCredential = require('../Workflows/stepCredential');
 const completionStore = require('../Tasks/helpers/completionStore');
 const { sprintPlacementOf, followSprintMove, moveDescendants } = require('../Tasks/helpers/sprintPlacement');
+const { pullOfLists } = require('../Tasks/helpers/taskExtraLists');
 const { emitPageChange } = require('../Pages/helpers/pageEvents');
 const { markdownToEditorData, blocksToHtml } = require('../Pages/helpers/pageContent');
+const { cleanPageContent } = require('../Tasks/helpers/cleanRichText');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { canCreatePageIn } = require('../Pages/helpers/pageAccess');
+const { readableTaskIds, openProject, listOf } = require('../Tasks/helpers/taskWritePlacement');
 const logger = require('../../Config/loggerConfig');
 
 // The single place an agent's action is executed. MCP tools, approved proposals
@@ -37,10 +45,7 @@ const { LINK_KINDS } = require('./taskRequests');
 // only on a reversible, task-scoped write with no money in it; everything else
 // is proposed. `reversible` follows the registry's undoable flag so the rating
 // and the Inbox's "reversible" badge never disagree.
-const SCOPE = Object.freeze({ TASK: 'task', PROJECT: 'project', WORKSPACE: 'workspace' });
 const RATING_KEYS = Object.freeze(['write', 'reversible', 'scope', 'money']);
-const read = (scope) => Object.freeze({ write: false, reversible: true, scope, money: false });
-const write = (scope, reversible = true) => Object.freeze({ write: true, reversible, scope, money: false });
 const RATINGS = Object.freeze({
     'tasks.next': read(SCOPE.WORKSPACE),
     'tasks.search': read(SCOPE.WORKSPACE),
@@ -64,37 +69,7 @@ const RATINGS = Object.freeze({
 });
 
 // Rated only while the registry holds them, so a flag that is off leaves no rating behind.
-const FLAGGED_RATINGS = Object.freeze({
-    'performance.read': read(SCOPE.PROJECT),
-    'projects.list': read(SCOPE.WORKSPACE),
-    'project.get': read(SCOPE.PROJECT),
-    'sprints.list': read(SCOPE.PROJECT),
-    'statuses.list': read(SCOPE.PROJECT),
-    'comments.list': read(SCOPE.TASK),
-    'pages.search': read(SCOPE.WORKSPACE),
-    'page.get': read(SCOPE.PROJECT),
-    'timesheet.read': read(SCOPE.WORKSPACE),
-    'comment.create': write(SCOPE.TASK),
-    'timelog.create': write(SCOPE.TASK),
-    'fields.list': read(SCOPE.PROJECT),
-    'subtasks.list': read(SCOPE.TASK),
-    'members.list': read(SCOPE.WORKSPACE),
-    'task.edit': write(SCOPE.TASK),
-    'task.assignees.set': write(SCOPE.TASK),
-    'task.field.set': write(SCOPE.TASK),
-    'task.move': write(SCOPE.PROJECT, false),
-    'task.archive': write(SCOPE.PROJECT),
-    'task.restore': write(SCOPE.PROJECT),
-    'task.history': read(SCOPE.TASK),
-    'task.links.list': read(SCOPE.TASK),
-    'task.status.change': write(SCOPE.TASK),
-    'task.add': write(SCOPE.PROJECT),
-    'subtask.add': write(SCOPE.TASK),
-    'comment.update': write(SCOPE.TASK),
-    'tasks.batch': write(SCOPE.TASK),
-    'page.create': write(SCOPE.PROJECT),
-    'page.update': write(SCOPE.PROJECT),
-});
+const FLAGGED_RATINGS = Object.freeze(Object.assign({}, ...groups.map((g) => g.ratings)));
 
 const ratingTable = () => ({ ...RATINGS, ...Object.fromEntries(Object.entries(FLAGGED_RATINGS).filter(([k]) => registry.has(k))) });
 
@@ -112,13 +87,16 @@ const manifest = () => {
 
 const clampDepth = (depth) => Math.max(0, Number(depth) || 0);
 
-const emitTask = (doc, updatedFields, actor, depth) => {
+const emitTask = (companyId, doc, updatedFields, actor, depth) => {
     socketEmitter.emit('update', {
-        type: 'update', module: 'task', data: doc, updatedFields,
+        type: 'update', module: 'task', companyId, data: doc, updatedFields,
         actor: { kind: 'agent', userId: actor.userId || null, agentId: actor.agentId || null },
         depth: clampDepth(depth) + 1,
     });
 };
+
+/* What people read on a task, a time entry or a doc: "Claude, for Priya". The audit log keeps `label`. */
+const nameShown = (actor, a) => (a.actorType === 'agent' ? shownAs(actor) : a.label);
 
 const workEntry = (actor, hours = 0) => {
     const a = attribution(actor);
@@ -134,7 +112,7 @@ const context = (actor, action, depth) => {
     return {
         ruleId: null, ruleName: a.label, runId: actor.runId || null, action: `agent.${action}`, depth: clampDepth(depth),
         userId: String(actor.userId || a.actorId || ''), actingUserId: String(actor.userId || ''), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null,
-        agentName: a.actorType === 'agent' ? a.label : null,
+        agentName: a.actorType === 'agent' ? shownAs(actor) : null,
         auditedByCaller: true,
     };
 };
@@ -203,6 +181,24 @@ const contentOfText = (text) => {
     return { html: blocksToHtml(blocks), blocks };
 };
 
+const DRAFT_ELSEWHERE = 'a doc drafted for a task is saved in that task\'s project';
+
+/* Where a draft is saved. One written for a task is filed in the task's project, and is its author's alone when the
+ * task's list is private: a project doc is read by everyone on the project, a private list's tasks are not.
+ * null when the task has no project, or the draft names another one. */
+const draftPlaceOf = async (companyId, params) => {
+    const named = params.projectId && oid(params.projectId) ? String(params.projectId) : '';
+    const taskId = params.taskId && oid(params.taskId);
+    if (!taskId) return { projectId: named, visibility: 'project', linkedTasks: [] };
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId }, { ProjectID: 1, sprintId: 1 }] }, 'findOne');
+    const projectId = task && oid(task.ProjectID) ? String(task.ProjectID) : '';
+    if (!projectId || (named && named !== projectId)) return null;
+    const list = oid(task.sprintId)
+        ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: oid(task.sprintId) }, { private: 1 }] }, 'findOne')
+        : null;
+    return { projectId, visibility: list && list.private === true ? 'private' : 'project', linkedTasks: [taskId] };
+};
+
 const executors = {
     async 'task.comment'(args) {
         return commentOn(args, 'task.comment', args.params.body);
@@ -224,7 +220,7 @@ const executors = {
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: {
-                LogDescription: String(params.description || `${a.label} on ${task.TaskKey || task.TaskName}`).slice(0, 500),
+                LogDescription: String(params.description || `${nameShown(actor, a)} on ${task.TaskKey || task.TaskName}`).slice(0, 500),
                 Loggeduser: userId, TicketID: String(task._id), ProjectId: String(task.ProjectID),
                 LogStartTime: start, LogEndTime: start + minutes * 60, LogTimeDuration: minutes, logAddType: 0, trackShots: [],
                 billable: params.billable !== false, actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null, runId: actor.runId || null,
@@ -260,7 +256,7 @@ const executors = {
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS, data: [{ _id: task._id }, { $push: { links: link } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
-        emitTask(updated, { links: updated.links }, actor, depth);
+        emitTask(companyId, updated, { links: updated.links }, actor, depth);
         return { result: { linkId: String(link._id), kind: link.kind }, undo: { kind: 'link', taskId: String(task._id), linkId: String(link._id) }, entityId: task._id, entityName: task.TaskName };
     },
 
@@ -314,7 +310,7 @@ const executors = {
         if (!sprint) throw new tools.DeterministicError('sprint not found in this project');
         const previous = { sprintId: task.sprintId, sprintArray: task.sprintArray, folderObjId: task.folderObjId || null };
         const placement = await sprintPlacementOf(companyId, sprint);
-        const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset);
+        const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset, pullOfLists([target]));
         await followSprintMove(companyId, { taskId: task._id, projectId: task.ProjectID, fromSprintId: task.sprintId, toSprintId: target });
         await moveDescendants(companyId, task._id, placement, target);
         return { result: { sprintId: String(target), name: sprint.name }, undo: { kind: 'sprint', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
@@ -347,7 +343,7 @@ const executors = {
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: {
-                LogDescription: String(params.description || `${a.label} working on ${task.TaskKey || task.TaskName}`).slice(0, 500),
+                LogDescription: String(params.description || `${nameShown(actor, a)} working on ${task.TaskKey || task.TaskName}`).slice(0, 500),
                 Loggeduser: userId, TicketID: String(task._id), ProjectId: String(task.ProjectID),
                 LogStartTime: now, LogEndTime: now, LogTimeDuration: 0, logAddType: 1, trackShots: [], startTimeTracker: now,
                 billable: true, actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null, runId: actor.runId || null,
@@ -381,16 +377,21 @@ const executors = {
         const a = attribution(actor);
         const title = String(params.title || '').trim().slice(0, 200);
         if (!title) throw new tools.DeterministicError('title is required');
-        const linked = (params.taskId && oid(params.taskId)) ? [oid(params.taskId)] : [];
+        const place = await draftPlaceOf(companyId, params);
+        if (!place) throw new tools.DeterministicError(DRAFT_ELSEWHERE);
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PAGES,
-            data: { title, rawText: String(params.text || '').slice(0, 20000), content: params.content || contentOfText(params.text),
-                    ProjectID: params.projectId && oid(params.projectId) ? oid(params.projectId) : undefined,
-                    createdBy: String(actor.userId || a.actorId), linkedTasks: linked, visibility: 'project',
-                    createdByAgent: true, agentName: a.label, agentStatus: 'draft', deletedStatusKey: 0 },
+            data: { title, rawText: String(params.text || '').slice(0, 20000), content: cleanPageContent(params.content || contentOfText(params.text)),
+                    ProjectID: place.projectId ? oid(place.projectId) : undefined,
+                    createdBy: String(actor.userId || a.actorId), linkedTasks: place.linkedTasks, visibility: place.visibility,
+                    createdByAgent: true, agentName: nameShown(actor, a), agentStatus: 'draft', deletedStatusKey: 0 },
         }, 'save');
         emitPageChange(companyId, 'insert', saved);
         return { result: { pageId: String(saved._id) }, undo: { kind: 'page', pageId: String(saved._id) }, entityType: 'page', entityId: saved._id, entityName: title };
+    },
+
+    async 'slack.message.post'({ companyId, actor, params }) {
+        return require('./connectors/slackPost').post({ companyId, actor, params });
     },
 
     async 'chat.post'({ companyId, actor, params, depth }) {
@@ -421,6 +422,9 @@ const executors = {
 
     ...require('./taskRequests').executors,
     ...require('./pageRequests').executors,
+    ...require('./workRequests').executors,
+    ...require('./goalRequests').executors,
+    ...require('./manager/workQueue').executors,
 };
 
 const COMMENT_ACTIONS = new Set(['task.comment', 'comment.create', 'chat.post', 'comment.update']);
@@ -434,6 +438,41 @@ const threadMay = async (companyId, actor, action, params) => {
     return (await canPostToThread(companyId, actor && actor.userId, tools.commentThreadOf(task))).allowed;
 };
 const THREAD_REFUSAL = 'not_visible: the task\'s comment thread is not one the person behind this agent can open';
+const TASK_REFUSAL = 'not_visible: the task is not one the person behind this agent can open';
+const PROJECT_REFUSAL = 'not_visible: the project is not one the person behind this agent can open';
+const LIST_REFUSAL = 'not_visible: the list is not one the person behind this agent can open in that project';
+
+/* These reach their task, project or list through the automation tool layer, which asks nothing about a person, so
+ * the task routes' read rule is asked here. Every other executor runs a route's handler or a check of its own. */
+const TASK_WRITES = new Set(['task.status.set', 'task.link', 'task.assign', 'task.update', 'task.sprint.move', 'subtask.create', 'timelog.create', 'timelog.start', 'timelog.stop']);
+
+const targetRefusal = async (companyId, actor, action, params) => {
+    const uid = String((actor && actor.userId) || '');
+    if (action === 'task.create') {
+        if (!(await openProject(companyId, uid, params.projectId))) return PROJECT_REFUSAL;
+        return !params.sprintId || await listOf(companyId, uid, params.projectId, params.sprintId) ? '' : LIST_REFUSAL;
+    }
+    if (!TASK_WRITES.has(action)) return '';
+    const taskId = String(params.taskId || '');
+    if (!(await readableTaskIds(companyId, uid, [taskId])).includes(taskId)) return TASK_REFUSAL;
+    if (action !== 'task.sprint.move') return '';
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: oid(taskId) }, { ProjectID: 1 }] }, 'findOne');
+    return await listOf(companyId, uid, task.ProjectID, params.sprintId) ? '' : LIST_REFUSAL;
+};
+
+/* page.draft saves its doc without the create route, so the route's rule is asked here: a task the person behind
+ * the agent can open to hang it on, and a place where they may start a doc. Returns the refusal, or ''. */
+const draftRefusal = async (companyId, actor, action, params) => {
+    if (action !== 'page.draft') return '';
+    const uid = String((actor && actor.userId) || '');
+    const linked = params.taskId && oid(params.taskId) ? [String(params.taskId)] : [];
+    if ((await readableTaskIds(companyId, uid, linked)).length !== linked.length) return TASK_REFUSAL;
+    const place = await draftPlaceOf(companyId, params);
+    if (!place) return `permission_denied: ${DRAFT_ELSEWHERE}`;
+    const start = await canCreatePageIn(companyId, uid, place.projectId);
+    if (start.allowed) return '';
+    return start.statusCode === 403 ? 'permission_denied: the person behind this agent cannot add a doc here' : PROJECT_REFUSAL;
+};
 
 const refusal = async (companyId, actor, { action, params, reason, ip, entityType, entityId, taint }) => {
     const auditId = await audit.recordRefusal(companyId, actor, { action, reason, params, entityType, entityId: entityId || params.taskId, ip, taint });
@@ -453,8 +492,9 @@ const liveStep = async (companyId, actor, { action, params, ip, taint }) => {
 
 /* Run one action for an actor. Refusals are audited and thrown as RefusedError.
  * A policy `decision` of refuse is honoured before the registry check, so a
- * policy refusal leaves the same audit row as a registry one. */
-const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null }) => {
+ * policy refusal leaves the same audit row as a registry one. `approved` is an
+ * argument and never read from `params`, so only the approval of a proposal sets it. */
+const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false }) => {
     await liveStep(companyId, actor, { action, params, ip, taint });
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip, taint });
     const check = registry.evaluate(action, params, { allowedActions });
@@ -462,11 +502,22 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     const holder = await permissions.holderMay(companyId, actor, action, params);
     if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip, taint });
     if (!(await threadMay(companyId, actor, action, params))) throw await refusal(companyId, actor, { action, params, reason: THREAD_REFUSAL, ip, taint });
+    const closed = await targetRefusal(companyId, actor, action, params) || await draftRefusal(companyId, actor, action, params);
+    if (closed) throw await refusal(companyId, actor, { action, params, reason: closed, ip, taint });
+    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved, taint, standing: true });
+    if (rule.decision !== projectPolicy.DECISION.ACT) {
+        const held = rule.decision === projectPolicy.DECISION.PROPOSE ? `${rule.reason}, so it waits for a person's approval` : rule.reason;
+        throw await refusal(companyId, actor, { action, params, reason: held, ip, taint });
+    }
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} has no executor`);
 
-    const auditId = await audit.openAction(companyId, actor, { action, reason, params, cost, ip, entityId: params.taskId, taint });
+    const standing = rule.standing || null;
+    const auditId = await audit.openAction(companyId, actor, {
+        action, params, cost, ip, entityId: params.taskId, taint, standing,
+        reason: standing ? `${reason || action} (standing approval ${standing.id}, made by ${standing.madeBy})` : reason,
+    });
     let out;
     try {
         out = await exec({ companyId, actor, params, depth: clampDepth(depth) });
@@ -478,7 +529,11 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
         await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
     }
     await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });
-    return { result: out.result, auditId, undo: out.undo, task: out.task || null };
+    if (standing) {
+        await require('./standingApprovals').recordUse(companyId, standing, { action, params, auditId, reason })
+            .catch((e) => logger.error(`[standing-approval] ${standing.id} applied ${action} (audit ${auditId}) but its use was not recorded: ${e.message}`));
+    }
+    return { result: out.result, auditId, undo: out.undo, task: out.task || null, ...(standing ? { standing } : {}) };
 };
 
 /* Reads still go through the registry so a refusal is logged the same way. */

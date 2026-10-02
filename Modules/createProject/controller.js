@@ -60,6 +60,8 @@ const { resolveProjectSkills } = require("../settings/ProjectSkills/helper");
 const { normaliseSource, cleanProposalId, numericProposalId, validateProposalId } = require("../Project/helpers/projectSourceRules");
 const { stepProjectCount } = require("../Project/helpers/projectQuota");
 const { recordProjectCreated } = require("../Project/helpers/projectHistory");
+const { announceFields } = require("../CustomField/helpers/fieldProjects");
+const { defaultCurrencyOf, hasCurrency } = require("../Company/helpers/companyCurrency");
 
 exports.checkProjectPlan = (req) => {
     return new Promise(async(resolve,reject) => {
@@ -100,8 +102,12 @@ exports.checkProjectPlan = (req) => {
     })
 }
 
+const refusedFields = (reason) => (reason && reason.name === 'ValidationError' && reason.errors ? Object.keys(reason.errors) : []);
+
 const failureReason = (outcome) => {
     const reason = outcome && outcome.statusText !== undefined ? outcome.statusText : outcome;
+    const missing = refusedFields(reason);
+    if (missing.length) return `The project was not created: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} missing.`;
     if (reason && reason.message) return reason.message;
     return typeof reason === 'string' ? reason : JSON.stringify(reason);
 };
@@ -143,7 +149,7 @@ exports.createProjectFun = async(req, res) => {
                 })
                 .catch((error) => {
                     exports.removeProjectCount(companyId, isPrivateSpace);
-                    res.send({status:false, statusText: error});
+                    res.send({status:false, statusText: failureReason(error)});
                 });
             } else {
                 // checkProjectPlan has already incremented the count, so a failed check rolls it back too.
@@ -575,7 +581,10 @@ exports.createProject = async (req) => {
                             show:true
                         }
                     ] 
-                    let customFieldVal = JSON.parse(JSON.stringify(createProjectObject.customFiedlsValue)) || [];
+                    if (!hasCurrency(createProjectObject.ProjectCurrency)) {
+                        createProjectObject.ProjectCurrency = await defaultCurrencyOf(companyId);
+                    }
+                    let customFieldVal = JSON.parse(JSON.stringify(createProjectObject.customFiedlsValue || []));
                     createProjectObject._id = new mongoose.Types.ObjectId(createProjectObject?._id);
                     // "Include the sample tasks" plus the team's setup answer become rows for
                     // seedTemplateSamples, which is the single seeding path.
@@ -630,7 +639,7 @@ exports.createProject = async (req) => {
                                 reject({status: false, statusText: 'error in creating project'});
                                 return;
                             }
-                            removeCache(`customField:${companyId}`);
+                            announceFields(companyId, 'insert');
                         }
 
                         // Awaited because clients create their first task straight from this response and a task needs a sprint.

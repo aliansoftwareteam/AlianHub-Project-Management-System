@@ -32,7 +32,17 @@
                 </div>
             </section>
 
-            <div v-if="!people.length" class="ah-empty">{{ $t('Members.no_people') }}</div>
+            <EmptyState
+                v-if="!people.length"
+                illustration="people"
+                data-test="people-empty"
+                :heading-level="2"
+                :title="$t('Members.no_people_title')"
+                :message="$t('Members.no_people_msg')"
+                :action-label="$t('Members.invite')"
+                :action-allowed="canInvite"
+                @action="openMembers"
+            />
             <div v-else-if="!managedCount" class="ah-card">
                 <div class="ah-card__body org__empty">
                     <div class="ah-label">{{ $t('Org.empty_title') }}</div>
@@ -122,7 +132,28 @@
                         </span>
                         <span class="ah-dot" :class="dotClass(person)" :title="statusTitle(person)"></span>
                     </button>
-                    <div v-if="!filtered.length" class="ah-empty">{{ $t('Members.no_people') }}</div>
+                    <EmptyState
+                        v-if="!filtered.length && search"
+                        compact
+                        illustration="search"
+                        data-test="people-no-match"
+                        :heading-level="2"
+                        :title="$t('Members.no_people')"
+                        :action-label="$t('Members.clear_search')"
+                        @action="search = ''"
+                    />
+                    <EmptyState
+                        v-else-if="!filtered.length"
+                        compact
+                        illustration="people"
+                        data-test="people-empty"
+                        :heading-level="2"
+                        :title="$t('Members.no_people_title')"
+                        :message="$t('Members.no_people_msg')"
+                        :action-label="$t('Members.invite')"
+                        :action-allowed="canInvite"
+                        @action="openMembers"
+                    />
                 </div>
             </div>
 
@@ -154,6 +185,7 @@ import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useCustomComposable } from "@/composable";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
@@ -275,6 +307,8 @@ const myRoleType = computed(() => {
     return me ? Number(me.roleType) : null;
 });
 const canEditManager = computed(() => isOwnerOrAdmin(myRoleType.value));
+const canInvite = computed(() => router.hasRoute("Members") && checkPermission("settings.settings_invite_member") === true);
+const openMembers = () => router.push({ name: "Members", params: { cid: companyId.value } });
 
 // A manager cannot be someone already below the person, or the person themselves.
 const managerOptions = computed(() => {

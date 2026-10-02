@@ -15,10 +15,10 @@ const readersAmong = async (companyId, page, userIds) => {
     return members.filter((uid, index) => allowed[index]);
 };
 
-/* Only people added since the last save hear of it, and only those who may open the doc: the notice names it. */
-const notifyNewMentions = async ({ companyId, page, actorId, before, after }) => {
+/* Only those who may open the doc hear of it: the notice names it. */
+const notifyMentioned = async ({ companyId, page, actorId, named: everyone, content: after }) => {
     const actor = String(actorId || '');
-    const named = newUserMentions(before, after).filter((uid) => uid !== actor);
+    const named = (everyone || []).filter((uid) => uid !== actor);
     if (!named.length || !page) return [];
     const readers = await readersAmong(companyId, page, named);
     if (!readers.length) return [];
@@ -41,4 +41,8 @@ const notifyNewMentions = async ({ companyId, page, actorId, before, after }) =>
     return readers;
 };
 
-module.exports = { notifyNewMentions };
+const notifyNewMentions = ({ companyId, page, actorId, before, after }) => notifyMentioned({
+    companyId, page, actorId, named: newUserMentions(before, after), content: after,
+});
+
+module.exports = { notifyMentioned, notifyNewMentions };

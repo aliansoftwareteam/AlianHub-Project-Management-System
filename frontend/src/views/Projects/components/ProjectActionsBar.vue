@@ -108,7 +108,7 @@
                             <DropDownOption @click="$emit('openPermissionSidebar')" v-if="checkPermission('settings.settings_security_permissions') !== null">
                                 <div class="d-flex align-items-center project-mobile-desc avtar-options" :class="`${clientWidth <= 767 ? 'project_detail_dropdown_wrapper' : ''}`">
                                     <div class="d-flex align-items-center">
-                                        <img :src="lockIcon" alt="" class="mr-20px">
+                                        <span class="ah-mask-icon pab-lock mr-20px" :style="maskOf(lockIcon)" aria-hidden="true"></span>
                                     </div>
                                     <span :class="{'font-size-16': clientWidth <= 767 }" class="font-weight-400 gray4b">{{ $t('Projects.project_permissions') }}</span>
                                 </div>
@@ -179,6 +179,7 @@ import WasabiImage from '@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue
 import DuplicateProjectDialog from '@/components/molecules/DuplicateProjectDialog/DuplicateProjectDialog.vue';
 import SaveProjectTemplateDialog from '@/components/molecules/SaveProjectTemplateDialog/SaveProjectTemplateDialog.vue';
 import { useCustomComposable } from '@/composable';
+import { maskOf } from '@/utils/iconMask';
 
 const { checkPermission } = useCustomComposable();
 
@@ -224,4 +225,5 @@ const deleteIcon = require('@/assets/images/svg/Delete_Icon.svg');
 <style scoped>
 .pab-duplicate { display: flex; align-items: center; gap: 20px; font-size: 12px; font-weight: 400; color: var(--ink-2); }
 .pab-duplicate--phone { height: 50px; font-size: 16px; color: var(--ink); }
+.pab-lock { width: 15px; height: 20px; color: var(--ink-2); }
 </style>

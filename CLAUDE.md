@@ -45,6 +45,7 @@ The `task-manager` skill in [.claude/skills/task-manager/](.claude/skills/task-m
 
 - The running version is derived from git, never hand-edited: `npm run version:show` prints it (`<next>-beta.<build>`, e.g. `14.36.0-beta.59`), and release-please alone edits `package.json` and `CHANGELOG.md`.
 - After merging PRs into `beta`, run `npm run version:log` and commit `docs/BETA-LOG.md` in the follow-up docs PR that ticks task progress, naming the build numbers those merges became.
+- After merges that add or change a route, run `npm run api:doc` in that same docs PR and commit `docs/API.md` and `docs/api/openapi.json`; `npm run api:doc:check` fails while they are stale. A feature PR leaves both files alone, so two PRs that each add a route cannot break `beta`.
 - Commit and PR titles stay Conventional Commits, because the next version is computed from them (`feat` → minor, `!` or `BREAKING CHANGE` → major, anything else → patch).
 
 ---
@@ -322,6 +323,6 @@ See [.claude/SECURITY-PATTERNS.md](.claude/SECURITY-PATTERNS.md) for detailed pr
 
 ---
 
-**Last Updated:** 2026-05-12  
-**Version:** 14.0.26  
+**Last Updated:** 2026-10-02  
+**Version:** 14.36.0-beta.766 (`npm run version:show` prints the current one)  
 **Status:** ✅ Documentation reorganized for Claude Code

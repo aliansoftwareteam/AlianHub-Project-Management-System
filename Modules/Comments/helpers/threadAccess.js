@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { canReadProject } = require('../../../Config/projectAccess');
+const { mayListTasksIn } = require('../../Tasks/helpers/taskListProjects');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprintById, hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
 
@@ -23,7 +24,9 @@ const canOpenTask = async (companyId, uid, task, privileged) => {
     if (task.mainChat === true) return (task.AssigneeUserId || []).map(String).includes(uid);
     const project = await canReadProject(companyId, uid, task.ProjectID);
     if (!project.allowed && !project.missing) return false;
-    return privileged || canSeeSprintById(companyId, uid, task.sprintId);
+    if (privileged) return true;
+    if (project.allowed && !(await mayListTasksIn(companyId, uid, task.ProjectID))) return false;
+    return canSeeSprintById(companyId, uid, task.sprintId);
 };
 
 /*

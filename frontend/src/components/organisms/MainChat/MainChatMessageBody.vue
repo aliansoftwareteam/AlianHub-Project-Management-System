@@ -87,11 +87,11 @@ const replyPreview = computed(() => {
 .mc-ai-body :deep(p),
 .mc-ai-body :deep(ul),
 .mc-ai-body :deep(ol) {
-    margin: 0 0 6px;
+    margin: 0 0 var(--sp-2);
 }
 .mc-ai-body :deep(ul),
 .mc-ai-body :deep(ol) {
-    padding-left: 20px;
+    padding-left: var(--sp-8);
 }
 .mc-ai-body :deep(.ask-cite) {
     color: var(--brand);

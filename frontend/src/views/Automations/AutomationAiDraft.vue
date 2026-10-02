@@ -1,6 +1,6 @@
 <template>
     <div v-if="failed" class="au__ai" aria-live="polite">
-        <p v-if="blockedKey" class="ah-small au__ai-note" data-test="ai-draft-off">{{ $t(blockedKey) }}</p>
+        <p v-if="blockedKey" class="ah-small au__ai-note" data-test="ai-draft-off">{{ $t(blockedKey) }} <ConnectAiHint /></p>
         <template v-else-if="usable">
             <p class="ah-small au__ai-note">{{ $t('Automations.ai_draft_offer') }}</p>
             <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="ai-draft" :disabled="drafting" :aria-busy="drafting" @click="draftWithAi">
@@ -32,6 +32,7 @@ import { useI18n } from 'vue-i18n';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import ConnectAiHint from '@/components/molecules/AiUnavailable/ConnectAiHint.vue';
 import { AI_ACCESS, AI_STATE, aiAccessFor } from '@/composable/aiAvailability';
 
 defineOptions({ name: 'AutomationAiDraft' });

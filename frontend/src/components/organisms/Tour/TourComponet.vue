@@ -1,142 +1,178 @@
 <template>
-    <span hidden></span>
+    <Teleport to="body">
+        <div v-if="stop" class="ah-coach" data-test="first-tour">
+            <div v-if="ring" class="ah-coach__ring" :style="ring" aria-hidden="true"></div>
+            <section
+                ref="card"
+                class="ah-coach__card"
+                role="dialog"
+                aria-modal="false"
+                aria-labelledby="ah-coach-title"
+                aria-describedby="ah-coach-body"
+                :style="{ left: `${spot.left}px`, top: `${spot.top}px` }"
+            >
+                <div class="ah-coach__count">{{ t('Auth.tour_step', { a: index + 1, b: STOPS.length }) }}</div>
+                <h2 id="ah-coach-title" class="ah-coach__title">{{ t(`Auth.tour_first_${stop.key}_title`) }}</h2>
+                <div id="ah-coach-body" aria-live="polite">
+                    <p class="ah-coach__body">{{ t(`Auth.tour_first_${stop.key}_body`) }}</p>
+                    <p v-if="hint" class="ah-coach__key"><kbd class="ah-kbd">{{ hint }}</kbd> {{ t(`Auth.tour_first_${stop.key}_key`) }}</p>
+                </div>
+                <div class="ah-coach__foot">
+                    <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="tour-skip" @click="skip">{{ t('Auth.tour_skip') }}</button>
+                    <button v-if="index" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="tour-back" @click="go(index - 1)">{{ t('Auth.tour_back') }}</button>
+                    <button ref="nextBtn" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="tour-next" @click="next">
+                        {{ index < STOPS.length - 1 ? t('Auth.tour_next_stop') : t('Auth.tour_done') }}
+                    </button>
+                </div>
+            </section>
+        </div>
+    </Teleport>
 </template>
 
 <script setup>
-import { computed, inject, onUnmounted, watch } from "vue";
-
-defineOptions({ name: "TourComponet" });
+import { computed, inject, nextTick, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { driver } from "driver.js";
-import "driver.js/dist/driver.css";
 import { useGetterFunctions } from "@/composable";
-import { tourHepler } from "@/components/organisms/Tour/helper";
-import { STEPS, screenFor, doneKey, mayAutoOffer } from "@/components/organisms/Tour/tourSteps";
+import { isBlockingSurfaceOpen } from "@/composable/blockingSurface";
+import { isEditableTarget, shortcutHint } from "@/composable/shortcuts";
 import { onboardingRecord, saveOnboarding } from "@/composable/onboardingState";
+import { shellState } from "@/components/organisms/Shell/shellState";
+import { TOUR, STOPS, mayAutoStart, placePopover } from "@/components/organisms/Tour/tourSteps";
 
-const STEP_STORAGE = "ah.tour.step";
-// Skip means "not now": the tour stops offering itself, but the Home checklist can still start it.
-const SKIP_STORAGE = "ah.tour.skipped";
-const MIN_WIDTH = 767;
+defineOptions({ name: "TourComponet" });
+
+/* The key the old shell tour wrote on Skip. Browsers that skipped it, and the e2e skipFirstRun
+   helper, already carry it, so it keeps this tour from starting by itself. */
+const SKIP_STORAGE = "ah.tour.skipped.shell";
+const START_DELAY_MS = 600;
+const MENU_BUTTONS = '.ah-rail__item--btn[aria-haspopup="menu"], .ah-tabbar [data-test="tab-more"]';
 
 const { t } = useI18n();
 const route = useRoute();
 const { getUser } = useGetterFunctions();
-const { updateTourStatusInUser } = tourHepler();
 const userId = inject("$userId");
-const clientWidth = inject("$clientWidth");
 
 const me = computed(() => getUser(userId.value, "all") || {});
-const tourStatus = computed(() => me.value.tourStatus || {});
-const wideEnough = computed(() => clientWidth.value > MIN_WIDTH);
-const screen = computed(() => screenFor(route));
-const isDone = (which) => tourStatus.value[doneKey(which)] === true;
+const record = computed(() => onboardingRecord(me.value.homeChecklist || {}));
+const seen = computed(() => record.value.toursOffered.includes(TOUR));
 
-const stepKey = (which) => `${STEP_STORAGE}.${which}`;
-const skipKey = (which) => `${SKIP_STORAGE}.${which}`;
-const savedStep = (which) => Number(localStorage.getItem(stepKey(which)) || 0);
-const skipped = (which) => localStorage.getItem(skipKey(which)) === "1";
+const index = ref(-1);
+const stop = computed(() => STOPS[index.value] || null);
+const hint = computed(() => (stop.value ? shortcutHint(stop.value.shortcut, t) : ""));
+const card = ref(null);
+const nextBtn = ref(null);
+const spot = ref({ left: 0, top: 0 });
+const ring = ref(null);
+let returnFocusTo = null;
+let startTimer = null;
 
-let driverObj = null;
-let activeScreen = "";
-
-const firstPresent = (selectors) => selectors.find((s) => document.querySelector(s));
-const buildSteps = (which) => STEPS[which].map((s, i, all) => ({
-    element: firstPresent(s.els),
-    popover: {
-        title: t(`Auth.tour_${which}_${s.key}_title`),
-        description: t(`Auth.tour_${which}_${s.key}_body`),
-        side: s.side,
-        align: s.align,
-        nextBtnText: i < all.length - 1 ? t("Auth.tour_next", { label: t(`Auth.tour_${which}_${s.key}_next`) }) : t("Auth.tour_done")
+const skipped = () => {
+    try {
+        return localStorage.getItem(SKIP_STORAGE) === "1";
+    } catch {
+        return false;
     }
-}));
-
-const finishTour = (which) => {
-    localStorage.removeItem(stepKey(which));
-    updateTourStatusInUser(doneKey(which));
-};
-const pauseTour = () => {
-    if (!driverObj || !activeScreen) return;
-    const index = driverObj.getActiveIndex();
-    if (Number.isInteger(index)) localStorage.setItem(stepKey(activeScreen), String(index));
 };
 
-const renderStepHeader = (popover, { state }) => {
-    const total = STEPS[activeScreen].length;
-    const index = Number.isInteger(state.activeIndex) ? state.activeIndex : 0;
-    const head = document.createElement("div");
-    head.className = "ah-tour__head";
-    const label = document.createElement("span");
-    label.className = "ah-tour__step";
-    label.textContent = t("Auth.tour_step", { a: index + 1, b: total });
-    const bars = document.createElement("div");
-    bars.className = "ah-tour__bars";
-    for (let i = 0; i < total; i += 1) {
-        const bar = document.createElement("span");
-        bar.className = `ah-tour__bar${i <= index ? " is-on" : ""}`;
-        bars.appendChild(bar);
+const onScreen = (el) => {
+    const box = el.getBoundingClientRect();
+    return box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < window.innerWidth && box.top < window.innerHeight;
+};
+const anchorOf = (entry) => entry.els.map((selector) => document.querySelector(selector)).find((el) => el && onScreen(el)) || null;
+
+function place() {
+    if (!stop.value || !card.value) return;
+    const anchor = anchorOf(stop.value);
+    const box = anchor ? anchor.getBoundingClientRect() : null;
+    const tabbar = document.querySelector(".ah-tabbar");
+    const floor = !box && tabbar && onScreen(tabbar) ? tabbar.getBoundingClientRect().top : window.innerHeight;
+    spot.value = placePopover(box, { width: card.value.offsetWidth, height: card.value.offsetHeight }, { width: window.innerWidth, height: floor }, stop.value.side);
+    ring.value = box ? { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` } : null;
+}
+
+const onKeydown = (event) => {
+    if (event.key === "Escape" && !event.defaultPrevented) close();
+};
+
+function listen(on) {
+    const method = on ? "addEventListener" : "removeEventListener";
+    document[method]("keydown", onKeydown);
+    window[method]("resize", place);
+    window[method]("scroll", place, true);
+}
+
+async function go(to) {
+    index.value = to;
+    await nextTick();
+    place();
+}
+
+async function startTour() {
+    if (stop.value) return;
+    returnFocusTo = document.activeElement;
+    if (!seen.value) saveOnboarding({ tourOffered: TOUR });
+    listen(true);
+    await go(0);
+    nextBtn.value?.focus({ preventScroll: true });
+}
+
+function close() {
+    if (!stop.value) return;
+    index.value = -1;
+    ring.value = null;
+    listen(false);
+    restoreFocus();
+}
+
+/* Started from the More menu, the item that had the focus is gone by now; its button is the way back. */
+function restoreFocus() {
+    const candidates = [returnFocusTo, ...document.querySelectorAll(MENU_BUTTONS)].filter((el) => el && document.contains(el));
+    returnFocusTo = null;
+    for (const el of candidates) {
+        el.focus({ preventScroll: true });
+        if (document.activeElement === el) return;
     }
-    head.append(label, bars);
-    popover.wrapper.insertBefore(head, popover.wrapper.firstChild);
+}
 
-    const skip = document.createElement("button");
-    skip.type = "button";
-    skip.className = "ah-tour__skip";
-    skip.textContent = t("Auth.tour_skip");
-    skip.addEventListener("click", () => { pauseTour(); localStorage.setItem(skipKey(activeScreen), "1"); driverObj?.destroy(); });
-    const meta = document.createElement("span");
-    meta.className = "ah-tour__meta";
-    meta.textContent = t("Auth.tour_meta", { n: total, s: total * 10 });
-    popover.footer.append(skip, meta);
-};
+function skip() {
+    try {
+        localStorage.setItem(SKIP_STORAGE, "1");
+    } catch {
+        /* the user record already says the tour was offered */
+    }
+    close();
+}
 
-const startTour = (which = screen.value || "shell") => {
-    if (!STEPS[which] || driverObj?.isActive()) return;
-    activeScreen = which;
-    driverObj = driver({
-        popoverClass: "ah-tour",
-        showProgress: false,
-        showButtons: ["next"],
-        allowClose: true,
-        stagePadding: 6,
-        stageRadius: 10,
-        animate: true,
-        smoothScroll: true,
-        steps: buildSteps(which),
-        onPopoverRender: renderStepHeader,
-        onNextClick: () => {
-            if (driverObj.isLastStep()) { finishTour(which); driverObj.destroy(); return; }
-            localStorage.setItem(stepKey(which), String(driverObj.getActiveIndex() + 1));
-            driverObj.moveNext();
-        },
-        onCloseClick: () => { pauseTour(); driverObj.destroy(); },
-        onDestroyStarted: () => { pauseTour(); driverObj.destroy(); }
-    });
-    driverObj.drive(Math.min(savedStep(which), STEPS[which].length - 1));
-};
-const startShellTour = () => startTour("shell");
+const next = () => (index.value < STOPS.length - 1 ? go(index.value + 1) : close());
 
-const offer = (which) => {
-    const allowed = mayAutoOffer(which, {
-        done: isDone(which),
-        skipped: skipped(which),
-        savedStep: savedStep(which),
-        offeredBefore: onboardingRecord(me.value.homeChecklist || {}).toursOffered.includes(which),
-        wide: wideEnough.value,
-        shellSettled: isDone("shell") || skipped("shell")
-    });
-    if (!allowed) return;
-    saveOnboarding({ tourOffered: which });
-    setTimeout(() => { if (screen.value === which) startTour(which); }, 600);
-};
-watch(screen, (which) => offer(which), { immediate: true });
+const allowed = () => mayAutoStart({
+    seen: seen.value,
+    skipped: skipped(),
+    legacyDone: me.value.tourStatus?.isShellTour === true,
+    dismissed: record.value.dismissed === true,
+    blocked: isBlockingSurfaceOpen(document) || isEditableTarget(document.activeElement)
+});
 
-const handleTour = () => offer(screen.value);
+function offer() {
+    clearTimeout(startTimer);
+    if (!me.value._id || route.meta?.hideHeader || !allowed()) return;
+    startTimer = setTimeout(() => { if (allowed()) startTour(); }, START_DELAY_MS);
+}
 
-onUnmounted(() => driverObj?.destroy());
-defineExpose({ handleTour, startShellTour, startTour });
+watch(() => [me.value._id, route.name], offer, { immediate: true });
+watch(() => route.fullPath, () => nextTick(place));
+watch(() => shellState.tourAsked, (asked) => {
+    if (!asked) return;
+    shellState.tourAsked = false;
+    startTour();
+});
+
+onUnmounted(() => {
+    clearTimeout(startTimer);
+    listen(false);
+});
+defineExpose({ handleTour: offer, startTour, close });
 </script>
 
 <style>

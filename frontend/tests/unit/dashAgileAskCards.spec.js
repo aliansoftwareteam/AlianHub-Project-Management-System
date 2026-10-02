@@ -416,13 +416,13 @@ describe('Ask card', () => {
         expect(shown.emptyText).toBe('Dash.ask_not_permitted');
     });
 
-    it('says no model is set up when Ask answers without one', async () => {
+    it('says to connect your own AI when Ask answers without a model', async () => {
         const server = askServer();
         server.reply = async () => ok({ configured: false, answer: '', sources: [] });
         const { shown } = mountAsk();
         await flushPromises();
         expect(shown.state).toBe('empty');
-        expect(shown.emptyText).toBe('AiAvailability.unconfigured_member');
+        expect(shown.emptyText).toBe('ConnectAi.card_no_model');
     });
 
     it('says nothing matched when the viewer can open nothing relevant', async () => {

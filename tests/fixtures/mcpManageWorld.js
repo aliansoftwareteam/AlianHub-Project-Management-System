@@ -23,6 +23,10 @@ const S_PRIVATE = '6f0000000000000000000e05';
 const F = { rating: '6f0000000000000000000f01', bugOnly: '6f0000000000000000000f02', elsewhere: '6f0000000000000000000f03', number: '6f0000000000000000000f04', choice: '6f0000000000000000000f05', off: '6f0000000000000000000f06' };
 const TASKS_GRANT = 'tasks:manage';
 const DOCS_GRANT = 'docs:manage';
+const ISSUER = 'https://hub.manage.test';
+const CLIENT = 'https://agent.manage.test/oauth/client.json';
+const GRANT_ID = '0123456789abcdef0123456789abcdef';
+const PLAIN_SCOPES = ['tasks:read', 'tasks:write', 'projects:read', 'docs:read'];
 
 const BEFORE = ['tasks.next', 'tasks.search', 'task.get', 'task.comment', 'task.status.set', 'task.link', 'task.create', 'subtask.create', 'timelog.start', 'timelog.stop', 'docs.read'];
 
@@ -44,7 +48,17 @@ const ctx = (uid, over = {}) => ({
 const withGrants = (uid, grants) => ctx(uid, { token: { _id: TOKEN, userId: uid, scopes: ['read', 'write'], grants, active: true } });
 const olderToken = (uid) => ctx(uid, { token: { _id: TOKEN, userId: uid, scopes: ['read', 'write'], active: true } });
 const readOnly = (uid) => ctx(uid, { canWrite: false, token: { _id: TOKEN, userId: uid, scopes: ['read'], grants: [TASKS_GRANT, DOCS_GRANT], active: true } });
-const oauth = (uid) => ctx(uid, { token: { oauth: true, scopes: ['tasks:read', 'tasks:write', 'projects:read', 'docs:read'] }, oauth: { clientId: 'c1', grantId: 'g1' } });
+const oauth = (uid) => ctx(uid, { token: { oauth: true, scopes: [...PLAIN_SCOPES] }, oauth: { clientId: 'c1', grantId: 'g1' } });
+
+/* An outside client's call as the server builds it from a verified grant: `scopes` is what the person consented
+ * to that the workspace's approval still allows. */
+const outside = (uid, scopes) => ctx(uid, {
+    canWrite: scopes.some((scope) => scope.endsWith(':write')),
+    actor: { kind: 'agent', userId: uid, agentName: 'Outside agent', viaAccount: 'external', tokenId: null, clientId: CLIENT, grantId: GRANT_ID, delegatedBy: uid },
+    token: { oauth: true, scopes: [...scopes] },
+    oauth: { clientId: CLIENT, grantId: GRANT_ID, scopes: [...scopes] },
+    taint: { tainted: true, taintSources: [{ kind: 'client', ref: CLIENT, at: new Date() }] },
+});
 
 const create = (mockDb) => {
     const rules = guardFixture.create(mockDb);
@@ -123,11 +137,23 @@ const create = (mockDb) => {
         return fx;
     };
 
-    return { rules, seed, stored, rows, audits, snapshot, rpcThrough, listedThrough };
+    /* The grant and the workspace approval behind an outside client's call, as consent and an owner's approval leave them. */
+    const seedGrant = (userId, scopes, over = {}) => {
+        mockDb.seed(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, {
+            companyId: CID, clientId: CLIENT, clientName: 'Outside agent', clientKind: 'metadata_document', status: 'approved', scopes: [...scopes], privateSprints: false,
+        });
+        return mockDb.seed(SCHEMA_TYPE.OAUTH_GRANTS, {
+            grantId: GRANT_ID, clientId: CLIENT, companyId: CID, userId, scopes: [...scopes], resource: `${ISSUER}/mcp`,
+            createdAt: new Date(), expiresAt: new Date(Date.now() + 86400000), revokedAt: null, ...over,
+        });
+    };
+
+    return { rules, seed, stored, rows, audits, snapshot, rpcThrough, listedThrough, seedGrant };
 };
 
 module.exports = {
     CID, OWNER, ADMIN, MEMBER, OTHER, OUTSIDER, TOKEN, LOCKED_PROJECT, LOCKED_TASK,
     P_OPEN, P_PRIVATE, P_DEST, PL_OTHER, CHAT, S_OPEN, S_NEXT, S_SECRET, S_DEST, S_PRIVATE, F, TASKS_GRANT, DOCS_GRANT,
-    BEFORE, STATUSES, TYPES, settle, ctx, withGrants, olderToken, readOnly, oauth, create,
+    ISSUER, CLIENT, GRANT_ID, PLAIN_SCOPES,
+    BEFORE, STATUSES, TYPES, settle, ctx, withGrants, olderToken, readOnly, oauth, outside, create,
 };

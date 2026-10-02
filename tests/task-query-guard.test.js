@@ -22,6 +22,7 @@ jest.mock('../Config/permissionGuard', () => ({
     evaluatePermission: jest.fn(),
     isWritable: (permission) => permission === true || permission === 1 || permission === 2,
 }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn() }));
 jest.mock('../utils/commonFunctions.js', () => ({ removeCache: jest.fn() }));

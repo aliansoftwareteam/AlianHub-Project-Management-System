@@ -46,7 +46,9 @@ export function placementActions(shape, rights) {
             : onlyLooseSubtasks ? off("BulkActions.subtask_moves_hint") : on,
         toSubtask: rights.toSubtask ? on : off("BulkActions.convert_denied"),
         toTask: !rights.toTask ? off("BulkActions.convert_denied")
-            : shape.subtasks === 0 ? off("List.bulk_no_subtasks") : on
+            : shape.subtasks === 0 ? off("List.bulk_no_subtasks") : on,
+        addToList: !rights.addToList ? off("BulkActions.move_denied")
+            : shape.count > 0 && shape.subtasks === shape.count ? off("TaskLists.bulk_subtasks_hint") : on
     };
 }
 

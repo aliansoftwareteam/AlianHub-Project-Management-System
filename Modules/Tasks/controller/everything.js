@@ -10,12 +10,14 @@ const { visibleProjectIds } = require('../../Agents/scope');
 const { hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
 const { fetchRules } = require('../../settings/securityPermissions/controller');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
+const { listsForViewerOf, opensList } = require('../helpers/taskExtraLists');
 const {
     EverythingRefused, parseRequest, scopedProjectIds, projectMatch, taskListProjectIds, projectPermissions, rowEditRights, buildMatch, pagePipeline, positionOf,
     groupPipeline, shapeGroups, queryBinding, encodeCursor, decodeCursor,
 } = require('../helpers/everythingQuery');
 
-const PROJECT_CARD_FIELDS = { ProjectName: 1, ProjectCode: 1, projectIcon: 1, taskStatusData: 1, taskTypeCounts: 1, apps: 1, statusType: 1, isPersonal: 1, isGlobalPermission: 1 };
+const PROJECT_HEADING_FIELDS = { ProjectName: 1, ProjectCode: 1, projectIcon: 1, statusType: 1, isPersonal: 1 };
+const PROJECT_CARD_FIELDS = { ...PROJECT_HEADING_FIELDS, taskStatusData: 1, taskTypeCounts: 1, apps: 1, isGlobalPermission: 1 };
 
 /* Without JWT_SECRET a cursor is signed with a key that lasts as long as the process, so a
  * restart only ends the pages in flight. */
@@ -68,24 +70,52 @@ const readPage = async (companyId, match, request, after) => {
     return { rows: rows.slice(0, limit), more: rows.length > limit };
 };
 
-const projectCards = async (companyId, uid, projectIds, permissionOf) => {
-    if (!projectIds.length) return {};
-    const projects = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.PROJECTS,
-        data: [projectMatch(projectIds, uid, true), PROJECT_CARD_FIELDS, { lean: true }],
-    }, 'find');
-    return Object.fromEntries((projects || []).map((project) => [String(project._id), {
-        _id: String(project._id),
-        ProjectName: project.ProjectName,
-        ProjectCode: project.ProjectCode,
-        projectIcon: project.projectIcon,
-        taskStatusData: project.taskStatusData || [],
-        taskTypeCounts: project.taskTypeCounts || [],
-        apps: project.apps || [],
-        statusType: project.statusType,
-        isPersonal: project.isPersonal === true,
-        edit: rowEditRights(project, permissionOf),
-    }]));
+const readProjects = async (companyId, uid, projectIds, fields) => (projectIds.length
+    ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [projectMatch(projectIds, uid, true), fields, { lean: true }] }, 'find') || []
+    : []);
+
+/* A row needs its project's statuses, task types, apps and edit rights. A project that is only
+ * counted needs what its group's heading shows; with hundreds of projects the whole cards were
+ * half a megabyte on the request that opens a view grouped by project. */
+const projectCards = async (companyId, uid, { onPage, onlyCounted }, permissionOf) => {
+    const [whole, headings] = await Promise.all([
+        readProjects(companyId, uid, onPage, PROJECT_CARD_FIELDS),
+        readProjects(companyId, uid, onlyCounted, PROJECT_HEADING_FIELDS),
+    ]);
+    return Object.fromEntries([
+        ...headings.map((project) => [String(project._id), {
+            _id: String(project._id),
+            ProjectName: project.ProjectName,
+            ProjectCode: project.ProjectCode,
+            projectIcon: project.projectIcon,
+            statusType: project.statusType,
+            isPersonal: project.isPersonal === true,
+        }]),
+        ...whole.map((project) => [String(project._id), {
+            _id: String(project._id),
+            ProjectName: project.ProjectName,
+            ProjectCode: project.ProjectCode,
+            projectIcon: project.projectIcon,
+            taskStatusData: project.taskStatusData || [],
+            taskTypeCounts: project.taskTypeCounts || [],
+            apps: project.apps || [],
+            statusType: project.statusType,
+            isPersonal: project.isPersonal === true,
+            edit: rowEditRights(project, permissionOf),
+        }]),
+    ]);
+};
+
+/* The lists a filter names, less the ones the caller cannot look at; null when it names none. */
+const openLists = async (companyId, uid, sprintIds) => {
+    if (!sprintIds) return null;
+    const opened = await Promise.all(sprintIds.map((id) => opensList(companyId, uid, id)));
+    return sprintIds.filter((id, at) => opened[at]);
+};
+
+const withViewerLists = async (companyId, uid, rows) => {
+    const lists = await listsForViewerOf(companyId, uid, rows);
+    return lists.size ? rows.map((row) => (lists.has(String(row._id)) ? { ...row, extraLists: lists.get(String(row._id)) } : row)) : rows;
 };
 
 const nothingToRead = (request) => ({ rows: [], groups: request.cursor ? null : shapeGroups([], request.group), nextCursor: null, projects: {} });
@@ -106,30 +136,33 @@ exports.listEverything = async (req, res) => {
         const binding = queryBinding({ companyId, uid }, request);
         const after = request.cursor ? decodeCursor(request.cursor, binding, cursorKey()) : null;
 
-        const { projectIds, permissionOf } = await readableProjects(companyId, uid, seat.roleType, request);
-        if (!projectIds.length) {
+        const [{ projectIds, permissionOf }, sprintIds] = await Promise.all([
+            readableProjects(companyId, uid, seat.roleType, request),
+            openLists(companyId, uid, request.filter.sprintIds),
+        ]);
+        if (!projectIds.length || (sprintIds && !sprintIds.length)) {
             return res.status(200).json({ status: true, statusText: 'Tasks fetched successfully.', data: nothingToRead(request) });
         }
         const projects = projectIds.map(objectId);
         const hidden = isPrivileged(seat.roleType) ? [] : await hiddenSprintIds(companyId, uid, projects);
-        const match = buildMatch(request, { projectIds: projects, hiddenSprintIds: hidden });
+        const match = buildMatch({ ...request, filter: { ...request.filter, sprintIds } }, { projectIds: projects, hiddenSprintIds: hidden });
 
         const [page, counted] = await Promise.all([
             readPage(companyId, match, request, after),
             after ? null : aggregateTasks(companyId, groupPipeline(match, request)),
         ]);
         const groups = counted ? shapeGroups(counted, request.group) : null;
-        const named = new Set(page.rows.map((row) => String(row.ProjectID)));
-        if (groups && request.group === 'project') groups.forEach((group) => named.add(group.key));
+        const onPage = new Set(page.rows.map((row) => String(row.ProjectID)));
+        const onlyCounted = groups && request.group === 'project' ? groups.map((group) => group.key).filter((key) => !onPage.has(key)) : [];
 
         return res.status(200).json({
             status: true,
             statusText: 'Tasks fetched successfully.',
             data: {
-                rows: page.rows,
+                rows: await withViewerLists(companyId, uid, page.rows),
                 groups,
                 nextCursor: page.more ? encodeCursor(positionOf(page.rows[page.rows.length - 1], request.sort), binding, cursorKey()) : null,
-                projects: await projectCards(companyId, uid, [...named], permissionOf),
+                projects: await projectCards(companyId, uid, { onPage: [...onPage], onlyCounted }, permissionOf),
             },
         });
     } catch (error) {

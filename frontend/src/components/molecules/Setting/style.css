@@ -1,5 +1,5 @@
-* {
-    -webkit-box-sizing: border-box;
+/* :where() keeps this at the weight the bare * had, so no class rule loses to it; it used to reach every screen once this file had loaded. */
+:where(.main-setting_wrapper), :where(.main-setting_wrapper) * {
     box-sizing: border-box;
     outline: none;
     text-transform: none;

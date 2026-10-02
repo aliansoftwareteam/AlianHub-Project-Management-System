@@ -56,9 +56,9 @@ describe('updateAssignee — who the change is announced as', () => {
         await settle();
         const [name, payload] = assigneeEmits()[0];
         expect(name).toBe('update');
-        expect(Object.keys(payload)).toEqual(['type', 'data', 'updatedFields', 'module']);
+        expect(Object.keys(payload)).toEqual(['type', 'data', 'updatedFields', 'module', 'companyId']);
         expect(JSON.stringify(payload)).toBe(JSON.stringify({
-            type: 'update', data: stored(), updatedFields: { $addToSet: { AssigneeUserId: PRIYA } }, module: 'task',
+            type: 'update', data: stored(), updatedFields: { $addToSet: { AssigneeUserId: PRIYA } }, module: 'task', companyId: C,
         }));
     });
 

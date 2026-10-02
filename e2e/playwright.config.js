@@ -17,6 +17,8 @@ module.exports = defineConfig({
         // Each test opens a fresh browser, which would install the app's worker and download the whole
         // bundle again. specs/app-shell.spec.js allows them for itself.
         serviceWorkers: 'block',
+        consoleGuard: true,
+        pageTreeOnFailure: true,
     },
     projects: [
         { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

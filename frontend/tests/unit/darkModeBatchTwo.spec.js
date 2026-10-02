@@ -335,8 +335,14 @@ describe('the legacy pickers follow the theme', () => {
         expect(panel().querySelector('.sidebar-close').getAttribute('aria-label')).toBe(en.Projects.close);
     });
 
-    test('every other sidebar keeps its light panel', async () => {
+    test('a sidebar is themed by default', async () => {
         await sidebar({});
+        expect(panel().classList.contains('sb-tokens')).toBe(true);
+        expect(panel().classList.contains('bg-white')).toBe(false);
+    });
+
+    test('a host that opts out keeps its light panel', async () => {
+        await sidebar({ themed: false });
         expect(panel().classList.contains('sb-tokens')).toBe(false);
         expect(panel().classList.contains('bg-white')).toBe(true);
         expect([...panel().querySelectorAll('.item-stub')].map((item) => item.dataset.themed)).toEqual(['false', 'false']);

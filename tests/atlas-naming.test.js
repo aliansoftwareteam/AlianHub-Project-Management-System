@@ -51,6 +51,11 @@ describe('atlas arguments', () => {
         expect(args.sizes.map((size) => size.label)).toEqual(['1440x900']);
     });
 
+    test('a stylesheet to patch into every page is optional', () => {
+        expect(parseArgs([]).css).toBeNull();
+        expect(parseArgs(['--css', 'patch.css']).css).toBe('patch.css');
+    });
+
     test('an unknown theme or variant is refused', () => {
         expect(() => parseArgs(['--themes', 'sepia'])).toThrow('light, dark');
         expect(() => parseArgs(['--variant', 'z'])).toThrow('a, b, c');

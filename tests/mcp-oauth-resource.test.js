@@ -4,7 +4,7 @@ jest.mock('../Modules/ApiTokens/controller', () => ({ verifyToken: jest.fn(), lo
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async () => ({ kind: 'agent', userId: '6f0000000000000000000001' })) }));
 jest.mock('../Modules/Agents/actions', () => ({ RefusedError: class RefusedError extends Error {} }));
 jest.mock('../Modules/Agents/registry', () => ({ NEVER: [] }));
-jest.mock('../Modules/Mcp/tools', () => ({ manifest: () => [], call: jest.fn(async () => ({ ok: true })) }));
+jest.mock('../Modules/Mcp/tools', () => ({ manifest: () => [], usable: () => [], call: jest.fn(async () => ({ ok: true })) }));
 
 const express = require('express');
 const apiTokens = require('../Modules/ApiTokens/controller');
@@ -39,7 +39,7 @@ const post = async (req) => { const res = response(); await server.post(req, res
 
 const challengeParams = (header) => Object.fromEntries([...String(header).matchAll(/(\w+)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
 
-const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'APIURL', 'API_TOKEN_STRICT'];
+const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'APIURL', 'API_TOKEN_STRICT', 'MCP_TOOLS_MANAGE'];
 const saved = {};
 beforeAll(() => { ENV_KEYS.forEach((k) => { saved[k] = process.env[k]; }); });
 afterEach(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }); });
@@ -48,6 +48,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.MCP_OAUTH;
     delete process.env.MCP_OAUTH_ISSUER;
+    delete process.env.MCP_TOOLS_MANAGE;
     process.env.APIURL = `${ISSUER}/`;
     apiTokens.verifyToken.mockResolvedValue(tokenWith(['read', 'write']));
 });
@@ -75,6 +76,14 @@ describe('protected resource metadata (RFC 9728)', () => {
             scopes_supported: ALL_SCOPES,
             bearer_methods_supported: ['header'],
         });
+    });
+
+    it('lists the manage scopes only while their tools are on', async () => {
+        const base = await serve({ MCP_OAUTH: 'on', APIURL: `${ISSUER}/` });
+        const supported = async () => (await (await fetch(`${base}/.well-known/oauth-protected-resource/mcp`)).json()).scopes_supported;
+        expect(await supported()).toEqual(ALL_SCOPES);
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        expect(await supported()).toEqual([...ALL_SCOPES, 'tasks:manage', 'docs:manage']);
     });
 
     it('names MCP_OAUTH_ISSUER over APIURL, as the authorization server does', async () => {
@@ -212,5 +221,29 @@ describe('tokens in the query string', () => {
     it('are ignored as on beta with the flag off', async () => {
         const res = await post(request({ query: { access_token: RAW } }));
         expect(res.statusCode).toBe(200);
+    });
+});
+
+describe('a personal token and the manage scopes', () => {
+    it('is not challenged for a manage scope it holds as a grant, and is not let through on its write scope', async () => {
+        flagOn();
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        apiTokens.verifyToken.mockResolvedValue({ ...tokenWith(['read', 'write']), grants: ['tasks:manage'] });
+        expect((await post(request({ body: call('task.archive') }))).statusCode).toBe(200);
+        expect(tools.call).toHaveBeenCalledTimes(1);
+
+        apiTokens.verifyToken.mockResolvedValue(tokenWith(['read', 'write', 'tasks:manage']));
+        const res = await post(request({ body: call('task.archive', 6) }));
+        expect(res.statusCode).toBe(403);
+        expect(res.body).toMatchObject({ id: 6, error: { data: { error: 'insufficient_scope', requiredScopes: ['tasks:manage'] } } });
+        expect(tools.call).toHaveBeenCalledTimes(1);
+    });
+
+    it('names the manage scope a tool needs when nobody is signed in, only while the tools are on', async () => {
+        flagOn();
+        const asked = async () => challengeParams((await post(request({ authorization: '', body: call('task.archive') }))).headers['WWW-Authenticate']).scope;
+        expect(await asked()).toBe(READ_SCOPES);
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        expect(await asked()).toBe('tasks:manage');
     });
 });

@@ -51,7 +51,7 @@ describe('AI sidebar structure', () => {
 
     it('leads the everyday entries with Ask and keeps the consoles out of them', async () => {
         const wrapper = await open();
-        expect(everyday(wrapper)).toEqual(['Parity.nav_ask', 'Ai.inbox', 'Ai.agents', 'Ai.skills', 'Parity.nav_connections']);
+        expect(everyday(wrapper)).toEqual(['Parity.nav_ask', 'Ai.inbox', 'Ai.agents', 'Ai.skills', 'Parity.nav_connections', 'ConnectAi.title']);
         expect(wrapper.find('.ai-side__count').text()).toBe('2');
         expect(setup(wrapper)).toContain('AiHealth.nav');
         expect(setup(wrapper)).not.toContain('Parity.nav_ask');

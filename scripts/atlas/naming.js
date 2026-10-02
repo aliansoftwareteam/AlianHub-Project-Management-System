@@ -41,6 +41,7 @@ function parseArgs(argv) {
         variant,
         core: Boolean(raw.core),
         tokenFile: text(raw['token-file']),
+        css: text(raw.css),
         company: text(raw.company),
         project: text(raw.project),
     };

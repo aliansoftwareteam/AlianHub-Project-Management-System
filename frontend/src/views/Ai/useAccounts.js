@@ -174,10 +174,23 @@ export function useAccounts() {
         }
     };
 
+    /* The new secret comes back exactly once, as a new token's does. The message is the server's, or empty for the caller to word. */
+    const renewToken = async (tokenId) => {
+        let res;
+        try {
+            res = await apiRequest("post", `${env.API_TOKENS}/${tokenId}/renew`);
+        } catch (error) {
+            throw new Error(thrown(error, ""));
+        }
+        if (!ok(res)) throw new Error(failure(res, ""));
+        await loadTokens();
+        return res.data.data;
+    };
+
     return {
         account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, stepCredentials, stepCredentialPolicy, manifest, runs, peopleHours,
         mode, allowed, isAllowed,
         loadAccount, loadPolicy, loadTokens, loadTokensNeedingExpiry, loadStepCredentials, loadManifest, loadRuns, loadPeopleHours,
-        savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken
+        savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken, renewToken
     };
 }

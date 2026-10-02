@@ -13,6 +13,9 @@
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'mine' }" @click="view = 'mine'">
                     {{ $t('Docs.mine') }}<span class="hub__item-count">{{ mine.length }}</span>
                 </button>
+                <button type="button" class="hub__item" :class="{ 'is-active': view === 'shared' }" data-test="docs-nav-shared" @click="view = 'shared'">
+                    {{ $t('Docs.shared_with_me') }}<span class="hub__item-count">{{ sharedWithMe.length }}</span>
+                </button>
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'wiki' }" @click="view = 'wiki'">
                     {{ $t('Docs.wiki') }}
                     <span v-if="needsReview.length" class="hub__item-badge hub__item-badge--warn">{{ needsReview.length }}</span>
@@ -45,7 +48,7 @@
                     <ShellIcon name="agent" :size="13" class="hub__item-icon" />{{ $t('Docs.agent_drafted') }}
                     <span v-if="agentDrafts.length" class="hub__item-badge">{{ agentDrafts.length }}</span>
                 </button>
-                <button type="button" class="hub__item" :class="{ 'is-active': view === 'templates' }" @click="view = 'templates'">
+                <button v-if="writesDocs" type="button" class="hub__item" :class="{ 'is-active': view === 'templates' }" @click="view = 'templates'">
                     <ShellIcon name="layout" :size="13" class="hub__item-icon" />{{ $t('Docs.templates') }}
                 </button>
                 <button type="button" class="hub__item" :class="{ 'is-active': view === 'trash' }" @click="view = 'trash'">
@@ -53,7 +56,7 @@
                 </button>
             </nav>
 
-            <button type="button" class="ah-btn ah-btn--primary ah-btn--block hub__new" @click="createDoc({})">
+            <button v-if="writesDocs" type="button" class="ah-btn ah-btn--primary ah-btn--block hub__new" @click="createDoc({})">
                 <ShellIcon name="plus" :size="14" />{{ $t('Docs.new_doc') }}
             </button>
         </aside>
@@ -67,18 +70,19 @@
                 <select v-model="view" class="hub__view-select">
                     <option value="recent">{{ $t('Docs.recent') }}</option>
                     <option value="mine">{{ $t('Docs.mine') }}</option>
+                    <option value="shared">{{ $t('Docs.shared_with_me') }}</option>
                     <option value="wiki">{{ $t('Docs.wiki') }}</option>
                     <option value="project:">{{ $t('Docs.workspace') }}</option>
                     <option v-for="project in projects" :key="'vs-' + project._id" :value="'project:' + project._id">{{ project.ProjectName }}</option>
                     <option value="agents">{{ $t('Docs.agent_drafted') }}</option>
-                    <option value="templates">{{ $t('Docs.templates') }}</option>
+                    <option v-if="writesDocs" value="templates">{{ $t('Docs.templates') }}</option>
                     <option value="trash">{{ $t('Docs.trash') }}</option>
                 </select>
                 <span class="ah-toolbar__spacer"></span>
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary hub__wiki-btn" :aria-label="$t('Docs.new_wiki_page')" @click="createDoc({ isWiki: true })">
+                <button v-if="writesDocs" type="button" class="ah-btn ah-btn--sm ah-btn--secondary hub__wiki-btn" :aria-label="$t('Docs.new_wiki_page')" @click="createDoc({ isWiki: true })">
                     <ShellIcon name="book" :size="13" /><span class="hub__btn-label">{{ $t('Docs.new_wiki_page') }}</span>
                 </button>
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--primary" @click="createDoc({})">
+                <button v-if="writesDocs" type="button" class="ah-btn ah-btn--sm ah-btn--primary" @click="createDoc({})">
                     <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
                 </button>
             </div>
@@ -95,14 +99,20 @@
 
                     <section class="hub__section">
                         <div class="hub__section-head"><span class="ah-label">{{ $t('Docs.recent') }}</span></div>
-                        <div v-if="!recent.length" class="hub__empty">
-                            <p class="ah-h3">{{ $t('Docs.no_recent_title') }}</p>
-                            <p class="ah-small">{{ $t('Docs.no_recent_hint') }}</p>
-                            <div class="hub__empty-actions">
-                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="createDoc({})">{{ $t('Docs.new_doc') }}</button>
-                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="view = 'templates'">{{ $t('Docs.templates') }}</button>
-                            </div>
-                        </div>
+                        <EmptyState
+                            v-if="!recent.length"
+                            class="hub__empty"
+                            illustration="docs"
+                            data-test="docs-empty-recent"
+                            :heading-level="2"
+                            :title="$t('Docs.no_recent_title')"
+                            :message="$t('Docs.no_recent_hint')"
+                            :action-label="$t('Docs.new_doc')"
+                            :action-allowed="writesDocs"
+                            :secondary-label="writesDocs ? $t('Docs.templates') : ''"
+                            @action="createDoc({})"
+                            @secondary="view = 'templates'"
+                        />
                         <div v-else class="hub__grid">
                             <DocCard v-for="page in recent.slice(0, 6)" :key="'rc-' + page._id" :page="page" @open="open" />
                         </div>
@@ -126,9 +136,16 @@
                 </template>
 
                 <template v-else-if="view === 'mine'">
-                    <div v-if="!mine.length" class="hub__empty"><p class="ah-small">{{ $t('Docs.no_mine') }}</p></div>
+                    <EmptyState v-if="!mine.length" class="hub__empty" illustration="docs" data-test="docs-empty-mine" :heading-level="2" :title="$t('Docs.no_mine')" :action-label="$t('Docs.new_doc')" :action-allowed="writesDocs" @action="createDoc({})" />
                     <div v-else class="hub__grid">
                         <DocCard v-for="page in mine" :key="'mc-' + page._id" :page="page" @open="open" />
+                    </div>
+                </template>
+
+                <template v-else-if="view === 'shared'">
+                    <EmptyState v-if="!sharedWithMe.length" class="hub__empty" illustration="docs" data-test="docs-empty-shared" :heading-level="2" :title="$t('Docs.no_shared_with_me')" :message="$t('Docs.no_shared_with_me_hint')" />
+                    <div v-else class="hub__grid" data-test="docs-shared-with-me">
+                        <DocCard v-for="page in sharedWithMe" :key="'sw-' + page._id" :page="page" @open="open" />
                     </div>
                 </template>
 
@@ -137,15 +154,22 @@
                         <span class="ah-label">{{ $t('Docs.pages_count', { n: wikiPages.length }) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
                         <button type="button" class="ah-btn ah-btn--sm" :class="onlyDue ? 'ah-btn--outline' : 'ah-btn--secondary'" @click="onlyDue = !onlyDue">{{ $t('Docs.needs_review') }}</button>
                     </div>
-                    <div v-if="!wikiRows.length" class="hub__empty"><p class="ah-small">{{ onlyDue ? $t('Docs.no_review_due') : $t('Docs.no_project_docs') }}</p></div>
+                    <EmptyState
+                        v-if="!wikiRows.length"
+                        class="hub__empty"
+                        illustration="docs"
+                        data-test="docs-empty-wiki"
+                        :heading-level="2"
+                        :title="onlyDue ? $t('Docs.no_review_due') : $t('Docs.no_project_docs')"
+                        :action-label="$t('Docs.new_wiki_page')"
+                        :action-allowed="!onlyDue && writesDocs"
+                        @action="createDoc({ isWiki: true })"
+                    />
                     <WikiTable v-else :rows="wikiRows" @open="open" @review="markReviewed" />
                 </template>
 
                 <template v-else-if="view === 'agents'">
-                    <div v-if="!agentDrafts.length" class="hub__empty">
-                        <p class="ah-h3">{{ $t('Docs.no_agent_drafts_title') }}</p>
-                        <p class="ah-small">{{ $t('Docs.no_agent_drafts_hint') }}</p>
-                    </div>
+                    <EmptyState v-if="!agentDrafts.length" class="hub__empty" illustration="docs" data-test="docs-empty-agents" :heading-level="2" :title="$t('Docs.no_agent_drafts_title')" :message="$t('Docs.no_agent_drafts_hint')" />
                     <AgentList v-else :rows="agentDrafts" @open="open" @approve="approve" />
                 </template>
 
@@ -163,17 +187,14 @@
                 </template>
 
                 <template v-else-if="view === 'trash'">
-                    <div v-if="!trash.length" class="hub__empty">
-                        <p class="ah-small">{{ $t('Docs.no_trash') }}</p>
-                        <p class="ah-small">{{ $t('Docs.trash_hint') }}</p>
-                    </div>
+                    <EmptyState v-if="!trash.length" class="hub__empty" data-test="docs-empty-trash" :heading-level="2" :title="$t('Docs.no_trash')" :message="$t('Docs.trash_hint')" />
                     <div v-else class="ah-card hub__list">
                         <div v-for="page in trash" :key="'tr-' + page._id" class="hub__row">
                             <ShellIcon name="file" :size="14" class="hub__row-icon" />
                             <span class="hub__row-title">{{ page.title || $t('Docs.untitled') }}</span>
                             <span class="hub__row-project">{{ projectNameOf(page.ProjectID) }}</span>
                             <span class="hub__row-time">{{ shortDate(page.updatedAt) }}</span>
-                            <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="restore(page)">
+                            <button v-if="writesDocs" type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="restore(page)">
                                 <ShellIcon name="restore" :size="13" />{{ $t('Docs.restore') }}
                             </button>
                         </div>
@@ -183,11 +204,11 @@
                 <template v-else>
                     <div class="hub__section-head">
                         <span class="ah-label">{{ projectNameOf(viewProjectId) }}</span>
-                        <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="createDoc({})">
+                        <button v-if="writesDocs" type="button" class="ah-btn ah-btn--sm ah-btn--secondary" @click="createDoc({})">
                             <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
                         </button>
                     </div>
-                    <div v-if="!projectRows.length" class="hub__empty"><p class="ah-small">{{ $t('Docs.no_project_docs') }}</p></div>
+                    <EmptyState v-if="!projectRows.length" class="hub__empty" illustration="docs" data-test="docs-empty-project" :heading-level="2" :title="$t('Docs.no_project_docs')" :message="$t('Docs.no_project_docs_hint')" />
                     <DocList v-else :rows="projectRows" tree @open="open" />
                 </template>
             </div>
@@ -196,16 +217,18 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, ref, watch } from 'vue';
+import { computed, defineComponent, h, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useGetterFunctions } from '@/composable';
 import templates from '@/components/molecules/Pages/pageTemplates';
+import { useDocRights } from '@/components/molecules/Pages/useDocRights';
 import { relativeTime, shortDate, initials, reviewChipClass, reviewLabelKey } from '@/components/molecules/Pages/docsFormat';
 
 defineOptions({ name: 'PagesSpace' });
@@ -216,6 +239,7 @@ const router = useRouter();
 const store = useStore();
 const $toast = useToast();
 const { getUser } = useGetterFunctions();
+const { writesDocs } = useDocRights();
 
 const SWATCHES = ['var(--brand)', 'var(--ok)', 'var(--warn)', 'var(--agent)', 'var(--danger)'];
 
@@ -256,6 +280,7 @@ const filtered = computed(() => {
 const byTime = (a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
 const recent = computed(() => [...filtered.value].sort(byTime));
 const mine = computed(() => recent.value.filter((p) => String(p.createdBy || '') === me));
+const sharedWithMe = computed(() => recent.value.filter((p) => Boolean(p.sharedWithMe)));
 const wikiPages = computed(() => recent.value.filter((p) => p.isWiki));
 const needsReview = computed(() => wikiPages.value.filter((p) => p.reviewState === 'due' || p.reviewState === 'stale'));
 const staleCount = computed(() => pages.value.filter((p) => p.isWiki && p.reviewState === 'stale').length);
@@ -311,6 +336,17 @@ function fetchTrash() {
 }
 
 watch(view, (value) => { if (value === 'trash') fetchTrash(); });
+
+const SHARES_CHANGED = 'docSharesChanged';
+let listening = null;
+function listenOn(socket) {
+    if (listening) listening.off(SHARES_CHANGED, fetchPages);
+    listening = socket && typeof socket.on === 'function' ? socket : null;
+    if (listening) listening.on(SHARES_CHANGED, fetchPages);
+}
+/* The socket is replaced when the connection is made again. */
+watch(() => store.getters['settings/getSocketInstance'], listenOn, { immediate: true });
+onBeforeUnmount(() => listenOn(null));
 
 onMounted(() => {
     fetchPages();
@@ -457,7 +493,7 @@ const AgentList = defineComponent({
                 relativeTime(page.updatedAt, t),
             ]),
             h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--secondary', onClick: () => emit('open', page) }, t('Docs.review')),
-            h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--primary', onClick: () => emit('approve', page) }, t('Docs.approve')),
+            writesDocs.value ? h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--primary', onClick: () => emit('approve', page) }, t('Docs.approve')) : null,
         ])));
     },
 });
@@ -490,7 +526,7 @@ const WikiTable = defineComponent({
                         : [h('span', { class: 'ah-avatar ah-avatar--sm hub__avatar-none' }, '?'), t('Docs.no_owner')]),
                     h('span', { class: ['hub__when', { 'hub__when--danger': page.reviewState === 'stale' }] }, page.reviewedAt ? shortDate(page.reviewedAt) : '—'),
                     h('span', { class: ['hub__wiki-state', `hub__wiki-state--${page.reviewState}`] }, [dot(page.reviewState), t(reviewLabelKey(page.reviewState))]),
-                    h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--ghost', onClick: () => emit('review', page) }, t('Docs.mark_reviewed')),
+                    writesDocs.value ? h('button', { type: 'button', class: 'ah-btn ah-btn--sm ah-btn--ghost', onClick: () => emit('review', page) }, t('Docs.mark_reviewed')) : h('span'),
                 ]);
             }),
         ]);
@@ -621,9 +657,7 @@ const WikiTable = defineComponent({
 }
 .hub__blank:hover { background: var(--brand-tint); }
 
-.hub__empty { border: 1px dashed var(--border); border-radius: var(--r-lg, 10px); padding: calc(var(--card-pad-x, 16px) + 6px); background: var(--surface-2); display: flex; flex-direction: column; gap: 6px; }
-.hub__empty p { margin: 0; }
-.hub__empty-actions { display: flex; gap: 8px; margin-top: 6px; }
+.hub__empty { border: 1px dashed var(--border); border-radius: var(--r-lg, 10px); background: var(--surface-2); }
 
 @media (max-width: 1279px) {
     .hub__side { display: none; }
@@ -642,7 +676,7 @@ const WikiTable = defineComponent({
     .hub__stats { display: none; }
     .hub__btn-label { display: none; }
     .hub .ah-btn--sm { min-height: var(--hit-min); }
-    .hub__view-select { height: var(--hit-min); }
+    .hub__view-select { height: var(--hit-min); min-width: 0; flex: 0 1 auto; }
     .hub__wiki-btn { width: var(--hit-min); height: var(--hit-min); padding: 0; }
 }
 </style>

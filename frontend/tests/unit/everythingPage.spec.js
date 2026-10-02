@@ -60,7 +60,7 @@ const reads = () => apiRequest.mock.calls.filter(([, url]) => url === TASKS);
 const sent = () => reads().map(([, , body]) => body);
 const sentNames = () => sent().map(recordedAs);
 
-const projectList = Object.values({ ...fixture.projectCounts.response.data.projects }).map((card) => ({ ...card, deletedStatusKey: 0 }));
+const projectList = Object.values({ ...fixture.withSubtasks.response.data.projects }).map((card) => ({ ...card, deletedStatusKey: 0 }));
 
 const newStore = () => createStore({
     modules: {
@@ -169,6 +169,8 @@ describe('the list', () => {
         expect(sentNames().at(-1)).toBe('nothing');
         expect(sent().at(-1).filter.search).toBe('nothing is called this');
         expect(test('evr-empty').exists()).toBe(true);
+        expect(test('evr-empty').find('svg').attributes('data-illustration')).toBe('search');
+        expect(test('evr-empty').find('.empty-state__btn').text()).toBe('Everything.clear_filters');
         expect(rows()).toHaveLength(0);
 
         await test('evr-empty').find('button').trigger('click');
@@ -446,5 +448,30 @@ describe('remembered settings', () => {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify({ group: 'customField', findQuery: [{ $match: {} }], hideDone: 'no' }));
         await open();
         expect(sentNames().at(-1)).toBe('all');
+    });
+});
+
+/* Task 047, S-1: "My work" on the Simple rail is this page, opened narrowed to the person. */
+describe('My work', () => {
+    it('opens narrowed to the person when the address asks for it', async () => {
+        route.query = { mine: '1' };
+        await open();
+        expect(sent()).toHaveLength(1);
+        expect(sent()[0].filter.assignee).toEqual(['user-1']);
+        expect(test('evr-me').attributes('aria-pressed')).toBe('true');
+    });
+
+    it('narrows what was left on screen last time and keeps its other settings', async () => {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({ group: 'status', assignee: ['6f0000000000000000000002'] }));
+        route.query = { mine: '1' };
+        await open();
+        expect(sent().at(-1)).toMatchObject({ group: 'status' });
+        expect(sent().at(-1).filter.assignee).toEqual(['user-1']);
+    });
+
+    it('leaves the page as it was without it', async () => {
+        await open();
+        expect(sent()[0].filter).not.toHaveProperty('assignee');
+        expect(test('evr-me').attributes('aria-pressed')).toBe('false');
     });
 });

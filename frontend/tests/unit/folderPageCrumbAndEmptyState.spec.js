@@ -108,7 +108,7 @@ describe('the header on a list inside a subfolder', () => {
         });
         await router.push({ name: 'Project', params: { cid: 'company-1', id: 'p1' } });
         await router.isReady();
-        const wrapper = keep(mount(ProjectHeader, { props: { project, projects: [project], sprint: location.sprint, folders: location.folders }, global: { plugins: [router] } }));
+        const wrapper = keep(mount(ProjectHeader, { props: { project, projects: [project], sprint: location.sprint, folders: location.folders }, global: { plugins: [router, createStore({ getters: { 'projectData/sprints': () => ({}), 'projectData/folders': () => ({}) } })] } }));
         await flushPromises();
         return { wrapper, router };
     };

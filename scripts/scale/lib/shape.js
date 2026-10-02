@@ -59,10 +59,14 @@ const PEOPLE = [
     })),
 ];
 
+// The optional second shape: many small projects beside the big one, so a read across projects names hundreds of them.
+const SMALL_PROJECTS = { max: 500, tasks: 10, list: 'List' };
+const smallProject = (n) => ({ name: `Scale Small ${String(n).padStart(3, '0')}`, code: `SS${String(n).padStart(3, '0')}` });
+
 const listName = (n) => (n === 0 ? 'List' : `Sprint ${String(n).padStart(2, '0')}`);
 
 module.exports = {
     MARK, COMPANY_NAME, EMAIL_DOMAIN, PROJECT, BENCHMARK_SIZES, MAX_TASKS, STATUS_COUNT, LIST_COUNT, MEMBER_COUNT, SHARES,
     DAY_MS, CREATED_SPAN_DAYS, CREATED_STEP_MS, DUE_WINDOW_DAYS, PRIORITIES, STATUS_WEIGHTS, ASSIGNEE_COUNTS, TAG_COUNTS,
-    SUBTASK_COUNTS, COMMENT_COUNTS, ESTIMATE_MINUTES, POINTS, GROUP_INDEX_STEP, TAGS, FIELDS, PEOPLE, listName,
+    SUBTASK_COUNTS, COMMENT_COUNTS, ESTIMATE_MINUTES, POINTS, GROUP_INDEX_STEP, TAGS, FIELDS, PEOPLE, listName, SMALL_PROJECTS, smallProject,
 };

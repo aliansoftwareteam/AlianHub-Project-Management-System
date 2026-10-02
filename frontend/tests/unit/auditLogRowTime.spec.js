@@ -32,3 +32,34 @@ describe('the audit log time column', () => {
         expect(times).toEqual(['09:05', older.format('D MMM HH:mm')]);
     });
 });
+
+describe('an empty audit log', () => {
+    const none = { data: { status: true, data: [], metadata: { total: 0, page: 1, totalPages: 1 } } };
+
+    it('says what the log is for and offers nothing to do', async () => {
+        apiRequest.mockResolvedValue(none);
+        const wrapper = mount(AuditLog, { global: { mocks: { $t: t } } });
+        await flushPromises();
+        const empty = wrapper.find('[data-test="audit-empty"]');
+        expect(empty.find('h2').text()).toBe(en.Audit.none);
+        expect(empty.text()).toContain(en.Audit.none_msg);
+        expect(empty.find('button').exists()).toBe(false);
+    });
+
+    it('offers to clear a search that matched nothing, and loads again without it', async () => {
+        apiRequest.mockResolvedValue(none);
+        const wrapper = mount(AuditLog, { global: { mocks: { $t: t } } });
+        await flushPromises();
+        await wrapper.find('.al__search-input').setValue('nothing like this');
+        const empty = wrapper.find('[data-test="audit-empty"]');
+        expect(empty.find('svg').attributes('data-illustration')).toBe('search');
+        expect(empty.find('.empty-state__btn').text()).toBe(en.Audit.clear_search);
+
+        const calls = apiRequest.mock.calls.length;
+        await empty.find('.empty-state__btn').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('.al__search-input').element.value).toBe('');
+        expect(apiRequest.mock.calls.length).toBe(calls + 1);
+        expect(wrapper.find('[data-test="audit-empty"] button').exists()).toBe(false);
+    });
+});

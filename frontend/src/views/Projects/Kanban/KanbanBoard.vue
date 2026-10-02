@@ -9,7 +9,6 @@
             @dragleave="onColumnDragLeave"
             @drop="hoveredColumnIndex = null"
         >
-            <!-- Card Area -->
             <div class="kanban-card-wrapper">
                 <div class="column-head column-head-wrap">
                     <span class="status-color-dot" :style="`background-color: ${column.textColor || 'var(--ink-3)'}`"></span>
@@ -35,14 +34,13 @@
                         :aria-label="$t('Projects.add_task_to_column', { name: column.name })"
                         @click="showAddInput(column.key)"
                     >
-                        <img class="add-task-icon" src="@/assets/images/svg/pluss.svg" alt="" aria-hidden="true">
+                        <span class="ah-mask-icon add-task-icon" :style="maskOf(plusIcon)" aria-hidden="true"></span>
                     </button>
                 </div>
                 <div class="add-task-section" v-if="activeColumnId === column.key" :id="column.key">
                     <BoardViewTaskCreateVue :data="column" :groupValue="groupValue" @toggle="(val) => showAddInput(val)" :sprintData="{}" :sprintId="sprintId" />
                 </div>
 
-                <!-- Tasks List -->
                 <div class="kanban-cards-area">
                     <Draggable
                         class="kanban-cards"
@@ -70,14 +68,24 @@
                             </div>
                         </template>
                     </Draggable>
-                    <p v-if="!column.tasksArray?.length" class="column-empty">{{ $t('Projects.column_empty_drop') }}</p>
+                    <OtherProjectRows as="card" :rows="otherRows.placed[column.key] || []" :projects="otherProjects" :list="viewedList" />
+                    <p v-if="!column.tasksArray?.length && !otherRows.placed[column.key]?.length" class="column-empty">{{ $t('Projects.column_empty_drop') }}</p>
                 </div>
 
                 <button v-if="moreCount(column) > 0" type="button" class="more-count" @click="loadMore(column)">{{ $t('Projects.more_count', { n: moreCount(column) }) }}</button>
             </div>
 
-            <!-- Drop Area -->
             <div class="column-drop-area" :class="{ 'highlight-drop': hoveredColumnIndex === columnIndex }"></div>
+        </div>
+        <div v-if="otherRows.unplaced.length || otherTruncated" class="kanban-column" data-other-project-column>
+            <div class="kanban-card-wrapper">
+                <div class="column-head column-head-wrap">
+                    <span class="column-title" :title="$t('TaskLists.other_projects')">{{ $t('TaskLists.other_projects') }}</span>
+                </div>
+                <div class="kanban-cards-area">
+                    <OtherProjectRows as="card" :rows="otherRows.unplaced" :projects="otherProjects" :list="viewedList" :truncated="otherTruncated" />
+                </div>
+            </div>
         </div>
     </div>
 </template>
@@ -87,6 +95,9 @@ import { ref, defineProps, nextTick, inject, provide, watch, onMounted, onUnmoun
 import Draggable from 'vuedraggable'
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+import { useToast } from "vue-toast-notification";
+import { isAddedRow, putBack } from "@/views/Projects/composables/taskHomeMark";
+import OtherProjectRows from "@/views/Projects/components/OtherProjectRows.vue";
 
 //Cmponents
 import BoardViewTaskCreateVue from "@/views/Projects/Kanban/BoardViewTaskCreate"
@@ -105,6 +116,9 @@ import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
 import { taskNavAttrs } from "@/components/organisms/TaskDetailOverlay/taskNavigation";
 import { useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { useSubtaskTree } from "@/views/Projects/composables/subtaskTree";
+import { maskOf } from "@/utils/iconMask";
+
+const plusIcon = require("@/assets/images/svg/pluss.svg");
 
 //Props
 const props = defineProps({
@@ -117,6 +131,19 @@ const props = defineProps({
     },
     sprintId: {
         type: String
+    },
+    /** Cards of tasks added to this list from other projects: `placed` by column key, `unplaced` when no column is named for them. */
+    otherRows: {
+        type: Object,
+        default: () => ({ placed: {}, unplaced: [] })
+    },
+    otherProjects: {
+        type: Object,
+        default: () => ({})
+    },
+    otherTruncated: {
+        type: Boolean,
+        default: false
     }
 })
 
@@ -129,12 +156,14 @@ const groupValue = ref(props.group)
 const activeColumnId = ref(null)
 const companyId = inject("$companyId")
 const projectData = inject("selectedProject")
+const viewedList = computed(() => ({ sprintId: props.sprintId, projectId: projectData.value?._id }))
 const showArchiveVar = inject("showArchived");
 const clientWidth = inject("$clientWidth");
 const hoveredColumnIndex = ref(null)
 const timer = ref(null)
 const { dispatch, commit } = useStore()
 const { t } = useI18n()
+const $toast = useToast();
 const { updateTaskByGroup } = useUpdateTasks()
 const { checkPermission } = useCustomComposable();
 
@@ -279,6 +308,14 @@ const updateEvent = (event, task) => {
     if (element) {
         if (event.added) {
             updateTaskByGroup(element, task, groupValue.value, null, true).catch((error) => console.error("ERROR in board drop: ", error));
+        }
+        /* A card of a task added to this list takes the column it is dropped in; its place is kept by the list it lives in. */
+        if (isAddedRow(element, columns.value[0]?.sprintId || props.sprintId)) {
+            if (event.moved) {
+                putBack(task.tasksArray, event.moved);
+                $toast.info(t("TaskLists.order_kept_at_home"), { position: "top-right" });
+            }
+            return;
         }
         if (task.customFieldId) return;
         let relevantIndex

@@ -73,6 +73,12 @@ updateArchiveDelete: entry((body) => archiveDeleteNeeds(body.deletedStatusKey), 
     mergeTask: entry([write('task.task_merge'), inProject(DESTINATION, write('task.task_merge'))], { tasks: [['taskId'], ['mergeTaskId']] }),
     duplicateTask: entry([write('task.task_duplicate'), inProject(DESTINATION, write('task.task_duplicate'))], { tasks: [['selectedTaskId']] }),
 
+    // The list is not named by a project in the body: the handler reads it and judges task.task_move in its project,
+    // after it has shown the caller can open it, so a list they cannot see answers as a missing one. A removal is
+    // allowed by that key in the home project or in the list's, which only the stored row can tell apart.
+    addToList: entry([write('task.task_move')], { tasks: TASK_ID }),
+    removeFromList: entry([VISIBLE], { tasks: TASK_ID }),
+
     addTaskRelation: entry([VISIBLE], { tasks: [['taskId'], ['relatedTaskId']] }),
     removeTaskRelation: entry([VISIBLE], { tasks: [['taskId'], ['relatedTaskId']] }),
     getTaskRelations: entry([VISIBLE], { tasks: TASK_ID }),
@@ -104,6 +110,7 @@ updateArchiveDelete: entry((body) => archiveDeleteNeeds(body.deletedStatusKey), 
     bulkMove: entry([BULK_MOVE, inProject(DESTINATION, BULK_MOVE)], { tasks: BULK_TASK_IDS }),
     bulkConvertToSubTask: entry([write('task.task_convert_to_subtask'), write('task.sub_task_create')], { tasks: [...BULK_TASK_IDS, ['parentTaskId']] }),
     bulkConvertToTask: entry([write('task.convert_to_task'), write('task.task_create'), inProject(DESTINATION, write('task.task_create'))], { tasks: BULK_TASK_IDS }),
+    bulkAddToList: entry([write('task.task_move')], { tasks: BULK_TASK_IDS }),
     bulkDuplicate: entry([write('task.task_duplicate'), inProject(DESTINATION, write('task.task_duplicate'))], { tasks: BULK_TASK_IDS }),
 });
 
@@ -168,7 +175,9 @@ const TASK_WRITE_ROUTES = Object.freeze({
     'POST /api/v1/ai/notes-to-tasks': judgedBy('Modules/AI/notesToTasks.js: task.task_create in the chosen project, then the create route\'s own preparation per task'),
     'POST /api/v1/ai/notes-to-tasks/undo': judgedBy('Modules/AI/notesToTasks.js: only the caller\'s tasks linked to that source, within the undo window'),
     'POST /api/v1/ai/notes-to-tasks/propose': notATaskWrite('a proposal; nothing is written'),
-    'POST /api/v1/ai/task-summary': notATaskWrite('a read, cached in memory'),
+    'POST /api/v1/ai/task-summary': notATaskWrite('a summary kept beside the task; the task is not written'),
+    'POST /api/v1/ai/task-values': notATaskWrite('a read of kept summaries and areas'),
+    'POST /api/v2/agents/work-queue/task/:taskId/hand-over': notATaskWrite('files a work-queue item about the task, for a person who can open and assign it; the task is not written'),
     'POST /api/v1/ai/task-category': notATaskWrite('a suggestion; the task is not written'),
     'POST /api/v1/ai/task-next-steps': notATaskWrite('a suggestion; applying it goes through AddAiChecklist or createSubTaskWithAi'),
     'POST /api/v1/ai/task-research': notATaskWrite('a suggestion; adding it posts a comment through /api/v1/comments'),

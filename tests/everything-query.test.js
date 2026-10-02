@@ -17,7 +17,7 @@ const refusal = (body) => {
     }
     return null;
 };
-const NO_FILTER = { status: null, statusType: null, assignee: null, priority: null, dueDate: null, taskType: null, tags: null, search: null, projectIds: null };
+const NO_FILTER = { status: null, statusType: null, assignee: null, priority: null, dueDate: null, taskType: null, tags: null, search: null, projectIds: null, sprintIds: null };
 const hexOf = (value) => JSON.parse(JSON.stringify(value));
 
 describe('the request is data, checked at the boundary', () => {
@@ -93,6 +93,8 @@ describe('the request is data, checked at the boundary', () => {
         ['filter.search', { filter: { search: 'x'.repeat(201) } }],
         ['filter.projectIds', { filter: { projectIds: ['not-an-id'] } }],
         ['filter.projectIds', { filter: { projectIds: P1 } }],
+        ['filter.sprintIds', { filter: { sprintIds: ['not-an-id'] } }],
+        ['filter.sprintIds', { filter: { sprintIds: Array.from({ length: 101 }, () => P1) } }],
         ['filter.projectIds', { filter: { projectIds: Array.from({ length: 501 }, () => P1) } }],
         ['filter.dueDate', { filter: { dueDate: '2026-10-01' } }],
         ['filter.dueDate.from', { filter: { dueDate: { from: 'yesterday' } } }],
@@ -116,6 +118,7 @@ describe('the request is data, checked at the boundary', () => {
                 tags: ['tag-1'],
                 search: '  a.b  ',
                 projectIds: [P1.toUpperCase(), P1],
+                sprintIds: [P2.toUpperCase(), P2],
             },
         });
         expect(filter).toEqual({
@@ -128,11 +131,12 @@ describe('the request is data, checked at the boundary', () => {
             tags: ['tag-1'],
             search: 'a.b',
             projectIds: [P1],
+            sprintIds: [P2],
         });
     });
 
     it('reads an empty list or an empty search as no filter', () => {
-        expect(q.parseRequest({ filter: { status: [], statusType: [], assignee: [], priority: [], taskType: [], tags: [], search: '   ', projectIds: [], dueDate: {} } }).filter).toEqual(NO_FILTER);
+        expect(q.parseRequest({ filter: { status: [], statusType: [], assignee: [], priority: [], taskType: [], tags: [], search: '   ', projectIds: [], sprintIds: [], dueDate: {} } }).filter).toEqual(NO_FILTER);
     });
 
     it('reads "no due date" and a timezone', () => {
@@ -284,7 +288,7 @@ describe('one page of rows', () => {
     });
 
     it('returns what a List row needs and nothing heavier', () => {
-        ['TaskName', 'TaskKey', 'status', 'statusKey', 'statusType', 'Task_Priority', 'AssigneeUserId', 'DueDate', 'startDate', 'ProjectID', 'sprintId', 'TaskType', 'TaskTypeKey', 'tagsArray', 'subTasks', 'ancestors', 'ParentTaskId', 'isParentTask', 'updatedAt']
+        ['TaskName', 'TaskKey', 'status', 'statusKey', 'statusType', 'Task_Priority', 'AssigneeUserId', 'DueDate', 'startDate', 'ProjectID', 'sprintId', 'TaskType', 'TaskTypeKey', 'tagsArray', 'subTasks', 'ancestors', 'ParentTaskId', 'isParentTask', 'updatedAt', 'sprintArray']
             .forEach((field) => expect(q.ROW_FIELDS[field]).toBe(1));
         ['description', 'rawDescription', 'descriptionBlock', 'customField', 'watchers', 'attachments', 'checklistArray', 'CompanyId', 'updateToken']
             .forEach((field) => expect(q.ROW_FIELDS).not.toHaveProperty(field));

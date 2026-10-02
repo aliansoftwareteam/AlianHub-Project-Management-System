@@ -41,6 +41,7 @@ mongoHelper.getTotalSprintCount = async () => true;
 
 const SPRINT = '6f0000000000000000000e01';
 const OTHER_SPRINT = '6f0000000000000000000e02';
+const FIELD = '6f0000000000000000000e0f';
 const FOLDER = '6f0000000000000000000f01';
 const OTHER_TASK = '6f0000000000000000000b09';
 const OTHER_PROJECT_ID = PARITY_PROJECT;
@@ -75,7 +76,10 @@ const call = (route, body, request = {}) => new Promise((resolve) => {
     }
 }).then(async (result) => { await settle(); return result; });
 
-const STATUS_LIST = [{ key: 1, name: 'To Do', type: 'default_active', convertStatus: { key: 1, name: 'To Do', type: 'default_active' } }];
+const STATUS_LIST = [
+    { key: 1, name: 'To Do', type: 'default_active', convertStatus: { key: 1, name: 'To Do', type: 'default_active' } },
+    { key: 2, name: 'Doing', type: 'active', convertStatus: { key: 2, name: 'Doing', type: 'active' } },
+];
 const TYPE_LIST = [{ key: 1, value: 'task', name: 'Task', taskCount: 0, convertType: { key: 1, value: 'task', name: 'Task' } }];
 
 const taskDoc = (_id, extra = {}) => ({
@@ -115,13 +119,15 @@ const reset = () => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockDb.calls.length = 0;
     logger.warn.mockClear();
-    [OPEN_PROJECT, OTHER_PROJECT_ID].forEach((_id) => mockDb.seed('projects', { _id, ProjectName: 'Parity', ProjectCode: 'PAR', CompanyId: CID, lastTaskId: 4, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST }));
+    [OPEN_PROJECT, OTHER_PROJECT_ID].forEach((_id) => mockDb.seed('projects', { _id, ProjectName: 'Parity', ProjectCode: 'PAR', CompanyId: CID, lastTaskId: 4, taskStatusData: STATUS_LIST, taskTypeCounts: TYPE_LIST, tagsArray: [{ uid: 'tag-1', tagName: 'Urgent' }] }));
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: 'Olivia Owner' });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: SPRINT, name: 'Sprint 1', projectId: OPEN_PROJECT });
-mockDb.seed('tasks', taskDoc(OPEN_TASK));
-    mockDb.seed('tasks', taskDoc(OPEN_TASK_2));
+    mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: OTHER_SPRINT, name: 'Sprint 2', projectId: OPEN_PROJECT });
+    mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: FIELD, fieldTitle: 'Customer', fieldType: 'text', type: 'task', global: true, isDelete: true });
+    mockDb.seed('tasks', taskDoc(OPEN_TASK));
+    mockDb.seed('tasks', taskDoc(OPEN_TASK_2, { extraLists: [{ projectId: OPEN_PROJECT, sprintId: OTHER_SPRINT, addedBy: OWNER }] }));
 };
 
 beforeEach(reset);
@@ -142,8 +148,8 @@ const BULK = 'POST /api/v2/tasks/bulk';
 const RELATIONS = 'POST /api/v2/tasks/relations';
 const PRE_V2 = 'PATCH /api/tasks/';
 
-/* The fixtures name sprints s1 and s2; the handlers cast sprint ids, so they are given real ones here. */
-const withSprintIds = (body) => JSON.parse(JSON.stringify(body, (key, value) => ({ s1: SPRINT, s2: OTHER_SPRINT }[value] || value)));
+/* The fixtures name sprints s1 and s2 and a field cf1; the handlers read each by id, so they are given real ones here. */
+const withSprintIds = (body) => JSON.parse(JSON.stringify(body, (key, value) => ({ s1: SPRINT, s2: OTHER_SPRINT, cf1: FIELD }[value] || value)));
 
 /* One body per dispatchable name; web-app actions use their fixture shape, the rest a shape their handler reads. */
 const fixtureBody = (route, action) => {
@@ -168,6 +174,9 @@ const CRAFTED = {
     pullRelationEntry: () => ({ action: 'pullRelationEntry', companyId: CID, taskId: OPEN_TASK }),
     bulkUpdateStartDate: () => ({ action: 'bulkUpdateStartDate', taskIds: [OPEN_TASK], userData: USER, startDate: '2026-10-01' }),
     bulkRestore: () => ({ action: 'bulkRestore', taskIds: [OPEN_TASK], userData: USER }),
+    addToList: () => ({ action: 'addToList', taskId: OPEN_TASK, sprintId: OTHER_SPRINT, userData: USER }),
+    removeFromList: () => ({ action: 'removeFromList', taskId: OPEN_TASK_2, sprintId: OTHER_SPRINT, userData: USER }),
+    bulkAddToList: () => ({ action: 'bulkAddToList', taskIds: [OPEN_TASK], sprintId: OTHER_SPRINT, userData: USER }),
     _bulkArchiveDelete: () => ({ action: '_bulkArchiveDelete', companyId: CID, taskIds: [OPEN_TASK], userData: USER, deletedStatusKey: 2 }),
     bulkDuplicate: () => ({ action: 'bulkDuplicate', taskIds: [OPEN_TASK], userData: USER, projectData: projectData(), sprintObj: sprintObj(), oldProject: projectData(), duplicateData: [], taskName: 'Copy', oldSprintObj: sprintObj() }),
     create: () => {
@@ -512,13 +521,21 @@ const linkTasks = () => {
     link(OPEN_TASK_2, OPEN_TASK, 'blocked_by');
 };
 
+/* The list a move names is stored as the server holds it, so a move into a folder list needs the list to sit in that folder. */
+const listInFolder = () => {
+    const { folderId, name } = WEB_APP_BODIES.PLACEMENT.PICKED_FOLDER;
+    mockDb.store.sprints.find((sprint) => String(sprint._id) === OTHER_SPRINT).folderId = folderId;
+    mockDb.seed(SCHEMA_TYPE.FOLDERS, { _id: folderId, name, projectId: OPEN_PROJECT });
+};
+
 describe('every web-app body is served as before', () => {
     const rows = WEB_APP_BODIES.map((row) => [`${row.route}${row.action ? ` ${row.action}` : ''} (${row.source})`, row]);
+    const SEEDS = { remove: linkTasks, 'ConvertToSubTaskSidebar.vue move into a folder list': listInFolder };
 
     test.each(rows)('%s', async (_, row) => {
         const ids = { taskId: OPEN_TASK, otherTaskId: OPEN_TASK_2, projectId: OPEN_PROJECT, destinationProjectId: OPEN_PROJECT };
         const body = completed(row, withSprintIds(row.body(ids)));
-        const before = row.action === 'remove' ? linkTasks : () => {};
+        const before = SEEDS[row.action] || SEEDS[row.source] || (() => {});
 
         const prepared = prepareTaskWrite({ headers: { companyid: CID }, aud: CID, body: clone(body) }, specOfRow(row), 'web app');
         expect(prepared.dropped).toEqual([]);
@@ -559,6 +576,7 @@ describe('a move keeps on the task the few values that name its new list', () =>
     });
 
     test('a list in a folder', async () => {
+        listInFolder();
         const result = await call(PATCH, withSprintIds(movedTo(PICKED_FOLDER_LIST)(ids)));
 
         expect(result.code).toBe(200);

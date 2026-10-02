@@ -160,6 +160,7 @@ describe('the PRD writer drafts a page from the brief', () => {
     });
 
     it('saves the drafted text as the page body the editor opens', async () => {
+        mockDb.seed(SCHEMA_TYPE.TASKS, taskOf());
         const out = await actions.executors['page.draft']({ companyId: C, actor: { kind: 'agent', userId: PERSON, agentName: 'PRD Writer' }, params: { title: 'PRD: One-step checkout', text: '# One-step checkout\n\n## Problem\nReturning customers drop off.', projectId: PROJECT, taskId: TASK_ID } });
         const saved = mockDb.store[SCHEMA_TYPE.PAGES].find((p) => String(p._id) === out.result.pageId);
         expect(saved.content.blocks.blocks.map((b) => b.type)).toEqual(['header', 'header', 'paragraph']);

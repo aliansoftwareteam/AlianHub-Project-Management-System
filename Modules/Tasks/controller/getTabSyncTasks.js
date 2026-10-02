@@ -1,196 +1,115 @@
 const { mongoose } = require("mongoose");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { QueryRefused, validatePipeline, visibilityStage, matchWithExtraListRows } = require("../helpers/taskQueryGuard");
+const { opensList } = require("../helpers/taskExtraLists");
 
+const LEAVE_PROJECT_ID = "6571e7195470e64b1203295c";
 
-exports.getTabSynctTaskWithoutTable = (companyId,req) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const indName = req.body.indexName || req.body.item.indexName
+const firstOf = (list) => (Array.isArray(list) && list.length ? list[0] : null);
 
-            const queryParams = [
-                {
-                    $match: {
-                        ProjectID: new mongoose.Types.ObjectId(req.body.pid),
-                        sprintId: new mongoose.Types.ObjectId(req.body.sprintId),
-                        updatedAt: {$gte: new Date(Number(req.body.tabLeaveTime))},
-                        deletedStatusKey: 0,
-                        ...((req.body.showAllTasks === undefined || req.body.showAllTasks === true || req.body.showAllTasks === 2) ? {} : {AssigneeUserId: {$in: [req.body.userId]}}),
-                        ...( req.body.parentId && req.body.parentId.length ? 
-                            { ParentTaskId: req.body.parentId }
-                        :
-                            {
-                                isParentTask: true,
-                                ...( req.body.item.mongoConditions?.length ? 
-                                    { ...req.body.item.mongoConditions[0] }
-                                :
-                                req.body.item?.conditions?.length ?
-                                        { ...req.body.item.conditions[0] }
-                                    :
-                                        {}
-                                )
-                            }
-                        ),
-                    }
-                },
-                { $sort: {[indName]: 1, "createdAt": 1, _id: 1}},
-            ]
-            const countParams = [
-                {
-                    $match: {
-                        ProjectID: new mongoose.Types.ObjectId(req.body.pid),
-                        sprintId: new mongoose.Types.ObjectId(req.body.sprintId),
-                        deletedStatusKey: 0,
-                        ...((req.body.showAllTasks === undefined || req.body.showAllTasks === true || req.body.showAllTasks === 2) ? {} : {AssigneeUserId: {$in: [req.body.userId]}}),
-                        ...( req.body.parentId && req.body.parentId.length ? 
-                            { ParentTaskId: req.body.parentId }
-                        :
-                            {
-                                isParentTask: true,
-                                ...( req.body.item.mongoConditions?.length ? 
-                                    { ...req.body.item.mongoConditions[0] }
-                                :
-                                req.body.item?.conditions?.length ?
-                                        { ...req.body.item.conditions[0] }
-                                    :
-                                        {}
-                                )
-                            }
-                        ),
-                    }
-                },
-                { $sort: {[indName]: 1, "createdAt": 1, _id: 1}},
-            ]
-            const finalQuery =  [
-                [
-                    {
-                        $facet: {
-                            result:[
-                                ...queryParams,
-                                { $skip: 0},
-                            ],
-                            count:[
-                                ...countParams,
-                                {$count: "count" }
-                            ]
-                        }
-                    }
-                ]
-            ]
-            
-            let mongoObj = {
-                type: SCHEMA_TYPE.TASKS,
-                data: finalQuery
-            }
-            MongoDbCrudOpration(companyId, mongoObj, 'aggregate').then((response)=>{
-                resolve(response);
-            }).catch((error)=>{
-                reject(error);
-            })
-        } catch (error) {
-            reject(error);
-        }
-    })
-}
+/* The group the client is refreshing, as it sent it. It joins the list's own clauses under $and,
+ * so a key it names can narrow the list and never replace the project or sprint. */
+const groupConditions = (body) => {
+    const item = body.item || {};
+    const conditions = firstOf(item.mongoConditions) || firstOf(item.conditions) || {};
+    validatePipeline([{ $match: conditions }]);
+    return conditions;
+};
 
+const ownTasksOnly = (body) => !(body.showAllTasks === undefined || body.showAllTasks === true || body.showAllTasks === 2);
 
-exports.getTabSynctTaskWithTable = (companyId,req) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const queryParams = [
-                {
-                    $match: {
-                        $and: [
-                            {
-                                $and:[
-                                    {ProjectID: {$in : [new mongoose.Types.ObjectId(req.body.pid)]}},
-                                    {sprintId: {$eq :new mongoose.Types.ObjectId(req.body.sprintId)}},
-                                    // BUG-032 / #86 fix: was `{ $in: [0] }` which
-                                    // excluded legacy tasks that pre-date the
-                                    // soft-delete field. Tasks where
-                                    // `deletedStatusKey` is unset (undefined)
-                                    // are still active and must be returned —
-                                    // matches the pattern used by getTaskCount
-                                    // (`{$in: [0, 2, undefined]}`) and the
-                                    // sibling getTabSynctTaskWithoutTable.
-                                    {deletedStatusKey: { $in: [0, undefined] }},
-                                    {updatedAt: {$gte: new Date(Number(req.body.tabLeaveTime))},}
-                                ]
-                            },
-                            {
-                                ...( req.body.item.mongoConditions?.length ? 
-                                    { ...req.body.item.mongoConditions[0] }
-                                :
-                                req.body.item?.conditions?.length ?
-                                        { ...req.body.item.conditions[0] }
-                                    :
-                                        {}
-                                )
-                            },
-                            {
-                                ...(req.body?.showAllTasks !== undefined && !req.body?.showAllTasks && {
-                                    $and: [
-                                        {AssigneeUserId: {$in : [req.body.userId]}}
-                                    ],
-                                }),
-                            },
-                            {
-                                ...(req.body.pid !== "6571e7195470e64b1203295c" ? {} : {AssigneeUserId: {$in: [req.body.userId]}}),
-                            }
-                        ],
-                    },
-                },
-                {
-                    $sort: req.body.sortKey ? { [req.body.sortKey.split(':')[0]]: Number(req.body.sortKey.split(':')[1]),_id:1 } : req.body.item?.indexName ? {[req.body.item.indexName]: 1} : {createdAt:1}, // Sort all records
-                },
-            ]
-            
-            let mongoObj = {
-                type: SCHEMA_TYPE.TASKS,
-                data: [queryParams]
-            }
-            MongoDbCrudOpration(companyId, mongoObj, 'aggregate').then((response)=>{
-                resolve(response);
-            }).catch((error)=>{
-                console.error(error);
-                reject(error);
-            })
-        } catch (error) {
-            reject(error);
-        }
-    })
-}
+/* `inList` widens the list to the tasks added to it, as the task query does for a caller who can
+ * look at the list. Subtasks are read where their parent lives, so their match is left as it is. */
+const listMatch = (body, conditions, { changedOnly, inList }) => {
+    const inParent = Boolean(body.parentId && body.parentId.length);
+    const rows = (match) => (inList && !inParent ? matchWithExtraListRows(match, body.sprintId) : match);
+    return rows({
+        $and: [
+            {
+                ProjectID: new mongoose.Types.ObjectId(body.pid),
+                sprintId: new mongoose.Types.ObjectId(body.sprintId),
+                ...(changedOnly ? { updatedAt: { $gte: new Date(Number(body.tabLeaveTime)) } } : {}),
+                deletedStatusKey: 0,
+                ...(ownTasksOnly(body) ? { AssigneeUserId: { $in: [body.userId] } } : {}),
+                ...(inParent ? { ParentTaskId: body.parentId } : { isParentTask: true }),
+            },
+            inParent ? {} : conditions,
+        ],
+    });
+};
 
-exports.getTabSyncTasks = (req,res) => {
-    try {
-        if (!(req.body && req.body.pid)) {
-            res.status(400).json({message: 'pid is required'});
-            return;
-        }
-        if (!(req.body.sprintId)) {
-            res.status(400).json({message: 'Project ID is required'});
-            return;
-        }
-        if (req.body.istableTask === undefined) {
-            res.status(400).json({message: 'istableTask ID is required'});
-            return;
-        }
-        const companyId = req.headers['companyid']
-        if (req.body.istableTask === false) {
-            exports.getTabSynctTaskWithoutTable(companyId,req).then((result)=>{
-                res.status(200).json(result);
-            }).catch((error)=>{
-                res.status(400).json({message: error.message});
-            })
-        } else {
-            exports.getTabSynctTaskWithTable(companyId,req).then((result)=>{
-                res.status(200).json(result);
-            }).catch((error)=>{
-                res.status(400).json({message: error.message});
-            })
-        }
-    } catch (error) {
-        console.error(error);
-        res.status(400).json({message: error});
+const listPipeline = (body, conditions, inList) => {
+    const indexName = body.indexName || body.item.indexName;
+    return [{
+        $facet: {
+            result: [
+                { $match: listMatch(body, conditions, { changedOnly: true, inList }) },
+                { $sort: { [indexName]: 1, createdAt: 1, _id: 1 } },
+                { $skip: 0 },
+            ],
+            count: [
+                { $match: listMatch(body, conditions, { changedOnly: false, inList }) },
+                { $count: "count" },
+            ],
+        },
+    }];
+};
+
+const tableSort = (body) => {
+    if (body.sortKey) {
+        const [field, direction] = body.sortKey.split(':');
+        return { [field]: Number(direction), _id: 1 };
     }
-}
+    return body.item?.indexName ? { [body.item.indexName]: 1 } : { createdAt: 1 };
+};
+
+const tablePipeline = (body, conditions, inList) => [
+    {
+        $match: (inList ? matchWithExtraListRows : (match) => match)({
+            $and: [
+                {
+                    ProjectID: new mongoose.Types.ObjectId(body.pid),
+                    sprintId: new mongoose.Types.ObjectId(body.sprintId),
+                    // A task written before the soft-delete field existed has none and is still active.
+                    deletedStatusKey: { $in: [0, undefined] },
+                    updatedAt: { $gte: new Date(Number(body.tabLeaveTime)) },
+                },
+                conditions,
+                body.showAllTasks !== undefined && !body.showAllTasks ? { AssigneeUserId: { $in: [body.userId] } } : {},
+                body.pid === LEAVE_PROJECT_ID ? { AssigneeUserId: { $in: [body.userId] } } : {},
+            ],
+        }, body.sprintId),
+    },
+    { $sort: tableSort(body) },
+];
+
+/* The list refreshed after a tab comes back, read through the same scope as the task query: the
+ * projects the caller may list tasks in, less the sprints hidden from them. */
+exports.getTabSyncTasks = async (req, res) => {
+    try {
+        const body = req.body || {};
+        if (!body.pid) {
+            return res.status(400).json({ message: 'pid is required' });
+        }
+        if (!body.sprintId) {
+            return res.status(400).json({ message: 'Project ID is required' });
+        }
+        if (body.istableTask === undefined) {
+            return res.status(400).json({ message: 'istableTask ID is required' });
+        }
+        const companyId = req.headers['companyid'];
+        const conditions = groupConditions(body);
+        const scope = await visibilityStage(companyId, req.uid);
+        const inList = await opensList(companyId, req.uid, String(body.sprintId));
+        const pipeline = body.istableTask === false ? listPipeline(body, conditions, inList) : tablePipeline(body, conditions, inList);
+
+        const result = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [[scope, ...pipeline]] }, 'aggregate');
+        return res.status(200).json(result);
+    } catch (error) {
+        if (error instanceof QueryRefused) {
+            return res.status(400).json({ message: error.message, stage: error.stage });
+        }
+        return res.status(400).json({ message: error.message });
+    }
+};

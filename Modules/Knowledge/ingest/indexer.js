@@ -15,6 +15,7 @@ const extractor = require('./extract/extractor');
 const { limits: fileLimits } = require('./extract/limits');
 const fileSweep = require('./fileSweep');
 const { chunkPage, chunkText, chunkGuide, guideMarkdown, guideTitle, chunkComment, chunkTranscript, contentHashOf, textBytesOf } = require('./chunker');
+const { sharesOf } = require('../../Pages/helpers/pageRules');
 
 // Writes source chunks into the store. Callers check KNOWLEDGE_INDEXER first; nothing here
 // reads that flag, so the backfill, the event handlers and a re-index share one write path.
@@ -35,8 +36,8 @@ const TASK_DELETED = 'task';
 const TASK_SOURCES = ['comment', 'file'];
 const PROJECT_SOURCES = ['page', 'comment', 'guide', 'file'];
 const LOG_PREFIX = '[knowledge-indexer]';
-const EXISTING_FIELDS = 'ordinal contentHash deleted companyId projectId sprintId taskId participants visibility createdBy authorKind origin embeddingModel sourceUpdatedAt';
-const COMPARED_FIELDS = ['companyId', 'projectId', 'sprintId', 'taskId', 'participants', 'visibility', 'createdBy', 'authorKind', 'origin'];
+const EXISTING_FIELDS = 'ordinal contentHash deleted companyId projectId sprintId taskId participants visibility createdBy sharedWith authorKind origin embeddingModel sourceUpdatedAt';
+const COMPARED_FIELDS = ['companyId', 'projectId', 'sprintId', 'taskId', 'participants', 'visibility', 'createdBy', 'sharedWith', 'authorKind', 'origin'];
 const FILE_STORED_FIELDS = 'ordinal headingPath text contentHash fileKey pieceCount deleted tombstoneReason extractAttempts';
 const SKIPPED = Object.freeze({
     LINKED: 'skipped:linked', UNSUPPORTED: 'skipped:unsupported', TOO_LARGE: 'skipped:too_large', EMPTY: 'skipped:empty', UNREADABLE: 'skipped:unreadable',
@@ -100,6 +101,7 @@ const base = (companyId, sourceType, row) => ({
     participants: [],
     visibility: 'project',
     createdBy: '',
+    sharedWith: [],
     authorKind: 'human',
     origin: origin.MEMBER,
     title: '',
@@ -198,7 +200,7 @@ const loadFile = async (companyId, row, { priority } = {}) => {
 const RULES = {
     page: {
         collection: SCHEMA_TYPE.PAGES,
-        fields: 'title content rawText visibility createdBy ProjectID createdByAgent origin deletedStatusKey updatedAt createdAt',
+        fields: 'title content rawText visibility createdBy sharedWith ProjectID createdByAgent origin deletedStatusKey updatedAt createdAt',
         ingestName: 'ingestPage',
         versionOf: rowVersion,
         chunk: chunkPage,
@@ -207,6 +209,7 @@ const RULES = {
             projectId: page.ProjectID || null,
             visibility: asText(page.visibility) || 'project',
             createdBy: asText(page.createdBy),
+            sharedWith: sharesOf(page).map((share) => asText(share.userId)).sort(),
             authorKind: page.createdByAgent ? 'agent' : 'human',
             origin: origin.ofPage(page),
             title: asText(page.title),

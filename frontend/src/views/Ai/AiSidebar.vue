@@ -60,6 +60,7 @@ import AiMobileNav from "./AiMobileNav.vue";
 import { useAgents } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
 import { useLiveAgents } from "./useLiveAgents";
+import { CONNECT_AI_ROUTE } from "@/router/ai/connect";
 
 defineOptions({ name: "AiSidebar" });
 
@@ -79,7 +80,8 @@ const everyday = computed(() => [
     { name: "AiInbox", label: "Ai.inbox", icon: "inbox", count: waiting.value },
     { name: "AiHub", label: "Ai.agents", icon: "agent" },
     { name: "AiSkills", label: "Ai.skills", icon: "docs" },
-    { name: "Connections", label: "Parity.nav_connections", icon: "integrations" }
+    { name: "Connections", label: "Parity.nav_connections", icon: "integrations" },
+    { name: CONNECT_AI_ROUTE, label: "ConnectAi.title", icon: "key" }
 ]);
 
 const setup = computed(() => [

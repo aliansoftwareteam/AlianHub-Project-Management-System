@@ -100,8 +100,8 @@ async function archiveOneTask(companyId, task, afterDays) {
         });
     }
 
-    socketEmitter.emit('update', { type: "update", data: updated, updatedFields: { deletedStatusKey: 2 }, module: 'task' });
-    carried.forEach((row) => socketEmitter.emit('update', { type: "update", data: row, updatedFields: { deletedStatusKey: row.deletedStatusKey }, module: 'task' }));
+    socketEmitter.emit('update', { type: "update", data: updated, updatedFields: { deletedStatusKey: 2 }, module: 'task', companyId });
+    carried.forEach((row) => socketEmitter.emit('update', { type: "update", data: row, updatedFields: { deletedStatusKey: row.deletedStatusKey }, module: 'task', companyId }));
 
     HandleHistory('task', companyId, task.ProjectID, task._id, {
         key: 'Task_Archive',

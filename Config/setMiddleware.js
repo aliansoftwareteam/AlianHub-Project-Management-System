@@ -82,6 +82,8 @@ const verifyJWTTokenWithCRoute = [
     "/api/v2/forms",
     "/api/v2/task-templates",
     "/api/v2/view-templates",
+    "/api/v2/goals",
+    "/api/v2/whiteboards",
     "/api/v2/assignment-rules",
     "/api/v1/removeCache",
     // Found by walking the Express stack for routes no guard list reached (task 034).
@@ -244,6 +246,7 @@ const verifyJWTTokenWithCRoute = [
     '/api/v1/ai/meeting-notes',
     '/api/v1/ai/chat-summary',
     '/api/v1/ai/task-summary',
+    '/api/v1/ai/task-values',
     '/api/v1/ai/task-category',
     '/api/v1/ai/task-assist',
     '/api/v1/ai/task-next-steps',
@@ -316,6 +319,7 @@ const verifyJWTTokenWithCRoute = [
     // Web timer reconciliation (Modules/LogTime webTimer) — JWT+company so req.uid scopes the caller's sessions.
     '/api/v2/timetracker/running',
     '/api/v2/timetracker/trim',
+    "/api/v2/timetracker/can-start",
     '/api/v1/reports/schedules',
     // Email-to-task management (AUTO-01). NOTE: only the /inboxes management
     // routes are JWT-protected; the public inbound webhook /api/v1/email-in/:token
@@ -368,6 +372,8 @@ const verifyJWTTokenWithCRoute = [
     '/api/v2/provider-keys',
     // The AI switch (Modules/AiSwitch): any member reads the state, only an owner or admin changes it.
     "/api/v2/ai-switch",
+    // Agent connectors (Modules/Connectors): owner or admin only, never an API token; no route returns a token.
+    "/api/v2/connectors",
     // Dashboards (Modules/UserDashboard) read the company from the header, so they get the same live seat check.
     '/api/v1/dashboard',
     '/api/v1/dashboards',

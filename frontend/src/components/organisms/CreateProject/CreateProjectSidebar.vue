@@ -208,6 +208,7 @@ import { blankTemplate, templateGlyph, colorForName, keyFromName, statusTone } f
 import SavedProjectTemplates from "./SavedProjectTemplates.vue";
 import { useTemplateProject } from "./templateProject";
 import { countsText, useProjectTemplates } from "@/views/Projects/projectTemplates";
+import { companyCurrency } from "@/utils/companyCurrency";
 
 const props = defineProps({
     isActiveCreateSidebar: { type: Boolean, default: false },
@@ -233,7 +234,7 @@ const companyName = computed(() => currentCompany.value.Cst_CompanyName || "");
 const teamFocus = computed(() => currentCompany.value.teamFocus || "");
 const users = computed(() => getters["users/users"] || []);
 const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
-const defaultCurrency = computed(() => getters["settings/allCurrencyArray"]?.find((x) => x.code === "INR") || {});
+const defaultCurrency = computed(() => companyCurrency(getters["settings/allCurrencyArray"]));
 const existingKeys = computed(() => (getters["projectData/allProjects"]?.data || []).map((p) => String(p.ProjectCode || "").toUpperCase()));
 
 const blank = blankTemplate(t);

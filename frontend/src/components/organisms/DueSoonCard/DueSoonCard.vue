@@ -158,13 +158,13 @@ onMounted(load);
     min-width: 46px;
     text-align: center;
     font: var(--text-data);
-    font-size: 10px;
-    padding: 2px 6px;
+    font-size: var(--fs-2xs, 10px);
+    padding: 2px var(--sp-2);
     border-radius: var(--r-chip);
 }
 .ds__due--late { background: var(--danger-bg); color: var(--danger-ink); }
 .ds__due--now { background: var(--warn-bg); color: var(--warn-ink); }
 .ds__due--later { background: var(--surface-2); color: var(--ink-label); }
-.ds__key { font: var(--text-data); color: var(--brand); margin-right: 5px; }
+.ds__key { font: var(--text-data); color: var(--brand); margin-right: calc(var(--sp-1) + 1px); }
 .ds__proj { max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

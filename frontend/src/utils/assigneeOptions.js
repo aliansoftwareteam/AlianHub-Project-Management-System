@@ -39,3 +39,11 @@ export const subtaskCreateAssignees = ({ parent, project, companyUsers }) => {
         ? own
         : scopedAssignees({ task: { isParentTask: true }, sprint: sprintOf(project, parent), project, companyUsers });
 };
+
+// A live update can take the person off before the caller's own request returns; splicing the
+// -1 that findIndex then answers would drop the last person instead.
+export function removePerson(people, id) {
+    const index = people.indexOf(id);
+    if (index !== -1) people.splice(index, 1);
+    return people;
+}

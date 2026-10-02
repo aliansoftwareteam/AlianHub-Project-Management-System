@@ -22,7 +22,7 @@
     z-index: 30;
     box-shadow: var(--shadow-pop);
 }
-.st__scrim { position: absolute; inset: 0; z-index: 29; background: rgba(0, 0, 0, .28); }
+.st__scrim { position: absolute; inset: 0; z-index: 29; background: var(--scrim); }
 .st-drawer-enter-active, .st-drawer-leave-active { transition: transform var(--t-panel) var(--ease), opacity var(--t-panel) var(--ease); }
 .st-drawer-enter-from, .st-drawer-leave-to { transform: translateX(-24px); opacity: 0; }
 .st__side-head {

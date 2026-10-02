@@ -1,0 +1,62 @@
+name: Clock
+
+# Runs the unit suites with the clock moved forward, to catch code that reads the real clock
+# against test data written with fixed dates. Not run on pull requests.
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: clock-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend +${{ matrix.days }}d shard ${{ matrix.shard }}/2
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        days: [3, 40, 400]
+        shard: [1, 2]
+    env:
+      CLOCK_SHIFT_DAYS: ${{ matrix.days }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx jest --selectProjects unit --shard=${{ matrix.shard }}/2 --maxWorkers=2 --json --outputFile=clock-report.json
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - if: always()
+        run: node tests/support/clock-summary.js clock-report.json "Backend shard ${{ matrix.shard }}/2" ${{ matrix.days }}
+
+  frontend:
+    name: frontend +${{ matrix.days }}d
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        days: [3, 40, 400]
+    env:
+      CLOCK_SHIFT_DAYS: ${{ matrix.days }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx vitest run --reporter=default --reporter=json --outputFile=clock-report.json
+      - if: always()
+        run: node ../tests/support/clock-summary.js clock-report.json "Frontend" ${{ matrix.days }}

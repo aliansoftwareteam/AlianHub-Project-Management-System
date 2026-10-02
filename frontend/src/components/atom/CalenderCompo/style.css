@@ -71,11 +71,14 @@ body:has(.calender-menu-class-duedate):after {
 .date_format_cal:focus-visible, .calendar-trigger:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
 /* The picked date carries an inline black (red when overdue); only the black gives way. */
 :root[data-theme="dark"] .due_date-listing[style*="color: black"] { color: var(--ink) !important; }
+/* A display or width utility on the same element decides; :where() adds no weight to these rules. */
+.calendar-comp-white:where(:not(.d-block)) {
+    display: flex;
+}
 .calendar-comp-white {
     background-image: url('@/assets/images/svg/white-icon-cal.svg');
     background-repeat: no-repeat;
     cursor: pointer;
-    display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 5px;
@@ -320,16 +323,18 @@ button.dp__btn.dp__month_year_select {
     }
 }
 @media(max-width:  767px){
-    .task-detail-right-side-label .calendar-comp {background-position: calc(100% - 130px);text-align: right;font-size: 16px;padding-right: 0 !important;padding-left: 0 !important;}
+    .task-detail-right-side-label .calendar-comp {background-image: none;text-align: right;font-size: 16px;padding-right: 0 !important;padding-left: 0 !important;}
     .task-detail-right-side-label .calendar-comp::placeholder, .task-detail-right-side-label input#inputId::placeholder{color: #000 !important;font-size: 16px !important;}
     body:has(.tab-list-header .tab-list-header-ul li:last-child.active) .dp--menu-wrapper{
         left: 10px !important;
     }
 }
 @media(max-width:  480px){
+    .date_mw:where(:not(.mw-150px)){
+        max-width: 110px;
+    }
     .date_mw{
         display: block;
-        max-width: 110px;
         text-overflow: ellipsis;
         overflow: hidden;
         white-space: nowrap;

@@ -124,7 +124,7 @@ const showReply = (body) => {
         return showError(body.code === 'ai_budget_exhausted' ? t('Dash.ask_budget_exhausted') : '');
     }
     const data = body.data || {};
-    if (data.configured === false) return showEmpty(availabilityText(AI_STATE.UNCONFIGURED));
+    if (data.configured === false) return showEmpty(t('ConnectAi.card_no_model'));
     if (!String(data.answer || '').trim()) return showEmpty(t(messageKey(data.emptyCode) || 'Dash.ask_no_answer'));
     return showAnswer(data);
 };
@@ -167,7 +167,8 @@ const awaitAvailability = () => {
 const reportWithoutAsking = () => {
     if (!question.value) return showEmpty(t('Dash.ask_pick_question')) || true;
     if (access.value === AI_ACCESS.UNKNOWN) return awaitAvailability() || true;
-    if (access.value === AI_ACCESS.OFF || access.value === AI_ACCESS.UNCONFIGURED) return showEmpty(availabilityText(aiAvailability.state)) || true;
+    if (access.value === AI_ACCESS.UNCONFIGURED) return showEmpty(t('ConnectAi.card_no_model')) || true;
+    if (access.value === AI_ACCESS.OFF) return showEmpty(availabilityText(aiAvailability.state)) || true;
     if (access.value === AI_ACCESS.NOT_PERMITTED) return showEmpty(t('Dash.ask_not_permitted')) || true;
     if (!unref(dashboardId)) return showError() || true;
     return false;
@@ -226,19 +227,19 @@ onBeforeUnmount(() => {
 }
 .askc__answer {
     font: var(--text-small);
-    line-height: 1.55;
+    line-height: var(--lh-body, 1.55);
     color: var(--ink);
     overflow-wrap: anywhere;
 }
-.askc__answer :deep(p) { margin: 0 0 6px; }
-.askc__answer :deep(ul), .askc__answer :deep(ol) { margin: 0 0 6px; padding-left: 18px; }
+.askc__answer :deep(p) { margin: 0 0 var(--sp-2); }
+.askc__answer :deep(ul), .askc__answer :deep(ol) { margin: 0 0 var(--sp-2); padding-left: calc(var(--sp-7) + 2px); }
 .askc__answer :deep(.ask-cite) {
     font: var(--text-data);
     color: var(--brand);
     text-decoration: none;
 }
 .askc__answer :deep(a.ask-cite:hover) { text-decoration: underline; }
-.askc__cites { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+.askc__cites { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: auto; }
 .askc__ref {
     flex: none;
     font: var(--text-data);
@@ -246,4 +247,7 @@ onBeforeUnmount(() => {
     text-decoration: none;
 }
 a.askc__ref:hover { text-decoration: underline; }
+@media (max-width: 767px) {
+    a.askc__ref { display: inline-flex; align-items: center; min-height: var(--hit-min); }
+}
 </style>

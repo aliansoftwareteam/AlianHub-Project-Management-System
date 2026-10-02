@@ -8,6 +8,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
 }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(async (companyId, uid) => {
         const roles = mockState.roles[String(companyId)] || {};

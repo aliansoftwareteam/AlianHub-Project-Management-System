@@ -64,11 +64,11 @@ beforeEach(() => {
 });
 
 describe('letting a new agent token manage tasks', () => {
-    it('does not offer the choice while the server does not name the grant, and sends what it sent before', async () => {
+    it('does not offer the choice while the server does not name the grant, and sends no grant', async () => {
         const wrapper = await openForm({ policy: policyOf() });
         expect(wrapper.find('[data-test="token-grant-tasks"]').exists()).toBe(false);
         await create(wrapper);
-        expect(mintBodies()).toEqual([{ name: 'Laptop', mode: 'personal', provider: 'claude-code', projectIds: [] }]);
+        expect(mintBodies()).toEqual([{ name: 'Laptop', mode: 'personal', provider: 'claude-code', projectIds: [], expiresInDays: 30 }]);
     });
 
     it('offers it unticked, and sends the grant only when it is ticked', async () => {

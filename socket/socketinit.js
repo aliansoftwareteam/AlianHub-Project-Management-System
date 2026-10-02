@@ -8,9 +8,13 @@ const {generalReminderSocketHandler} = require('./controller/generalReminderSock
 const {callSocketHandler} = require('./controller/callSocket');
 require('./controller/agentSessionSocket').registerWhenOn();
 require('./controller/viewTemplateSocket');
+require('./controller/goalSocket');
+require('./controller/pageShareSocket');
+require('./controller/whiteboardSocket');
 require('./controller/projectTemplateSocket');
 require('./controller/agentSocket');
 require('./controller/folderSocket');
+require('./controller/customFieldSocket');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
 const { handshakeToken } = require('../Config/cookies');

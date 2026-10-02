@@ -11,6 +11,7 @@ jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), 
 const mongoose = require('mongoose');
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
+const { seedTaskListRules } = require('./fixtures/taskListRules');
 
 const C = 'c00000000000000000000001';
 const OWNER = 'a00000000000000000000001';
@@ -59,6 +60,7 @@ beforeEach(() => {
     myCache.flushAll();
     mockDb = fakeMongo.create();
     [[OWNER, 1], [MEMBER, 3], [OTHER, 3]].forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
+    seedTaskListRules(mockDb);
     open = seedProject('Open');
     empty = seedProject('Empty');
     secret = seedProject('Secret', { isPrivateSpace: true, AssigneeUserId: [OWNER] });

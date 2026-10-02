@@ -46,10 +46,10 @@ describe('the route', () => {
 });
 
 describe('the rail item', () => {
-    it('sits between Home and Projects and opens the page', () => {
+    it('sits after Home, ahead of Goals and Projects, and opens the page', () => {
         const { rail } = mountNav().vm;
         const keys = rail.map((item) => item.key);
-        expect(keys.slice(0, 3)).toEqual(['home', 'everything', 'projects']);
+        expect(keys.slice(0, 4)).toEqual(['home', 'everything', 'goals', 'projects']);
         const item = rail.find((entry) => entry.key === 'everything');
         expect(item.to).toEqual({ name: 'Everything', params: { cid: 'c1' }, query: undefined });
         expect(item.icon).toBe('layers');

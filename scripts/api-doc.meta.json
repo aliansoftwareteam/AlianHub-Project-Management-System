@@ -23,12 +23,12 @@
         {
             "id": "projects",
             "title": "Projects",
-            "intro": "Duplicating a project. To list projects, use `GET /api/public-v1/projects`."
+            "intro": "Duplicating a project, and saving a project as a template to start others from. To list projects, use `GET /api/public-v1/projects`."
         },
         {
             "id": "pages",
             "title": "Pages",
-            "intro": "Docs and wiki pages, and their version history. A page belongs to a project or to the workspace. A private page is its author's alone; any other page is open to whoever can see its project. A page the caller cannot see answers the same as one that does not exist."
+            "intro": "Docs and wiki pages, their version history, and who a comment on one can name. A page belongs to a project or to the workspace. A private page is its author's alone; any other page is open to whoever can see its project. A page the caller cannot see answers the same as one that does not exist."
         },
         {
             "id": "agents",
@@ -44,6 +44,26 @@
             "id": "webhooks",
             "title": "Webhooks",
             "intro": "Managing the webhooks described under [Webhook deliveries](#webhook-deliveries) above. A webhook belongs to the person who created it: nobody else can list, change or delete it, or read its delivery log."
+        },
+        {
+            "id": "goals",
+            "title": "Goals",
+            "intro": "Goals with targets that show how far a team or a person has got. A goal has an owner, a period and up to 20 targets; its progress is the weighted average of its targets. A target is a `number`, a `currency` amount, a `boolean` or a `tasks` target counted from lists and tasks. A goal is `private` (its owner), `people` (its owner and the people it is shared with) or `workspace` (every member; a guest only when named). Guests can read goals shared with them and cannot create one. A token limited to projects cannot use these routes. A write made with an agent's token follows the rules that hold that agent."
+        },
+        {
+            "id": "whiteboards",
+            "title": "Whiteboards",
+            "intro": "One whiteboard for each list: task cards, sticky notes and text laid out on a canvas. A board is as open as its list: it can be read by whoever can open the list, and changed by whoever can edit the project while the list, its folders and the project are active. The title of a task card is shown only to someone who may open that task."
+        },
+        {
+            "id": "imports",
+            "title": "Imports",
+            "intro": "Undoing an import that created tasks in bulk."
+        },
+        {
+            "id": "custom-fields",
+            "title": "Custom fields",
+            "intro": "Reading the tasks a relationship field links and the votes on a voting field, and casting a vote."
         }
     ],
     "routes": {
@@ -576,6 +596,11 @@
                     "description": "Up to 500 project ids. It can only narrow what the caller may read."
                 },
                 {
+                    "name": "filter.sprintIds",
+                    "type": "id[]",
+                    "description": "Up to 100 list ids: tasks that live in one of them or were added to one. A list the caller cannot open is ignored."
+                },
+                {
                     "name": "group",
                     "type": "string",
                     "description": "`none`, `status`, `assignee`, `project`, `priority` or `dueDate`. `none` when left out."
@@ -688,7 +713,7 @@
             "responseFields": [
                 {
                     "name": "rows",
-                    "description": "Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt` and `updatedAt`. No custom field values."
+                    "description": "Up to `limit` tasks. Each carries `_id`, `TaskName`, `TaskKey`, `status`, `statusKey`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `startDate`, `ProjectID`, `sprintId`, `folderObjId`, `TaskType`, `TaskTypeKey`, `tagsArray`, `subTasks`, `ancestors`, `ParentTaskId`, `isParentTask`, `createdAt`, `updatedAt` and `sprintArray` (the list the task lives in, with its `name`). A task that was added to other lists also carries `extraLists`: each entry has `projectId`, `sprintId`, `addedBy` and `addedAt`, and `name` and `projectName` only for a list the caller can open. No custom field values."
                 },
                 {
                     "name": "groups",
@@ -700,7 +725,7 @@
                 },
                 {
                     "name": "projects",
-                    "description": "A map by project id, for the projects the rows name. Each carries `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `taskStatusData`, `taskTypeCounts`, `apps`, `statusType`, `isPersonal` and `edit: { status, priority }`, which says whether the caller may change those two fields on that project's tasks."
+                    "description": "A map by project id, for the projects the rows name. Each carries `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `taskStatusData`, `taskTypeCounts`, `apps`, `statusType`, `isPersonal` and `edit: { status, priority }`, which says whether the caller may change those two fields on that project's tasks. With `group: project` it also names every project counted; one that has no row on the page carries only `_id`, `ProjectName`, `ProjectCode`, `projectIcon`, `statusType` and `isPersonal`."
                 }
             ],
             "paging": "Cursor. Send `nextCursor` back as `cursor`. A cursor is good only for the same workspace, person, filter, sort and the two `include` switches; with anything else it is a 400. The page size and the grouping may change between pages. Rows with no value for the sort key come last, in both directions.",
@@ -875,6 +900,45 @@
                 "404": "The view does not exist, or is someone else's."
             }
         },
+        "GET /api/v2/tasks/:id/lists": {
+            "resource": "tasks",
+            "stability": "beta",
+            "title": "List a task's extra lists",
+            "summary": "Lists the other lists a task has been added to, besides its own.",
+            "description": [
+                "The ids are always given. A list's name and its project's name are given only for a live list the caller can open."
+            ],
+            "permission": "The task must be one the caller can open",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The task."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Task lists.",
+                "data": {
+                    "taskId": "<task id>",
+                    "extraLists": [
+                        {
+                            "projectId": "<project id>",
+                            "sprintId": "<list id>",
+                            "addedBy": "<user id>",
+                            "addedAt": "2026-10-01T09:30:00.000Z",
+                            "name": "Sprint 12",
+                            "projectName": "Website"
+                        }
+                    ]
+                }
+            },
+            "paging": "None.",
+            "errors": {
+                "400": "The id is not an id.",
+                "404": "The task does not exist, or the caller cannot open it."
+            }
+        },
         "POST /api/v2/projects/:id/duplicate": {
             "resource": "projects",
             "stability": "beta",
@@ -1014,6 +1078,386 @@
                 "404": "The project does not exist, or the caller cannot see it."
             }
         },
+        "POST /api/v2/projects/:id/template": {
+            "resource": "projects",
+            "stability": "beta",
+            "title": "Save a project as a template",
+            "summary": "Saves a project's settings, folders, lists and, when asked, its tasks and automations as a template.",
+            "description": [
+                "The template keeps no ids of the project it came from. Tasks start in the project's first status, with nothing ticked. A template holds at most 2000 tasks and a workspace at most 100 templates. A personal list cannot be saved.",
+                "A template is offered to everyone unless the project has a private list or `everyone` says otherwise. A template offered to everyone leaves private lists out. Automations are kept only when the caller may manage automations."
+            ],
+            "permission": "The project must be one the caller can open",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The project to save."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "required": true,
+                    "description": "The template's name, at most 255 characters."
+                },
+                {
+                    "name": "include.tasks",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Keep the tasks."
+                },
+                {
+                    "name": "include.assignees",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Keep the assignees."
+                },
+                {
+                    "name": "include.dates",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Keep the dates, kept as distances from the project's start."
+                },
+                {
+                    "name": "include.automations",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Keep the automations."
+                },
+                {
+                    "name": "description",
+                    "type": "string",
+                    "description": "Up to 2000 characters."
+                },
+                {
+                    "name": "everyone",
+                    "type": "boolean",
+                    "description": "Offer the template to everyone who can create projects. Defaults to `true` unless the project holds a private list."
+                }
+            ],
+            "bodyNotes": [
+                "Any other key is refused."
+            ],
+            "request": {
+                "name": "Website launch",
+                "include": {
+                    "tasks": true,
+                    "assignees": false,
+                    "dates": true,
+                    "automations": false
+                }
+            },
+            "response": {
+                "status": true,
+                "statusText": "Template saved.",
+                "data": {
+                    "template": {
+                        "_id": "<template id>",
+                        "name": "Website launch",
+                        "description": "",
+                        "everyone": true,
+                        "sourcePrivate": false,
+                        "include": {
+                            "tasks": true,
+                            "assignees": false,
+                            "dates": true,
+                            "automations": false
+                        },
+                        "counts": {
+                            "folders": 2,
+                            "lists": 5,
+                            "tasks": 48,
+                            "automations": 0
+                        },
+                        "statuses": [
+                            {
+                                "key": "default_active",
+                                "name": "To do",
+                                "type": "default_active"
+                            }
+                        ],
+                        "createdBy": "<user id>",
+                        "createdAt": "2026-10-01T09:30:00.000Z",
+                        "canManage": true
+                    },
+                    "notes": [
+                        {
+                            "code": "private_lists_left",
+                            "count": 1
+                        }
+                    ]
+                }
+            },
+            "responseFields": [
+                {
+                    "name": "template",
+                    "description": "The saved template."
+                },
+                {
+                    "name": "notes",
+                    "description": "What was left out or changed, each with a `code` and a `count` or a `name`: `tasks_left_out`, `private_lists_left`, `automations_skipped`, `subfolder_moved_to_top`."
+                }
+            ],
+            "errors": {
+                "400": "The body is missing `name` or `include`, carries another key, has a value of the wrong type, or the project is a personal list; the project holds more than 2000 tasks and `include.tasks` is `true`; or the workspace already holds 100 templates.",
+                "404": "The project does not exist, is in the trash, or the caller cannot open it."
+            }
+        },
+        "GET /api/v2/projects/templates": {
+            "resource": "projects",
+            "stability": "beta",
+            "title": "List project templates",
+            "summary": "Lists the project templates the caller may use, by name.",
+            "description": [
+                "Owners and admins see every template. Anyone else sees the templates offered to everyone and the ones they saved."
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Templates fetched.",
+                "data": [
+                    {
+                        "_id": "<template id>",
+                        "name": "Website launch",
+                        "description": "",
+                        "everyone": true,
+                        "sourcePrivate": false,
+                        "include": {
+                            "tasks": true,
+                            "assignees": false,
+                            "dates": true,
+                            "automations": false
+                        },
+                        "counts": {
+                            "folders": 2,
+                            "lists": 5,
+                            "tasks": 48,
+                            "automations": 0
+                        },
+                        "statuses": [
+                            {
+                                "key": "default_active",
+                                "name": "To do",
+                                "type": "default_active"
+                            }
+                        ],
+                        "createdBy": "<user id>",
+                        "createdAt": "2026-10-01T09:30:00.000Z",
+                        "canManage": true
+                    }
+                ]
+            },
+            "responseNotes": [
+                "`data` is the template as the caller may see it; `canManage` says whether the caller may change or delete it."
+            ],
+            "paging": "None. A workspace holds at most 100 templates."
+        },
+        "POST /api/v2/projects/templates/:id/use": {
+            "resource": "projects",
+            "stability": "beta",
+            "title": "Create a project from a template",
+            "summary": "Creates a project from a template, with its folders, lists and, when asked, its tasks.",
+            "description": [
+                "The caller becomes a member of the new project. People who have left the workspace, and statuses and custom fields that no longer exist, are dropped. Dates are laid out from `startDate`; without it the project and its tasks have no dates.",
+                "The answer is the one of [Duplicate a project](#duplicate-a-project)."
+            ],
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The template."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "required": true,
+                    "description": "The project's name, at most 255 characters."
+                },
+                {
+                    "name": "include.tasks",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Use the tasks."
+                },
+                {
+                    "name": "include.assignees",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Use the assignees."
+                },
+                {
+                    "name": "include.dates",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Use the dates, kept as distances from the project's start."
+                },
+                {
+                    "name": "include.automations",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "Use the automations."
+                },
+                {
+                    "name": "code",
+                    "type": "string",
+                    "description": "The project key, letters and digits, at most 10. It must not be taken. Defaults to a generated key."
+                },
+                {
+                    "name": "isPrivate",
+                    "type": "boolean",
+                    "description": "Make the project private. Defaults to the template's own setting."
+                },
+                {
+                    "name": "startDate",
+                    "type": "date",
+                    "description": "The project's first day."
+                }
+            ],
+            "bodyNotes": [
+                "Any other key is refused."
+            ],
+            "request": {
+                "name": "Website relaunch",
+                "include": {
+                    "tasks": true,
+                    "assignees": false,
+                    "dates": true,
+                    "automations": false
+                },
+                "startDate": "2026-11-02"
+            },
+            "response": {
+                "status": true,
+                "statusText": "Project created from the template.",
+                "data": {
+                    "project": {
+                        "_id": "<new project id>",
+                        "ProjectName": "Website relaunch",
+                        "ProjectCode": "WEB3"
+                    },
+                    "counts": {
+                        "folders": 2,
+                        "lists": 5,
+                        "tasks": 48,
+                        "automations": 0
+                    },
+                    "notes": [],
+                    "sharedFields": [],
+                    "job": null
+                }
+            },
+            "responseNotes": [
+                "`data` has the fields described under [Duplicate a project](#duplicate-a-project)."
+            ],
+            "errors": {
+                "400": "The body is missing `name` or `include`, carries another key, has a value of the wrong type, or `code` is already taken.",
+                "404": "The template does not exist, or is not one the caller may use."
+            }
+        },
+        "PATCH /api/v2/projects/templates/:id": {
+            "resource": "projects",
+            "stability": "beta",
+            "title": "Change a project template",
+            "summary": "Changes a template's name, description or whether it is offered to everyone.",
+            "description": [
+                "A template that holds a private list cannot be offered to everyone. Offering a template to everyone is for the person who saved it; owners and admins may also do it for one saved from a public project."
+            ],
+            "permission": "The person who saved the template, an owner or an admin",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The template."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "At most 255 characters."
+                },
+                {
+                    "name": "description",
+                    "type": "string",
+                    "description": "Up to 2000 characters."
+                },
+                {
+                    "name": "everyone",
+                    "type": "boolean",
+                    "description": "Offer the template to everyone who can create projects."
+                }
+            ],
+            "bodyNotes": [
+                "Name at least one key. Any other key is refused."
+            ],
+            "request": {
+                "name": "Website launch v2"
+            },
+            "response": {
+                "status": true,
+                "statusText": "Template updated.",
+                "data": {
+                    "_id": "<template id>",
+                    "name": "Website launch",
+                    "description": "",
+                    "everyone": true,
+                    "sourcePrivate": false,
+                    "include": {
+                        "tasks": true,
+                        "assignees": false,
+                        "dates": true,
+                        "automations": false
+                    },
+                    "counts": {
+                        "folders": 2,
+                        "lists": 5,
+                        "tasks": 48,
+                        "automations": 0
+                    },
+                    "statuses": [
+                        {
+                            "key": "default_active",
+                            "name": "To do",
+                            "type": "default_active"
+                        }
+                    ],
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "canManage": true
+                }
+            },
+            "responseNotes": [
+                "`data` is the template as the caller may see it; `canManage` says whether the caller may change or delete it."
+            ],
+            "errors": {
+                "400": "The body names nothing to change, carries another key, has a value of the wrong type, or offers a template that holds a private list to everyone.",
+                "404": "The template does not exist, or is not one the caller may use."
+            }
+        },
+        "DELETE /api/v2/projects/templates/:id": {
+            "resource": "projects",
+            "stability": "beta",
+            "title": "Delete a project template",
+            "summary": "Deletes a template and the task rows it kept. Projects made from it are not affected.",
+            "permission": "The person who saved the template, an owner or an admin",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The template."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Template deleted."
+            },
+            "errors": {
+                "404": "The template does not exist, or is not one the caller may use."
+            }
+        },
         "GET /api/v2/pages": {
             "resource": "pages",
             "stability": "beta",
@@ -1103,7 +1547,7 @@
                 {
                     "name": "linkedTasks",
                     "type": "id[]",
-                    "description": "Tasks the page is attached to."
+                    "description": "Tasks the page is attached to. Each must be a task the caller can open."
                 },
                 {
                     "name": "isWiki",
@@ -1123,12 +1567,7 @@
                 {
                     "name": "createdByAgent",
                     "type": "boolean",
-                    "description": "Marks the page as drafted by an agent. It starts as a draft that a person approves."
-                },
-                {
-                    "name": "agentName",
-                    "type": "string",
-                    "description": "The agent's name, up to 80 characters."
+                    "description": "Marks the page as a draft that a person approves. A page an agent token creates is always one, under the token's own name."
                 }
             ],
             "request": {
@@ -1274,7 +1713,7 @@
                 {
                     "name": "linkedTasks",
                     "type": "id[]",
-                    "description": "Replaces the tasks the page is attached to."
+                    "description": "Replaces the tasks the page is attached to. A task added here must be one the caller can open."
                 },
                 {
                     "name": "isWiki",
@@ -1290,11 +1729,6 @@
                     "name": "reviewDate",
                     "type": "date",
                     "description": "When the wiki page is next due for review."
-                },
-                {
-                    "name": "agentStatus",
-                    "type": "string",
-                    "description": "`draft` or `approved`, for a page an agent drafted."
                 }
             ],
             "request": {
@@ -1604,6 +2038,165 @@
             "errors": {
                 "403": "The caller can see the page but may not change it.",
                 "404": "The page or the version does not exist, or the caller cannot see it."
+            }
+        },
+        "GET /api/v2/pages/:id/comments/people": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "List who can be mentioned on a page",
+            "summary": "Lists the ids of the people a comment on a page may mention or be assigned to.",
+            "description": [
+                "These are the active members who can read the page."
+            ],
+            "permission": "The caller must be able to read the page",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "People fetched.",
+                "data": [
+                    "<user id>"
+                ]
+            },
+            "paging": "None.",
+            "errors": {
+                "404": "The page does not exist, or the caller cannot read it."
+            }
+        },
+        "PUT /api/v2/pages/:id/comments/:commentId/assign": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "Assign a page comment",
+            "summary": "Assigns a comment thread to a person, or clears the assignment.",
+            "description": [
+                "Assigning a thread reopens it. The assignee is told once, unless they assigned it to themselves."
+            ],
+            "permission": "The caller must be able to read the page. Once a thread is assigned, only its author, the person who assigned it, its assignee, an owner or an admin can change the assignment",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                },
+                {
+                    "name": "commentId",
+                    "type": "id",
+                    "description": "The comment."
+                }
+            ],
+            "body": [
+                {
+                    "name": "assigneeId",
+                    "type": "id",
+                    "description": "An active member who can read the page. Empty, or left out, clears the assignment."
+                }
+            ],
+            "request": {
+                "assigneeId": "<user id>"
+            },
+            "response": {
+                "status": true,
+                "statusText": "Comment assigned.",
+                "data": {
+                    "_id": "<comment id>",
+                    "pageId": "<page id>",
+                    "userId": "<user id>",
+                    "message": "Can we cut this section?",
+                    "blockId": "",
+                    "mentionIds": [],
+                    "assigneeId": "<user id>",
+                    "assignedBy": "<user id>",
+                    "assignedAt": "2026-10-01T09:30:00.000Z",
+                    "resolved": false,
+                    "reactions": [
+                        {
+                            "emoji": "👍",
+                            "userId": "<user id>",
+                            "createdAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the whole stored comment; the example shows some of its fields.",
+                "Clearing the assignment answers `Comment unassigned.`."
+            ],
+            "errors": {
+                "400": "The comment is a reply (only a thread can be assigned), or `assigneeId` is not an active member who can read the page.",
+                "404": "The page does not exist, or the caller cannot read it. Or the comment does not exist on it."
+            }
+        },
+        "PUT /api/v2/pages/:id/comments/:commentId/reaction": {
+            "resource": "pages",
+            "stability": "beta",
+            "title": "React to a page comment",
+            "summary": "Puts the caller's reaction on a comment, or takes it off if it is already there.",
+            "description": [
+                "A reaction does not count as an edit: the comment's `updatedAt` stays as it was."
+            ],
+            "permission": "The caller must be able to read the page",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The page."
+                },
+                {
+                    "name": "commentId",
+                    "type": "id",
+                    "description": "The comment."
+                }
+            ],
+            "body": [
+                {
+                    "name": "emoji",
+                    "type": "string",
+                    "required": true,
+                    "description": "One of 👍, ❤️, 😄, 🎉, 😮, 😢, 🚀 or 👀."
+                }
+            ],
+            "request": {
+                "emoji": "👍"
+            },
+            "response": {
+                "status": true,
+                "statusText": "Reaction added.",
+                "data": {
+                    "_id": "<comment id>",
+                    "pageId": "<page id>",
+                    "userId": "<user id>",
+                    "message": "Can we cut this section?",
+                    "blockId": "",
+                    "mentionIds": [],
+                    "assigneeId": "<user id>",
+                    "assignedBy": "<user id>",
+                    "assignedAt": "2026-10-01T09:30:00.000Z",
+                    "resolved": false,
+                    "reactions": [
+                        {
+                            "emoji": "👍",
+                            "userId": "<user id>",
+                            "createdAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the whole stored comment; the example shows some of its fields.",
+                "Taking a reaction off answers `Reaction removed.`."
+            ],
+            "errors": {
+                "400": "`emoji` is not one of the supported reactions.",
+                "404": "The page does not exist, or the caller cannot read it. Or the comment does not exist on it."
             }
         },
         "GET /api/v2/agents": {
@@ -2322,6 +2915,1471 @@
                 "404": "The webhook does not exist, or is someone else's."
             }
         },
+        "GET /api/v2/goals": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "List goals",
+            "summary": "Lists the goals the caller can read, by name.",
+            "description": [
+                "A counted target is answered with the numbers last counted; a count that is due is made again behind the answer."
+            ],
+            "permission": "An active seat in the workspace. Only goals the caller can read are listed",
+            "query": [
+                {
+                    "name": "archived",
+                    "type": "boolean",
+                    "description": "`true` lists the archived goals instead of the live ones."
+                },
+                {
+                    "name": "mine",
+                    "type": "boolean",
+                    "description": "`true` keeps the goals the caller owns or is named on."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Goals fetched successfully.",
+                "data": [
+                    {
+                        "_id": "<goal id>",
+                        "name": "Launch 2.0",
+                        "description": "",
+                        "ownerUserId": "<user id>",
+                        "periodStart": "2026-10-01",
+                        "periodEnd": "2026-12-31",
+                        "visibility": "workspace",
+                        "sharedWith": [],
+                        "sharedWithMe": false,
+                        "isOwner": true,
+                        "color": "#2F3990",
+                        "progressPct": 40,
+                        "targets": [
+                            {
+                                "id": "<target id>",
+                                "name": "Revenue",
+                                "kind": "currency",
+                                "weight": 1,
+                                "progressPct": 40,
+                                "reachedAt": null,
+                                "start": 0,
+                                "target": 50000,
+                                "current": 20000,
+                                "unit": "",
+                                "currencyCode": "USD",
+                                "updatedBy": "<user id>",
+                                "updatedAt": "2026-10-01T09:30:00.000Z"
+                            }
+                        ],
+                        "archived": false,
+                        "canEdit": true,
+                        "canSetValue": true,
+                        "createdBy": "<user id>",
+                        "createdAt": "2026-10-01T09:30:00.000Z",
+                        "updatedAt": "2026-10-01T09:30:00.000Z"
+                    }
+                ]
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "paging": "None. The whole list is returned.",
+            "errors": {
+                "400": "`archived` or `mine` is not `true` or `false`.",
+                "403": "The caller has no active seat in the workspace."
+            }
+        },
+        "POST /api/v2/goals": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Create a goal",
+            "summary": "Creates a goal, with its targets if they are sent.",
+            "description": [
+                "The caller becomes its owner. A goal starts `private` unless `visibility` says otherwise. A `tasks` target is counted before the answer."
+            ],
+            "permission": "An active seat in the workspace that is not a guest",
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "required": true,
+                    "description": "The goal's name, 1 to 120 characters."
+                },
+                {
+                    "name": "description",
+                    "type": "string",
+                    "description": "Up to 2000 characters."
+                },
+                {
+                    "name": "periodStart",
+                    "type": "date",
+                    "description": "The first day, written `YYYY-MM-DD`, or empty."
+                },
+                {
+                    "name": "periodEnd",
+                    "type": "date",
+                    "description": "The last day, written `YYYY-MM-DD`, or empty. Not before `periodStart`."
+                },
+                {
+                    "name": "visibility",
+                    "type": "string",
+                    "description": "`private`, `people` or `workspace`. Defaults to `private`."
+                },
+                {
+                    "name": "sharedWith",
+                    "type": "id[]",
+                    "description": "Up to 100 active members to share the goal with. It must be empty for a `private` goal."
+                },
+                {
+                    "name": "color",
+                    "type": "string",
+                    "description": "A colour written `#rrggbb`, or empty."
+                },
+                {
+                    "name": "targets",
+                    "type": "object[]",
+                    "description": "Up to 20 targets, each as described under [Add a target](#add-a-target) without the goal."
+                }
+            ],
+            "bodyNotes": [
+                "Any other key is refused."
+            ],
+            "request": {
+                "name": "Launch 2.0",
+                "visibility": "workspace",
+                "periodStart": "2026-10-01",
+                "periodEnd": "2026-12-31",
+                "targets": [
+                    {
+                        "name": "Revenue",
+                        "kind": "currency",
+                        "currencyCode": "USD",
+                        "start": 0,
+                        "target": 50000
+                    }
+                ]
+            },
+            "response": {
+                "status": true,
+                "statusText": "Goal saved.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 40,
+                    "targets": [
+                        {
+                            "id": "<target id>",
+                            "name": "Revenue",
+                            "kind": "currency",
+                            "weight": 1,
+                            "progressPct": 40,
+                            "reachedAt": null,
+                            "start": 0,
+                            "target": 50000,
+                            "current": 20000,
+                            "unit": "",
+                            "currencyCode": "USD",
+                            "updatedBy": "<user id>",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "archived": false,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "errors": {
+                "400": "A key that is not known, a value of the wrong type or size, or a body that changes nothing. The answer names the `field` that was refused. A person can own at most 200 goals.",
+                "403": "The caller has no active seat in the workspace."
+            }
+        },
+        "GET /api/v2/goals/for-task/:taskId": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "List the goals a task counts towards",
+            "summary": "Lists the targets that count a task, with the goal each belongs to.",
+            "description": [
+                "A target counts a task when it names the task, or names its list and the task is a top-level task. Only live goals the caller can read are listed."
+            ],
+            "permission": "An active seat in the workspace. The task must be one the caller can open",
+            "pathParams": [
+                {
+                    "name": "taskId",
+                    "type": "id",
+                    "description": "The task."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Goals fetched successfully.",
+                "data": [
+                    {
+                        "goalId": "<goal id>",
+                        "goalName": "Launch 2.0",
+                        "color": "#2F3990",
+                        "progressPct": 40,
+                        "targetId": "<target id>",
+                        "targetName": "Ship the tasks",
+                        "targetProgressPct": 60,
+                        "through": "task"
+                    }
+                ]
+            },
+            "responseNotes": [
+                "`through` is `task` when the target names the task and `list` when it counts the task's list. The rows are ordered by goal name, then target name."
+            ],
+            "paging": "None.",
+            "errors": {
+                "403": "The caller has no active seat in the workspace.",
+                "404": "The task does not exist, or the caller cannot open it."
+            }
+        },
+        "GET /api/v2/goals/:id": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Read a goal",
+            "summary": "Returns one goal, live or archived.",
+            "permission": "An active seat in the workspace. The goal must be one the caller can read",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The goal."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Goal fetched successfully.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 40,
+                    "targets": [
+                        {
+                            "id": "<target id>",
+                            "name": "Revenue",
+                            "kind": "currency",
+                            "weight": 1,
+                            "progressPct": 40,
+                            "reachedAt": null,
+                            "start": 0,
+                            "target": 50000,
+                            "current": 20000,
+                            "unit": "",
+                            "currencyCode": "USD",
+                            "updatedBy": "<user id>",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "archived": false,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "errors": {
+                "403": "The caller has no active seat in the workspace.",
+                "404": "The goal does not exist, or the caller cannot read it."
+            }
+        },
+        "PATCH /api/v2/goals/:id": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Change a goal",
+            "summary": "Changes a goal's name, period, audience, colour or owner. Only the keys sent are changed.",
+            "description": [
+                "Targets have routes of their own. Changing `visibility`, `sharedWith` or `ownerUserId` is refused with the code `sources_would_drop`, and the `sources` that would drop out, when the goal counts tasks that not everyone who would then read it can open. Making a goal `private` empties `sharedWith`."
+            ],
+            "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The goal."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "1 to 120 characters."
+                },
+                {
+                    "name": "description",
+                    "type": "string",
+                    "description": "Up to 2000 characters."
+                },
+                {
+                    "name": "periodStart",
+                    "type": "date",
+                    "description": "Written `YYYY-MM-DD`, or empty."
+                },
+                {
+                    "name": "periodEnd",
+                    "type": "date",
+                    "description": "Written `YYYY-MM-DD`, or empty. Not before `periodStart`."
+                },
+                {
+                    "name": "visibility",
+                    "type": "string",
+                    "description": "`private`, `people` or `workspace`."
+                },
+                {
+                    "name": "sharedWith",
+                    "type": "id[]",
+                    "description": "Up to 100 active members. It must be empty for a `private` goal."
+                },
+                {
+                    "name": "color",
+                    "type": "string",
+                    "description": "A colour written `#rrggbb`, or empty."
+                },
+                {
+                    "name": "ownerUserId",
+                    "type": "id",
+                    "description": "The new owner: an active member who is not a guest."
+                }
+            ],
+            "bodyNotes": [
+                "Any other key is refused."
+            ],
+            "request": {
+                "visibility": "people",
+                "sharedWith": [
+                    "<user id>"
+                ]
+            },
+            "response": {
+                "status": true,
+                "statusText": "Goal saved.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 40,
+                    "targets": [
+                        {
+                            "id": "<target id>",
+                            "name": "Revenue",
+                            "kind": "currency",
+                            "weight": 1,
+                            "progressPct": 40,
+                            "reachedAt": null,
+                            "start": 0,
+                            "target": 50000,
+                            "current": 20000,
+                            "unit": "",
+                            "currencyCode": "USD",
+                            "updatedBy": "<user id>",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "archived": false,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "errors": {
+                "400": "A key that is not known, a value of the wrong type or size, or a body that changes nothing. The answer names the `field` that was refused.",
+                "403": "The caller has no active seat in the workspace.",
+                "404": "The goal does not exist, or the caller cannot read it.",
+                "409": "The goal is archived. Restore it first. The goal was changed at the same moment. Send the request again."
+            }
+        },
+        "POST /api/v2/goals/:id/summary": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Summarise a goal",
+            "summary": "Writes a short summary of a goal's progress with the workspace's AI, keeps it on the goal and answers with the whole goal.",
+            "description": [
+                "The summary is made only when this route is called, from the goal's name, its period and its targets with their numbers. It is kept until the next one is made; `stale` says the numbers have changed since.",
+                "It needs AI switched on for the workspace and a model the server can reach, and it is booked to the workspace's AI budget."
+            ],
+            "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The goal."
+                }
+            ],
+            "bodyNotes": [
+                "The body must be empty."
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Summary saved.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 40,
+                    "targets": [
+                        {
+                            "id": "<target id>",
+                            "name": "Revenue",
+                            "kind": "currency",
+                            "weight": 1,
+                            "progressPct": 40,
+                            "reachedAt": null,
+                            "start": 0,
+                            "target": 50000,
+                            "current": 20000,
+                            "unit": "",
+                            "currencyCode": "USD",
+                            "updatedBy": "<user id>",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "archived": false,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z",
+                    "summary": {
+                        "text": "Launch 2.0 is 40% of the way. Revenue stands at 20,000 of 50,000 USD with the period ending on 31 December.",
+                        "madeAt": "2026-10-01T09:30:00.000Z",
+                        "stale": false
+                    }
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as in [Read a goal](#read-a-goal), with its new `summary`."
+            ],
+            "errors": {
+                "400": "The body is not empty.",
+                "402": "The workspace's AI budget is spent. The answer has `code: \"ai_budget_exhausted\"`.",
+                "403": "The caller has no active seat in the workspace, or can read the goal and may not change it.",
+                "404": "The goal does not exist, or the caller cannot read it.",
+                "409": "The goal is archived, or AI is switched off or not set up for the workspace (`code: \"ai_unavailable\"`).",
+                "502": "The model gave no usable answer (`code: \"summary_failed\"`). Send the request again."
+            }
+        },
+        "POST /api/v2/goals/:id/archive": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Archive a goal",
+            "summary": "Archives a goal. It leaves the live list and can be restored.",
+            "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The goal."
+                }
+            ],
+            "bodyNotes": [
+                "The body must be empty."
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Goal archived.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 40,
+                    "targets": [
+                        {
+                            "id": "<target id>",
+                            "name": "Revenue",
+                            "kind": "currency",
+                            "weight": 1,
+                            "progressPct": 40,
+                            "reachedAt": null,
+                            "start": 0,
+                            "target": 50000,
+                            "current": 20000,
+                            "unit": "",
+                            "currencyCode": "USD",
+                            "updatedBy": "<user id>",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "archived": true,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "errors": {
+                "400": "The body is not empty.",
+                "403": "The caller has no active seat in the workspace.",
+                "404": "The goal does not exist, or the caller cannot read it.",
+                "409": "The goal was changed at the same moment. Send the request again."
+            }
+        },
+        "POST /api/v2/goals/:id/restore": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Restore a goal",
+            "summary": "Brings an archived goal back to the live list.",
+            "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The goal."
+                }
+            ],
+            "bodyNotes": [
+                "The body must be empty."
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Goal restored.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 40,
+                    "targets": [
+                        {
+                            "id": "<target id>",
+                            "name": "Revenue",
+                            "kind": "currency",
+                            "weight": 1,
+                            "progressPct": 40,
+                            "reachedAt": null,
+                            "start": 0,
+                            "target": 50000,
+                            "current": 20000,
+                            "unit": "",
+                            "currencyCode": "USD",
+                            "updatedBy": "<user id>",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "archived": false,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "errors": {
+                "400": "The body is not empty.",
+                "403": "The caller has no active seat in the workspace.",
+                "404": "The goal does not exist, or the caller cannot read it.",
+                "409": "The goal was changed at the same moment. Send the request again."
+            }
+        },
+        "POST /api/v2/goals/:id/targets": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Add a target",
+            "summary": "Adds a target to a goal and answers with the whole goal.",
+            "description": [
+                "A goal holds at most 20 targets. A `tasks` target is counted before the answer."
+            ],
+            "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The goal."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "required": true,
+                    "description": "The target's name, 1 to 120 characters."
+                },
+                {
+                    "name": "kind",
+                    "type": "string",
+                    "required": true,
+                    "description": "`number`, `currency`, `boolean` or `tasks`. It cannot be changed afterwards."
+                },
+                {
+                    "name": "weight",
+                    "type": "integer",
+                    "description": "How much the target counts towards the goal, 1 to 100. Defaults to 1."
+                },
+                {
+                    "name": "start",
+                    "type": "number",
+                    "description": "For `number` and `currency`: where the range starts. Defaults to 0."
+                },
+                {
+                    "name": "target",
+                    "type": "number",
+                    "description": "For `number` and `currency`: where the range ends. Required, and different from `start`."
+                },
+                {
+                    "name": "current",
+                    "type": "number",
+                    "description": "For `number` and `currency`: the value now. Defaults to `start`."
+                },
+                {
+                    "name": "unit",
+                    "type": "string",
+                    "description": "For `number` and `currency`: a label, up to 20 characters."
+                },
+                {
+                    "name": "currencyCode",
+                    "type": "string",
+                    "description": "For `currency`: a three-letter code of a currency the workspace uses. Defaults to the workspace's own currency."
+                },
+                {
+                    "name": "done",
+                    "type": "boolean",
+                    "description": "For `boolean`: whether it is done. Defaults to `false`."
+                },
+                {
+                    "name": "sources",
+                    "type": "object",
+                    "description": "For a `tasks` target: `{ sprintIds, taskIds }`, at most 20 lists and 100 tasks. Each must be one the caller can open and every reader of the goal can open."
+                }
+            ],
+            "bodyNotes": [
+                "Only the keys of the target's `kind` are accepted; any other key is refused."
+            ],
+            "request": {
+                "name": "Revenue",
+                "kind": "currency",
+                "currencyCode": "USD",
+                "start": 0,
+                "target": 50000
+            },
+            "response": {
+                "status": true,
+                "statusText": "Target added.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 40,
+                    "targets": [
+                        {
+                            "id": "<target id>",
+                            "name": "Revenue",
+                            "kind": "currency",
+                            "weight": 1,
+                            "progressPct": 40,
+                            "reachedAt": null,
+                            "start": 0,
+                            "target": 50000,
+                            "current": 20000,
+                            "unit": "",
+                            "currencyCode": "USD",
+                            "updatedBy": "<user id>",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "archived": false,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "errors": {
+                "400": "A key that is not known, a value of the wrong type or size, or a body that changes nothing. The answer names the `field` that was refused. The goal already holds 20 targets, a currency is not one of the workspace's, or a `tasks` source is not one the caller can open and every reader of the goal can open (the code is `source_not_found` or `source_not_shared`).",
+                "403": "The caller has no active seat in the workspace.",
+                "404": "The goal does not exist, or the caller cannot read it.",
+                "409": "The goal is archived. Restore it first. The goal was changed at the same moment. Send the request again."
+            }
+        },
+        "PATCH /api/v2/goals/:id/targets/:targetId": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Change a target",
+            "summary": "Changes what a target is: its name, weight, range, unit, currency or sources. Its value has a route of its own.",
+            "description": [
+                "The target's `kind` cannot change. Changing the `sources` of a `tasks` target counts it again before the answer."
+            ],
+            "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The goal."
+                },
+                {
+                    "name": "targetId",
+                    "type": "id",
+                    "description": "The target."
+                }
+            ],
+            "body": [
+                {
+                    "name": "name",
+                    "type": "string",
+                    "description": "The target's name, 1 to 120 characters."
+                },
+                {
+                    "name": "weight",
+                    "type": "integer",
+                    "description": "How much the target counts towards the goal, 1 to 100."
+                },
+                {
+                    "name": "start",
+                    "type": "number",
+                    "description": "For `number` and `currency`: where the range starts."
+                },
+                {
+                    "name": "target",
+                    "type": "number",
+                    "description": "For `number` and `currency`: where the range ends. Different from `start`."
+                },
+                {
+                    "name": "unit",
+                    "type": "string",
+                    "description": "For `number` and `currency`: a label, up to 20 characters."
+                },
+                {
+                    "name": "currencyCode",
+                    "type": "string",
+                    "description": "For `currency`: a three-letter code of a currency the workspace uses."
+                },
+                {
+                    "name": "sources",
+                    "type": "object",
+                    "description": "For a `tasks` target: `{ sprintIds, taskIds }`, at most 20 lists and 100 tasks. Each must be one the caller can open and every reader of the goal can open."
+                }
+            ],
+            "bodyNotes": [
+                "Only the keys of the target's `kind` are accepted, without its value; any other key is refused. The body must name something to change."
+            ],
+            "request": {
+                "target": 60000
+            },
+            "response": {
+                "status": true,
+                "statusText": "Target saved.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 40,
+                    "targets": [
+                        {
+                            "id": "<target id>",
+                            "name": "Revenue",
+                            "kind": "currency",
+                            "weight": 1,
+                            "progressPct": 40,
+                            "reachedAt": null,
+                            "start": 0,
+                            "target": 50000,
+                            "current": 20000,
+                            "unit": "",
+                            "currencyCode": "USD",
+                            "updatedBy": "<user id>",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "archived": false,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "errors": {
+                "400": "A key that is not known, a value of the wrong type or size, or a body that changes nothing. The answer names the `field` that was refused. A `tasks` source is not one the caller can open and every reader of the goal can open.",
+                "403": "The caller has no active seat in the workspace.",
+                "404": "The goal does not exist, or the caller cannot read it. Or the goal has no such target.",
+                "409": "The goal is archived. Restore it first. The goal was changed at the same moment. Send the request again."
+            }
+        },
+        "DELETE /api/v2/goals/:id/targets/:targetId": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Remove a target",
+            "summary": "Removes a target and answers with the whole goal.",
+            "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The goal."
+                },
+                {
+                    "name": "targetId",
+                    "type": "id",
+                    "description": "The target."
+                }
+            ],
+            "bodyNotes": [
+                "The body must be empty."
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Target removed.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 0,
+                    "targets": [],
+                    "archived": false,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "errors": {
+                "400": "The body is not empty.",
+                "403": "The caller has no active seat in the workspace.",
+                "404": "The goal does not exist, or the caller cannot read it. Or the goal has no such target.",
+                "409": "The goal is archived. Restore it first. The goal was changed at the same moment. Send the request again."
+            }
+        },
+        "PUT /api/v2/goals/:id/targets/:targetId/value": {
+            "resource": "goals",
+            "stability": "beta",
+            "title": "Set a target's value",
+            "summary": "Sets the current value of a `number` or `currency` target, or whether a `boolean` target is done.",
+            "description": [
+                "The goal's progress is worked out again. A `tasks` target is counted from its tasks and cannot be set by hand: the answer is a refusal with the code `counted_from_tasks`."
+            ],
+            "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The goal."
+                },
+                {
+                    "name": "targetId",
+                    "type": "id",
+                    "description": "The target."
+                }
+            ],
+            "body": [
+                {
+                    "name": "current",
+                    "type": "number",
+                    "description": "For a `number` or `currency` target: the value now."
+                },
+                {
+                    "name": "done",
+                    "type": "boolean",
+                    "description": "For a `boolean` target: whether it is done."
+                }
+            ],
+            "bodyNotes": [
+                "Send the one key the target's `kind` takes; any other key is refused."
+            ],
+            "request": {
+                "current": 25000
+            },
+            "response": {
+                "status": true,
+                "statusText": "Target updated.",
+                "data": {
+                    "_id": "<goal id>",
+                    "name": "Launch 2.0",
+                    "description": "",
+                    "ownerUserId": "<user id>",
+                    "periodStart": "2026-10-01",
+                    "periodEnd": "2026-12-31",
+                    "visibility": "workspace",
+                    "sharedWith": [],
+                    "sharedWithMe": false,
+                    "isOwner": true,
+                    "color": "#2F3990",
+                    "progressPct": 40,
+                    "targets": [
+                        {
+                            "id": "<target id>",
+                            "name": "Revenue",
+                            "kind": "currency",
+                            "weight": 1,
+                            "progressPct": 40,
+                            "reachedAt": null,
+                            "start": 0,
+                            "target": 50000,
+                            "current": 20000,
+                            "unit": "",
+                            "currencyCode": "USD",
+                            "updatedBy": "<user id>",
+                            "updatedAt": "2026-10-01T09:30:00.000Z"
+                        }
+                    ],
+                    "archived": false,
+                    "canEdit": true,
+                    "canSetValue": true,
+                    "createdBy": "<user id>",
+                    "createdAt": "2026-10-01T09:30:00.000Z",
+                    "updatedAt": "2026-10-01T09:30:00.000Z"
+                }
+            },
+            "responseNotes": [
+                "`data` is the goal as the caller may see it; the example shows one currency target. A `boolean` target carries `done`; a `tasks` target carries `sources`, `counted`, `notCounted`, `dirty`, `updating` and `sourceNames` in place of `start`, `target` and `current`. `sharedWith` lists people only for someone who can change the goal. `canEdit` and `canSetValue` say what the caller may do with it. A goal that has been summarised carries `summary`: its `text`, when it was made (`madeAt`) and whether the numbers have changed since (`stale`)."
+            ],
+            "errors": {
+                "400": "A key that is not known, a value of the wrong type or size, or a body that changes nothing. The answer names the `field` that was refused. The key the target needs is missing, or the target is counted from tasks.",
+                "403": "The caller has no active seat in the workspace.",
+                "404": "The goal does not exist, or the caller cannot read it. Or the goal has no such target.",
+                "409": "The goal is archived. Restore it first. The goal was changed at the same moment. Send the request again."
+            }
+        },
+        "GET /api/v2/whiteboards/:projectId/:sprintId": {
+            "resource": "whiteboards",
+            "stability": "beta",
+            "title": "Read a whiteboard",
+            "summary": "Returns the board of a list: its cards, notes and texts.",
+            "description": [
+                "A list that has no board yet answers with an empty one at revision 0."
+            ],
+            "permission": "The caller must be able to open the list",
+            "pathParams": [
+                {
+                    "name": "projectId",
+                    "type": "id",
+                    "description": "The project."
+                },
+                {
+                    "name": "sprintId",
+                    "type": "id",
+                    "description": "The list."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Whiteboard fetched.",
+                "data": {
+                    "boardId": "<board id>",
+                    "revision": 3,
+                    "elements": [
+                        {
+                            "id": "card1",
+                            "type": "task",
+                            "x": 120,
+                            "y": 80,
+                            "z": 0,
+                            "taskId": "<task id>",
+                            "title": "Write the release notes",
+                            "taskKey": "WEB-12"
+                        },
+                        {
+                            "id": "note1",
+                            "type": "note",
+                            "text": "Ask design",
+                            "tone": "amber",
+                            "x": 400,
+                            "y": 80,
+                            "w": 200,
+                            "h": 120,
+                            "z": 1
+                        }
+                    ],
+                    "savedBy": "<user id>",
+                    "savedAt": "2026-10-01T09:30:00.000Z",
+                    "canEdit": true,
+                    "limits": {
+                        "elements": 2000,
+                        "notes": 500,
+                        "text": 2000
+                    }
+                }
+            },
+            "responseFields": [
+                {
+                    "name": "elements",
+                    "description": "A `task` card (`id`, `type`, `x`, `y`, `z`, `taskId`, `title`, `taskKey`), a `note` (`text`, `tone`, `x`, `y`, `w`, `h`, `z`) or a `text` (the same without `tone`). A card for a task the caller may not open carries only its place and `withheld: true`. A card whose task was deleted or moved to another list is left out."
+                },
+                {
+                    "name": "revision",
+                    "description": "The number a save names as `baseRevision`."
+                },
+                {
+                    "name": "canEdit",
+                    "description": "Whether the caller may change the board now."
+                },
+                {
+                    "name": "limits",
+                    "description": "The most cards, notes and texts a board holds, and the longest text."
+                }
+            ],
+            "errors": {
+                "404": "The project or list does not exist, or the caller cannot open it."
+            }
+        },
+        "PATCH /api/v2/whiteboards/:projectId/:sprintId": {
+            "resource": "whiteboards",
+            "stability": "beta",
+            "title": "Save a whiteboard",
+            "summary": "Adds, moves and removes elements on a board, as a change on the revision the caller last read.",
+            "description": [
+                "A card names the task it stands for and a task has one card: a second card for it moves the first. A note or a text is replaced whole. A new card is left out, with no word of why, when its task is not a live task of the list or one the caller may not open. A save that changes nothing is answered without a new revision.",
+                "The state a save replaces is kept in the history: when someone else is about to change the board, when the save touches half the board or more, and otherwise at most once every ten minutes. The history holds the last 20 states."
+            ],
+            "permission": "The caller must be able to edit the project, and the list, its folders and the project must be active",
+            "pathParams": [
+                {
+                    "name": "projectId",
+                    "type": "id",
+                    "description": "The project."
+                },
+                {
+                    "name": "sprintId",
+                    "type": "id",
+                    "description": "The list."
+                }
+            ],
+            "body": [
+                {
+                    "name": "baseRevision",
+                    "type": "integer",
+                    "required": true,
+                    "description": "The `revision` the change was made on."
+                },
+                {
+                    "name": "upsert",
+                    "type": "object[]",
+                    "description": "The elements to add or replace, at most 2500 of them, each named once. A `task` card carries `id`, `type`, `taskId`, `x`, `y` and `z`. A `note` carries `id`, `type`, `text`, `tone`, `x`, `y`, `w`, `h` and `z`; a `text` the same without `tone`."
+                },
+                {
+                    "name": "remove",
+                    "type": "string[]",
+                    "description": "The ids of the elements to take off."
+                }
+            ],
+            "bodyNotes": [
+                "Name at least one of `upsert` and `remove`. An element id is up to 40 letters, digits, `-` and `_`. `x` and `y` are numbers from 0 to 100000, `w` from 40 to 1200, `h` from 24 to 1200, `z` a whole number up to 1000000 (default 0), `text` up to 2000 characters, `tone` one of `amber`, `green`, `red`, `violet`, `brand` or `grey`. A board holds at most 2000 cards and 500 notes and texts. One save is at most 512 KB. Any other key is refused."
+            ],
+            "request": {
+                "baseRevision": 3,
+                "upsert": [
+                    {
+                        "id": "note1",
+                        "type": "note",
+                        "text": "Ask design",
+                        "tone": "amber",
+                        "x": 400,
+                        "y": 80,
+                        "w": 200,
+                        "h": 120
+                    }
+                ],
+                "remove": [
+                    "card2"
+                ]
+            },
+            "response": {
+                "status": true,
+                "statusText": "Whiteboard saved.",
+                "data": {
+                    "boardId": "<board id>",
+                    "revision": 4,
+                    "elements": [],
+                    "savedBy": "<user id>",
+                    "savedAt": "2026-10-01T09:30:00.000Z",
+                    "canEdit": true,
+                    "limits": {
+                        "elements": 2000,
+                        "notes": 500,
+                        "text": 2000
+                    }
+                }
+            },
+            "responseNotes": [
+                "`data` is the board after the save, as in [Read a whiteboard](#read-a-whiteboard); the example leaves `elements` empty."
+            ],
+            "errors": {
+                "400": "A key that is not known, a field of the wrong type or size, or a save that changes nothing. The answer names the `field`.",
+                "409": "The board changed since `baseRevision`. The answer has `code: \"revision_conflict\"` and the current board in `data`.",
+                "413": "The save, or the board it would make, is too large."
+            }
+        },
+        "GET /api/v2/whiteboards/:projectId/:sprintId/history": {
+            "resource": "whiteboards",
+            "stability": "beta",
+            "title": "List a whiteboard's history",
+            "summary": "Lists the earlier states kept for a board, newest first.",
+            "permission": "The caller must be able to open the list",
+            "pathParams": [
+                {
+                    "name": "projectId",
+                    "type": "id",
+                    "description": "The project."
+                },
+                {
+                    "name": "sprintId",
+                    "type": "id",
+                    "description": "The list."
+                }
+            ],
+            "response": {
+                "status": true,
+                "statusText": "Whiteboard history fetched.",
+                "data": [
+                    {
+                        "revision": 3,
+                        "savedBy": "<user id>",
+                        "savedAt": "2026-10-01T09:30:00.000Z",
+                        "cards": 12,
+                        "reason": "interval"
+                    }
+                ]
+            },
+            "responseNotes": [
+                "`revision` is the state to name in a restore. `cards` counts every element of that state. `reason` says why it was kept: `author` (someone else was about to change the board), `bulk` (a save touched half the board or more), `interval` (ten minutes had passed) or `restore` (the state before a restore)."
+            ],
+            "paging": "None. A board keeps at most 20 states.",
+            "errors": {
+                "404": "The project or list does not exist, or the caller cannot open it."
+            }
+        },
+        "POST /api/v2/whiteboards/:projectId/:sprintId/restore": {
+            "resource": "whiteboards",
+            "stability": "beta",
+            "title": "Restore a whiteboard",
+            "summary": "Puts an earlier state of a board back, as a new revision.",
+            "description": [
+                "The state being replaced is kept in the history. Cards whose tasks are gone are left out."
+            ],
+            "permission": "The caller must be able to edit the project, and the list, its folders and the project must be active",
+            "pathParams": [
+                {
+                    "name": "projectId",
+                    "type": "id",
+                    "description": "The project."
+                },
+                {
+                    "name": "sprintId",
+                    "type": "id",
+                    "description": "The list."
+                }
+            ],
+            "body": [
+                {
+                    "name": "revision",
+                    "type": "integer",
+                    "required": true,
+                    "description": "The `revision` of a state in the history, 1 or more."
+                }
+            ],
+            "request": {
+                "revision": 3
+            },
+            "response": {
+                "status": true,
+                "statusText": "Whiteboard restored.",
+                "data": {
+                    "boardId": "<board id>",
+                    "revision": 5,
+                    "elements": [],
+                    "savedBy": "<user id>",
+                    "savedAt": "2026-10-01T09:30:00.000Z",
+                    "canEdit": true,
+                    "limits": {
+                        "elements": 2000,
+                        "notes": 500,
+                        "text": 2000
+                    }
+                }
+            },
+            "responseNotes": [
+                "`data` is the board after the restore, as in [Read a whiteboard](#read-a-whiteboard); the example leaves `elements` empty."
+            ],
+            "errors": {
+                "400": "`revision` is not a whole number of 1 or more.",
+                "404": "The project or list does not exist, or the caller cannot open it; or that earlier state is no longer kept.",
+                "409": "The board changed while it was being restored. The answer has `code: \"revision_conflict\"` and the current board in `data`."
+            }
+        },
+        "POST /api/v2/imports/:id/undo": {
+            "resource": "imports",
+            "stability": "beta",
+            "title": "Undo an import",
+            "summary": "Moves the tasks an import created to the trash.",
+            "description": [
+                "The custom fields the import created are switched off when no task outside the trash still holds a value in them. A field that has since been made a field of every project stays, and so do statuses and tags. A task the import only updated is left alone. Trashing a task takes the tasks under it, so a task that is kept keeps every task above it.",
+                "An import with tasks that someone has worked on since (a history line other than its creation, a comment the import did not bring, or a subtask it did not make) is not undone unless `keepEdited` is `true`; those tasks are then left where they are."
+            ],
+            "permission": "The person who ran the import, an owner or an admin",
+            "pathParams": [
+                {
+                    "name": "id",
+                    "type": "id",
+                    "description": "The import, from `GET /api/v2/imports`."
+                }
+            ],
+            "body": [
+                {
+                    "name": "keepEdited",
+                    "type": "boolean",
+                    "description": "`true` to undo the import and keep the tasks that have been worked on. Defaults to `false`."
+                }
+            ],
+            "request": {
+                "keepEdited": true
+            },
+            "response": {
+                "status": true,
+                "statusText": "38 imported task(s) moved to the trash.",
+                "data": {
+                    "trashed": 38,
+                    "kept": [
+                        {
+                            "id": "<task id>",
+                            "name": "Plan the launch"
+                        }
+                    ],
+                    "keptCount": 1,
+                    "fieldsRemoved": [
+                        "Story points"
+                    ],
+                    "fieldsKept": []
+                }
+            },
+            "responseFields": [
+                {
+                    "name": "trashed",
+                    "description": "How many tasks were moved to the trash."
+                },
+                {
+                    "name": "kept",
+                    "description": "The tasks left where they are, at most 50, each as `{ id, name }`."
+                },
+                {
+                    "name": "keptCount",
+                    "description": "How many tasks were kept."
+                },
+                {
+                    "name": "fieldsRemoved",
+                    "description": "The titles of the custom fields that were switched off."
+                },
+                {
+                    "name": "fieldsKept",
+                    "description": "The titles of the custom fields the import created that are still in use."
+                }
+            ],
+            "errors": {
+                "404": "The import does not exist.",
+                "409": "The import was already undone (`code: \"ALREADY_UNDONE\"`); nothing it created is left (`NOTHING_TO_UNDO`); or tasks were worked on since and `keepEdited` was not sent (`EDITED`, with `data.edited`, the first 50 of them as `{ id, name }`, and `data.editedCount`)."
+            }
+        },
+        "POST /api/v2/custom-fields/links/resolve": {
+            "resource": "custom-fields",
+            "stability": "beta",
+            "title": "Resolve relationship and voting values",
+            "summary": "Returns, for each task named, the tasks its relationship fields link and the tally of its voting fields.",
+            "description": [
+                "A task the caller cannot open is left out as if it held nothing. A linked task the caller cannot open is left out of its list. The voters of a field are named only when the field shows them. A task with no values is not in the answer."
+            ],
+            "permission": "Only tasks the caller can open are answered",
+            "body": [
+                {
+                    "name": "taskIds",
+                    "type": "id[]",
+                    "required": true,
+                    "description": "The tasks, at most 200."
+                }
+            ],
+            "request": {
+                "taskIds": [
+                    "<task id>"
+                ]
+            },
+            "response": {
+                "status": true,
+                "statusText": "OK",
+                "data": {
+                    "<task id>": {
+                        "<relationship field id>": [
+                            {
+                                "id": "<task id>",
+                                "key": "WEB-12",
+                                "title": "Write the release notes",
+                                "status": {
+                                    "key": 1,
+                                    "text": "Open",
+                                    "type": "default_active"
+                                },
+                                "projectId": "<project id>",
+                                "sprintId": "<list id>",
+                                "folderId": ""
+                            }
+                        ],
+                        "<voting field id>": {
+                            "count": 4,
+                            "voted": true
+                        }
+                    }
+                }
+            },
+            "responseNotes": [
+                "A relationship field answers with its linked tasks. A voting field answers with `count`, `voted` (whether the caller has voted) and, when the field shows voters, `voters`, a list of user ids."
+            ],
+            "errors": {
+                "400": "`taskIds` is not a list, or lists more than 200 tasks."
+            }
+        },
+        "POST /api/v2/custom-fields/:fieldId/vote": {
+            "resource": "custom-fields",
+            "stability": "beta",
+            "title": "Vote on a task",
+            "summary": "Casts or withdraws the caller's own vote on a voting field of a task.",
+            "description": [
+                "The voter is always the caller."
+            ],
+            "permission": "The caller must be able to open the task and to read its custom fields",
+            "pathParams": [
+                {
+                    "name": "fieldId",
+                    "type": "id",
+                    "description": "The voting field."
+                }
+            ],
+            "body": [
+                {
+                    "name": "taskId",
+                    "type": "id",
+                    "required": true,
+                    "description": "The task."
+                },
+                {
+                    "name": "vote",
+                    "type": "boolean",
+                    "required": true,
+                    "description": "`true` to cast the vote, `false` to withdraw it."
+                }
+            ],
+            "bodyNotes": [
+                "Any other key is refused."
+            ],
+            "request": {
+                "taskId": "<task id>",
+                "vote": true
+            },
+            "response": {
+                "status": true,
+                "statusText": "OK",
+                "data": {
+                    "count": 5,
+                    "voted": true
+                }
+            },
+            "responseNotes": [
+                "`count` is the votes on the field after the change."
+            ],
+            "errors": {
+                "400": "The body names more than `taskId` and `vote`, `vote` is not `true` or `false`, or the field is not a voting field of that task.",
+                "403": "The caller's role gives no access to the custom fields of the task.",
+                "404": "The task does not exist, or the caller cannot open it."
+            }
+        },
         "POST /api/v2/auth/login": { "stability": "internal", "summary": "Signs in with an email and a password." },
         "POST /api/v2/auth/tracker-code": { "stability": "internal", "summary": "Issues a sign-in code for the desktop time tracker." },
         "GET /api/v2/auth/2fa/status": { "stability": "internal", "summary": "Whether two-factor sign-in is on for the signed-in person." },
@@ -2412,6 +4470,14 @@
         "DELETE /api/v2/agents/account": { "stability": "beta", "summary": "Unlinks the caller's AI account." },
         "GET /api/v2/agents/policy": { "stability": "beta", "summary": "Reads the workspace's agent policy." },
         "PUT /api/v2/agents/policy": { "stability": "beta", "summary": "Changes the workspace's agent policy." },
+        "GET /api/v2/agents/project-policy/:projectId": { "stability": "beta", "summary": "Reads a project's policy for agents: whether an agent may close a task (`done`) and how far a connected agent may go on its own (`connected`), with the workspace defaults and the policy in force." },
+        "PUT /api/v2/agents/project-policy/:projectId": { "stability": "beta", "summary": "Changes a project's policy for agents. Send `done`, `connected` or both. For an owner or admin who is signed in.", "apiToken": false },
+        "GET /api/v2/agents/project-manager/:projectId": { "stability": "beta", "summary": "Reads whether a project's manager is on, and the findings from its daily look that the caller may open." },
+        "PUT /api/v2/agents/project-manager/:projectId": { "stability": "beta", "summary": "Turns a project's manager on or off (`on`). Turning it on looks at the project once straight away. For an owner or admin who is signed in.", "apiToken": false },
+        "GET /api/v2/agents/work-queue/task/:taskId": { "stability": "beta", "summary": "What the work queue holds about a task: its items, which connected agent has claimed one, and whether the caller may hand the task over." },
+        "POST /api/v2/agents/work-queue/task/:taskId/hand-over": { "stability": "beta", "summary": "Puts a task in the work queue for a connected agent to pick up, in a project whose manager is on.", "apiToken": false },
+        "POST /api/v2/agents/work-queue/:itemId/take-back": { "stability": "beta", "summary": "Takes a work-queue item back from the agent that holds it.", "apiToken": false },
+        "USE /api/v2/goals": { "stability": "internal", "summary": "Runs before every goal route: a write made with an agent's token is judged by the rules that hold that agent." },
         "POST /api/v2/agents": { "stability": "beta", "summary": "Creates an agent." },
         "PUT /api/v2/agents/:id": { "stability": "beta", "summary": "Changes an agent." },
         "DELETE /api/v2/agents/:id": { "stability": "beta", "summary": "Deletes an agent." },
@@ -2435,6 +4501,7 @@
         "POST /api/v2/oauth-client-approvals/revoke": { "stability": "internal", "summary": "Revokes an approval.", "apiToken":false },
         "GET /api/v2/oauth-grants": { "stability": "internal", "summary": "Lists the caller's own OAuth grants.", "apiToken":false },
         "DELETE /api/v2/oauth-grants/:grantId": { "stability": "internal", "summary": "Revokes one of the caller's OAuth grants.", "apiToken":false },
+        "POST /api/v2/oauth-grants/:grantId/withdraw": { "stability": "internal", "summary": "Withdraws some of the permissions the caller gave a connected app.", "apiToken": false },
         "GET /api/v2/agent-sessions/endpoints": { "stability": "internal", "summary": "Reads where outside agents are reached." },
         "PUT /api/v2/agent-sessions/endpoints": { "stability": "internal", "summary": "Changes where outside agents are reached." },
         "GET /api/v2/agent-sessions": { "stability": "internal", "summary": "Lists the outside agent sessions of a task." },
@@ -2499,6 +4566,7 @@
         "POST /api/v2/timetracker/capture": { "stability": "internal", "summary": "Stores a tracker capture, for the time tracker." },
         "POST /api/v2/timetracker/timelog": { "stability": "internal", "summary": "A time log request, for the time tracker." },
         "GET /api/v2/timetracker/running": { "stability": "internal", "summary": "The caller's open tracker sessions." },
+        "GET /api/v2/timetracker/can-start": { "stability": "internal", "summary": "Whether the caller may start a timer today; refused in an approved timesheet period." },
         "POST /api/v2/timetracker/trim": { "stability": "internal", "summary": "Closes an open tracker session at a given length." },
         "POST /api/v2/timesheet-approval/submit": { "stability": "beta", "summary": "Submits a timesheet period for approval." },
         "GET /api/v2/timesheet-approval/status": { "stability": "beta", "summary": "The approval status of a timesheet period." },
@@ -2580,6 +4648,18 @@
         "GET /api/v2/provider-keys": { "stability": "internal", "summary": "Lists the workspace's AI provider keys, by handle only.", "apiToken":false },
         "PUT /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Stores a workspace AI provider key.", "apiToken":false },
         "DELETE /api/v2/provider-keys/:provider": { "stability": "internal", "summary": "Removes a workspace AI provider key.", "apiToken":false },
+        "GET /api/v2/connectors/slack": { "stability": "internal", "summary": "Shows the workspace's Slack connector: whether each secret is set and since when, the channel list and, for each allowed channel, whether agents may read it or post to it. Never a secret.", "apiToken":false },
+        "PUT /api/v2/connectors/slack/secrets": { "stability": "internal", "summary": "Stores the Slack bot token or signing secret in the secrets store, after checking the token with Slack.", "apiToken":false },
+        "DELETE /api/v2/connectors/slack/secrets/:key": { "stability": "internal", "summary": "Removes a Slack connector secret.", "apiToken":false },
+        "POST /api/v2/connectors/slack/channels/refresh": { "stability": "internal", "summary": "Reads the Slack channel list again.", "apiToken":false },
+        "PUT /api/v2/connectors/slack/channels": { "stability": "internal", "summary": "Sets, for each allowed Slack channel, whether agents may read it, propose a message to it, or both.", "apiToken":false },
+        "GET /api/v2/connectors/google/mine": { "stability": "internal", "summary": "Shows the signed-in member's own Google connections: the account's email, the granted scopes, the dates and the state. Never a token or its handle.", "apiToken":false },
+        "GET /api/v2/connectors/google/members": { "stability": "internal", "summary": "For an owner or admin: which members hold a Google connection, with its scopes, dates and state. Never the account or a token.", "apiToken":false },
+        "POST /api/v2/connectors/google/:connector/connect": { "stability": "internal", "summary": "Starts the signed-in member's Google connection and answers Google's consent address. The state is single-use, lasts ten minutes and belongs to this session.", "apiToken":false },
+        "POST /api/v2/connectors/google/:connector/complete": { "stability": "internal", "summary": "Completes the connection the same session started: exchanges the code with the PKCE verifier and keeps the tokens in the secrets store.", "apiToken":false },
+        "DELETE /api/v2/connectors/google/:connector": { "stability": "internal", "summary": "Ends the signed-in member's Google connection: revokes the grant with Google and clears the stored tokens.", "apiToken":false },
+        "DELETE /api/v2/connectors/google/:connector/members/:userId": { "stability": "internal", "summary": "For an owner or admin: ends a member's Google connection.", "apiToken":false },
+        "GET /api/v1/connector-oauth/google/callback": { "stability": "internal", "summary": "Google's redirect after consent. Public: it exchanges nothing and returns the browser to the signed-in page, which completes the connection." },
         "GET /api/v2/ai-switch": { "stability": "internal", "summary": "Whether AI is on for the workspace." },
         "PUT /api/v2/ai-switch": { "stability": "internal", "summary": "Turns AI on or off for the workspace.", "apiToken":false },
         "POST /api/v2/reactions": { "stability": "beta", "summary": "Adds or removes a reaction." },
@@ -2600,6 +4680,8 @@
         "GET /api/v2/api-tokens/step-credentials": { "stability": "internal", "summary": "The live step credentials of the workspace." },
         "GET /api/v2/api-tokens/:id/logs": { "stability": "internal", "summary": "The latest calls made with a token." },
         "POST /api/v2/api-tokens/mcp": { "stability": "internal", "summary": "Creates a token for an AI agent." },
+        "POST /api/v2/api-tokens/:id/renew": { "stability": "internal", "summary": "Gives the person's own token a new secret and a new end date." },
+        "GET /api/v2/api-tokens/ai-connection": { "stability": "internal", "summary": "Whether the signed-in person's own AI app has connected to this workspace, when it last called, and which groups of tools this server offers it. Never a token or an app's name." },
         "GET /api/v2/api-tokens": { "stability": "internal", "summary": "Lists the person's tokens." },
         "POST /api/v2/api-tokens": { "stability": "internal", "summary": "Creates a token." },
         "PUT /api/v2/api-tokens/:id": { "stability": "internal", "summary": "Renames a token, or switches it on or off." },
@@ -2611,6 +4693,9 @@
         "PUT /api/v2/pages/:id/comments/:commentId/resolve": { "stability": "beta", "summary": "Resolves a comment thread, or reopens it." },
         "PUT /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Changes a comment." },
         "DELETE /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Deletes a comment and its replies." },
+        "GET /api/v2/pages/:id/shares": { "stability": "beta", "summary": "Lists the people a page is shared with by name." },
+        "PUT /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Shares a page with a person as a viewer or an editor, or changes their role." },
+        "DELETE /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Stops sharing a page with a person." },
         "PUT /api/v2/pages/:id/review": { "stability": "beta", "summary": "Marks a wiki page as reviewed." },
         "PUT /api/v2/pages/:id/approve": { "stability": "beta", "summary": "Signs off a page an agent drafted." },
         "POST /api/v2/pages/:id/images": { "stability": "beta", "summary": "Uploads an image for a page." },

@@ -92,8 +92,8 @@
         <div>
             <div id="comment_footer"  class="border-top position-fi flex-column border-bottom d-flex align-items-end justify-content-between bg-white p-12px comment__footer">
                 <!-- SCROLL BOTTOM -->
-                <button v-if="showScrollBotton" class="scroll-bottom-btn position-ab bg-light-blue cursor-pointer" @click="scrollBottom()">
-                    <img :src="downArrow" alt="downArrow" class="vertical-middle">
+                <button v-if="showScrollBotton" type="button" class="scroll-bottom-btn position-ab cursor-pointer" :aria-label="$t('MainChat.jump_latest')" :title="$t('MainChat.jump_latest')" @click="scrollBottom()">
+                    <span class="ah-mask-icon" :style="maskOf(downArrow)"></span>
                 </button>
 
                 <MediaConfirmation
@@ -128,8 +128,8 @@
                         </template>
                         <template v-else>
                             <span class="mr-10px">{{recordTime}}</span>
-                            <div class="bg-green border-radius-10-px record__progress" :style="{width: `${recordingProgress}%`}"></div>
-                            <div class="bg-light-gray border-radius-10-px record__progress" :style="{width: `${100 - recordingProgress}%`}"></div>
+                            <div class="border-radius-10-px record__progress record__progress--done" :style="{width: `${recordingProgress}%`}"></div>
+                            <div class="border-radius-10-px record__progress record__progress--left" :style="{width: `${100 - recordingProgress}%`}"></div>
                         </template>
                     </div>
 
@@ -254,6 +254,7 @@ import { isOnViewerSide } from "@/utils/commentSide";
 import CommentThread from "@/components/molecules/CommentThread/CommentThread.vue";
 import { applyCommentEvent, isTaskThread } from "@/composable/commentThreads";
 import { fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
+import { maskOf } from "@/utils/iconMask";
 
 const { t } = useI18n();
 

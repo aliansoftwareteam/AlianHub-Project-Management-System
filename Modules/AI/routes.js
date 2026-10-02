@@ -7,6 +7,8 @@ const askController = require('./ask');
 const askStream = require('./askStream');
 const askThreads = require('./askThreads');
 const askCard = require('./askCard');
+const askPost = require('./askPost');
+const taskValues = require('./taskValues');
 const feedback = require('./feedback');
 const quality = require('./quality');
 const aiProfile = require('./aiProfile');
@@ -35,6 +37,8 @@ exports.init = (app) => {
     // axios interceptor). Returns { questions } or { description }.
     app.post('/api/v1/ai/description', ctrl.writeDescription);
     app.post('/api/v1/ai/task-summary', ctrl.summarizeTask);
+    // The kept summary and area of the rows a table shows. Reads only: never a model call.
+    app.post('/api/v1/ai/task-values', taskValues.keptValues);
     // Files a task under one of the labels its OWN project already uses (a
     // category custom field, else the project tags, else the company task
     // types). Never invents a vocabulary — a project with none gets a reason.
@@ -55,6 +59,8 @@ exports.init = (app) => {
     app.delete('/api/v1/ai/ask/threads/:id', askThreads.deleteThread);
     app.get('/api/v1/ai/ask/card/:dashboardId/:cardUid', askCard.readAnswer);
     app.post('/api/v1/ai/ask/card/:dashboardId/:cardUid', askCard.askAnswer);
+    app.get('/api/v1/ai/ask/post/targets', askPost.targets);
+    app.post('/api/v1/ai/ask/post', askPost.post);
     app.put('/api/v1/ai/feedback', feedback.saveFeedback);
     app.get('/api/v1/ai/feedback/mine', feedback.listMine);
     app.delete('/api/v1/ai/feedback/:id', feedback.removeFeedback);

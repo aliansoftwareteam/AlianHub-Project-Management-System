@@ -103,7 +103,7 @@ exports.updateMemory = async (req, res) => {
         const parsed = memory.parseId(id);
         if (!parsed) return fail(res, 'A valid memory id (kind:key) is required.', 400);
         const body = req.body || {};
-        const project = memory.PROJECT_KINDS.includes(parsed.kind);
+        const project = memory.PROJECT_ROW_KINDS.includes(parsed.kind);
         const scopeId = project ? String(body.projectId || body.scopeId || '') : auth.uid;
         if (project) {
             if (!OBJECT_ID.test(scopeId)) return fail(res, 'projectId is required for a project row.', 400);

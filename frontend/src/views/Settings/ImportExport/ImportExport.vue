@@ -8,6 +8,7 @@
                 <div>
                     <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="iex-import" @click="showImport = true">{{ $t('ImportExport.import_start') }}</button>
                 </div>
+                <RecentImports :key="importsShown" />
             </section>
 
             <section class="ah-card iex__section" aria-labelledby="iex-export-title">
@@ -41,7 +42,7 @@
             </section>
         </template>
 
-        <WorkspaceImportDialog v-if="showImport" @close="showImport = false" @imported="markImported" />
+        <WorkspaceImportDialog v-if="showImport" @close="closeImport" @imported="markImported" />
     </div>
 </template>
 
@@ -55,6 +56,7 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { isOwnerOrAdmin } from "@/utils/roles";
 import { saveOnboarding } from "@/composable/onboardingState";
+import RecentImports from "@/components/organisms/WorkspaceImport/RecentImports.vue";
 
 defineOptions({ name: "ImportExport" });
 
@@ -67,6 +69,12 @@ const { t } = useI18n();
 
 const allowed = computed(() => isOwnerOrAdmin((getters["settings/companyUserDetail"] || {}).roleType));
 const showImport = ref(false);
+const importsShown = ref(0);
+// The list of recent imports is read again once the dialog closes, so an import just made is in it.
+const closeImport = () => {
+    showImport.value = false;
+    importsShown.value += 1;
+};
 const format = ref("xlsx");
 const starting = ref(false);
 const error = ref("");

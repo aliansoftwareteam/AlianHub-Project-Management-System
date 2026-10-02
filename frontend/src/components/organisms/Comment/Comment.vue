@@ -161,7 +161,7 @@
                     <slot name="thread" />
                 </div>
             </div>
-            <DropDown mode="menu" v-if="showOptions && !message?.isDeleted" class="align-self-start"  :bodyClass="{'comments__message--dropdown' : true}">
+            <DropDown mode="menu" themed v-if="showOptions && !message?.isDeleted" class="align-self-start"  :bodyClass="{'comments__message--dropdown' : true}">
                 <template #button>
                     <img :src="verticalDots" :alt="$t('Comments.message_actions')" class="cursor-pointer ml-10px" :class="[showMessageTime ? 'mt-30px' : 'mt-10px']">
                 </template>

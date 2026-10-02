@@ -112,6 +112,7 @@ exports.submitTimesheet = async (req, res) => {
             reviewedAt: null,
             reviewedBy: '',
             reviewerName: '',
+            selfApproved: false,
             rejectionReason: '',
             deletedStatusKey: 0,
         };
@@ -211,17 +212,29 @@ const reviewOne = async (req, { id, action, reason, reviewerName = reviewerNameO
     }
 
     const reviewed = action !== 'reopen';
+    const actorName = await reviewerName(uid);
+    const at = new Date();
+    // An owner or admin may approve their own week; the approval says so, and so does its history entry.
+    const selfApproved = action === 'approve' && String(doc.userId) === uid;
     const update = {
         status: transition.to,
         rejectionReason: action === 'reject' ? String(reason).trim() : '',
-        reviewedAt: reviewed ? new Date() : null,
+        reviewedAt: reviewed ? at : null,
         reviewedBy: reviewed ? uid : '',
-        reviewerName: reviewed ? await reviewerName(uid) : '',
+        reviewerName: reviewed ? actorName : '',
+        selfApproved,
     };
+    const entry = { action, from: doc.status, to: transition.to, by: uid, byName: actorName, at };
+    // A reopening clears the review it undoes, so the week's history keeps both: who reopened it and whose review that was.
+    const history = {
+        approve: { ...entry, selfApproved },
+        reopen: { ...entry, reviewedBy: doc.reviewedBy || '', reviewerName: doc.reviewerName || '', reviewedAt: doc.reviewedAt || null },
+    }[action];
+    const write = history ? { $set: update, $push: { history } } : { $set: update };
     // Matching on the status that was read keeps a second reviewer from overwriting a review that landed in between.
     const updated = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
-        data: [{ _id, status: doc.status, deletedStatusKey: 0 }, { $set: update }, { returnDocument: 'after' }],
+        data: [{ _id, status: doc.status, deletedStatusKey: 0 }, write, { returnDocument: 'after' }],
     }, 'findOneAndUpdate');
     if (!updated) return refused('wrong_state', 'This timesheet was reviewed by someone else just now.');
     socketEmitter.emit('update', { type: 'update', data: updated, module: 'timesheetApproval' });
@@ -329,6 +342,9 @@ exports.listQueue = async (req, res) => {
             const o = typeof doc.toObject === 'function' ? doc.toObject() : doc;
             return {
                 ...o,
+                // The stored totals are the week as first submitted; a reopened week keeps taking time, so the card totals what its split is made of.
+                totalMinutes: split.totalMinutes,
+                entryCount: (entries || []).length,
                 userName: u ? u.Employee_Name || u.Employee_Email || '' : '',
                 userAvatar: u ? u.Employee_profileImageURL || '' : '',
                 billableMinutes: split.billableMinutes,

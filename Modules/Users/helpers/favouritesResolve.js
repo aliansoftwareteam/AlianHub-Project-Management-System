@@ -4,7 +4,7 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { visibleProjects } = require('../../Agents/scope');
 const { asObjectIds, canSeeSprint, hiddenSprintIds, sprintIdentities } = require('../../Sprints/helpers/sprintVisibility');
-const { pageVisibilityFilter } = require('../../Pages/helpers/pageRules');
+const { pageReachFilter } = require('../../Pages/helpers/pageRules');
 const { favouriteKey } = require('./favouritesRules');
 
 const text = (value) => (value === undefined || value === null || value === '' ? undefined : String(value));
@@ -31,7 +31,7 @@ const resolveFavourites = async (companyId, uid, entries) => {
         read(companyId, SCHEMA_TYPE.PAGES, {
             _id: { $in: idsOf('doc') },
             ...NOT_DELETED,
-            $and: [pageVisibilityFilter(uid), { $or: [{ ProjectID: { $in: inProjects } }, { ProjectID: { $in: [null, undefined] } }] }],
+            ...pageReachFilter({ uid, projectIds: inProjects }),
         }, 'title ProjectID'),
         privileged ? [] : sprintIdentities(companyId, uid),
     ]);

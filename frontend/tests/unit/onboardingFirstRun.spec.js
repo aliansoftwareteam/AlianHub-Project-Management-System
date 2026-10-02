@@ -19,7 +19,6 @@ vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: () => me.
 import { useOnboardingChecklist, MEMBER_STEPS, WORKSPACE_STEPS } from '@/composable/useOnboardingChecklist';
 import { resetOnboardingRecord } from '@/composable/onboardingState';
 import { isBlockingSurfaceOpen, useBlockingSurface } from '@/composable/blockingSurface';
-import { mayAutoOffer } from '@/components/organisms/Tour/tourSteps';
 import { USER_ONBOARDING, USER_UPATE } from '@/config/env';
 
 const ROLE = { guest: 0, owner: 1, admin: 2, member: 3 };
@@ -48,9 +47,10 @@ beforeEach(() => {
 });
 
 describe('one checklist per role', () => {
-    it.each(['owner', 'admin'])('gives an %s the workspace steps and the tour', (role) => {
+    it.each(['owner', 'admin'])('gives an %s the workspace steps', (role) => {
         const keys = useChecklist(ROLE[role]).steps.value.map((s) => s.key);
-        expect(keys).toEqual(expect.arrayContaining(['invite', 'project', 'tour']));
+        expect(keys).toEqual(expect.arrayContaining(['invite', 'project']));
+        expect(keys).not.toContain('tour');
     });
 
     it.each(['member', 'guest'])('gives a %s personal steps only, even when the workspace ones are done', (role) => {
@@ -86,16 +86,16 @@ describe('dismissal and progress live on the user record', () => {
 
     it('records a step without sending anyone else\'s id', async () => {
         const checklist = useChecklist(ROLE.member);
-        checklist.mark('open_project');
+        checklist.mark('my_work');
         await flushPromises();
-        expect(apiRequestWithoutCompnay).toHaveBeenCalledWith('put', USER_ONBOARDING, { openedProject: true });
-        expect(checklist.steps.value.find((s) => s.key === 'open_project').done).toBe(true);
+        expect(apiRequestWithoutCompnay).toHaveBeenCalledWith('put', USER_ONBOARDING, { openedMyWork: true });
+        expect(checklist.steps.value.find((s) => s.key === 'my_work').done).toBe(true);
     });
 
     it('reads progress saved on another device', () => {
-        me.value = { ...me.value, homeChecklist: { completedTask: true, viewedNotifications: true } };
+        me.value = { ...me.value, homeChecklist: { viewedNotifications: true, viewedShortcuts: true } };
         const done = useChecklist(ROLE.member).steps.value.filter((s) => s.done).map((s) => s.key);
-        expect(done).toEqual(['complete_task', 'notifications']);
+        expect(done).toEqual(['notifications', 'shortcuts']);
     });
 });
 
@@ -138,20 +138,7 @@ describe('the checklist steps aside for panels, bulk bars and dialogs', () => {
     });
 });
 
-describe('the tour starts on request, or once', () => {
-    const ctx = { done: false, skipped: false, savedStep: 0, offeredBefore: false, wide: true, shellSettled: true };
-
-    it('never starts the shell tour by itself', () => {
-        expect(mayAutoOffer('shell', ctx)).toBe(false);
-    });
-
-    it('offers a screen tour once, after the shell tour is settled', () => {
-        expect(mayAutoOffer('project', ctx)).toBe(true);
-        expect(mayAutoOffer('project', { ...ctx, offeredBefore: true })).toBe(false);
-        expect(mayAutoOffer('project', { ...ctx, shellSettled: false })).toBe(false);
-        expect(mayAutoOffer('project', { ...ctx, wide: false })).toBe(false);
-    });
-
+describe('the tour keeps nothing in the tab', () => {
     it('has no floating card and no session-only dismissal left', () => {
         const source = fs.readFileSync(path.join(__dirname, '../../src/components/organisms/Tour/TourComponet.vue'), 'utf8');
         expect(source).not.toMatch(/ah-gs/);

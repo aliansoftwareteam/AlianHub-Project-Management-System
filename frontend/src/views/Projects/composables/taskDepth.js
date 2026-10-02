@@ -1,7 +1,9 @@
-/* The client's reading of the rules in Modules/Tasks/helpers/taskTree.js. The server decides;
+/* The client's reading of the rules in Modules/Tasks/helpers/taskTreeRules.js. The server decides;
  * this only keeps the panel and the parent picker from offering what it would refuse. */
 
-export const MAX_DEPTH = 2;
+import { MAX_DEPTH } from "@taskTreeRules";
+
+export { MAX_DEPTH };
 
 const TREE_REFUSAL_CODES = Object.freeze(["PARENT_AT_MAX_DEPTH", "SUBTREE_TOO_DEEP", "PARENT_NOT_FOUND"]);
 

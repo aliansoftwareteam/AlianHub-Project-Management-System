@@ -20,7 +20,7 @@ vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 
 import * as env from '@/config/env';
 import en from '@/locales/en';
-import SprintRowMenu from '@/components/molecules/ProjectTree/SprintRowMenu.vue';
+import ListMenu from '@/components/molecules/ListMenu/ListMenu.vue';
 import SprintRenameInput from '@/components/molecules/ProjectTree/SprintRenameInput.vue';
 import ProjectTree from '@/components/molecules/ProjectTree/ProjectTree.vue';
 import { resetProjectTreeCache } from '@/components/molecules/ProjectTree/projectTreeData';
@@ -30,7 +30,7 @@ const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
 
 const MEMBER = 3;
-const KEYS = ['project_sprint_create', 'project_sprint_name_edit', 'sprint_type_change', 'project_folder_create'];
+const KEYS = ['project_sprint_create', 'project_sprint_name_edit', 'sprint_type_change', 'project_folder_create', 'sprint_archive', 'sprint_delete', 'sprint_restore'];
 const rulesGranting = (...granted) => ({
     project: Object.fromEntries(KEYS.map((key) => [key, { roles: [{ key: MEMBER, permission: granted.includes(key) }] }]))
 });
@@ -67,7 +67,7 @@ const rowOf = (id) => {
     const stored = SPRINTS.find((item) => item._id === id);
     return { id, name: stored.name, folderId: stored.folderId || '' };
 };
-const menu = (id, handed = project()) => show(SprintRowMenu, { project: handed, sprint: rowOf(id), folders: FOLDERS });
+const menu = (id, handed = project()) => show(ListMenu, { inTree: true, project: handed, sprint: rowOf(id), folders: FOLDERS, sprints: SPRINTS });
 const entries = async (wrapper) => {
     if (!wrapper.find('.pt-row__more').exists()) return [];
     await wrapper.find('.pt-row__more').trigger('click');
@@ -102,27 +102,29 @@ afterEach(() => {
 });
 
 describe('which actions a list row offers', () => {
-    it('a move and a rename to someone who may rename lists', async () => {
-        expect(await entries(menu('d1'))).toEqual(['Move to folder…', 'Rename']);
+    it('a rename, the link and a move to someone who may rename lists', async () => {
+        expect(await entries(menu('d1'))).toEqual(['Rename', 'Copy link', 'Move to folder…']);
     });
 
-    it.each(['sprint_type_change', 'project_sprint_create'])('only the move to someone who holds %s', async (key) => {
-        getters['settings/rules'] = rulesGranting(key);
-        expect(await entries(menu('d1'))).toEqual(['Move to folder…']);
+    it('the move, and no rename, to someone who holds another of the keys the server takes for it', async () => {
+        getters['settings/rules'] = rulesGranting('sprint_type_change');
+        expect(await entries(menu('d1'))).toEqual(['Copy link', 'Move to folder…']);
+        getters['settings/rules'] = rulesGranting('project_sprint_create');
+        expect(await entries(menu('d1'))).toEqual(['Copy link', 'Move to folder…', 'Make it a sprint']);
     });
 
-    it('nothing without one of the permissions the server asks for, or in a closed project', async () => {
+    it('only the link without one of the permissions the server asks for, or in a closed project', async () => {
         getters['settings/rules'] = rulesGranting('project_folder_create');
-        expect(await entries(menu('d1'))).toEqual([]);
+        expect(await entries(menu('d1'))).toEqual(['Copy link']);
         getters['settings/rules'] = rulesGranting('project_sprint_name_edit');
-        expect(await entries(menu('d1', project({ status: 'close' })))).toEqual([]);
+        expect(await entries(menu('d1', project({ status: 'close' })))).toEqual(['Copy link']);
     });
 
     it('reads each key from the rules of the project it is handed', async () => {
-        expect(await entries(menu('d1', project({ isGlobalPermission: false })))).toEqual([]);
+        expect(await entries(menu('d1', project({ isGlobalPermission: false })))).toEqual(['Copy link']);
         getters['settings/projectRules'] = rulesGranting('project_sprint_name_edit');
         getters['settings/rules'] = rulesGranting();
-        expect(await entries(menu('d1', project({ isGlobalPermission: false })))).toEqual(['Move to folder…', 'Rename']);
+        expect(await entries(menu('d1', project({ isGlobalPermission: false })))).toEqual(['Rename', 'Copy link', 'Move to folder…']);
     });
 
     it('names the list in the label of its button', () => {
@@ -240,7 +242,7 @@ describe('renaming a list', () => {
 
         const taken = input('d1');
         await type(taken, 'research');
-        expect(toast.error).toHaveBeenCalledWith('Sprint already exists', { position: 'top-right' });
+        expect(toast.error).toHaveBeenCalledWith('List already exists', { position: 'top-right' });
         expect(apiRequest).not.toHaveBeenCalled();
     });
 

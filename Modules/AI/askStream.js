@@ -8,6 +8,7 @@ const {
     gather, promptFor, tokenProjectIdsOf, aboutOf, SYSTEM, RESEARCH_SYSTEM, MAX_PER_TYPE, ASK_TOKENS, RESEARCH_TOKENS,
 } = require('./ask');
 const threads = require('./askThreads');
+const { askAnswerToken } = require('./shareToken');
 const askContext = require('./askContext');
 
 const FOLLOW_UP = `
@@ -115,6 +116,7 @@ const askStream = async (req, res) => {
                 createdAt: new Date(),
             };
             const savedId = answer ? await threads.appendTurn(companyId, uid, thread, turn) : threadIdOut;
+            const shareToken = askAnswerToken({ companyId, uid, question: asked, answer, cited, sources: gathered.sources });
             stream.send({
                 event: 'done',
                 configured: true,
@@ -126,6 +128,7 @@ const askStream = async (req, res) => {
                 sources: gathered.sources,
                 scope,
                 usage: { tokens: result.totalTokens, model: result.model },
+                ...(shareToken ? { shareToken } : {}),
                 ...found,
             });
         } catch (error) {

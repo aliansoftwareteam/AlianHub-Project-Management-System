@@ -151,7 +151,7 @@ exports.processTask = async (projectId, taskData) => {
     };
     const result = await MongoDbCrudOpration(taskData.companyId, upobj, "findOneAndUpdate");
     if (!result) return;
-    socketEmitter.emit('update', { type: "update", data: result, updatedFields: { [taskData.indexName]: result[taskData.indexName] }, module: 'task' });
+    socketEmitter.emit('update', { type: "update", data: result, updatedFields: { [taskData.indexName]: result[taskData.indexName] }, module: 'task', companyId: taskData.companyId });
 }
 
 
@@ -317,7 +317,7 @@ exports.update0Index = (taskUpdate,companyId,rep) => {
                 ]
             }
             MongoDbCrudOpration(companyId,obj,"findOneAndUpdate").then((result)=>{
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskUpdate.item.indexName]: result[taskUpdate.item.indexName]} , module: 'task'});
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskUpdate.item.indexName]: result[taskUpdate.item.indexName]} , module: 'task', companyId});
                 resolve({
                     status: true,
                     statusText: `Index Update Successfully`
@@ -368,7 +368,7 @@ exports.updateIndex = (taskUpdate,companyId,rep,typsenseTask) => {
                     ]
                 }
                 MongoDbCrudOpration(companyId,obj,"findOneAndUpdate").then((result)=>{
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskUpdate.item.indexName]: result[taskUpdate.item.indexName]}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {[taskUpdate.item.indexName]: result[taskUpdate.item.indexName]}, module: 'task', companyId });
                     resolve({
                         status: true,
                         statusText: `Index Update Successfully`

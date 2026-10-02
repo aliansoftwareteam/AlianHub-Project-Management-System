@@ -27,6 +27,7 @@ const HOME = 'components/molecules/Home/style.css';
 const HOME_VIEW = 'views/Home/style.css';
 const INBOX = 'views/Inbox/Inbox.vue';
 const HUB = 'views/Pages/PagesSpace.vue';
+const EMPTY_STATE = 'components/atom/EmptyState/EmptyState.vue';
 const HOME_PARTS = [
     'components/molecules/Home/AgendaCard.vue',
     'components/molecules/Home/AssignedCommentsCard.vue',
@@ -228,7 +229,6 @@ describe('one type scale', () => {
         [HOME, '.hc-card__title', 'font', '--fs-lg'],
         [HOME, '.hc-setup__title', 'font', '--fs-lg'],
         [HOME, '.hp-panel__head', 'font', '--fs-lg'],
-        [INBOX, '.ibx__zero-title', 'font', '--fs-lg'],
         [HUB, '.hub__card-title', 'font', '--fs-md'],
         [HOME, '.hc-row', 'font', '--fs-md'],
         [INBOX, '.ibx', 'font-size', '--row-font'],
@@ -390,23 +390,21 @@ describe('the setup checklist', () => {
     ];
     const mountChecklist = () => mount(SetupChecklist, { props: { companyName: 'Acme', steps }, global: { stubs: { ShellIcon: true } } });
 
-    it('shows the progress, the one next step and its action; the rest stays folded', () => {
+    it('shows the progress, the one next step and its action above the open list', () => {
         const wrapper = mountChecklist();
         expect(wrapper.find('.hc-setup__ring').text()).toBe('1/3');
         expect(wrapper.find('.hc-setup__next').text()).toContain('Home.step_invite');
         expect(wrapper.find('.hc-setup__next').text()).not.toContain('Home.step_permissions');
         expect(wrapper.find('.hc-setup__cta').text()).toBe('Home.invite_team');
-        expect(wrapper.find('.hc-setup__steps').exists()).toBe(false);
+        expect(wrapper.find('.hc-setup__steps').exists()).toBe(true);
         expect(wrapper.find('s').exists()).toBe(false);
         const toggle = wrapper.find('button.hc-setup__toggle');
-        expect(toggle.attributes('aria-expanded')).toBe('false');
+        expect(toggle.attributes('aria-expanded')).toBe('true');
         expect(toggle.attributes('aria-controls')).toBe('hc-setup-steps');
     });
 
-    it('opens to the full list, where a done step is marked and a later one can be started', async () => {
+    it('lists every step, where a done step is marked and a later one can be started, and folds away', async () => {
         const wrapper = mountChecklist();
-        await wrapper.find('.hc-setup__toggle').trigger('click');
-        expect(wrapper.find('.hc-setup__toggle').attributes('aria-expanded')).toBe('true');
         const items = wrapper.findAll('#hc-setup-steps .hc-setup__step');
         expect(items).toHaveLength(3);
         expect(items[0].classes()).toContain('is-done');
@@ -414,6 +412,9 @@ describe('the setup checklist', () => {
         expect(wrapper.find('s').exists()).toBe(false);
         await items[2].find('button').trigger('click');
         expect(wrapper.emitted('action')[0]).toEqual(['permissions']);
+        await wrapper.find('.hc-setup__toggle').trigger('click');
+        expect(wrapper.find('.hc-setup__toggle').attributes('aria-expanded')).toBe('false');
+        expect(wrapper.find('.hc-setup__steps').exists()).toBe(false);
     });
 
     it('the action still starts the next step', async () => {
@@ -520,10 +521,11 @@ describe('Inbox rows', () => {
         expect(value(INBOX, '.ibx__undo-btn', 'color')).toBe('var(--rail-brand)');
     });
 
-    it('the empty state is on the scale', () => {
-        expect(value(INBOX, '.ibx__zero-title', 'font')).toBe('var(--fw-title, 600) var(--fs-lg, 15px)/var(--lh-snug, 1.3) var(--font-ui)');
-        expect(value(INBOX, '.ibx__zero-sub', 'font-size')).toBe('var(--fs-md, 12.5px)');
-        expect(value(INBOX, '.ibx__zero-mark', 'border-radius')).toBe('50%');
+    it('the empty state is the shared one, which is on the scale', () => {
+        expect(read(INBOX)).toMatch(/<EmptyState[^>]*illustration="inbox"/);
+        expect(read(INBOX)).not.toContain('ibx__zero-title');
+        expect(value(EMPTY_STATE, '.empty-state__title', 'font')).toBe('var(--text-h3)');
+        expect(value(EMPTY_STATE, '.empty-state__msg', 'font')).toBe('var(--text-small)');
     });
 });
 
@@ -604,7 +606,6 @@ describe('the classic look still computes the sizes these rules had', () => {
         [INBOX, '.ibx__actions .ah-btn--sm', 'padding', '0 10px'],
         [INBOX, '.ibx__actions .ah-btn--sm', 'font-size', '11.5px'],
         [INBOX, '.ibx__reply-input', 'font-size', '12.5px'],
-        [INBOX, '.ibx__zero-title', 'font', '600 15px/1.3 var(--font-ui)'],
         [INBOX, '.ibx__foot', 'font-size', '11.5px'],
         [INBOX, '.ibx__snooze-hint', 'font', '400 11px/1.2 var(--font-ui)'],
         [INBOX, '.ibx__undo', 'font-size', '12.5px'],
@@ -638,7 +639,6 @@ describe('the classic look still computes the sizes these rules had', () => {
         [HUB, '.hub__wiki-state', 'font', '600 11.5px/1.2 var(--font-ui)'],
         [HUB, '.hub__tpl-cta', 'font', '600 12px/1.2 var(--font-ui)'],
         [HUB, '.hub__blank', 'font', '600 12.5px/1.2 var(--font-ui)'],
-        [HUB, '.hub__empty', 'padding', '22px'],
     ])('%s %s { %s } is %s', (rel, selector, property, former) => {
         expect(compute(value(rel, selector, property), CLASSIC)).toBe(former);
     });

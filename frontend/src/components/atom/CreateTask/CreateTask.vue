@@ -101,6 +101,7 @@ import { treeRefusalReason } from "@/views/Projects/composables/taskDepth";
 const projectRef = inject("selectedProject");
 import { useValidation } from "@/composable/Validation";
 import { useToast } from "vue-toast-notification";
+import { defaultStatus } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 const clientWidth = inject("$clientWidth");
 const companyId = inject("$companyId");
 const $toast = useToast()
@@ -209,11 +210,8 @@ onMounted(() => {
         taskType.value = taskTypes.value[taskTypeIndex]
     }
 
-    // SELECT DEFAULT STATUS
-    let statusIndex = project?.value?.taskStatusData && project?.value?.taskStatusData.length ? project?.value?.taskStatusData.findIndex((x) => x.type === "default_active") : -1
-    if(statusIndex !== -1) {
-        status.value = project?.value.taskStatusData[statusIndex];
-    }
+    const opening = defaultStatus(project.value);
+    if (opening) status.value = opening;
 
     assignee.value = defaultAssignee();
 })
@@ -440,7 +438,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-input#inputId::placeholder {
+input.form-control.create__task-inputtext::placeholder {
     color: #959595;
     font-size: 12px;
     font-weight: 400;

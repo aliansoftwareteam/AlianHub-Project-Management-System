@@ -11,6 +11,7 @@ const { ROLE_OWNER } = require('../../Config/roleTypes');
 const knowledgeEvents = require('../Knowledge/ingest/events');
 const { sharedRecordVisible } = require('./helpers/scimRules');
 const { revokeMemberTokens } = require('../ApiTokens/memberTokens');
+const { endMemberConnections } = require('../Agents/connectors/memberDeparted');
 const { invalidateMembershipCache } = require('../../Config/jwt');
 
 // scimRules.isActive reads this back as "not active"; isDelete is what keeps the seat out of the guards.
@@ -120,7 +121,10 @@ const provision = async (companyId, { email, firstName, lastName, externalId, ac
         type: SCHEMA_TYPE.COMPANY_USERS,
         data: [{ userId: String(uid) }, { $set: set }],
     }, 'updateOne');
-    if (active === false) await revokeMemberTokens(companyId, uid);
+    if (active === false) {
+        await revokeMemberTokens(companyId, uid);
+        await endMemberConnections(companyId, uid);
+    }
     clearUserCaches(companyId, uid);
     announceSeatChange(companyId, uid, existing, active !== false);
     return { uid, created: !existing };
@@ -154,7 +158,10 @@ const invite = async (companyId, { email, firstName, lastName, externalId, defau
 const setActive = async (companyId, id, active) => {
     const cu = await getCompanyUser(companyId, id);
     if (!cu) return null;
-    if (!active) await revokeMemberTokens(companyId, cu.userId);
+    if (!active) {
+        await revokeMemberTokens(companyId, cu.userId);
+        await endMemberConnections(companyId, cu.userId);
+    }
     if (!sharedRecordVisible(cu)) {
         if (!active) await updateRow(companyId, cu, { status: SEAT_CANCELLED, isDelete: true });
         clearUserCaches(companyId, cu.userId);

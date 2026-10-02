@@ -60,7 +60,6 @@ module.exports = {
                         return;
                 }
                 MongoDbCrudOpration(companyId, objSchema, 'findOneAndUpdate').then(async(res)=>{
-                    socketEmitter.emit('update', { type: "update", data: res , updatedFields: {}, module: 'task' });
                     let taskObj;
                     let updateObj = {
                         TaskKey: `${projectCode}-${res.lastTaskId+1}`
@@ -97,7 +96,7 @@ module.exports = {
                         data: taskObj
                     }
                     MongoDbCrudOpration(companyId, objSh, 'findOneAndUpdate').then((result)=>{
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: updateObj, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: updateObj, module: 'task', companyId });
                         resolve();
                     }).catch((error)=>{
                         reject(error)
@@ -129,7 +128,7 @@ module.exports = {
         }
 
         MongoDbCrudOpration(companyId, query, "findOneAndUpdate").then((result)=>{
-            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTask}, module: 'task' });
+            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTask}, module: 'task', companyId });
         })
         .catch((error) => {
             logger.error(`ERROR in update parent subtask count: ${error.message}`);
@@ -260,7 +259,7 @@ module.exports = {
                         reject(taskNotFound());
                         return;
                     }
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {queueListArray: result.queueListArray}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {queueListArray: result.queueListArray}, module: 'task', companyId: CompanyId });
                     resolve({status: true, statusText: "updateQueueList updated successfully"});
                     const taskName = sanitizeInput(String(result.TaskName || ''));
                     let historyObj = {};

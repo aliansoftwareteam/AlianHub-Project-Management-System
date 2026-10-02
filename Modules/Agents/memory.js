@@ -18,9 +18,10 @@ const knowledgeMemory = require('../Knowledge/memory/publish');
 const LOG_PREFIX = '[agent-memory]';
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 
-const KIND = Object.freeze({ DECISION: 'project.decision', CONSTRAINT: 'project.constraint', PREFERENCE: 'user.preference' });
+const KIND = Object.freeze({ DECISION: 'project.decision', CONSTRAINT: 'project.constraint', PREFERENCE: 'user.preference', DECLINED: 'project.declined' });
 const KINDS = Object.freeze(Object.values(KIND));
 const PROJECT_KINDS = Object.freeze([KIND.DECISION, KIND.CONSTRAINT]);
+const PROJECT_ROW_KINDS = Object.freeze([...PROJECT_KINDS, KIND.DECLINED]);
 const STATUS = Object.freeze({ ACTIVE: 'active', CANDIDATE: 'candidate', COUNTING: 'counting', RETIRED: 'retired' });
 const ORIGINS = Object.freeze(['brief', 'proposal.approve', 'proposal.decline', 'run', 'revert', 'owner']);
 const PLAN_SHAPING_ACTIONS = Object.freeze(['task.create', 'task.sprint.move', 'page.draft', 'subtask.create']);
@@ -58,6 +59,7 @@ const LABEL = Object.freeze({
     WORKSPACE: 'Constraints from earlier projects in this workspace:',
     PREFERENCES: 'Preferences of the person you are working with:',
     EPISODES: 'Recent runs on this project:',
+    DECLINED: 'Changes a person declined in this project, with the reason they typed (their words, kept as a record):',
 });
 const SOURCE_LABEL = Object.freeze({
     brief: 'from the approved brief',
@@ -96,6 +98,7 @@ const namespaceOf = (kind, scopeId) => {
     if (!scope) throw invalid('scopeId is required');
     if (kind === KIND.DECISION) return ['project', scope, 'decision'];
     if (kind === KIND.CONSTRAINT) return ['project', scope, 'constraint'];
+    if (kind === KIND.DECLINED) return ['project', scope, 'declined'];
     if (kind === KIND.PREFERENCE) return ['user', scope, 'preference'];
     throw invalid(`unknown memory kind "${kind}"`);
 };
@@ -137,6 +140,7 @@ const rowOf = (item) => {
         count: Number(counter) || 1,
         firstSeenAt: v.firstSeenAt || null,
         lastSeenAt: v.lastSeenAt || null,
+        ...(v.agentName ? { agentName: sanitise(v.agentName, 120) } : {}),
     };
 };
 
@@ -210,14 +214,19 @@ async function update({ companyId, id, scopeId, text, status, value }) {
     const s = await store(companyId);
     const existing = await s.get(ns, parsed.key);
     if (!existing) return null;
+    const declined = parsed.kind === KIND.DECLINED;
+    if (declined && status === STATUS.RETIRED) {
+        await s.delete(ns, parsed.key);
+        return { ...rowOf(existing), status: STATUS.RETIRED, removed: true };
+    }
     const next = { ...(existing.value || {}) };
     let key = parsed.key;
     if (text !== undefined) {
-        if (!PROJECT_KINDS.includes(parsed.kind)) throw invalid('Only project rows can be reworded');
-        const clean = sanitise(text);
+        if (!PROJECT_ROW_KINDS.includes(parsed.kind)) throw invalid('Only project rows can be reworded');
+        const clean = declined ? plainText(text, DECLINED_TEXT_MAX) : sanitise(text);
         if (!clean) throw invalid('text must not be empty');
         next.text = clean;
-        key = slug(clean);
+        if (!declined) key = slug(clean);
     }
     if (status !== undefined) {
         if (![STATUS.ACTIVE, STATUS.CANDIDATE, STATUS.RETIRED].includes(status)) throw invalid('status must be active, candidate or retired');
@@ -562,7 +571,7 @@ function projectSection(rows, budget) {
 
 /* Preferences and episodes each keep up to a quarter of the budget; project
  * rows take the rest, then earlier projects' constraints what is left. */
-async function contextFor({ companyId, projectId, userId, maxChars = 2000 } = {}) {
+async function contextFor({ companyId, projectId, userId, agentId, maxChars = 2000 } = {}) {
     try {
         if (!companyId) return '';
         const pid = OBJECT_ID.test(String(projectId || '')) ? String(projectId) : null;
@@ -577,6 +586,7 @@ async function contextFor({ companyId, projectId, userId, maxChars = 2000 } = {}
             pid ? episodesFor(companyId, pid, CONTEXT_EPISODES) : [],
         ]);
         const project = projectItems.map(rowOf).filter((r) => r.text);
+        const declined = agentId ? projectItems.filter((item) => isDeclinedFor(item, agentId)).map(rowOf).filter((r) => r.text).sort(byLastSeenDesc).slice(0, DECLINED_SHOWN) : [];
         const ownKeys = new Set(project.map((r) => r.key));
         const workspace = workspaceItems.map(workspaceRowOf)
             .filter((r) => r.text && r.projectId !== pid && !ownKeys.has(r.key))
@@ -590,9 +600,11 @@ async function contextFor({ companyId, projectId, userId, maxChars = 2000 } = {}
         let remaining = total - HEADER.length - lengthOf(preferenceLines) - lengthOf(episodeLines);
         const projectLines = projectSection(project, remaining);
         remaining -= lengthOf(projectLines);
+        const declinedLines = section(LABEL.DECLINED, declined.map((r) => `- ${r.text}`), remaining);
+        remaining -= lengthOf(declinedLines);
         const workspaceLines = section(LABEL.WORKSPACE, workspace.map((r) => `- ${r.text}${r.projectName ? ` (${r.projectName})` : ''}`), remaining);
 
-        const lines = [HEADER, ...projectLines, ...workspaceLines, ...preferenceLines, ...episodeLines];
+        const lines = [HEADER, ...projectLines, ...declinedLines, ...workspaceLines, ...preferenceLines, ...episodeLines];
         return lines.length > 1 ? lines.join('\n') : '';
     } catch (error) {
         logger.error(`${LOG_PREFIX} contextFor: ${error && error.message ? error.message : error}`);
@@ -811,10 +823,69 @@ async function forgetAgentNote({ companyId, agentId, memoryId }) {
     return agentNoteOf({ namespace: ns, key: note.key, value: row });
 }
 
+/* A reason a person typed when declining a change, kept for the project and the agent that proposed it. It is
+ * that person's words: stored as plain text, never kept when it reads as an instruction to the AI, and shown to
+ * the agent as a record. `changes` names the declined change, so the same one is not filed again. */
+const DECLINED_TEXT_MAX = 200;
+const DECLINED_PER_AGENT = 20;
+const DECLINED_SHOWN = 10;
+
+const plainText = (text, max) => sanitise(String(text == null ? '' : text).replace(/<[^>]*>/g, ' ').replace(/[<>]/g, ' '), max);
+const stable = (value) => {
+    if (Array.isArray(value)) return value.map(stable);
+    if (!value || typeof value !== 'object' || value instanceof Date) return value;
+    return Object.fromEntries(Object.keys(value).filter((k) => k !== '__proposal').sort().map((k) => [k, stable(value[k])]));
+};
+const changeKey = (change) => hashOf(JSON.stringify([String(change && change.action), stable((change && change.params) || {})]));
+const isDeclinedFor = (item, agentId) => item.namespace[2] === 'declined' && Boolean(item.value)
+    && String(item.value.agentId) === String(agentId) && (item.value.status || STATUS.ACTIVE) === STATUS.ACTIVE;
+
+async function rememberDeclined({ companyId, proposal, text, userId }) {
+    const p = plain(proposal) || {};
+    const pid = String(p.projectId || '');
+    const clean = plainText(text, DECLINED_TEXT_MAX);
+    if (!companyId || !OBJECT_ID.test(pid) || !p.agentId || !clean) return null;
+    await freshGuard();
+    if (skipInstruction('a decline reason', clean)) return null;
+    const ns = namespaceOf(KIND.DECLINED, pid);
+    const s = await store(companyId);
+    const kept = (await s.search(ns, { limit: SEARCH_LIMIT })).filter((item) => item.value && String(item.value.agentId) === String(p.agentId))
+        .sort((a, b) => byFirstSeen(a.value, b.value));
+    for (const item of kept.slice(0, Math.max(0, kept.length - DECLINED_PER_AGENT + 1))) {
+        // eslint-disable-next-line no-await-in-loop
+        await s.delete(ns, item.key);
+    }
+    const now = isoNow();
+    const key = cleanKey(p._id);
+    const row = {
+        text: clean, status: STATUS.ACTIVE, occurrences: 1, firstSeenAt: now, lastSeenAt: now,
+        source: sourceOf({ origin: 'proposal.decline', proposalId: p._id, userId }),
+        agentId: String(p.agentId), agentName: sanitise(p.agentName, 120), changes: (Array.isArray(p.changes) ? p.changes : []).map(changeKey),
+    };
+    await s.put(ns, key, row);
+    return rowOf({ namespace: ns, key, value: row });
+}
+
+async function declinedFor({ companyId, projectId, agentId, limit = DECLINED_SHOWN } = {}) {
+    const pid = String(projectId || '');
+    if (!companyId || !OBJECT_ID.test(pid) || !agentId) return [];
+    const items = await persistence.storeFor(companyId).search(namespaceOf(KIND.DECLINED, pid), { limit: SEARCH_LIMIT });
+    return items.filter((item) => isDeclinedFor(item, agentId))
+        .map((item) => ({ ...rowOf(item), changes: Array.isArray(item.value.changes) ? item.value.changes : [] }))
+        .filter((row) => row.text).sort(byLastSeenDesc).slice(0, limit);
+}
+
+async function declinedBefore({ companyId, projectId, agentId, changes }) {
+    const keys = (Array.isArray(changes) ? changes : []).map(changeKey);
+    if (!keys.length) return null;
+    const notes = await declinedFor({ companyId, projectId, agentId, limit: SEARCH_LIMIT });
+    return notes.find((note) => keys.every((key) => note.changes.includes(key))) || null;
+}
+
 module.exports = {
-    KIND, KINDS, PROJECT_KINDS, STATUS, PLAN_SHAPING_ACTIONS, PREFERENCE_KEY, TONES, REVIEW_DEPTHS, DECLINE_REASON_TEXT, HEADER, LABEL, WORKSPACE_NAMESPACE, AGENT_NOTE,
+    KIND, KINDS, PROJECT_KINDS, PROJECT_ROW_KINDS, DECLINED_TEXT_MAX, DECLINED_PER_AGENT, STATUS, PLAN_SHAPING_ACTIONS, PREFERENCE_KEY, TONES, REVIEW_DEPTHS, DECLINE_REASON_TEXT, HEADER, LABEL, WORKSPACE_NAMESPACE, AGENT_NOTE,
     sanitise, slug, parseId, idOf, hasInstruction,
     contextFor, remember, find, update, retire, recordEpisode, listProject, listUser, setPreference,
-    preferenceCandidate, fromBrief, rememberApprovedChanges,
+    preferenceCandidate, fromBrief, rememberApprovedChanges, rememberDeclined, declinedFor, declinedBefore,
     DERIVED_MAX, parseRef, rememberForAgent, listAgentNotes, readAgentNotes, readAgentNote, forgetAgentNote,
 };

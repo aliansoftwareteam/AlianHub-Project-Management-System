@@ -9,9 +9,16 @@ const BUDGETS = {
     'list.scrollFps': { limit: 50, unit: 'fps', atLeast: true },
     'api.listFirstPage': { limit: 300, unit: 'ms' },
     'api.listOpen': { limit: 300, unit: 'ms' },
+    'everything.firstRows': { limit: 1500, unit: 'ms' },
+    'everything.groupedFirstRows': { limit: 1500, unit: 'ms' },
+    'everything.byProjectFirstRows': { limit: 1500, unit: 'ms' },
 };
 
-const budgetFor = (metric, tasks) => (tasks === BUDGET_TASKS ? BUDGETS[metric.key] || null : null);
+/* Every request the Everything page makes is a task query's first page, so each has that budget. */
+const EVERYTHING_API = { prefix: 'api.everything', budget: { limit: 300, unit: 'ms' } };
+
+const budgetOf = (key) => BUDGETS[key] || (String(key).startsWith(EVERYTHING_API.prefix) ? EVERYTHING_API.budget : null);
+const budgetFor = (metric, tasks) => (tasks === BUDGET_TASKS ? budgetOf(metric.key) : null);
 
 /* A budget is judged on the median of the runs; p95 is reported beside it. */
 const verdict = (metric, tasks) => {
@@ -48,4 +55,4 @@ const markdownTable = ({ date, build, machine, tasks, metrics }) => {
     ].join('\n');
 };
 
-module.exports = { BUDGETS, BUDGET_TASKS, verdict, budgetText, markdownTable };
+module.exports = { BUDGETS, BUDGET_TASKS, budgetOf, verdict, budgetText, markdownTable };

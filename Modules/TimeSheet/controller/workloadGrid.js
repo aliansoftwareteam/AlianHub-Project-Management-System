@@ -17,6 +17,7 @@ const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { resolveSheetScope, scopedEstimateMatch, scopedTimeMatch, openProjects, SHEET_PERMISSION } = require('../helpers/timeScope');
 const { withoutHiddenSprintPlans, namesTimeOff, asUnavailableDays } = require('../helpers/planVisibility');
 const { canReadTask } = require('../../Tasks/helpers/taskReadAccess');
+const { assigneeProblem } = require('../helpers/planMoveAccess');
 const { visibilityStage } = require('../../Tasks/helpers/taskQueryGuard');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
@@ -304,6 +305,8 @@ exports.moveWorkloadChip = async (req, res) => {
         if (!task || !(await canReadTask(companyId, req.uid, task))) {
             return res.status(404).json({ status: false, statusText: 'Task not found.' });
         }
+        const problem = sameUser ? '' : await assigneeProblem(companyId, task, toUserId);
+        if (problem) return res.status(400).json({ status: false, statusText: problem });
 
         const from = dayBounds(b.fromDate);
         /* A plan id only picks among the plans of the task and person just checked. */
@@ -331,7 +334,7 @@ exports.moveWorkloadChip = async (req, res) => {
         }, 'findOneAndUpdate');
 
         removeCache(String(b.taskId), true);
-        socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task' });
+        socketEmitter.emit('update', { type: 'update', data: updated, updatedFields: set, module: 'task', companyId });
         socketEmitter.emit('update', { type: 'update', data: { taskId: String(b.taskId), fromUserId, toUserId, fromDate: b.fromDate, toDate: b.toDate }, module: 'estimatedTime' });
         return res.json({ status: true, statusText: 'Work moved.', data: { taskId: String(b.taskId), updatedFields: set } });
     } catch (e) {

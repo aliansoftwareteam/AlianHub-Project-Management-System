@@ -36,6 +36,7 @@ const commentsController = require('../Modules/Comments/controller');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const importers = require('../Modules/Importers/controller');
 const { mergeSummaries } = require('../Modules/Importers/helpers/clickupPlan');
+const { safeHref } = require('../Modules/CustomField/fieldTypes/url');
 const guardFixture = require('./fixtures/taskWriteGuard');
 const readRows = require('./fixtures/importers/clickupRichRows');
 
@@ -113,7 +114,7 @@ describe('a ClickUp file imported into a project', () => {
         created.forEach((field) => expect(field).toMatchObject({ global: false, projectId: [PROJECT], type: 'task', isDelete: true, userId: OWNER }));
         expect(first.body.data.summary.fields).toMatchObject({ created: created.map((field) => field.fieldTitle), reused: [], asText: ['Site'] });
 
-        const second = await importRows();
+        const second = await importRows({ options: { createMissingStatuses: true, existing: 'update' } });
         expect(store(SCHEMA_TYPE.CUSTOM_FIELDS).filter((field) => field.fieldDescription === 'Imported from ClickUp.')).toHaveLength(15);
         expect(second.body.data.summary.fields).toMatchObject({ created: [], reused: created.map((field) => field.fieldTitle), valuesSet: 22, valuesDropped: 7 });
     });
@@ -167,10 +168,10 @@ describe('a ClickUp file imported into a project', () => {
         rows[0].Comments = JSON.stringify([{ text: 'see the file', by: 'Pat', mediaURL: `Project/${PROJECT}/${SPRINT}/6f0000000000000000000b99/Comments/secret.png`, attachment: { url: 'k' }, type: 'image' }]);
         await importRows({ rows });
         const comments = store(SCHEMA_TYPE.COMMENTS);
-        expect(comments.map((comment) => comment.type).sort()).toEqual(['link', 'text']);
+        expect(comments.map((comment) => comment.type)).toEqual(['text']);
         comments.forEach((comment) => expect(Object.keys(comment).filter((field) => /media|attachment|url/i.test(field))).toEqual([]));
         expect(comments.find((comment) => comment.type === 'text').message).toBe('Pat: see the file');
-        expect(comments.map((comment) => comment.importedFrom)).toEqual(['clickup', 'clickup']);
+        expect(comments.map((comment) => comment.importedFrom)).toEqual(['clickup']);
     });
 
     it('brings checklists with their done state, on a task and on a subtask', async () => {
@@ -192,7 +193,7 @@ describe('a ClickUp file imported into a project', () => {
         expect(res.body.data.summary.tags).toEqual({ added: ['urgent', 'archive'], skipped: [] });
     });
 
-    it('turns attachments into links to ClickUp: on the task, and in a comment the task panel shows; no file is stored', async () => {
+    it('turns attachments into links to ClickUp on the task; no file is stored and no comment is written for them', async () => {
         const res = await importRows();
         const launch = taskNamed('Plan the launch');
         expect(launch.links.map(({ url, kind, label, addedBy }) => ({ url, kind, label, addedBy }))).toEqual([
@@ -200,12 +201,23 @@ describe('a ClickUp file imported into a project', () => {
             { url: 'https://files.clickup.test/t1/shot.png', kind: 'link', label: 'shot.png', addedBy: OWNER },
         ]);
         expect(launch.attachments).toEqual([]);
-        expect(taskNamed('Proofread').links).toHaveLength(1);
-        expect(commentsOn('Plan the launch').find((comment) => comment.type === 'link')).toMatchObject({
-            userId: OWNER,
-            message: 'Attachments in ClickUp:\nbrief.pdf: https://files.clickup.test/t1/brief.pdf\nshot.png: https://files.clickup.test/t1/shot.png',
-        });
+        expect(store(SCHEMA_TYPE.COMMENTS).filter((comment) => comment.type !== 'text')).toEqual([]);
         expect(res.body.data.summary.links).toBe(3);
+    });
+
+    it('puts on every imported task, at every level, each address the file gave it, in the form the panel\'s Links list draws', async () => {
+        await importRows();
+        const attachmentsOf = (id) => {
+            const cell = readRows().find((row) => row['Task ID'] === id).Attachments;
+            return (cell ? JSON.parse(cell) : []).map((entry) => entry.url).filter((url) => /^https?:/.test(url));
+        };
+        const drawn = (name) => (taskNamed(name).links || []).map((link) => safeHref(link.url)).filter(Boolean);
+        expect(drawn('Plan the launch')).toEqual(attachmentsOf('c1'));
+        expect(drawn('Write the invite')).toEqual(attachmentsOf('c2'));
+        expect(drawn('Proofread')).toEqual(attachmentsOf('c3'));
+        expect(drawn('Archive the notes')).toEqual(attachmentsOf('c4'));
+        expect(drawn('Proofread')).toHaveLength(1);
+        store(SCHEMA_TYPE.TASKS).filter((task) => task.TaskName).forEach((task) => expect((task.links || []).every((link) => safeHref(link.url))).toBe(true));
     });
 
     it('assigns members by email and reports the people it could not match', async () => {

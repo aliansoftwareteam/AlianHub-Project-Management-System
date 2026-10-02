@@ -2,7 +2,7 @@ const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
-jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => []) }));
+jest.mock('../Modules/settings/securityPermissions/controller', () => ({ fetchRules: jest.fn(async () => require('./fixtures/taskListRules').taskListRules()) }));
 jest.mock('../event/socketEventEmitter', () => ({}));
 
 const { myCache } = require('../Config/config');

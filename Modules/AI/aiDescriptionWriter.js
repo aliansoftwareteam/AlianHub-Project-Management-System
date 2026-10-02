@@ -27,6 +27,7 @@ const path = require('path');
 const logger = require('../../Config/loggerConfig');
 
 const { FEATURES } = require('../AICore/features');
+const { withTimeout } = require('./withTimeout');
 
 let providerFactory = null;
 try {
@@ -215,13 +216,7 @@ async function callProvider(input) {
         maxTokens: 8192,
         spend: { feature: FEATURES.DESCRIPTION, companyId: input.companyId, userId: input.userId },
     });
-    const result = await Promise.race([
-        chatPromise,
-        new Promise((_, reject) => setTimeout(
-            () => reject(new Error('AI description request timed out')),
-            REQUEST_TIMEOUT_MS,
-        )),
-    ]);
+    const result = await withTimeout(chatPromise, REQUEST_TIMEOUT_MS, 'AI description request timed out');
     if (!result || typeof result.content !== 'string') return null;
     return parseDescriptionResponse(result.content);
 }

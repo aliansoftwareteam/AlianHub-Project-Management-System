@@ -19,16 +19,35 @@
                     </button>
                 </div>
                 <p v-if="!shortcutPrefs.singleKeys" class="ksh__note">{{ $t('Shortcuts.single_keys_off') }}</p>
-                <div class="ksh__groups">
+                <input
+                    ref="searchEl"
+                    v-model.trim="query"
+                    type="search"
+                    class="ah-input ksh__search"
+                    data-test="shortcut-search"
+                    :placeholder="$t('Shortcuts.search_ph')"
+                    :aria-label="$t('Shortcuts.search_label')"
+                />
+                <EmptyState
+                    v-if="!groups.length"
+                    compact
+                    illustration="search"
+                    data-test="shortcut-none"
+                    :title="$t('Shortcuts.none_title')"
+                    :message="$t('Shortcuts.none_msg')"
+                    :action-label="$t('Shortcuts.clear_search')"
+                    @action="clearSearch"
+                />
+                <div v-else class="ksh__groups">
                     <section v-for="group in groups" :key="group.id" class="ksh__group" :aria-labelledby="`${headingId}-${group.id}`">
                         <h3 :id="`${headingId}-${group.id}`" class="ah-h3 ksh__group-title">{{ $t(`Shortcuts.group_${group.id}`) }}</h3>
                         <dl class="ksh__list">
                             <div v-for="entry in group.entries" :key="entry.id" class="ksh__row">
-                                <dt class="ksh__label">{{ $t(entry.label) }}</dt>
+                                <dt class="ksh__label">{{ entry.name }}</dt>
                                 <dd class="ksh__keys">
                                     <template v-for="(step, i) in entry.steps" :key="i">
                                         <span v-if="i" class="ksh__then">{{ $t('Shortcuts.then') }}</span>
-                                        <kbd v-for="cap in step" :key="cap" class="ksh__kbd">{{ cap }}</kbd>
+                                        <kbd v-for="cap in step" :key="cap" class="ah-kbd ksh__kbd">{{ cap }}</kbd>
                                     </template>
                                 </dd>
                             </div>
@@ -41,20 +60,23 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useNavItems } from "@/components/organisms/Shell/navItems";
-import { isMacPlatform, openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
+import { openPalette } from "@/components/molecules/AdvanceSearch/paletteKeys";
 import { useFocusTrap } from "@/composable/useFocusTrap";
+import { onboardingRecord, saveOnboarding } from "@/composable/onboardingState";
 import {
     SHORTCUTS,
     SHORTCUT_GROUPS,
     bindShortcut,
     closeShortcutSheet,
     openShortcutSheet,
+    shortcutCaps,
     shortcutPrefs,
     shortcutSheet,
     syncShortcutPreferences
@@ -81,19 +103,36 @@ watch(() => myRecord.value && myRecord.value.accessibilityPreferences, (stored) 
 
 const railItem = (key) => rail.value.find((item) => item.key === key && item.to);
 
-const mac = isMacPlatform();
-const KEY_NAMES = { Escape: "Shortcuts.key_escape", Enter: "Shortcuts.key_enter", shift: "Shortcuts.key_shift" };
-const capOf = (token) => {
-    if (token === "mod") return mac ? "⌘" : t("Shortcuts.key_ctrl");
-    return KEY_NAMES[token] ? t(KEY_NAMES[token]) : token;
+const query = ref("");
+const searchEl = ref(null);
+const clearSearch = () => {
+    query.value = "";
+    if (searchEl.value) searchEl.value.focus();
 };
 
-const groups = computed(() => SHORTCUT_GROUPS.map((id) => ({
-    id,
-    entries: SHORTCUTS
-        .filter((s) => s.group === id && (!s.nav || railItem(s.nav)))
-        .map((s) => ({ ...s, steps: s.keys.map((step) => step.split("+").map(capOf)) }))
-})).filter((g) => g.entries.length));
+// A pointer device gets the search box focused, ready to type in; on a phone that would raise the keyboard over the list.
+watch(() => shortcutSheet.open, async (open) => {
+    query.value = "";
+    if (open && myRecord.value && !onboardingRecord(myRecord.value.homeChecklist || {}).viewedShortcuts) saveOnboarding({ viewedShortcuts: true });
+    if (!open || typeof window.matchMedia !== "function" || !window.matchMedia("(hover: hover)").matches) return;
+    await nextTick();
+    if (searchEl.value) searchEl.value.focus({ preventScroll: true });
+});
+
+const listed = computed(() => SHORTCUTS
+    .filter((s) => !s.nav || railItem(s.nav))
+    .map((s) => ({ ...s, name: t(s.label), steps: shortcutCaps(s.id, t) })));
+
+const matches = (entry, term) => entry.name.toLowerCase().includes(term)
+    || entry.steps.some((step) => step.some((cap) => cap.toLowerCase() === term));
+
+const groups = computed(() => {
+    const term = query.value.toLowerCase();
+    return SHORTCUT_GROUPS.map((id) => ({
+        id,
+        entries: listed.value.filter((entry) => entry.group === id && (!term || matches(entry, term)))
+    })).filter((g) => g.entries.length);
+});
 
 const PAGE_SEARCH = "[data-page-search], input[type=\"search\"], [role=\"search\"] input";
 
@@ -164,10 +203,8 @@ onBeforeUnmount(() => {
 .ksh__label { font: var(--text-body); color: var(--ink); margin: 0; }
 .ksh__keys { display: inline-flex; align-items: center; gap: 4px; margin: 0; flex: none; }
 .ksh__then { font: var(--text-small); color: var(--ink-2); }
-.ksh__kbd {
-    min-width: 22px; padding: 2px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px;
-    background: var(--surface-2); color: var(--ink); font: var(--text-data); text-align: center;
-}
+.ah-input.ksh__search { margin-bottom: 12px; }
+.ah-kbd.ksh__kbd { min-width: 22px; padding: 3px 6px; border-bottom-width: 2px; color: var(--ink); font: var(--text-data); text-align: center; }
 @media (max-width: 767px) {
     .ksh__groups { grid-template-columns: 1fr; }
     .ksh__close { width: 44px; height: 44px; }

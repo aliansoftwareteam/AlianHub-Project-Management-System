@@ -47,7 +47,24 @@ describe('when the outgoing state is kept', () => {
     const latest = (over = {}) => ({ savedBy: ALICE, savedAt: ago(HOUR), createdAt: ago(8 * MINUTE), hash: 'other', ...over });
 
     it('is kept when someone else wrote it', () => {
-        expect(rules.reasonToKeep({ page: page(), editorId: BOB, latest: latest(), now: NOW })).toBe('author');
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, latest: latest({ savedBy: BOB }), now: NOW })).toBe('author');
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, latest: null, now: NOW })).toBe('author');
+    });
+
+    it('is kept once per writer in ten minutes when two people save in turn', () => {
+        const aliceKept = latest({ savedBy: ALICE, createdAt: ago(2 * MINUTE) });
+        const bobKept = latest({ savedBy: BOB, createdAt: ago(MINUTE) });
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, recent: [bobKept, aliceKept], now: NOW })).toBe('');
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, recent: [bobKept], now: NOW })).toBe('author');
+
+        const aliceLongAgo = latest({ savedBy: ALICE, createdAt: ago(11 * MINUTE) });
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, recent: [bobKept, aliceLongAgo], now: NOW })).toBe('author');
+    });
+
+    it('still keeps the other writer’s text inside the ten minutes when the save would lose it', () => {
+        const aliceKept = latest({ savedBy: ALICE, createdAt: ago(2 * MINUTE) });
+        const incoming = rules.snapshotOf(page({ content: { blocks: [para('a', 'Two')] } }));
+        expect(rules.reasonToKeep({ page: page(), editorId: BOB, recent: [aliceKept], now: NOW, incoming })).toBe('rewrite');
     });
 
     it('is not kept when its own writer saves again within ten minutes of the last version', () => {
@@ -78,6 +95,80 @@ describe('when the outgoing state is kept', () => {
         expect(rules.writerOf(old)).toBe(BOB);
         expect(rules.writtenAt(old)).toEqual(ago(HOUR));
         expect(rules.reasonToKeep({ page: old, editorId: ALICE, latest: null, now: NOW })).toBe('author');
+    });
+});
+
+describe('how much of the outgoing text a save loses', () => {
+    const blocks = (...texts) => texts.map((text, index) => para(`b${index}`, text));
+
+    it('counts nothing for text that is only added', () => {
+        expect(rules.lossOf(blocks('First draft'), blocks('First draft, with more'))).toEqual({ lost: 0, total: 11 });
+        expect(rules.lossOf(blocks('One'), [...blocks('One'), para('new', 'Two')])).toEqual({ lost: 0, total: 3 });
+    });
+
+    it('counts the characters that are removed or written over inside a block', () => {
+        expect(rules.lossOf(blocks('First draft'), blocks('Second draft'))).toEqual({ lost: 5, total: 11 });
+        expect(rules.lossOf(blocks('The quick brown fox'), blocks('The brown fox'))).toEqual({ lost: 6, total: 19 });
+    });
+
+    it('counts a block that is gone whole, and a picture that is gone as more than a small edit', () => {
+        expect(rules.lossOf(blocks('Keep me', 'Remove me'), blocks('Keep me'))).toEqual({ lost: 9, total: 16 });
+        const picture = { id: 'pic', type: 'image', data: { key: 'docs/a.png' } };
+        expect(rules.lossOf([para('a', 'Text'), picture], [para('a', 'Text')]).lost).toBe(rules.SMALL_EDIT_CHARS);
+    });
+
+    it('compares the whole text when the blocks carry no ids', () => {
+        const bare = (...texts) => texts.map((text) => ({ type: 'paragraph', data: { text } }));
+        expect(rules.lossOf(bare('First draft'), bare('Second draft'))).toEqual({ lost: 5, total: 11 });
+    });
+
+    it('calls an edit small when it loses fewer than twenty characters and less than a quarter of the text', () => {
+        expect(rules.SMALL_EDIT_CHARS).toBe(20);
+        expect(rules.isSmallEdit({ lost: 0, total: 0 })).toBe(true);
+        expect(rules.isSmallEdit({ lost: 19, total: 400 })).toBe(true);
+        expect(rules.isSmallEdit({ lost: 20, total: 400 })).toBe(false);
+        expect(rules.isSmallEdit({ lost: 5, total: 11 })).toBe(false);
+        expect(rules.isSmallEdit({ lost: 2, total: 9 })).toBe(true);
+    });
+});
+
+describe('when a save loses text', () => {
+    const LONG = 'The launch moves to the second week of March because the supplier contract is not signed yet.';
+    const state = (...texts) => rules.snapshotOf({ title: 'Plan', content: { blocks: texts.map((text, index) => para(`b${index}`, text)) } });
+    const doc = (texts, over = {}) => page({ content: { blocks: texts.map((text, index) => para(`b${index}`, text)) }, createdAt: ago(4 * MINUTE), editedAt: ago(MINUTE), ...over });
+    const justKept = { savedBy: ALICE, savedAt: ago(3 * MINUTE), createdAt: ago(2 * MINUTE), hash: 'other', reason: 'interval', visibility: 'project' };
+
+    it('keeps the first text of a new doc when its writer replaces it minutes later', () => {
+        expect(rules.reasonToKeep({ page: doc(['First draft']), editorId: ALICE, latest: null, now: NOW, incoming: state('Second draft') })).toBe('rewrite');
+    });
+
+    it('keeps the text before a rewrite however recently a version was kept', () => {
+        const incoming = state('The launch moves to April.');
+        expect(rules.reasonToKeep({ page: doc([LONG]), editorId: ALICE, latest: justKept, now: NOW, incoming })).toBe('rewrite');
+    });
+
+    it('keeps what a save removes most of, whoever wrote it', () => {
+        const incoming = state('Kept line');
+        expect(rules.reasonToKeep({ page: doc(['Kept line', LONG]), editorId: ALICE, latest: justKept, now: NOW, incoming })).toBe('rewrite');
+        expect(rules.reasonToKeep({ page: doc(['Kept line', LONG]), editorId: BOB, latest: justKept, now: NOW, incoming })).toBe('rewrite');
+        expect(rules.reasonToKeep({ page: doc(['Kept line', LONG]), editorId: BOB, latest: null, now: NOW, incoming })).toBe('author');
+    });
+
+    it('still coalesces a run of small edits inside ten minutes', () => {
+        const typo = state(LONG.replace('supplier', 'vendor'));
+        const longer = state(`${LONG} Legal reviews it on Monday.`);
+        expect(rules.reasonToKeep({ page: doc([LONG]), editorId: ALICE, latest: justKept, now: NOW, incoming: typo })).toBe('');
+        expect(rules.reasonToKeep({ page: doc([LONG]), editorId: ALICE, latest: null, now: NOW, incoming: longer })).toBe('');
+    });
+
+    it('does not keep a state the last version already holds', () => {
+        const page0 = doc(['First draft']);
+        const held = { ...justKept, hash: rules.snapshotOf(page0).hash };
+        expect(rules.reasonToKeep({ page: page0, editorId: ALICE, latest: held, now: NOW, incoming: state('Second draft') })).toBe('');
+    });
+
+    it('does not keep a blank doc', () => {
+        expect(rules.reasonToKeep({ page: doc([]), editorId: ALICE, latest: null, now: NOW, incoming: state('First draft') })).toBe('');
     });
 });
 

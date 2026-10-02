@@ -799,11 +799,11 @@ describe('telling the other clients', () => {
         socketEmitter.emit.mockClear();
         await run(EDIT, { id: template._id, body: {} });
         await use(template._id);
-        expect(socketEmitter.emit).not.toHaveBeenCalled();
+        expect(socketEmitter.emit.mock.calls.filter(([, payload]) => payload && payload.module === 'projectSnapshots')).toEqual([]);
     });
 
-    it('relays only that the list changed, to the sockets of that company, for every kind of write', () => {
-        jest.isolateModules(() => {
+    it('relays only that the list changed, to the sockets of that company, for every kind of write', async () => {
+        await jest.isolateModulesAsync(async () => {
             const helper = require('../socket/helper');
             const emitter = require('../event/socketEventEmitter');
             const { relay, EVENT } = require('../socket/controller/projectTemplateSocket');
@@ -816,8 +816,8 @@ describe('telling the other clients', () => {
             };
             const mine = join(C, 's1');
             const theirs = join('c00000000000000000000002', 's2');
-            relay({ type: 'insert', companyId: C, module: 'projectSnapshots', data: { _id: 'x', name: 'Launch plan' } });
-            relay({ type: 'insert' });
+            await relay({ type: 'insert', companyId: C, module: 'projectSnapshots', data: { _id: 'x', name: 'Launch plan' } });
+            await relay({ type: 'insert' });
             expect(mine.mock.calls).toEqual([[EVENT, { type: 'insert' }]]);
             expect(theirs).not.toHaveBeenCalled();
             expect(emitter.on.mock.calls.map(([event]) => event)).toEqual(['projectSnapshots:insert', 'projectSnapshots:update', 'projectSnapshots:delete']);

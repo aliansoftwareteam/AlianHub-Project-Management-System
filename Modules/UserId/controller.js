@@ -98,7 +98,7 @@ exports.updateCounts = async (req, res) => {
 
         const response = await MongoDbCrudOpration(req.headers['companyid'], query, 'findOneAndUpdate');
 
-        socketEmitter.emit('update', { type: "update", data: response , module: 'userIdNotification' });
+        socketEmitter.emit('update', { type: "update", data: response , module: 'userIdNotification', companyId: req.headers['companyid'] });
 
         return res.status(200).json({ status: true });
 

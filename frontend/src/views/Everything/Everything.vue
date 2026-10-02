@@ -81,11 +81,18 @@
                 <strong>{{ $t('Everything.error_title') }}</strong>
                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="evr-retry" @click="reload()">{{ $t('Everything.retry') }}</button>
             </div>
-            <div v-else-if="!total" class="ah-empty evr__state" data-test="evr-empty">
-                <strong>{{ $t(filtered ? 'Everything.empty_title' : 'Everything.empty_none_title') }}</strong>
-                <span>{{ $t(filtered ? 'Everything.empty_hint' : 'Everything.empty_none_hint') }}</span>
-                <button v-if="filtered" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="clearFilters">{{ $t('Everything.clear_filters') }}</button>
-            </div>
+            <EmptyState
+                v-else-if="!total"
+                data-test="evr-empty"
+                :illustration="filtered ? 'search' : 'tasks'"
+                :heading-level="2"
+                :title="$t(filtered ? 'Everything.empty_title' : 'Everything.empty_none_title')"
+                :message="$t(filtered ? 'Everything.empty_hint' : 'Everything.empty_none_hint')"
+                :action-label="$t('Everything.clear_filters')"
+                :action-allowed="filtered"
+                :sentence="filtered ? '' : $t('EmptyState.say_project')"
+                @action="clearFilters"
+            />
             <EverythingBoard
                 v-else-if="shownMode === 'board'"
                 :groups="groups"
@@ -131,11 +138,13 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, onUnmounted, ref } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { onTaskClosed, openTask, useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { useGetterFunctions } from "@/composable";
 import { projectColor } from "@/components/molecules/Home/homeFormat";
@@ -167,6 +176,7 @@ const DUE_LABELS = { overdue: "List.due_group_overdue", today: "List.due_group_t
 const FILTER_KEYS = ["search", "status", "assignee", "priority", "taskType", "projectIds", "due"];
 
 const store = useStore();
+const route = useRoute();
 const { t } = useI18n();
 const $toast = useToast();
 const { getUser } = useGetterFunctions();
@@ -343,23 +353,28 @@ useTaskSequenceSource(body);
 const stopOnTaskClosed = onTaskClosed(refresh);
 const onVisible = () => { if (document.visibilityState === "visible") refreshOnReturn(); };
 
+/* "My work" is this page asked for with ?mine=1: whatever else is on screen, it shows the person's own tasks. */
+const askedForMine = () => route.query.mine === "1" && Boolean(userId.value);
+watch(() => route.query.mine, () => { if (askedForMine() && !onlyMe.value) toggleMe(); });
+
 /* What was left on screen last time wins; a person who left nothing gets their default view. */
 onMounted(async () => {
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", refreshOnReturn);
+    const mine = askedForMine() ? { assignee: [userId.value] } : {};
     const working = readWorkingState(companyId.value, userId.value);
     if (working) {
         const available = dueWindows(new Date(), timeZone()).filters;
-        store.commit("everything/setSettings", { ...working.settings, search: "", due: available[working.settings.due] ? working.settings.due : "" });
+        store.commit("everything/setSettings", { ...working.settings, search: "", due: available[working.settings.due] ? working.settings.due : "", ...mine });
         reload();
         loadViews().then(() => store.commit("everything/setActiveView", working.viewId));
         return;
     }
-    store.commit("everything/setSettings", { ...DEFAULT_SETTINGS });
+    store.commit("everything/setSettings", { ...DEFAULT_SETTINGS, ...mine });
     store.commit("everything/setActiveView", "");
     await loadViews();
     const preferred = store.getters["everything/defaultView"];
-    if (preferred) openView(preferred._id);
+    if (preferred && !mine.assignee) openView(preferred._id);
     else reload();
 });
 onUnmounted(() => {

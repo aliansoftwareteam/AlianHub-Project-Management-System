@@ -62,7 +62,8 @@ export function useAskConversation({ t }) {
                 scope: payload.scope,
                 mode: payload.mode,
                 usage: payload.usage,
-                turnId: payload.turnId || ""
+                turnId: payload.turnId || "",
+                shareToken: payload.shareToken || ""
             });
             if (payload.threadId && payload.threadId !== threadId.value) {
                 threadId.value = payload.threadId;

@@ -36,7 +36,7 @@ onUnmounted(() => clearTimeout(timer));
 </script>
 
 <style scoped>
-.mt-banner { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 12px; background: var(--warn-bg, #fff4d6); color: var(--warn-ink, #7a5200); font: 500 13px/1.3 var(--font-ui, sans-serif); }
-.mt-banner__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn, #d98c00); animation: mt-pulse 1.2s ease-in-out infinite; }
+.mt-banner { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 12px; background: var(--warn-bg); color: var(--warn-ink); font: 500 13px/1.3 var(--font-ui); }
+.mt-banner__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warn); animation: mt-pulse 1.2s ease-in-out infinite; }
 @keyframes mt-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 </style>

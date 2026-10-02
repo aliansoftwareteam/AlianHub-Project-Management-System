@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useGetterFunctions } from '@/composable';
 import { useUpdateTasks } from '@/views/Projects/helper';
 import taskClass from '@/utils/TaskOperations';
+import { removePerson } from '@/utils/assigneeOptions';
 
 export function useTaskMutations({ projectData, task, props }) {
     const { commit, getters } = useStore();
@@ -122,8 +123,7 @@ export function useTaskMutations({ projectData, task, props }) {
             userData,
         }).then(() => {
             if (operation === 'assigneRemove') {
-                const index = task.value.AssigneeUserId.findIndex((x) => x === value.id);
-                task.value.AssigneeUserId.splice(index, 1);
+                removePerson(task.value.AssigneeUserId, value.id);
                 commit('projectData/mutateSearchTask', { op: 'modified', data: [task.value] });
             }
             delete assigneeInProgress.value[value?.id];

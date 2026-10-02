@@ -26,6 +26,7 @@ vi.mock('@/offline', async () => {
     const { ref } = await import('vue');
     return { initOffline: vi.fn(), away: ref(false), pageUnavailable: ref(false) };
 });
+vi.mock('@/config/warmChunks', () => ({ warmWorkspaceChunks: vi.fn() }));
 vi.mock('@/components/offline/OfflineBanner.vue', () => stub('OfflineBanner'));
 vi.mock('@/components/organisms/Tour/TourComponet.vue', () => stub('TourCom'));
 vi.mock('@/components/organisms/Shell/GlobalRail.vue', () => stub('GlobalRail'));

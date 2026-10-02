@@ -1,10 +1,11 @@
 import { reactive } from "vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { readKept } from "./keptAiValues.js";
 
 /* The ✦ AREA column (handoff 13c). Same contract as useTaskSummaries: one entry
- * per task, fetched lazily when a row scrolls into view, kept for the session,
- * and frozen once pinned.
+ * per task, read from what the server keeps when a row scrolls into view, asked
+ * of a model only on request, and frozen once pinned.
  *
  * The label always comes from the project's own vocabulary, so the entry also
  * carries where that vocabulary came from — the chip says so on hover. */
@@ -29,8 +30,6 @@ function drain() {
     }
 }
 
-/* Rows come into view in bursts; a burst must not turn into a burst of model
- * calls, so visible-row fetches go through a small queue. */
 function schedule(job) {
     return new Promise((resolve) => {
         queue.push(() => job().then(resolve));
@@ -53,7 +52,7 @@ function writePins(pins) {
 }
 
 function blank() {
-    return { state: "idle", category: "", source: "", sourceName: "", reason: "", updatedAt: "", pinned: false };
+    return { state: "idle", category: "", source: "", sourceName: "", reason: "", updatedAt: "", stale: false, pinned: false, read: false };
 }
 
 function hydrate(taskId) {
@@ -64,6 +63,22 @@ function hydrate(taskId) {
         ? { ...blank(), state: "ready", category: pinned.category, source: pinned.source || "", sourceName: pinned.sourceName || "", updatedAt: pinned.updatedAt || "", pinned: true }
         : blank();
     return entries[id];
+}
+
+function show(entry, data, stale) {
+    entry.source = data.source || "";
+    entry.sourceName = data.sourceName || "";
+    entry.updatedAt = data.updatedAt || "";
+    entry.stale = stale;
+    if (data.category) {
+        entry.category = data.category;
+        entry.reason = "";
+        entry.state = "ready";
+    } else {
+        entry.category = "";
+        entry.reason = data.reason || "no-fit";
+        entry.state = "empty";
+    }
 }
 
 async function fetchOne(taskId, force) {
@@ -86,17 +101,8 @@ async function fetchOne(taskId, force) {
         } else if (data.configured === false) {
             unavailable = true;
             entry.state = "unavailable";
-        } else if (data.category) {
-            entry.category = data.category;
-            entry.source = data.source || "";
-            entry.sourceName = data.sourceName || "";
-            entry.updatedAt = data.updatedAt || "";
-            entry.reason = "";
-            entry.state = "ready";
         } else {
-            entry.category = "";
-            entry.reason = data.reason || "no-fit";
-            entry.state = "empty";
+            show(entry, data, false);
         }
     } catch (_error) {
         entry.state = "error";
@@ -105,19 +111,32 @@ async function fetchOne(taskId, force) {
     return entry;
 }
 
+async function readOne(taskId) {
+    const entry = hydrate(taskId);
+    entry.read = true;
+    entry.state = "reading";
+    const kept = await readKept("category", taskId);
+    if (entry.state !== "reading") return entry;
+    if (kept) show(entry, kept, kept.stale === true);
+    else entry.state = "idle";
+    return entry;
+}
+
+const needsValue = (entry) => entry.state === "idle" || entry.state === "error";
+
 export function useTaskCategories() {
     return {
         entries,
         get: (taskId) => hydrate(taskId),
         isUnavailable: () => unavailable,
-        /* Called when a row becomes visible — never refetches a value it has. */
+        /* Called when a row becomes visible: reads the kept value once, and never asks a model. */
         ensure(taskId) {
             const entry = hydrate(taskId);
-            if (entry.state !== "idle") return Promise.resolve(entry);
-            entry.state = "loading";
-            return schedule(() => fetchOne(taskId, false));
+            return entry.state === "idle" && !entry.read ? readOne(taskId) : Promise.resolve(entry);
         },
+        missing: (taskIds) => (taskIds || []).map(String).filter((id) => needsValue(hydrate(id))),
         generate: (taskId) => fetchOne(taskId, true),
+        generateShown: (taskIds) => Promise.all((taskIds || []).map((id) => schedule(() => fetchOne(id, false)))),
         pin(taskId) {
             const id = String(taskId);
             const entry = hydrate(id);

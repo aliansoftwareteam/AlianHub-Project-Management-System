@@ -36,9 +36,9 @@
                 </div>
                 <div class="conditional-btn-wrapper d-flex justify-content-end mt-29px">
                     <button v-if="activeIndex > 0 && !isSpinner"  @click="prevStep()" class="cursor-pointer conditional-previous-step btn border-primary border-radius-4-px blue bg-white">{{ $t('Projects.previous') }}</button>
-                    <button v-if="activeIndex < (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 7 : 6) && activeIndex !== -1" @click="nextStep()" class="cursor-pointer conditional__template-project outline-primary font-ui font-size-16 border-radius-4-px white border-0 btn-bg-blue" :class="[{'conditional__template-projectstepOne' : activeIndex === 0}]">{{ $t('Home.Next') }}</button>
-                    <button v-else-if="activeIndex !== -1 && !isSpinner" @click="submitData()" class="submit-btn cursor-pointer create__template btn border-radius-4-px white border-0 btn-bg-blue" >{{ $t('Templates.create_template') }}</button>
-                    <button v-else-if="isSpinner" type="button" class="btn btn-blue btn-login btn-disabled font-ui btn-bg-blue white cursor-pointer font-weight-500 pointer-event-none" disabled><span id="btn-spinner"></span>{{$t('Auth.loading')}}...</button>
+                    <button v-if="activeIndex < (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 7 : 6) && activeIndex !== -1" @click="nextStep()" class="conditional__template-project btn-primary font-ui font-size-16" :class="[{'conditional__template-projectstepOne' : activeIndex === 0}]">{{ $t('Home.Next') }}</button>
+                    <button v-else-if="activeIndex !== -1 && !isSpinner" @click="submitData()" class="submit-btn create__template btn btn-primary" >{{ $t('Templates.create_template') }}</button>
+                    <button v-else-if="isSpinner" type="button" class="btn btn-blue btn-login btn-disabled font-ui btn-primary font-weight-500 pointer-event-none" disabled><span id="btn-spinner"></span>{{$t('Auth.loading')}}...</button>
                 </div>
             </div>
         </template>

@@ -60,8 +60,8 @@ const contrastLight = { ...light, ...declared(block(':root.ah-high-contrast')) }
 const contrastDark = { ...dark, ...declared(block(':root.ah-high-contrast')), ...declared(block(':root.ah-high-contrast[data-theme="dark"]')) };
 const THEMES = { light, dark, 'high contrast light': contrastLight, 'high contrast dark': contrastDark };
 const valueOf = (value, theme) => {
-    const ref = /^var\((--[a-z0-9-]+)\)$/.exec(value.trim());
-    return ref ? valueOf(theme[ref[1]], theme) : value.trim();
+    const ref = /^var\((--[a-z0-9-]+)(?:,\s*(.+))?\)$/.exec(value.trim());
+    return ref ? valueOf(theme[ref[1]] ?? ref[2], theme) : value.trim();
 };
 
 describe('a chip reads on every surface of every theme', () => {

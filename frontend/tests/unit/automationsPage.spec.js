@@ -57,3 +57,23 @@ describe('AutomationsPage rule management controls', () => {
         expect(wrapper.find('.au__readonly').exists()).toBe(false);
     });
 });
+
+describe('AutomationsPage with no rules yet', () => {
+    beforeEach(() => {
+        apiRequest.mockReset();
+        apiRequest.mockImplementation(async (method, url) => (url.endsWith('/automations') ? { data: { status: true, data: [] } } : answer(method, url)));
+    });
+
+    it('offers an owner a new automation, and the templates as the quieter choice', async () => {
+        const empty = (await open(1)).find('[data-test="automations-empty"]');
+        expect(empty.find('h2').text()).toBe('Automations.empty_title');
+        expect(empty.find('.empty-state__btn').text()).toBe('Automations.new');
+        expect(empty.find('.empty-state__link').text()).toBe('AutomationTemplates.open');
+    });
+
+    it('explains the page to a member without offering either', async () => {
+        const empty = (await open(3)).find('[data-test="automations-empty"]');
+        expect(empty.text()).toContain('Automations.empty_sub');
+        expect(empty.findAll('button')).toHaveLength(0);
+    });
+});

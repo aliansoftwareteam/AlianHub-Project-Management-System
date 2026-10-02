@@ -320,6 +320,25 @@ describe('the consent screen and workspace approval on the real app', () => {
         expect(await auditRow('oauth.client_approval_revoked', clientId)).toMatchObject({ actorId: owner.uid });
     });
 
+    it('never puts a manage scope in an approval that names no scopes, and refuses one to a client registered without a scope list', async () => {
+        const approvalOf = (clientId) => globalDb.collection('oauth_client_approvals').findOne({ clientId });
+        const approve = (body) => fetch(`${server.baseURL}/api/v2/oauth-client-approvals/approve`, { method: 'POST', headers: ownerApi(), body: JSON.stringify(body) });
+        const plain = ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'];
+
+        const { clientId } = await register('S10 manage default');
+        expect((await approve({ clientId })).status).toBe(200);
+        expect((await approvalOf(clientId)).scopes).toEqual(['tasks:read', 'projects:read', 'docs:read', 'time:read']);
+        expect((await approve({ clientId, scopes: ['tasks:read', 'tasks:manage'] })).status).toBe(200);
+        expect((await approvalOf(clientId)).scopes).toEqual(['tasks:read', 'tasks:manage']);
+
+        const created = await fetch(`${server.baseURL}/api/v2/oauth-clients`, { method: 'POST', headers: ownerApi(), body: JSON.stringify({ name: 'S10 open client', redirectUris: [REDIRECT], tokenEndpointAuthMethod: 'none' }) });
+        expect(created.status).toBe(201);
+        const open = (await created.json()).data.clientId;
+        expect((await approvalOf(open)).scopes).toEqual(plain);
+        expect((await approve({ clientId: open, scopes: ['tasks:read', 'tasks:manage'] })).status).toBe(400);
+        expect((await approvalOf(open)).scopes).toEqual(plain);
+    });
+
     it('refuses the approval routes to a member', async () => {
         const res = await fetch(`${server.baseURL}/api/v2/oauth-client-approvals`, { headers: { authorization: `Bearer ${member.accessToken}`, companyid: state.companyId } });
         expect(res.status).toBe(403);

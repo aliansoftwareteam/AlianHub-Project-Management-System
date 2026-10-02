@@ -1,6 +1,7 @@
 const mockChat = jest.fn();
+const mockDb = require('./fixtures/fakeMongo').create();
 
-jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
 jest.mock('../Modules/AI/taskAccess', () => ({ visibleTask: jest.fn(), TASK_NOT_FOUND: 'task not found' }));
 jest.mock('../utils/companyMembers', () => ({ memberProfiles: jest.fn(() => Promise.resolve([])) }));
 jest.mock('../Modules/AICore/llmProvider', () => ({
@@ -11,9 +12,9 @@ jest.mock('../Modules/AI/helper', () => ({ pushChat: jest.fn(), addChat: jest.fn
 jest.mock('../Modules/AI/taskCategory', () => ({ categoriseTask: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 
-const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
+const mongoose = require('mongoose');
+const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { visibleTask } = require('../Modules/AI/taskAccess');
-const { myCache } = require('../Config/config');
 const { summarizeTask } = require('../Modules/AI/taskSummary');
 
 const C = '6f0000000000000000000c01';
@@ -21,16 +22,19 @@ const ME = '6f0000000000000000000001';
 const TASK = '6f0000000000000000000b01';
 
 const thread = (count) => {
-    MongoDbCrudOpration.mockImplementation(async (companyId, query) => {
-        const pipeline = query.data[0];
-        if (pipeline.some((stage) => stage.$count)) return count ? [{ count }] : [];
-        return Array.from({ length: count }, (_, i) => ({ message: `Comment ${i + 1}`, userId: ME, createdAt: new Date() }));
-    });
+    mockDb.store[SCHEMA_TYPE.COMMENTS] = [];
+    Array.from({ length: count }, (_, i) => mockDb.seed(SCHEMA_TYPE.COMMENTS, {
+        taskId: new mongoose.Types.ObjectId(TASK), message: `Comment ${i + 1}`, userId: ME, type: 'text', createdAt: new Date(),
+    }));
 };
+
+/* A model call races a 60 second timer, which would keep this file open long after its last test. */
+beforeAll(() => { jest.useFakeTimers(); });
+afterAll(() => { jest.useRealTimers(); });
 
 beforeEach(() => {
     jest.clearAllMocks();
-    myCache.flushAll();
+    Object.keys(mockDb.store).forEach((key) => { mockDb.store[key].length = 0; });
     visibleTask.mockResolvedValue({ _id: TASK, TaskName: 'Launch' });
     mockChat.mockResolvedValue({ content: '{"summary":"Shipping on Friday."}' });
     thread(2);
@@ -43,17 +47,17 @@ describe('a task summary is written when someone asks for it', () => {
         expect(mockChat).not.toHaveBeenCalled();
     });
 
-    it('hands back the kept summary to every later open, until the thread changes', async () => {
+    it('hands back the kept summary to every later open, and says when the thread has moved on', async () => {
         const asked = await summarizeTask({ companyId: C, uid: ME, taskId: TASK });
         expect(asked.data).toMatchObject({ summary: 'Shipping on Friday.', commentCount: 2, cached: false });
 
         const opened = await summarizeTask({ companyId: C, uid: ME, taskId: TASK, keptOnly: true });
-        expect(opened.data).toMatchObject({ summary: 'Shipping on Friday.', commentCount: 2, cached: true });
+        expect(opened.data).toMatchObject({ summary: 'Shipping on Friday.', commentCount: 2, cached: true, stale: false });
         expect(opened.data.pending).toBeUndefined();
 
         thread(3);
         const moved = await summarizeTask({ companyId: C, uid: ME, taskId: TASK, keptOnly: true });
-        expect(moved.data).toMatchObject({ summary: '', commentCount: 3, pending: true });
+        expect(moved.data).toMatchObject({ summary: 'Shipping on Friday.', commentCount: 3, summaryCount: 2, stale: true });
         expect(mockChat).toHaveBeenCalledTimes(1);
     });
 

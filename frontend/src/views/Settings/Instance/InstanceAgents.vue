@@ -172,14 +172,14 @@ onMounted(load);
 <style scoped>
 .in-agents__lead { margin: 0; color: var(--ink-2); }
 .in-meter { position: relative; height: 8px; border-radius: 999px; background: var(--hairline); overflow: hidden; max-width: 520px; }
-.in-meter__fill { display: block; height: 100%; border-radius: inherit; background: var(--ok-ink, #1a7f4b); transition: width 200ms ease; }
-.in-meter.is-warn .in-meter__fill { background: var(--warn-ink, #b54708); }
-.in-meter.is-over .in-meter__fill { background: var(--danger-ink, #b42318); }
+.in-meter__fill { display: block; height: 100%; border-radius: inherit; background: var(--ok); transition: width 200ms ease; }
+.in-meter.is-warn .in-meter__fill { background: var(--warn); }
+.in-meter.is-over .in-meter__fill { background: var(--danger); }
 .in-alerts { display: flex; flex-wrap: wrap; gap: 6px; }
 .in-features { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
 .in-features__row { display: grid; grid-template-columns: minmax(120px, 1fr) 2fr auto; align-items: center; gap: 10px; }
 .in-features__bar { position: relative; height: 6px; border-radius: 999px; background: var(--hairline); overflow: hidden; }
-.in-features__fill { display: block; height: 100%; border-radius: inherit; background: var(--accent, #3b5bdb); }
+.in-features__fill { display: block; height: 100%; border-radius: inherit; background: var(--brand); }
 .in-features__line { white-space: nowrap; }
 .in-provider { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px; }
 </style>

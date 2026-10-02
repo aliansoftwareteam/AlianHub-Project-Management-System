@@ -22,11 +22,15 @@ const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
 const { taskNotFound, plainIdOf, TaskWriteRefusal } = require('../taskWriteFields');
+const keptAiValues = require('../../../AI/taskAiValues');
 const { cascadeStatus, sprintCountChange, loadSubtree, storedTask, slotUnder } = require('../taskTree');
+const { removeLinksOfTasks } = require('../../../CustomField/helpers/fieldLinkStore');
 module.exports = {
 
     /* The counts, the parent and the current state come from the stored task; the body only says which task and which state it goes to. */
-    updateArchiveDelete({companyId, projectData, task, userData, deletedStatusKey = 0}) {
+    /* `quiet` is set by the undo of an import alone, which trashes many tasks at once and notifies no one; the task
+     * routes drop it from a body. */
+    updateArchiveDelete({companyId, projectData, task, userData, deletedStatusKey = 0, quiet = false}) {
         return new Promise((resolve, reject) => {
             try {
                 const taskId = plainIdOf(task && task._id).id;
@@ -52,7 +56,7 @@ module.exports = {
                         data: [filter, { $set: { deletedStatusKey }, $unset: { cascadedBy: '' } }, { returnDocument: 'after' }]
                     }
                     return MongoDbCrudOpration(companyId, query, "findOneAndUpdate").then(async (result) => {
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey}, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey}, module: 'task', companyId });
                         let carried = [];
                         try {
                             if(before.ParentTaskId && !from !== !deletedStatusKey) {
@@ -60,7 +64,7 @@ module.exports = {
                             }
                             carried = await cascadeStatus(companyId, before, deletedStatusKey);
                             carried.forEach((row) => {
-                                socketEmitter.emit('update', { type: "update", data: row, updatedFields: {deletedStatusKey: row.deletedStatusKey}, module: 'task' });
+                                socketEmitter.emit('update', { type: "update", data: row, updatedFields: {deletedStatusKey: row.deletedStatusKey}, module: 'task', companyId });
                                 removeCommentCount(companyId,row.ProjectID,row.sprintId,row._id).catch((error) => {
                                     logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
                                 })
@@ -137,7 +141,7 @@ module.exports = {
                                     logger.error(`ERROR in history: ${error.message}`);
                                 });
                             }
-                            if(notificationObject && Object.keys(notificationObject).length) {
+                            if(!quiet && notificationObject && Object.keys(notificationObject).length) {
                                 HandleBothNotification({type: 'tasks', companyId, projectId, taskId, folderId: before.folderObjId || '', sprintId: before.sprintId || '',  object: notificationObject, userData})
                                 .catch((error) => {
                                     logger.error(`ERROR in add notification: ${error.message}`);
@@ -285,7 +289,7 @@ module.exports = {
                     }
 
                     MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate").then((result)=>{
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: { deletedStatusKey: 1 }, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: { deletedStatusKey: 1 }, module: 'task', companyId });
                     })
 
                     const addObj = {
@@ -341,7 +345,7 @@ module.exports = {
                             }
                             MongoDbCrudOpration(companyId, updateObj1, "findOneAndUpdate").then((result)=>{
                                 if (!result) return;
-                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task' });
+                                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTasks}, module: 'task', companyId });
                             })
                         }
 
@@ -353,7 +357,10 @@ module.exports = {
                                 }
                             ]
                         }
-                        MongoDbCrudOpration(companyId, delObj, "deleteOne");
+                        MongoDbCrudOpration(companyId, delObj, "deleteOne")
+                            .then(() => removeLinksOfTasks(companyId, [task._id]))
+                            .catch((error) => logger.error(`convert to list, removing the task: ${error && error.message}`));
+                        keptAiValues.forgetTask(companyId, task._id).catch((error) => logger.error(`kept AI values of converted task ${task._id}: ${error.message}`));
 
                         /* Its subtasks become tasks of the new list whatever the request says, or they
                          * would be left under a task that no longer exists; theirs stay under them. */
@@ -396,7 +403,7 @@ module.exports = {
                     ]
                 }
                 MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate").then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task' });
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
                     let object = {
                         type: dbCollections.TASKS,
                         data: [
@@ -470,7 +477,7 @@ module.exports = {
                                 },
                                 {
                                     $set: {...obj},
-                                    $unset: {...unsetObj, cascadedBy: ''}
+                                    $unset: {...unsetObj, cascadedBy: '', extraLists: ''}
                                 },
                                 {
                                     returnDocument: 'after'
@@ -478,7 +485,7 @@ module.exports = {
                             ]
                         }
                         MongoDbCrudOpration(companyId, queryObj, "findOneAndUpdate").then((result) => {
-                            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...obj,folderId: ''}, module: 'task' });
+                            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...obj,folderId: ''}, module: 'task', companyId });
                             let object = {
                                 type:SCHEMA_TYPE.TASKS,
                                 data: [
@@ -488,7 +495,7 @@ module.exports = {
                                 ]
                             }
                             MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then(async (response) => {
-                                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {subTasks: response.subTask}, module: 'task' });
+                                socketEmitter.emit('update', { type: "update", data: response , updatedFields: {subTasks: response.subTask}, module: 'task', companyId });
                                 await carrySubtree(companyId, taskId, [], { projectData, sprintObj, oldProject }).catch((error) => {
                                     logger.error(`ERROR IN CONVERT TO TASK SUBTREE ${error}`)
                                 });

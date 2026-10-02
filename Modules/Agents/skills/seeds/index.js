@@ -12,6 +12,8 @@ const prReview = require('./prReview');
 const fieldsFill = require('./fieldsFill');
 const prdDraft = require('./prdDraft');
 const wikiUpkeep = require('./wikiUpkeep');
+const slackSummary = require('./slackSummary');
+const connectorsFlag = require('../../connectors/flag');
 
 const documentOf = (seed) => {
     const checked = validateSkill(seed);
@@ -39,4 +41,13 @@ const prReviewSkill = () => {
     return prReviewBuilt;
 };
 
-module.exports = { documentOf, BUILT_IN, PR_REVIEW, prReviewSkill, SEEDS: { briefParse, digest, projectGuide, prReview, fieldsFill, prdDraft, wikiUpkeep } };
+/* slack.summary reads and posts through the Slack connector, whose reader and action exist only while it is on,
+ * so the seed validates, lists and resolves only then. Off means the skill is absent, like the connector. */
+let slackSummaryBuilt = null;
+const slackSummarySkill = () => {
+    if (!connectorsFlag.slackOn()) return null;
+    if (!slackSummaryBuilt) slackSummaryBuilt = builtInOf(slackSummary);
+    return slackSummaryBuilt;
+};
+
+module.exports = { documentOf, BUILT_IN, PR_REVIEW, prReviewSkill, slackSummarySkill, SEEDS: { briefParse, digest, projectGuide, prReview, fieldsFill, prdDraft, wikiUpkeep, slackSummary } };

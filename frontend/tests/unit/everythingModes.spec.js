@@ -72,7 +72,7 @@ const reads = () => apiRequest.mock.calls.filter(([, url]) => url === TASKS).map
 const readNames = () => reads().map(readAs);
 const viewCalls = () => apiRequest.mock.calls.filter(([method, url]) => url !== TASKS && method !== 'get').map(([method, url, body]) => viewAs(method, url, body));
 
-const projectList = Object.values(fixture.projectCounts.response.data.projects).map((card) => ({ ...card, deletedStatusKey: 0 }));
+const projectList = Object.values(fixture.withSubtasks.response.data.projects).map((card) => ({ ...card, deletedStatusKey: 0 }));
 const newStore = () => createStore({
     modules: {
         everything,

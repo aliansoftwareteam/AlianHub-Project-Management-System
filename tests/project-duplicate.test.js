@@ -12,6 +12,7 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Modules/Project/helpers/projectHistory', () => ({ recordProjectCreated: jest.fn(async () => undefined) }));
@@ -33,6 +34,7 @@ const mongoose = require('mongoose');
 const { myCache } = require('../Config/config');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { removeCache } = require('../utils/commonFunctions');
+const socketEmitter = require('../event/socketEventEmitter');
 const { stepProjectCount } = require('../Modules/Project/helpers/projectQuota');
 const { recordProjectCreated } = require('../Modules/Project/helpers/projectHistory');
 const matcher = require('../Modules/Automations/engine/matcher');
@@ -332,6 +334,16 @@ describe('the project itself', () => {
         expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => row._id === own._id).projectId).toEqual([launch.id, id]);
         expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => row._id === other._id).projectId).toHaveLength(1);
         expect(removeCache).toHaveBeenCalledWith(`customField:${C}`);
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', { type: 'update', companyId: C, module: 'customFields' });
+    });
+
+    it('links a field that holds its one project as text', async () => {
+        const own = seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Shape', global: false, projectId: launch.id });
+        const { id } = copyOf(await duplicate(launch.id));
+        const writes = db().calls.filter((call) => call.type === SCHEMA_TYPE.CUSTOM_FIELDS && ['updateOne', 'updateMany'].includes(call.method));
+        expect(writes.map((call) => [call.method, Object.keys(call.data[1])[0]])).toEqual([['updateOne', '$set'], ['updateMany', '$addToSet']]);
+        expect(writes[0].data[0]).toEqual({ _id: own._id, projectId: launch.id });
+        expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => row._id === own._id).projectId).toEqual([launch.id, id]);
     });
 
     it('copies the permissions of a project that has its own', async () => {
@@ -538,7 +550,6 @@ describe('tasks', () => {
     });
 
     it('never fire the task-created event, a notification or a history line for a copied task', async () => {
-        const socketEmitter = require('../event/socketEventEmitter');
         seedTree(launch);
         await duplicate(launch.id, { include: { tasks: true, assignees: true, dates: true } });
         expect(socketEmitter.emit).not.toHaveBeenCalled();
@@ -589,6 +600,53 @@ describe('what is written fits the schemas', () => {
             const kept = cast.toObject({ minimize: false });
             expect([type, Object.keys(doc).filter((key) => doc[key] !== undefined && !(key in kept))]).toEqual([type, []]);
         });
+    });
+
+    const projectFits = (project) => new (modelOf(SCHEMA_TYPE.PROJECTS))(project).validateSync() || null;
+    const fitDetails = { ProjectType: 'fixed', ProjectRequiredDefaultComponent: 'ListView', projectIcon: { type: 'color', data: 'blue' }, status: 'active', statusType: 'active' };
+
+    it('gives the copy of a project without a currency the default one of the company', async () => {
+        seed(SCHEMA_TYPE.CURRENCY_LIST, { code: 'USD', symbol: '$', name: 'US Dollar', isDefault: false, isDelete: false });
+        seed(SCHEMA_TYPE.CURRENCY_LIST, { code: 'EUR', symbol: '€', name: 'Euro', isDefault: true, isDelete: false });
+        launch = seedLaunch({ ...fitDetails, ProjectCode: 'BARE', ProjectCurrency: null });
+        const res = await duplicate(launch.id);
+        expect(res.body.status).toBe(true);
+        const { project } = copyOf(res);
+        expect(project.ProjectCurrency).toMatchObject({ code: 'EUR', symbol: '€', name: 'Euro' });
+        expect(Object.keys(project.ProjectCurrency)).not.toContain('_id');
+        expect(projectFits(project)).toBeNull();
+    });
+
+    it('fits the schema when the company has no default currency either', async () => {
+        launch = seedLaunch({ ...fitDetails, ProjectCode: 'BARE' });
+        const res = await duplicate(launch.id);
+        expect(res.body.status).toBe(true);
+        expect(projectFits(copyOf(res).project)).toBeNull();
+    });
+
+    it('keeps the currency of a source that has one', async () => {
+        seed(SCHEMA_TYPE.CURRENCY_LIST, { code: 'EUR', symbol: '€', name: 'Euro', isDefault: true, isDelete: false });
+        launch = seedLaunch({ ...fitDetails, ProjectCode: 'PAID', ProjectCurrency: { code: 'USD', symbol: '$' } });
+        expect(copyOf(await duplicate(launch.id)).project.ProjectCurrency).toEqual({ code: 'USD', symbol: '$' });
+    });
+});
+
+describe('a copy the schema refuses', () => {
+    it('answers the reason in the usual shape and writes nothing', async () => {
+        const real = db().crud.getMockImplementation();
+        db().crud.mockImplementation(async (companyId, query, method) => {
+            if (query.type === SCHEMA_TYPE.PROJECTS && method === 'save') {
+                const refusedDoc = new mongoose.Error.ValidationError();
+                refusedDoc.addError('ProjectType', new mongoose.Error.ValidatorError({ path: 'ProjectType', message: 'Path `ProjectType` is required.' }));
+                throw refusedDoc;
+            }
+            return real(companyId, query, method);
+        });
+        const res = await duplicate(launch.id);
+        const reason = refused(res, 400);
+        expect(reason).toMatch(/ProjectType/);
+        expect(res.body.message).toBe(reason);
+        nothingCopied();
     });
 });
 
@@ -700,6 +758,31 @@ describe('who may duplicate', () => {
     });
 });
 
+describe('a copy that fails after its tasks were made', () => {
+    it('takes the linked tasks of the copies back with them', async () => {
+        const client = String(seed(SCHEMA_TYPE.CUSTOM_FIELDS, { fieldTitle: 'Client', fieldType: 'relationship', type: 'task', global: true, isDelete: true })._id);
+        const spec = String(seedTask(launch, launch.backlog, { TaskName: 'Spec' })._id);
+        const build = String(seedTask(launch, launch.backlog, { TaskName: 'Build', customField: { [client]: { _id: client, fieldValue: '', revision: 3 } } })._id);
+        seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: build, fieldId: client, kind: 'relationship', ids: [spec] });
+        const real = db().crud.getMockImplementation();
+        let linksCopied = false;
+        db().crud.mockImplementation(async (companyId, query, method) => {
+            if (linksCopied && query.type === SCHEMA_TYPE.PROJECTS && method === 'findOne') throw new Error('connection lost');
+            const answer = await real(companyId, query, method);
+            if (query.type === SCHEMA_TYPE.CUSTOM_FIELD_LINKS && method === 'findOneAndUpdate') linksCopied = true;
+            return answer;
+        });
+
+        const res = await duplicate(launch.id, { include: { tasks: true, assignees: false, dates: false } });
+
+        expect(res.body.status).toBe(false);
+        expect(linksCopied).toBe(true);
+        nothingCopied();
+        expect(rowsOf(SCHEMA_TYPE.TASKS).map((row) => row.TaskName).sort()).toEqual(['Build', 'Spec']);
+        expect(rowsOf(SCHEMA_TYPE.CUSTOM_FIELD_LINKS).map((row) => [row.taskId, row.ids])).toEqual([[build, [spec]]]);
+    });
+});
+
 describe('the request', () => {
     const bad = async (body) => {
         const res = await run(DUPLICATE, { id: launch.id, body });
@@ -737,6 +820,9 @@ describe('a field shared with the copy', () => {
     const updateField = (id, updateObject, uid = OWNER) => run('PUT /api/v1/customField', {
         uid, table: fieldRoutes(), body: { type: 'updateOne', key: '$set', id: String(id), updateObject },
     });
+    const takeOff = (id, projectId, uid = OWNER) => run('PUT /api/v1/customField', {
+        uid, table: fieldRoutes(), body: { type: 'updateOne', key: '$set', id: String(id), removeProjects: [projectId] },
+    });
     const definition = (id) => rowsOf(SCHEMA_TYPE.CUSTOM_FIELDS).find((row) => String(row._id) === String(id));
     const valuesIn = (projectId) => inProject(SCHEMA_TYPE.TASKS, projectId, 'ProjectID').map((task) => task.customField);
 
@@ -753,7 +839,7 @@ describe('a field shared with the copy', () => {
 
     it('stays on the copy, with its values, when it is taken off the source', async () => {
         await shared();
-        const res = await updateField(field, { projectId: [copy.id] });
+        const res = await takeOff(field, launch.id);
         expect(res.statusCode).toBe(200);
         expect(definition(field)).toMatchObject({ fieldTitle: 'Score', fieldType: 'rating', isDelete: true, global: false, projectId: [copy.id] });
         expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
@@ -762,7 +848,7 @@ describe('a field shared with the copy', () => {
 
     it('stays on the source, with its values, when it is taken off the copy', async () => {
         await shared();
-        const res = await updateField(field, { projectId: [launch.id] });
+        const res = await takeOff(field, copy.id);
         expect(res.statusCode).toBe(200);
         expect(definition(field)).toMatchObject({ fieldTitle: 'Score', isDelete: true, global: false, projectId: [launch.id] });
         expect(valuesIn(launch.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
@@ -778,6 +864,8 @@ describe('a field shared with the copy', () => {
             expect([403, 404]).toContain(res.statusCode);
             expect(JSON.stringify(definition(field))).toBe(before);
         }
+        expect([403, 404]).toContain((await takeOff(field, copy.id, MEMBER)).statusCode);
+        expect(JSON.stringify(definition(field))).toBe(before);
         expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
     });
 

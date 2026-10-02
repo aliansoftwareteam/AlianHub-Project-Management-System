@@ -376,10 +376,14 @@ describe('a themed dropdown panel', () => {
         expect(panel.querySelector('.drop-down-options').classList.contains('black')).toBe(false);
     });
 
-    it('is left as it was everywhere else', async () => {
+    it('is the default, and a host that opts out keeps the white panel', async () => {
         const panel = await mountPanel({});
-        expect(panel.classList.contains('dd-tokens')).toBe(false);
-        expect(panel.classList.contains('bg-white')).toBe(true);
+        expect(panel.classList.contains('dd-tokens')).toBe(true);
+        expect(panel.classList.contains('bg-white')).toBe(false);
+        wrapper.unmount();
+        const legacy = await mountPanel({ themed: false });
+        expect(legacy.classList.contains('dd-tokens')).toBe(false);
+        expect(legacy.classList.contains('bg-white')).toBe(true);
     });
 });
 

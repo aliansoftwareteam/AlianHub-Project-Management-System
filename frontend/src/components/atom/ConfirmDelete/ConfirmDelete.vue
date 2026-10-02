@@ -55,9 +55,9 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
    own copy of this markup. */
 .cd__wrap { position: fixed; inset: 0; z-index: 1300; display: flex; align-items: center;
     justify-content: center; padding: 16px; background: rgba(23, 24, 36, .45);
-    font-family: var(--font-ui); }
+    font-family: var(--font-ui); animation: ah-fade-in var(--motion-base) var(--ease-out); }
 .cd { width: 100%; max-width: 384px; padding: 20px; background: #fff; border-radius: 12px;
-    box-shadow: 0 18px 50px rgba(23, 24, 36, .28); }
+    box-shadow: 0 18px 50px rgba(23, 24, 36, .28); animation: ah-rise-in var(--motion-base) var(--ease-out); }
 .cd__icon { display: inline-flex; align-items: center; justify-content: center; width: 34px;
     height: 34px; margin-bottom: 12px; color: #9B2C2C; background: #FBEBEB; border-radius: 9px; }
 .cd__title { margin: 0 0 4px; font-size: 14.5px; font-weight: 600; color: #191A2B; }

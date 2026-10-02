@@ -4,7 +4,7 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
-const { visibleProjectIds } = require('../Agents/scope');
+const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 const { canSeeSprintById, hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { pinSessionTenant } = require('../../Config/tenant');
@@ -103,8 +103,8 @@ exports.createExport = async (req, res) => {
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
         }
-        const visible = await visibleProjectIds(companyId, userId);
-        if (!visible.includes(String(projectId))) {
+        const listable = await taskListProjectIds(companyId, userId);
+        if (!listable.includes(String(projectId))) {
             return res.status(404).send({ status: false, statusText: 'Project not found.' });
         }
         if (sprintId && !(await canSeeSprintById(companyId, userId, sprintId))) {

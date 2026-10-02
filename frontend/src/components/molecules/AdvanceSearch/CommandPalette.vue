@@ -95,6 +95,7 @@
                                 </span>
                                 <span v-if="row.age" class="pal__age">{{ row.age }}</span>
                                 <span v-else-if="row.hint" class="pal__hint">{{ row.hint }}</span>
+                                <KeyHint v-else-if="row.shortcut" :shortcut="row.shortcut" />
                             </div>
                         </div>
                     </div>
@@ -122,16 +123,19 @@
                         </button>
                     </div>
 
-                    <div v-if="!flat.length && query.trim().length >= 2 && !searching" class="pal__empty">
-                        <span class="pal__icon pal__icon--brand"><ShellIcon name="search" :size="13" /></span>
-                        <div class="pal__empty-title">{{ $t('Inbox.search_nothing', { q: query.trim() }) }}</div>
-                        <div class="pal__empty-sub">{{ $t('Inbox.search_nothing_sub', { n: sourceCount }) }}</div>
-                        <div class="pal__empty-actions">
-                            <button v-if="hasAi" type="button" class="ah-btn ah-btn--outline ah-btn--sm" @click="askAi()">✦ {{ $t('Inbox.ask_ai') }}</button>
-                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="clearQuery">{{ $t('Inbox.clear_search') }}</button>
-                        </div>
-                    </div>
-                    <div v-else-if="!flat.length" class="pal__empty pal__empty--idle">
+                    <EmptyState
+                        v-if="!flat.length && query.trim().length >= 2 && !searching"
+                        compact
+                        illustration="search"
+                        data-test="palette-none"
+                        :title="$t('Inbox.search_nothing', { q: query.trim() })"
+                        :message="$t('Inbox.search_nothing_sub', { n: sourceCount })"
+                        :action-label="$t('Inbox.clear_search')"
+                        :secondary-label="hasAi ? `✦ ${$t('Inbox.ask_ai')}` : ''"
+                        @action="clearQuery"
+                        @secondary="askAi()"
+                    />
+                    <div v-else-if="!flat.length" class="pal__empty">
                         <div class="pal__empty-sub">{{ chip === 'all' ? $t('Inbox.search_idle') : $t('Palette.type_to_search', { type: $t('Palette.chip_' + chip) }) }}</div>
                     </div>
                 </div>
@@ -145,6 +149,14 @@
                 </div>
             </div>
         </div>
+        <AskPostToChat
+            v-if="posting && answerData"
+            :question="asked.question"
+            :answer="String(answerData.answer || '')"
+            :cited="answerData.cited || []"
+            :share-token="answerData.shareToken"
+            @close="posting = false; focusInput()"
+        />
     </teleport>
 </template>
 
@@ -160,15 +172,19 @@ import { useCustomComposable } from '@/composable';
 import { useFocusTrap } from '@/composable/useFocusTrap';
 import { aiOff } from '@/composable/aiAvailability';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import AskPostToChat from '@/views/Ai/AskPostToChat.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import KeyHint from '@/components/atom/KeyHint/KeyHint.vue';
 import { toggleTheme, shellState } from '@/components/organisms/Shell/shellState';
 import { isMacPlatform } from './paletteKeys';
-import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, foldRecentProjects, projectPath, recentType, relativeAge, taskLocation, taskPath } from './paletteRows';
+import { CHIPS, RECORD_CHIPS, chipAllows, commandArgument, commandLeads, foldRecentProjects, projectPath, recentType, relativeAge, taskPath, taskPlace } from './paletteRows';
 import { openQuickCreate } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 import { routeProjectId, useNewDoc } from '@/components/molecules/Pages/useNewDoc';
 import { docRoute } from '@/components/molecules/Pages/docRoute';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { messageKey } from '@/views/Ai/askWhy';
 import { leaveAskHandoff } from './askHandoff';
+import { canApprove } from '@/views/Approvals/approvalAccess';
 import '@/components/molecules/AdvanceSearch/style.css';
 
 defineOptions({ name: 'CommandPalette' });
@@ -213,6 +229,7 @@ const recentSearches = ref([]);
 const recentVisits = ref([]);
 const toolbarStyle = ref({});
 const asked = ref(null);
+const posting = ref(false);
 let askController = null;
 
 useFocusTrap(dialogEl, computed(() => props.open));
@@ -234,6 +251,8 @@ const timesheetRoute = () => ['User Timesheet', 'project Timesheet', 'Workload T
 
 const NAV = computed(() => [
     { key: 'home', label: t('Shell.home'), icon: 'home', route: 'Home' },
+    { key: 'everything', label: t('Shell.everything'), icon: 'layers', route: 'Everything' },
+    { key: 'goals', label: t('Shell.goals'), icon: 'target', route: 'Goals' },
     { key: 'planner', label: t('Shell.planner'), icon: 'planner', route: 'Planner' },
     { key: 'chat', label: t('Shell.chat'), icon: 'chat', route: 'chats', show: allowed('chat') },
     { key: 'inbox', label: t('Inbox.title'), icon: 'inbox', route: 'inbox' },
@@ -241,6 +260,7 @@ const NAV = computed(() => [
     { key: 'pages', label: t('Shell.docs'), icon: 'docs', route: 'Pages' },
     { key: 'dash', label: t('Shell.dash'), icon: 'dash', route: 'Dashboards' },
     { key: 'time', label: t('Shell.time'), icon: 'time', route: timesheetRoute() },
+    { key: 'approvals', label: t('Time.approvals'), icon: 'checkSquare', route: 'Approvals', sub: t('Shell.time'), show: canApprove(getters['settings/companyUserDetail']) },
     { key: 'ask', label: t('Palette.action_ask'), icon: 'ai', route: 'AiAsk' },
     { key: 'settings', label: t('settingslider.Settings'), icon: 'settings', route: 'Setting' },
     { key: 'members', label: t('settingslider.Members'), icon: 'members', route: 'Members', sub: t('settingslider.Settings') },
@@ -257,13 +277,13 @@ const NAV = computed(() => [
 const { canCreateIn, createIn } = useNewDoc();
 const docProjectId = computed(() => routeProjectId(route));
 const canNewDoc = computed(() => {
-    if (!docProjectId.value) return true;
+    if (!docProjectId.value) return canCreateIn(null);
     const project = (getters['projectData/allProjects']?.data || []).find((p) => String(p._id) === docProjectId.value);
     return Boolean(project) && canCreateIn(project);
 });
 
 const COMMANDS = computed(() => [
-    { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus' },
+    { key: 'new-task', label: t('Inbox.cmd_new_task'), icon: 'plus', shortcut: 'create-task' },
     { key: 'new-doc', label: t('Docs.new_doc'), icon: 'docs', show: canNewDoc.value },
     { key: 'new-project', label: t('Inbox.cmd_new_project'), icon: 'projects', show: allowed('project.project_list'), takesName: true },
     { key: 'start-timer', label: t('Inbox.cmd_start_timer'), icon: 'play', show: !!timesheetRoute() },
@@ -277,7 +297,7 @@ const projectName = (id) => (getters['projectData/projects']?.data || []).find((
 const taskRow = (task, when) => ({
     id: `task:${task._id}`, kind: 'task', swatch: task.status?.color || 'var(--brand)', bold: true,
     code: task.TaskKey && task.TaskKey !== '--' ? task.TaskKey : '', title: task.TaskName,
-    sub: taskLocation(task, projectName(task.ProjectID)), age: relativeAge(when || task.updatedAt, t), to: taskPath(cid.value, task),
+    sub: taskPlace(task, projectName(task.ProjectID), t), age: relativeAge(when || task.updatedAt, t), to: taskPath(cid.value, task),
     task: { companyId: cid.value, projectId: task.ProjectID, sprintId: task.sprintId, folderId: task.folderObjId || '', taskId: task._id },
 });
 const projectRow = (p) => ({ id: `project:${p._id}`, kind: 'project', icon: 'projects', title: p.ProjectName, sub: t('Header.Projects'), age: relativeAge(p.updatedAt, t), to: projectPath(cid.value, p) });
@@ -316,7 +336,7 @@ const navRow = (n) => ({ id: `nav:${n.key}`, kind: 'nav', icon: n.icon, title: n
 const nameFor = (c) => (c.takesName ? commandArgument(query.value, [c.label, c.alias]) : '');
 const commandRow = (c) => {
     const name = nameFor(c);
-    return { id: `cmd:${c.key}`, kind: 'command', icon: c.icon, title: c.label, sub: name, command: c.key, name };
+    return { id: `cmd:${c.key}`, kind: 'command', icon: c.icon, title: c.label, sub: name, command: c.key, name, shortcut: c.shortcut };
 };
 
 const sourceRow = (s) => {
@@ -357,7 +377,10 @@ const groups = computed(() => {
     };
     if (asked.value) {
         add('sources', t('Palette.group_sources'), answerSources.value.map(sourceRow), MAX_PER_CHIP);
-        add('ask', t('Inbox.group_ask'), [{ id: 'ask:continue', kind: 'continue', icon: 'ai', iconClass: 'pal__icon--brand', bold: true, title: t('Palette.ask_continue'), hint: '↵' }]);
+        add('ask', t('Inbox.group_ask'), [
+            { id: 'ask:continue', kind: 'continue', icon: 'ai', iconClass: 'pal__icon--brand', bold: true, title: t('Palette.ask_continue'), hint: '↵' },
+            ...(answerData.value && answerData.value.answer && answerData.value.shareToken ? [{ id: 'ask:post', kind: 'post', icon: 'chat', title: t('Ask.post_to_chat') }] : []),
+        ]);
         return out;
     }
     const people = () => users.value.filter((u) => matches(u.Employee_Name, u.Employee_Email)).map(personRow);
@@ -469,6 +492,7 @@ const cancelAsk = () => {
     if (askController) askController.abort();
     askController = null;
     asked.value = null;
+    posting.value = false;
 };
 const askHere = async () => {
     const question = query.value.trim();
@@ -517,6 +541,7 @@ const run = (row) => {
     remember(query.value);
     if (row.kind === 'ask') return askHere();
     if (row.kind === 'continue') return continueInAsk();
+    if (row.kind === 'post') { posting.value = true; return undefined; }
     if (row.task) { close(); openTask(row.task); return; }
     if (row.overlay) return go(row.overlay);
     if (row.to) return go(row.to);

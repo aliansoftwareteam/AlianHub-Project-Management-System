@@ -114,6 +114,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
 import { apiRequestWithoutCompnay, useAuth } from "@/services";
 import * as env from "@/config/env";
+import { connectAiWelcomePath } from "@/router/ai/connect";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -219,7 +220,7 @@ const create = (withSample) => {
         localStorage.removeItem("isLogging");
         Cookies.remove("refferCode");
         setTimeout(() => {
-            router.push({ name: "Home", params: { cid: data?.companyId || "" } }).then(() => window.location.reload());
+            router.push(connectAiWelcomePath(data?.companyId)).then(() => window.location.reload());
         }, 600);
     };
     source.onerror = () => { source.close(); if (!done) { done = true; fail(t("Auth.workspace_failed")); } };

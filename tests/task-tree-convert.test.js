@@ -274,6 +274,24 @@ describe('a task becomes a list', () => {
     });
 });
 
+describe('a task that became a list', () => {
+    const FIELD = '6f0000000000000000000f01';
+    const linked = () => (mockDb.store[SCHEMA_TYPE.CUSTOM_FIELD_LINKS] || []).map((row) => [String(row.taskId), row.ids]);
+
+    test('leaves no linked tasks or votes of its own, and no task linking to it', async () => {
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: ROOT, fieldId: FIELD, kind: 'relationship', ids: [LONE] });
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: ROOT, fieldId: '6f0000000000000000000f02', kind: 'voting', ids: [MEMBER] });
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: LONE, fieldId: FIELD, kind: 'relationship', ids: [ROOT, CHILD] });
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELD_LINKS, { taskId: CHILD, fieldId: FIELD, kind: 'relationship', ids: [LONE] });
+
+        const res = await call(PATCH, { action: 'convertToList', companyId: CID, projectData: { ...PROJECT }, taskId: ROOT, userData: USER, folderData: null, sprintObj: { id: SPRINT, folderId: FOLDER }, isSubTask: true });
+
+        expect(res.body.status).toBe(true);
+        expect(stored(ROOT)).toBeUndefined();
+        expect(linked()).toEqual([[LONE, [CHILD]], [CHILD, [LONE]]]);
+    });
+});
+
 describe('merge', () => {
     const merge = (taskId, mergeTaskId) => call(PATCH, { action: 'mergeTask', companyId: CID, projectData: { ...PROJECT }, taskId, mergeTaskId, oldProject: { ...OLD_PROJECT }, isSubTask: true, userData: USER });
 

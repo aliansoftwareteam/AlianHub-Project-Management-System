@@ -24,6 +24,8 @@
 
         <EmptyState
             v-else-if="!rows.length"
+            data-test="trash-empty"
+            :heading-level="2"
             :title="$t('Trash.empty_title')"
             :message="$t('Trash.empty_message', { kind: $t(`Trash.empty_${kind}`) })"
         />
@@ -44,7 +46,7 @@
                 </span>
                 <span class="tr__row-project tr__c-project">{{ projectNameOf(row.projectId) }}</span>
                 <span class="tr__row-time tr__c-when">{{ shortDate(row.updatedAt) }}</span>
-                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :disabled="busy === row._id" @click="restore(row)">
+                <button type="button" class="ah-btn ah-btn--sm ah-btn--secondary" :aria-label="$t('Trash.restore_named', { name: row.title })" :disabled="busy === row._id" @click="restore(row)">
                     <ShellIcon name="restore" :size="13" />{{ $t('Trash.restore') }}
                 </button>
             </div>

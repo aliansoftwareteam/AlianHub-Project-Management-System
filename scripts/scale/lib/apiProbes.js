@@ -1,5 +1,6 @@
 const { performance } = require('perf_hooks');
 const { summarise } = require('./stats');
+const { goalProbes } = require('./goalProbes');
 
 const PAGE_SIZE = 35;
 const WARM_UP_RUNS = 2;
@@ -85,6 +86,8 @@ async function measureApi({ base, session, runs, room, log = () => {} }) {
         { key: 'api.lists', label: 'API: Project load (lists of the project)', run: () => call('GET', `/api/v1/project/sprintFolder/${projectId}?collection=sprints`) },
         { key: 'api.search', label: `API: Global search for "${SEARCH_TEXT}"`, run: () => call('POST', '/api/v2/search', { query: SEARCH_TEXT }) },
     ];
+    await room(2);
+    probes.push(...await goalProbes({ call, lists: session.lists, log }));
 
     const metrics = [];
     for (const probe of probes) {
@@ -106,4 +109,4 @@ async function measureApi({ base, session, runs, room, log = () => {} }) {
     return { metrics, size: { tasks: countOf(true), subtasks: countOf(false), list: { id: list._id, name: list.name, tasks: list.tasks } } };
 }
 
-module.exports = { measureApi, groupPage, wholeProject, subtaskProgress };
+module.exports = { client, measureApi, groupPage, wholeProject, subtaskProgress };
