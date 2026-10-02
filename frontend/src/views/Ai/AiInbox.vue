@@ -30,7 +30,7 @@
                         <EmptyState v-if="approvalsEngineOff" data-test="approvals-engine-off" :title="$t('Workflows.engine_off_title')" :message="$t('Workflows.engine_off_body')" />
                         <div v-else-if="!approvalsLoaded" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
                         <EmptyState v-else-if="approvalsError" :title="$t('Ai.load_failed')" :message="approvalsError" :action-label="$t('Ai.retry')" @action="loadApprovals" />
-                        <EmptyState v-else-if="!approvals.length" data-test="approvals-empty" :title="$t('Workflows.approvals_empty_title')" :message="$t('Workflows.approvals_empty_body')" />
+                        <EmptyState v-else-if="!approvals.length" data-test="approvals-empty" :title="$t('Workflows.approvals_empty_title')" :message="$t('Workflows.approvals_empty_body')" :action-label="$t('Ai.back_to_waiting')" @action="switchView('pending')" />
                         <WorkflowApprovalRow
                             v-for="approval in approvals"
                             v-else
@@ -44,7 +44,7 @@
                     <template v-else-if="view === 'reports'">
                         <div v-if="!reportsLoaded" class="ah-empty" style="margin:14px">{{ $t('Ai.loading') }}</div>
                         <EmptyState v-else-if="reportsError" :title="$t('Ai.load_failed')" :message="reportsError" :action-label="$t('Ai.retry')" @action="loadReports" />
-                        <EmptyState v-else-if="!reports.length" data-test="reports-empty" :title="$t('Ai.reports_empty_title')" :message="$t('Ai.reports_empty_body')" />
+                        <EmptyState v-else-if="!reports.length" data-test="reports-empty" :title="$t('Ai.reports_empty_title')" :message="$t('Ai.reports_empty_body')" :action-label="$t('Ai.reports_empty_action')" @action="$router.push({ name: 'AgentTeammates', params: { cid: companyId } })" />
                         <button
                             v-for="r in reports"
                             v-else

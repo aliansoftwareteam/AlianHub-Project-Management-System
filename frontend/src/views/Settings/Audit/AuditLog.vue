@@ -30,14 +30,14 @@
             <div v-else-if="busy && !rows.length" class="ah-empty">{{ $t('Audit.loading') }}</div>
             <EmptyState
                 v-else-if="!rows.length"
-                :illustration="search ? 'search' : 'generic'"
+                :illustration="narrowed ? 'search' : 'generic'"
                 data-test="audit-empty"
                 :heading-level="2"
-                :title="search ? $t('Audit.none_match') : $t('Audit.none')"
-                :message="search ? '' : $t('Audit.none_msg')"
-                :action-label="$t('Audit.clear_search')"
-                :action-allowed="Boolean(search)"
-                @action="clearSearch"
+                :title="$t(filtered ? 'Audit.none_filtered' : search ? 'Audit.none_match' : 'Audit.none')"
+                :message="narrowed ? '' : $t('Audit.none_msg')"
+                :action-label="$t(filtered ? 'Audit.clear_filters' : 'Audit.clear_search')"
+                :action-allowed="narrowed"
+                @action="clearFilters"
             />
 
             <table v-else class="al__table">
@@ -164,6 +164,9 @@ const tabs = [
 ];
 const scope = ref(tabs.some((tab) => tab.key === route.query.scope) ? route.query.scope : "all");
 
+const filtered = computed(() => scope.value !== "all" || Boolean(projectFilter.value));
+const narrowed = computed(() => filtered.value || Boolean(search.value));
+
 const REFUSALS = ["agent.action_refused", "permission.refused"];
 const INTEGRITY_CHIPS = { verified: "ah-chip--ok", broken: "ah-chip--danger", unverified: "ah-chip--warn", unchained: "" };
 
@@ -235,7 +238,12 @@ const load = async ({ append = false } = {}) => {
 const reload = () => { page.value = 1; load(); };
 const setScope = (key) => { scope.value = key; reload(); };
 const clearProject = () => { projectFilter.value = null; reload(); };
-const clearSearch = () => { search.value = ""; reload(); };
+const clearFilters = () => {
+    search.value = "";
+    scope.value = "all";
+    projectFilter.value = null;
+    reload();
+};
 const loadMore = () => { page.value += 1; load({ append: true }); };
 
 const undo = async (row) => {

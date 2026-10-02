@@ -487,7 +487,9 @@ html, body, #app {
     display: flex;
     height: 100dvh;
     width: 100vw;
+    /* `hidden` still lets focus scroll the shell, and nothing on screen scrolls it back; `clip` cannot be scrolled at all. */
     overflow: hidden;
+    overflow: clip;
     background: var(--canvas);
 }
 .ah-app__main {
