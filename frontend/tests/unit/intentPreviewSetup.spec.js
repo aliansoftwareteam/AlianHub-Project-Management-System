@@ -4,6 +4,7 @@ import { createI18n } from 'vue-i18n';
 import en from '@/locales/en';
 import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
 import { intentTitle } from '@/components/molecules/IntentPreview/intentLines';
+import { unappliedOf } from '@/views/Inbox/approvalQueue';
 
 const i18n = () => createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
 const t = (key, named) => i18n().global.t(key, named);
@@ -90,5 +91,57 @@ describe('the preview card for a view an agent wants to add', () => {
             ['sort', 'Sorted by', 'Name, ascending'],
             ['columns', 'Columns', '1 field not shown'],
         ]);
+    });
+});
+
+describe('the preview card for a whole project setup an agent wants to make', () => {
+    const plan = {
+        kind: 'setup',
+        title: 'Website',
+        lines: [
+            { kind: 'place', project: 'Website', list: '' },
+            { kind: 'newStatuses', names: ['In Review', 'Client check'] },
+            { kind: 'newLists', names: ['Backlog', 'This week'] },
+            { kind: 'field', name: 'Budget', type: 'money', options: [] },
+            { kind: 'planView', name: 'Review board', layout: 'board' },
+            { kind: 'group', by: 'status', field: '' },
+            { kind: 'columns', names: ['Budget'], others: 0 },
+            { kind: 'planView', name: '<i>Plain</i>', layout: 'hologram' },
+        ],
+    };
+
+    it('says it is a project setup and lists every part on a line of its own, each view followed by what it shows', () => {
+        mountCard(plan);
+        expect(wrapper.find('[data-test="intent-kind"]').text()).toBe('Project setup');
+        expect(wrapper.find('[data-test="intent-title"]').text()).toBe('Website');
+        expect(rows()).toEqual([
+            ['place', 'Where', 'Website'],
+            ['newStatuses', 'New statuses', 'In Review, Client check'],
+            ['newLists', 'New lists', 'Backlog, This week'],
+            ['field', 'Field', 'Budget: Money'],
+            ['planView', 'New view', 'Review board: Board'],
+            ['group', 'Grouped by', 'Status'],
+            ['columns', 'Columns', 'Budget'],
+            ['planView', 'New view', '<i>Plain</i>'],
+        ]);
+        expect(wrapper.find('i').exists()).toBe(false);
+        expect(intentTitle(t, plan)).toBe('set up the project “Website”');
+    });
+
+    it('leaves out a part that names nothing', () => {
+        mountCard({ kind: 'setup', title: 'Website', lines: [{ kind: 'newStatuses', names: [] }, { kind: 'newLists', names: ['', 7] }, { kind: 'planView', name: '', layout: 'board' }] });
+        expect(rows()).toEqual([]);
+    });
+});
+
+describe('what an approved setup could not make', () => {
+    it('counts each part that was not made beside a change that failed whole', () => {
+        const applied = [
+            { action: 'project.setup', ok: true, result: { made: 3, notMade: [{ part: 'fields', name: 'Budget', error: 'disk full' }, { part: 'views', name: '', error: 'no board view' }, { part: 'lists' }] } },
+            { action: 'task.add', ok: false, error: 'not allowed' },
+            { action: 'fields.create', ok: true, result: { made: 1 } },
+        ];
+        expect(unappliedOf({ applied })).toEqual([{ ok: false, error: 'Budget: disk full' }, { ok: false, error: 'no board view' }, applied[1]]);
+        expect(unappliedOf({})).toEqual([]);
     });
 });

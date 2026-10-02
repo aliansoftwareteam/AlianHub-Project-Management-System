@@ -189,9 +189,9 @@ describe('who may send a plan', () => {
         setRule('task_custom_field', false, [3]);
         setRule('project_sprint_create', false, [3]);
         const out = await rpc(as(OUTSIDER), TOOL, PLAN);
-        expect(out).toMatchObject({ ok: false, refused: true });
-        expect(out.reason).toMatch(/permission_denied/);
-        expect(out.parts.map((part) => part.part)).toEqual(['lists', 'fields']);
+        expect(out).toMatchObject({ refused: true });
+        expect(out.reason).toMatch(/^permission_denied: .*: lists \(project\.project_sprint_create is not granted\); fields \(project\.project_custom_field is not granted\)$/);
+        expect(audits(TOOL).map((row) => row.meta.ran)).toEqual([false]);
         expect(waiting()).toHaveLength(0);
         await filed(as(OUTSIDER), { projectId: P_OPEN, statuses: ['In Review'], views: [{ name: 'Mine', mine: true }] });
     });
@@ -199,7 +199,7 @@ describe('who may send a plan', () => {
     it('refuses a guest, who may make none of it', async () => {
         const before = everythingNow();
         const out = await rpc(as(GUEST), TOOL, PLAN);
-        expect(out).toMatchObject({ ok: false, refused: true, reason: expect.stringMatching(/permission_denied/) });
+        expect(out).toMatchObject({ refused: true, reason: expect.stringMatching(/^permission_denied: /) });
         expect(everythingNow()).toBe(before);
         expect(waiting()).toHaveLength(0);
     });

@@ -64,6 +64,7 @@ const setupRule = (has) => {
     const makes = [
         has('fields.create') && '`fields.create` adds fields to a project, all of them in one call',
         has('view.create') && '`view.create` adds a saved view',
+        has('project.setup') && '`project.setup` sets up a whole project from one plan: its statuses, lists, fields and views',
     ].filter(Boolean);
     return makes.length ? `- ${joined(makes)}. Everyone on the project sees these, so nothing is made until the person approves it in AlianHub.` : '';
 };

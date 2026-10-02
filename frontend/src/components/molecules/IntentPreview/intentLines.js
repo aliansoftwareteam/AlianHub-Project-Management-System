@@ -107,6 +107,13 @@ export const LINE_KINDS = {
         return known.length ? { label: t('IntentPreview.line_priority'), text: known.join(', ') } : null;
     },
     search: (t, line) => (textOf(line.text) ? { label: t('IntentPreview.line_search'), text: textOf(line.text) } : null),
+    newStatuses: (t, line) => (textsOf(line.names).length ? { label: t('IntentPreview.line_new_statuses'), text: textsOf(line.names).join(', ') } : null),
+    newLists: (t, line) => (textsOf(line.names).length ? { label: t('IntentPreview.line_new_lists'), text: textsOf(line.names).join(', ') } : null),
+    planView: (t, line) => {
+        const name = textOf(line.name);
+        if (!name) return null;
+        return { label: t('IntentPreview.line_view'), text: LAYOUTS.includes(line.layout) ? t('IntentPreview.view_named', { name, layout: t(`IntentPreview.layout_${line.layout}`) }) : name };
+    },
     columns: (t, line) => {
         const shown = textsOf(line.names).join(', ');
         const others = countOf(line.others);
@@ -121,6 +128,7 @@ const HEADINGS = Object.freeze({
     subtask: { kind: 'IntentPreview.new_subtask', wants: 'IntentPreview.wants_subtask' },
     fields: { kind: 'IntentPreview.new_fields', wants: 'IntentPreview.wants_fields' },
     view: { kind: 'IntentPreview.new_view', wants: 'IntentPreview.wants_view' },
+    setup: { kind: 'IntentPreview.new_setup', wants: 'IntentPreview.wants_setup' },
 });
 
 const headingOf = (preview) => (preview && Object.hasOwn(HEADINGS, preview.kind) ? HEADINGS[preview.kind] : null);

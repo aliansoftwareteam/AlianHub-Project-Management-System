@@ -1,6 +1,12 @@
 const refusalOf = (source, fallback) => source?.response?.data?.statusText || source?.data?.statusText || source?.message || fallback;
 
-export const unappliedOf = (data) => (Array.isArray(data?.applied) ? data.applied : []).filter((change) => change && change.ok === false);
+/* A change that was carried out in part (a project setup) names what it could not make; each counts as one thing not done. */
+const notMadeIn = (change) => (Array.isArray(change?.result?.notMade) ? change.result.notMade : [])
+    .filter((entry) => entry && typeof entry.error === 'string')
+    .map((entry) => ({ ok: false, error: typeof entry.name === 'string' && entry.name ? `${entry.name}: ${entry.error}` : entry.error }));
+
+export const unappliedOf = (data) => (Array.isArray(data?.applied) ? data.applied : [])
+    .flatMap((change) => (change && change.ok === false ? [change] : notMadeIn(change)));
 
 /* One decision through the agent API. A refusal is an answer, never a throw, so a caller working through several keeps going. */
 export const decideOne = async (send, id, verb, body, fallback) => {
