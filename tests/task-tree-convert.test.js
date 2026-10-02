@@ -179,6 +179,34 @@ describe('a subtask becomes a task', () => {
         expect(writes[0].args[1].$set.ancestors).toEqual([]);
         expect(writes[0].args[1].$unset).toHaveProperty('cascadedBy');
     });
+
+    const toTaskNaming = (taskId, named) => call(PATCH, {
+        action: 'convertToTask', companyId: CID, projectData: { id: OPEN_PROJECT }, taskId, sprintObj: { ...OTHER_ELEMENT }, oldProject: { ...OLD_PROJECT }, ...named,
+    });
+
+    test('the parent and the list that lose a row are the ones the task is stored under, whatever the request names', async () => {
+        const res = await toTaskNaming(CHILD, { parentTaskId: OTHER_ROOT, oldSprintObj: { id: OTHER_SPRINT, name: 'Sprint 2' } });
+
+        expect(res.body.status).toBe(true);
+        expect([stored(ROOT).subTasks, stored(OTHER_ROOT).subTasks]).toEqual([1, 1]);
+        expect(liveCounts()).toEqual([3, 4]);
+    });
+
+    test('the request does not have to name them', async () => {
+        const res = await toTaskNaming(CHILD, {});
+
+        expect(res.body.status).toBe(true);
+        expect([stored(ROOT).subTasks, stored(OTHER_ROOT).subTasks]).toEqual([1, 1]);
+        expect(liveCounts()).toEqual([3, 4]);
+    });
+
+    test('a task that has no parent takes a subtask from no other task', async () => {
+        const res = await toTaskNaming(LONE, { parentTaskId: OTHER_ROOT, oldSprintObj: { id: SPRINT, folderId: FOLDER } });
+
+        expect(res.body.status).toBe(true);
+        expect(stored(OTHER_ROOT).subTasks).toBe(1);
+        expect(shape(LONE)).toEqual({ parent: '', ancestors: [], top: true, sprint: OTHER_SPRINT });
+    });
 });
 
 describe('a task becomes a subtask', () => {

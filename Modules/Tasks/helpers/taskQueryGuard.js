@@ -8,6 +8,7 @@ const { agentOf } = require('../../../Config/agentRequest');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { othersPersonalListIds } = require('../../PersonalList/ownership');
 const { taskListProjectIds } = require('./taskListProjects');
+const { FORBIDDEN_OPERATORS: CALLER_FORBIDDEN_OPERATORS, TOO_DEEP, isPlainObject, forbiddenOperatorIn } = require('../../Company/helpers/callerQueryRules');
 
 const MAX_LIMIT = 1000;
 const MAX_STAGES = 40;
@@ -15,10 +16,8 @@ const MAX_STAGES = 40;
 const TOP_LEVEL_STAGES = Object.freeze(['$match', '$sort', '$skip', '$limit', '$project', '$addFields', '$count', '$group', '$unwind', '$lookup', '$facet']);
 const SUB_PIPELINE_STAGES = Object.freeze(['$match', '$sort', '$skip', '$limit', '$project', '$addFields', '$count', '$group', '$unwind']);
 
-const FORBIDDEN_OPERATORS = Object.freeze([
-    '$where', '$function', '$accumulator', '$out', '$merge', '$unionWith', '$graphLookup', '$lookup', '$facet',
-    '$documents', '$collStats', '$indexStats', '$currentOp', '$listSessions', '$listLocalSessions', '$planCacheStats',
-]);
+/* The one list every caller-built query is held to, and $facet: a task query takes $lookup and $facet as stages of their own, checked below, never nested. */
+const FORBIDDEN_OPERATORS = Object.freeze([...CALLER_FORBIDDEN_OPERATORS, '$facet']);
 
 const LOOKUP_TARGETS = Object.freeze({
     [dbCollections.PROJECTS]: Object.freeze({ localField: Object.freeze(['ProjectID']), foreignField: Object.freeze(['_id']) }),
@@ -34,26 +33,6 @@ class QueryRefused extends Error {
         this.reason = reason;
     }
 }
-
-const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
-    && [Object.prototype, null].includes(Object.getPrototypeOf(value));
-
-const findForbiddenOperator = (value) => {
-    if (Array.isArray(value)) {
-        for (const item of value) {
-            const hit = findForbiddenOperator(item);
-            if (hit) return hit;
-        }
-        return null;
-    }
-    if (!isPlainObject(value)) return null;
-    for (const [key, inner] of Object.entries(value)) {
-        if (FORBIDDEN_OPERATORS.includes(key)) return key;
-        const hit = findForbiddenOperator(inner);
-        if (hit) return hit;
-    }
-    return null;
-};
 
 const clampLimit = (value) => {
     const n = Number(value);
@@ -101,7 +80,8 @@ validateStages = (stages, allowed) => {
         if (!allowed.includes(name)) throw new QueryRefused(name, 'the stage is outside the task query allowlist');
         if (name === '$lookup') return { $lookup: checkLookup(spec) };
         if (name === '$facet') return { $facet: checkFacet(spec) };
-        const forbidden = findForbiddenOperator(spec);
+        const forbidden = forbiddenOperatorIn(spec, FORBIDDEN_OPERATORS);
+        if (forbidden === TOO_DEEP) throw new QueryRefused(name, 'it is nested too deeply');
         if (forbidden) throw new QueryRefused(forbidden, `found inside ${name}`);
         if (name === '$limit') return { $limit: clampLimit(spec) };
         if (name === '$skip') return { $skip: checkSkip(spec) };

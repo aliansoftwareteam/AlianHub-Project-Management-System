@@ -17,6 +17,7 @@ const taskentriesctrl = require('./controller/taskEntries');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
 const { requireMovedTaskFields } = require('./helpers/planMoveAccess');
+const { requireCompanyAdmin } = require('../../Config/permissionGuard');
 
 const ofTask = projectIdsFrom({ records: [[SCHEMA_TYPE.TASKS, (req) => req.params.taskId]] });
 const { agentsRefused } = require('../Agents/guard');
@@ -32,7 +33,7 @@ exports.init = (app) => {
     app.put('/api/v1/timesheet/workload-capacity', gridctrl.saveWorkloadCapacity);
     app.post('/api/v1/timesheet/billable-summary', billablectrl.getBillableSummary);
     app.post('/api/v1/timesheet/export-csv', csvctrl.exportTimesheetCsv);
-    app.post('/api/v1/timesheet/send-reminders', agentsRefused('email.send'), reminderctrl.triggerReminders);
+    app.post('/api/v1/timesheet/send-reminders', agentsRefused('email.send'), requireCompanyAdmin(), reminderctrl.triggerReminders);
     app.get('/api/v1/timesheet/reminder-settings', reminderctrl.getReminderSettings);
     app.put('/api/v1/timesheet/reminder-settings', agentsRefused('workspace.settings'), reminderctrl.updateReminderSettings);
     app.post('/api/v1/timesheet/rates', agentsRefused('billing.rates'), billingctrl.setRate);
