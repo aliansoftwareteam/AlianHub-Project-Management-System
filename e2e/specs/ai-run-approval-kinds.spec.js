@@ -139,7 +139,8 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
         await expect.poll(() => kinds.statusOf(id)).toBe('approved');
         return made;
     }
-    const reviewBoard = (page) => page.getByRole('tab', { name: /Review board/ });
+    const views = (page) => page.getByRole('group', { name: 'Project views' });
+    const reviewBoard = (page) => views(page).getByRole('button', { name: /Review board/ });
 
     test('approving the project setup makes its parts in the project', async ({ page, state, loginAs }) => {
         const { owner, project, agent, tokenId } = await approveSetup({ page, state, loginAs }, 'approve setup');
@@ -162,7 +163,7 @@ test.describe('Inbox: one card for each kind of waiting proposal', () => {
             await expect(page.getByText('Approval undone.')).toBeVisible();
 
             await page.goto(`/#/${state.companyId}/project/${project._id}`);
-            await expect(page.getByRole('tab', { name: 'List', exact: false }).first()).toBeVisible();
+            await expect(views(page).getByRole('button', { name: /^List/ })).toBeVisible();
             await expect(reviewBoard(page)).toHaveCount(0);
             const lists = await listSprints(owner.api, project._id);
             expect(lists.filter((list) => !Number(list.deletedStatusKey || 0)).map((list) => list.name)).not.toContain('This week');
