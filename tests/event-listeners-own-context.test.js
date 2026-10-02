@@ -34,6 +34,7 @@ const providerContext = require('../Modules/AICore/providerContext');
 const socketEmitter = require('../event/socketEventEmitter');
 const domainEventBus = require('../event/domainEventBus');
 const registry = require('../Modules/Automations/engine/registry');
+const runner = require('../Modules/Automations/engine/runner');
 const matcher = require('../Modules/Automations/engine/matcher');
 const engine = require('../Modules/Automations/engine');
 const formEvent = require('../Modules/Automations/engine/formEvent');
@@ -63,6 +64,11 @@ const whereItRuns = () => ({
     narrowedTo: narrowingFor(PERSON), agent: agentOf(PERSON), mark: actingAgent.current(), request: requestContext.get(), workspace: providerContext.companyIdOf(),
 });
 const outsideTheRequest = (traceId) => ({ narrowedTo: null, agent: null, mark: null, request: { traceId }, workspace: C });
+const TOKENS_LIMITS = { userId: PERSON, projectIds: [IN_REACH], chat: false };
+
+/* The same person at the web app, and an agent's token that is held to no project. */
+const asThePerson = (work) => requestContext.run({ ...REQUEST }, work);
+const withAnUnheldToken = (work) => requestContext.run({ ...REQUEST }, () => runForAgentOf(PERSON, { chat: false }, () => actingAgent.runAs(mark(), work)));
 
 const realSetTimeout = global.setTimeout;
 const settle = (ms = WAIT_MS * 6) => new Promise((resolve) => { realSetTimeout(resolve, ms); });
@@ -132,7 +138,16 @@ describe('a listener on the event bus', () => {
         expect(heard).toHaveLength(1);
         const [{ envelope, ...where }] = heard;
         expect(where).toEqual(outsideTheRequest(traceId));
-        expect(envelope).toMatchObject({ type: 'task.priority_changed', companyId: C, traceId, actor: { kind: 'agent', userId: PERSON }, depth: 1 });
+        expect(envelope).toMatchObject({ type: 'task.priority_changed', companyId: C, traceId, actor: { kind: 'agent', userId: PERSON }, depth: 1, narrowing: TOKENS_LIMITS });
+    });
+
+    it('is told of no limits where the change came from a person or from a token held to no project', async () => {
+        asThePerson(() => changePriority('HIGH'));
+        await settle();
+        withAnUnheldToken(() => changePriority('URGENT'));
+        await settle();
+
+        expect(heard.map(({ envelope }) => [envelope.actor.kind, 'narrowing' in envelope])).toEqual([['system', false], ['agent', false]]);
     });
 
     it('is told the same way when a second change sends the first at once', async () => {
@@ -160,13 +175,40 @@ describe('a listener on the event bus', () => {
 });
 
 describe('a rule the change wakes', () => {
-    it('runs its step for its maker, with the maker\'s own projects', async () => {
+    it('woken by a token held to one project, runs its step for its maker inside that token\'s project and chat rule', async () => {
         seedRule();
         insideARequest(() => changePriority('HIGH'));
         await settle();
 
         expect(steps).toHaveLength(1);
+        expect(steps[0]).toMatchObject({ makerOpensElsewhere: false, narrowedTo: [IN_REACH], agent: { uid: PERSON, chat: false }, mark: null, workspace: C });
+        expect(steps[0].request).toEqual({ traceId: heard[0].envelope.traceId });
+    });
+
+    it.each([
+        ['the person', asThePerson],
+        ['a token held to no project', withAnUnheldToken],
+    ])('woken by %s, runs the same step with its maker\'s own projects', async (_writer, write) => {
+        seedRule();
+        write(() => changePriority('HIGH'));
+        await settle();
+
+        expect(steps).toHaveLength(1);
         expect(steps[0]).toMatchObject({ makerOpensElsewhere: true, narrowedTo: null, agent: null, mark: null, workspace: C });
+    });
+
+    it('reads the limits from the event it was woken by, not from where its run happens to be picked up', async () => {
+        const rule = seedRule();
+        const envelope = (over = {}) => ({ id: 'evt-1', companyId: C, type: 'task.priority_changed', depth: 0, actor: { kind: 'user', userId: PERSON }, entity: { kind: 'task', id: TASK }, data: task(), ...over });
+        const run = { _id: 'run-1', cursor: 0, steps: [], outputs: {} };
+
+        await insideARequest(() => runner.runOnce(C, run, rule, envelope()));
+        await runner.runOnce(C, run, rule, envelope({ narrowing: TOKENS_LIMITS }));
+
+        expect(steps.map(({ makerOpensElsewhere, narrowedTo, agent, mark: at }) => ({ makerOpensElsewhere, narrowedTo, agent, mark: at }))).toEqual([
+            { makerOpensElsewhere: true, narrowedTo: null, agent: null, mark: null },
+            { makerOpensElsewhere: false, narrowedTo: [IN_REACH], agent: { uid: PERSON, chat: false }, mark: null },
+        ]);
     });
 
     it('still knows the change was an agent\'s, and one step deeper than what the agent answered', async () => {

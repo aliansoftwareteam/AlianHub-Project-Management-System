@@ -9,6 +9,7 @@ const socketEmitter = require('./socketEventEmitter');
 const { normalizeChangedFields, createSnapshotStore, isNotAnEdit } = require('../utils/entityEvents');
 const actingAgent = require('../Modules/Agents/actingAgent');
 const providerContext = require('../Modules/AICore/providerContext');
+const writerLimits = require('./writerLimits');
 
 // Canonical domain-event bus — stage 1 of the automation engine (ADR 002).
 //
@@ -105,7 +106,10 @@ const originOf = (payload) => {
     return { actor: { userId: mark.userId ? String(mark.userId) : null, kind: 'agent' }, depth: (Number(mark.depth) || 0) + 1 };
 };
 
-const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, depth, traceId }) => ({
+/* Present only where the change came from a token held to some projects (./writerLimits). */
+const narrowingOf = (narrowing) => (narrowing ? { narrowing } : {});
+
+const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, depth, traceId, narrowing }) => ({
     id: ulid(),
     companyId: String(companyId),
     type,
@@ -113,6 +117,7 @@ const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, d
     traceId: traceId || telemetry.traceIdNow() || telemetry.newTraceId(),
     actor,
     depth: Number(depth) || 0,
+    ...narrowingOf(narrowing),
     scope: {
         projectId: doc.ProjectID ? String(doc.ProjectID) : null,
         sprintId: doc.sprintId ? String(doc.sprintId) : null,
@@ -125,7 +130,7 @@ const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, d
 
 /* Pages, projects and members have no field-level classification: an envelope names what
  * happened to the entity, and its data is the few fields a consumer needs to act on it. */
-const buildEntityEnvelope = ({ companyId, type, entity, scope = {}, data = {}, actor, depth }) => ({
+const buildEntityEnvelope = ({ companyId, type, entity, scope = {}, data = {}, actor, depth, narrowing }) => ({
     id: ulid(),
     companyId: String(companyId),
     type,
@@ -133,6 +138,7 @@ const buildEntityEnvelope = ({ companyId, type, entity, scope = {}, data = {}, a
     traceId: telemetry.traceIdNow() || telemetry.newTraceId(),
     actor: resolveActor({ actor }),
     depth: Number(depth) || 0,
+    ...narrowingOf(narrowing),
     scope: {
         projectId: scope.projectId ? String(scope.projectId) : null,
         sprintId: scope.sprintId ? String(scope.sprintId) : null,
@@ -216,7 +222,8 @@ async function record(envelope) {
 /* A listener acts for its own people (a rule for its maker, a notice for the person it is sent to), not for whoever
  * made the change. Bound here, where no request is running, it is told under no token's project list, no agent's
  * mark and no request. What it may know of the change is in the envelope: who made it and how deep in a chain,
- * which the loop guards read, and the trace and the workspace, which are entered again from it. */
+ * which the loop guards read, the project list of a token that made it, and the trace and the workspace, which
+ * are entered again from it. */
 const toListeners = AsyncResource.bind((envelope, recorded) => providerContext.run({ companyId: envelope.companyId },
     () => telemetry.withTrace(envelope.traceId, () => {
         bus.emit('domain.event', envelope);
@@ -236,7 +243,7 @@ function publish(envelope) {
 }
 
 function flush(entry) {
-    const { companyId, doc, changed, actor, depth, emitType, traceId } = entry;
+    const { companyId, doc, changed, actor, depth, emitType, traceId, narrowing } = entry;
     const type = classifyTaskEvent(emitType, changed);
     if (!type) return;
 
@@ -245,7 +252,7 @@ function flush(entry) {
     const data = trimTask(doc);
     taskSnapshots.remember(taskId, data);
 
-    publish(buildEnvelope({ companyId, type, doc, changedFields: changed, previous, actor, depth, traceId }));
+    publish(buildEnvelope({ companyId, type, doc, changedFields: changed, previous, actor, depth, traceId, narrowing }));
 }
 
 const fieldValue = (doc, field) => {
@@ -288,6 +295,7 @@ function onTaskEvent(emitType) {
             const key = `${companyId}:${String(doc._id)}:${emitType}`;
             const changedNow = normalizeChangedFields(payload?.updatedFields);
             const { actor, depth } = originOf(payload);
+            const narrowing = writerLimits.ofThisRequest();
 
             const existing = pending.get(key);
             if (supersedesPending(existing, doc, changedNow)) {
@@ -301,15 +309,16 @@ function onTaskEvent(emitType) {
                 open.doc = doc;
                 changedNow.forEach((field) => open.changed.add(field));
                 // The loop guard only holds if a merged envelope is never shallower than
-                // an emit it absorbed, so the deepest emit's actor and depth win.
+                // an emit it absorbed, so the deepest emit's actor and depth win, and its limits with them.
                 if (depth >= open.depth) {
                     open.actor = actor;
                     open.depth = depth;
+                    open.narrowing = narrowing;
                 }
                 return;
             }
 
-            const entry = { companyId, doc, changed: new Set(changedNow), emitType, actor, depth, traceId: telemetry.traceIdNow() };
+            const entry = { companyId, doc, changed: new Set(changedNow), emitType, actor, depth, narrowing, traceId: telemetry.traceIdNow() };
             entry.timer = setTimeout(() => {
                 if (pending.get(key) !== entry) return;
                 pending.delete(key);
@@ -322,16 +331,20 @@ function onTaskEvent(emitType) {
     };
 }
 
+/* An event published where the change is made reads the token's limits there; one published by a listener passes on
+ * the limits of the event it heard. */
+const limitsOf = (narrowing) => (narrowing === undefined ? writerLimits.ofThisRequest() : narrowing);
+
 function publishEntityEvent(input) {
-    const envelope = buildEntityEnvelope(input);
+    const envelope = buildEntityEnvelope({ ...input, narrowing: limitsOf(input.narrowing) });
     publish(envelope);
     return envelope;
 }
 
 /* A task event no write emitted: one derived from stored state, such as a due date
  * passing or the last open subtask closing. `doc` is the stored task. */
-function publishTaskEvent({ companyId, type, doc, actor, depth }) {
-    const envelope = buildEnvelope({ companyId, type, doc, changedFields: [], previous: null, actor: resolveActor({ actor }), depth });
+function publishTaskEvent({ companyId, type, doc, actor, depth, narrowing }) {
+    const envelope = buildEnvelope({ companyId, type, doc, changedFields: [], previous: null, actor: resolveActor({ actor }), depth, narrowing: limitsOf(narrowing) });
     publish(envelope);
     return envelope;
 }

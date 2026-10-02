@@ -14,4 +14,6 @@ const agentOf = (uid) => {
     return store && store.uid === String(uid || '') ? store : null;
 };
 
-module.exports = { runForAgentOf, agentOf };
+const outside = (fn) => storage.exit(fn);
+
+module.exports = { runForAgentOf, agentOf, outside };

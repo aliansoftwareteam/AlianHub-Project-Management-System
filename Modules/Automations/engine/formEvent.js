@@ -2,6 +2,7 @@ const { ulid } = require('ulid');
 const logger = require('../../../Config/loggerConfig');
 const domainEventBus = require('../../../event/domainEventBus');
 const telemetry = require('../../../Config/telemetry');
+const writerLimits = require('../../../event/writerLimits');
 
 // `form.submitted` envelopes.
 //
@@ -34,6 +35,7 @@ const answerMap = (record) => {
 const buildFormEnvelope = ({ companyId, form, submissionId, answers, task, actor }) => {
     const projectId = form && form.ProjectID ? String(form.ProjectID) : null;
     const taskId = task && task._id ? String(task._id) : null;
+    const narrowing = writerLimits.ofThisRequest();
     return {
         id: ulid(),
         companyId: String(companyId),
@@ -45,6 +47,7 @@ const buildFormEnvelope = ({ companyId, form, submissionId, answers, task, actor
             kind: actor && actor.kind ? actor.kind : 'system',
         },
         depth: 0,
+        ...(narrowing ? { narrowing } : {}),
         scope: {
             projectId,
             sprintId: form && form.sprintId ? String(form.sprintId) : null,
