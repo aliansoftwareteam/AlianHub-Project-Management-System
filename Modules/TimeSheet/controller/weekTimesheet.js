@@ -10,6 +10,7 @@ const { parsePeriod } = require('../../TimesheetApproval/helpers/approvalRules')
 const R = require('../helpers/weekRules');
 const { workingDaysOf, weekendOf } = require('../../Company/helpers/companyWeek');
 const { resolveTimeScope, withoutHidden, openProjects } = require('../helpers/timeScope');
+const { openTasksById, openProjectsById } = require('../../Tasks/helpers/openNames');
 
 const RUNNING_WINDOW_SEC = 10 * 60;
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
@@ -22,18 +23,6 @@ const projectMeta = (p) => ({
     projectCode: p ? p.ProjectCode || '' : '',
     projectColor: p && p.projectIcon && p.projectIcon.type === 'color' ? p.projectIcon.data : '',
 });
-
-const loadProjects = async (companyId, ids) => {
-    const objIds = [...new Set(ids.filter(Boolean))].map(oid).filter(Boolean);
-    if (!objIds.length) return {};
-    const projects = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.PROJECTS,
-        data: [{ _id: { $in: objIds } }, { ProjectName: 1, ProjectCode: 1, projectIcon: 1 }],
-    }, 'find').catch(() => []);
-    const byId = {};
-    (projects || []).forEach((p) => { byId[String(p._id)] = p; });
-    return byId;
-};
 
 const approvalFor = async (companyId, userId, start, end) => {
     const period = parsePeriod({ periodStart: start, periodEnd: end });
@@ -70,20 +59,14 @@ exports.getWeekTimesheet = async (req, res) => {
         const dayOf = (e) => DateTime.fromSeconds(Number(e.LogStartTime) || 0, { zone }).toISODate();
         const rows = R.groupEntriesByTask(entries, dayOf);
 
-        const taskIds = rows.map((r) => oid(r.taskId)).filter(Boolean);
-        const tasks = taskIds.length ? await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: { $in: taskIds } }, { TaskName: 1, ProjectID: 1, sprintId: 1 }],
-        }, 'find').catch(() => []) : [];
-        const taskById = {};
-        (tasks || []).forEach((t) => { taskById[String(t._id)] = t; });
+        const taskById = await openTasksById(companyId, req.uid, rows.map((r) => r.taskId), { TaskName: 1 }).catch(() => ({}));
         rows.forEach((r) => {
             const t = taskById[r.taskId];
             r.taskName = t ? t.TaskName || '' : '';
             r.sprintId = t ? String(t.sprintId || '') : '';
             if (!r.projectId && t) r.projectId = String(t.ProjectID || '');
         });
-        const projectById = await loadProjects(companyId, rows.map((r) => r.projectId));
+        const projectById = await openProjectsById(companyId, req.uid, rows.map((r) => r.projectId), { ProjectName: 1, ProjectCode: 1, projectIcon: 1 }).catch(() => ({}));
         rows.forEach((r) => Object.assign(r, projectMeta(projectById[r.projectId])));
 
         const ptoRows = await MongoDbCrudOpration(companyId, {

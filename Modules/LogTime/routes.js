@@ -6,6 +6,8 @@ const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } =
 const { ownSessionRefusal } = require('./controllerV2/sessionUser');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const mongoose = require('mongoose');
 
 /* Anyone who can open the task may log time on it; the task's project is read off the stored task. */
 const onAVisibleTask = requireProjectAccess({
@@ -15,6 +17,29 @@ const onAVisibleTask = requireProjectAccess({
         direct: (req) => req.body && req.body.projectId,
     }),
 });
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+const findById = (companyId, type, id, fields) => MongoDbCrudOpration(companyId, { type, data: [{ _id: new mongoose.Types.ObjectId(String(id)) }, fields] }, 'findOne');
+
+/* The entry a request names, when it is the caller's own and the request leaves it where it is: the task, the
+ * project and, if one is named, the list are the entry's own. */
+const ownEntryInPlace = async (companyId, uid, body) => {
+    if (!OBJECT_ID.test(String(body.timeSheetId || '')) || !OBJECT_ID.test(companyId) || body.isEdit === false) return false;
+    const entry = await findById(companyId, SCHEMA_TYPE.TIMESHEET, body.timeSheetId, { Loggeduser: 1, TicketID: 1, ProjectId: 1 });
+    if (!entry || String(entry.Loggeduser) !== String(uid)) return false;
+    if (String(entry.ProjectId) !== String(body.projectId) || (body.ticketId && String(entry.TicketID) !== String(body.ticketId))) return false;
+    if (!body.sprintId) return true;
+    const task = OBJECT_ID.test(String(entry.TicketID || '')) ? await findById(companyId, SCHEMA_TYPE.TASKS, entry.TicketID, { sprintId: 1 }) : null;
+    return Boolean(task) && String(task.sprintId) === String(body.sprintId);
+};
+
+/* A time entry stays its person's to correct and to delete after they can no longer open its task: the week it
+ * sits in is still theirs to put right. It is corrected or deleted where it is, and never moved through this door. */
+const ownEntryOr = (guard) => async (req, res, next) => {
+    const own = await ownEntryInPlace(String(req.headers['companyid'] || ''), req.uid, req.body || {}).catch(() => false);
+    return own ? next() : guard(req, res, next);
+};
 
 /* The storage engine writes to the bucket named in the body, while the middleware only verified the companyid header. */
 const captureRefusal = async (req) => {
@@ -164,7 +189,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/manualLogtime', onAVisibleTask, logged, ctrlV2.manualLogTime);
+    app.post('/api/v2/manualLogtime', ownEntryOr(onAVisibleTask), logged, ctrlV2.manualLogTime);
 
 
       /**
@@ -271,7 +296,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true/false, statusText:message
      */
-    app.post('/api/v2/deleteManualLogtime', agentsRefused('timelog.delete'), onAVisibleTask, ctrlV2.deleteManualLogtime);
+    app.post('/api/v2/deleteManualLogtime', agentsRefused('timelog.delete'), ownEntryOr(onAVisibleTask), ctrlV2.deleteManualLogtime);
 
         /**
      * @swagger

@@ -11,6 +11,7 @@ const { settingsCollectionDocs } = require("../../../Config/collections");
 const { idForms } = require("../../../utils/mongo-handler/objectIdKeys");
 
 const MILESTONE_WEEKLY_RANGES = ['Mon - Sun', 'Sun - Mon'];
+const WEEKLY = 'Weekly';
 
 exports.getMilestone = async (req, res) => {
     try {
@@ -26,12 +27,13 @@ exports.getMilestone = async (req, res) => {
             });
         }
 
-        const query = {
-            type: SCHEMA_TYPE.MILESTONE,
-            data: id === "Weekly" ? [{ billingPeriod: id }] : [{ projectId: { $in: idForms(id) } }]
-        };
+        /* The weekly-range setting asks only whether any project bills weekly; it is told that and nothing of the milestone. */
+        if (id === WEEKLY) {
+            const weekly = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.MILESTONE, data: [{ billingPeriod: WEEKLY }, { _id: 1 }] }, "findOne");
+            return res.status(200).json(weekly ? { billingPeriod: WEEKLY } : {});
+        }
 
-        const response = await MongoDbCrudOpration(companyId, query, "findOne");
+        const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.MILESTONE, data: [{ projectId: { $in: idForms(id) } }] }, "findOne");
 
         return res.status(200).json(response || {});
     } catch (error) {

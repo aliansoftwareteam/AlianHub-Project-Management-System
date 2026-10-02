@@ -177,10 +177,8 @@ async function flush(companyId, event, doc, changedKeys) {
     // NON-task document under module:'task' (the project counter bump fires
     // { data: <project>, updatedFields: {} }). Its _id is a project id, so the
     // task lookup finds nothing — and we must not deliver a project as a phantom
-    // task.updated. shouldDeliverTask drops that case; a transient read error
-    // still falls back to best-effort delivery with the socket doc.
+    // task.updated. shouldDeliverTask drops that case, and a read that failed.
     let fullDoc = null;
-    let readErrored = false;
     try {
         const fresh = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -188,12 +186,10 @@ async function flush(companyId, event, doc, changedKeys) {
         }, 'findOne');
         if (fresh && fresh._id) fullDoc = fresh;
     } catch (error) {
-        readErrored = true;
         logger.error(`${LOG_PREFIX} could not re-read task ${doc._id}: ${error.message}`);
     }
 
-    if (!shouldDeliverTask(fullDoc, readErrored)) return;
-    if (!fullDoc) fullDoc = doc; // transient read error → best-effort with the socket payload
+    if (!shouldDeliverTask(fullDoc)) return;
 
     const targets = await hooksThatMayCarry(companyId, subscribed, fullDoc);
     if (!targets.length) return;

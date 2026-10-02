@@ -1,4 +1,5 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { othersPersonalListIds } = require('../PersonalList/ownership');
 const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { removeCache } = require('../../utils/commonFunctions');
@@ -68,13 +69,18 @@ const foldRevenue = async (companyId, raw) => {
 const UNITS = { hours: 'hours', revenue: 'currency', points: 'points', count: 'count', entries: 'count' };
 
 /* A report aggregates the whole tasks collection, so it is narrowed to what the person it
- * runs for may read: their projects, minus the private sprints they are not on. `viewer` is
+ * runs for may read: their projects, minus the private sprints they are not on, and for an
+ * owner or admin everything but the personal list of someone else. `viewer` is
  * the session for a live run, and the report's author for a schedule or a public link —
  * neither may show more than its author could see on screen. */
 const viewerScope = async (companyId, viewer, isLogs) => {
     const uid = String(viewer || '');
     if (!uid) return null;
-    if (await access.isPrivilegedUser(companyId, uid)) return null;
+    if (await access.isPrivilegedUser(companyId, uid)) {
+        const personal = await othersPersonalListIds(companyId, uid);
+        if (!personal.length) return null;
+        return isLogs ? { ProjectId: { $nin: idForms(personal) } } : { ProjectID: { $nin: idForms(personal) } };
+    }
     const projects = await visibleProjectIds(companyId, uid);
     if (isLogs) return { ProjectId: { $in: idForms(projects) } };
     return { ProjectID: { $in: asObjectIds(projects) }, ...(await hiddenSprintFilter(companyId, uid, projects)) };

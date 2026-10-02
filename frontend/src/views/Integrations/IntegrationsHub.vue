@@ -63,6 +63,7 @@
                             <button class="ig-mini del" data-test="inbox-remove" @click="remove(ib)">{{ $t('IntegrationsHub.delete') }}</button>
                         </div>
                         <p v-else class="ig-note" data-test="inbox-readonly">{{ $t('IntegrationsHub.email_change_by') }}</p>
+                        <p v-if="ib.filing === false" class="ig-note ig-error" data-test="inbox-not-filing">{{ $t('IntegrationsHub.email_not_filing') }}</p>
                         <p v-if="inboxErrors[ib._id]" class="ig-note ig-error" role="alert" data-test="inbox-error">{{ inboxErrors[ib._id] }}</p>
                     </div>
 

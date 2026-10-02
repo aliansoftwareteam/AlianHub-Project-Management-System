@@ -7,6 +7,13 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAuditFromReq: jest.fn(), recordAudit: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(), isPrivileged: (r) => r === 1 || r === 2 }));
+/* The tasks the reader can open, by the rule tests/timesheet-names-open-rule.test.js covers: here a case names them. */
+const mockOpenTasks = new Set();
+jest.mock('../Modules/Tasks/helpers/openNames', () => ({
+    openTasksById: jest.fn(async (companyId, uid, ids) => Object.fromEntries((mockDb.store.tasks || [])
+        .filter((task) => ids.map(String).includes(String(task._id)) && mockOpenTasks.has(String(task._id)))
+        .map((task) => [String(task._id), task]))),
+}));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { getRoleType } = require('../Config/permissionGuard');
@@ -15,6 +22,7 @@ const socket = require('../event/socketEventEmitter');
 const { recordAuditFromReq } = require('../Modules/Audit/recorder');
 const billing = require('../Modules/Milestone/controller/billing');
 const ctrl = require('../Modules/Invoice/controller/projectInvoices');
+const { openTasksById } = require('../Modules/Tasks/helpers/openNames');
 
 const C = '6f0000000000000000000c01';
 const P = '6f0000000000000000000b01';
@@ -26,6 +34,8 @@ const USER2 = '6f0000000000000000000002';
 const T1 = '6f0000000000000000000f01';
 const T2 = '6f0000000000000000000f02';
 const L1 = '6f0000000000000000000a01';
+const L2 = '6f0000000000000000000a02';
+const L3 = '6f0000000000000000000a03';
 const INV = '6f0000000000000000000d01';
 
 const res = () => {
@@ -67,6 +77,7 @@ const contractCtx = (over = {}) => ({
 beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockDb.calls.length = 0;
+    mockOpenTasks.clear();
     jest.clearAllMocks();
     getRoleType.mockResolvedValue(3);
     jest.spyOn(billing, 'resolveUserNames').mockResolvedValue(new Map());
@@ -211,7 +222,8 @@ describe('getInvoice', () => {
         ] });
         mockDb.seed(SCHEMA_TYPE.TASKS, { _id: T1, TaskKey: 'AP-1', TaskName: 'Build', statusType: 'close' });
         mockDb.seed(SCHEMA_TYPE.TASKS, { _id: T2, TaskKey: 'AP-2', TaskName: 'Ship', statusType: 'open' });
-        mockDb.seed(SCHEMA_TYPE.TIMESHEET, { _id: L1, TicketID: T1, Loggeduser: USER2, LogTimeDuration: 90, LogStartTime: 1770000000, LogDescription: 'z'.repeat(300) });
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET, { _id: L1, TicketID: T1, ProjectId: P, Loggeduser: USER2, LogTimeDuration: 90, LogStartTime: 1770000000, LogDescription: 'z'.repeat(300) });
+        [T1, T2].forEach((id) => mockOpenTasks.add(id));
         billing.resolveUserNames.mockResolvedValue(new Map([[USER2, 'Bea']]));
 
         const r = await run(ctrl.getInvoice, { params: { id: INV } });
@@ -229,11 +241,39 @@ describe('getInvoice', () => {
         expect(companies()).toEqual([C]);
     });
 
-    it('asks for each task once even when several lines name it', async () => {
+    it('keeps a task the reader cannot open on its line without its key, name or state, and its time without the note', async () => {
+        seedInvoice({ lines: [{ id: 'a', taskIds: [T1, T2], timelogIds: [L1, L2] }] });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: T1, TaskKey: 'AP-1', TaskName: 'Build', statusType: 'close' });
+        mockDb.seed(SCHEMA_TYPE.TASKS, { _id: T2, TaskKey: 'AP-2', TaskName: 'Ship', statusType: 'close' });
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET, { _id: L1, TicketID: T1, ProjectId: P, Loggeduser: USER2, LogTimeDuration: 90, LogStartTime: 1770000000, LogDescription: 'built it' });
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET, { _id: L2, TicketID: T2, ProjectId: P, Loggeduser: USER2, LogTimeDuration: 30, LogStartTime: 1770000100, LogDescription: 'shipped it' });
+        mockOpenTasks.add(T1);
+
+        const { trace } = (await run(ctrl.getInvoice, { params: { id: INV } })).body.data;
+
+        expect(trace.tasks).toEqual([
+            { _id: T1, key: 'AP-1', name: 'Build', done: true },
+            { _id: T2, key: '', name: '', done: false, hidden: true },
+        ]);
+        expect(trace.timelogs.map((log) => [log._id, log.minutes, log.note])).toEqual([[L1, 90, 'built it'], [L2, 30, '']]);
+    });
+
+    it('reads behind a line only the time logged on the invoice\'s own project', async () => {
+        seedInvoice({ lines: [{ id: 'a', taskIds: [], timelogIds: [L1, L3] }] });
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET, { _id: L1, TicketID: T1, ProjectId: P, Loggeduser: USER2, LogTimeDuration: 90, LogStartTime: 1770000000, LogDescription: 'here' });
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET, { _id: L3, TicketID: T2, ProjectId: OTHER_P, Loggeduser: USER2, LogTimeDuration: 45, LogStartTime: 1770000200, LogDescription: 'elsewhere' });
+
+        const { trace } = (await run(ctrl.getInvoice, { params: { id: INV } })).body.data;
+
+        expect(trace.timelogs.map((log) => log._id)).toEqual([L1]);
+    });
+
+    it('asks for each task once even when several lines name it, and as the person who reads', async () => {
         seedInvoice({ lines: [{ id: 'a', taskIds: [T1] }, { id: 'b', taskIds: [T1] }] });
         await run(ctrl.getInvoice, { params: { id: INV } });
-        const [taskCall] = callsFor(SCHEMA_TYPE.TASKS, 'find');
-        expect(taskCall.data[0]).toEqual({ _id: { $in: [T1] } });
+        expect(openTasksById).toHaveBeenCalledTimes(1);
+        expect(openTasksById.mock.calls[0].slice(0, 3)).toEqual([C, USER, [T1]]);
+        expect(callsFor(SCHEMA_TYPE.TASKS)).toHaveLength(0);
     });
 
     it('does not query tasks or time logs for an invoice whose lines name none', async () => {

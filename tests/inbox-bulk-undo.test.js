@@ -5,6 +5,7 @@ jest.mock('../Modules/notification-count/controller', () => ({
     updateMentionCount: jest.fn((companyId, userIds, field, cb) => cb({ status: true })),
 }));
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(() => Promise.resolve(3)), isPrivileged: () => false }));
+jest.mock('../Modules/Comments/helpers/readerRows', () => require('./fixtures/taskReadByProject').nothingKeptFromReader());
 
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
 const counter = require('../Modules/notification-count/controller');

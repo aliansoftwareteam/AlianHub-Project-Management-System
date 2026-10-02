@@ -18,6 +18,12 @@ const statusConditions = require('./helpers/statusConditions');
 const { loadStatuses } = require('./helpers/projectStatuses');
 const notices = require('./engine/noticeRecipients');
 const triggerState = require('./helpers/triggerState');
+const { visibilityStage } = require('../Tasks/helpers/taskQueryGuard');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
+const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
+const { hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
+const { othersPersonalListIds } = require('../PersonalList/ownership');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
 const NOT_FOUND = 'Not found.';
 const APPLY_REFUSED = 'You cannot edit every task this automation targets.';
@@ -75,8 +81,9 @@ const v1Statuses = (companyId, conditions, projectIds) => (conditions && conditi
     ? loadStatuses(companyId, projectIds).catch(() => [])
     : Promise.resolve([]));
 
+/* `match`, held to the tasks `uid` can open by the rule every task read applies. */
 const visibleOnly = async (companyId, uid, match) => ({
-    $and: [match, { ProjectID: { $in: await access.visibleProjectIds(companyId, uid) }, mainChat: { $ne: true } }],
+    $and: [match, (await visibilityStage(companyId, String(uid))).$match, { mainChat: { $ne: true } }],
 });
 
 // POST /api/v1/automations
@@ -339,16 +346,22 @@ exports.setRuleEnabled = async (req, res) => {
 
 const RUNS_LIMIT = 50;
 const RUN_PROJECT = 'envelope.scope.projectId';
+const RUN_LIST = 'envelope.scope.sprintId';
 
 const definedOnly = (obj) => Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
 
-/* A run without a project is shown only when it names no task: a task always has
- * a project, so a task run without one cannot be checked against the caller. */
+/* A run is shown when its task sits where the caller reads tasks. A run without a project is shown only
+ * when it names no task: a task always has a project, so a task run without one cannot be checked. */
 const visibleRunsMatch = async (companyId, uid) => {
-    if (await access.canManageRules(companyId, uid)) return {};
+    if (await access.canManageRules(companyId, uid)) {
+        const personal = await othersPersonalListIds(companyId, uid);
+        return personal.length ? { [RUN_PROJECT]: { $nin: idForms(personal) } } : {};
+    }
+    const projects = await taskListProjectIds(companyId, String(uid));
+    const hidden = await hiddenSprintIds(companyId, uid, projects);
     return {
         $or: [
-            { [RUN_PROJECT]: { $in: await access.visibleProjectIds(companyId, uid) } },
+            { [RUN_PROJECT]: { $in: idForms(projects) }, ...(hidden.length ? { [RUN_LIST]: { $nin: idForms(hidden) } } : {}) },
             { [RUN_PROJECT]: null, 'entity.kind': { $ne: 'task' } },
         ],
     };
@@ -445,8 +458,7 @@ exports.dryRun = async (req, res) => {
         const task = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }],
         }, 'findOne');
-        const visible = (await access.visibleProjectIds(companyId, req.uid)).map(String);
-        if (!task || !visible.includes(String(task.ProjectID))) return refuse(res, 404, NOT_FOUND);
+        if (!task || !(await canReadTask(companyId, String(req.uid), task))) return refuse(res, 404, NOT_FOUND);
         const statuses = await loadStatuses(companyId, [String(task.ProjectID)]).catch(() => []);
         const plan = dryRunPlan.plan({ rule, task: task.toObject ? task.toObject() : task, uid: req.uid, triggerLabel: trigger.label, statuses });
         await previewAssignments(companyId, rule, task, plan);
@@ -547,7 +559,7 @@ exports.backtest = async (req, res) => {
         const basis = await triggerState.backtestBasis(companyId, rule.trigger && rule.trigger.event, { since, projectIds, windowDays: WINDOW_DAYS });
         const match = { ...basis.match };
         if (Object.keys(conditionMatch).length) Object.assign(match, conditionMatch);
-        const scoped = { $and: [match, { ProjectID: { $in: projectIds }, mainChat: { $ne: true } }] };
+        const scoped = await visibleOnly(companyId, req.uid, { $and: [match, { ProjectID: { $in: projectIds } }] });
         const [count, sample] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped] }, 'countDocuments').catch(() => 0),
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped, 'TaskName TaskKey ProjectID statusKey', { limit: 5, sort: { updatedAt: -1 } }] }, 'find').catch(() => []),

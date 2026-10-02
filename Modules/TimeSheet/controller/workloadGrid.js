@@ -19,7 +19,13 @@ const { withoutHiddenSprintPlans, namesTimeOff, asUnavailableDays } = require('.
 const { canReadTask } = require('../../Tasks/helpers/taskReadAccess');
 const { assigneeProblem } = require('../helpers/planMoveAccess');
 const { visibilityStage } = require('../../Tasks/helpers/taskQueryGuard');
+const { openTasksById, openProjectsById } = require('../../Tasks/helpers/openNames');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
+
+/* A scope that reads everyone already knows the tasks of the private lists its person is not on. */
+const withoutPlansOnHiddenLists = (companyId, scope, rows) => (scope.closedTasks
+    ? (rows || []).filter((row) => !scope.closedTasks.includes(String(row.TaskId)))
+    : withoutHiddenSprintPlans(companyId, scope.uid, rows));
 const safeZone = (z) => (z && DateTime.local().setZone(z).isValid ? z : 'UTC');
 const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
 const dayBounds = (day) => ({ start: new Date(`${day}T00:00:00.000Z`), end: new Date(`${day}T23:59:59.999Z`) });
@@ -172,7 +178,7 @@ exports.getWorkloadGrid = async (req, res) => {
         const [estimates, logs, ptoRows, names] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ESTIMATES_TIME, data: [estMatch, { UserId: 1, TaskId: 1, ProjectId: 1, Date: 1, EstimatedTime: 1 }] }, 'find')
                 .catch(() => [])
-                .then((rows) => withoutHiddenSprintPlans(companyId, req.uid, rows)),
+                .then((rows) => withoutPlansOnHiddenLists(companyId, scope, rows)),
             unit === 'hours'
                 ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [logMatch, { Loggeduser: 1, LogStartTime: 1, LogTimeDuration: 1 }] }, 'find').catch(() => [])
                 : [],
@@ -190,19 +196,10 @@ exports.getWorkloadGrid = async (req, res) => {
             return res.json({ status: true, statusText: 'OK', data: { start: b.start, end: b.end, days, unit, workingDays, unpointed, users: asShownToCaller(users) } });
         }
 
-        const taskIds = [...new Set((estimates || []).map((e) => String(e.TaskId || '')).filter(Boolean))];
-        const tasks = taskIds.length ? await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: { $in: taskIds.map(oid).filter(Boolean) } }, { TaskName: 1, ProjectID: 1, sprintId: 1, DueDate: 1, AssigneeUserId: 1 }],
-        }, 'find').catch(() => []) : [];
-        const taskById = {};
-        (tasks || []).forEach((t) => { taskById[String(t._id)] = t; });
-        const projById = {};
-        const pids = [...new Set((estimates || []).map((e) => String(e.ProjectId || '')).filter(Boolean))].map(oid).filter(Boolean);
-        if (pids.length) {
-            const projects = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: pids } }, { ProjectName: 1, projectIcon: 1 }] }, 'find').catch(() => []);
-            (projects || []).forEach((p) => { projById[String(p._id)] = p; });
-        }
+        const [taskById, projById] = await Promise.all([
+            openTasksById(companyId, req.uid, (estimates || []).map((e) => e.TaskId), { TaskName: 1 }).catch(() => ({})),
+            openProjectsById(companyId, req.uid, (estimates || []).map((e) => e.ProjectId), { ProjectName: 1, projectIcon: 1 }).catch(() => ({})),
+        ]);
 
         const chipsByUser = {};
         (estimates || []).forEach((e) => {

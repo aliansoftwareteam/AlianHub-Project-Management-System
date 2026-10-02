@@ -4,6 +4,7 @@ jest.mock('../Modules/Workflows/queue');
 jest.mock('../Modules/Workflows/definitions');
 jest.mock('../Modules/Agents/access');
 jest.mock('../utils/mongo-handler/mongoQueries');
+jest.mock('../Modules/Tasks/helpers/taskReadAccess', () => ({ canReadTask: jest.fn(async () => true), TASK_READ_FIELDS: {} }));
 
 const store = require('../Modules/Workflows/store');
 const queue = require('../Modules/Workflows/queue');

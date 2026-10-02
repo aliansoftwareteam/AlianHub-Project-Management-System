@@ -146,7 +146,7 @@ describe('a time-log report by project', () => {
     test.each([['a limited viewer', MEMBER], ['an owner', OWNER]])('shows one row per project for %s while records hold both forms', async (who, uid) => {
         MongoDbCrudOpration.mockImplementation(async (companyId, { type, data }, method) => {
             if (method === 'aggregate' && type === SCHEMA_TYPE.TIMESHEET) return aggregate(LOGGED, data[0]);
-            if (type === SCHEMA_TYPE.PROJECTS) return [{ _id: oid(MINE), ProjectName: 'Mine' }];
+            if (type === SCHEMA_TYPE.PROJECTS) return data[0].isPersonal ? [] : [{ _id: oid(MINE), ProjectName: 'Mine' }];
             return [];
         });
         const { res } = await run(uid, logReport());

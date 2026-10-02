@@ -1,11 +1,12 @@
-const { canReadProject } = require('../../../Config/projectAccess');
+const { canReadProject, readableProjects } = require('../../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
-const { canSeeSprintById } = require('../../Sprints/helpers/sprintVisibility');
-const { mayListTasksIn } = require('./taskListProjects');
+const { canSeeSprintById, hiddenAmong } = require('../../Sprints/helpers/sprintVisibility');
+const { mayListTasksIn, keepTaskListProjectIds } = require('./taskListProjects');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { visibilityStage, toObjectIds } = require('./taskQueryGuard');
 const { inConversation } = require('../../Comments/helpers/conversationReaders');
+const { allowsProject } = require('../../../Config/tokenNarrowing');
 
 /* Deleted, archived, or in a deleted project. */
 const NOT_LIVE = Object.freeze([1, 2, 7]);
@@ -25,6 +26,29 @@ const canReadTask = async (companyId, uid, task) => {
     return canSeeSprintById(companyId, uid, task.sprintId);
 };
 
+const TASK_READ_FIELDS = Object.freeze({ ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 });
+
+/* canReadTask for many rows (read with TASK_READ_FIELDS) at a fixed cost: the person's standing once, the projects
+ * in one read, the task-list rule once and the private lists in one read, however many places the rows sit in. */
+const readableTasks = async (companyId, uid, rows) => {
+    const tasks = (rows || []).filter((row) => row && row.ProjectID);
+    if (!tasks.length) return [];
+    const person = String(uid || '');
+    const { standing, found, open } = await readableProjects(companyId, person, tasks.map((task) => task.ProjectID));
+    if (standing.roleType === null) return [];
+    const [listed, hidden] = standing.privileged ? [null, null] : (await Promise.all([
+        keepTaskListProjectIds(companyId, person, [...open.keys()]),
+        hiddenAmong(companyId, person, tasks.map((task) => task.sprintId).filter(Boolean)),
+    ])).map((ids) => new Set(ids.map(String)));
+    return tasks.filter((task) => {
+        const projectId = String(task.ProjectID);
+        if (!allowsProject(person, projectId)) return false;
+        if (!found.has(projectId)) return task.mainChat === true && inConversation(task, person);
+        if (!open.has(projectId) || (task.mainChat === true && !inConversation(task, person))) return false;
+        return standing.privileged || (listed.has(projectId) && !hidden.has(String(task.sprintId)));
+    });
+};
+
 /* Which of `ids` the person can open, read in one query under the rule the task query applies to every read. A chat row is
  * not a task anyone links to or votes on, so it is never among them. `live` leaves out what is deleted or archived. */
 const openableTasks = async (companyId, uid, ids, { projection = {}, live = true } = {}) => {
@@ -42,4 +66,4 @@ const openableTasks = async (companyId, uid, ids, { projection = {}, live = true
     return rows || [];
 };
 
-module.exports = { canReadTask, openableTasks };
+module.exports = { canReadTask, openableTasks, readableTasks, TASK_READ_FIELDS };

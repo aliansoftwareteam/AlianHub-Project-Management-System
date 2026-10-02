@@ -4,6 +4,7 @@ const actions = require('../Agents/actions');
 const tools = require('../Automations/engine/tools');
 const writerLimits = require('../../event/writerLimits');
 const store = require('./store');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 
 // The agent runner behind the `agent_run` step type.
 //
@@ -70,10 +71,18 @@ const agentFor = async (companyId, run, step) => {
     return { agentId: String(agentId), agent: (await runs.getAgent(companyId, agentId)) || null };
 };
 
+/* A new run is started on a task its starter can open, and never on a conversation; either reads like a task
+ * that is not there. A run with no person behind it, a rule's, is held by the agent's own scope below. */
+const openTaskFor = async (companyId, taskId, startedBy) => {
+    const task = await taskFor(companyId, taskId);
+    if (task.mainChat === true || (startedBy && !(await canReadTask(companyId, String(startedBy), task)))) throw permanent(`task ${taskId} was not found`);
+    return task;
+};
+
 const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, depth }) => {
     const agent = await runs.getAgent(companyId, agentId);
     if (!agent) throw permanent(`agent ${agentId} was not found`);
-    const task = await taskFor(companyId, taskId);
+    const task = await openTaskFor(companyId, taskId, startedBy);
     if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) {
         throw permanent(`agent ${agent.name} is not scoped to project ${task.ProjectID}`);
     }

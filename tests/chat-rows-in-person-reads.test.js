@@ -198,7 +198,7 @@ describe('the private work an owner or admin does not read', () => {
     });
 
     it.each([['a member', OUTSIDER], ['a member who is in it', INSIDER]])('a join into the tasks made by %s takes the conversation only when they are in it', (who, uid) => {
-        const scope = { uid, companyWide: false, everyone: false, visible: [P_OPEN] };
+        const scope = { uid, companyWide: false, everyone: false, visible: [P_OPEN], hiddenLists: [] };
         const [, { $lookup: { pipeline: [first] } }] = scopeTimesheetPipeline([{ $lookup: { from: 'tasks', localField: 'TicketID', foreignField: '_id', as: 'task', pipeline: [{ $project: { TaskName: 1 } }] } }], scope);
         const row = (id) => rows(SCHEMA_TYPE.TASKS).find((task) => String(task._id) === id);
 

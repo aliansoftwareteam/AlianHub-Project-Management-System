@@ -10,7 +10,7 @@ const { escapeCommentFields } = require("./helpers/plainText");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
 const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
-const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor } = require("./helpers/threadWriteAccess");
+const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor, liveModuleOf } = require("./helpers/threadWriteAccess");
 const { resolveMentionIds, deliverMentions } = require("./helpers/commentNotifications");
 const { taskIdMatch } = require("./helpers/taskIdMatch");
 const { isThreadFile, mayCarryMedia, refuseMedia } = require("./helpers/commentFileKeys");
@@ -110,14 +110,7 @@ exports.save = async (req, res) => {
             await handToOwnAi(req, companyId, { ...thread, userId: convertData.userId, message: convertData.message })
                 .catch((err) => logger.error(`[mentions] task not handed over: ${err.message}`));
         }
-        if (placement.parent || (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId)) {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
-        } else if(data?.taskId === "default"){
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
-        }
-        else {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project', companyId });
-        }
+        socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: placement.parent ? 'comments' : liveModuleOf(response || convertData), companyId });
         const saved = response && response._id && (typeof response.toObject === "function" ? response.toObject() : response);
         if (saved) {
             await askOwnAi(req, companyId, saved).catch((err) => logger.error(`[mentions] own AI not asked: ${err.message}`));
@@ -163,7 +156,7 @@ exports.save = async (req, res) => {
 
 exports.update = async (req, res) => {
     try {
-        const { id, isProjectComment } = req.body;
+        const { id } = req.body;
         const data = withoutImportFields(withoutAiFields(withoutThreadState(escapeCommentFields(req.body.data))));
 
         if (!id) {
@@ -231,11 +224,7 @@ exports.update = async (req, res) => {
 
         const companyId = req.headers['companyid'];
         const response = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
-        if(!isProjectComment){
-            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments', companyId });
-        }else{
-            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments_project', companyId });
-        }
+        socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: liveModuleOf(existingComment), companyId });
         const deletionChanged = changedKeys.includes('isDeleted') && Boolean(data.isDeleted) !== Boolean(existingComment.isDeleted);
         if (response && (deletionChanged || changes.message !== undefined)) {
             await ownAiFollowsChange(req, companyId, existingComment, response).catch((err) => logger.error(`[mentions] own AI did not follow the change: ${err.message}`));

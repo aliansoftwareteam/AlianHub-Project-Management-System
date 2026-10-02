@@ -18,6 +18,8 @@ const mockChat = jest.fn(async () => ({ content: JSON.stringify({ minutes: 210, 
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockCrud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ ...jest.requireActual('../Modules/Sprints/helpers/sprintVisibility'), hiddenSprintIds: jest.fn(async () => []) }));
+jest.mock('../Modules/Tasks/helpers/taskReadAccess', () => require('./fixtures/taskReadByProject').taskReadByProject());
 jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(async () => 3),
