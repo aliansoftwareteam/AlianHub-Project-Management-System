@@ -60,8 +60,24 @@ export const autonomyTip = (t, level) => t("Ai.autonomy_tip", { code: `L${levelO
 const CHANGES_ON = /^(\S+): (\d+) change(?:\(s\)|s)? on (.+)$/;
 const FINDINGS_ON = /^File (\d+) QA finding(?:\(s\)|s)? on (.+)$/;
 
+// A proposal filed by a caller that had no title to give was stored with the text of that nothing.
+const NO_WORDS = Object.freeze(["", "undefined", "null"]);
+const wordsOf = (value) => {
+    const words = String(value ?? "").trim();
+    return NO_WORDS.includes(words) ? "" : words;
+};
+
+const titleFromChanges = (t, proposal) => {
+    const changes = Array.isArray(proposal && proposal.changes) ? proposal.changes : [];
+    const first = wordsOf(changes[0] && changes[0].label);
+    if (!first) return t("Ai.proposal_untitled");
+    const more = changes.length - 1;
+    return more ? t("Ai.proposal_first_and_more", { label: first, n: more }, more) : first;
+};
+
 export const proposalTitle = (t, proposal) => {
-    const what = String((proposal && proposal.what) || "");
+    const what = wordsOf(proposal && proposal.what);
+    if (!what) return titleFromChanges(t, proposal);
     const changes = CHANGES_ON.exec(what);
     if (changes) {
         const n = Number(changes[2]);

@@ -133,6 +133,8 @@
                     data-test="approvals-empty"
                     :title="$t('Time.queue_empty_title')"
                     :message="$t('Time.queue_empty')"
+                    :action-label="filter === 'all' ? '' : $t('Time.show_all_approvals')"
+                    @action="filter = 'all'"
                 />
                 <div v-else-if="loading && !visibleCards.length" class="ah-small">{{ $t('Time.loading') }}</div>
             </div>

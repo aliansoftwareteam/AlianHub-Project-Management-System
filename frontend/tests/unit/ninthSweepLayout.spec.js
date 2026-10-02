@@ -265,7 +265,7 @@ describe('an audit log filter that matches nothing', () => {
     it('says so and clears the filter, back to the whole log', async () => {
         apiRequest.mockReset();
         apiRequest.mockResolvedValue(none);
-        wrapper = mount(AuditLog, { global: { mocks: { $t: t }, plugins: [createI18n({ legacy: false, locale: 'en', messages: { en } })] } });
+        wrapper = mount(AuditLog, { global: { mocks: { $t: t } } });
         await flushPromises();
         await wrapper.findAll('.ah-tab')[2].trigger('click');
         await flushPromises();
@@ -334,7 +334,7 @@ describe('empty screens that explained but offered nothing', () => {
         expect(approvals).toContain('@action="switchView(\'pending\')"');
         const reports = tag('views/Ai/AiInbox.vue', 'reports-empty');
         expect(reports).toContain(':action-label="$t(\'Ai.reports_empty_action\')"');
-        expect(reports).toContain('@action="openTeammates"');
+        expect(reports).toContain('@action="$router.push({ name: \'AgentTeammates\', params: { cid: companyId } })"');
         expect(en.Ai.back_to_waiting).toBeTruthy();
         expect(en.Ai.reports_empty_action).toBeTruthy();
     });
