@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 import { flushPromises, mount } from '@vue/test-utils';
 
 const COMPANY_ID = '6f0000000000000000000c01';
@@ -120,6 +121,25 @@ describe('Invitation page for an invitee who may already have an account', () =>
         expect(localStorage.getItem('selectedCompany')).toBe(COMPANY_ID);
         expect(mocks.replace).toHaveBeenCalledWith(`/${COMPANY_ID}/welcome/connect-ai`);
         expect(reload).toHaveBeenCalled();
+    });
+
+    it('tells the app which workspace is open before it goes there, so a person with no workspace is not sent to name one', async () => {
+        signedInAs(INVITED);
+        const openCompany = ref('');
+        let openWhenLeaving;
+        mocks.replace.mockImplementation(async () => { openWhenLeaving = openCompany.value; });
+        const wrapper = mount(Invitation, {
+            global: {
+                provide: { $axios: previewSays(), addSubscription: vi.fn(), $companyId: openCompany },
+                stubs: { 'router-link': { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' } },
+            },
+        });
+        await flushPromises();
+
+        await buttonNamed(wrapper, 'Auth.invite_accept').trigger('click');
+        await flushPromises();
+
+        expect(openWhenLeaving).toBe(COMPANY_ID);
     });
 
     it('says plainly when signed in as another account, offers to switch, and never accepts', async () => {
