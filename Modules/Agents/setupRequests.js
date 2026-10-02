@@ -19,6 +19,11 @@ const FIELD_NAME_MAX = 80;
 const OPTIONS_MAX = 30;
 const OPTION_MAX = 60;
 const NOTE_MAX = 200;
+const VALUES_MAX = 50;
+const VALUE_TEXT_MAX = 4000;
+const VALUE_PARTS_MAX = 50;
+const FIELD_SET = 'task.field.set';
+const NO_TASK = 'that task was not found in this project';
 
 /* The `tab` of each kind of view a project can keep a saved copy of (Modules/ViewTemplates/templateRules.js). */
 const VIEW_KINDS = Object.freeze({ list: 'ProjectListView', board: 'ProjectKanban', table: 'TableView', calendar: 'Calendar', workload: 'Workload' });
@@ -167,6 +172,79 @@ const createFields = async ({ companyId, who, projectId, definitions }) => {
             : await saveField({ companyId, who, projectId: inProject, draft }));
     }
     return { project, projectId: inProject, fields };
+};
+
+const isPart = (value) => (typeof value === 'string' && value.length <= VALUE_TEXT_MAX) || (typeof value === 'number' && Number.isFinite(value));
+const isValue = (value) => value === null || typeof value === 'boolean' || isPart(value) || (Array.isArray(value) && value.length <= VALUE_PARTS_MAX && value.every(isPart));
+
+const valuesOf = (given) => listOf(given).map((entry) => ({ taskId: idOf(entry.taskId).toLowerCase(), field: lineOf(entry.field, FIELD_NAME_MAX), value: entry.value }));
+
+/* '' when every value names a task and a field and holds what a field can store; otherwise which one does not. */
+const valuesProblem = (given) => {
+    if (given === undefined) return '';
+    const entries = listOf(given);
+    if (!entries.length || entries.length > VALUES_MAX) return `values needs 1 to ${VALUES_MAX} values`;
+    const at = entries.findIndex((entry) => !entry || !isId(entry.taskId) || !lineOf(entry.field, FIELD_NAME_MAX) || !isValue(entry.value));
+    return at < 0 ? '' : `values[${at}] needs a task id, the name of a field, and a value that is text, a number, true or false, a list of those, or null`;
+};
+
+/* What stops the first value that could not be set once the fields exist, or ''. `taskIds` are the tasks of the project the caller may open. */
+const valuesMisfit = async ({ companyId, uid, projectId, definitions, values, taskIds }) => {
+    const { storedValueOf } = require('../CustomField/helpers/fieldValueInput');
+    const held = await fieldsOfProject(companyId, projectId);
+    const drafts = draftsOf(definitions);
+    for (const [at, entry] of valuesOf(values).entries()) {
+        if (!taskIds.includes(entry.taskId)) return `values[${at}]: ${NO_TASK}`;
+        const draft = drafts.find((named) => sameName(named.name, entry.field));
+        const definition = held.find((field) => sameName(field.fieldTitle, entry.field)) || (draft && definitionOf(draft, { projectId, uid }));
+        if (!definition) return `values[${at}] names "${entry.field}", which is not a field of this call or of the project`;
+        const read = storedValueOf(definition, entry.value);
+        if (read.error) return `values[${at}] (${definition.fieldTitle}) ${read.error}`;
+    }
+    return '';
+};
+
+/* One value, set the way task.field.set sets it, on a live task of the project that the person behind the agent
+ * and the approver can both open and both may edit the fields of. A task either cannot open answers as a task that is not there. */
+const setValue = async ({ companyId, actor, depth, approvedBy, projectId, held, entry }) => {
+    const permissions = require('./permissions');
+    const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
+    const definition = held.find((field) => sameName(field.fieldTitle, entry.field));
+    if (!definition) throw refuse(`this project has no field "${entry.field}"`);
+    const task = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS, data: [{ _id: tools.oid(entry.taskId), ProjectID: { $in: idForms(projectId) }, deletedStatusKey: { $ne: 1 } }, { _id: 1 }],
+    }, 'findOne');
+    const people = [actor, ...(approvedBy ? [{ kind: 'human', userId: approvedBy }] : [])];
+    for (const person of people) {
+        if (!task || !(await readableTaskIds(companyId, idOf(person.userId), [entry.taskId])).includes(entry.taskId)) throw refuse(NO_TASK);
+    }
+    for (const person of people) {
+        const may = await permissions.holderMay(companyId, person, FIELD_SET, { taskId: entry.taskId });
+        if (!may.allowed) throw refuse(person === actor ? may.reason : `the approver may not set a field on this task: ${may.reason}`);
+    }
+    const fieldId = idOf(definition._id);
+    const out = await require('./taskRequests').executors[FIELD_SET]({ companyId, actor, params: { taskId: entry.taskId, fieldId, value: entry.value }, depth });
+    if (require('./actor').isAgent(actor)) await require('../Tasks/helpers/completionStore').recordWork(companyId, entry.taskId, require('./actions').workEntry(actor, 0));
+    return { item: { taskId: entry.taskId, field: definition.fieldTitle || entry.field, set: true }, undo: { taskId: entry.taskId, fieldId, previous: out.undo.previous[`customField.${fieldId}`] } };
+};
+
+/* One answer per value: set, or why not. A value that is not set stops no other. */
+const setValues = async ({ values, ...context }) => {
+    const usable = require('./registry').has(FIELD_SET);
+    const held = usable ? await fieldsOfProject(context.companyId, context.projectId) : [];
+    const items = [];
+    const undos = [];
+    for (const entry of values) {
+        try {
+            if (!usable) throw refuse(`${FIELD_SET} is switched off here`);
+            const done = await setValue({ ...context, held, entry });
+            items.push(done.item);
+            undos.push(done.undo);
+        } catch (error) {
+            items.push({ taskId: entry.taskId, field: entry.field, set: false, error: error.message });
+        }
+    }
+    return { items, undos };
 };
 
 const storedField = (companyId, fieldId) => (isId(fieldId)
@@ -358,14 +436,20 @@ const withdrawView = async ({ companyId, who, projectId, viewId }) => {
 };
 
 const executors = {
-    async 'fields.create'({ companyId, actor, params, depth }) {
+    async 'fields.create'({ companyId, actor, params, depth, approvedBy }) {
+        const problem = valuesProblem(params.values);
+        if (problem) throw refuse(problem);
         const out = await createFields({ companyId, who: whoOf(actor, depth), projectId: params.projectId, definitions: params.definitions });
+        const values = params.values === undefined ? null : await setValues({ companyId, actor, depth, approvedBy, projectId: out.projectId, values: valuesOf(params.values) });
         const made = out.fields.filter((field) => field.made);
-        const failed = out.fields.filter((field) => field.error);
-        if (!made.length && failed.length) throw refuse(unique(failed.map((field) => `${field.name}: ${field.error}`)).join('; '));
+        const set = values ? values.undos : [];
+        const failed = [...out.fields, ...(values ? values.items : [])].filter((entry) => entry.error).map((entry) => `${entry.name || entry.field}: ${entry.error}`);
+        if (!made.length && !set.length && failed.length) throw refuse(unique(failed).join('; '));
         return {
-            result: { projectId: out.projectId, made: made.length, fields: out.fields },
-            undo: made.length ? { kind: 'fields', projectId: out.projectId, fieldIds: made.map((field) => field.fieldId) } : null,
+            result: { projectId: out.projectId, made: made.length, fields: out.fields, ...(values ? { values: values.items } : {}) },
+            undo: made.length || set.length
+                ? { kind: 'fields', projectId: out.projectId, fieldIds: made.map((field) => field.fieldId), ...(set.length ? { values: set } : {}) }
+                : null,
             entityType: 'project', entityId: out.projectId, entityName: out.project.ProjectName || '',
         };
     },
@@ -382,6 +466,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
-    FIELD_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
+    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, valuesOf, valuesProblem, valuesMisfit, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
+    FIELD_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };

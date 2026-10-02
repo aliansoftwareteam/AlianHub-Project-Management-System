@@ -9092,7 +9092,13 @@ export default {
         "due_next_7_days": "The next 7 days",
         "due_this_month": "This month",
         "due_overdue": "Before today",
-        "due_range": "{from} to {to}"
+        "due_range": "{from} to {to}",
+        "line_value": "Value",
+        "value_on_task": "{field} on “{task}”: {value}",
+        "value_yes": "Yes",
+        "value_no": "No",
+        "value_empty": "Empty",
+        "values_hidden": "{n} value on a task you cannot open | {n} values on tasks you cannot open"
     },
     "Integrations": {
         "title": "Integrations",

@@ -94,6 +94,14 @@ export const LINE_KINDS = {
         if (!type) return { label: t('IntentPreview.line_field'), text: name };
         return { label: t('IntentPreview.line_field'), text: options ? t('IntentPreview.field_with_options', { name, type, options }) : t('IntentPreview.field_named', { name, type }) };
     },
+    fieldValue: (t, line) => {
+        const [field, task] = [textOf(line.field), textOf(line.task)];
+        if (!field || !task) return null;
+        const flag = typeof line.checked === 'boolean' ? t(line.checked ? 'IntentPreview.value_yes' : 'IntentPreview.value_no') : '';
+        const value = flag || peopleText(t, { names: [line.value], others: line.others }) || t('IntentPreview.value_empty');
+        return { label: t('IntentPreview.line_value'), text: t('IntentPreview.value_on_task', { field, task, value }) };
+    },
+    fieldValuesHidden: (t, line) => (countOf(line.count) ? { label: t('IntentPreview.line_value'), text: t('IntentPreview.values_hidden', { n: countOf(line.count) }, countOf(line.count)) } : null),
     layout: (t, line) => (LAYOUTS.includes(line.value) ? { label: t('IntentPreview.line_layout'), text: t(`IntentPreview.layout_${line.value}`) } : null),
     group: (t, line) => {
         const text = chosenText(t, line, GROUPS, 'group');

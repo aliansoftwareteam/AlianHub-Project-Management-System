@@ -105,7 +105,7 @@ describe('waiting fields with their first values', () => {
         const preview = await previewOf(OUTSIDER, 'valued');
         expect(preview.lines.slice(6).map((line) => line.kind)).toEqual(['fieldValue', 'fieldValue', 'fieldValue', 'fieldValue', 'fieldValue', 'fieldValuesHidden']);
         expect(preview.lines[preview.lines.length - 1]).toEqual({ kind: 'fieldValuesHidden', count: 3 });
-        expect(JSON.stringify(preview)).not.toMatch(/Secret task|Hidden|Elsewhere|Private task/);
+        expect(JSON.stringify(preview)).not.toMatch(/Secret task|"Hidden"|Elsewhere|Private task/);
     });
 });
 

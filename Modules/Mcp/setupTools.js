@@ -1,10 +1,18 @@
+const { SCHEMA_TYPE } = require('../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const { oid } = require('../Automations/engine/tools');
+const registry = require('../Agents/registry');
 const setup = require('../Agents/setupRequests');
 const actions = require('../Agents/actions');
-const { REASON: DENIED } = require('../Agents/permissions');
+const permissions = require('../Agents/permissions');
 const plans = require('../Agents/projectSetup');
 const { LIST_NAME_MAX } = require('../Agents/workRequests');
-const { GRANT } = require('./manageFlag');
+const manageFlag = require('./manageFlag');
+const { TASK_ACCESS_FIELDS } = require('./visibility');
 const { loadProject } = require('./dataTools');
+
+const { GRANT } = manageFlag;
+const DENIED = permissions.REASON;
 
 // Setting a project up: custom fields, saved views, or a whole plan in one call. These show to everyone on the
 // project, so a call never makes one: it is filed for the person to approve in AlianHub (their actions are
@@ -37,6 +45,42 @@ const FIELD = Object.freeze({
     },
     required: ['name', 'type'],
 });
+
+const VALUE = Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        taskId: ID,
+        field: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX, description: 'The name of a field of this call, or of one the project already has' },
+        value: { description: 'The value in the field\'s type, as task.field.set takes it' },
+    },
+    required: ['taskId', 'field', 'value'],
+});
+
+const NO_FIELD_SET = `${DENIED}: values are set as ${setup.FIELD_SET} sets one, which this connection may not use`;
+
+/* Values are refused at once where the caller could not set one by itself, where a task is not one of the project
+ * the caller can open, or where a field would not take its value, so nobody is asked to approve a value that cannot
+ * be set. A project the caller cannot open is left to the target check. */
+const fieldsToFile = async (ctx, args, vis) => {
+    if (args.values === undefined) return { args };
+    const project = await loadProject(ctx, vis, args.projectId);
+    if (!project) return { args };
+    const projectId = String(project._id);
+    const refuse = async (reason) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'fields.create', params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId }); };
+    const usable = registry.has(setup.FIELD_SET) && manageFlag.mayUse(ctx, GRANT)
+        && registry.evaluate(setup.FIELD_SET, { __proposal: true }, { allowedActions: ctx.allowedActions }).allowed;
+    if (!usable) await refuse(NO_FIELD_SET);
+    const named = [...new Set(setup.valuesOf(args.values).map((value) => value.taskId))];
+    const rows = await MongoDbCrudOpration(ctx.companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: named.map(oid) }, deletedStatusKey: { $ne: 1 } }, TASK_ACCESS_FIELDS] }, 'find');
+    const taskIds = (rows || []).filter((task) => String(task.ProjectID) === projectId && vis.allowsTask(task)).map((task) => String(task._id));
+    for (const taskId of taskIds) {
+        const may = await permissions.holderMay(ctx.companyId, ctx.actor, setup.FIELD_SET, { taskId });
+        if (!may.allowed) await refuse(may.reason);
+    }
+    const problem = await setup.valuesMisfit({ companyId: ctx.companyId, uid: String(ctx.userId), projectId, definitions: args.fields, values: args.values, taskIds });
+    return problem ? { answer: { ok: false, error: problem } } : { args };
+};
 
 const LOOK = Object.freeze({
     groupBy: { type: 'string', maxLength: 24, description: `One of ${Object.keys(setup.GROUPS).join(', ')}, or the id of a custom field (see fields.list)` },
@@ -105,10 +149,18 @@ const TOOLS = [
         target: projectTarget,
         description: `Add up to ${setup.FIELDS_MAX} custom fields to one project in a single call, each with a name and a type: ${setup.FIELD_TYPES.join(', ')}. `
             + 'A dropdown takes its options as plain text. A field the project already has by that name is kept, not made twice, so read fields.list first. '
-            + `${WAITS} Set a value on a task afterwards with task.field.set.`,
-        input: input({ projectId: ID, fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD }, ...REASON }, ['projectId', 'fields']),
-        check: (args) => setup.draftsProblem(args.fields),
-        params: (args) => ({ projectId: str(args.projectId, 40), definitions: setup.draftsOf(args.fields) }),
+            + `To give the fields their first values in the same approval, name them in values (at most ${setup.VALUES_MAX}): each a task of this project, a field by its name and the value. `
+            + 'A value is set only on a task the person and the approver may both edit, and the answer says which were set. '
+            + `${WAITS} Set or change a value later with task.field.set.`,
+        input: input({
+            projectId: ID,
+            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
+            values: { type: 'array', minItems: 1, maxItems: setup.VALUES_MAX, items: VALUE },
+            ...REASON,
+        }, ['projectId', 'fields']),
+        check: (args) => setup.draftsProblem(args.fields) || setup.valuesProblem(args.values),
+        prepare: fieldsToFile,
+        params: (args) => ({ projectId: str(args.projectId, 40), definitions: setup.draftsOf(args.fields), ...(args.values === undefined ? {} : { values: setup.valuesOf(args.values) }) }),
     },
     {
         name: 'view.create',

@@ -156,7 +156,7 @@ describe('a value that cannot be set is refused before anybody is asked', () => 
         const before = everythingNow();
         const out = await rpc(caller, TOOL, args);
         expect(out.pending).toBeUndefined();
-        expect(JSON.stringify(out)).toMatch(message);
+        expect([out.error, out.reason, out.rpcError && out.rpcError.message].filter(Boolean).join(' ')).toMatch(message);
         expect(everythingNow()).toBe(before);
     };
 
