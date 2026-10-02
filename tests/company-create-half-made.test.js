@@ -61,6 +61,7 @@ const restoreEnv = (name, value) => {
 
 beforeAll(async () => {
     process.env.FREE_COMPANY_COUNT = '-1';
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     app = await startApp((server) => {
         setMiddlewareWithCV2(server);
         setMiddlewareV2(server);
@@ -70,6 +71,7 @@ beforeAll(async () => {
 afterAll(() => {
     restoreEnv('FREE_COMPANY_COUNT', previousFreeCount);
     restoreEnv('PAYMENTMETHOD', previousPaymentMethod);
+    console.error.mockRestore();
     return app.close();
 });
 
@@ -199,6 +201,16 @@ describe('POST /api/v2/company/create, when a step the workspace cannot do witho
 
         const reserved = rowsOf(GLOBAL, SCHEMA_TYPE.PRECOMPANIES).find((row) => String(row._id) === READY);
         expect(reserved.pickupCount).toBe(1);
+    });
+
+    it('takes back only its own company row, never one another person holds under that id', async () => {
+        mockDbFor(GLOBAL).seed(SCHEMA_TYPE.COMPANIES, { _id: READY, userId: '6f0000000000000000000002', Cst_CompanyName: 'Somebody Else Ltd' });
+        refuse(GLOBAL, SCHEMA_TYPE.COMPANIES, 'save');
+
+        const res = await create$();
+
+        expect(res.body).toEqual(NOT_FINISHED);
+        expect(companyRows().map((row) => row.Cst_CompanyName)).toEqual(['Somebody Else Ltd']);
     });
 
     it('still answers the failure when what it made cannot be taken back, and reports what is left', async () => {
