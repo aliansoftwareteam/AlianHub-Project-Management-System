@@ -29,7 +29,7 @@ Where things come from:
 | 3 | Turn a message into a task | The chat | Make a task in [AI bench] list from the last message in the scratch channel. | `lists.list`, `task.from_message`. Missing: a tool that reads the messages of a chat channel, so the agent cannot get the message id. `person.place` does not know which chat is open | None | 15 | |
 | 4 | Subtasks to three levels | The parent task | Under "[AI bench] Parent" add a subtask "Child", under that "Grandchild", and under that "Great-grandchild". | `person.place` or `tasks.search`, then `subtask.create` three times. The third call is refused: a task tree holds a task, a subtask and a sub-subtask, no deeper (`Modules/Tasks/helpers/taskTreeRules.js`) | None | Reserve | |
 | 5 | Folder, subfolder, list, and move a task | The list | In QA Sandbox make a folder "[AI bench] folder", inside it a subfolder "[AI bench] subfolder", inside that a list "[AI bench] inner list", and move "[AI bench] Write release note" into that list. | Folder and subfolder: missing. `lists.list`, `list.create` (it can put a list in a folder that exists), `tasks.search`, `task.move` | None. One if `MCP_TOOLS_V2` is on, because `task.move` cannot be undone | Reserve | |
-| 6 | Duplicate a project | The project | Duplicate the project QA Sandbox as "[AI bench] Sandbox copy", with its lists, statuses and views. | `person.place` or `projects.list`, then `project.duplicate` (#PRNUM). It copies the folders, lists, statuses, fields and views, and the tasks only when the sentence asks for them. The copy is private to the person who approves it | One, always | No | |
+| 6 | Duplicate a project | The project | Duplicate the project QA Sandbox as "[AI bench] Sandbox copy", with its lists, statuses and views. | `person.place` or `projects.list`, then `project.duplicate` (#1467). It copies the folders, lists, statuses, fields and views, and the tasks only when the sentence asks for them. The copy is private to the person who approves it | One, always | No | |
 | 7 | Bulk-edit twenty tasks | The list | Set "[AI bench] bulk 01" to "bulk 20" to high priority and assign them all to (the teammate). | `person.place`, `tasks.search`, `members.list`, then `tasks.batch` running `task.update` and `task.assign`. That is 40 changes and a batch takes 25, so two batch calls | Two since #1427: each batch call waits as one proposal. See "Job 7: how many approvals" | 15 | |
 | 8 | Group by a custom field | The list | Show me this list grouped by Stage. | `person.place`, `fields.list`, `view.create` with the field as the grouping. `screen.link` opens a list but cannot carry a grouping | One. It saves a view that everyone on the project sees | 15 | |
 | 9 | Filter and save a view | The list | Show my tasks due this week and save it as a view called "[AI bench] Mine this week". | `person.place`, `view.create` with `mine`. Missing: `view.create` has no filter on the due date | One | 15 | |
@@ -94,7 +94,7 @@ They are measured too. They count only if one of the fifteen fails.
 
 ## Not picked, and why
 
-- **Job 6, duplicate a project.** It had no tool when the fifteen were picked. It has one since #PRNUM, `project.duplicate`, with its own rated action: one sentence and one approval.
+- **Job 6, duplicate a project.** It had no tool when the fifteen were picked. It has one since #1467, `project.duplicate`, with its own rated action: one sentence and one approval.
 - **Job 14, comment and reply.** These are the person's own words. The reply also has no tool.
 - **Job 16, restore a doc version.** No tool. `task.md` treats it as a person's decision.
 - **Job 18, timesheet.** No tool to submit or approve. Approving is a person's decision.
@@ -223,10 +223,10 @@ Marked on 2026-10-02 at build 772: "Closed" names the pull request that closed a
 13. **Job 16.** No tool lists or restores a doc's versions.
 14. **Job 15.** No tool shares a doc with one named person. The web app cannot do this either.
 15. **Job 18.** No tool submits or approves a timesheet.
-16. **Job 6.** No tool duplicates a project. **Closed by #PRNUM:** `project.duplicate` asks for the copy and a person approves it. The copy is private to the approver, whoever is on the project it is copied from. Tasks are copied only when asked for, without their assignees, and a project with more than 300 tasks is copied without them.
+16. **Job 6.** No tool duplicates a project. **Closed by #1467:** `project.duplicate` asks for the copy and a person approves it. The copy is private to the approver, whoever is on the project it is copied from. Tasks are copied only when asked for, without their assignees, and a project with more than 300 tasks is copied without them.
 17. **Job 25.** No tool invites a person or changes who can open a project.
 
-New since this sheet and tied to no job above: `project.setup` (#1420) sets up a project that exists from one plan, and `project.create` (#1433) proposes a new project with its setup. Neither duplicates a project: job 6 has its own tool, `project.duplicate` (#PRNUM).
+New since this sheet and tied to no job above: `project.setup` (#1420) sets up a project that exists from one plan, and `project.create` (#1433) proposes a new project with its setup. Neither duplicates a project: job 6 has its own tool, `project.duplicate` (#1467).
 
 **Rules that would refuse, or that do less than the plan says**
 
