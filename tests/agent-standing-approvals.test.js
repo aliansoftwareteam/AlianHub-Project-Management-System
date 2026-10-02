@@ -452,14 +452,14 @@ describe('who may make, list and remove a standing approval', () => {
         expect(comments()).toHaveLength(0);
     });
 
-    it('a guest makes none even where a guest could approve the change once', async () => {
+    it('a guest makes none even where a guest\'s role may make the change', async () => {
         rows(SCHEMA_TYPE.RULES).filter((rule) => !rule.isParent).forEach((rule) => { rule.roles = [...rule.roles, { key: 0, permission: true }]; });
-        const once = await filed(await comment(ctx(OWNER)));
-        expect((await proposals.approve(CID, once, { decider: person(GUEST), isPrivileged: false, ip: '' })).error).toBeUndefined();
-        const id = await filed(await comment(ctx(OWNER), 'Again'));
+        const id = await filed(await comment(ctx(OWNER)));
+        expect(await approve(GUEST, id, {})).toMatchObject({ code: 403 });
         expect(await always(id, GUEST)).toMatchObject({ status: 403 });
         expect(proposalRows().find((row) => String(row._id) === id).status).toBe('pending');
         expect(standingRows()).toHaveLength(0);
+        expect(comments()).toHaveLength(0);
     });
 
     it('a person who may not make the change by hand makes none', async () => {
