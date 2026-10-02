@@ -90,8 +90,6 @@ const walk = (value, scope, joinable = PROJECT_FIELD_OF_JOINABLE) => {
     }));
 };
 
-const checkStages = (stages, scope) => walk(stages, scope);
-
 const withPlainText = (stages) => {
     try {
         return withPlainSearchText(stages);
@@ -100,6 +98,8 @@ const withPlainText = (stages) => {
         throw error;
     }
 };
+
+const checkStages = (stages, scope) => walk(withPlainText(stages), scope);
 
 const scopePipeline = (query, scope, ownRowsMatch) => {
     const stages = isPlainObject(query) ? [query] : query;

@@ -1,3 +1,4 @@
+const { AsyncResource } = require('async_hooks');
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
@@ -165,14 +166,16 @@ const VERDICT_WAIT_MS = 5 * 1000;
 const REMEMBERED_VERDICTS = 5000;
 const verdicts = new Map();
 
-/* Sends are queued behind their verdict, so a read that never answers must not hold every room: it counts as a refusal. */
-const answeredInTime = (decide) => new Promise((resolve) => {
+/* Sends are queued behind their verdict, so a read that never answers must not hold every room: it counts as a refusal.
+ * A send starts inside the request that made the change, and the verdict is about the person looking at the screen,
+ * not that request: bound here, it is read under no token's project list and no agent's mark. */
+const answeredInTime = AsyncResource.bind((decide) => new Promise((resolve) => {
     const timer = setTimeout(() => resolve(false), VERDICT_WAIT_MS);
     Promise.resolve().then(decide).then(Boolean, () => false).then((allowed) => {
         clearTimeout(timer);
         resolve(allowed);
     });
-});
+}));
 
 /* A room outlives the access it was joined on: the person leaves the project, loses their seat, the list turns
  * private. So every send asks again, as the socket's own user in the socket's own company, and keeps the answer

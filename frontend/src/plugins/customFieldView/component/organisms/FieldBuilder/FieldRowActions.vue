@@ -22,10 +22,12 @@
                 <div class="fb-menu__card" role="alertdialog" aria-modal="true" :aria-label="t('Fields.delete_title', { field: name })">
                     <h3 class="ah-h3 fb-menu__title">{{ t('Fields.delete_title', { field: name }) }}</h3>
                     <p class="fb-menu__text">{{ deleteText }}</p>
-                    <p v-if="usage && !usage.readBy.length" class="fb-menu__text">{{ t('Fields.delete_archive_hint') }}</p>
+                    <p v-if="usage?.readBy.length && usage.readElsewhere" class="fb-menu__text">{{ t('Fields.delete_read_elsewhere') }}</p>
+                    <p v-if="usage && !isRead && usage.partial" class="fb-menu__text">{{ t('Fields.delete_counted_open') }}</p>
+                    <p v-if="usage && !isRead" class="fb-menu__text">{{ t('Fields.delete_archive_hint') }}</p>
                     <div class="fb-menu__actions">
-                        <button ref="cancelButton" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-action="cancel" @click="mode = ''">{{ usage?.readBy.length ? t('Fields.close') : t('Fields.cancel') }}</button>
-                        <template v-if="usage && !usage.readBy.length">
+                        <button ref="cancelButton" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-action="cancel" @click="mode = ''">{{ isRead ? t('Fields.close') : t('Fields.cancel') }}</button>
+                        <template v-if="usage && !isRead">
                             <button v-if="!archived" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" data-action="archive" @click="archiveInstead">{{ t('Fields.archive_instead') }}</button>
                             <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy" data-action="confirm" @click="remove">{{ t('Fields.delete') }}</button>
                         </template>
@@ -104,10 +106,13 @@ const entries = computed(() => [
     { kind: "delete", icon: "trash", label: t("Fields.delete") }
 ]);
 
+const isRead = computed(() => Boolean(usage.value) && (usage.value.readBy.length > 0 || usage.value.readElsewhere));
+
 const deleteText = computed(() => {
     if (!usage.value) return t("Fields.delete_counting");
-    const { tasks, readBy } = usage.value;
+    const { tasks, readBy, readElsewhere } = usage.value;
     if (readBy.length) return t("Fields.delete_read_by", { fields: readBy.join(", ") }, readBy.length);
+    if (readElsewhere) return t("Fields.delete_read_elsewhere");
     return tasks ? t("Fields.delete_with_values", { n: tasks }, tasks) : t("Fields.delete_no_values");
 });
 
@@ -140,7 +145,7 @@ async function askDelete() {
     try {
         const response = await apiRequest("get", `${env.CUSTOM_FIELDS_V2}/${props.field._id}/usage`);
         const data = response?.data?.data || {};
-        usage.value = { tasks: Number(data.tasks) || 0, readBy: Array.isArray(data.readBy) ? data.readBy : [] };
+        usage.value = { tasks: Number(data.tasks) || 0, readBy: Array.isArray(data.readBy) ? data.readBy : [], readElsewhere: data.readElsewhere === true, partial: data.partial === true };
     } catch (error) {
         mode.value = "";
         complain(error);

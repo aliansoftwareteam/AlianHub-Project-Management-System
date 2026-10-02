@@ -211,6 +211,9 @@ const { evaluateFormula, extractReferences, FUNCTIONS, ROLLUP_FUNCTIONS } = requ
 const { COMPUTED_TYPES, computeTaskFields, descendantsOf, validateFormulaDefinition, slug, builtinScope } = require("./helpers/computeFields");
 const { MAX_DEPTH } = require("../Tasks/helpers/taskTreeRules");
 const { readableTaskIds } = require("../Tasks/helpers/taskWritePlacement");
+const { COMPUTED_SOURCE } = require("../../utils/entityEvents");
+
+const SYSTEM_ACTOR = Object.freeze({ kind: "system", userId: null });
 
 const isObjectIdString = (value) => typeof value === "string" && /^[a-f\d]{24}$/i.test(value);
 
@@ -312,9 +315,10 @@ exports.formulaScope = async (req, res) => {
     }
 };
 
+/* A conversation is kept in the tasks collection and is no task: it holds no field and counts under nothing. */
 const liveTasks = async (companyId, filter) => await MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.TASKS,
-    data: [{ ...filter, deletedStatusKey: { $ne: 1 } }]
+    data: [{ ...filter, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }]
 }, "find") || [];
 
 /* A rollup counts every level under its task, so a change on one row moves the rollups of each task above it.
@@ -363,7 +367,7 @@ const sameStored = (task, id, entry) => {
 /* Works out every formula and rollup of each task from `rows`, stores it on the task and tells the open clients.
  * The deepest task goes first and its new numbers are put on its row, so a rollup above reads them in the same pass.
  * `onlyChanged` leaves a task whose stored numbers already match alone: no write and no event. */
-const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint = false, onlyChanged = false }) => {
+const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint = false, onlyChanged = false, depth = 0 }) => {
     const out = {};
     const errors = {};
     const rowById = new Map(rows.map((row) => [String(row._id), row]));
@@ -398,14 +402,15 @@ const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint
         if (row) row.customField = { ...(row.customField || {}), ...entries };
         if (!Object.keys($set).length) continue;
 
+        // Nobody edited the task, so the time it was last changed stays: lists sorted by it and the notices that read it are not moved.
         // eslint-disable-next-line no-await-in-loop
         const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: task._id }, { $set }, { returnDocument: "after" }]
+            data: [{ _id: task._id }, { $set }, { returnDocument: "after", timestamps: false }]
         }, "findOneAndUpdate");
 
         // The relay places a change by the row's project, list and people, so the stored row is what is sent.
-        if (updated) socketEmitter.emit("update", { type: "update", data: updated, updatedFields: $set, module: "task", companyId });
+        if (updated) socketEmitter.emit("update", { type: "update", data: updated, updatedFields: $set, module: "task", companyId, source: COMPUTED_SOURCE, actor: SYSTEM_ACTOR, depth });
     }
     return { out, errors };
 };
@@ -483,7 +488,7 @@ exports.computeFields = async (req, res) => {
 /* A task write changed something a formula or a rollup reads (computedRefresh.js). Those tasks and every task above
  * them are worked out again and stored. Nobody is answered, so no caller's access narrows the climb; open clients hear
  * of it through the relay, which sends a row only to those who can open it. */
-exports.refreshComputed = async (companyId, taskIds) => {
+exports.refreshComputed = async (companyId, taskIds, { depth = 0 } = {}) => {
     const ids = [...new Set((Array.isArray(taskIds) ? taskIds : []).map(String))].filter(isObjectIdString);
     if (!companyId || !ids.length) return 0;
     const everyDefinition = await loadDefinitions(companyId, null);
@@ -491,7 +496,7 @@ exports.refreshComputed = async (companyId, taskIds) => {
     const asked = await liveTasks(companyId, { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } });
     if (!asked.length) return 0;
     const tasks = await withTasksAbove(companyId, asked, (found) => found);
-    const { out } = await storeComputed({ companyId, tasks, rows: await rowsBelow(companyId, tasks), everyDefinition, onlyChanged: true });
+    const { out } = await storeComputed({ companyId, tasks, rows: await rowsBelow(companyId, tasks), everyDefinition, onlyChanged: true, depth });
     return Object.keys(out).length;
 };
 

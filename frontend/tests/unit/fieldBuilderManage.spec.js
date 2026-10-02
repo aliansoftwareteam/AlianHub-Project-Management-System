@@ -226,6 +226,27 @@ describe('deleting a field', () => {
         expect(dialog().find('[data-action="confirm"]').exists()).toBe(false);
     });
 
+    it('offers no delete while a field the person cannot see reads it, and says why', async () => {
+        answers({ tasks: 2, readBy: [], readElsewhere: true });
+        await builder();
+        await pick('Cost', en.Fields.delete);
+        expect(dialog().text()).toContain(en.Fields.delete_read_elsewhere);
+        expect(dialog().find('[data-action="confirm"]').exists()).toBe(false);
+        expect(dialog().find('[data-action="archive"]').exists()).toBe(false);
+        expect(dialog().get('[data-action="cancel"]').text()).toBe(en.Fields.close);
+    });
+
+    it('says a count is of the tasks the person can open when it is not of every task', async () => {
+        answers({ tasks: 2, readBy: [], partial: true });
+        await builder();
+        await pick('Cost', en.Fields.delete);
+        expect(dialog().text()).toContain(en.Fields.delete_counted_open);
+        answers({ tasks: 2, readBy: [] });
+        await dialog().get('[data-action="cancel"]').trigger('click');
+        await pick('Cost', en.Fields.delete);
+        expect(dialog().text()).not.toContain(en.Fields.delete_counted_open);
+    });
+
     it('closes the editor of the field it deletes', async () => {
         await builder();
         await line('Value').get('button.fb__row').trigger('click');

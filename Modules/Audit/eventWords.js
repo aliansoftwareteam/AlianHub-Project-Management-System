@@ -46,6 +46,7 @@ const EVENTS = Object.freeze({
     'goal.update': 'Changed a goal',
     'goal.archive': 'Archived a goal',
     'goal.restore': 'Restored a goal',
+    'custom_field.deleted': 'Deleted a custom field',
     'oauth.grant_created': 'Connected an outside app',
     'oauth.grant_revoked': 'Disconnected an outside app',
     'oauth.grant_narrowed': 'Reduced what an outside app may do',

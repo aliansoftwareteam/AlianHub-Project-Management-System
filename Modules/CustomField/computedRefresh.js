@@ -1,4 +1,7 @@
+const { AsyncResource } = require('async_hooks');
 const socketEmitter = require('../../event/socketEventEmitter');
+const { originOf } = require('../../event/domainEventBus');
+const { isNotAnEdit } = require('../../utils/entityEvents');
 const logger = require('../../Config/loggerConfig');
 const { myCache } = require('../../Config/config');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
@@ -41,12 +44,12 @@ async function usesComputed(companyId) {
     return uses;
 }
 
-async function refresh(companyId, taskIds) {
+async function refresh(companyId, taskIds, depth) {
     if (!(await usesComputed(companyId))) return;
     const { refreshComputed } = require('./controller');
     for (let at = 0; at < taskIds.length; at += BATCH) {
         // eslint-disable-next-line no-await-in-loop
-        await refreshComputed(companyId, taskIds.slice(at, at + BATCH));
+        await refreshComputed(companyId, taskIds.slice(at, at + BATCH), { depth });
     }
 }
 
@@ -55,36 +58,45 @@ function run(companyId) {
     if (!entry) return;
     pending.delete(companyId);
     clearTimeout(entry.timer);
-    const work = refresh(companyId, [...entry.taskIds])
+    const work = refresh(companyId, [...entry.taskIds], entry.depth)
         .catch((error) => logger.error(`computed fields not worked out again: ${(error && error.message) || error}`))
         .finally(() => running.delete(work));
     running.add(work);
 }
 
-/* One task write sends several events (the new subtask, its parent's count), and an import sends hundreds. */
-function schedule(companyId, taskIds) {
+/* A batch holds the writes of several requests and is started by the last one. Bound here, where no request is
+ * running, the work and everything that hears of it run under no token's project list, no agent's mark and no
+ * request: started from the timer or from flush(), they would otherwise run under whichever request came last. */
+const runOutsideAnyRequest = AsyncResource.bind(run);
+
+/* One task write sends several events (the new subtask, its parent's count), and an import sends hundreds.
+ * The deepest write of the batch gives its depth, so a chain of rules is as deep after the refresh as before it. */
+function schedule(companyId, taskIds, depth) {
     const ids = taskIds.map((id) => String(id || '')).filter((id) => OBJECT_ID.test(id));
     if (!OBJECT_ID.test(String(companyId || '')) || !ids.length) return;
     const key = String(companyId);
-    const entry = pending.get(key) || { taskIds: new Set() };
+    const entry = pending.get(key) || { taskIds: new Set(), depth: 0 };
     ids.forEach((id) => entry.taskIds.add(id));
+    entry.depth = Math.max(entry.depth, depth);
     clearTimeout(entry.timer);
-    entry.timer = setTimeout(() => run(key), debounceMs);
+    entry.timer = setTimeout(() => runOutsideAnyRequest(key), debounceMs);
     if (entry.timer && typeof entry.timer.unref === 'function') entry.timer.unref();
     pending.set(key, entry);
 }
 
 const companyOf = (payload) => payload.companyId || (payload.data && payload.data.CompanyId);
 
+const isTask = (doc) => Boolean(doc) && Boolean(doc._id) && doc.mainChat !== true;
+
 function onTaskUpdate(payload) {
     const doc = payload && payload.data;
-    if (!doc || !doc._id || !readsInput(payload.updatedFields)) return;
-    schedule(companyOf(payload), [doc._id, doc.ParentTaskId]);
+    if (!isTask(doc) || isNotAnEdit(payload) || !readsInput(payload.updatedFields)) return;
+    schedule(companyOf(payload), [doc._id, doc.ParentTaskId], originOf(payload).depth);
 }
 
 function onTaskInsert(payload) {
     const doc = payload && payload.data;
-    if (doc && doc._id) schedule(companyOf(payload), [doc._id, doc.ParentTaskId]);
+    if (isTask(doc)) schedule(companyOf(payload), [doc._id, doc.ParentTaskId], originOf(payload).depth);
 }
 
 function start({ debounceMs: given } = {}) {
@@ -103,7 +115,7 @@ function stop() {
 
 /* Runs every pending refresh now and waits for all of them. */
 async function flush() {
-    [...pending.keys()].forEach(run);
+    [...pending.keys()].forEach((key) => runOutsideAnyRequest(key));
     await Promise.all([...running]);
 }
 

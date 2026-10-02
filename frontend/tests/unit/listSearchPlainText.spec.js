@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import { defineComponent, h, ref } from 'vue';
-import { readFileSync } from 'fs';
+import { readFileSync, readdirSync } from 'fs';
 import path from 'path';
 
 vi.mock('@/composable', () => ({
@@ -12,7 +12,7 @@ vi.mock('@/composable', () => ({
 }));
 
 import { useProjectSearch } from '@/views/Projects/composables/useProjectSearch';
-import { SEARCH_TEXT_MAX, searchTextPattern } from '@/utils/searchText';
+import { SEARCH_TEXT_MAX, typedSearchText } from '@/utils/searchText';
 import en from '@/locales/en.js';
 
 const searchTask = vi.fn(() => Promise.resolve([]));
@@ -43,16 +43,17 @@ beforeEach(() => {
 
 describe('the text a list search sends', () => {
     it.each([
-        ['[QA 047] parent', '\\[QA 047\\] parent'],
-        ['[QA', '\\[QA'],
-        ['(again?)', '\\(again\\?\\)'],
-        ['a.b*c', 'a\\.b\\*c'],
-        ['plain words', 'plain words']
-    ])('"%s" is sent as text to find', async (typed, sent) => {
+        ['[QA 047] parent'],
+        ['[QA'],
+        ['(again?)'],
+        ['a.b*c'],
+        ['a\\.b'],
+        ['plain words']
+    ])('"%s" is sent as it was typed: the server reads it as text', async (typed) => {
         const { wrapper, search } = open();
         search.taskSearch.value = typed;
         await flushPromises();
-        expect(textConditions()).toEqual([{ TaskName: { $regex: sent, $options: 'i' } }]);
+        expect(textConditions()).toEqual([{ TaskName: { $regex: typed, $options: 'i' } }]);
         wrapper.unmount();
     });
 
@@ -62,15 +63,33 @@ describe('the text a list search sends', () => {
         search.taskDescriptionSearch.value = true;
         search.taskSearch.value = 'QA-1 (draft)';
         await flushPromises();
-        const text = { $regex: 'QA-1 \\(draft\\)', $options: 'i' };
+        const text = { $regex: 'QA-1 (draft)', $options: 'i' };
         expect(textConditions()).toEqual([{ TaskName: text }, { TaskKey: text }, { rawDescription: text }]);
         wrapper.unmount();
     });
 
     it('is cut at the length the server takes', () => {
-        expect(searchTextPattern('a'.repeat(SEARCH_TEXT_MAX + 50))).toHaveLength(SEARCH_TEXT_MAX);
+        expect(typedSearchText('a'.repeat(SEARCH_TEXT_MAX + 50))).toHaveLength(SEARCH_TEXT_MAX);
         const toolbar = readFileSync(path.resolve(__dirname, '../../src/views/Projects/components/ProjectFiltersToolbar.vue'), 'utf8');
         expect(toolbar).toContain(':maxlength="SEARCH_TEXT_MAX"');
+    });
+});
+
+describe('every search the web app and the desktop tracker send', () => {
+    const ROOT = path.resolve(__dirname, '../../..');
+    const CLIENTS = [path.join(ROOT, 'frontend/src'), path.join(ROOT, 'time-tracker-app/renderer')];
+    const sourceFiles = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return ['locales', 'node_modules'].includes(entry.name) ? [] : sourceFiles(full);
+        return /\.(js|jsx|vue)$/.test(entry.name) ? [full] : [];
+    });
+    const senders = CLIENTS.flatMap(sourceFiles).map((file) => [path.relative(ROOT, file), readFileSync(file, 'utf8')]).filter(([, text]) => text.includes('$regex'));
+
+    it('leave the typed text as it is: escaping it is the server\'s work, done once', () => {
+        expect(senders.map(([file]) => file)).toContain('time-tracker-app/renderer/components/TrackerSelection/TrackerSelection.jsx');
+        expect(senders.length).toBeGreaterThan(5);
+        const escapesFirst = senders.filter(([, text]) => text.includes("'\\\\$&'")).map(([file]) => file);
+        expect(escapesFirst).toEqual([]);
     });
 });
 
@@ -101,6 +120,6 @@ describe('the dashboard task list search', () => {
     it('sends typed text the same way', () => {
         const list = readFileSync(path.resolve(__dirname, '../../src/plugins/tasklistDashboard/views/DashBoardList/DashBoardList.vue'), 'utf8');
         expect(list).not.toContain('$regex: searchStr');
-        expect(list.match(/\$regex: searchTextPattern\(searchStr\)/g)).toHaveLength(2);
+        expect(list.match(/\$regex: typedSearchText\(searchStr\)/g)).toHaveLength(2);
     });
 });

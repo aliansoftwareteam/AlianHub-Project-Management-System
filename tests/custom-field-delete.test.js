@@ -44,7 +44,7 @@ const response = () => {
 
 const run = async (route, uid, fieldId, extra = {}) => {
     const res = response();
-    const req = { uid, params: { fieldId: String(fieldId) }, query: {}, body: {}, headers: { companyid: C }, ...extra };
+    const req = { uid, aud: C, params: { fieldId: String(fieldId) }, query: {}, body: {}, headers: { companyid: C }, ...extra };
     for (const handler of routes()[route]) {
         let advanced = false;
         await handler(req, res, () => { advanced = true; });
@@ -170,7 +170,8 @@ describe('deleting a field', () => {
         seedTask({ [field._id]: { fieldValue: 5 } });
         await remove(OWNER, field._id);
         expect(mockDb.calls.length).toBeGreaterThan(0);
-        expect(mockDb.calls.every((call) => call.companyId === C)).toBe(true);
+        const elsewhere = mockDb.calls.filter((call) => call.companyId !== C);
+        expect(elsewhere.map((call) => [call.companyId, call.type, call.method])).toEqual([[SCHEMA_TYPE.GOLBAL, SCHEMA_TYPE.USERS, 'findOne']]);
     });
 });
 
@@ -216,6 +217,170 @@ describe('who may delete a field', () => {
         const field = seedField({ global: false, projectId: [String(project._id)] });
         const res = await remove(MEMBER, field._id);
         expect(res.statusCode).not.toBe(200);
+        expect(stored(field._id)).toBeDefined();
+    });
+});
+
+describe('what the count and the names are taken from', () => {
+    const MAY_MANAGE = { [SETTINGS_KEY]: true, 'task.task_list': true };
+    const inProject = (project) => ({ ProjectID: new mongoose.Types.ObjectId(String(project._id)) });
+
+    it('counts the tasks the person asking can open, and no others', async () => {
+        seedRules(MAY_MANAGE);
+        const mine = seedProject();
+        const theirs = seedProject({ AssigneeUserId: [OWNER] });
+        const field = seedField();
+        seedTask({ [field._id]: { fieldValue: 1 } }, inProject(mine));
+        seedTask({ [field._id]: { fieldValue: 2 } }, inProject(theirs));
+        seedTask({ [field._id]: { fieldValue: 3 } }, inProject(theirs));
+        expect((await usage(MEMBER, field._id)).body.data).toMatchObject({ tasks: 1, partial: true });
+        expect((await usage(OWNER, field._id)).body.data).toMatchObject({ tasks: 3, partial: false });
+    });
+
+    it('leaves out the tasks of a list that is not shared with them', async () => {
+        seedRules(MAY_MANAGE);
+        const mine = seedProject();
+        const closed = mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id: oid(), projectId: String(mine._id), private: true, AssigneeUserId: [OWNER] });
+        const field = seedField();
+        seedTask({ [field._id]: { fieldValue: 1 } }, inProject(mine));
+        seedTask({ [field._id]: { fieldValue: 2 } }, { ...inProject(mine), sprintId: new mongoose.Types.ObjectId(String(closed._id)) });
+        expect((await usage(MEMBER, field._id)).body.data.tasks).toBe(1);
+    });
+
+    it('never counts a conversation', async () => {
+        const project = seedProject();
+        const field = seedField();
+        seedTask({ [field._id]: { fieldValue: 1 } }, inProject(project));
+        seedTask({ [field._id]: { fieldValue: 2 } }, { ...inProject(project), mainChat: true, AssigneeUserId: [OWNER, MEMBER] });
+        expect((await usage(OWNER, field._id)).body.data.tasks).toBe(1);
+    });
+
+    it('counts a field of some projects in those projects alone', async () => {
+        const launch = seedProject();
+        const site = seedProject();
+        const field = seedField({ global: false, projectId: [String(launch._id)] });
+        seedTask({ [field._id]: { fieldValue: 1 } }, inProject(launch));
+        seedTask({ [field._id]: { fieldValue: 2 } }, inProject(site));
+        expect((await usage(OWNER, field._id)).body.data.tasks).toBe(1);
+    });
+
+    it('names a formula or a rollup only where the person asking can open one of its projects', async () => {
+        seedRules(MAY_MANAGE);
+        const theirs = seedProject({ AssigneeUserId: [OWNER] });
+        const field = seedField({ fieldTitle: 'Cost' });
+        seedField({ fieldTitle: 'Everywhere', fieldType: 'formula', formulaExpression: '{Cost} * 2' });
+        seedField({ fieldTitle: 'Elsewhere', fieldType: 'rollup', rollupFunction: 'sum', rollupSourceFieldId: String(field._id), global: false, projectId: [String(theirs._id)] });
+        expect((await usage(MEMBER, field._id)).body.data).toMatchObject({ readBy: ['Everywhere'], readElsewhere: true });
+        const forOwner = (await usage(OWNER, field._id)).body.data;
+        expect(forOwner.readBy.sort()).toEqual(['Elsewhere', 'Everywhere']);
+        expect(forOwner.readElsewhere).toBe(false);
+    });
+
+    it('does not take a formula of another project for a reader of a field of some projects', async () => {
+        const launch = seedProject();
+        const site = seedProject();
+        const field = seedField({ fieldTitle: 'Cost', global: false, projectId: [String(launch._id)] });
+        seedField({ fieldTitle: 'Site cost', fieldType: 'formula', formulaExpression: '{Cost} * 2', global: false, projectId: [String(site._id)] });
+        seedField({ fieldTitle: 'Launch cost', fieldType: 'formula', formulaExpression: '{Cost} * 2', global: false, projectId: [String(launch._id)] });
+        expect((await usage(OWNER, field._id)).body.data.readBy).toEqual(['Launch cost']);
+    });
+
+    it('refuses the delete while a field the person cannot see reads it, without naming that field', async () => {
+        seedRules(MAY_MANAGE);
+        const theirs = seedProject({ AssigneeUserId: [OWNER] });
+        const field = seedField({ fieldTitle: 'Cost' });
+        seedField({ fieldTitle: 'Margin total', fieldType: 'rollup', rollupFunction: 'sum', rollupSourceFieldId: String(field._id), global: false, projectId: [String(theirs._id)] });
+        const res = await remove(MEMBER, field._id);
+        expect(res.statusCode).toBe(409);
+        expect(res.body).toMatchObject({ code: 'FIELD_IS_READ', data: { readBy: [], readElsewhere: true } });
+        expect(JSON.stringify(res.body)).not.toContain('Margin total');
+        expect(stored(field._id)).toBeDefined();
+    });
+
+    it('answers the delete with the count the person could see', async () => {
+        seedRules(MAY_MANAGE);
+        const mine = seedProject();
+        const theirs = seedProject({ AssigneeUserId: [OWNER] });
+        const field = seedField();
+        seedTask({ [field._id]: { fieldValue: 1 } }, inProject(mine));
+        const hidden = seedTask({ [field._id]: { fieldValue: 2 } }, inProject(theirs));
+        const res = await remove(MEMBER, field._id);
+        expect(res.body).toMatchObject({ status: true, data: { tasks: 1 } });
+        expect(tasks().find((row) => row._id === hidden._id).customField).toEqual({});
+    });
+});
+
+describe('what a delete leaves behind', () => {
+    const auditRows = () => mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] || [];
+    const settled = async () => { for (let turn = 0; turn < 20; turn += 1) await new Promise((resolve) => setImmediate(resolve)); };
+    const taskEvents = () => socketEmitter.emit.mock.calls.filter(([, payload]) => payload.module === 'task').map(([, payload]) => payload);
+
+    it('is written in the audit log, with who did it and how many values went', async () => {
+        const field = seedField({ fieldTitle: 'Budget' });
+        seedTask({ [field._id]: { fieldValue: 5 } });
+        seedTask({ [field._id]: { fieldValue: '' } });
+        await remove(OWNER, field._id);
+        await settled();
+        expect(auditRows()).toHaveLength(1);
+        expect(auditRows()[0]).toMatchObject({ action: 'custom_field.deleted', actorId: OWNER, entityType: 'custom_field', entityId: String(field._id), entityName: 'Budget', meta: { fieldType: 'number', tasks: 2 } });
+    });
+
+    it('writes nothing in the audit log when the delete is refused', async () => {
+        const field = seedField({ fieldTitle: 'Cost' });
+        seedField({ fieldTitle: 'Total cost', fieldType: 'rollup', rollupFunction: 'sum', rollupSourceFieldId: String(field._id) });
+        await remove(OWNER, field._id);
+        await settled();
+        expect(auditRows()).toEqual([]);
+    });
+
+    it('tells the open screens of each task that lost a value, as a change nobody made to the task', async () => {
+        const field = seedField();
+        const held = seedTask({ [field._id]: { fieldValue: 5 } }, { CompanyId: C });
+        seedTask({}, { CompanyId: C });
+        await remove(OWNER, field._id);
+        expect(taskEvents()).toEqual([expect.objectContaining({ type: 'update', companyId: C, source: 'field_removed', updatedFields: { [`customField.${field._id}`]: null } })]);
+        expect(String(taskEvents()[0].data._id)).toBe(String(held._id));
+        expect(taskEvents()[0].data.customField).toEqual({});
+    });
+
+    it('takes the value off a conversation without telling anyone of it', async () => {
+        const field = seedField();
+        const chat = seedTask({ [field._id]: { fieldValue: 5 } }, { mainChat: true, AssigneeUserId: [OWNER, MEMBER] });
+        await remove(OWNER, field._id);
+        expect(tasks().find((row) => row._id === chat._id).customField).toEqual({});
+        expect(taskEvents()).toEqual([]);
+    });
+
+    it('leaves the time each task was last changed alone', async () => {
+        const field = seedField();
+        seedTask({ [field._id]: { fieldValue: 5 } });
+        await remove(OWNER, field._id);
+        const write = mockDb.calls.find((call) => call.type === SCHEMA_TYPE.TASKS && call.method === 'updateMany');
+        expect(write.data[2]).toMatchObject({ timestamps: false });
+    });
+});
+
+describe('a field that names a project which is no longer there', () => {
+    const orphan = () => seedField({ global: false, projectId: [oid()] });
+
+    it('is counted and deleted by an owner', async () => {
+        const field = orphan();
+        expect((await usage(OWNER, field._id)).statusCode).toBe(200);
+        expect((await remove(OWNER, field._id)).statusCode).toBe(200);
+        expect(stored(field._id)).toBeUndefined();
+    });
+
+    it('is deleted by a member who holds the custom field setting', async () => {
+        seedRules({ [SETTINGS_KEY]: true });
+        const field = orphan();
+        expect((await remove(MEMBER, field._id)).statusCode).toBe(200);
+    });
+
+    it('is not deleted by a member who only edits fields in projects', async () => {
+        seedRules({ 'project.project_custom_field': true, 'task.task_custom_field': true, 'project.private_projects': 1 });
+        const project = seedProject();
+        const field = seedField({ global: false, projectId: [String(project._id), oid()] });
+        expect((await remove(MEMBER, field._id)).statusCode).toBe(403);
         expect(stored(field._id)).toBeDefined();
     });
 });

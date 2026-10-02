@@ -3,15 +3,15 @@ import * as env from '@/config/env';
 import { apiRequest } from '@/services';
 import { useCustomComposable } from '@/composable';
 import { scopeOf } from '@fieldTypes/relationship';
+import { typedSearchText } from '@/utils/searchText';
 
 const SHOWN = 10;
 const WAIT_MS = 300;
 
-const escaped = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /* The task query answers only tasks this person can open, so a search offers nothing the server would refuse to link. */
-function findQuery(text, definition, limit) {
+function findQuery(typed, definition, limit) {
     const { scope, projectId, sprintId } = scopeOf(definition);
+    const text = typedSearchText(typed);
     return [
         {
             $match: {
@@ -19,7 +19,7 @@ function findQuery(text, definition, limit) {
                 ...(scope === 'list' ? { sprintId: { objId: { $in: [sprintId] } } } : {}),
                 deletedStatusKey: { $in: [0, undefined] },
                 mainChat: { $ne: true },
-                $or: [{ TaskName: { $regex: escaped(text), $options: 'i' } }, { TaskKey: { $regex: escaped(text), $options: 'i' } }]
+                $or: [{ TaskName: { $regex: text, $options: 'i' } }, { TaskKey: { $regex: text, $options: 'i' } }]
             }
         },
         { $project: { TaskName: 1, TaskKey: 1, ProjectID: 1, sprintId: 1, folderObjId: 1 } },

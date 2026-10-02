@@ -46,6 +46,8 @@ const { task } = mockWorld;
 const PARENT = `6f${'0'.repeat(19)}b30`;
 const PRINT = `6f${'0'.repeat(19)}b31`;
 const SESSION = `6f${'0'.repeat(19)}b32`;
+const DOTTED = `6f${'0'.repeat(19)}b33`;
+const SLASHED = `6f${'0'.repeat(19)}b34`;
 
 const searchQuery = (text) => [{
     $match: { $and: [
@@ -85,8 +87,12 @@ describe('the text of a list search, as the server runs it', () => {
         expect(namesOf(await search('.*'))).toEqual([]);
     });
 
-    test('text a client escaped already means the same', async () => {
-        expect(namesOf(await search('\\[QA 047\\] parent'))).toEqual(['[QA 047] parent']);
+    test('a backslash is text too: each name is found by exactly what it holds', async () => {
+        task(DOTTED, P.HOME, L.HOME, { TaskName: 'release a.b notes' });
+        task(SLASHED, P.HOME, L.HOME, { TaskName: 'path a\\.b here' });
+        expect(namesOf(await search('a.b'))).toEqual(['release a.b notes']);
+        expect(namesOf(await search('a\\.b'))).toEqual(['path a\\.b here']);
+        expect(namesOf(await search('\\[QA 047\\] parent'))).toEqual([]);
     });
 
     test('text longer than the cap is refused with a message a person can read', async () => {
@@ -101,9 +107,9 @@ describe('search text in a query a caller built', () => {
         ['plain text', 'landing page', 'landing page'],
         ['a bracket', '[QA', '\\[QA'],
         ['a pattern', '(a+)+$', '\\(a\\+\\)\\+\\$'],
-        ['text escaped once', '\\[QA 047\\]', '\\[QA 047\\]'],
+        ['a backslash before a bracket', '\\[QA 047\\]', '\\\\\\[QA 047\\\\\\]'],
+        ['a backslash before a dot', 'a\\.b', 'a\\\\\\.b'],
         ['a backslash before a letter', 'C:\\data', 'C:\\\\data'],
-        ['a half-escaped text', '\\[QA 047]', '\\\\\\[QA 047\\]'],
     ])('%s is matched as text', (_name, typed, pattern) => {
         expect(withPlainSearchText({ TaskName: { $regex: typed, $options: 'i' } })).toEqual({ TaskName: { $regex: pattern, $options: 'i' } });
     });

@@ -177,7 +177,7 @@ import { ref, defineProps, defineEmits, nextTick, inject, watch,
 } from 'vue';
 import { useStore } from 'vuex';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
-import { searchTextPattern } from '@/utils/searchText';
+import { typedSearchText } from '@/utils/searchText';
 import { useRoute } from 'vue-router';
 
 // COMPONENTS
@@ -802,7 +802,7 @@ async function searchMongoDB(parentId = '') {
             let searchStr = taskSearch.value ? taskSearch.value.toString(): "";
             let andOr = '$or';
             query_by[andOr] = [];
-            const typedText = { $regex: searchTextPattern(searchStr), $options: 'i' };
+            const typedText = { $regex: typedSearchText(searchStr), $options: 'i' };
             if(taskNameSearch.value) {
                 query_by[andOr].push({'TaskName': typedText});
             }
@@ -1110,7 +1110,7 @@ function filterSprintsIdQuery () {
             let searchStr = taskSearch.value ? taskSearch.value.toString(): "";
             let andOr = '$or';
             query_by[andOr] = [];
-            const typedText = { $regex: searchTextPattern(searchStr), $options: 'i' };
+            const typedText = { $regex: typedSearchText(searchStr), $options: 'i' };
             if(taskNameSearch.value) {
                 query_by[andOr].push({'TaskName': typedText});
             }
