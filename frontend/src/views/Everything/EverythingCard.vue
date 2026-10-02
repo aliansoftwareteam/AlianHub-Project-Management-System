@@ -29,7 +29,7 @@
             </span>
             <span class="evr__assignee"><ListAssigneeCell :task="task" /></span>
             <span class="evr__due"><ListDueCell :task="task" :done="done" /></span>
-            <span v-if="task.subTasks" class="evr__subs" :title="$t('Everything.subtasks_n', { n: task.subTasks })">{{ task.subTasks }}</span>
+            <span v-if="task.subTasks" class="evr__subs" :title="$t('Everything.subtasks_n', { n: task.subTasks }, task.subTasks)">{{ task.subTasks }}</span>
         </div>
     </article>
 </template>

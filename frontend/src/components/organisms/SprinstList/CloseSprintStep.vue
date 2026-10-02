@@ -11,7 +11,7 @@
                     <p class="css__lead">
                         {{ $t('Members.close_lead', { done: donePoints, total: committedPoints }) }}
                         <template v-if="unfinished.length">
-                            <strong>{{ $t('Members.close_unfinished', { count: unfinished.length }) }}</strong>
+                            <strong>{{ $t('Members.close_unfinished', { count: unfinished.length }, unfinished.length) }}</strong>
                             {{ $t('Members.close_decide') }}
                         </template>
                         <template v-else>{{ $t('Members.close_all_done') }}</template>

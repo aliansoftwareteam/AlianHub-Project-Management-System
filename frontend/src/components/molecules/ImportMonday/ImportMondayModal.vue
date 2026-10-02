@@ -13,7 +13,7 @@
             <input ref="fileEl" type="file" accept=".csv,.xlsx" class="font-size-13 mimport__file" @change="parseFile" />
 
             <div v-if="rows.length" class="font-size-13 mimport__preview">
-                {{ $t('Projects.import_rows_found', { count: rows.length }) }}
+                {{ $t('Projects.import_rows_found', { count: rows.length }, rows.length) }}
             </div>
 
             <!-- Column mapping (defaults auto-detected; editable) -->

@@ -78,7 +78,7 @@
                                         <td class="ah-mono">{{ durationText(agent.p95DurationMs) }}</td>
                                         <td class="ah-mono">{{ usdText(agent.costUsd) }}</td>
                                         <td>
-                                            <svg class="ai-health__spark" viewBox="0 0 64 18" preserveAspectRatio="none" role="img" :aria-label="$t('AiHealth.spark_label', { n: agent.runs })">
+                                            <svg class="ai-health__spark" viewBox="0 0 64 18" preserveAspectRatio="none" role="img" :aria-label="$t('AiHealth.spark_label', { n: agent.runs }, agent.runs)">
                                                 <polyline :points="sparkPoints(agent.series, 64, 18)" />
                                             </svg>
                                         </td>
