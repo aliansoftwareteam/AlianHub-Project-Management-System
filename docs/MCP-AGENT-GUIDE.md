@@ -15,7 +15,7 @@ Everything below is off until you switch it on. Each setting is read on every ca
 | `MCP_OAUTH` | off | Connecting Claude or ChatGPT by address, with a consent screen. `on`, `true`, `1` and `yes` mean `both` (apps and personal tokens work). `only` refuses personal tokens. Needs `MCP_OAUTH_ISSUER` or `APIURL` to be an `https` origin (plain `http` only on `localhost` outside production), or the server does not start. |
 | `MCP_TOOLS_DATA` | off | The data tools: the projects, lists, statuses, comments, docs and timesheet reads, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `proposal.get`, and reading chat. It is also the only setting that offers the `chat:read` permission |
 | `MCP_TOOLS_MANAGE` | off | The task management tools and the doc writing tools, and the `tasks:manage` and `docs:manage` permissions. A token or app gets them only by asking for them by name |
-| `MCP_TOOLS_WORK` | off | Tags, links between tasks, lists, doc comments, goals, fields, saved views, project setup, new projects, automations and the work queue. They need no manage permission |
+| `MCP_TOOLS_WORK` | off | Tags, links between tasks, lists, doc comments, goals, fields, saved views, project setup, new projects, automations, dashboard cards and the work queue. They need no manage permission |
 | `MCP_TOOLS_V2` | off | Names next to ids, paged lists, tool annotations, and an approval for any call rated as one that cannot be undone or that reaches the whole workspace |
 | `AGENT_PERFORMANCE_READ` | off | `performance.read` |
 | `AGENT_TAINT_ROUTING` | off | A connected app's write that reaches past one task waits for a person. See "What happens to a write" |
@@ -146,7 +146,7 @@ These need the `tasks:manage` permission, except `page.create` and `page.update`
 
 The grant also gives fuller forms of tools in the first group, which are the same names with more arguments: `tasks.search`, `task.get`, `task.create`, `subtask.create`, `task.comment`, `comment.create` and `task.status.set`.
 
-### Work tools, `MCP_TOOLS_WORK` (31 tools)
+### Work tools, `MCP_TOOLS_WORK` (32 tools)
 
 None of these needs a grant. A read takes the read scope and a write takes the write scope.
 
@@ -178,11 +178,12 @@ None of these needs a grant. A read takes the read scope and a write takes the w
 | `goal.target.sources.remove` | `tasks:write` | At once. Stops counting one | |
 | `queue.claim` | `tasks:write` | At once. Takes one queue item for 30 minutes | A claim gives no extra rights |
 | `queue.release` | `tasks:write` | At once. Gives an item back | |
-| `fields.create` | `tasks:write` | Waits, always. Up to 10 custom fields, with up to 50 first values | Field names 80 characters |
+| `fields.create` | `tasks:write` | Waits, always. Up to 10 custom fields, a rollup or a formula among them, with up to 50 first values | Field names 80 characters |
 | `view.create` | `tasks:write` | Waits, always. A saved view | Name 60 characters |
-| `project.setup` | `tasks:write` | Waits, always. Statuses, lists, fields and views for an existing project | Up to 10 statuses, 10 lists, 10 fields, 5 views |
+| `project.setup` | `tasks:write` | Waits, always. Statuses, lists, fields, views, automations and first tasks for an existing project | Up to 10 statuses, 10 lists, 10 fields, 5 views, 5 automations, 30 tasks |
 | `project.create` | `tasks:write` | Waits, always. A new project, with or without a plan | Name 3 to 100 characters, description up to 2000 |
 | `automation.create` | `tasks:write` | Waits, always, for an owner or admin. One automation rule for one project | Six step kinds; see "Automations" |
+| `dashboard.card.add` | `tasks:write` | Waits, always, for the dashboard's owner. One card on a dashboard they own, or on a new private one | Eight kinds of card; see "Dashboards" |
 
 ### Delegated sessions, `EXTERNAL_AGENT_SESSIONS` (3 tools)
 
@@ -492,6 +493,17 @@ The fields and their first values can be one approval: add `values`, up to 50, e
 - `values` is for a connection that may use `task.field.set` itself: the tool is on (`MCP_TOOLS_MANAGE`) and the connection holds `tasks:manage`. Any other connection is refused, and nothing is filed.
 - The call is refused at once, and nothing is filed, when a task is not one of that project that the person can open, when a field name is neither in the call nor in the project, when a value is not one the field takes, or when the person may not edit custom fields on a task.
 - The Inbox card lists each value under the fields, on its task by name. A value on a task the person looking cannot open is counted, not named.
+
+`fields.create` also takes the two types AlianHub works out, as the field form makes them. Neither takes a value.
+
+- `rollup`: a number worked out for each task from the subtasks under it, on every level. Give `function` (`sum`, `avg`, `count`, `min`, `max`) and `source`, the name of the number field it reads: a field of the same call or one the project already has, of type `number`, `money`, `rating`, `progress`, `formula` or `rollup`. `count` with no `source` counts the subtasks.
+- `formula`: a number worked out from the task's own number fields. Give `expression`: numbers, fields by name in braces, `+ - * /`, brackets, and `SUM`, `AVG`, `MIN`, `MAX`, `COUNT`, `ROUND`, `IF`, as in `{Price} - {Cost}`.
+
+```json
+{ "name": "fields.create", "arguments": { "projectId": "<project id>", "fields": [{ "name": "Cost total", "type": "rollup", "function": "sum", "source": "Cost" }] } }
+```
+
+A rollup of a field that is not there or is not a number, and a formula that cannot be read or that closes a circle with another formula, are answered at once and nothing is filed. The Inbox card says in words what each works out. A rollup has its number on each task as soon as it is approved; a formula has it on a task once a field value of that task is next saved. Read the number with `task.fields.list`. `project.setup` and `project.create` take the other types only.
 - Approved, the fields are made first, then each value is set as `task.field.set` sets it, and only on a live task of the project that the person behind the token and the approver can both open and may both edit the fields of. A value that is not set does not stop the others: `values` in the result says, for each, `set` or the reason.
 - Undo puts each value back to what the task held, then takes the fields away as above. A value on a task the person undoing cannot open stays, and so does the field that holds it.
 
@@ -501,10 +513,10 @@ The fields and their first values can be one approval: add `values`, up to 50, e
 { "name": "view.create", "arguments": { "projectId": "<project id>", "name": "My open work", "kind": "board", "groupBy": "priority", "mine": true } }
 ```
 
-`project.setup`: set up a project that exists from one plan, in one call. Arguments: `projectId`, and any of `statuses` (up to 10 names of at most 60 characters), `lists` (up to 10 names of at most 100 characters), `fields` (up to 10, as in `fields.create`) and `views` (up to 5, each as in `view.create`, plus `showFields`: fields of the same plan to show as columns, by name), and `reason`. Every name is cleaned to plain text. The whole plan is one proposal and one approval, and the Inbox shows every part on one card. It cannot make a project, an automation or a task.
+`project.setup`: set up a project that exists from one plan, in one call. Arguments: `projectId`, and any of `statuses` (up to 10 names of at most 60 characters), `lists` (up to 10 names of at most 100 characters), `fields` (up to 10, as in `fields.create`), `views` (up to 5, each as in `view.create`, plus `showFields`: fields of the same plan to show as columns, by name), `rules` (up to 5 automations, each the `trigger`, `conditions` and `actions` of `automation.create`, without the project) and `tasks` (up to 30 first tasks, each a `name` and, when wanted, a `list` and a `status` by name, one `assigneeId` and a `dueDate` as YYYY-MM-DD), and `reason`. Every name is cleaned to plain text. The whole plan is one proposal and one approval, and the Inbox shows every part on one card. It cannot make a project.
 
 ```json
-{ "name": "project.setup", "arguments": { "projectId": "<project id>", "statuses": ["In Review"], "lists": ["Backlog", "This week"], "fields": [{ "name": "Budget", "type": "money" }], "views": [{ "name": "Review board", "kind": "board", "groupBy": "status", "showFields": ["Budget"] }] } }
+{ "name": "project.setup", "arguments": { "projectId": "<project id>", "statuses": ["In Review"], "lists": ["Backlog", "This week"], "fields": [{ "name": "Budget", "type": "money" }], "views": [{ "name": "Review board", "kind": "board", "groupBy": "status", "showFields": ["Budget"] }], "rules": [{ "trigger": "task.status_changed", "conditions": [{ "field": "statusRef", "op": "changedTo", "value": "In Review" }], "actions": [{ "action": "notify", "config": { "recipients": ["task_assignees"], "message": "Ready for review" } }] }], "tasks": [{ "name": "Write the brief", "list": "Backlog", "status": "In Review", "dueDate": "2026-11-02" }] } }
 ```
 
 What happens to a plan:
@@ -513,6 +525,9 @@ What happens to a plan:
 - Approved, each part runs the web app's own route as the person behind the token, and only where the approver may make that part by hand too. A part that fails does not stop the others: the result lists each part with what was made, what was kept and what was not made, and `notMade` names each of those with the reason.
 - A status is added as a working stage, before the statuses that close a task. A status the project already has by that name is kept. One the company has in its own status list is taken from there with its colours. One the company does not have is added to that list first, which only an owner or an admin may do: the plan's person and its approver both have to be one, or that status is not made.
 - Lists are created at the top level of the project. A list is not checked against the lists the project has, so read `lists.list` first.
+- The person approving can untick any single status, list, field, view, automation or task on the card. Only what stays ticked is made, and the proposal keeps what was approved. A part that cannot be made without one that is unticked (a view that shows a field of the plan, a task in a list or a status of the plan, an automation that names a status of the plan) is unticked with it; an approval that keeps one without the other is refused and says which two.
+- Automations and first tasks are made last, in that order, and each is made as the action a call for it alone runs: `automation.create` and the `task.create` that takes a task's details. So each meets the same checks: the connection's actions, the permissions of the person behind the token, the project's rule for agents, and for an automation an owner or an admin as approver. A plan with a rule or a task that its connection could not ask for alone is refused at once; one that names a list, a status or a person that is in neither the plan nor the project is answered at once. A rule may name a status of the same plan. A rule of a plan always starts switched off.
+- Each automation and each task has its own audit row and its own undo; undoing the proposal undoes them first.
 - Undo takes back what the plan made, newest part first: its views, its fields (as for `fields.create`), its lists while they are empty, and its statuses while no task is in them. Whatever is in use stays, and the undo names it and says why. A status added to the company's list stays in that list, as it does when a person takes a status off a project.
 
 `project.create`: ask for a new project, with or without a plan for it, in one call. Arguments: `name` (3 to 100 characters), `description` (what it is for, up to 2000 characters), any of `statuses`, `lists`, `fields` and `views` as in `project.setup`, and `reason`. A view is a list or a board view, the kinds a new project starts with, and names no person and no field by id. The project and its plan are one proposal and one approval, and the Inbox shows the name, who will be on it and every part on one card. It cannot make an automation or a task.
@@ -529,7 +544,7 @@ What happens to a new project:
 - The proposal is listed for the person whose agent asked and for owners and admins.
 - Undo moves the project to the trash through the project's own route, as the person undoing, who must be allowed to delete it; a person restores it from the trash. A project that holds a task or a doc by then stays: the undo is refused and says why. Nothing is deleted for good.
 
-Undo, from the Inbox or the agent audit log: a view an agent added is removed, and nothing else. Each field it made is switched off, as the field form's own switch does, only while it is still that project's alone and no task holds a value in it. A field that holds a value, or that someone has since put on another project, stays, and the undo names it and says why.
+Undo, from the Inbox or the agent audit log: a view an agent added is removed, and nothing else. Each field it made is switched off, as the field form's own switch does, only while it is still that project's alone and no task holds a value in it; a rollup or a formula is switched off whatever number its tasks store, since nobody typed it. A field that holds a value, or that someone has since put on another project, stays, and the undo names it and says why.
 
 
 ### Automations
@@ -549,6 +564,20 @@ What is refused, with the reason: a step that runs an agent; any step outside th
 The Inbox shows the approver the project, what starts the rule, the rule in a sentence, each step, and whether it starts switched on. For an owner or an admin it also shows how many tasks of the last 30 days the rule matches, with up to three of them, counted the way the Automations page counts and only over what that person can open. Approving saves the rule through the Automations page's own create route as the person who approved: the rule is theirs, not the agent's and not the token's, and anything that page would refuse is refused.
 
 Undo, from the Inbox or the agent audit log: the rule is deleted, as the Automations page deletes it, whether it is on or off. A rule someone has edited since stays, and the undo says so; switch it off or delete it on the Automations page.
+
+### Dashboards
+
+`dashboard.card.add` needs `MCP_TOOLS_WORK` and the write scope, and no grant; an outside client's call is filed only when its connection holds `tasks:manage`. A dashboard is changed by its owner alone, so a call never adds a card: it is filed for the person the agent works for, and only that person can approve it. A token kept to some projects cannot use it, since a dashboard belongs to no project.
+
+Arguments: `dashboardId` (a dashboard the person owns) or `newDashboard` (the name of a new dashboard, made private to them), `card`, `period` and `reason`. The cards are the ones the dashboard editor adds with nothing more to fill in: `due_soon`, `my_time`, `project_pulse`, `logged_vs_estimate`, `free_capacity`, `at_risk`, `tasks_by_status` and `agent_spend`. `my_time`, `project_pulse`, `logged_vs_estimate` and `tasks_by_status` cover a span of time and take `period`: `auto`, `today`, `this_week`, `last_week`, `this_month`, `last_month` or `last_30_days`; left out, the card starts on the span the editor gives it. A card that first asks for a project, a list or a question (burndown, velocity, ask a question) is added in AlianHub, as is sharing a dashboard.
+
+```json
+{ "name": "dashboard.card.add", "arguments": { "newDashboard": "Team overview", "card": "tasks_by_status", "period": "this_week" } }
+```
+
+A dashboard that is not there and one the person cannot open are answered alike, as not found; one that belongs to someone else, or already holds 60 cards, is answered at once, and nothing is filed. The Inbox shows the dashboard by name and the card in the editor's words, to a viewer who can open the dashboard. Approving runs the dashboard editor's own routes as that person: the card goes under the cards already there, and it shows each viewer only the work they may see.
+
+Undo, by the dashboard's owner: the card is removed. A dashboard the change made is deleted with it while that card is all it holds; one that has gained a card since, or was there before, stays.
 
 ### Comments, links and time
 
@@ -718,15 +747,15 @@ The answer is `{ "userId": "...", "name": "...", "role": "member", "timeZone": "
 
 The answer is `{ "of": "workspace", "workingDays": ["Monday", ...], "dayNumbers": [1, 2, 3, 4, 5], "daysOff": ["Sunday", "Saturday"], "holidays": null, "note": "..." }`. `of` is `project` when the project has its own week, and `dayNumbers` count from 0 for Sunday. AlianHub keeps no list of public holidays, so `holidays` is always null, and a person's time off is not read here. A project the person cannot open answers `{ "error": "project not found" }`, as a missing one does.
 
-**A task's fields.** `task.fields.list` answers the custom fields of one task with what each holds. It needs `MCP_TOOLS_DATA`, the right to read tasks, and a role that is shown custom fields in the task's project.
+**A task's fields.** `task.fields.list` answers the custom fields of one task with what each holds. It needs `MCP_TOOLS_DATA`, the right to read tasks, and a role that is shown custom fields in the task's project. A formula or a rollup answers the number AlianHub last stored, with `computed: true` and `computedAt`, when it was worked out: when a rollup is made or changed, and each time a person or `task.field.set` saves a field value on the task or on a subtask under it. A subtask added, moved or removed since is not in the number yet, and before the first time both are null.
 
 ```json
 { "name": "task.fields.list", "arguments": { "taskId": "<task id>" } }
 ```
 
-The answer is `{ "taskId", "projectId", "about": "...", "fields": [{ "fieldId", "title", "type", "value" }] }`, by field name. `value` is text, a number, true or false, an ISO date, the labels of the options chosen, or `[{ "id", "name" }]` for people; null when the field is empty. A text longer than 2,000 characters is cut and carries `"cut": true`. A formula or rollup field carries `"computed": true` and the number AlianHub stored for it. A field whose value is kept beside the task (votes, linked tasks) is named with `"notReadHere": true` and no value. A field that is switched off, that belongs to another project, or that is for another task type is left out. A task the person cannot open answers `{ "error": "task not found" }`, as a missing one does.
+The answer is `{ "taskId", "projectId", "about": "...", "fields": [{ "fieldId", "title", "type", "value" }] }`, by field name. `value` is text, a number, true or false, an ISO date, the labels of the options chosen, or `[{ "id", "name" }]` for people; null when the field is empty. A text longer than 2,000 characters is cut and carries `"cut": true`. A formula or rollup field carries `"computed": true`, `"computedAt"` and the number AlianHub stored for it. A field whose value is kept beside the task (votes, linked tasks) is named with `"notReadHere": true` and no value. A field that is switched off, that belongs to another project, or that is for another task type is left out. A task the person cannot open answers `{ "error": "task not found" }`, as a missing one does.
 
-**Reading chat.** `chat.channels.list` lists the chat channels the person can open, and `chat.messages.list` reads the recent messages of one channel or of one task's comment thread. Both need `MCP_TOOLS_DATA`, the `chat:read` scope and a role that is shown comments. A connection without `chat:read` is listed neither tool, and a call of one is refused before anything is read. Direct messages are never listed or read.
+**Reading chat.** `chat.channels.list` lists the chat channels the person can open, and `chat.messages.list` reads the recent messages of one channel or of one task's comment thread. Both need `MCP_TOOLS_DATA`, the `chat:read` scope and a role that is shown comments. A connection without `chat:read` is listed neither tool, and a call of one is refused before anything is read. Direct messages are never listed or read, by these tools or any other: a conversation is not a task, so `tasks.search`, `tasks.next`, `task.get`, `comments.list` and every tool that takes a `taskId` answer for one as for a task that does not exist, and none writes to it. A chat space is not a project and a channel is not a list for the project and list tools.
 
 ```json
 { "name": "chat.channels.list", "arguments": { "query": "scratch" } }
@@ -739,13 +768,13 @@ A channel is `{ "channelId", "name", "private", "space": { "id", "name" } }`. A 
 
 The answer is `{ "proposalId", "state", "what", "changes", "filedAt", "next": "..." }`. `state` is `waiting`, `approved` (approved and being applied), `applied` (with `changesApplied`), `declined` (with `declined.reason`, the words the person typed, kept as a record and not an instruction), `undone` or `failed`. `next` says in a sentence what the agent should do. It answers only for a proposal the same connection filed: the same personal token, or the same app under the same grant. Any other proposal answers `{ "error": "proposal not found" }`, as a missing one does. It carries nothing of what the change holds.
 
-**Message to task.** `task.from_message` makes a task from a chat message, or a comment on a task, that the person can read. It needs `MCP_TOOLS_MANAGE` and the `tasks:manage` grant, and it is the same create as `task.create`: the project's rule for agents, approval and undo apply as they do there.
+**Message to task.** `task.from_message` makes a task from a comment on a task, or a message in a chat channel, that the person can read. It needs `MCP_TOOLS_MANAGE` and the `tasks:manage` grant, and it is the same create as `task.create`: the project's rule for agents, approval and undo apply as they do there. A comment on a task needs no more. A message in a channel (a chat channel, or the channel of a list) is chat, so the connection must also hold `chat:read`; without it the answer is `{ "ok": false, "error": "..." }` naming the scope, and nothing is made. A direct message is never read: it answers as a message that does not exist.
 
 ```json
 { "name": "task.from_message", "arguments": { "messageId": "<message id>", "assigneeIds": ["<member id>"], "dueDate": "2026-10-09" } }
 ```
 
-The task's description is the message's text, stored as text, followed by a line that says where it came from; with a web address set on the server it also holds a link back. The title is the first line of the message unless `title` is given. With no `projectId`, the task lands in the list the message's channel belongs to, or in the list of the task the comment is on; a direct message needs `projectId` (and `sprintId` for a list other than the project's first). It also takes `assigneeIds`, `priority`, `dueDate`, `startDate`, `status`, `taskType`, `estimateMinutes` and `reason`. A message the person cannot read, a deleted one and an id that does not exist all answer `{ "ok": false, "error": "message not found" }`. A chat message's id comes from `chat.messages.list`, and a comment's from `comments.list` or `chat.messages.list`.
+The task's description is the message's text, stored as text, followed by a line that says where it came from; with a web address set on the server it also holds a link back. The title is the first line of the message unless `title` is given. With no `projectId`, the task lands in the list the message's channel belongs to, or in the list of the task the comment is on; a message in a chat channel that belongs to no list needs `projectId` (and `sprintId` for a list other than the project's first). It also takes `assigneeIds`, `priority`, `dueDate`, `startDate`, `status`, `taskType`, `estimateMinutes` and `reason`. A message the person cannot read, a direct message, a deleted one and an id that does not exist all answer `{ "ok": false, "error": "message not found" }`. A chat message's id comes from `chat.messages.list`, and a comment's from `comments.list` or `chat.messages.list`.
 
 ## The work queue, performance numbers and delegated sessions
 
@@ -765,4 +794,4 @@ The task's description is the message's text, stored as text, followed by a line
 
 ## What an agent cannot do yet
 
-Create, share, archive or delete a goal, or add and remove its targets; change a project or its members; create, rename or move a folder; archive or restore a list; start or complete a sprint; create or edit a project's tags; change or remove a field or a view, formula and rollup fields, company-wide fields; dashboards; changing or switching off an automation rule that exists; time edits and time approval; checklists, attachments and watchers; converting a task to a subtask and back, merging and duplicating; reactions, files and resolving on a doc comment, and editing one; reactions on a task comment. Deleting is not planned.
+Create, share, archive or delete a goal, or add and remove its targets; change a project or its members; create, rename or move a folder; archive or restore a list; start or complete a sprint; create or edit a project's tags; change or remove a field or a view, company-wide fields; share, rename or delete a dashboard, move or remove its cards, or add a card that asks for a project, a list or a question; changing or switching off an automation rule that exists; time edits and time approval; checklists, attachments and watchers; converting a task to a subtask and back, merging and duplicating; reactions, files and resolving on a doc comment, and editing one; reactions on a task comment. Deleting is not planned.

@@ -240,10 +240,11 @@ describe('what removing the sample tells everyone else', () => {
         return socketEmitter.emit.mock.calls.map(([type, payload]) => ({ type, ...payload }));
     };
 
-    test('the folders and the docs are announced as their own trash paths announce them, each with the company', async () => {
+    test('the docs are announced as their own trash path announces them, and the folders go with the project, each event with the company', async () => {
         const docIds = rows(SCHEMA_TYPE.PAGES).filter((p) => inSample(p, 'ProjectID')).map((p) => String(p._id));
         const sent = await sentBy(removeSample);
-        expect(sent.filter((event) => event.module === 'folders')).toEqual([{ type: 'update', companyId: COMPANY, module: 'folders' }]);
+        expect(sent.filter((event) => event.module === 'folders')).toEqual([]);
+        expect(sent.filter((event) => event.module === 'project')).toHaveLength(1);
         const docs = sent.filter((event) => event.module === 'pages');
         expect(docs).toHaveLength(1);
         expect(docs[0]).toMatchObject({ type: 'update', companyId: COMPANY, data: { deletedStatusKey: 1, deleted: docIds.length, ids: docIds } });

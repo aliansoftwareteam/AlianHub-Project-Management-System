@@ -36,6 +36,7 @@ import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { AGENTS_CHANGED_EVENT, POLICY_CHANGE } from "@/views/Ai/agentFeed";
+import { useStoredProjectPart } from "@/views/Projects/liveProjects";
 
 defineOptions({ name: "ProjectAgentPolicyCard" });
 
@@ -135,6 +136,7 @@ watch(() => socket?.value, (next, previous) => {
     next?.on?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
 }, { immediate: true });
 onBeforeUnmount(() => socket?.value?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged));
+useStoredProjectPart(() => props.projectId, "agentPolicy", saved, follow);
 
 async function save(key) {
     busy.value = true;
@@ -169,5 +171,5 @@ async function save(key) {
 .pap__radio:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .pap__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .pap__name { color: var(--ink); font: 500 12.5px/1.35 var(--font-ui); overflow-wrap: anywhere; }
-.pap__about { color: var(--ink-2); font: 400 12px/1.4 var(--font-ui); overflow-wrap: anywhere; }
+.pap__about { color: var(--ink-label); font: 400 12px/1.4 var(--font-ui); overflow-wrap: anywhere; }
 </style>

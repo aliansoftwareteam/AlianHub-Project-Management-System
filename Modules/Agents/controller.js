@@ -7,6 +7,7 @@ const registry = require('./registry');
 const runs = require('./runs');
 const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
 const proposals = require('./proposals');
+const approverRights = require('./approverRights');
 const standingApprovals = require('./standingApprovals');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
@@ -33,7 +34,9 @@ const confidence = require('./engine/confidence');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const triggers = require('./triggers');
 const { agentsRefused } = require('./guard');
-const { personDecides } = require('./personDecides');
+const { personDecides, refuse } = require('./personDecides');
+const runStart = require('./runStart');
+const proposalFiling = require('./proposalFiling');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
 const companyOf = (req) => String(req.headers['companyid'] || '');
@@ -68,7 +71,7 @@ const idempotencyKeyOf = (req) => {
     return raw;
 };
 
-const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, REFUSAL } = access;
+const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, decidesProposals, REFUSAL } = access;
 
 /* A run that is someone else's private work is not there for an owner or admin; a member's standing
  * on a run is decided by the checks each route already makes. */
@@ -344,7 +347,7 @@ exports.pauseAll = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         if (refuseUnlessManager(res, await callerOf(req, companyId), 'Agents cannot pause agents.')) return undefined;
-        const out = await runs.pauseAll(companyId, `pause all by ${req.uid}`);
+        const out = await runs.pauseAll(companyId, `pause all by ${req.uid}`, req.uid);
         return res.send({ status: true, statusText: 'All agents paused.', data: out });
     } catch (e) { logger.error(`pauseAll: ${e.message}`); return fail(res, e.message, 500); }
 };
@@ -479,7 +482,8 @@ exports.startRun = async (req, res) => {
         if (taskId) {
             task = await tools.getTask(companyId, taskId).catch(() => null);
             if (!task) return fail(res, 'Task not found.', 404);
-            if (human && !(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
+            if (!human && !triggers.isWorkTask(task)) return fail(res, 'Task not found.', 404);
+            if (!(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
             if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) return fail(res, 'This agent is not scoped to that project.', 403);
         }
         if (!task) {
@@ -489,6 +493,8 @@ exports.startRun = async (req, res) => {
         }
         const paused = await runs.pausedIn(companyId, task.ProjectID);
         if (paused) return fail(res, paused, 409);
+        const held = human ? '' : await runStart.heldBy(companyId, actor, task);
+        if (held) return refuse(req, res, actor, { action: runStart.START, reason: held, params: { taskId: String(task._id) }, entityId: String(task._id) });
         const { run, deduplicated } = await runs.start(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note, spendCapUsd, notifyMe: Boolean(notifyMe), idempotencyKey });
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
         if (deduplicated) return res.send({ status: true, statusText: 'Run already started.', data: { ...plain, deduplicated: true } });
@@ -609,12 +615,15 @@ exports.listProposals = async (req, res) => {
         const q = req.query || {};
         const caller = await callerOf(req, companyId);
         const readScope = await readScopeOf(companyId, caller);
-        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope });
+        // An agent reads what waits; whether a row is a person's to decide is said to a person.
+        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope, viewer: caller.human ? caller : null });
         return res.send({ status: true, statusText: 'Proposals fetched.', data: await asCards(companyId, caller, out.proposals), counts: out.counts });
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
 
-/* POST /api/v2/agents/proposals — only an agent files one, and only in its own name */
+const NAMED_NOT_FOUND = 'A task, project, list, doc or run this proposal names was not found.';
+
+/* POST /api/v2/agents/proposals — only an agent files one, only in its own name, and only about what its person can open */
 exports.createProposal = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -628,22 +637,31 @@ exports.createProposal = async (req, res) => {
         const agent = await runs.getAgent(companyId, agentId);
         if (!agent) return fail(res, 'Agent not found.', 404);
         if (actor.tokenId && require('./connectors/slackPost').hasSlackChange(b.changes)) return fail(res, 'A Slack message is proposed only by a workspace agent\'s own run, not through a token.', 403);
-        const saved = await proposals.create(companyId, { agent, runId: b.runId || actor.runId, taskId: b.taskId, projectId: b.projectId, what: b.what, why: b.why, changes: b.changes, gate: b.gate, priority: b.priority, cost: b.cost });
+        const runId = b.runId || actor.runId;
+        const open = await proposalFiling.namesOnlyOpenThings(companyId, actor.userId, b) && (!runId || await proposalFiling.ownRun(companyId, actor.userId, agentId, runId));
+        if (!open) return fail(res, NAMED_NOT_FOUND, 404);
+        const refused = await proposalFiling.refusedChange(companyId, actor, b);
+        if (refused) return refuse(req, res, actor, { ...refused, entityId: refused.params.taskId });
+        const saved = await proposals.create(companyId, { agent, runId, taskId: b.taskId, projectId: b.projectId, what: b.what, why: b.why, changes: b.changes, gate: proposalFiling.gateAsked(b.gate), priority: b.priority, cost: b.cost });
         return res.send({ status: true, statusText: 'Proposal filed.', data: saved });
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
-const decide = (action, fn) => async (req, res) => {
+/* `heldTo`, when given, is asked of the caller and the proposal before the decision is taken; it answers a refusal or null. */
+const decide = (action, fn, heldTo = null) => async (req, res) => {
     try {
         if (!(await personDecides(req, res, action))) return undefined;
         const companyId = companyOf(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid proposal id are required.');
         const caller = await callerOf(req, companyId);
-        if (!caller.human) return fail(res, 'Agents cannot decide proposals — a person has to.', 403);
+        if (!caller.human) return fail(res, REFUSAL.DECIDE_PERSON, 403);
         // One answer for a proposal that is not there and one the caller may not see.
         const proposal = await proposals.get(companyId, req.params.id);
         if (!proposal || !(await canSeeProposal(companyId, caller, proposal))) return fail(res, 'Proposal not found.', 404);
-        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
+        if (!decidesProposals(caller)) return fail(res, REFUSAL.DECIDE_MEMBER, 403, refusalOf({ reason: 'not_permitted' }));
+        const held = heldTo ? await heldTo(companyId, caller, proposal) : null;
+        if (held) return fail(res, held.error, held.status, refusalOf(held));
+        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, parts: req.body && req.body.parts, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
         return res.send({ status: true, statusText: 'Done.', data: out });
     } catch (e) { logger.error(`proposal decision: ${e.message}`); return fail(res, e.message, 500); }
@@ -652,7 +670,7 @@ const decide = (action, fn) => async (req, res) => {
 const approveOnceOrAlways = (companyId, id, { always, ...decision }) => (always ? standingApprovals.approveAlways(companyId, id, decision) : proposals.approve(companyId, id, decision));
 
 exports.approveProposal = decide('proposal.approve', approveOnceOrAlways);
-exports.declineProposal = decide('proposal.decline', proposals.decline);
+exports.declineProposal = decide('proposal.decline', proposals.decline, approverRights.declineRefusal);
 exports.undoProposal = decide('proposal.undo', proposals.undoApproval);
 
 /* GET / PUT / DELETE /api/v2/agents/account — my personal coding-agent link */
@@ -707,7 +725,7 @@ const saveWorkspacePolicy = async (req, res) => {
         if (req.apiToken) return fail(res, 'An API token cannot change the workspace\'s agent settings.', 403);
         const caller = await callerOf(req, companyId);
         if (!canManageAgents(caller)) return fail(res, 'Owner/admin only.', 403);
-        const out = await accounts.setPolicy(companyId, req.body || {});
+        const out = await accounts.setPolicy(companyId, req.body || {}, caller.actor.userId);
         if (out.error) return fail(res, out.error, out.status || 400);
         await agentAudit.recordWorkspacePolicyChange(companyId, caller.actor, { from: out.from, to: out.policy, ip: req.ip || '' });
         socketEmitter.emit('update', { type: 'update', module: 'agent', companyId, data: { kind: POLICY_CHANGE }, updatedFields: { kind: POLICY_CHANGE }, actor: { kind: 'human' }, depth: 1 });

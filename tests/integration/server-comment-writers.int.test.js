@@ -70,15 +70,28 @@ async function proposalToComment(thread, body, filedOn = thread) {
     const agentId = created.body.data._id;
     agentIds.push(agentId);
     const api = await agentClient(agentId);
+    // Filing refuses a direct message, so a row that names one is filed on an open task and then pointed at it.
+    const fileable = (place) => (place.taskId === dm.taskId ? open : place);
     const res = await api.post('/api/v2/agents/proposals', {
-        agentId, taskId: filedOn.taskId, projectId: filedOn.projectId, what: label('proposal'), why: 'integration',
-        changes: [{ action: 'task.comment', params: { taskId: thread.taskId, body }, label: 'Comment' }],
+        agentId, taskId: fileable(filedOn).taskId, projectId: fileable(filedOn).projectId, what: label('proposal'), why: 'integration',
+        changes: [{ action: 'task.comment', params: { taskId: fileable(thread).taskId, body }, label: 'Comment' }],
     });
     expect(res.body.status).toBe(true);
-    return res.body.data._id;
+    const proposalId = res.body.data._id;
+    if (thread.taskId === dm.taskId) await pointAt(proposalId, thread, filedOn);
+    return proposalId;
 }
 
 const storedProposal = (proposalId) => db.collection('agent_proposals').findOne({ _id: new ObjectId(String(proposalId)) });
+const sameKind = (was, id) => (was instanceof ObjectId ? new ObjectId(String(id)) : String(id));
+const pointAt = async (proposalId, thread, filedOn) => {
+    const stored = await storedProposal(proposalId);
+    await db.collection('agent_proposals').updateOne({ _id: stored._id }, { $set: {
+        taskId: sameKind(stored.taskId, filedOn.taskId),
+        projectId: sameKind(stored.projectId, filedOn.projectId),
+        'changes.0.params.taskId': sameKind(stored.changes[0].params.taskId, thread.taskId),
+    } });
+};
 
 const clientMessage = (session, projectId, message) => session.api.post('/api/v2/billing/client-view/message', { projectId, message });
 
@@ -180,24 +193,24 @@ describe('a proposal filed on a thread the approver cannot open is not theirs to
 });
 
 describe('a comment an approved agent proposal writes follows thread visibility for the approver', () => {
-    it('does not apply a comment on a private sprint the approving member is not on', async () => {
+    it('refuses a comment on a private sprint the approving member is not on, and leaves the proposal pending', async () => {
         const message = label('proposal into private sprint');
         const proposalId = await proposalToComment(privateSprint, message, open);
         const res = await member.api.post(`/api/v2/agents/proposals/${proposalId}/approve`);
 
-        expect(res.status).toBe(200);
-        expect(res.body.data.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: false })]);
+        expect(res.status).toBe(403);
         expect(await countByMessage(message)).toBe(0);
+        expect((await storedProposal(proposalId)).status).toBe('pending');
     });
 
-    it('does not apply a comment on a direct message the approving admin is not in', async () => {
+    it('refuses a comment on a direct message the approving admin is not in, and leaves the proposal pending', async () => {
         const message = label('proposal into dm');
         const proposalId = await proposalToComment(dm, message, open);
         const res = await admin.api.post(`/api/v2/agents/proposals/${proposalId}/approve`);
 
-        expect(res.status).toBe(200);
-        expect(res.body.data.applied).toEqual([expect.objectContaining({ action: 'task.comment', ok: false })]);
+        expect(res.status).toBe(403);
         expect(await countByMessage(message)).toBe(0);
+        expect((await storedProposal(proposalId)).status).toBe('pending');
     });
 
     it('still applies a comment on a task the approver can open', async () => {

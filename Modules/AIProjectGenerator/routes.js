@@ -1,5 +1,9 @@
 const ctrl = require('./controller');
 const guideCtrl = require('./guideController');
+const { agentsRefused } = require('../Agents/guard');
+
+/* The workspace's AI writes these when a person asks for them. */
+const askedByPeople = agentsRefused('ai.spend');
 
 exports.init = (app) => {
     /**
@@ -11,7 +15,7 @@ exports.init = (app) => {
      *     responses:
      *       200: { description: returns briefId + extracted text stats }
      */
-    app.post('/api/v1/ai/project/upload-brief', ...ctrl.uploadBrief);
+    app.post('/api/v1/ai/project/upload-brief', askedByPeople, ...ctrl.uploadBrief);
 
     /**
      * @swagger
@@ -24,7 +28,7 @@ exports.init = (app) => {
      *       /api/v1/ai-progress/{jobId}, avoiding proxy 504s while the LLM is
      *       still producing the full plan.
      */
-    app.post('/api/v1/ai/project/plan', ctrl.plan);
+    app.post('/api/v1/ai/project/plan', askedByPeople, ctrl.plan);
 
     /**
      * @swagger
@@ -41,7 +45,7 @@ exports.init = (app) => {
      *       Returning `{ status: true, questions: [] }` is valid: it tells
      *       the frontend the brief is already complete enough to skip Q&A.
      */
-    app.post('/api/v1/ai/project/clarify', ctrl.clarify);
+    app.post('/api/v1/ai/project/clarify', askedByPeople, ctrl.clarify);
 
     /**
      * @swagger
@@ -56,7 +60,7 @@ exports.init = (app) => {
      *       which the user edits and approves and /plan receives as
      *       `approvedBrief`. Synchronous.
      */
-    app.post('/api/v1/ai/project/brief', ctrl.brief);
+    app.post('/api/v1/ai/project/brief', askedByPeople, ctrl.brief);
 
     /**
      * @swagger
@@ -65,7 +69,7 @@ exports.init = (app) => {
      *     summary: Execute an approved plan and create the full project bootstrap
      *     tags: [AI Project Generator]
      */
-    app.post('/api/v1/ai/project/execute', ctrl.execute);
+    app.post('/api/v1/ai/project/execute', agentsRefused('project.create'), ctrl.execute);
 
     /**
      * @swagger
@@ -74,7 +78,7 @@ exports.init = (app) => {
      *     summary: Generate the project's Guide instructions from the approved brief (task 015)
      *     tags: [AI Project Generator]
      */
-    app.post('/api/v1/ai/project/guide', guideCtrl.guide);
+    app.post('/api/v1/ai/project/guide', askedByPeople, guideCtrl.guide);
 
     /**
      * @swagger
@@ -87,7 +91,7 @@ exports.init = (app) => {
      *       team's requirements. Returns a jobId immediately; the plan is
      *       delivered on /api/v1/ai-progress/{jobId}. Does NOT create a project.
      */
-    app.post('/api/v1/ai/project/:projectId/tasks/plan', ctrl.tasksPlan);
+    app.post('/api/v1/ai/project/:projectId/tasks/plan', askedByPeople, ctrl.tasksPlan);
 
     /**
      * @swagger
@@ -96,7 +100,7 @@ exports.init = (app) => {
      *     summary: Persist an approved AI task plan into an EXISTING project (AHE-3777)
      *     tags: [AI Project Generator]
      */
-    app.post('/api/v1/ai/project/:projectId/tasks/execute', ctrl.tasksExecute);
+    app.post('/api/v1/ai/project/:projectId/tasks/execute', agentsRefused('tasks.import'), ctrl.tasksExecute);
 
     /**
      * @swagger

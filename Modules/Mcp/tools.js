@@ -169,6 +169,7 @@ const TOOLS = [
         name: 'task.create',
         action: 'task.create',
         visibility: 'filtered',
+        creates: true,
         target: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
         description: 'File a new task in a project, in its opening status and unassigned. Use it for work you found that is not on the board yet; put the goal and acceptance criteria in the description.',
         input: {
@@ -182,6 +183,7 @@ const TOOLS = [
         name: 'subtask.create',
         action: 'subtask.create',
         visibility: 'filtered',
+        creates: true,
         target: taskTarget,
         description: 'Break the task down. One subtask per call.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, title: { type: 'string' } }, required: ['taskId', 'title'] },
@@ -455,24 +457,29 @@ const batchItem = async (ctx, operation) => {
     }
 };
 
-/* A tool that prepares its arguments names its target only once prepared, so it counts as naming no task. */
-const targetTaskOf = (tool, args) => {
-    if (tool.prepare || !tool.target) return '';
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+/* What one operation reaches, as far as its arguments say: every task its target names, the task it links to
+ * beside the one it starts from. A tool that makes a new task or doc (`creates`) reaches that new one, and so does
+ * one that names no task or names its target only once prepared: each counts as one of its own. */
+const reachOf = (tool, args, index) => {
+    const own = [`operation:${index}`];
+    if (tool.creates || tool.prepare || !tool.target) return own;
     try {
-        return String(tool.target(args).taskId || '');
+        const target = tool.target(args);
+        const tasks = [target.taskId, target.relatedTaskId].map((id) => String(id || '').toLowerCase()).filter((id) => OBJECT_ID.test(id));
+        return tasks.length ? tasks.map((id) => `task:${id}`) : own;
     } catch (error) {
-        return '';
+        return own;
     }
 };
 
-/* How many tasks a batch names: one for each task an operation targets, and one for each operation that targets
- * none, a new task or a doc for one. An operation no call could make names nothing. */
-const tasksNamed = (ctx, operations) => new Set(operations.map((operation, index) => {
+/* How many tasks a batch reaches. An operation no call could make reaches nothing. */
+const tasksNamed = (ctx, operations) => new Set(operations.flatMap((operation, index) => {
     const tool = batchTool(ctx, operation);
-    if (!tool || scopeRefusal(ctx, tool, true) || argumentProblem(tool, operation.arguments)) return '';
-    const taskId = targetTaskOf(tool, operation.arguments);
-    return taskId ? `task:${taskId.toLowerCase()}` : `operation:${index}`;
-}).filter(Boolean)).size;
+    if (!tool || scopeRefusal(ctx, tool, true) || argumentProblem(tool, operation.arguments)) return [];
+    return reachOf(tool, operation.arguments, index);
+})).size;
 
 /* One operation of a batch that waits: taken as far as a call of its own goes before it would run, then asked what
  * filing asks. Answers the change to file, or the outcome that keeps it out. Nothing runs here. */
@@ -496,7 +503,7 @@ const batchChange = async (ctx, operation) => {
 };
 
 /* Decision 6 of task 047: over MCP a change to one task may be applied at once, and anything wider waits. A batch
- * that names more than one task therefore runs nothing: what a call could make of it is filed as one proposal. */
+ * that reaches more than one task therefore runs nothing: what a call could make of it is filed as one proposal. */
 const fileBatch = async (ctx, tool, args) => {
     const taken = [];
     for (const operation of args.operations) taken.push(await batchChange(ctx, operation));
@@ -525,8 +532,9 @@ const applyBatch = async (ctx, tool, args) => {
     };
 };
 
+/* A batch of one operation is that operation's own call, which waits or runs by the rule for a single change. */
 function runBatch(ctx, tool, args) {
-    return tasksNamed(ctx, args.operations) > 1 ? fileBatch(ctx, tool, args) : applyBatch(ctx, tool, args);
+    return args.operations.length > 1 && tasksNamed(ctx, args.operations) > 1 ? fileBatch(ctx, tool, args) : applyBatch(ctx, tool, args);
 }
 
 module.exports = { TOOLS, names: toolNames, manifest, usable, call, registered, actionOf, actionsOffered };

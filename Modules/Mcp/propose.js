@@ -52,6 +52,15 @@ const declinedNotes = async (ctx, projectId) => {
     return rows && rows.length ? { about: DECLINED_ABOUT, notes: rows.map(noteOf) } : null;
 };
 
+/* Whether the person behind `actor` holds what a change needs in every project it names. A change that names a
+ * project beside its task, a move for one, takes the task out of one project and into another: it is held in
+ * both. Filing asks it of the requester and approval of the approver (./approval.js). */
+const holderMayInEach = async (companyId, actor, action, params = {}) => {
+    const named = await permissions.holderMay(companyId, actor, action, params);
+    if (!named.allowed || !params.projectId || !OBJECT_ID.test(String(params.taskId || '').toLowerCase())) return named;
+    return permissions.holderMay(companyId, actor, action, { ...params, projectId: '' });
+};
+
 /* What filing asks of one change before a person is asked to approve it: the same registry and holder checks a
  * direct call faces, so a proposal never asks a person to approve something the token could not have done.
  * Throws the audited refusal. */
@@ -62,7 +71,7 @@ const fileable = async (ctx, tool, params) => {
     }
     const check = registry.evaluate(tool.action, { ...params, __proposal: true }, { allowedActions: ctx.allowedActions });
     if (!check.allowed) await refuse(check.reason);
-    const holder = await permissions.holderMay(ctx.companyId, ctx.actor, tool.action, params);
+    const holder = await holderMayInEach(ctx.companyId, ctx.actor, tool.action, params);
     if (!holder.allowed) await refuse(holder.reason);
 };
 
@@ -130,4 +139,4 @@ const proposeBatch = async (ctx, entries, reason) => {
     return { ...filed, message: BATCH_PENDING_MESSAGE };
 };
 
-module.exports = { SOURCE, propose, proposeBatch, afterManyTasks, fileable, outsideMayFile, declinedNotes };
+module.exports = { SOURCE, propose, proposeBatch, afterManyTasks, fileable, holderMayInEach, outsideMayFile, declinedNotes };

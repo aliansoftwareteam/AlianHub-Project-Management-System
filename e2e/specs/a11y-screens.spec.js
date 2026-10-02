@@ -14,9 +14,7 @@ const THEMES = ['light', 'dark'];
 /* Known findings the product has not fixed yet. `screen` is the test title, `target` the node's selector. */
 const ALLOWED = [
     { screen: 'Settings, Company', rule: 'list', target: /^ul$/, reason: 'the workspace list also holds the create tile and spinner components as direct children' },
-    { screen: 'Settings, General', rule: 'color-contrast', target: /^\.milestone__value-input$/, reason: 'legacy milestone status input keeps its own light-theme colours' },
     { screen: 'Settings, General', rule: 'target-size', target: /^\.hasValue$/, reason: 'native colour swatch of the milestone status form is smaller than 24px' },
-    { screen: 'Settings, General', rule: 'scrollable-region-focusable', target: /addExtentionWrapper/, reason: 'file extension and skill chip lists scroll without a focusable child' },
     { screen: 'Gantt', rule: 'color-contrast', target: /^\.v-toast__text$/, reason: 'the toast library colours its text per type and the Gantt opens with one' },
     { screen: 'Calendar', rule: 'color-contrast', target: /^a\[aria-label="(Saturday|Sunday)"\]$|\.cv__daynum$/, reason: 'the project calendar is a legacy screen that keeps light-theme colours (docs/ACCESSIBILITY.md known gaps)' },
 ];

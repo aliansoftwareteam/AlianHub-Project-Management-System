@@ -2,6 +2,7 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { Notification_key } = require("../../../Config/notificationKey.js");
 const mongoose = require("mongoose")
+const { mentionsKeptFromAgent, noticesKeptFromAgent, withoutKept } = require("../../Comments/helpers/agentChatRows");
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
@@ -46,7 +47,7 @@ exports.getMentionsMessages = async (req, res) => {
         const params = {
             type: SCHEMA_TYPE.MENTIONS,
             data: [
-                query,
+                withoutKept(query, await mentionsKeptFromAgent(req.headers['companyid'], userId)),
                 {},
                 options
             ]
@@ -98,7 +99,7 @@ exports.getNotificationMessages = async (req, res) => {
         }
 
         const query = [
-            { $match: { $and: baseMatch } },
+            { $match: withoutKept({ $and: baseMatch }, await noticesKeptFromAgent(req.headers['companyid'], userId)) },
             { $sort: { createdAt: -1, _id: 1 } },
             { $skip: loadMore ? skip : 0 },
             { $limit: limit },

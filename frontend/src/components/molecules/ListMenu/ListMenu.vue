@@ -13,7 +13,7 @@
             >
                 <ShellIcon name="dots" :size="14" />
             </button>
-            <div v-if="shown" ref="menu" class="ah-pop pt-menu__pop" role="menu" :aria-label="label" @keydown.stop="onMenuKeydown">
+            <div v-if="shown" ref="menu" class="ah-pop pt-menu__pop" :class="menuClass" :style="menuStyle" role="menu" :aria-label="label" @keydown.stop="onMenuKeydown">
                 <template v-for="entry in entries" :key="entry.id">
                     <div v-if="entry.separated" class="ah-pop__sep" role="separator"></div>
                     <button
@@ -147,7 +147,7 @@ const router = inject(routerKey, null);
 const route = inject(routeLocationKey, null);
 const companyId = inject("$companyId", null);
 const { checkPermission } = useCustomComposable();
-const { shown, root, menu, open, close, onMenuKeydown } = useRowMenu();
+const { shown, root, menu, menuClass, menuStyle, open, close, onMenuKeydown } = useRowMenu();
 
 const mode = ref("");
 const busy = ref(false);
@@ -208,8 +208,20 @@ async function move(target) {
         folder: target ? { id: target.id, name: target.name } : null,
         fromFolderName: from?.name || ""
     });
-    if (result.ok) $toast.success(t("Projects.list_moved"), TOAST);
-    else complain(result);
+    if (result.ok) {
+        $toast.success(t("Projects.list_moved"), TOAST);
+        followItsPage(target ? target.id : "");
+    } else complain(result);
+}
+
+/* The page of a list that moved stays on the list, so its address has to name the folder the list is in now. */
+function followItsPage(folderId) {
+    if (!router || String(route?.params?.sprintId || "") !== list.value.id) return;
+    const place = treeRoute("sprint", { cid: route.params.cid, projectId: props.project._id, folderId, id: list.value.id });
+    const { taskId } = route.params;
+    router.replace(taskId
+        ? { name: `${place.name}Task`, params: { ...place.params, taskId }, query: route.query }
+        : { ...place, query: route.query });
 }
 
 /* Unfinished work has moved into another sprint, whose task count the store still holds. */

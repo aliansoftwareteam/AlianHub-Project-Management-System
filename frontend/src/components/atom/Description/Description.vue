@@ -46,7 +46,7 @@
 <script setup>
 import { computed, defineComponent, inject, onMounted, provide, ref, watch } from 'vue';
 import { useStore } from 'vuex';
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";

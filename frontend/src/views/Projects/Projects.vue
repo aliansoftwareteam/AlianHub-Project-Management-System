@@ -13,7 +13,7 @@
                             :folders="headerFolders"
                             :agentSummary="agentSummary"
                             :agentsAtWork="agentWorkCountIn(projectData?._id)"
-                            :agentsPaused="agentsPaused"
+                            :agentsPaused="projectData?.agentLimits?.paused === true"
                             @show-agent-work="setAgentWorking(true)"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
@@ -68,7 +68,7 @@
                                                         :ref="projectView"
                                                     >
                                                         <img :src="publicIcon" v-if="!projectData.isPrivateSpace" class="pr-10px vertical-middle" alt="public-folder"/>
-                                                        <span class="font-size-14 text-ellipsis d-inline-block gray81 project__requirement">
+                                                        <span class="font-size-14 text-ellipsis d-inline-block project__requirement">
                                                             <span v-if="activeTab !== 'EmbedView' && projectComponentsIcons(activeTab)?.icon" class="ah-mask-icon phone-view__icon mr-5px" :style="maskOf(projectComponentsIcons(activeTab).icon)" aria-hidden="true"></span>
                                                             <img v-else-if="activeTab === 'EmbedView' && icons[selectedEmbedView?.type]" :src="icons[selectedEmbedView.type]" alt="" class="mr-5px">
                                                             {{activeTab !== 'EmbedView' ? (shownView?.title || viewLabel(shownView?.name)) : embedViewName || "N/A"}}
@@ -497,7 +497,6 @@ import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
 import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
 import { agentWorkCountIn } from './composables/agentWork';
-import { useAgentPause } from './composables/agentPause';
 import SavedViewBar from './components/SavedViewBar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
@@ -507,7 +506,7 @@ import ProjectEmptyState from './components/ProjectEmptyState.vue';
 import FolderEmptyState from './components/FolderEmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { folderSprintList, folderWithoutLists, headerLocation, projectSprintList } from './folderSprints';
+import { folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
 import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
@@ -711,7 +710,6 @@ const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData
 const projectSearch = useProjectSearch(projectData, showArchived, { buildFilterQuery });
 const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy, agentWorking, setAgentWorking } = projectSearch;
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
-const { agentsPaused } = useAgentPause(projectData, socket);
 
 const Uid = ref('embed' + makeUniqueId(6));
 const renameValue = ref('');
@@ -1124,6 +1122,12 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
 
     if (!project) return;
 
+    const moved = movedListRoute({ route, project });
+    if (moved) {
+        router.replace(moved);
+        return;
+    }
+
     try {
         if (route.name === 'Projects' || route.name === 'Project') {
             tmp = projectSprintList({ project, showArchived: showArchived.value, includeSprint: checkSprint });
@@ -1384,6 +1388,7 @@ function closeModal() {
     height: 28px;
 }
 .project__requirement{
+    color: var(--ink-2);
     padding: 0px 10px 0 2px;
 }
 .project__requirement img{

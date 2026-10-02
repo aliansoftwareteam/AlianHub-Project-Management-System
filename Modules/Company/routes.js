@@ -9,6 +9,8 @@ const upload = multer({
     limits: DEFAULT_LIMITS,
     fileFilter: safeFileFilter,
 });
+const { agentsRefused } = require('../Agents/guard');
+
 exports.init = (app) => {
     /**
     * @swagger
@@ -114,7 +116,7 @@ exports.init = (app) => {
     /**
      * Create a new Company and Add company In wasabi.
      */
-	app.post("/api/v2/company/create", upload.single("file"), ctrl.createCompanyV2);
+	app.post("/api/v2/company/create", agentsRefused('workspace.create'), upload.single("file"), ctrl.createCompanyV2);
 	app.get("/api/v1/freeCompanyCount/:userId", ctrl.checkFreeCompanyCountsApi);
 	// The audience is frozen at login, so the membership re-check is what stops a removed
 	// member reaching a handler that drops the whole database.
@@ -126,13 +128,13 @@ exports.init = (app) => {
 
         handleEvents(req, res)
     });
-    app.put('/api/v1/company',updateCompanyCtrl.updateCompany);
+    app.put('/api/v1/company', agentsRefused('workspace.settings'), updateCompanyCtrl.updateCompany);
     app.post('/api/v1/company',updateCompanyCtrl.getCompany);
     app.post('/api/v1/admin/company',updateCompanyCtrl.getCompany); // For Admin side Get
     app.post('/api/v1/admin/company/find',updateCompanyCtrl.getCompanyByAggregate); // For Admin side Get Aggregate
     // Both take their company from the request body, so neither runs the membership re-check
     // verifyJWTTokenWithCV2 gives every other company route.
     app.put('/api/v1/company-invitation', requireLiveCompanyMembership, updateCompanyCtrl.updateCompany);
-    app.put('/api/v1/admin/company', requireLiveCompanyMembership, updateCompanyCtrl.updateCompany);
+    app.put('/api/v1/admin/company', agentsRefused('workspace.settings'), requireLiveCompanyMembership, updateCompanyCtrl.updateCompany);
     app.get('/api/v1/getcompany-reffercode',updateCompanyCtrl.getCompanyRefferCode);
 }

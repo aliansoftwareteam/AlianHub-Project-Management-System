@@ -11,10 +11,13 @@ const { storedProject, whoOf } = require('./taskRequests');
 // One plan for a project that exists: statuses, lists, fields and views. Each part is made by the route the web app
 // calls for it, as the person behind the agent, and only where the person who approved may make that part by hand
 // too. A part that fails is reported beside the parts that worked. Taking a plan back removes what it made, part
-// by part, and leaves whatever is in use by then.
+// by part, and leaves whatever is in use by then. Its automations and first tasks come last and are each an action
+// of their own (./planWork.js), with their own audit row and undo.
 
 const PARTS = Object.freeze(['statuses', 'lists', 'fields', 'views']);
-const PLAN_KEY = Object.freeze({ statuses: 'statuses', lists: 'lists', fields: 'definitions', views: 'views' });
+const WORK_PARTS = Object.freeze(['rules', 'tasks']);
+const ALL_PARTS = Object.freeze([...PARTS, ...WORK_PARTS]);
+const PLAN_KEY = Object.freeze({ statuses: 'statuses', lists: 'lists', fields: 'definitions', views: 'views', rules: 'rules', tasks: 'tasks' });
 const STATUSES_MAX = 10;
 const LISTS_MAX = 10;
 const VIEWS_MAX = 5;
@@ -25,6 +28,7 @@ const LIST_CREATE = 'project.project_sprint_create';
 const ADMIN_ONLY = 'the company does not have this status yet, and only an owner or an admin adds one';
 
 const work = () => require('./workRequests');
+const planWork = () => require('./planWork');
 const refuse = (message) => new tools.DeterministicError(message);
 const idOf = (value) => (value === undefined || value === null ? '' : String(value));
 const lower = (value) => String(value).trim().toLowerCase();
@@ -65,8 +69,11 @@ const planOf = (given) => {
     };
 };
 
-const partsOf = (plan) => PARTS.filter((part) => listOf(plan[PLAN_KEY[part]]).length > 0);
-const namesIn = (plan, part) => listOf(plan[PLAN_KEY[part]]).map((entry) => (typeof entry === 'string' ? entry : entry.name));
+/* The plan project.setup takes: the four parts every plan has, and the automations and first tasks of a project that exists. */
+const setupPlanOf = (given) => ({ ...planOf(given), ...planWork().partsOf(given) });
+
+const partsOf = (plan) => ALL_PARTS.filter((part) => listOf(plan[PLAN_KEY[part]]).length > 0);
+const namesIn = (plan, part) => (WORK_PARTS.includes(part) ? planWork().namesOf(plan, part) : listOf(plan[PLAN_KEY[part]]).map((entry) => (typeof entry === 'string' ? entry : entry.name)));
 
 const namesProblem = (part, given, max, nameMax) => {
     if (given === undefined) return '';
@@ -108,6 +115,14 @@ const planProblem = (given) => {
         || viewsProblem(plan);
 };
 
+/* '' for a plan of a project that exists, every part of which can be asked for; otherwise what is wrong with it. */
+const setupProblem = (given) => {
+    const plan = objectOf(given);
+    const own = [plan.statuses, plan.lists, fieldsGiven(plan), plan.views].some((part) => part !== undefined);
+    if (!own && !planWork().isAsked(plan)) return `the plan needs at least one of ${ALL_PARTS.join(', ')}`;
+    return (own ? planProblem(plan) : '') || planWork().problemIn(plan);
+};
+
 /* The keys the web app's route for a part asks of a person in that project. */
 const keysOf = (part, uid) => {
     const { FIELD_PERMISSIONS, permissionsForProjectUpdate } = require('../../Config/projectAccess');
@@ -127,10 +142,10 @@ const whyNot = async (companyId, uid, projectId, part) => {
     return access.allowed ? '' : `${access.permission || keys.flat().join(' or ')} is not granted`;
 };
 
-/* The parts of a plan `uid` may not make, each with the reason. */
+/* The parts of a plan `uid` may not make, each with the reason. An automation or a first task is held to its own action when it is made. */
 const refusedParts = async (companyId, uid, projectId, plan) => {
     const refused = [];
-    for (const part of partsOf(plan)) {
+    for (const part of partsOf(plan).filter((held) => PARTS.includes(held))) {
         const reason = await whyNot(companyId, uid, projectId, part);
         if (reason) refused.push({ part, reason });
     }
@@ -161,7 +176,7 @@ const addToCompany = async ({ companyId, who, approvedBy, name, at }) => {
 const saveStatuses = async ({ companyId, who, projectId, next }) => {
     const answer = await setup.answerOf('projectUpdate', { companyId, who, params: { id: projectId }, body: { updateObject: { taskStatusData: next } } });
     if (answer.code !== 200) return setup.reasonOf(answer, 'the statuses were not saved');
-    socketEmitter.emit('update', { type: 'update', data: await storedProject(companyId, projectId), updatedFields: { taskStatusData: next }, module: 'project' });
+    socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: await storedProject(companyId, projectId), updatedFields: { taskStatusData: next }, module: 'project' });
     return '';
 };
 
@@ -227,9 +242,11 @@ const addViews = async ({ companyId, who, projectId, plan, fields }) => {
 };
 
 const MAKERS = Object.freeze({ statuses: addStatuses, lists: addLists, fields: addFields, views: addViews });
+const makerOf = (part) => MAKERS[part] || planWork().MAKERS[part];
 
-/* Every part in turn, each answered on its own: made, kept, or why not. */
-const carryOut = async ({ companyId, who, approvedBy, projectId, plan }) => {
+/* Every part in turn, each answered on its own: made, kept, or why not. `asked` is how the plan was asked for (the
+ * agent and what its call was held to), which only its automations and first tasks need. */
+const carryOut = async ({ companyId, who, approvedBy, projectId, plan, asked = {} }) => {
     const requester = await refusedParts(companyId, who.uid, projectId, plan);
     const approver = approvedBy ? await refusedParts(companyId, approvedBy, projectId, plan) : [];
     const barred = (part) => {
@@ -247,7 +264,7 @@ const carryOut = async ({ companyId, who, approvedBy, projectId, plan }) => {
         }
         const fields = (parts.find((made) => made.part === 'fields') || { items: [] }).items;
         try {
-            const items = await MAKERS[part]({ companyId, who, approvedBy, projectId, plan, fields, project: await storedProject(companyId, projectId) });
+            const items = await makerOf(part)({ ...asked, companyId, who, approvedBy, projectId, plan, fields, made: parts, project: await storedProject(companyId, projectId) });
             parts.push({ part, ok: items.every((item) => !item.error), items });
         } catch (failure) {
             parts.push({ part, ok: false, error: failure.message, items: [] });
@@ -327,15 +344,15 @@ const withdraw = async ({ companyId, who, made }) => {
 };
 
 const executors = {
-    async 'project.setup'({ companyId, actor, params, depth, approvedBy }) {
+    async 'project.setup'({ companyId, actor, params, depth, approvedBy, within }) {
         const project = await storedProject(companyId, params.projectId);
         const projectId = idOf(project._id);
-        const problem = planProblem(params);
+        const problem = setupProblem(params);
         if (problem) throw refuse(problem);
-        const plan = planOf(params);
-        const parts = await carryOut({ companyId, who: whoOf(actor, depth), approvedBy: idOf(approvedBy), projectId, plan });
+        const plan = setupPlanOf(params);
+        const parts = await carryOut({ companyId, who: whoOf(actor, depth), approvedBy: idOf(approvedBy), projectId, plan, asked: { actor, depth, within } });
         const notMade = notMadeIn(parts, plan);
-        const made = PARTS.reduce((count, part) => count + madeIn(parts, part).length, 0);
+        const made = ALL_PARTS.reduce((count, part) => count + madeIn(parts, part).length, 0);
         if (!made && notMade.length) throw refuse(unique(notMade.map((entry) => `${entry.part}: ${entry.name}: ${entry.error}`)).join('; '));
         return {
             result: { projectId, made, parts, notMade },
@@ -358,4 +375,4 @@ const inverses = {
     },
 };
 
-module.exports = { executors, inverses, planOf, planProblem, refusedParts, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };
+module.exports = { executors, inverses, planOf, planProblem, setupPlanOf, setupProblem, refusedParts, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, ALL_PARTS, PLAN_KEY, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };

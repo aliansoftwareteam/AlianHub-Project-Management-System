@@ -34,14 +34,20 @@ const loadSubtree = async (companyId, taskId, { filter = {}, projection = null }
 /* The rows that go with `top` when its deletedStatusKey changes: its live descendants on the way
  * down, and on the way back only the rows this top carried, so one archived or deleted on its
  * own stays as it is. Subtasks archived with their parent before the stamp existed hold key 3
- * and no stamp. Returns the rows it changed, as they are afterwards. */
-const cascadeStatus = async (companyId, top, to) => {
+ * and no stamp. */
+const carriedWith = (top) => {
     const id = String(top._id);
     const from = top.deletedStatusKey || LIVE;
-    if (from === to) return [];
     const carriedBefore = [{ ancestors: id, cascadedBy: id }];
     if (from === ARCHIVED) carriedBefore.push({ ParentTaskId: id, deletedStatusKey: CARRIED_KEY[ARCHIVED], cascadedBy: { $exists: false } });
-    const filter = from === LIVE ? { ancestors: id, deletedStatusKey: LIVE } : { $or: carriedBefore };
+    return from === LIVE ? { ancestors: id, deletedStatusKey: LIVE } : { $or: carriedBefore };
+};
+
+/* Returns the rows it changed, as they are afterwards. */
+const cascadeStatus = async (companyId, top, to) => {
+    const id = String(top._id);
+    if ((top.deletedStatusKey || LIVE) === to) return [];
+    const filter = carriedWith(top);
     const rows = (await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [filter, null, { lean: true }] }, 'find')) || [];
     if (!rows.length) return [];
     const update = to === LIVE
@@ -81,5 +87,5 @@ const rewriteDescendantAncestors = async (companyId, topId, topAncestors) => {
 
 module.exports = {
     ...rules,
-    storedTask, rootOf, slotUnder, loadSubtree, rewriteDescendantAncestors, cascadeStatus, placeDescendants,
+    storedTask, rootOf, slotUnder, loadSubtree, rewriteDescendantAncestors, carriedWith, cascadeStatus, placeDescendants,
 };

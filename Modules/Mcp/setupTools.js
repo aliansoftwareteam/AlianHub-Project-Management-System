@@ -3,11 +3,16 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { oid } = require('../Automations/engine/tools');
 const registry = require('../Agents/registry');
 const setup = require('../Agents/setupRequests');
+const computed = require('../Agents/computedFields');
 const actions = require('../Agents/actions');
 const permissions = require('../Agents/permissions');
 const plans = require('../Agents/projectSetup');
 const projects = require('../Agents/projectCreate');
+const copies = require('../Agents/projectDuplicate');
 const lists = require('../Agents/listSetup');
+const planWork = require('../Agents/planWork');
+const { TITLE_MAX } = require('../Agents/taskRequests');
+const { DRAFT: RULE_DRAFT } = require('./automationTools');
 const { LIST_NAME_MAX } = require('../Agents/workRequests');
 const manageFlag = require('./manageFlag');
 const { TASK_ACCESS_FIELDS } = require('./visibility');
@@ -17,11 +22,11 @@ const { loadProject } = require('./dataTools');
 const { GRANT } = manageFlag;
 const DENIED = permissions.REASON;
 
-// Setting a project up: custom fields, saved views, a whole plan in one call, a new project with its plan, a folder
-// with its lists, or a list made a sprint. These show to everyone on the project, so a call never makes one: it is
-// filed for the person to approve in AlianHub (their actions are proposeOnly, Agents/registry/setup.js, projectSetup.js,
-// projectCreate.js and listSetup.js), and what is approved runs the web app's own routes (Modules/Agents/setupRequests.js,
-// projectSetup.js, projectCreate.js and listSetup.js).
+// Setting a project up: custom fields, saved views, a whole plan in one call, a new project with its plan, a copy of
+// a project, a folder with its lists, or a list made a sprint. These show to everyone on the project, so a call never
+// makes one: it is filed for the person to approve in AlianHub (their actions are proposeOnly, Agents/registry/setup.js,
+// projectSetup.js, projectCreate.js, projectDuplicate.js and listSetup.js), and what is approved runs the web app's own
+// routes (Modules/Agents/setupRequests.js, projectSetup.js, projectCreate.js, projectDuplicate.js and listSetup.js).
 
 const RAW_OPTIONS_MAX = 100;
 const RAW_TEXT_MAX = 200;
@@ -50,6 +55,24 @@ const FIELD = Object.freeze({
     required: ['name', 'type'],
 });
 
+/* A field of fields.create, which also takes the two kinds AlianHub works out. */
+const CREATE_FIELD = Object.freeze({
+    ...FIELD,
+    properties: {
+        ...FIELD.properties,
+        type: { type: 'string', enum: [...setup.CREATE_TYPES] },
+        function: { type: 'string', enum: [...computed.FUNCTIONS], description: 'For a rollup: what it works out from the subtasks under each task, on every level' },
+        source: {
+            type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX,
+            description: `For a rollup: the name of the field it reads on those subtasks, one of this call or of the project, of type ${computed.SOURCE_TYPES.join(', ')}. Left out, count counts the subtasks`,
+        },
+        expression: {
+            type: 'string', minLength: 1, maxLength: computed.EXPRESSION_MAX,
+            description: 'For a formula: numbers, the task\'s own number fields by name in braces, + - * / and brackets, as in {Price} - {Cost}',
+        },
+    },
+});
+
 const VALUE = Object.freeze({
     type: 'object',
     additionalProperties: false,
@@ -64,13 +87,15 @@ const VALUE = Object.freeze({
 const NO_FIELD_SET = `${DENIED}: values are set as ${setup.FIELD_SET} sets one, which this connection may not use`;
 
 /* Values are refused at once where the caller could not set one by itself, where a task is not one of the project
- * the caller can open, or where a field would not take its value, so nobody is asked to approve a value that cannot
- * be set. A project the caller cannot open is left to the target check. */
+ * the caller can open, or where a field would not take its value, and a rollup or a formula where the field form
+ * would not save it, so nobody is asked to approve what cannot be made. A project the caller cannot open is left to the target check. */
 const fieldsToFile = async (ctx, args, vis) => {
-    if (args.values === undefined) return { args };
     const project = await loadProject(ctx, vis, args.projectId);
     if (!project) return { args };
     const projectId = String(project._id);
+    const unsaved = await setup.draftsMisfit({ companyId: ctx.companyId, projectId, definitions: args.fields });
+    if (unsaved) return { answer: { ok: false, error: unsaved } };
+    if (args.values === undefined) return { args };
     const refuse = async (reason) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'fields.create', params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId }); };
     const usable = registry.has(setup.FIELD_SET) && manageFlag.mayUse(ctx, GRANT)
         && registry.evaluate(setup.FIELD_SET, { __proposal: true }, { allowedActions: ctx.allowedActions }).allowed;
@@ -128,19 +153,40 @@ const PLAN_VIEW = Object.freeze({
     required: ['name'],
 });
 
-/* A plan is refused at once where its person may not make one of its parts by hand, or a view has nothing to start
- * from, so nobody is asked to approve a part that cannot be made. A project the caller cannot open is left to the target check. */
+const PLAN_RULE = Object.freeze({ type: 'object', additionalProperties: false, properties: { ...RULE_DRAFT }, required: ['trigger', 'actions'] });
+
+const PLAN_TASK = Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        name: { type: 'string', minLength: 1, maxLength: TITLE_MAX },
+        list: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX, description: 'A list of this plan or of the project, by name; left out, the project\'s first list' },
+        status: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX, description: 'A status of this plan or of the project, by name; left out, the opening status' },
+        assigneeId: { ...ID, description: 'One member who can open the project (see members.list)' },
+        dueDate: { ...DAY, description: 'The day it is due, as YYYY-MM-DD' },
+    },
+    required: ['name'],
+});
+
+/* A plan is refused at once where its person may not make one of its parts by hand, or could not ask for one of its
+ * automations or first tasks in a call of its own, and answered at once where a view has nothing to start from or a
+ * rule or a task names what is in neither the plan nor the project. So nobody is asked to approve a part that cannot
+ * be made. A project the caller cannot open is left to the target check. */
 const planToFile = async (ctx, args, vis) => {
     const project = await loadProject(ctx, vis, args.projectId);
     if (!project) return { args };
-    const plan = plans.planOf(args);
-    const refused = await plans.refusedParts(ctx.companyId, ctx.userId, String(project._id), plan);
-    if (refused.length) {
-        const reason = `${REFUSED}: ${refused.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`;
-        throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'project.setup', params: { projectId: String(project._id) }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: String(project._id) });
-    }
+    const projectId = String(project._id);
+    const plan = plans.setupPlanOf(args);
+    const refuse = async (reason) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'project.setup', params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId }); };
+    const refused = await plans.refusedParts(ctx.companyId, ctx.userId, projectId, plan);
+    if (refused.length) await refuse(`${REFUSED}: ${refused.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`);
     const kind = (plan.views || []).map((view) => view.kind).find((wanted) => !setup.sourceView(project, wanted));
-    return kind ? { answer: { ok: false, error: setup.noSource(kind) } } : { args };
+    if (kind) return { answer: { ok: false, error: setup.noSource(kind) } };
+    const stopped = await planWork.filingProblem({
+        companyId: ctx.companyId, actor: ctx.actor, uid: String(ctx.userId), allowedActions: ctx.allowedActions, mayManage: manageFlag.enabled() && manageFlag.mayUse(ctx, GRANT), project, plan,
+    });
+    if (stopped && stopped.refused) await refuse(stopped.refused);
+    return stopped ? { answer: { ok: false, error: stopped.error } } : { args };
 };
 
 const BY_ID_ONLY = Object.freeze(['assigneeIds', 'showFieldIds']);
@@ -172,6 +218,24 @@ const projectToFile = async (ctx, args) => {
         || (refused.parts.length && `${REFUSED}: ${refused.parts.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`);
     if (reason) throw await actions.refusal(ctx.companyId, ctx.actor, { action: projects.ACTION, params: { name: draft.name }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project' });
     return { args };
+};
+
+const copyAsked = (args) => copies.draftOf({ ...args, sourceProjectId: args.projectId });
+
+/* A copy is refused at once where its person may not create a project by hand, and answered at once where the project
+ * is a personal list or has more tasks than a copy made this way takes, so nobody is asked to approve what could not
+ * be made. A project the caller cannot open is left to the target check. */
+const copyToFile = async (ctx, args, vis) => {
+    const draft = copyAsked(args);
+    const lacked = await copies.refusedFor(ctx.companyId, ctx.userId);
+    if (lacked) {
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: copies.ACTION, params: { sourceProjectId: draft.sourceProjectId, name: draft.name }, reason: `${CANNOT_CREATE} (${lacked})`, ip: ctx.ip, taint: ctx.taint, entityType: 'project' });
+    }
+    const project = await loadProject(ctx, vis, args.projectId);
+    if (!project) return { args };
+    if (project.isPersonal === true) return { answer: { ok: false, error: copies.PERSONAL } };
+    const large = draft.tasks ? copies.tooLarge(await copies.taskCount({ companyId: ctx.companyId, uid: ctx.userId, source: project })) : '';
+    return large ? { answer: { ok: false, error: large } } : { args };
 };
 
 const FOLDER_NAME = Object.freeze({ type: 'string', minLength: 1, maxLength: lists.NAME_MAX });
@@ -209,14 +273,16 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: projectTarget,
-        description: `Add up to ${setup.FIELDS_MAX} custom fields to one project in a single call, each with a name and a type: ${setup.FIELD_TYPES.join(', ')}. `
+        description: `Add up to ${setup.FIELDS_MAX} custom fields to one project in a single call, each with a name and a type: ${setup.CREATE_TYPES.join(', ')}. `
             + 'A dropdown takes its options as plain text. A field the project already has by that name is kept, not made twice, so read fields.list first. '
+            + `A rollup works a number out for each task from the subtasks under it (function: ${computed.FUNCTIONS.join(', ')}; source: the number field it reads), and a formula from the task's own number fields (expression). `
+            + 'Neither takes a value: AlianHub works the number out and task.fields.list reads it, a rollup\'s once it is approved, a formula\'s on a task once a field value of that task is next saved. '
             + `To give the fields their first values in the same approval, name them in values (at most ${setup.VALUES_MAX}): each a task of this project, a field by its name and the value. `
             + 'A value is set only on a task the person and the approver may both edit, and the answer says which were set. '
             + `${WAITS} Set or change a value later with task.field.set.`,
         input: input({
             projectId: ID,
-            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
+            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: CREATE_FIELD },
             values: { type: 'array', minItems: 1, maxItems: setup.VALUES_MAX, items: VALUE },
             ...REASON,
         }, ['projectId', 'fields']),
@@ -253,22 +319,26 @@ const TOOLS = [
         filedUnder: GRANT,
         target: projectTarget,
         description: 'Set up a project that exists from one plan, in a single call: '
-            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields and ${plans.VIEWS_MAX} saved views. Name only the parts you need. `
+            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields, ${plans.VIEWS_MAX} saved views, ${planWork.RULES_MAX} automations (rules) and ${planWork.TASKS_MAX} first tasks (tasks). Name only the parts you need. `
             + 'A status is added as a working stage, before the statuses that close a task; one the company does not have yet can be added only when an owner or an admin sends and approves the plan. '
             + 'A status or a field the project already has by that name is kept, not made twice, so read statuses.list, lists.list and fields.list first. '
-            + 'It cannot make a project, an automation or a task. '
-            + `${WAITS} The person sees the whole plan as one preview and approves it once; the answer then says, part by part, what was made, what was kept and what could not be made.`,
+            + 'A rule is written as automation.create takes one, without the project (read automation.catalogue first). It may name a status of this plan, it always starts switched off, and only an owner or an admin can have one made and can approve it. '
+            + 'A first task has a name and, when wanted, a list and a status of this plan or of the project, one assignee and a due day. It is made as task.create makes a task with its details, so the plan is refused where this connection could not make that call. '
+            + 'They are made in this order: statuses and lists, fields, views, automations, tasks. It cannot make a project. '
+            + `${WAITS} The person sees the whole plan as one preview, can leave any single part out, and approves it once; the answer then says, part by part, what was made, what was kept and what could not be made.`,
         input: input({
             projectId: ID,
             statuses: NAMES(plans.STATUSES_MAX, plans.STATUS_NAME_MAX, 'Statuses to add, by name'),
             lists: NAMES(plans.LISTS_MAX, LIST_NAME_MAX, 'Lists to create, by name'),
             fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
             views: { type: 'array', minItems: 1, maxItems: plans.VIEWS_MAX, items: PLAN_VIEW },
+            rules: { type: 'array', minItems: 1, maxItems: planWork.RULES_MAX, items: PLAN_RULE, description: 'Automations to add, each made of a trigger, optional conditions and steps' },
+            tasks: { type: 'array', minItems: 1, maxItems: planWork.TASKS_MAX, items: PLAN_TASK, description: 'First tasks to create' },
             ...REASON,
         }, ['projectId']),
-        check: (args) => plans.planProblem(args),
+        check: (args) => plans.setupProblem(args),
         prepare: planToFile,
-        params: (args) => ({ projectId: str(args.projectId, 40), ...plans.planOf(args) }),
+        params: (args) => ({ projectId: str(args.projectId, 40), ...plans.setupPlanOf(args) }),
     },
     {
         name: projects.ACTION,
@@ -294,6 +364,31 @@ const TOOLS = [
         check: (args) => projects.problemIn(args),
         prepare: projectToFile,
         params: (args) => projects.draftOf(args),
+    },
+    {
+        name: copies.ACTION,
+        action: copies.ACTION,
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: (args) => ({ ...WRITE_TARGET, ...projectTarget(args) }),
+        description: 'Ask for a copy of a project the person can open, in a single call: the project and the name of the copy. '
+            + 'The copy takes the project\'s folders, lists, statuses, custom fields, saved views and settings. Its automations come too, switched off, where the approver may manage automations. '
+            + 'It takes no task unless tasks is true: set that only when the person asked, in words, for the tasks to be copied too. Copied tasks come without their assignees, and dates are kept only when dates is true. '
+            + `A project with more than ${copies.TASKS_MAX} tasks is not copied with its tasks here: ask for the copy without them, or the person duplicates it in AlianHub. `
+            + 'The copy is private, with only the person who approves it on it, whoever is on the project it is copied from; they add the others afterwards. '
+            + 'Read projects.list first, for the project. A personal list cannot be copied, and a token kept to some projects cannot use it. '
+            + `${WAITS} The person sees the copy as one preview, with how many tasks it would take, and approves it once. Undo moves the copy to the trash, unless a task or a doc was added to it since.`,
+        input: input({
+            projectId: { ...ID, description: 'The project to copy' },
+            name: { type: 'string', minLength: 1, maxLength: projects.NAME_MAX, description: `The name of the copy, at least ${projects.NAME_MIN} characters` },
+            tasks: { type: 'boolean', description: 'Copy the tasks too. Left out, only the setup is copied' },
+            dates: { type: 'boolean', description: 'Keep the dates of the project, its lists and its tasks. Left out, the copy has none' },
+            ...REASON,
+        }, ['projectId', 'name']),
+        check: (args) => copies.problemIn(copyAsked(args)),
+        prepare: copyToFile,
+        params: copyAsked,
     },
     {
         name: lists.FOLDER,

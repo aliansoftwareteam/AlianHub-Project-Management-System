@@ -77,11 +77,14 @@ async function approvedAction(approver, thread, change) {
     const agentId = created.body.data._id;
     agentIds.push(agentId);
     const api = await agentClient(agentId);
+    // Filing refuses a direct message, so a row that names one is filed on an open task and then pointed at it.
+    const direct = change.params.taskId === dm.taskId;
     const filed = await api.post('/api/v2/agents/proposals', {
-        agentId, taskId: thread.taskId, projectId: thread.projectId, what: label('proposal'), why: 'integration',
-        changes: [{ ...change, label: 'Change' }],
+        agentId, taskId: direct ? open.taskId : thread.taskId, projectId: thread.projectId, what: label('proposal'), why: 'integration',
+        changes: [{ ...change, params: { ...change.params, taskId: direct ? open.taskId : change.params.taskId }, label: 'Change' }],
     });
     expect(filed.body.status).toBe(true);
+    if (direct) await pointAt(filed.body.data._id, thread.taskId);
     const approved = await approver.api.post(`/api/v2/agents/proposals/${filed.body.data._id}/approve`);
     expect(approved.body.data.applied).toEqual([expect.objectContaining({ ok: true })]);
     const [auditId] = approved.body.data.proposal.auditIds;
@@ -89,6 +92,16 @@ async function approvedAction(approver, thread, change) {
     const row = await db.collection('audit_logs').findOne({ _id: new ObjectId(String(auditId)) });
     return { auditId: String(auditId), undo: row.meta.undo };
 }
+
+const sameKind = (was, id) => (was instanceof ObjectId ? new ObjectId(String(id)) : String(id));
+const pointAt = async (proposalId, taskId) => {
+    const proposals = db.collection('agent_proposals');
+    const stored = await proposals.findOne({ _id: new ObjectId(String(proposalId)) });
+    await proposals.updateOne({ _id: stored._id }, { $set: {
+        taskId: sameKind(stored.taskId, taskId),
+        'changes.0.params.taskId': sameKind(stored.changes[0].params.taskId, taskId),
+    } });
+};
 
 const undoAs = (session, auditId) => session.api.post(`/api/v1/audit-logs/${auditId}/undo`, {});
 const commentOf = (id) => db.collection('comments').findOne({ _id: new ObjectId(String(id)) });

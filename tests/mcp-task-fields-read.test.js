@@ -172,8 +172,11 @@ describe('what it answers', () => {
         expect(fields.Billable).toEqual({ fieldId: F.billable, title: 'Billable', type: 'checkbox', value: true });
     });
 
-    it('a field worked out from other tasks answers the number AlianHub stored, and says it is worked out', async () => {
-        expect(byTitle(await read(ctx(OWNER), T_OPEN))['Cost total']).toEqual({ fieldId: F.total, title: 'Cost total', type: 'rollup', value: 300, computed: true });
+    it('a field worked out from other tasks answers the number AlianHub stored, and says when it was worked out', async () => {
+        expect(byTitle(await read(ctx(OWNER), T_OPEN))['Cost total']).toEqual({ fieldId: F.total, title: 'Cost total', type: 'rollup', value: 300, computed: true, computedAt: '2026-10-01T00:00:00.000Z' });
+        delete task(T_OPEN).customField[F.total];
+        expect(byTitle(await read(ctx(OWNER), T_OPEN))['Cost total']).toEqual({ fieldId: F.total, title: 'Cost total', type: 'rollup', value: null, computed: true, computedAt: null });
+        expect(tools.registered().find((tool) => tool.name === TOOL).description).toMatch(/computedAt/);
     });
 
     it('a field with nothing in it is listed as empty', async () => {

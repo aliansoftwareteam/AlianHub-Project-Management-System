@@ -4,8 +4,10 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const HandleHistoryref = require('../Tasks/helpers/helper');
 const { addSprintFun } = require('./controller');
+const { announceList } = require('./helpers/listEvents');
 const rules = require('./scrumRules');
 const { actingUser } = require('./helpers/actingUser');
+const { backlogsIn } = require('./helpers/backlogs');
 
 /**
  * Scrum sprint lifecycle — opt in, start, complete.
@@ -57,10 +59,14 @@ const scopeTasks = (companyId, sprintObjId) => MongoDbCrudOpration(companyId, {
     data: [{ sprintId: sprintObjId, ...SCOPE_FILTER }, SCOPE_FIELDS],
 }, 'find');
 
-const patchSprint = (companyId, filter, set) => MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.SPRINTS,
-    data: [filter, { $set: set }, { returnDocument: 'after' }],
-}, 'findOneAndUpdate');
+const patchSprint = async (companyId, filter, set) => {
+    const saved = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS,
+        data: [filter, { $set: set }, { returnDocument: 'after' }],
+    }, 'findOneAndUpdate');
+    if (saved) announceList('update', companyId, saved);
+    return saved;
+};
 
 /* Resolve and vet the sprint every handler operates on. Returns { sprint } or
    { error } with a sentence the UI can show as-is. */
@@ -99,15 +105,6 @@ const totals = (tasks) => {
     const snap = rules.summariseCommitment(tasks);
     return { tasks: snap.tasks, points: snap.points, minutes: snap.minutes };
 };
-
-const backlogsIn = (companyId, projectId) => MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.SPRINTS,
-    data: [{
-        projectId: new mongoose.Types.ObjectId(String(projectId)),
-        isBacklog: true,
-        deletedStatusKey: { $ne: 1 },
-    }, '_id name folderId tasks'],
-}, 'find').catch(() => []);
 
 // An ObjectId leads with its creation time, so the smallest one is the original.
 const oldest = (rows) => (rows || []).slice().sort((a, b) => String(a._id).localeCompare(String(b._id)))[0] || null;

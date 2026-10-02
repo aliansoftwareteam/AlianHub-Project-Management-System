@@ -2,12 +2,10 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { treeCache } from '@/components/molecules/ProjectTree/projectTreeData';
 
-export const FOLDERS_CHANGED_EVENT = 'foldersChanged';
-
 const withParent = (folder) => ({ ...folder, parentFolderId: folder.parentFolderId || null });
 
 /* This client's own write reaches the store, and the tree's copy of the project, from the answer,
-   without waiting for the `foldersChanged` event that tells the other tabs to read again. */
+   without waiting for the `foldersChanged` event that tells the other tabs to read again (liveLists.js). */
 function storeFolder(store, folder) {
     const data = withParent(folder);
     store.commit('projectData/mutateFolders', { op: 'modified', data });

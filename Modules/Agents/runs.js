@@ -11,6 +11,7 @@ const telemetry = require('../../Config/telemetry');
 const { dailyRunLimitOf } = require('./dailyRunLimit');
 const { runClause } = require('./privateWork');
 const projectLimits = require('./projectLimits');
+const accounts = require('./accounts');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -50,14 +51,15 @@ const runsToday = (companyId, agentId) => MongoDbCrudOpration(companyId, {
 const LOOP_DEPTH_EXCEEDED = 'loop_depth_exceeded';
 const PROJECT_PAUSED = 'Agents are paused in this project. A person has to resume them first.';
 
-const pausedIn = async (companyId, projectId) => ((await projectLimits.pausedAmong(companyId, [projectId])).length ? PROJECT_PAUSED : '');
+const pausedIn = async (companyId, projectIds) => ((await projectLimits.pausedAmong(companyId, [].concat(projectIds || []))).length ? PROJECT_PAUSED : '');
 
-/* Can this agent start a run right now? Returns { ok, reason }. With `projectId`, a project where agents are paused refuses the start. */
-const canStart = async (agent, { trigger, viaAccount, companyId, depth, projectId } = {}) => {
+/* Can this agent start a run right now? Returns { ok, reason }. A run names the project it works in as `projectId`,
+ * or each of several as `projectIds`: where agents are paused in one of them, the start is refused. */
+const canStart = async (agent, { trigger, viaAccount, companyId, depth, projectId, projectIds } = {}) => {
     if (!agent) return { ok: false, reason: 'Agent not found.' };
     if (clampDepth(depth) >= MAX_DEPTH) return { ok: false, reason: LOOP_DEPTH_EXCEEDED, code: LOOP_DEPTH_EXCEEDED, depth: clampDepth(depth), maxDepth: MAX_DEPTH };
     if (agent.paused) return { ok: false, reason: `Agent is paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.` };
-    if (companyId && projectId && await pausedIn(companyId, projectId)) return { ok: false, reason: PROJECT_PAUSED, code: 'project_paused' };
+    if (companyId && await pausedIn(companyId, [projectId, ...(projectIds || [])].filter(Boolean))) return { ok: false, reason: PROJECT_PAUSED, code: 'project_paused' };
     try {
         await aiSwitch.assertAllowed(companyId);
     } catch (error) {
@@ -306,10 +308,12 @@ const countsByStatus = async (companyId, { projectId, agentId, projectIds, hidde
     return counts;
 };
 
-/* A run waiting on a person is left alone: stopping it would strand its pending
- * proposal, and approving that later would mark the stopped run done anyway. */
-const pauseAll = async (companyId, reason) => {
+/* Every agent of the workspace stops: its own agents are paused one by one, and its connected agents by the
+ * workspace's own mark (accounts.setPolicy), which a person lifts. A run waiting on a person is left alone:
+ * stopping it would strand its pending proposal, and approving that later would mark the stopped run done anyway. */
+const pauseAll = async (companyId, reason, pausedBy = '') => {
     await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, { $set: { paused: true, pausedReason: reason || 'pause_all', pausedAt: new Date() } }] }, 'updateMany');
+    await accounts.setPolicy(companyId, { connectedPaused: true }, pausedBy);
     const active = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ status: { $in: [STATUS.QUEUED, STATUS.RUNNING] } }, '_id status'] }, 'find');
     let stopped = 0;
     for (const r of active || []) {
@@ -317,6 +321,7 @@ const pauseAll = async (companyId, reason) => {
         if (await finish(companyId, r._id, { status: STATUS.STOPPED, outcome: 'pause all', onlyIf: r.status })) stopped += 1;
     }
     emit(companyId, 'agent', { pausedAll: true });
+    emit(companyId, 'policy', {});
     return { stopped };
 };
 

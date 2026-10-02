@@ -54,19 +54,19 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey));
 /* Same visual spec as the Notepad and Clips confirmations, which each carry their
    own copy of this markup. */
 .cd__wrap { position: fixed; inset: 0; z-index: 1300; display: flex; align-items: center;
-    justify-content: center; padding: 16px; background: rgba(23, 24, 36, .45);
+    justify-content: center; padding: 16px; background: var(--scrim);
     font-family: var(--font-ui); animation: ah-fade-in var(--motion-base) var(--ease-out); }
-.cd { width: 100%; max-width: 384px; padding: 20px; background: #fff; border-radius: 12px;
+.cd { width: 100%; max-width: 384px; padding: 20px; background: var(--surface); border-radius: 12px;
     box-shadow: 0 18px 50px rgba(23, 24, 36, .28); animation: ah-rise-in var(--motion-base) var(--ease-out); }
 .cd__icon { display: inline-flex; align-items: center; justify-content: center; width: 34px;
-    height: 34px; margin-bottom: 12px; color: #9B2C2C; background: #FBEBEB; border-radius: 9px; }
-.cd__title { margin: 0 0 4px; font-size: 14.5px; font-weight: 600; color: #191A2B; }
-.cd__desc { margin: 0 0 18px; font-size: 12.5px; color: #6B6B70; line-height: 1.55; }
+    height: 34px; margin-bottom: 12px; color: var(--danger-ink); background: var(--danger-bg); border-radius: 9px; }
+.cd__title { margin: 0 0 4px; font-size: 14.5px; font-weight: 600; color: var(--ink); }
+.cd__desc { margin: 0 0 18px; font-size: 12.5px; color: var(--ink-2); line-height: 1.55; }
 .cd__actions { display: flex; gap: 10px; }
 .cd__btn { flex: 1; padding: 8px 14px; font-family: inherit; font-size: 13px; font-weight: 600;
-    color: #191A2B; background: #fff; border: 1px solid #D3D5E4; border-radius: 8px; cursor: pointer; }
-.cd__btn:hover { background: #F4F4FA; }
-.cd__btn--danger { color: #fff; background: #DC4C4C; border-color: #DC4C4C; }
-.cd__btn--danger:hover:not(:disabled) { background: #C43D3D; }
+    color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.cd__btn:hover { background: var(--fill); }
+.cd__btn--danger { color: var(--on-danger); background: var(--danger); border-color: var(--danger); }
+.cd__btn--danger:hover:not(:disabled) { background: var(--danger); }
 .cd__btn:disabled { opacity: .7; cursor: default; }
 </style>

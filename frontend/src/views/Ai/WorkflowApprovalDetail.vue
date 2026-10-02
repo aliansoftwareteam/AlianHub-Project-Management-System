@@ -72,6 +72,7 @@ import { useStore } from "vuex";
 import moment from "moment";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { canDecide, deadlineOf, escalationOf, handoversOf, ownerOf } from "./workflowApprovals";
+import { membersOnly } from "@/views/Workflows/approvalOwners";
 
 defineOptions({ name: "WorkflowApprovalDetail" });
 
@@ -133,9 +134,9 @@ const handoverLine = (move) => t("Workflows.approval_handover_line", {
     at: move.at ? moment(move.at).format("D MMM, H:mm") : ""
 });
 
-/* The people a request can be handed to are the company's own, less whoever
+/* The people a request can be handed to are the company's members, less whoever
  * holds it now: handing it to its owner is not a handover. */
-const people = computed(() => (getters["users/users"] || [])
+const people = computed(() => membersOnly(getters["users/users"], getters["settings/companyUsers"])
     .filter((user) => String(user._id) !== String(owner.value.userId))
     .map((user) => ({ _id: String(user._id), name: user.Employee_Name || String(user._id).slice(-6) })));
 

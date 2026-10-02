@@ -96,7 +96,7 @@ describe('the count in the project header', () => {
 
     it('is wired to the lists that mark the tasks, the project\'s pause and the "agent working" filter', () => {
         expect(PROJECTS).toMatch(/:agentsAtWork="agentWorkCountIn\(projectData\?\._id\)"/);
-        expect(PROJECTS).toMatch(/:agentsPaused="agentsPaused"/);
+        expect(PROJECTS).toMatch(/:agentsPaused="projectData\?\.agentLimits\?\.paused === true"/);
         expect(PROJECTS).toMatch(/@show-agent-work="setAgentWorking\(true\)"/);
     });
 

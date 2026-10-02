@@ -62,4 +62,4 @@ const nameRows = async (companyId, rows) => {
 
 const csvLabel = ({ clientName, delegatedByName }) => `${clientName ? `${clientName} (outside agent)` : 'An outside agent'} for ${delegatedByName || 'a member'}`;
 
-module.exports = { isOutside, nameRows, csvLabel };
+module.exports = { isOutside, nameRows, csvLabel, personNamesIn };
