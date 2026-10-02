@@ -7,6 +7,7 @@ const actions = require('../Agents/actions');
 const permissions = require('../Agents/permissions');
 const plans = require('../Agents/projectSetup');
 const projects = require('../Agents/projectCreate');
+const lists = require('../Agents/listSetup');
 const { LIST_NAME_MAX } = require('../Agents/workRequests');
 const manageFlag = require('./manageFlag');
 const { TASK_ACCESS_FIELDS } = require('./visibility');
@@ -16,10 +17,11 @@ const { loadProject } = require('./dataTools');
 const { GRANT } = manageFlag;
 const DENIED = permissions.REASON;
 
-// Setting a project up: custom fields, saved views, a whole plan in one call, or a new project with its plan. These
-// show to everyone on the project, so a call never makes one: it is filed for the person to approve in AlianHub (their
-// actions are proposeOnly, Agents/registry/setup.js, projectSetup.js and projectCreate.js), and what is approved runs
-// the web app's own routes as that person (Modules/Agents/setupRequests.js, projectSetup.js and projectCreate.js).
+// Setting a project up: custom fields, saved views, a whole plan in one call, a new project with its plan, a folder
+// with its lists, or a list made a sprint. These show to everyone on the project, so a call never makes one: it is
+// filed for the person to approve in AlianHub (their actions are proposeOnly, Agents/registry/setup.js, projectSetup.js,
+// projectCreate.js and listSetup.js), and what is approved runs the web app's own routes (Modules/Agents/setupRequests.js,
+// projectSetup.js, projectCreate.js and listSetup.js).
 
 const RAW_OPTIONS_MAX = 100;
 const RAW_TEXT_MAX = 200;
@@ -172,6 +174,33 @@ const projectToFile = async (ctx, args) => {
     return { args };
 };
 
+const FOLDER_NAME = Object.freeze({ type: 'string', minLength: 1, maxLength: lists.NAME_MAX });
+const FOLDER_PARTS = Object.freeze({
+    lists: NAMES(lists.LISTS_MAX, LIST_NAME_MAX, 'Lists to create inside it, by name'),
+    moveListIds: { type: 'array', minItems: 1, maxItems: lists.MOVES_MAX, items: ID, description: 'Lists the project already has to move into it, by id (see lists.list)' },
+});
+
+/* A folder is refused at once where its person may not make one of its parts by hand, and answered at once where the
+ * folder it goes in, or a list to move, is not one of the project that person can open, so nobody is asked to approve
+ * what could not be made. A project the caller cannot open is left to the target check. */
+const folderToFile = async (ctx, args, vis) => {
+    const project = await loadProject(ctx, vis, args.projectId);
+    if (!project) return { args };
+    const projectId = String(project._id);
+    const draft = lists.draftOf(args);
+    const refused = await lists.refusedParts(ctx.companyId, ctx.userId, projectId, draft);
+    if (refused.length) {
+        const reason = `${REFUSED}: ${refused.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`;
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: lists.FOLDER, params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId });
+    }
+    const parent = draft.parentFolderId ? await lists.parentProblem(ctx.companyId, projectId, draft.parentFolderId) : '';
+    if (parent) return { answer: { ok: false, error: `parentFolderId: ${parent}` } };
+    for (const sprintId of [draft, ...(draft.subfolders || [])].flatMap((folder) => folder.moveListIds || [])) {
+        if (!(await lists.listFor(ctx.companyId, ctx.userId, projectId, sprintId))) return { answer: { ok: false, error: `moveListIds: ${lists.LIST_NOT_FOUND} (${sprintId})` } };
+    }
+    return { args };
+};
+
 const TOOLS = [
     {
         name: 'fields.create',
@@ -265,6 +294,54 @@ const TOOLS = [
         check: (args) => projects.problemIn(args),
         prepare: projectToFile,
         params: (args) => projects.draftOf(args),
+    },
+    {
+        name: lists.FOLDER,
+        action: lists.FOLDER,
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: projectTarget,
+        description: 'Ask for a new folder in a project, in a single call: its name and, when wanted, lists to create inside it, lists the project already has to move into it, '
+            + `and up to ${lists.SUBFOLDERS_MAX} subfolders, each with its own lists. To put the new folder inside a folder that exists, name that folder in parentFolderId. `
+            + 'Folders nest one level: a subfolder holds lists, not folders. Read lists.list first, for the folders and lists the project has. It cannot rename, move or delete a folder. '
+            + `${WAITS} The person sees the folder and everything in it as one preview and approves it once; the answer then says, part by part, what was made or moved and what could not be. `
+            + 'Undo puts the moved lists back and takes the folder away, unless someone has put a list in it since.',
+        input: input({
+            projectId: ID,
+            name: FOLDER_NAME,
+            parentFolderId: { ...ID, description: 'A top-level folder of this project to make the new folder a subfolder of' },
+            ...FOLDER_PARTS,
+            subfolders: {
+                type: 'array', minItems: 1, maxItems: lists.SUBFOLDERS_MAX, items: input({ name: FOLDER_NAME, ...FOLDER_PARTS }, ['name']),
+                description: 'Subfolders to make inside the new folder; not together with parentFolderId',
+            },
+            ...REASON,
+        }, ['projectId', 'name']),
+        check: (args) => lists.folderPlanProblem(args),
+        prepare: folderToFile,
+        params: (args) => ({ projectId: str(args.projectId, 40), ...lists.draftOf(args) }),
+    },
+    {
+        name: lists.SPRINT,
+        action: lists.SPRINT,
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
+        description: 'Make a list a sprint with a first day and a last day, or change the days of a list that is already a sprint. '
+            + 'When there is no list yet, create it with list.create first, then name it here; the days are read where the person is. '
+            + 'It cannot start or complete a sprint, and it cannot change a completed one: the person does those in AlianHub. '
+            + `${WAITS} Undo makes it what it was: a plain list, or a sprint with its former days.`,
+        input: input({
+            projectId: ID,
+            sprintId: ID,
+            startDate: { ...DAY, description: 'The first day, as YYYY-MM-DD' },
+            endDate: { ...DAY, description: 'The last day, as YYYY-MM-DD' },
+            ...REASON,
+        }, ['projectId', 'sprintId', 'startDate', 'endDate']),
+        check: (args) => lists.sprintProblem(args),
+        params: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40), startDate: str(args.startDate, 10), endDate: str(args.endDate, 10) }),
     },
 ];
 

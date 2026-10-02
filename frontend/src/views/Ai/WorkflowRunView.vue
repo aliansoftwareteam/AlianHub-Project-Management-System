@@ -26,7 +26,7 @@
                         <span v-if="blocked.terminal" class="ah-chip ah-chip--danger" data-test="blocked-code">{{ $t(`Workflows.blocked_${blocked.code}`) }}</span>
                         <p class="wf-blocked__reason" data-test="blocked-reason">{{ blocked.reason }}</p>
                         <p class="ah-small" data-test="blocked-step">{{ $t('Workflows.blocked_at_step', { stepId: blocked.stepId }) }}</p>
-                        <p v-if="!blocked.terminal && blocked.also > 0" class="ah-small" data-test="blocked-also">{{ $t('Workflows.waiting_also', { n: blocked.also }) }}</p>
+                        <p v-if="!blocked.terminal && blocked.also > 0" class="ah-small" data-test="blocked-also">{{ $t('Workflows.waiting_also', { n: blocked.also }, blocked.also) }}</p>
                     </div>
 
                     <ul class="wf-graph" data-test="graph">

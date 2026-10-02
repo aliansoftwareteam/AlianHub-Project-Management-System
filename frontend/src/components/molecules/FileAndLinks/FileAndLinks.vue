@@ -57,7 +57,7 @@
                                         <template #button>
                                             <div @click="toggleUsers = true" class="cursor-pointer d-flex align-items-center justify-content-center profile-image GunPowder blue text-nowrap">
                                                 <span aria-hidden="true">+ {{ Number(userList.length-4) }}</span>
-                                                <span class="ah-sr-only">{{ $t('Filters.more_users', { count: Number(userList.length-4) }) }}</span>
+                                                <span class="ah-sr-only">{{ $t('Filters.more_users', { count: Number(userList.length-4) }, Number(userList.length-4)) }}</span>
                                             </div>
                                         </template>
                                         <template #options>

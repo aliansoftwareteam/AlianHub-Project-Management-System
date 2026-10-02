@@ -6,12 +6,16 @@ const { callerOf, canManageAgents } = require('./access');
 const { agentsRefused } = require('./guard');
 const agentAudit = require('./agentAudit');
 const projectLimits = require('./projectLimits');
+const directChanges = require('./directChanges');
 const runs = require('./runs');
 const workQueue = require('./manager/workQueue');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const EDIT_ACTION = 'project.agent_limits.edit';
 const STOPPED_BY_PAUSE = 'agents were paused in this project';
+const LIMITS_CHANGE = 'limits';
+
+const recorded = (limits) => ({ agentsAtOnce: limits.atOnce, agentsPaused: limits.paused, agentsDirectTasks: limits.directTasks });
 
 const fail = (res, code, statusText) => res.status(code).json({ status: false, statusText, message: statusText });
 
@@ -29,6 +33,8 @@ const answer = async (companyId, projectId, canEdit) => ({
     limits: await projectLimits.read(companyId, projectId),
     defaults: { ...projectLimits.DEFAULTS },
     atOnceRange: { min: projectLimits.AT_ONCE.MIN, max: projectLimits.AT_ONCE.MAX },
+    directTasksRange: { min: projectLimits.DIRECT_TASKS.MIN, max: projectLimits.DIRECT_TASKS.MAX },
+    directTasksMinutes: directChanges.WINDOW_MINUTES,
     canEdit,
 });
 
@@ -58,13 +64,15 @@ const saveProjectLimits = async (req, res) => {
         if (saved.error) return fail(res, saved.status, saved.error);
         await agentAudit.recordProjectPolicyChange(companyId, caller.actor, {
             projectId: at.projectId, projectName: saved.project.ProjectName, ip: req.ip || '',
-            from: { agentsAtOnce: saved.from.atOnce, agentsPaused: saved.from.paused }, to: { agentsAtOnce: saved.to.atOnce, agentsPaused: saved.to.paused },
+            from: recorded(saved.from), to: recorded(saved.to),
         });
         if (saved.pausedNow) {
             await Promise.all([workQueue.dropClaimsIn(companyId, at.projectId), runs.stopIn(companyId, at.projectId, STOPPED_BY_PAUSE)]);
         }
         removeCache('UserProjectData:', true);
         socketEmitter.emit('update', { type: 'update', companyId, data: saved.project, updatedFields: { agentLimits: saved.agentLimits }, module: 'project' });
+        // No relay carries a project event to a browser; the agents signal does, and names no project.
+        socketEmitter.emit('update', { type: 'update', module: 'agent', companyId, data: { kind: LIMITS_CHANGE }, updatedFields: { kind: LIMITS_CHANGE }, actor: { kind: 'human' }, depth: 1 });
         return res.json({ status: true, statusText: 'Limits updated.', data: await answer(companyId, at.projectId, true) });
     } catch (e) { logger.error(`saveProjectLimits: ${e.message}`); return fail(res, 500, e.message); }
 };

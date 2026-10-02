@@ -69,12 +69,34 @@ What it is not: a walk of all twelve kinds through their real routes. The list, 
 ## LEFT, with the question
 
 1. **The create-project banner.** The server now gives a sentence, in English. Should the banner show it, or should each cause get its own translated line? Today: "The project couldn't be created. Try again."
+
+   **Answer (second pass, for the owner to review): keep the translated banner; add one translated line per cause later.** Reason: the server's sentence is English, and every sentence a person reads goes through i18n. Not built: it needs the server to answer a cause code.
 2. **Billing type of a project.** The web always sends `ProjectType: "Fix"`. Should the server take that as the default for a caller that names none, or should it be a company setting?
+
+   **Answer: the server takes `Fix` when a caller names none.** Reason: it is what the web form always sends, so an API caller gets what the form gives, and no new company setting is needed. Not built: server change.
 3. **No template named.** Should a create with no template mean the Blank template? It is one line, but it changes what an API caller gets.
+
+   **Answer: yes, no template named means the Blank template.** Reason: the form already treats Blank as the default; refusing a caller who names nothing helps nobody. Not built: server change.
 4. **The other five composers** (voice, note, message, chat, comments). Apply the same opening-status rule? No risk seen; left out to keep this slice to the first hour.
+
+   **Answer: yes, the same opening-status rule.** Reason: no risk was seen and the other composers already agree with it. Built: voice, note, message, chat and comment composers use `defaultStatus` (`composerOpeningStatus.spec.js`).
 5. **Timer in an approved week.** Refuse at Start instead of at Stop?
+
+   **Answer: refuse at Start, naming the week.** Reason: a person should not run a timer that will be refused later. Not built: the web does not know the week is approved without a server answer.
 6. **Desktop tracker and `companyOwnerId`.** Look the owner up there too? Better still: stop taking the owner from the request anywhere, since project history already ignores it.
+
+   **Answer: yes, look the owner up there too, and stop taking it from the request.** Reason: project history already ignores the request's value. Not built: the desktop app is a separate client.
 7. **Storage.** What does a person see when they attach a file and storage is not set up? Not read here.
+
+   **Answer: say that storage is not set up, and who can set it up, in the same place as the attachment.** Reason: the person should read the cause where they met it. Not built: the web has no signal that storage is missing; it needs the server to answer a cause code.
 8. **Gantt drag on the Weeks scale.** Say why it snaps back, or allow it?
+
+   **Answer: say why, do not allow it.** Reason: a week-wide scale cannot place a bar on a day; letting it would move dates by guess. Built: a drag that ends on the dates it began on tells the person "the bar went back because this scale moves it a week or more at a time. Switch to Days to move it by a day" (`ganttDragSnap.spec.js`).
 9. **Choosing the company's default currency.** No screen changes `isDefault`; it stays on the seeded INR. The lookup above gets the right answer for a company that uses one currency. A company that uses several and has switched INR off still gets INR. Should the currencies screen let an owner mark the default?
+
+   **Answer: yes, the currencies screen lets an owner mark the default.** Reason: the lookup already reads `isDefault`, so the screen is the only missing piece. Not built: needs a server route.
 10. **`isDelete` on a currency.** The name says the opposite of what it means. Rename it (a migration), or leave it and keep the comment in the two helpers?
+
+   **Answer: leave the name, keep the comment in the two helpers.** Reason: a rename is a migration for no change a person sees; the cost is a confusing name. Not built.
+
+These ten answers were made without the owner, by choosing the least surprising option. They are reversible; the owner may overrule any of them.
