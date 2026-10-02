@@ -117,6 +117,9 @@
             "stability": "stable",
             "title": "List projects",
             "summary": "Lists the projects the token's person can open.",
+            "description": [
+                "Called with an API token that holds the `read` scope, for a person who is still a member of the workspace. Answers with `data`: up to 200 projects that are not deleted and that the token's person can open, each with `ProjectName`, `ProjectCode` and `createdAt`."
+            ],
             "response": {
                 "status": true,
                 "data": [
@@ -138,6 +141,9 @@
             "stability": "stable",
             "title": "List a project's tasks",
             "summary": "Lists the tasks of one project, most recently updated first.",
+            "description": [
+                "Called with an API token that holds the `read` scope. It reads the query field `projectId` (a 24-character id, required) and `limit` (a number, clamped to 1 to 500, 100 when left out); a missing or malformed `projectId` answers 400, and a project the token's person cannot open answers 404. Answers with `data`: the project's tasks that are not deleted, most recently updated first, each with `TaskKey`, `TaskName`, `status`, `statusType`, `Task_Priority`, `AssigneeUserId`, `DueDate`, `sprintId`, `epicId`, `createdAt` and `updatedAt`."
+            ],
             "query": [
                 {
                     "name": "projectId",
@@ -190,6 +196,9 @@
             "stability": "stable",
             "title": "Read a task by its key",
             "summary": "Returns one task, looked up by its key.",
+            "description": [
+                "Called with an API token that holds the `read` scope. The path value is the task key as a string of at most 40 characters; an empty or longer one answers 400, and a task the token's person cannot open or that does not exist answers 404. Answers with `data`: the stored task."
+            ],
             "pathParams": [
                 {
                     "name": "key",
@@ -739,6 +748,9 @@
             "stability": "beta",
             "title": "List saved views",
             "summary": "Lists the caller's own saved views of the Everything list, by name.",
+            "description": [
+                "Any signed-in person with an active seat in the workspace may call it, and it lists only the views that person saved. Answers with `data`, sorted by name, each view with `_id`, `name`, `settings`, `isDefault` and `updatedAt`."
+            ],
             "response": {
                 "status": true,
                 "statusText": "Views fetched successfully.",
@@ -826,6 +838,9 @@
             "stability": "beta",
             "title": "Change a saved view",
             "summary": "Changes the name, the settings or the default mark of one of the caller's views.",
+            "description": [
+                "Any signed-in person with an active seat in the workspace may call it, on a view that person saved; any other id answers 404. Reads `name` (string), `settings` (object) and `isDefault` (boolean) from the body, and changes the ones sent. Making a view the default clears the mark on the caller's other views. Answers with `data`: the view as it is now."
+            ],
             "pathParams": [
                 {
                     "name": "id",
@@ -884,6 +899,9 @@
             "stability": "beta",
             "title": "Delete a saved view",
             "summary": "Deletes one of the caller's views.",
+            "description": [
+                "Any signed-in person with an active seat in the workspace may call it, on a view that person saved; any other id answers 404. The view is marked deleted and leaves the list, and its default mark is cleared. Answers with `statusText` `View deleted.` and no `data`."
+            ],
             "pathParams": [
                 {
                     "name": "id",
@@ -1052,6 +1070,9 @@
             "stability": "beta",
             "title": "Read a duplicate's progress",
             "summary": "Reports how far the tasks of a large copy have got.",
+            "description": [
+                "Needs a project the caller can open. The path id is the copy that a `POST /api/v2/projects/:id/duplicate` made. Answers with `data`: the newest copy job that the caller started for that project, as `id`, `status`, `total`, `processed` and `created`, or `null` when there is none."
+            ],
             "permission": "The project must be one the caller can open",
             "pathParams": [
                 {
@@ -1442,6 +1463,9 @@
             "stability": "beta",
             "title": "Delete a project template",
             "summary": "Deletes a template and the task rows it kept. Projects made from it are not affected.",
+            "description": [
+                "Allowed for the person who saved the template and for owners and admins; a template the caller may not see answers 404 and one they may see but not manage answers 403. The template is marked deleted and so are the task rows kept with it. Answers with `statusText` `Template deleted.` and no `data`."
+            ],
             "permission": "The person who saved the template, an owner or an admin",
             "pathParams": [
                 {
@@ -1463,6 +1487,9 @@
             "stability": "beta",
             "title": "List pages",
             "summary": "Lists pages, without their bodies.",
+            "description": [
+                "Any signed-in member of the workspace may call it. It reads `projectId` (id), `taskId` (id, which wins over `projectId`) and `scope` (`all`, `shared` or `trash`) from the query; with none of them it lists the workspace's pages that belong to no project. A malformed id answers a failed status. Only pages the caller may read are listed: a private page is its author's, a project's pages go to those who can see the project, and a page shared with the caller by name is included except in the trash. Answers with `data`: the pages ordered by `order`, each with an `excerpt` of up to 160 characters in place of its body."
+            ],
             "query": [
                 {
                     "name": "projectId",
@@ -1516,6 +1543,9 @@
             "stability": "beta",
             "title": "Create a page",
             "summary": "Creates a page in a project, or in the workspace when no project is named.",
+            "description": [
+                "Any signed-in member of the workspace may call it, except the guest role, which cannot add pages; a page in a project also needs edit rights on that project (403 without them, 404 when the project cannot be seen), and a parent page needs edit rights too. Reads `title` (string, required), `projectId`, `parentPageId` (ids), `visibility` (string), `linkedTasks` (id list of tasks the caller can open), `contentBlocks` (list), `isWiki` (boolean), `ownerId` (id) and `reviewDate` from the body. Answers with `data`: the saved page."
+            ],
             "permission": "With a `projectId`, the caller must be able to edit that project",
             "body": [
                 {
@@ -1627,6 +1657,9 @@
             "stability": "beta",
             "title": "Read a page",
             "summary": "Returns one page with its body.",
+            "description": [
+                "Any signed-in member of the workspace who may read the page. A page the caller may not read answers the same way as one that does not exist, with a failed status and `Page not found.`. Answers with `data`: the page with its body, and the flags `canEdit`, `canChangeProperties` and `canManageShares` as they apply to the caller."
+            ],
             "pathParams": [
                 {
                     "name": "id",
@@ -1764,6 +1797,9 @@
             "stability": "beta",
             "title": "Delete a page",
             "summary": "Moves a page to the trash, together with the pages under it that the caller can see.",
+            "description": [
+                "Allowed for the author of a private page and for owners and admins; for a page in a project, for those with edit rights on that project; for a workspace page, for any member. The guest role cannot delete pages. Answers 404 when the page cannot be seen and 403 when it can be seen but not deleted. Answers with `data.deleted`: the number of pages moved to the trash."
+            ],
             "permission": "A private page goes only by its author, an owner or an admin. Any other page needs edit rights on its project",
             "pathParams": [
                 {
@@ -1793,6 +1829,9 @@
             "stability": "beta",
             "title": "Restore a page",
             "summary": "Takes a page back out of the trash. Only the page itself: the pages that went with it are restored one by one.",
+            "description": [
+                "Needs edit rights on the page as reached without a share by name, and the guest role is excluded. The page must be in the trash, else the answer is a failed status with `Page not found in trash.`. Answers with `data`: the restored page."
+            ],
             "permission": "The caller must be able to edit the page",
             "pathParams": [
                 {
@@ -1827,6 +1866,9 @@
             "stability": "beta",
             "title": "List a page's versions",
             "summary": "Lists the versions kept for a page, newest first, without their bodies.",
+            "description": [
+                "Any signed-in member of the workspace who may read the page; a page the caller may not read answers 404 `Page not found.`. Answers with `data`: the versions the caller may see, newest first, without their bodies."
+            ],
             "pathParams": [
                 {
                     "name": "id",
@@ -1863,6 +1905,9 @@
             "stability": "beta",
             "title": "Save a version",
             "summary": "Keeps the page as it is now as a version, with a name when one is given.",
+            "description": [
+                "Needs edit rights on the page. Reads `name` (string, up to 80 characters, optional) from the body. A page with no content answers 400, a page too large to keep answers 400, and a page may hold a limited number of named versions. When the latest version already matches the page, no new version is made and the answer names or returns that one. Answers with `data`: the version."
+            ],
             "permission": "The caller must be able to edit the page",
             "pathParams": [
                 {
@@ -1909,6 +1954,9 @@
             "stability": "beta",
             "title": "Read a version",
             "summary": "Returns one version with its body.",
+            "description": [
+                "Any signed-in member of the workspace who may read the page and that version; otherwise 404 with `Version not found.` or `Page not found.`. Answers with `data`: the version with its title and body."
+            ],
             "pathParams": [
                 {
                     "name": "id",
@@ -1954,6 +2002,9 @@
             "stability": "beta",
             "title": "Name a version",
             "summary": "Names a version, or clears its name.",
+            "description": [
+                "Needs edit rights on the page. Reads `name` (string, up to 80 characters) from the body; an empty name clears it, and naming one more version than the limit allows answers 400. Answers with `data`: the version."
+            ],
             "permission": "The caller must be able to edit the page",
             "pathParams": [
                 {
@@ -2002,6 +2053,9 @@
             "stability": "beta",
             "title": "Restore a version",
             "summary": "Puts a version's title and body back on the page. The page as it was is kept as a version first.",
+            "description": [
+                "Needs edit rights on the page. The page as it is now is kept as a version first, then the version's title and body replace it. Answers with `data`: the page as it is now."
+            ],
             "permission": "The caller must be able to edit the page",
             "pathParams": [
                 {
@@ -2204,6 +2258,9 @@
             "stability": "beta",
             "title": "List agents",
             "summary": "Lists the workspace's agents, oldest first.",
+            "description": [
+                "Any signed-in member of the workspace may call it. Answers with `data`: the agents that are not deleted, oldest first. Each agent's `projectIds` list is cut to the projects the caller can open, unless the caller is an owner or admin, and `projectScoped` says whether the agent is limited to projects at all."
+            ],
             "response": {
                 "status": true,
                 "statusText": "Agents fetched.",
@@ -2229,6 +2286,9 @@
             "stability": "beta",
             "title": "Read the team board",
             "summary": "Returns the people and agents of the workspace, what each is on right now, and a short standup.",
+            "description": [
+                "Any signed-in member of the workspace may call it. Reads `hoursPerWeek` (a number above 0, 40 when left out) from the query. Answers with `data`: the people and agents of the workspace with what each is on, their load for the week, time off, and a `standup` composed from them."
+            ],
             "query": [
                 {
                     "name": "hoursPerWeek",
@@ -2317,6 +2377,9 @@
             "stability": "beta",
             "title": "List agent runs",
             "summary": "Lists agent runs, newest first, with a summary of the runs that are open now.",
+            "description": [
+                "Any signed-in member of the workspace may call it. Reads `status`, `projectId`, `agentId`, `taskId`, `errorType` and `limit` from the query; an `errorType` outside the known provider errors answers 400. Owners and admins see every project's runs, and other members see runs in the projects they can open, except runs on tasks in private lists they are not on. Answers with `data` (the runs, newest first) and `summary` (the runs open now)."
+            ],
             "query": [
                 {
                     "name": "status",
@@ -2406,6 +2469,9 @@
             "stability": "beta",
             "title": "Read an agent run",
             "summary": "Returns one run with its steps, the audit rows of what it did, and the agent revision it ran on.",
+            "description": [
+                "Any signed-in member of the workspace who may see the run: for most runs, the people who can open its project and its tasks, and for a run that produced a report, only the person who started it and owners and admins. A run the caller may not see answers 404 as one that does not exist does. Answers with `data`: the `run` with its steps, the `audit` rows of what it did, the `revision` of the agent it ran on, and a `trace`."
+            ],
             "pathParams": [
                 {
                     "name": "id",
@@ -2474,6 +2540,9 @@
             "stability": "beta",
             "title": "List agent proposals",
             "summary": "Lists the changes agents have proposed and are waiting on a person for, newest first.",
+            "description": [
+                "Any signed-in member of the workspace may call it. Reads `status` (`pending` when left out, or `all`, or one status), `bucket`, `agentId` and `limit` from the query. A member sees the proposals of projects they can open, plus ones asked for by their own agents, and owners and admins see every project's. Answers with `data` (the proposals, newest first) and `counts`."
+            ],
             "query": [
                 {
                     "name": "status",
@@ -2680,6 +2749,9 @@
             "stability": "beta",
             "title": "List webhook events",
             "summary": "Lists the events a webhook can subscribe to.",
+            "description": [
+                "Any signed-in member of the workspace may call it. Answers with `data`: the list of event names a webhook can subscribe to."
+            ],
             "response": {
                 "status": true,
                 "statusText": "Webhook events.",
@@ -2697,6 +2769,9 @@
             "stability": "beta",
             "title": "List webhooks",
             "summary": "Lists the caller's own webhooks. The signing secret is never returned here.",
+            "description": [
+                "Any signed-in member of the workspace may call it. Answers with `data`: the webhooks the caller created, together with any recorded with no owner, each with `name`, `url`, `events`, `active`, `format`, `lastStatus`, `lastDeliveredAt`, `needsAttention` and `createdAt`, and never the secret."
+            ],
             "response": {
                 "status": true,
                 "statusText": "Webhooks fetched.",
@@ -2726,6 +2801,9 @@
             "stability": "beta",
             "title": "Create a webhook",
             "summary": "Creates a webhook and returns its signing secret, once.",
+            "description": [
+                "Any signed-in member of the workspace may call it. Reads `name` (string), `url` (string), `events` (string list) and `format` (string) from the body. The address must be an `http` or `https` one that resolves to a public host, or to a private host the person who runs the server allows. Failures answer a failed status with the reason. Answers with `data`: the webhook and its `secret`, shown once."
+            ],
             "body": [
                 {
                     "name": "name",
@@ -2786,6 +2864,9 @@
             "stability": "beta",
             "title": "Change a webhook",
             "summary": "Changes a webhook, or switches it on or off. Only the keys sent are changed.",
+            "description": [
+                "Any signed-in member of the workspace may call it, on a webhook the caller created or one recorded with no owner; any other id answers `Webhook not found.`. Reads `name`, `url`, `events`, `format` and `active` from the body and changes the ones sent; a body with none of them answers `Nothing to update.`. A new `url` is checked as when creating. Answers with `data`: the webhook as it is now."
+            ],
             "pathParams": [
                 {
                     "name": "id",
@@ -2850,6 +2931,9 @@
             "stability": "beta",
             "title": "Delete a webhook",
             "summary": "Deletes a webhook, its delivery log and its signing secret.",
+            "description": [
+                "Any signed-in member of the workspace may call it, on a webhook the caller created or one recorded with no owner; any other id answers `Webhook not found.`. Removes the webhook, its delivery log and its signing secret. Answers with `statusText` `Webhook deleted.` and no `data`."
+            ],
             "pathParams": [
                 {
                     "name": "id",
@@ -2871,6 +2955,9 @@
             "stability": "beta",
             "title": "Read a webhook's delivery log",
             "summary": "Lists a webhook's deliveries, newest first.",
+            "description": [
+                "Any signed-in member of the workspace may call it, on a webhook the caller created or one recorded with no owner; any other id answers `Webhook not found.`. Reads `limit` (1 to 50, 10 when left out) and `skip` (0 or more) from the query. Answers with `data` (the deliveries, newest first), `hasMore` and `nextSkip`."
+            ],
             "pathParams": [
                 {
                     "name": "id",
@@ -3153,6 +3240,9 @@
             "stability": "beta",
             "title": "Read a goal",
             "summary": "Returns one goal, live or archived.",
+            "description": [
+                "Needs an active seat in the workspace; a token limited to some projects is refused with 403. A goal is readable by its owner, by people it is shared with by name, and, when its visibility is `workspace`, by every member except guests, who need to be named. A goal the caller cannot read answers 404 as one that does not exist does. Answers with `data`: the goal, live or archived, with its targets, `progressPct`, and `canEdit`."
+            ],
             "permission": "An active seat in the workspace. The goal must be one the caller can read",
             "pathParams": [
                 {
@@ -3411,6 +3501,9 @@
             "stability": "beta",
             "title": "Archive a goal",
             "summary": "Archives a goal. It leaves the live list and can be restored.",
+            "description": [
+                "Allowed for the goal's owner, and for owners and admins when the goal's visibility is `workspace`; a goal the caller can read but not change answers 403. A token limited to some projects is refused. The body must be empty. Answers with `data`: the archived goal."
+            ],
             "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
             "pathParams": [
                 {
@@ -3478,6 +3571,9 @@
             "stability": "beta",
             "title": "Restore a goal",
             "summary": "Brings an archived goal back to the live list.",
+            "description": [
+                "Allowed for the goal's owner, and for owners and admins when the goal's visibility is `workspace`; a goal the caller can read but not change answers 403. A token limited to some projects is refused. The body must be empty. Answers with `data`: the goal, live again."
+            ],
             "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
             "pathParams": [
                 {
@@ -3791,6 +3887,9 @@
             "stability": "beta",
             "title": "Remove a target",
             "summary": "Removes a target and answers with the whole goal.",
+            "description": [
+                "Allowed for the goal's owner, and for owners and admins when the goal's visibility is `workspace`; a goal the caller can read but not change answers 403, and an archived goal answers 409. The body must be empty and an unknown `targetId` answers 404. Answers with `data`: the whole goal without that target."
+            ],
             "permission": "An active seat in the workspace. The goal must be one the caller can read, and one the caller can change: its owner, or an owner or admin when the goal is visible to the workspace",
             "pathParams": [
                 {
@@ -4106,6 +4205,9 @@
             "stability": "beta",
             "title": "List a whiteboard's history",
             "summary": "Lists the earlier states kept for a board, newest first.",
+            "description": [
+                "Needs a project and list the caller can open; anything else answers 404 `Whiteboard not found.`. Answers with `data`: the earlier states kept for the board, newest first, each with `revision`, `savedBy`, `savedAt`, `cards` (how many elements) and `reason`."
+            ],
             "permission": "The caller must be able to open the list",
             "pathParams": [
                 {
@@ -4484,7 +4586,7 @@
         "PUT /api/v2/agents/project-limits/:projectId": { "stability": "beta", "summary": "Changes a project's limits for agents. Send `atOnce`, `paused` or both. Pausing takes held work-queue items back and stops the project's running agent runs. For an owner or admin who is signed in.", "apiToken": false },
         "GET /api/v2/agents/standing-approvals/:projectId": { "stability": "beta", "summary": "The standing approvals (\"Always do this\") of a project: every one for an owner or admin, the caller's own for a member. For a signed-in person.", "apiToken": false },
         "DELETE /api/v2/agents/standing-approvals/:projectId/:id": { "stability": "beta", "summary": "Removes a standing approval. Its maker, an owner or an admin may remove it. For a signed-in person.", "apiToken": false },
-        "USE /api/v2/goals": { "stability": "internal", "summary": "Runs before every goal route: a write made with an agent's token is judged by the rules that hold that agent." },
+        "USE /api/v2/goals": { "stability": "internal", "summary": "Runs before every goal route: reads pass through, and a write (POST, PATCH, PUT or DELETE) made with an agent's token is judged by the rules that hold that agent." },
         "POST /api/v2/agents": { "stability": "beta", "summary": "Creates an agent." },
         "PUT /api/v2/agents/:id": { "stability": "beta", "summary": "Changes an agent." },
         "DELETE /api/v2/agents/:id": { "stability": "beta", "summary": "Deletes an agent." },
@@ -4546,26 +4648,26 @@
         "POST /api/v2/workflows/runs/:id/steps/:stepId/reassign": { "stability": "beta", "summary": "Hands a step's decision to someone else." },
         "POST /api/v2/tasks/bulk": { "stability": "beta", "summary": "Changes many tasks at once." },
         "POST /api/v2/tasks/relations": { "stability": "beta", "summary": "Links tasks, unlinks them and lists a task's links." },
-        "POST /api/v2/sprints/burndown": { "stability": "beta", "summary": "The burndown of a sprint." },
-        "POST /api/v2/sprints/hours": { "stability": "beta", "summary": "The hours logged in a sprint." },
-        "POST /api/v2/sprints/scrum": { "stability": "beta", "summary": "Sets whether a list is a scrum sprint." },
-        "POST /api/v2/sprints/start": { "stability": "beta", "summary": "Starts a sprint." },
-        "POST /api/v2/sprints/complete": { "stability": "beta", "summary": "Completes a sprint." },
-        "GET /api/v2/sprints/complete-preview": { "stability": "beta", "summary": "What completing a sprint would move." },
-        "POST /api/v2/sprints/backlog": { "stability": "beta", "summary": "Reads a project's backlog." },
-        "GET /api/v2/sprints/report": { "stability": "beta", "summary": "The report of a sprint." },
+        "POST /api/v2/sprints/burndown": { "stability": "beta", "summary": "Needs a project the caller can open and a list the caller can see. Reads `sprintId` (id) from the body. Answers with `data`: the sprint's name, state, goal and dates, its totals of tasks, estimate and points, and a `days` series with the ideal line." },
+        "POST /api/v2/sprints/hours": { "stability": "beta", "summary": "Needs a project the caller can open and a list the caller can see. Reads `sprintId` (id) from the body. Answers with `data`: `plannedMinutes`, `loggedMinutes` and `overdueMinutes`, the minutes the sprint is projected to run over its plan." },
+        "POST /api/v2/sprints/scrum": { "stability": "beta", "summary": "Needs write access to the list's project and the permission to create lists there; a person must make the call. Reads `sprintId` (id), `isScrum` (boolean; false turns Scrum off), `goal` (string), `startDate` and `endDate` (dates, both or neither, the end after the start) from the body. A completed sprint cannot be edited, and a running one cannot have Scrum turned off. Answers with `data`: the sprint." },
+        "POST /api/v2/sprints/start": { "stability": "beta", "summary": "Needs write access to the list's project and the permission to create lists there; a person must make the call. Reads `sprintId` (id) from the body. The list must be a sprint with a start and end date, and a project runs one sprint at a time; the tasks in it become the sprint's commitment. Answers with `data`: the started sprint, or a failed status with the reason." },
+        "POST /api/v2/sprints/complete": { "stability": "beta", "summary": "Needs write access to the list's project and the permission to create lists there; a person must make the call. Reads `sprintId` (id) and `incompleteDestination` (`next`, `backlog` or the id of an open sprint of the same project, `next` when left out) from the body. Unfinished tasks move to the destination. Answers with `data`: the completed sprint; a sprint already completed answers success and moves nothing." },
+        "GET /api/v2/sprints/complete-preview": { "stability": "beta", "summary": "Needs a project the caller can open and a list the caller can see. Reads `sprintId` (id) from the query; a list that is not a sprint answers a failed status. Answers with `data`: the sprint's state, commitment, tasks added after the start, and the counts of finished work and of unfinished work with a `list` of it." },
+        "POST /api/v2/sprints/backlog": { "stability": "beta", "summary": "Needs a project the caller can open. Reads `projectId` (id) from the body. Answers with `data`: the project's backlog list, which is made first if it does not exist." },
+        "GET /api/v2/sprints/report": { "stability": "beta", "summary": "Needs a project the caller can open and a list the caller can see. Reads `sprintId` (id) from the query; a list that is not a sprint answers a failed status. Answers with `data`: the sprint's state, goal and dates, and the totals of what was committed, completed and left unfinished, with the tasks added after the start and those moved out." },
         "GET /api/v2/calls/ice-config": { "stability": "internal", "summary": "The connection settings for a call." },
         "POST /api/v2/calls/notes": { "stability": "beta", "summary": "Saves the notes of a call." },
         "GET /api/v2/calls/notes": { "stability": "beta", "summary": "Lists the caller's own call notes." },
         "GET /api/v2/calls/notes/:id": { "stability": "beta", "summary": "Reads one set of call notes." },
         "PATCH /api/v2/calls/notes/:id": { "stability": "beta", "summary": "Changes a set of call notes." },
-        "GET /api/v2/assignment-rules/project/:projectId": { "stability": "beta", "summary": "Reads a project's assignment rules." },
-        "PUT /api/v2/assignment-rules/project/:projectId": { "stability": "beta", "summary": "Changes a project's assignment rules." },
-        "POST /api/v2/assignment-rules/project/:projectId/draft": { "stability": "beta", "summary": "Drafts assignment rules for a project." },
-        "GET /api/v2/assignment-rules/task/:taskId": { "stability": "beta", "summary": "Reads the assignment suggestions for a task." },
-        "POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/accept": { "stability": "beta", "summary": "Accepts an assignment suggestion." },
-        "POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/dismiss": { "stability": "beta", "summary": "Dismisses an assignment suggestion." },
-        "POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo": { "stability": "beta", "summary": "Undoes an accepted assignment suggestion." },
+        "GET /api/v2/assignment-rules/project/:projectId": { "stability": "beta", "summary": "Needs a project the caller can open. Answers with `data`: `rules` (`entries` of person and sentence, `fallbackUserId`, `mode`, `onCreate`, `onChange`) and `ai.state`, whether AI is available." },
+        "PUT /api/v2/assignment-rules/project/:projectId": { "stability": "beta", "summary": "Needs the permission to change the project's details. Reads `entries` (a list of at most 50 objects with `userId` and `when`, a sentence of at most 300 characters, one per person), `fallbackUserId` (id or empty), `mode` (`suggest` or `apply`, `suggest` when left out), `onCreate` (boolean, true when left out) and `onChange` (boolean, false when left out) from the body; each person must hold a seat and be able to open the project. Answers with `data`: the saved rules." },
+        "POST /api/v2/assignment-rules/project/:projectId/draft": { "stability": "beta", "summary": "Needs the permission to change the project's details, and AI must be on with a model configured (409 otherwise). Reads `userIds` (a list of 1 to 10 ids) from the body. Answers with `data.drafts`: a suggested rule sentence for each person who can open the project, based on their recent tasks there." },
+        "GET /api/v2/assignment-rules/task/:taskId": { "stability": "beta", "summary": "Needs a task the caller can open (404 otherwise). Answers with `data`: `decision`, the latest open suggestion for the task or `null`, and `pending`, whether one is still being worked out." },
+        "POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/accept": { "stability": "beta", "summary": "Needs the permission to change a task's assignee in the task's project. Assigns the suggested person to the task; 409 when the suggestion was already handled, the task already has an assignee, or the person can no longer open it. Answers with `data`: the decision." },
+        "POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/dismiss": { "stability": "beta", "summary": "Needs the permission to change a task's assignee in the task's project. Marks the suggestion dismissed. Answers with `data`: the decision." },
+        "POST /api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo": { "stability": "beta", "summary": "Needs the permission to change a task's assignee in the task's project. Takes back an accepted suggestion. Answers with `data`: the decision." },
         "POST /api/v2/manualLogtime": { "stability": "beta", "summary": "Logs time on a task by hand." },
         "POST /api/v2/deleteManualLogtime": { "stability": "beta", "summary": "Deletes a manual time log." },
         "POST /api/v2/timeTracker/start": { "stability": "internal", "summary": "Starts a tracker session, for the time tracker." },
@@ -4669,54 +4771,54 @@
         "GET /api/v1/connector-oauth/google/callback": { "stability": "internal", "summary": "Google's redirect after consent. Public: it exchanges nothing and returns the browser to the signed-in page, which completes the connection." },
         "GET /api/v2/ai-switch": { "stability": "internal", "summary": "Whether AI is on for the workspace." },
         "PUT /api/v2/ai-switch": { "stability": "internal", "summary": "Turns AI on or off for the workspace.", "apiToken":false },
-        "POST /api/v2/reactions": { "stability": "beta", "summary": "Adds or removes a reaction." },
-        "POST /api/v2/recent-visits": { "stability": "internal", "summary": "Records what the person just opened." },
-        "GET /api/v2/recent-visits": { "stability": "internal", "summary": "What the person opened recently." },
-        "POST /api/v2/search": { "stability": "beta", "summary": "Searches the workspace." },
-        "POST /api/v2/epics/assign": { "stability": "beta", "summary": "Puts a task in an epic, or takes it out." },
-        "POST /api/v2/epics/:id/recount": { "stability": "beta", "summary": "Rebuilds an epic's counters from its tasks." },
-        "POST /api/v2/epics": { "stability": "beta", "summary": "Creates an epic." },
-        "GET /api/v2/epics": { "stability": "beta", "summary": "Lists a project's epics." },
-        "PUT /api/v2/epics/:id": { "stability": "beta", "summary": "Changes an epic." },
-        "DELETE /api/v2/epics/:id": { "stability": "beta", "summary": "Deletes an epic. Its tasks stay." },
-        "GET /api/v2/exports/:id/download": { "stability": "beta", "summary": "Downloads a finished export." },
-        "GET /api/v2/exports": { "stability": "beta", "summary": "Lists exports." },
-        "POST /api/v2/exports/workspace": { "stability": "beta", "summary": "Exports every project's tasks, for an owner or admin." },
-        "POST /api/v2/exports": { "stability": "beta", "summary": "Starts an export." },
-        "GET /api/v2/api-tokens/needing-expiry": { "stability": "internal", "summary": "Tokens that have no expiry, for owners and admins." },
-        "GET /api/v2/api-tokens/step-credentials": { "stability": "internal", "summary": "The live step credentials of the workspace." },
-        "GET /api/v2/api-tokens/:id/logs": { "stability": "internal", "summary": "The latest calls made with a token." },
-        "POST /api/v2/api-tokens/mcp": { "stability": "internal", "summary": "Creates a token for an AI agent." },
-        "POST /api/v2/api-tokens/:id/renew": { "stability": "internal", "summary": "Gives the person's own token a new secret and a new end date." },
+        "POST /api/v2/reactions": { "stability": "beta", "summary": "Any signed-in member of the workspace who can read the target. Reads `targetType` (`task` or `comment`), `targetId` (id), `emoji` (string) and `isProjectComment` (boolean) from the body; the caller's own reaction is added, or removed if it is already there. A target the caller cannot read answers 404. Answers with `data.reactions`: the target's reactions." },
+        "POST /api/v2/recent-visits": { "stability": "internal", "summary": "Any signed-in member of the workspace may call it, and it records a visit for that person only. Reads `entityType` (`task`, `project`, `sprint` or `doc`) and `entityId` (id) from the body. Answers with `statusText` `Visit recorded.` and no `data`." },
+        "GET /api/v2/recent-visits": { "stability": "internal", "summary": "Any signed-in member of the workspace may call it, and it lists that person's own visits. Reads `types` (a comma list of `task`, `project`, `sprint` and `doc`, or `all`; tasks only when left out) and `limit` (a number) from the query. Visits to anything deleted or no longer open to the caller drop out. Answers with `data`: the newest visits first." },
+        "POST /api/v2/search": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it. Reads `query` (string) from the body and matches it against task names and keys, project names, comment text and page titles, within the projects, lists and pages the caller can open. Answers with `data`: `tasks`, `projects`, `comments` and `pages`, each limited in number." },
+        "POST /api/v2/epics/assign": { "stability": "beta", "summary": "Needs the permission to create tasks in the projects of both the task and the epic. Reads `taskId` (id) and `epicId` (id, or empty or null to take the task out) from the body; a task the caller cannot open, or an epic that does not exist, answers a failed status. Answers with `data`: `taskId` and `epicId`." },
+        "POST /api/v2/epics/:id/recount": { "stability": "beta", "summary": "Needs the permission to create tasks in the epic's project. Counts the epic's tasks again and answers with `data`: the epic with `taskCount` and `completedCount`, counted for tasks the caller can open." },
+        "POST /api/v2/epics": { "stability": "beta", "summary": "Needs the permission to create tasks in the project named by `projectId`. Reads `name` (string, required), `projectId` (id, required), `description`, `color`, `priority`, `ownerUserId` (strings), `startDate` and `dueDate` from the body; a failed check answers a failed status with the reason. Answers with `data`: the new epic." },
+        "GET /api/v2/epics": { "stability": "beta", "summary": "Needs a project the caller can open, named by the query field `projectId` (id). Answers with `data`: the project's epics, oldest first, with `taskCount` and `completedCount` counted over the tasks the caller can open." },
+        "PUT /api/v2/epics/:id": { "stability": "beta", "summary": "Needs the permission to create tasks in the epic's project. Reads `name`, `color`, `description`, `status`, `priority`, `ownerUserId`, `startDate` and `dueDate` from the body and changes the ones sent; a body with none of them answers a failed status. Answers with `data`: the epic as it is now." },
+        "DELETE /api/v2/epics/:id": { "stability": "beta", "summary": "Needs the permission to create tasks in the epic's project. The epic is marked deleted and its tasks are unlinked from it. Answers with `statusText` `Epic deleted.` and no `data`." },
+        "GET /api/v2/exports/:id/download": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it, for an export the caller started; a workspace export also needs the owner or admin role. Answers with the file once the export has finished, and 404 `Export not ready.` before that." },
+        "GET /api/v2/exports": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it, and it lists only the caller's own exports (a `uid` of someone else answers 403). Answers with `data`: up to 20 exports, newest first, each with `type`, `format`, `status`, `fileName`, `total`, `processed`, `error` and `createdAt`." },
+        "POST /api/v2/exports/workspace": { "stability": "beta", "summary": "Owners and admins only. Reads `format` (`csv` or `xlsx`, `xlsx` when left out) from the body. The export runs in the background. Answers with `data`: the job's `_id`, `type`, `format`, `status`, `fileName` and `createdAt`." },
+        "POST /api/v2/exports": { "stability": "beta", "summary": "Any signed-in member of the workspace who can list the project's tasks (404 otherwise). Reads `format` (`csv` or `xlsx`), `projectId` (id), `sprintId` (id, optional) and `projectName` (string) from the body. The export runs in the background. Answers with `data`: the job." },
+        "GET /api/v2/api-tokens/needing-expiry": { "stability": "internal", "summary": "Owners and admins only, and not with an API token (403). Answers with `data`: tokens in the workspace that have no expiry date, and the token `policy`; an empty list while the strict token policy is off." },
+        "GET /api/v2/api-tokens/step-credentials": { "stability": "internal", "summary": "Any member of the workspace, and not with an API token (403). Answers with `data`: the live step credentials, owners and admins seeing all of them and others the ones they started, and `policy`; an empty list while step credentials are off." },
+        "GET /api/v2/api-tokens/:id/logs": { "stability": "internal", "summary": "Only the person who owns the token; any other id answers `Token not found.`. Answers with `data`: the latest 50 calls made with the token, newest first." },
+        "POST /api/v2/api-tokens/mcp": { "stability": "internal", "summary": "Any signed-in member of the workspace, and not with an API token (403). Reads `name` (string), `mode` and `provider` (strings), `projectIds` (id list), `expiresInDays` (number), `label` (string), `scopes` and `grants` (lists) from the body; the account `mode` must be one the workspace allows. Answers with `data`: the token, shown once, and the address of the MCP server." },
+        "POST /api/v2/api-tokens/:id/renew": { "stability": "internal", "summary": "Only the person who owns the token, and not with an API token (403). A token that was revoked cannot be renewed. Answers with `data`: the token with a new secret, shown once, and a new end date." },
         "GET /api/v2/api-tokens/ai-connection": { "stability": "internal", "summary": "Whether the signed-in person's own AI app has connected to this workspace, when it last called, and which groups of tools this server offers it. Never a token or an app's name." },
-        "GET /api/v2/api-tokens": { "stability": "internal", "summary": "Lists the person's tokens." },
-        "POST /api/v2/api-tokens": { "stability": "internal", "summary": "Creates a token." },
-        "PUT /api/v2/api-tokens/:id": { "stability": "internal", "summary": "Renames a token, or switches it on or off." },
-        "DELETE /api/v2/api-tokens/:id": { "stability": "internal", "summary": "Revokes a token." },
-        "GET /api/v2/pages/ai-status": { "stability": "beta", "summary": "Whether AI writing is available for pages." },
-        "POST /api/v2/pages/ai": { "stability": "beta", "summary": "Drafts or rewrites page text with AI." },
-        "GET /api/v2/pages/:id/comments": { "stability": "beta", "summary": "Lists a page's comments." },
-        "POST /api/v2/pages/:id/comments": { "stability": "beta", "summary": "Comments on a page." },
-        "PUT /api/v2/pages/:id/comments/:commentId/resolve": { "stability": "beta", "summary": "Resolves a comment thread, or reopens it." },
-        "PUT /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Changes a comment." },
-        "DELETE /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Deletes a comment and its replies." },
-        "GET /api/v2/pages/:id/shares": { "stability": "beta", "summary": "Lists the people a page is shared with by name." },
-        "PUT /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Shares a page with a person as a viewer or an editor, or changes their role." },
-        "DELETE /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Stops sharing a page with a person." },
-        "PUT /api/v2/pages/:id/review": { "stability": "beta", "summary": "Marks a wiki page as reviewed." },
-        "PUT /api/v2/pages/:id/approve": { "stability": "beta", "summary": "Signs off a page an agent drafted." },
-        "POST /api/v2/pages/:id/images": { "stability": "beta", "summary": "Uploads an image for a page." },
-        "GET /api/v2/trash": { "stability": "beta", "summary": "Lists what is in the trash." },
-        "PUT /api/v2/trash/:kind/:id/restore": { "stability": "beta", "summary": "Restores something from the trash." },
+        "GET /api/v2/api-tokens": { "stability": "internal", "summary": "Any signed-in member of the workspace may call it, and it lists only that person's own tokens. Answers with `data` (each token's name, prefix, scopes, state and dates, never the secret) and `policy`." },
+        "POST /api/v2/api-tokens": { "stability": "internal", "summary": "Any signed-in member of the workspace may call it, for the caller's own token. Reads `name` (string), `scopes` (list from the scopes the server offers) and `expiresInDays` (number) from the body. Answers with `data`: the token with its secret, shown once." },
+        "PUT /api/v2/api-tokens/:id": { "stability": "internal", "summary": "Only the person who owns the token. Reads `name` (string) and `active` (boolean) from the body and changes the ones sent; a body with neither answers `Nothing to update.`. Answers with `data`: the token." },
+        "DELETE /api/v2/api-tokens/:id": { "stability": "internal", "summary": "Only the person who owns the token; any other id answers `Token not found.`. Removes the token and its activity log. Answers with `statusText` `Token deleted.` and no `data`." },
+        "GET /api/v2/pages/ai-status": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it. Answers with `data.configured`: whether an AI provider is set up for writing pages." },
+        "POST /api/v2/pages/ai": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it. Reads `action`, `title`, `instruction` and `currentText` (strings) and `pageId` (id of a page the caller may read, whose title and text fill in what is left out) from the body. Answers with `data`: the composed text, or a failed status with the reason, and `isNotAi` when no AI is set up." },
+        "GET /api/v2/pages/:id/comments": { "stability": "beta", "summary": "Any signed-in member who may read the page. Answers with `data`: the page's comments, oldest first, up to 500, with `limit` and `atLimit`." },
+        "POST /api/v2/pages/:id/comments": { "stability": "beta", "summary": "Any signed-in member who may read the page. Reads `message` (string), `blockId` (string), `parentId` (id of a comment to reply under) and an attached file as `mediaURL`, `mediaOriginalName` and `mediaSize` from the body. A page holds at most 500 comments (409). Answers with `data`: the comment." },
+        "PUT /api/v2/pages/:id/comments/:commentId/resolve": { "stability": "beta", "summary": "Any signed-in member who may read the page; a thread that has an assignee can be resolved only by the assignee, the person who assigned it or an admin, and a reply cannot be resolved (400). Reads `resolved` (boolean, true when left out; false reopens the thread) from the body. Answers with `data`: the comment." },
+        "PUT /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "Only the comment's author, who must be able to read the page (403 for anyone else). Reads `message` (string) from the body. Answers with `data`: the comment as it is now." },
+        "DELETE /api/v2/pages/:id/comments/:commentId": { "stability": "beta", "summary": "The comment's author or an admin, who must be able to read the page. A thread is deleted with its replies. Answers with `data._id`: the id of the comment." },
+        "GET /api/v2/pages/:id/shares": { "stability": "beta", "summary": "Only the page's author, or an owner or admin who can open it (403 for anyone else). Answers with `data`: `people`, each with `userId`, `role`, `by`, `at` and `active`, and `limit`." },
+        "PUT /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Only the page's author, or an owner or admin who can open it. Reads `role` (`viewer` or `editor`, `viewer` when left out) from the body; the person must be an active member of the workspace, and a page can be shared with a limited number of people (400 otherwise). Answers with `data`: the list of people the page is shared with." },
+        "DELETE /api/v2/pages/:id/shares/:userId": { "stability": "beta", "summary": "Only the page's author, or an owner or admin who can open it. Answers with `data`: the list of people the page is still shared with." },
+        "PUT /api/v2/pages/:id/review": { "stability": "beta", "summary": "Needs edit rights on the page, and a share by name as editor is not enough. Reads `nextReviewDate` (a date, three months ahead when left out) from the body, marks the page as a wiki page reviewed now by the caller, and answers with `data`: the page." },
+        "PUT /api/v2/pages/:id/approve": { "stability": "beta", "summary": "Needs edit rights on the page, and a share by name as editor is not enough; a person must make the call. Only a page an agent drafted can be approved, else a failed status. Answers with `data`: the page." },
+        "POST /api/v2/pages/:id/images": { "stability": "beta", "summary": "Needs edit rights on the page. Takes a multipart body with the image as `file`. Answers with `data.key`: the key to put in the page's image block." },
+        "GET /api/v2/trash": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it. Reads `kind` (`projects`, `folders`, `lists`, `tasks` or `docs`, `projects` when left out) from the query. Lists only what the caller could open. Answers with `data`: the trashed items, each with a `title`, a `code` and a `projectId`." },
+        "PUT /api/v2/trash/:kind/:id/restore": { "stability": "beta", "summary": "Needs what deleting that kind needed, in the project the item belongs to; a person must make the call; a doc is judged by the doc rules. The path `kind` is `projects`, `folders`, `lists`, `tasks` or `docs`, and `id` an id. Projects and lists come back together with their tasks. Answers with `data`: the `kind` and `id`." },
         "DELETE /api/v2/sample-data": { "stability": "internal", "summary": "Removes the sample data a new workspace starts with." },
-        "GET /api/v2/forms/fields": { "stability": "beta", "summary": "The kinds of question a form can ask." },
-        "POST /api/v2/forms/:id/publish": { "stability": "beta", "summary": "Publishes a form, or takes it offline." },
-        "GET /api/v2/forms/:id/submissions": { "stability": "beta", "summary": "Lists a form's submissions." },
-        "GET /api/v2/forms/:id": { "stability": "beta", "summary": "Reads a form with its questions." },
-        "PUT /api/v2/forms/:id": { "stability": "beta", "summary": "Changes a form." },
-        "DELETE /api/v2/forms/:id": { "stability": "beta", "summary": "Deletes a form." },
-        "GET /api/v2/forms": { "stability": "beta", "summary": "Lists a project's forms." },
-        "POST /api/v2/forms": { "stability": "beta", "summary": "Creates a form." },
+        "GET /api/v2/forms/fields": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it. Answers with `data`: the questions a form can ask, as `groups`, the `widgets`, `spans`, `gridColumns` and the task fields a question can be mapped to." },
+        "POST /api/v2/forms/:id/publish": { "stability": "beta", "summary": "Needs edit rights on the form's project (403 without them, 404 when the project cannot be seen). Reads `publish` (boolean, true when left out; false takes the form offline) from the body. A form that fails the checks for going live answers a failed status with the reason. Answers with `data`: `state` and, when live, `token` and `url`." },
+        "GET /api/v2/forms/:id/submissions": { "stability": "beta", "summary": "Needs edit rights on the form's project, because submissions hold the submitters' answers. Reads `q` (string, up to 120 characters, matched against every answer), `page` and `limit` (numbers, 10 per page by default and at most 100) and `all` (`1` returns up to 5000 rows for an export) from the query. Answers with `data`: `submissions`, `total`, `page`, `pages` and `truncated`." },
+        "GET /api/v2/forms/:id": { "stability": "beta", "summary": "Needs a project the caller can open; otherwise 404 `Form not found.`. Answers with `data`: the form with its questions, and its public `url` while it is live." },
+        "PUT /api/v2/forms/:id": { "stability": "beta", "summary": "Needs edit rights on the form's project. Reads `title`, `description`, `successMessage` (strings), `sprintId` (id), `questions` (list), `defaults` (object) and `state` from the body and changes the ones sent; a failed check answers a failed status with the reason. Answers with `data`: the form as it is now." },
+        "DELETE /api/v2/forms/:id": { "stability": "beta", "summary": "Needs edit rights on the form's project. A form that is published answers a failed status, and must be taken offline first. The form is marked deleted and the tasks it filed are kept. Answers with `statusText` `Form deleted.` and no `data`." },
+        "GET /api/v2/forms": { "stability": "beta", "summary": "Needs a project the caller can open, named by the query field `projectId` (id); otherwise 404. Answers with `data`: the project's forms, newest first, each with `title`, `description`, `sprintId`, `state` and `submissionCount`." },
+        "POST /api/v2/forms": { "stability": "beta", "summary": "Needs edit rights on the project named in the body (403 without them, 404 when it cannot be seen). Reads `title` (string, required), `projectId` (id, required), `description` (string) and `sprintId` (id) from the body. The form starts as a draft with no questions. Answers with `data`: the form." },
         "POST /api/v2/public-shares": { "stability": "beta", "summary": "Creates a public link to a list, a report or a page." },
         "GET /api/v2/public-shares": { "stability": "beta", "summary": "Lists the public links of something." },
         "PUT /api/v2/public-shares/:id": { "stability": "beta", "summary": "Switches a public link on or off." },
@@ -4734,23 +4836,23 @@
         "POST /api/v2/imports/clickup/project": { "stability": "beta", "summary": "Imports a ClickUp export as a new project." },
         "POST /api/v2/imports/clickup": { "stability": "beta", "summary": "Imports from ClickUp." },
         "GET /api/v2/imports": { "stability": "beta", "summary": "Lists imports." },
-        "GET /api/v2/custom-fields/formula/scope": { "stability": "beta", "summary": "The names a formula field may reference." },
-        "POST /api/v2/custom-fields/formula/validate": { "stability": "beta", "summary": "Checks a formula." },
-        "POST /api/v2/custom-fields/compute": { "stability": "beta", "summary": "Recomputes formula and rollup fields for tasks." },
-        "POST /api/v2/custom-fields/:fieldId/ai/preview": { "stability": "beta", "summary": "Previews what an AI field would fill in." },
-        "POST /api/v2/custom-fields/:fieldId/ai/apply": { "stability": "beta", "summary": "Fills an AI field in." },
-        "POST /api/v2/custom-fields/:fieldId/ai/jobs": { "stability": "beta", "summary": "Starts filling an AI field in for many tasks." },
-        "GET /api/v2/custom-fields/ai/jobs/:jobId": { "stability": "beta", "summary": "Reads the progress of an AI field job." },
-        "GET /api/v2/task-templates": { "stability": "beta", "summary": "Lists task templates." },
-        "POST /api/v2/task-templates": { "stability": "beta", "summary": "Creates a task template." },
-        "PUT /api/v2/task-templates/default": { "stability": "beta", "summary": "Sets a project's default task template." },
-        "POST /api/v2/task-templates/:id/apply": { "stability": "beta", "summary": "Applies a template to a task." },
-        "PATCH /api/v2/task-templates/:id": { "stability": "beta", "summary": "Changes a task template." },
-        "DELETE /api/v2/task-templates/:id": { "stability": "beta", "summary": "Deletes a task template." },
-        "GET /api/v2/view-templates": { "stability": "beta", "summary": "Lists view templates." },
-        "POST /api/v2/view-templates": { "stability": "beta", "summary": "Creates a view template." },
-        "PATCH /api/v2/view-templates/:id": { "stability": "beta", "summary": "Changes a view template." },
-        "DELETE /api/v2/view-templates/:id": { "stability": "beta", "summary": "Deletes a view template." },
+        "GET /api/v2/custom-fields/formula/scope": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it. Reads `projectId` (id) and `taskId` (id, used only when the caller can open the task) from the query. Answers with `data`: `names` a formula may use, with the task's values when a task is named, and the lists of `functions` and `rollupFunctions`." },
+        "POST /api/v2/custom-fields/formula/validate": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it. Reads `expression` (string, required), `fieldId`, `fieldTitle`, `projectId` (ids and string) and `sample` (an object of values to try it on) from the body. A formula that does not parse or that closes a cycle answers a failed status with a `code`. Answers with `data`: `references`, `functions`, `preview` and `previewError`." },
+        "POST /api/v2/custom-fields/compute": { "stability": "beta", "summary": "Needs the permission to change a task's custom field. Reads `taskIds` (a list of 1 to 200 ids) and `scope` (`sprint` or left out) from the body; only tasks the caller can open are computed. Answers with `data`: `updated`, the computed `values` and `errors`." },
+        "POST /api/v2/custom-fields/:fieldId/ai/preview": { "stability": "beta", "summary": "Any signed-in member of the workspace who can edit that field on the task; a task they cannot edit it on comes back with a `reason` instead. Reads `taskIds` (a list of 1 to 5 ids) from the body. Nothing is written. Answers with `data.proposals`: for each task, a `proposalId`, the proposed `text` and `fieldValue`." },
+        "POST /api/v2/custom-fields/:fieldId/ai/apply": { "stability": "beta", "summary": "Any signed-in member of the workspace who can edit that field on the task. Reads `proposalIds` (a list of up to 5 ids from a preview the same person made) from the body; an expired one is refused. Answers with `data`: `applied` (task ids) and `refused` (with a reason each)." },
+        "POST /api/v2/custom-fields/:fieldId/ai/jobs": { "stability": "beta", "summary": "Any signed-in member of the workspace who can edit that field on the tasks. Reads `taskIds` (a list of ids, up to the workspace's bulk limit) and `proposalIds` (a list of up to 5 ids) from the body. The fill runs in the background. Answers with `data`: the job." },
+        "GET /api/v2/custom-fields/ai/jobs/:jobId": { "stability": "beta", "summary": "Any signed-in member of the workspace, and only for a job that person started; any other id answers 404 `Job not found.`. Answers with `data`: the job and its progress." },
+        "GET /api/v2/task-templates": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it. Reads `projectId` (id, optional) from the query: with it, the workspace's templates and that project's, for a project the caller can open; without it, the workspace's templates and those of every project the caller can open. Answers with `data`, sorted by name, each with `name`, `scope`, `projectId`, `isDefault`, `canManage` and a count of what it carries." },
+        "POST /api/v2/task-templates": { "stability": "beta", "summary": "Allowed for owners and admins when `scope` is `workspace`, and otherwise for those who can create tasks in the task's project. Reads `name` (string, required), `scope` (`project` or `workspace`, `project` when left out), `taskId` (id of the task to copy from, required) and `include` (an object of booleans, where `false` leaves a part out) from the body. Answers with `data`: the template." },
+        "PUT /api/v2/task-templates/default": { "stability": "beta", "summary": "Needs the permission to change the project's details. Reads `projectId` (id, required) and `templateId` (id, or empty to clear the default) from the body; the template must be a workspace one or that project's. Answers with `statusText` saying whether a default was set or cleared." },
+        "POST /api/v2/task-templates/:id/apply": { "stability": "beta", "summary": "Needs the permission to create tasks in the task's project; fields the caller's role may not change are skipped and named. Reads `taskId` (id, required), `overwrite` and `preview` (booleans) from the body; with `preview` true nothing is written. Answers with `data`: `applied`, `conflicts`, `skipped`, `checklistAdded` and `subtasksCreated`." },
+        "PATCH /api/v2/task-templates/:id": { "stability": "beta", "summary": "Allowed for owners and admins on a workspace template, and for those who can create tasks in the project on a project template. Reads `name` (string, required) from the body. Answers with `statusText` `Template renamed.` and no `data`." },
+        "DELETE /api/v2/task-templates/:id": { "stability": "beta", "summary": "Allowed for owners and admins on a workspace template, and for those who can create tasks in the project on a project template. The template is marked deleted and is no longer any project's default. Answers with `statusText` `Template deleted.` and no `data`." },
+        "GET /api/v2/view-templates": { "stability": "beta", "summary": "Any signed-in member of the workspace may call it. Answers with `data`, sorted by name, each template with `name`, `viewType` and `canManage`, which is true for owners and admins." },
+        "POST /api/v2/view-templates": { "stability": "beta", "summary": "Needs the permission to change the project's views. Reads `projectId` (id), `viewId` (string) and `name` (string) from the body, and keeps the setup of that view as a template; a workspace holds a limited number. Answers with `data`: the template." },
+        "PATCH /api/v2/view-templates/:id": { "stability": "beta", "summary": "Owners and admins only. Reads `name` (string, required) from the body. Answers with `data`: the renamed template." },
+        "DELETE /api/v2/view-templates/:id": { "stability": "beta", "summary": "Owners and admins only. The template is marked deleted. Answers with `statusText` `Template deleted.` and no `data`." },
         "GET /api/v2/invoices": { "stability": "beta", "summary": "Lists a project's invoices." },
         "POST /api/v2/invoices/draft-from-milestone": { "stability": "beta", "summary": "Drafts an invoice from a milestone." },
         "POST /api/v2/invoices/draft-from-month": { "stability": "beta", "summary": "Drafts an invoice from a month of logged time." },
