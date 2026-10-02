@@ -224,13 +224,18 @@ const alreadyDecided = async (companyId, id) => {
     return { error: `Proposal is ${state}.`, status: 409 };
 };
 
-/* Approve (optionally with edited changes). `decider` is the human actor;
- * the changes execute AS the agent, on the human's decision, inside the
- * agent's allowedActions. */
-const approve = async (companyId, id, { decider, isPrivileged, changes: edited, ip }) => {
+/* Approve (optionally with edited changes, or with the parts of a plan to keep, ./planChoice.js). `decider` is the
+ * human actor; the changes execute AS the agent, on the human's decision, inside the agent's allowedActions. */
+const approve = async (companyId, id, { decider, isPrivileged, changes: edited, parts, ip }) => {
     const p = await get(companyId, id);
     if (!p) return { error: 'Proposal not found.', status: 404 };
     if (p.status !== STATUS.PENDING) return alreadyDecided(companyId, id);
+    const planChoice = require('./planChoice');
+    const chosen = planChoice.given(parts);
+    const editing = Array.isArray(edited) && edited.length > 0;
+    if (chosen && editing) return { error: planChoice.REFUSED.both, status: 400 };
+    const kept = chosen ? planChoice.narrow(p.changes, parts) : null;
+    if (kept && kept.error) return { error: kept.error, status: 400 };
     const fromMcp = p.source === SOURCE_MCP;
     if (fromMcp) {
         const refusal = await require('../Mcp/approval').refusalFor(companyId, p, { decider, isPrivileged, edited });
@@ -238,9 +243,9 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     }
     if (p.gate === GATE_OWNER_ADMIN && !isPrivileged) return { error: 'This proposal needs an Owner or Admin.', status: 403 };
 
-    let changes = p.changes;
-    let status = STATUS.APPROVED;
-    if (Array.isArray(edited) && edited.length) {
+    let changes = kept ? kept.changes : p.changes;
+    let status = kept ? STATUS.EDITED : STATUS.APPROVED;
+    if (editing) {
         const check = validateChanges(edited);
         if (!check.valid) return { error: check.reason, status: 400 };
         changes = edited.map((c) => ({ action: c.action, params: c.params || {}, label: c.label || c.action }));

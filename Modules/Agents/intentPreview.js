@@ -8,6 +8,7 @@ const setup = require('./setupRequests');
 const computed = require('./computedFields');
 const plans = require('./projectSetup');
 const projects = require('./projectCreate');
+const planChoice = require('./planChoice');
 const automation = require('./automationPreview');
 const listSetup = require('./listSetupPreview');
 const projectCopy = require('./projectDuplicatePreview');
@@ -194,36 +195,43 @@ const viewPreview = (change, context) => {
     };
 };
 
-const namesLine = (kind, given, max, nameMax) => {
-    const names = listOf(given).slice(0, max).map((name) => textOf(name, nameMax)).filter(Boolean);
-    return names.length > 0 && { kind, names };
+const { keyOf } = planChoice;
+
+const namesLine = (kind, part, given, max, nameMax) => {
+    const kept = listOf(given).slice(0, max).map((name, at) => ({ name: textOf(name, nameMax), pick: keyOf(part, at) })).filter((entry) => entry.name);
+    return kept.length > 0 && { kind, names: kept.map((entry) => entry.name), picks: kept.map((entry) => entry.pick) };
 };
 
-const planViewLines = (view, projectId, context) => {
+const picked = (line, pick) => line && { ...line, pick };
+
+const planViewLines = (view, at, projectId, context) => {
     const name = textOf(view.name, setup.VIEW_NAME_MAX);
     if (!name) return [];
     const planned = listOf(view.showFields).map((field) => textOf(field, setup.FIELD_NAME_MAX)).filter(Boolean);
+    const pick = keyOf('views', at);
     return [
-        { kind: 'planView', name, layout: Object.hasOwn(setup.VIEW_KINDS, String(view.kind)) ? String(view.kind) : '' },
-        ...lookLines(objectOf(view.look), projectId, context, planned),
+        { kind: 'planView', name, layout: Object.hasOwn(setup.VIEW_KINDS, String(view.kind)) ? String(view.kind) : '', pick },
+        ...lookLines(objectOf(view.look), projectId, context, planned).filter(Boolean).map((line) => ({ ...line, under: pick })),
     ];
 };
 
-/* The parts of a plan: the statuses and lists by name, each field with its type, and each view followed by what it shows. */
+/* The parts of a plan: the statuses and lists by name, each field with its type, and each view followed by what it
+ * shows. A line says which part of the stored plan it is (`pick`, `picks` for a line of names), or which part it
+ * belongs under, so the person approving can leave that part out (./planChoice.js). */
 const planLines = (change, context) => {
     const params = paramsOf(change);
     return [
-        namesLine('newStatuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
-        namesLine('newLists', params.lists, plans.LISTS_MAX, TEXT_MAX),
-        ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map(fieldLine),
-        ...planViews(change).flatMap((view) => planViewLines(view, idOf(params.projectId), context)),
+        namesLine('newStatuses', 'statuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
+        namesLine('newLists', 'lists', params.lists, plans.LISTS_MAX, TEXT_MAX),
+        ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map((field, at) => picked(fieldLine(field), keyOf('fields', at))),
+        ...planViews(change).flatMap((view, at) => planViewLines(view, at, idOf(params.projectId), context)),
     ];
 };
 
 const planPreview = (change, context) => {
     const place = placeLine(paramsOf(change), context.named);
     if (!place) return null;
-    return { kind: 'setup', title: place.project, lines: [place, ...planLines(change, context)].filter(Boolean) };
+    return { kind: 'setup', title: place.project, lines: [place, ...planLines(change, context)].filter(Boolean), needs: planChoice.needsOf(paramsOf(change)) };
 };
 
 /* A project that is not there yet: its name, who will be on it, what it is for, and the plan that comes with it. */
@@ -235,6 +243,7 @@ const projectPreview = (change, context) => {
         kind: 'project',
         title,
         lines: [{ kind: 'members', only: 'approver' }, descriptionLine({ rawDescription: params.description }), ...planLines(change, context)].filter(Boolean),
+        needs: planChoice.needsOf(params),
     };
 };
 

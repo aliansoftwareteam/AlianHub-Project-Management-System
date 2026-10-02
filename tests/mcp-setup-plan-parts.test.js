@@ -275,6 +275,48 @@ describe('a part that needs one left out', () => {
     });
 });
 
+describe('through the approve route', () => {
+    const routes = {};
+    const register = (method) => (path, ...handlers) => { routes[`${method} ${path}`] = handlers.flat(); };
+    require('../Modules/Agents/routes').init({ get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE'), use: () => {} });
+    const send = async (id, caller, body) => {
+        const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(sent) { this.body = sent; return this; }, send(sent) { this.body = sent; return this; }, on() {} };
+        const url = `/api/v2/agents/proposals/${id}/approve`;
+        const req = { ...caller, method: 'POST', originalUrl: url, url, query: {}, params: { id }, headers: { companyid: CID }, aud: CID, ip: '1.1.1.1', body };
+        for (const handler of routes['POST /api/v2/agents/proposals/:id/approve']) {
+            let passed = false;
+            await handler(req, res, () => { passed = true; });
+            if (!passed) break;
+        }
+        await settle();
+        return { code: res.statusCode, body: res.body };
+    };
+
+    it('a signed-in person approves with the parts they kept', async () => {
+        const id = await filed();
+        const out = await send(id, { uid: OWNER }, { parts: { 0: { lists: [1] } } });
+        expect(out).toMatchObject({ code: 200, body: { status: true } });
+        expect(listNames()).toContain('This week');
+        expect(listNames()).not.toContain('Backlog');
+        expect(liveFields()).toEqual([]);
+    });
+
+    it('answers a choice the plan cannot follow as a refusal the page can show', async () => {
+        const id = await filed();
+        const out = await send(id, { uid: OWNER }, { parts: { 0: { fields: [1], views: [0] } } });
+        expect(out).toMatchObject({ code: 400, body: { status: false, statusText: expect.stringMatching(/needs the field "Budget"/) } });
+        expect(proposal(id).status).toBe('pending');
+    });
+
+    it('a token cannot approve, with a choice or without', async () => {
+        const id = await filed();
+        const out = await send(id, { uid: OWNER, apiToken: { _id: tokenOf(OWNER), userId: OWNER, name: 'A script', scopes: ['read', 'write'] } }, { parts: { 0: { lists: [1] } } });
+        expect(out.code).toBe(403);
+        expect(proposal(id).status).toBe('pending');
+        expect(listNames()).not.toContain('This week');
+    });
+});
+
 describe('the choice of a plan, on its own', () => {
     const change = (params, action = TOOL) => ({ action, params, label: 'Set up', reversible: true });
 

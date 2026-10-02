@@ -378,13 +378,14 @@ describe('the preview says what will be made', () => {
             lines: [
                 { kind: 'members', only: 'approver' },
                 { kind: 'description', text: 'Everything for the new site.', more: false },
-                { kind: 'newStatuses', names: ['In Review'] },
-                { kind: 'newLists', names: ['Backlog', 'This week'] },
-                { kind: 'field', name: 'Budget', type: 'money', options: [] },
-                { kind: 'planView', name: 'Review board', layout: 'board' },
-                { kind: 'group', by: 'status', field: '' },
-                { kind: 'columns', names: ['Budget'], others: 0 },
+                { kind: 'newStatuses', names: ['In Review'], picks: ['statuses:0'] },
+                { kind: 'newLists', names: ['Backlog', 'This week'], picks: ['lists:0', 'lists:1'] },
+                { kind: 'field', name: 'Budget', type: 'money', options: [], pick: 'fields:0' },
+                { kind: 'planView', name: 'Review board', layout: 'board', pick: 'views:0' },
+                { kind: 'group', by: 'status', field: '', under: 'views:0' },
+                { kind: 'columns', names: ['Budget'], others: 0, under: 'views:0' },
             ],
+            needs: { 'views:0': ['fields:0'] },
         }]);
     });
 

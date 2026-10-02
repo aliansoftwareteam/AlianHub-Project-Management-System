@@ -14,6 +14,7 @@ const { storedProject, whoOf } = require('./taskRequests');
 // by part, and leaves whatever is in use by then.
 
 const PARTS = Object.freeze(['statuses', 'lists', 'fields', 'views']);
+const ALL_PARTS = PARTS;
 const PLAN_KEY = Object.freeze({ statuses: 'statuses', lists: 'lists', fields: 'definitions', views: 'views' });
 const STATUSES_MAX = 10;
 const LISTS_MAX = 10;
@@ -358,4 +359,4 @@ const inverses = {
     },
 };
 
-module.exports = { executors, inverses, planOf, planProblem, refusedParts, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };
+module.exports = { executors, inverses, planOf, planProblem, refusedParts, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, ALL_PARTS, PLAN_KEY, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };
