@@ -12,6 +12,7 @@ const { dailyRunLimitOf } = require('./dailyRunLimit');
 const { runClause } = require('./privateWork');
 const projectLimits = require('./projectLimits');
 const accounts = require('./accounts');
+const writerLimits = require('../../event/writerLimits');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -130,7 +131,7 @@ const start = async (companyId, { agent, taskId, projectId, skill, trigger, star
                 agentId: String(agent._id), agentName: agent.name, taskId: taskId ? String(taskId) : null, projectId: projectId ? String(projectId) : null,
                 skill: skill || null, trigger: trigger || 'manual', status: STATUS.RUNNING, viaAccount: via,
                 triggerDepth: clampDepth(triggerDepth), triggerEventId: triggerEventId ? String(triggerEventId) : null,
-                startedBy: startedBy ? String(startedBy) : null, startedAt: new Date(), elapsedMs: 0,
+                startedBy: startedBy ? String(startedBy) : null, startedUnder: writerLimits.ofStarter(startedBy), startedAt: new Date(), elapsedMs: 0,
                 spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: via === 'workspace' },
                 reservedUsd: 0,
                 actions: note ? [{ action: 'mention', note: String(note).slice(0, 2000), at: new Date() }] : [],

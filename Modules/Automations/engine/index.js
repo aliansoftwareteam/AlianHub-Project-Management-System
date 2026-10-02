@@ -40,10 +40,11 @@ const enqueueWorkflowRun = async (data, opts) => {
     return true;
 };
 
+// Bound where it is scheduled, as the one-off handler is at start: a repeated job is under none of the request it is picked up in.
 const scheduleRecurring = async (name, intervalMs, handler) => {
-    driver.define(name, async (job) => {
+    driver.define(name, AsyncResource.bind(async (job) => {
         try { await handler(job); } catch (error) { logger.error(`${LOG_PREFIX} ${name} failed: ${error.message}`); }
-    });
+    }));
     await driver.every(intervalMs, name);
     logger.info(`${LOG_PREFIX} ${name} every ${Math.round(intervalMs / 1000)}s`);
 };

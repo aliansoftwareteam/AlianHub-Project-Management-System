@@ -1234,6 +1234,12 @@ const schema = {
         idempotencyKey: { type: String, required: false },
         viaAccount: { type: String, required: false },
         startedBy: { type: String, required: false },
+        // What the request that started the run was held to (event/writerLimits.js); the run's skill executes under it
+        startedUnder: {
+            agent: { type: Boolean, required: false },
+            chat: { type: Boolean, required: false },
+            projectIds: { type: [String], default: undefined, required: false },
+        },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
         // set with the terminal status; the TTL index deletes the run once it passes

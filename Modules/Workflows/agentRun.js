@@ -2,6 +2,7 @@ const runs = require('../Agents/runs');
 const proposals = require('../Agents/proposals');
 const actions = require('../Agents/actions');
 const tools = require('../Automations/engine/tools');
+const writerLimits = require('../../event/writerLimits');
 const store = require('./store');
 
 // The agent runner behind the `agent_run` step type.
@@ -125,7 +126,7 @@ const executeAgentRun = async (companyId, agentRun, { stepCredential = null } = 
     if (!agent) throw permanent(`agent ${agentRun.agentId} was not found`);
     const task = await taskFor(companyId, agentRun.taskId);
     const actor = actorFor(agentRun, agent, stepCredential);
-    const state = await runs.executeSkill(companyId, agentRun, agent, task, { proposals, actions, actor });
+    const state = await writerLimits.underItsStartersLimits(agentRun, () => runs.executeSkill(companyId, agentRun, agent, task, { proposals, actions, actor }));
     const finished = (await runs.get(companyId, agentRun._id)) || agentRun;
     if (state.status === runs.STATUS.FAILED) throw permanent(`agent run ${agentRun._id} failed: ${state.error || state.outcome || 'no reason given'}`);
     if (state.status === runs.STATUS.STOPPED || state.status === 'abandoned') throw permanent(`agent run ${agentRun._id} was stopped`);

@@ -9,6 +9,7 @@ const { commentThreadAccess } = require('../Comments/helpers/threadAccess');
 const { parseAgentMentionIds, mentionsAsNames } = require('../Comments/helpers/parseMentions');
 const registry = require('./registry');
 const runs = require('./runs');
+const writerLimits = require('../../event/writerLimits');
 
 // Where people start agents from the task itself: choosing one in the assignee
 // picker, or @naming one in a comment. Guests never start one here, and neither
@@ -65,7 +66,7 @@ const dispatch = (companyId, run, agent, task, { userId, note } = {}) => {
     const actor = { kind: 'agent', userId: String(userId || ''), agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
     const execute = () => (workflows.enabled()
         ? workflows.enqueueForAgentRun(companyId, plain, { note })
-        : runs.executeSkill(companyId, run, agent, task, { proposals: require('./proposals'), actions: require('./actions'), actor }));
+        : writerLimits.underItsStartersLimits(plain, () => runs.executeSkill(companyId, run, agent, task, { proposals: require('./proposals'), actions: require('./actions'), actor })));
     setImmediate(() => Promise.resolve(execute()).catch((e) => logger.error(`agent run ${run._id} was not dispatched: ${e.message}`)));
 };
 
