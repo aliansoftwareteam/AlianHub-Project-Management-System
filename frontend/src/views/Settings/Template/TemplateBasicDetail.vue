@@ -15,7 +15,7 @@
             </div>
             <div class="template__desc-wrapperform">
                 <div class="form-group">
-                    <label class="dark-gray">{{$t('Templates.template_name')}}<span class="text-red asterisk">*</span></label>
+                    <label class="template-basic-detail-dark-gray">{{$t('Templates.template_name')}}<span class="text-red asterisk">*</span></label>
                     <div class="input-field-group">
                             <InputText
                                 class="form-control login-input template__input"
@@ -31,13 +31,13 @@
                                 height="29px"
                                 type="text"
                             />
-                            <div class="text-red font-size-11">{{theModel.templateDetail.templateName.error === 'The templatename field is required' ? 'The template name field is required' : theModel.templateDetail.templateName.error}}</div>
-                            <div class="text-red font-size-11" v-if="errorMsg.isUniqueProjectCode">{{`errorPage.${errorMsg.isUniqueProjectCode.replaceAll('.','').replaceAll(' ','_')}`}}</div>
+                            <div class="text-red template-basic-detail-font-size-11">{{theModel.templateDetail.templateName.error === 'The templatename field is required' ? 'The template name field is required' : theModel.templateDetail.templateName.error}}</div>
+                            <div class="text-red template-basic-detail-font-size-11" v-if="errorMsg.isUniqueProjectCode">{{`errorPage.${errorMsg.isUniqueProjectCode.replaceAll('.','').replaceAll(' ','_')}`}}</div>
                     </div>
                 </div>
                 <div class="form-group textareaWrapper flex-column">
                     <div class="d-flex" :class="{'flex-column' :clientWidth <= 767}">
-                        <label class="dark-gray">{{$t('ProjectDetails.description')}}<span class="text-red asterisk">*</span></label>
+                        <label class="template-basic-detail-dark-gray">{{$t('ProjectDetails.description')}}<span class="text-red asterisk">*</span></label>
                         <textarea :placeholder="$t('PlaceHolder.Enter_Description')" @keyup="checkErrors({'field':theModel.templateDetail.description,
                                 'name':theModel.templateDetail.description.name,
                                 'validations':theModel.templateDetail.description.rules,
@@ -46,7 +46,7 @@
                         </textarea>
                     </div>
                     <div class="d-flex mt-1px" :style="[{'margin-left': clientWidth <= 767 ? '0' : '28%'}]">
-                        <span class="text-red font-size-11 red">{{theModel.templateDetail.description.error}}</span>
+                        <span class="text-red template-basic-detail-font-size-11 template-basic-detail-red">{{theModel.templateDetail.description.error}}</span>
                     </div>
                 </div>
             </div>
@@ -115,6 +115,18 @@ const { t } = useI18n();
         theModel.value.templateDetail.previewImage.name = val.fileName;
     }
 </script>
+<style scoped>
+.template-basic-detail-font-size-11 {
+    font-size: 11px;
+}
+.template-basic-detail-dark-gray {
+    color: var(--ink);
+}
+.template-basic-detail-red {
+    color: var(--danger-ink);
+}
+</style>
+
 <style scoped>
 @import "./style.css";
 </style>

@@ -2,21 +2,21 @@
     <div v-if="modelValue" class="aarch__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="aarch__card">
             <div class="d-flex align-items-center justify-content-between aarch__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.auto_archive') }}</span>
-                <span class="cursor-pointer font-size-16 aarch__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="auto-archive-modal-font-size-16 auto-archive-modal-font-weight-700">{{ $t('Projects.auto_archive') }}</span>
+                <span class="cursor-pointer auto-archive-modal-font-size-16 aarch__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
-            <div class="font-size-12 gray81 aarch__hint">{{ $t('Projects.auto_archive_hint') }}</div>
-            <label class="d-flex align-items-center cursor-pointer font-size-13 aarch__row">
+            <div class="auto-archive-modal-font-size-12 auto-archive-modal-gray81 aarch__hint">{{ $t('Projects.auto_archive_hint') }}</div>
+            <label class="d-flex align-items-center cursor-pointer auto-archive-modal-font-size-13 aarch__row">
                 <input type="checkbox" v-model="enabled" />
                 <span class="ml-5px">{{ $t('Projects.auto_archive_enable') }}</span>
             </label>
-            <div class="d-flex align-items-center font-size-13 aarch__row" :class="{'aarch__row--muted': !enabled}">
+            <div class="d-flex align-items-center auto-archive-modal-font-size-13 aarch__row" :class="{'aarch__row--muted': !enabled}">
                 <span class="mr-10px">{{ $t('Projects.auto_archive_after') }}</span>
-                <input type="number" min="1" max="365" v-model.number="afterDays" class="aarch__days font-size-13" :disabled="!enabled" />
+                <input type="number" min="1" max="365" v-model.number="afterDays" class="aarch__days auto-archive-modal-font-size-13" :disabled="!enabled" />
                 <span class="ml-5px">{{ $t('Projects.days') }}</span>
             </div>
             <div class="d-flex justify-content-end">
-                <button class="btn-primary font-size-13" :disabled="isSaving" @click="save">{{ $t('Projects.save') }}</button>
+                <button class="btn-primary auto-archive-modal-font-size-13" :disabled="isSaving" @click="save">{{ $t('Projects.save') }}</button>
             </div>
         </div>
     </div>
@@ -85,6 +85,24 @@ function save() {
     }).finally(() => { isSaving.value = false; });
 }
 </script>
+
+<style scoped>
+.auto-archive-modal-font-size-12 {
+    font-size: 12px;
+}
+.auto-archive-modal-font-size-13 {
+    font-size: 13px;
+}
+.auto-archive-modal-font-size-16 {
+    font-size: 16px;
+}
+.auto-archive-modal-font-weight-700 {
+    font-weight: 700 !important;
+}
+.auto-archive-modal-gray81 {
+    color: var(--ink-2);
+}
+</style>
 
 <style scoped>
 .aarch__overlay {

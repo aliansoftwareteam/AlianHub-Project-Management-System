@@ -10,7 +10,7 @@
             <template #body>
                 <form @submit.prevent="submitData" class="createteamSiebarform bg-white">
                     <div class="form-group d-flex align-items-center common-sidebar-div">
-                        <label>{{$t('subProjectRulesNames.Team_Name')}}<span class="red">*</span></label>
+                        <label>{{$t('subProjectRulesNames.Team_Name')}}<span class="add-team-sidebar-red">*</span></label>
                         <div class="teaminput-sidebar">
                             <InputText
                                 v-model="formData.teamName.value"
@@ -23,7 +23,7 @@
                                 'type':formData.teamName.type,
                                 'event':$event.event})"
                              />
-                            <div class="red font-size-11 position-ab">{{formData.teamName.error}}</div>
+                            <div class="add-team-sidebar-red add-team-sidebar-font-size-11 position-ab">{{formData.teamName.error}}</div>
                         </div>
                     </div>
                     <div class="d-flex align-items-center common-sidebar-div">
@@ -167,6 +167,15 @@
     }
 
 </script>
+
+<style scoped>
+.add-team-sidebar-font-size-11 {
+    font-size: 11px;
+}
+.add-team-sidebar-red {
+    color: var(--danger-ink);
+}
+</style>
 
 <style src="./style.css">
 </style>
