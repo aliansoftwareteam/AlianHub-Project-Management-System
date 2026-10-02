@@ -16,6 +16,7 @@ const taint = require('./taint');
 const { externalClientActor } = require('./actor');
 const aiFeedback = require('../AI/feedback');
 const slackPost = require('./connectors/slackPost');
+const proposalText = require('./proposalText');
 
 // AI Inbox proposals (9b). A proposal says what, why and exactly which registry
 // actions it would run. Approving applies them through perform() — so they are
@@ -144,7 +145,6 @@ const mcpActor = async (p) => (p.oauthGrantId
     : { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP });
 
 const create = async (companyId, { agent, runId, taskId, taskIds, projectId, what, why, changes, gate, priority, cost, taint: marker, source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId, finding }) => {
-    if (typeof what !== 'string' || !what.trim()) throw Object.assign(new Error('what is required: say in one sentence what the proposal does.'), { status: 400 });
     const check = validateChanges(changes);
     if (!check.valid) throw Object.assign(new Error(check.reason), { status: 400 });
     const prepared = slackPost.hasSlackChange(changes) ? await slackPost.prepareChanges(companyId, changes) : changes;
@@ -152,10 +152,10 @@ const create = async (companyId, { agent, runId, taskId, taskIds, projectId, wha
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
-            agentId: String(agent._id), agentName: agent.name, runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
+            agentId: String(agent._id), agentName: proposalText.nameOf(agent.name), runId: runId || null, taskId: taskId || null, projectId: scopedProjectId || null,
             ...(Array.isArray(taskIds) && taskIds.length ? { taskIds: taskIds.map(String) } : {}),
-            what: what.trim().slice(0, 300), why: String(why || '').slice(0, 2000),
-            changes: prepared.map((c) => ({ action: c.action, params: c.params || {}, label: String(c.label || c.action).slice(0, 300), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
+            what: proposalText.titleOf(what, prepared), why: proposalText.reasonOf(why),
+            changes: prepared.map((c) => ({ action: c.action, params: c.params || {}, label: proposalText.labelOf(c), reversible: Boolean(registry.get(c.action) && registry.get(c.action).undoable), rating: c.rating || null, ...(c.remember ? { remember: c.remember } : {}) })),
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
             ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
@@ -230,7 +230,7 @@ const list = async (companyId, { status, bucket, agentId, limit = 100, projectId
         const skillSource = o.runId ? sources.get(String(o.runId)) : undefined;
         const standing = viewer && o.status === STATUS.PENDING ? waiting.get(String(o._id)) : null;
         return {
-            ...o, bucket: bucketOf(o), undoAvailable: o.undoUntil ? new Date(o.undoUntil).getTime() > Date.now() : false,
+            ...o, ...proposalText.shown(o), bucket: bucketOf(o), undoAvailable: o.undoUntil ? new Date(o.undoUntil).getTime() > Date.now() : false,
             ...(skillSource ? { skillSource } : {}),
             ...(standing ? { locked: standing.locked, lockedWhy: standing.lockedWhy, mayDecline: standing.mayDecline } : {}),
         };
@@ -377,12 +377,12 @@ const decline = async (companyId, id, { decider, ip, reason }) => {
 const fileApplied = async (companyId, { rule, action, params, auditId, why }) => {
     const asAsked = { ...params };
     delete asAsked.__proposal;
-    const label = String((registry.get(action) && registry.get(action).label) || action).slice(0, 300);
+    const label = proposalText.titleOf('', [{ action }]);
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AGENT_PROPOSALS,
         data: {
-            agentId: String(rule.agentId || ''), agentName: rule.agentName, runId: null, taskId: asAsked.taskId ? String(asAsked.taskId) : null, projectId: rule.projectId,
-            what: label, why: String(why || '').slice(0, 2000), changes: [{ action, params: asAsked, label, reversible: true, rating: actions.rating(action) }],
+            agentId: String(rule.agentId || ''), agentName: proposalText.nameOf(rule.agentName), runId: null, taskId: asAsked.taskId ? String(asAsked.taskId) : null, projectId: rule.projectId,
+            what: label, why: proposalText.reasonOf(why), changes: [{ action, params: asAsked, label, reversible: true, rating: actions.rating(action) }],
             status: STATUS.APPROVED, gate: null, priority: 'normal', decidedBy: String(rule.madeBy), decidedAt: new Date(), undoUntil: new Date(Date.now() + UNDO_WINDOW_MS),
             auditIds: [String(auditId)], source: SOURCE_MCP, requestedBy: String(rule.requestedBy), standingApprovalId: String(rule._id),
             ...(rule.oauthGrantId ? { oauthClientId: rule.oauthClientId, oauthGrantId: rule.oauthGrantId } : { tokenId: rule.tokenId }),

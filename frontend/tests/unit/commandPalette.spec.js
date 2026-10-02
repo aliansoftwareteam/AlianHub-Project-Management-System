@@ -320,6 +320,13 @@ describe('CommandPalette', () => {
         expect(recent.text()).toContain('Budget ops / Sprint 2');
     });
 
+    it.each(['', '   ', 'a', ' a '])('sends no record search for %j', async (typed) => {
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, typed);
+        expect(apiRequest).not.toHaveBeenCalledWith('post', '/api/v2/search', expect.anything());
+        expect(wrapper.find('.pal__spin').exists()).toBe(false);
+    });
+
     it('keeps navigation open to everyone but runs the record search only with the advanced-search permission', async () => {
         perms['task.advance_search'] = null;
         const wrapper = await mountPalette();
