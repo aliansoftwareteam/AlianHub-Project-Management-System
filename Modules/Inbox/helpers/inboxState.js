@@ -29,12 +29,13 @@ const moveCounter = (companyId, userId, sourceType, delta) => new Promise((resol
     }
 });
 
-/* Sets the person's stored unread counters to `counts` where they differ, and tells their open screens. */
+/* Lowers the person's stored unread counters to `counts` where they are higher, and tells their open screens. A
+ * counter is never raised here: a row that arrives between the count and this write has already raised it. */
 const settleCounters = async (companyId, userId, counts) => {
     try {
         const stored = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.USERID, data: [{ userId }, { notification_counts: 1, mention_counts: 1 }] }, 'findOne');
         const wanted = Object.fromEntries(Object.entries(COUNT_FIELD).map(([sourceType, field]) => [field, Math.max(0, Number(counts[sourceType]) || 0)]));
-        const moved = Object.entries(wanted).filter(([field, value]) => Math.max(0, Number(stored && stored[field]) || 0) !== value);
+        const moved = Object.entries(wanted).filter(([field, value]) => Math.max(0, Number(stored && stored[field]) || 0) > value);
         if (!moved.length) return;
         await new Promise((resolve) => { counter.updateCount(companyId, [userId], { $set: Object.fromEntries(moved) }, resolve); });
     } catch (e) {

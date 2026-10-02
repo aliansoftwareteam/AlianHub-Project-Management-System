@@ -108,4 +108,20 @@ describe('an email inbox that turns mail into tasks', () => {
         expect((await answered(inboxes.deleteInbox, { uid: INSIDER, params: { id } })).status).toBe(true);
         expect(inboxOf(L_PRIVATE).deletedStatusKey).toBe(1);
     });
+
+    it('says on its row whether mail is still being filed, to whoever is shown the row', async () => {
+        const filing = async (uid) => Object.fromEntries((await answered(inboxes.listInboxes, { uid })).data.map((row) => [String(row.sprintId), row.filing]));
+        mockDb.seed(SCHEMA_TYPE.EMAIL_INBOXES, { token: tokenOf(MISSING), companyId: CID, name: 'Made before makers were kept', ProjectID: P_OPEN, sprintId: MISSING, enabled: true, deletedStatusKey: 0 });
+        expect(await filing(INSIDER)).toEqual({ [L_OPEN]: true, [L_SECRET]: true, [L_PRIVATE]: true, [L_PERSONAL]: true, [MISSING]: true });
+
+        rows(SCHEMA_TYPE.PROJECTS).find((project) => String(project._id) === P_PRIVATE).AssigneeUserId = [];
+        rows(SCHEMA_TYPE.SPRINTS).find((list) => String(list._id) === L_SECRET).AssigneeUserId = [OUTSIDER];
+
+        expect(await filing(INSIDER)).toEqual({ [L_OPEN]: true, [L_SECRET]: false, [L_PRIVATE]: false, [L_PERSONAL]: true, [MISSING]: true });
+        expect(await filing(OWNER)).toEqual({ [L_OPEN]: true, [L_SECRET]: false, [L_PRIVATE]: false, [MISSING]: true });
+        expect(await filing(OUTSIDER)).toEqual({ [L_OPEN]: true, [L_SECRET]: false, [MISSING]: true });
+
+        rows(SCHEMA_TYPE.COMPANY_USERS).find((seat) => String(seat.userId) === INSIDER).isDelete = true;
+        expect(await filing(OWNER)).toEqual({ [L_OPEN]: false, [L_SECRET]: false, [L_PRIVATE]: false, [MISSING]: true });
+    });
 });

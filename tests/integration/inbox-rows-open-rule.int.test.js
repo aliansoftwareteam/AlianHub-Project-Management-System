@@ -134,4 +134,22 @@ describe('the notices and mentions a person reads, on a real database', () => {
         expect(items.filter((item) => item.sourceType === 'mention').map((item) => item.message).sort()).toEqual(bothForms(mentioned(OPENS[uid])));
         expect(tasksNamed).toEqual(OPENS[uid].includes(ON_A_TASK_OF_A_PRIVATE_LIST) ? ['Moved task', 'Open task', 'Secret task'] : OPENS[uid].includes(ON_A_TASK) ? ['Open task'] : []);
     });
+
+    it('the tasks a person\'s rows name are read through the two indexes the migration builds, however often it runs', async () => {
+        // eslint-disable-next-line global-require
+        const migration = require('../../migrations/072-reader-row-indexes');
+        const ctx = { SCHEMA_TYPE, company: MongoDbCrudOpration };
+        const keysOf = async (name) => (await db.collection(name).indexes()).map((index) => JSON.stringify(index.key));
+        const planOf = async (name, query) => JSON.stringify((await db.command({ explain: { distinct: name, key: 'taskId', query }, verbosity: 'queryPlanner' })).queryPlanner.winningPlan);
+
+        await migration.indexCompany(ctx, COMPANY);
+        const built = { notifications: await keysOf('notifications'), mentions: await keysOf('mentions') };
+        await migration.indexCompany(ctx, COMPANY);
+
+        expect(built.notifications).toContain(JSON.stringify(migration.NOTICES_BY_READER));
+        expect(built.mentions).toContain(JSON.stringify(migration.MENTIONS_BY_READER));
+        expect({ notifications: await keysOf('notifications'), mentions: await keysOf('mentions') }).toEqual(built);
+        expect(await planOf('notifications', { receiverID: MEMBER })).not.toContain('COLLSCAN');
+        expect(await planOf('mentions', { mentionIds: MEMBER })).not.toContain('COLLSCAN');
+    });
 });

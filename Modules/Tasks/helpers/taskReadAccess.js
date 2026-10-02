@@ -6,6 +6,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const { visibilityStage, toObjectIds } = require('./taskQueryGuard');
 const { inConversation } = require('../../Comments/helpers/conversationReaders');
+const { allowsProject } = require('../../../Config/tokenNarrowing');
 
 /* Deleted, archived, or in a deleted project. */
 const NOT_LIVE = Object.freeze([1, 2, 7]);
@@ -34,15 +35,17 @@ const readableTasks = async (companyId, uid, rows) => {
     if (!tasks.length) return [];
     const person = String(uid || '');
     const { standing, found, open } = await readableProjects(companyId, person, tasks.map((task) => task.ProjectID));
-    const [listed, hidden] = standing.privileged ? [null, []] : await Promise.all([
+    if (standing.roleType === null) return [];
+    const [listed, hidden] = standing.privileged ? [null, null] : (await Promise.all([
         keepTaskListProjectIds(companyId, person, [...open.keys()]),
         hiddenAmong(companyId, person, tasks.map((task) => task.sprintId).filter(Boolean)),
-    ]);
+    ])).map((ids) => new Set(ids.map(String)));
     return tasks.filter((task) => {
         const projectId = String(task.ProjectID);
+        if (!allowsProject(person, projectId)) return false;
         if (!found.has(projectId)) return task.mainChat === true && inConversation(task, person);
         if (!open.has(projectId) || (task.mainChat === true && !inConversation(task, person))) return false;
-        return standing.privileged || (listed.map(String).includes(projectId) && !hidden.includes(String(task.sprintId)));
+        return standing.privileged || (listed.has(projectId) && !hidden.has(String(task.sprintId)));
     });
 };
 

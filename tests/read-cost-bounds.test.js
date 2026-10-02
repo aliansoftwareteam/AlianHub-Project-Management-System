@@ -34,7 +34,7 @@ const { seed } = world.create(mockDb);
 
 /* Reads a screen may make however many rows, lists and projects it shows. A count above these means a check went
  * back to asking once for each row or each place. */
-const INBOX_PAGE = 18;
+const INBOX_PAGE = 20;
 const INBOX_COUNTS = 23;
 const WEEK = 14;
 const WORKLOAD = 17;

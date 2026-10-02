@@ -6,7 +6,7 @@ const logger = require('../../Config/loggerConfig');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo'); // canonical task create
 const R = require('./helpers/emailInRules');
 const { pinSessionTenant } = require('../../Config/tenant');
-const { canEditProject, canReadProject, keepVisibleProjectIds } = require('../../Config/projectAccess');
+const { canEditProject, canReadProject, keepVisibleProjectIds, readableProjects } = require('../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { sprintIdentities, canSeeSprint, hiddenSprintFilter, hiddenAmong } = require('../Sprints/helpers/sprintVisibility');
 const { actingUser } = require('../Sprints/helpers/actingUser');
@@ -171,12 +171,20 @@ const manageableInbox = async (companyId, uid, id) => {
 
 /* A mail is filed in the name of the inbox's maker, so it is filed while they can still open that project and
  * that list. An inbox made before makers were kept has nobody to ask. */
-const makerStillFiles = async (inbox) => {
-    const maker = String(inbox.createdBy || '');
-    if (!maker) return true;
-    if (!(await canReadProject(inbox.companyId, maker, String(inbox.ProjectID))).allowed) return false;
-    return !inbox.sprintId || isPrivileged(await getRoleType(inbox.companyId, maker)) || !(await hiddenAmong(inbox.companyId, maker, [String(inbox.sprintId)])).length;
+const stillFiling = async (companyId, inboxes) => {
+    const filing = new Set(inboxes.filter((inbox) => !inbox.createdBy).map((inbox) => String(inbox._id)));
+    const makers = [...new Set(inboxes.map((inbox) => String(inbox.createdBy || '')).filter(Boolean))];
+    await Promise.all(makers.map(async (maker) => {
+        const theirs = inboxes.filter((inbox) => String(inbox.createdBy) === maker);
+        const { standing, open } = await readableProjects(companyId, maker, theirs.map((inbox) => inbox.ProjectID));
+        const reached = theirs.filter((inbox) => open.has(String(inbox.ProjectID)));
+        const lists = reached.map((inbox) => inbox.sprintId).filter(Boolean).map(String);
+        const hidden = new Set(standing.privileged || !lists.length ? [] : (await hiddenAmong(companyId, maker, lists)).map(String));
+        reached.filter((inbox) => !hidden.has(String(inbox.sprintId))).forEach((inbox) => filing.add(String(inbox._id)));
+    }));
+    return filing;
 };
+const makerStillFiles = async (inbox) => (await stillFiling(inbox.companyId, [inbox])).has(String(inbox._id));
 
 // GET /api/v1/email-in/inboxes?projectId=
 exports.listInboxes = async (req, res) => {
@@ -191,8 +199,9 @@ exports.listInboxes = async (req, res) => {
         const privileged = isPrivileged(await getRoleType(companyId, req.uid));
         const closed = new Set(((await hiddenSprintFilter(companyId, req.uid, [...openable])).sprintId || { $nin: [] }).$nin.map(String));
         const own = (row) => String(row.createdBy) === String(req.uid);
-        const shown = rows.filter((row) => own(row) || (openable.has(String(row.ProjectID)) && !closed.has(String(row.sprintId))))
-            .map((row) => ({ ...withAddress(row), canManage: privileged || String(row.createdBy) === String(req.uid) }));
+        const listed = rows.filter((row) => own(row) || (openable.has(String(row.ProjectID)) && !closed.has(String(row.sprintId))));
+        const filing = await stillFiling(companyId, listed);
+        const shown = listed.map((row) => ({ ...withAddress(row), canManage: privileged || own(row), filing: filing.has(String(row._id)) }));
         return res.send({ status: true, data: shown });
     } catch (e) { logger.error(`listInboxes: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };

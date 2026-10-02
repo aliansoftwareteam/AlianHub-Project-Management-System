@@ -1,5 +1,7 @@
 /* A stand-in for Modules/Tasks/helpers/taskReadAccess in a suite about some other rule, whose world is the
- * projects Modules/Agents/scope says a person can open: a task is read by whoever can open its project. */
+ * projects Modules/Agents/scope says a person can open: a task is read by whoever can open its project. The rule
+ * itself, private lists included, is asked in tests/ai-task-reads-open-rule, automation-reads-open-rule,
+ * workflow-run-task-rule and task-read-batch-matches-single. */
 const taskReadByProject = () => {
     const opens = async (companyId, uid, task) => Boolean(task && task.ProjectID)
         && (await require('../../Modules/Agents/scope').visibleProjectIds(companyId, uid) || []).map(String).includes(String(task.ProjectID));
