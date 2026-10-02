@@ -165,17 +165,17 @@ describe('SubItem row', () => {
     it('highlights the row of the sprint currently open', () => {
         route.params = { sprintId: 's1' };
         mountItem();
-        expect(wrapper.get('.project-item').classes()).toContain('bg-light-purple-v1');
+        expect(wrapper.get('.project-item').classes()).toContain('sub-item-bg-light-purple-v1');
     });
 
-    it('highlights an open folder, and a second shade when a list inside it is open', () => {
+    it('highlights an open folder, and marks it differently when a list inside it is open', () => {
         route.params = { folderId: 'f1' };
         mountItem({ data: folderData(), folder: true });
-        expect(wrapper.get('.project-item').classes()).toContain('bg-light-purple-v1');
+        expect(wrapper.get('.project-item').classes()).toContain('sub-item-bg-light-purple-v1');
         wrapper.unmount();
         route.params = { folderId: 'f1', sprintId: 's1' };
         mountItem({ data: folderData(), folder: true });
-        expect(wrapper.get('.project-item').classes()).toContain('bg-light-purple-v2');
+        expect(wrapper.get('.project-item').classes()).toContain('sub-item-bg-light-purple-v2');
     });
 
     it('marks archived and deleted rows with their icon', () => {
