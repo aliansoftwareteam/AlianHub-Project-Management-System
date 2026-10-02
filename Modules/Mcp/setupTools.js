@@ -6,18 +6,20 @@ const setup = require('../Agents/setupRequests');
 const actions = require('../Agents/actions');
 const permissions = require('../Agents/permissions');
 const plans = require('../Agents/projectSetup');
+const projects = require('../Agents/projectCreate');
 const { LIST_NAME_MAX } = require('../Agents/workRequests');
 const manageFlag = require('./manageFlag');
 const { TASK_ACCESS_FIELDS } = require('./visibility');
+const { WRITE_TARGET } = require('../Goals/goalTokens');
 const { loadProject } = require('./dataTools');
 
 const { GRANT } = manageFlag;
 const DENIED = permissions.REASON;
 
-// Setting a project up: custom fields, saved views, or a whole plan in one call. These show to everyone on the
-// project, so a call never makes one: it is filed for the person to approve in AlianHub (their actions are
-// proposeOnly, Agents/registry/setup.js and projectSetup.js), and what is approved runs the web app's own routes as
-// that person (Modules/Agents/setupRequests.js and projectSetup.js).
+// Setting a project up: custom fields, saved views, a whole plan in one call, or a new project with its plan. These
+// show to everyone on the project, so a call never makes one: it is filed for the person to approve in AlianHub (their
+// actions are proposeOnly, Agents/registry/setup.js, projectSetup.js and projectCreate.js), and what is approved runs
+// the web app's own routes as that person (Modules/Agents/setupRequests.js, projectSetup.js and projectCreate.js).
 
 const RAW_OPTIONS_MAX = 100;
 const RAW_TEXT_MAX = 200;
@@ -139,6 +141,37 @@ const planToFile = async (ctx, args, vis) => {
     return kind ? { answer: { ok: false, error: setup.noSource(kind) } } : { args };
 };
 
+const BY_ID_ONLY = Object.freeze(['assigneeIds', 'showFieldIds']);
+
+/* A view of a project that is not there yet: one of the kinds a new project starts with, and nothing that names a
+ * field or a person by id, which the project does not have. */
+const NEW_PROJECT_VIEW = Object.freeze({
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        name: PLAN_VIEW.properties.name,
+        kind: { type: 'string', enum: projects.viewKinds(), description: 'Left out, a list view' },
+        ...Object.fromEntries(Object.entries(LOOK).filter(([key]) => !BY_ID_ONLY.includes(key))),
+        groupBy: { type: 'string', enum: Object.keys(setup.GROUPS) },
+        sortBy: { type: 'string', enum: Object.keys(setup.SORTS) },
+        showFields: { ...PLAN_VIEW.properties.showFields, description: 'Fields of this same plan to show as columns, by name' },
+    },
+    required: ['name'],
+});
+
+const CANNOT_CREATE = `${DENIED}: the person behind this token may not create a project by hand`;
+
+/* A project is refused at once where its person may not create one by hand, or may not make a part of its plan, so
+ * nobody is asked to approve what could not be made. */
+const projectToFile = async (ctx, args) => {
+    const draft = projects.draftOf(args);
+    const refused = await projects.refusedFor(ctx.companyId, ctx.userId, draft);
+    const reason = (refused.project && `${CANNOT_CREATE} (${refused.project})`)
+        || (refused.parts.length && `${REFUSED}: ${refused.parts.map((entry) => `${entry.part} (${entry.reason})`).join('; ')}`);
+    if (reason) throw await actions.refusal(ctx.companyId, ctx.actor, { action: projects.ACTION, params: { name: draft.name }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project' });
+    return { args };
+};
+
 const TOOLS = [
     {
         name: 'fields.create',
@@ -207,6 +240,31 @@ const TOOLS = [
         check: (args) => plans.planProblem(args),
         prepare: planToFile,
         params: (args) => ({ projectId: str(args.projectId, 40), ...plans.planOf(args) }),
+    },
+    {
+        name: projects.ACTION,
+        action: projects.ACTION,
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: () => WRITE_TARGET,
+        description: 'Ask for a new project, in a single call: its name, what it is for, and the plan project.setup takes, '
+            + `up to ${plans.STATUSES_MAX} statuses, ${plans.LISTS_MAX} lists, ${setup.FIELDS_MAX} custom fields and ${plans.VIEWS_MAX} saved views. Name only the parts you need; the name alone is enough. `
+            + `It starts as a blank project: the statuses ${projects.startingStatuses().join(', ')}, one list, and ${projects.viewKinds().join(' and ')} views. It is private, with only the person who approves it on it; they add the others afterwards. `
+            + 'Use it only when the person has no project for the work: read projects.list first. It cannot make an automation or a task, and a token kept to some projects cannot use it. '
+            + `${WAITS} The person sees the project and its whole plan as one preview and approves it once, and is told, part by part, what was made and what could not be made. Undo moves the project to the trash.`,
+        input: input({
+            name: { type: 'string', minLength: 1, maxLength: projects.NAME_MAX, description: `The project's name, at least ${projects.NAME_MIN} characters` },
+            description: { type: 'string', maxLength: projects.DESCRIPTION_MAX, description: 'What the project is for, in a few lines' },
+            statuses: NAMES(plans.STATUSES_MAX, plans.STATUS_NAME_MAX, 'Statuses to add, by name'),
+            lists: NAMES(plans.LISTS_MAX, LIST_NAME_MAX, 'Lists to create, by name'),
+            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
+            views: { type: 'array', minItems: 1, maxItems: plans.VIEWS_MAX, items: NEW_PROJECT_VIEW },
+            ...REASON,
+        }, ['name']),
+        check: (args) => projects.problemIn(args),
+        prepare: projectToFile,
+        params: (args) => projects.draftOf(args),
     },
 ];
 

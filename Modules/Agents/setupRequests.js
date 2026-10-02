@@ -54,6 +54,7 @@ const ROUTES = Object.freeze({
     fieldUpdate: { routes: () => require('../CustomField/routes'), method: 'put', path: FIELD_ROUTE },
     viewCreate: { routes: () => require('../Project/routes'), method: 'post', path: '/api/v1/project/:id/views' },
     projectUpdate: { routes: () => require('../Project/routes'), method: 'put', path: '/api/v1/project/:id' },
+    projectCreate: { routes: () => require('../createProject/routes'), method: 'post', path: '/api/v1/createproject' },
     statusInsert: { routes: () => require('../settings/templates/routes'), method: 'put', path: '/api/v1/setting/taskStatus' },
 });
 

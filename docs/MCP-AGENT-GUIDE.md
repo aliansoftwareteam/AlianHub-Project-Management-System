@@ -14,7 +14,7 @@ Three things, in this order.
    |---|---|
    | `MCP_TOOLS_DATA=on` | `projects.list`, `project.get`, `sprints.list`, `statuses.list`, `comments.list`, `pages.search`, `page.get`, `timesheet.read`, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `chat.channels.list`, `chat.messages.list`, `proposal.get` |
    | `MCP_TOOLS_MANAGE=on` | The task management tools and the doc writing tools below, for tokens created with the matching grant |
-   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, `automation.catalogue`, `automation.create`, `project.setup`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
+   | `MCP_TOOLS_WORK=on` | `tags.list`, `task.tags.add`, `task.tags.remove`, `task.relations.list`, `task.relation.add`, `task.relation.remove`, `lists.list`, `list.create`, `list.rename`, `list.move`, `page.comments.list`, `page.comment.create`, `page.comment.reply`, `page.comment.assign`, `goals.list`, `goal.get`, `goal.target.set`, `goal.target.sources.add`, `goal.target.sources.remove`, `task.lists.list`, `task.lists.add`, `task.lists.remove`, `fields.create`, `view.create`, `automation.catalogue`, `automation.create`, `project.setup`, `project.create`, and `sprintId` on `tasks.search`, for every token that reads or writes; none of them needs a grant |
    | `MCP_TOOLS_V2=on` | Names next to ids, paged lists, and a person's approval for any call that cannot be undone |
 
 2. **What the token was created with.** A token has scopes (read, write) and may have grants:
@@ -355,6 +355,20 @@ What happens to a plan:
 - Lists are created at the top level of the project. A list is not checked against the lists the project has, so read `lists.list` first.
 - Undo takes back what the plan made, newest part first: its views, its fields (as for `fields.create`), its lists while they are empty, and its statuses while no task is in them. Whatever is in use stays, and the undo names it and says why. A status added to the company's list stays in that list, as it does when a person takes a status off a project.
 
+`project.create`: ask for a new project, with or without a plan for it, in one call. Arguments: `name` (3 to 100 characters), `description` (what it is for, up to 2000 characters), any of `statuses`, `lists`, `fields` and `views` as in `project.setup`, and `reason`. A view is a list or a board view, the kinds a new project starts with, and names no person and no field by id. The project and its plan are one proposal and one approval, and the Inbox shows the name, who will be on it and every part on one card. It cannot make an automation or a task.
+
+```json
+{ "name": "project.create", "arguments": { "name": "Website relaunch", "description": "Everything for the new site.", "statuses": ["In Review"], "lists": ["Backlog", "This week"], "fields": [{ "name": "Budget", "type": "money" }], "views": [{ "name": "Review board", "kind": "board", "groupBy": "status", "showFields": ["Budget"] }] } }
+```
+
+What happens to a new project:
+
+- The call makes nothing. It is refused at once when the person behind the token may not create a project by hand, or may not make a part of the plan under the company's permissions, and the answer says which. A token kept to some projects cannot ask for one.
+- Approved, the project is made by the Create project screen's own route, as the person who approved, who must be allowed to create a project by hand. It is a blank project (To Do, In Progress and Done, one list, a list and a board view), private, with only the approver on it. Its key is made from the first letters of its name, with a number added when that key is taken.
+- Then the description and each part of the plan are made as `project.setup` makes them: as the person behind the token, and only where the approver may make that part too. When someone other than that person approved, the person is not on the new project (unless they are an owner or an admin), so no part is made and `notMade` says so; the approver adds them, and `project.setup` does the rest.
+- The proposal is listed for the person whose agent asked and for owners and admins.
+- Undo moves the project to the trash through the project's own route, as the person undoing, who must be allowed to delete it; a person restores it from the trash. A project that holds a task or a doc by then stays: the undo is refused and says why. Nothing is deleted for good.
+
 Undo, from the Inbox or the agent audit log: a view an agent added is removed, and nothing else. Each field it made is switched off, as the field form's own switch does, only while it is still that project's alone and no task holds a value in it. A field that holds a value, or that someone has since put on another project, stays, and the undo names it and says why.
 
 
@@ -488,7 +502,7 @@ The text is fixed and ships with the server. It holds no name, id or other data 
 
 | Prompt | Shown as | Arguments | What it does |
 |---|---|---|---|
-| `set_up_my_project` | Set up my project | `project` | Asks a few questions, reads what the project has, shows the whole plan, and makes it only after a yes. On a connection that may run `project.setup` the statuses, lists, fields and views go in that one call and wait for the person's approval in AlianHub; elsewhere the agent makes lists and first tasks and leaves the rest to the person. Offered only to a connection that may create tasks |
+| `set_up_my_project` | Set up my project | `project` | Asks a few questions, reads what the project has, shows the whole plan, and makes it only after a yes. On a connection that may run `project.setup` the statuses, lists, fields and views go in that one call and wait for the person's approval in AlianHub; elsewhere the agent makes lists and first tasks and leaves the rest to the person. Where the person has no project for the work yet, a connection that may run `project.create` asks for the project and its setup in one call; elsewhere the person makes the project first. Offered only to a connection that may create tasks |
 | `plan_my_day` | Plan my day | `project` | What to do first today, what can wait, what is late. Changes nothing |
 | `what_is_at_risk` | What is at risk | `project` | Overdue work, tasks nobody owns, work that stopped moving, the biggest risks first. Changes nothing |
 | `write_the_status_report` | Write the status report | `project`, `period` | A short report shown in the conversation first; saved as a doc only where `page.create` is offered and after a yes |
