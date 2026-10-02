@@ -97,7 +97,7 @@
     "frontend/src/components/molecules/AiFieldFill/AiFieldFillDialog.vue": { "colours": 1, "legacyClasses": 0 },
     "frontend/src/components/molecules/AiWriteDescription/AiWriteDescription.vue": { "colours": 29, "legacyClasses": 7 },
     "frontend/src/components/molecules/AppState/AppState.vue": { "colours": 1, "legacyClasses": 0 },
-    "frontend/src/components/molecules/AppTeaserBlock/style.css": { "colours": 9, "legacyClasses": 0 },
+    "frontend/src/components/molecules/AppTeaserBlock/style.css": { "colours": 8, "legacyClasses": 0 },
     "frontend/src/components/molecules/Assignee/Assignee.vue": { "colours": 0, "legacyClasses": 7 },
     "frontend/src/components/molecules/AutoArchive/AutoArchiveModal.vue": { "colours": 6, "legacyClasses": 10 },
     "frontend/src/components/molecules/Burndown/BurndownModal.vue": { "colours": 7, "legacyClasses": 10 },

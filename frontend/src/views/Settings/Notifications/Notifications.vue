@@ -13,7 +13,7 @@
             </div>
             <div v-if="!sections.length && !isSpinner" class="nt__empty ah-empty">{{ $t('Settings.notifications_empty') }}</div>
             <template v-for="section in sections" :key="section.key">
-                <div class="nt__section ah-label" role="rowgroup">{{ sectionName(section) }} · {{ section.items.length }}</div>
+                <div class="nt__section ah-label" role="row"><span role="cell">{{ sectionName(section) }} · {{ section.items.length }}</span></div>
                 <div v-for="item in section.items" :key="item.key" class="nt__row" role="row">
                     <span class="nt__event" role="cell">
                         <span class="nt__event-name">{{ itemName(item) }}</span>

@@ -51,7 +51,7 @@
     gap: 5px;
     margin-top: 4px;
     font-size: 11px;
-    color: #9092AC;
+    color: var(--ink-2);
 }
 .app-teaser-banner__hint svg {
     flex: none;

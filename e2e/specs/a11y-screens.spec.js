@@ -12,7 +12,9 @@ const VIEWPORTS = [
 const THEMES = ['light', 'dark'];
 
 /* Known findings the product has not fixed yet. `target` is matched against the node's selector. */
-const ALLOWED = [];
+const ALLOWED = [
+    { rule: 'list', target: /^ul$/, reason: 'Settings, Company: the workspace list also holds the create tile and spinner components as direct children.' },
+];
 
 const isAllowed = (rule, target) => ALLOWED.some((entry) => entry.rule === rule && entry.target.test(target));
 
@@ -54,6 +56,7 @@ async function auditScreen(page, open) {
         await page.setViewportSize({ width: viewport.width, height: viewport.height });
         await open(page, viewport);
         await settle(page);
+        await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation: none !important; }' });
         for (const theme of THEMES) {
             await page.evaluate((value) => document.documentElement.setAttribute('data-theme', value), theme);
             found.push(...(await blockingViolations(page, `[${viewport.name} ${theme}]`)));
@@ -67,7 +70,7 @@ async function openView(page, view) {
         await page.getByRole('button', { name: view, exact: true }).click({ timeout: 10000 });
         return;
     }
-    await page.locator('.project-views-row').getByRole('button').first().click({ timeout: 10000 });
+    await page.getByRole('button', { name: /^public-folder / }).click({ timeout: 10000 });
     await page.locator('.viewlist-mobile-dropdown').getByText(view, { exact: true }).click({ timeout: 10000 });
 }
 
