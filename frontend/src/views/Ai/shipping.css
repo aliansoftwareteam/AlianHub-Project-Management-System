@@ -181,6 +181,8 @@
     padding: 6px 4px;
 }
 .live__pause:disabled { opacity: .55; cursor: not-allowed; }
+.live__paused { flex: none; margin-left: auto; }
+.live__paused + .live__pause { margin-left: 0; }
 .live.live--compact { height: auto; min-height: 44px; flex-wrap: wrap; row-gap: 0; padding: 0 12px; overflow: hidden; }
 .live__summary {
     flex: 1 1 0;
