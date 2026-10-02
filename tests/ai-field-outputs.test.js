@@ -28,6 +28,7 @@ jest.mock('../Modules/Agents/scope', () => ({
     visibleProjectIds: jest.fn(async () => ['6a9954186dd786246031e481']),
 }));
 jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
+jest.mock('../Modules/Tasks/helpers/taskReadAccess', () => require('./fixtures/taskReadByProject').taskReadByProject());
 jest.mock('../Config/permissionGuard', () => {
     const actual = jest.requireActual('../Config/permissionGuard');
     return { ...actual, evaluatePermission: jest.fn(async () => true) };
