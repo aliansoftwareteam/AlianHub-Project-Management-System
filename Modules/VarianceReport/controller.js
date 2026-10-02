@@ -23,7 +23,7 @@ exports.getVarianceReport = async (req, res) => {
         if (!q.projectId && !q.sprintId) {
             return res.status(400).json({ status: false, statusText: 'projectId or sprintId is required.' });
         }
-        const match = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true };
+        const match = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true, mainChat: { $ne: true } };
         if (q.projectId) match.ProjectID = String(q.projectId);
         if (q.sprintId) match.sprintId = String(q.sprintId);
         const scope = await resolveTimeScope(companyId, req.uid);
@@ -115,7 +115,7 @@ exports.getVarianceSummary = async (req, res) => {
         const taskIds = Object.keys(actualByTask).map(oid).filter(Boolean);
         const tasks = taskIds.length ? await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ _id: { $in: taskIds } }, { TaskName: 1, ProjectID: 1, totalEstimatedTime: 1, rawDescription: 1, estimateChangedFlag: 1, AssigneeUserId: 1 }],
+            data: [{ _id: { $in: taskIds }, mainChat: { $ne: true } }, { TaskName: 1, ProjectID: 1, totalEstimatedTime: 1, rawDescription: 1, estimateChangedFlag: 1, AssigneeUserId: 1 }],
         }, 'find').catch(() => []) : [];
 
         const rows = (tasks || []).map((t) => ({

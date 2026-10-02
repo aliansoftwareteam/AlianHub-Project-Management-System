@@ -68,9 +68,10 @@ const response = () => {
 };
 
 const call = async (route, uid, [projectId, sprintId], body, headers = { companyid: C }) => {
-    const [handler] = routes[route];
     const res = response();
-    await handler(verified({ uid, params: { projectId, sprintId }, body, headers }), res);
+    const req = verified({ uid, params: { projectId, sprintId }, body, headers });
+    const step = (at) => routes[route][at](req, res, () => step(at + 1));
+    await step(0);
     return res;
 };
 const BOARD = 'GET /api/v2/whiteboards/:projectId/:sprintId';

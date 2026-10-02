@@ -100,6 +100,7 @@ import { sortChoices, sortTasks, useListSort } from '@/views/Projects/composable
 import { useProjectCustomFields } from '@/views/Projects/composables/projectCustomFields';
 import { useListRowMenu } from '@/views/Projects/ListView/useListRowMenu.js';
 import { useListInlineEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
+import { useGroupSource } from '@/views/Projects/composables/groupSource';
 
 // Helpers
 import { taskListHelper } from '@/views/Projects/helper.js';
@@ -266,7 +267,14 @@ watch([() => props.grouped, () => props.sprints,() => route?.params], ([newGroup
     }
 }, { deep: true });
 
-// --- Lifecycle Hooks ---
+/* Columns the board already read answer at once (`firstPageOnly`), so only a new one is asked for, and the board stays drawn. */
+useGroupSource(project, () => props.grouped, () => {
+    if (!props.sprints?.length) return;
+    groupBy(props.grouped, true, project.value, props.sprints, internalGroupedTasks, true, 'board', false, true, (resp) => {
+        internalGroupedTasks.value = resp;
+    }, { firstPageOnly: true });
+});
+
 onMounted(async () => {
     markFirstRunStep(FIRST_RUN_STEPS.BOARD_VIEW);
     if (project.value?._id && props.sprints?.length) {

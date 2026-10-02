@@ -13,11 +13,11 @@
                                 <img src="@/assets/images/table_arrow.png" alt="" v-if="row?.subItems && row.subItems.length" class="align-items-center cursor-pointer mr-10-px" :style="`transform: rotateZ(${row.isExpand ? '90' : '0'}deg); margin-left:2px;`" @click="handleCollapseExpand(row)"/>
                                 <input type="checkbox" :id="'checkbox_sub_'+row.id" @click="handleCheckedParent(row.isChecked)" v-model="row.isChecked"/>
                                 <img :src="aiIcon" class="ml-8px" />
-                                <label class="font-weight-normal font-size-14 d-flex ml-10-px black" :class="[{'w-90': row.name.length > 100}]">
-                                    <span class="text-ellipsis font-size-14 font-weight-500 black" :title="row.name">{{ row.name }}</span>
+                                <label class="ai-check-list-font-weight-normal ai-check-list-font-size-14 d-flex ml-10-px ai-check-list-black" :class="[{'w-90': row.name.length > 100}]">
+                                    <span class="text-ellipsis ai-check-list-font-size-14 ai-check-list-font-weight-500 ai-check-list-black" :title="row.name">{{ row.name }}</span>
                                 </label>
                                 <!-- <div class="d-flex ml-10-px">
-                                    <span class="d-flex align-items-center font-size-13 font-weight-400 GunPowder">({{ row.checkItem }}/{{ row.totalSubItems }})</span>
+                                    <span class="d-flex align-items-center font-size-13 ai-check-list-font-weight-400 GunPowder">({{ row.checkItem }}/{{ row.totalSubItems }})</span>
                                 </div> -->
                             </div>
                         </div>
@@ -33,14 +33,14 @@
                         :from="!taskId.length ? 'project' : 'task'"
                     />
                     <div class="pt-15px d-flex justify-content-end">
-                        <button class="outline-primary mr-10-px font-size-16 font-weight-400" @click="cancelChecklist()" v-if="row.isAigenerated">{{$t('Projects.cancel')}}</button>
-                        <button class="btn-primary mr-10-px font-size-16 font-weight-400" @click="saveChecklist()" v-if="checklistArray.filter((x) => x.isChecked === true).length > 0">{{`${$t('general.Create')} ${checklistArray.filter((x) => x.isChecked === true).length} ${$t('Checklist.checklist')}`}}</button>
+                        <button class="ai-check-list-outline-primary mr-10-px ai-check-list-font-size-16 ai-check-list-font-weight-400" @click="cancelChecklist()" v-if="row.isAigenerated">{{$t('Projects.cancel')}}</button>
+                        <button class="ai-check-list-btn-primary mr-10-px ai-check-list-font-size-16 ai-check-list-font-weight-400" @click="saveChecklist()" v-if="checklistArray.filter((x) => x.isChecked === true).length > 0">{{`${$t('general.Create')} ${checklistArray.filter((x) => x.isChecked === true).length} ${$t('Checklist.checklist')}`}}</button>
                     </div>
                 </li>
             </ul>
         </div>
         <SpinnerComp :is-spinner="checkSpinner" v-if="checkSpinner" />
-        <span v-if="isErrorFromAI" class="red">{{$t('Toast.something_went_wrong')}}</span>
+        <span v-if="isErrorFromAI" class="ai-check-list-red">{{$t('Toast.something_went_wrong')}}</span>
     </div>
 </template>
 
@@ -318,4 +318,46 @@ function cancelChecklist () {
     emit('cancleCheck')
 }
 </script>
+<style scoped>
+.ai-check-list-font-size-14 {
+    font-size: 14px;
+}
+.ai-check-list-font-size-16 {
+    font-size: 16px;
+}
+.ai-check-list-font-weight-normal {
+    font-weight: normal;
+}
+.ai-check-list-font-weight-400 {
+    font-weight: 400 !important;
+}
+.ai-check-list-font-weight-500 {
+    font-weight: 500 !important;
+}
+.ai-check-list-black {
+    color: var(--ink);
+}
+.ai-check-list-red {
+    color: var(--danger-ink);
+}
+.ai-check-list-btn-primary {
+    cursor: pointer;
+    background: var(--brand);
+    border-radius: 4px;
+    color: var(--on-brand);
+    border: none;
+    height: 30px;
+    font-family: var(--font-ui);
+}
+.ai-check-list-outline-primary {
+    height: 30px;
+    background: var(--surface);
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    color: var(--brand);
+    cursor: pointer;
+    font-family: var(--font-ui);
+}
+</style>
+
 <style> @import "./style.css"; </style>

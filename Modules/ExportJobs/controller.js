@@ -20,6 +20,7 @@ async function projectRows(companyId, job) {
     const filter = {
         ProjectID: new mongoose.Types.ObjectId(job.filters.projectId),
         deletedStatusKey: { $ne: 1 },
+        mainChat: { $ne: true },
     };
     if (job.filters.sprintId) {
         filter.sprintId = new mongoose.Types.ObjectId(job.filters.sprintId);
@@ -46,7 +47,7 @@ async function workspaceRows(companyId, userId) {
     if (!byId.size) return [];
     const tasks = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ ProjectID: { $in: [...byId.keys()].map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: 1 } }, `ProjectID ${TASK_FIELDS}`],
+        data: [{ ProjectID: { $in: [...byId.keys()].map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }, `ProjectID ${TASK_FIELDS}`],
     }, 'find');
     return treeRows(tasks || []).map(({ task, ...place }) => workspaceTaskRow(task, byId.get(String(task.ProjectID)), place));
 }

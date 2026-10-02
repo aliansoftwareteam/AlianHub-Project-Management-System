@@ -11,7 +11,7 @@ const DIRECT_TASKS = Object.freeze({ MIN: 1, MAX: 100 });
 const DEFAULTS = Object.freeze({ atOnce: 3, paused: false, directTasks: 10 });
 
 const REASON = Object.freeze({
-    PAUSED: 'agents are paused in this project, so no agent takes work or changes anything here until a person resumes them',
+    PAUSED: 'agents are paused in this project, so nothing can be taken or changed here until a person resumes them',
 });
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;

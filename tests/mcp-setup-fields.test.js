@@ -58,7 +58,7 @@ const web = asPerson(routeTable(require('../Modules/CustomField/routes').init));
 
 const TOOL = 'fields.create';
 const KEYS = ['project.project_custom_field', 'task.task_custom_field'];
-const NO_PROJECT = 'not_visible: the project is not one the person behind this token can open';
+const NO_PROJECT = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
 const FIVE = [
     { name: 'Budget', type: 'money' },
     { name: 'Client', type: 'text' },
@@ -155,7 +155,7 @@ describe('a field is never made before a person has seen it', () => {
 
     it('cannot be run directly, with or without the mark of a proposal', async () => {
         const call = (params) => actions.perform({ companyId: CID, actor: as(OWNER).actor, action: TOOL, params, reason: 'direct' });
-        await expect(call({ projectId: P_OPEN, definitions: [{ name: 'Budget', type: 'money' }] })).rejects.toThrow(/must be proposed/);
+        await expect(call({ projectId: P_OPEN, definitions: [{ name: 'Budget', type: 'money' }] })).rejects.toThrow(/needs a person's approval first/);
         await expect(call({ projectId: P_OPEN, definitions: [{ name: 'Budget', type: 'money' }], __proposal: true })).rejects.toThrow(/waits for a person's approval/);
         expect(fields()).toHaveLength(0);
     });
@@ -194,7 +194,7 @@ describe('who may ask for a field', () => {
             expect(await rpc(as(uid), TOOL, args(projectId))).toMatchObject({ refused: true, reason: NO_PROJECT });
         }
         expect(await rpc({ ...as(INSIDER), projectIds: narrowed(INSIDER, [P_OPEN]).projectIds }, TOOL, args(P_PRIVATE))).toMatchObject({ refused: true, reason: NO_PROJECT });
-        expect(await rpc(readOnly(OWNER), TOOL, args(P_OPEN))).toMatchObject({ isError: true, error: 'This token is read-only.' });
+        expect(await rpc(readOnly(OWNER), TOOL, args(P_OPEN))).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
         expect(waiting()).toHaveLength(0);
     });
 

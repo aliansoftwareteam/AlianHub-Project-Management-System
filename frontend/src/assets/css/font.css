@@ -77,23 +77,23 @@
 .assignee-headtitle{
     font-size: 18px;
     font-weight: 700;
-    color: #000000;
+    color: var(--ink);
 }
 .taskstatustitle-desktop{
     font-weight: 500 !important;
     font-size: 14px !important;
     line-height: 21px !important;
-    color: #3A3A3A !important;
+    color: var(--ink) !important;
 }
 .task-heading-desktop{
     font-weight: 700 !important;
     font-size: 18px !important;
     line-height: 27px !important;
-    color: #3A3A3A !important;
+    color: var(--ink) !important;
     text-align: center !important;
 }
 .enableapp-list-desktop{
-    color: #959595 !important;
+    color: var(--ink-2) !important;
     font-weight: 400 !important;
     font-size: 14px !important;
     line-height: 30px !important;
@@ -104,7 +104,7 @@
     font-weight: 400 !important;
 }
 .enable-cataction-mobile {
-    border: 1.5px solid #CFCFCF !important;
+    border: 1.5px solid var(--border) !important;
 }
 .p-navigating-desktop{
     font-style: normal;
@@ -112,19 +112,19 @@
     font-size: 13px;
     line-height: 19px;
     text-align: center;
-    color: #535358;
+    color: var(--ink-label);
 }
 .template-label-desktop{
     font-weight: 400 !important;
     font-size: 12px !important;
     line-height: 18px !important;
-    color: #959595 !important;
+    color: var(--ink-2) !important;
 }
 .Workspace-desktop-text{
     font-weight: 500;
     font-size: 13px;
     line-height: 19px;
-    color: #818181;
+    color: var(--ink-2);
     text-align: center;
 }
 .privatespace-desc-desktop{
@@ -134,16 +134,16 @@
     line-height: 19px;
 }
 @media(max-width: 767px){
-    .mobile-label-font{font-size: 16px !important;line-height: 21px !important;letter-spacing: 0.02em !important;color: #3A3A3A !important;} 
-    .taskstatustitle-mobile{ font-size: 16px !important;line-height: 21px !important;font-weight: 500 !important;color: #3A3A3A !important;}
-    .enableapp-list-mobile{ font-size: 16px !important;line-height: 26px !important; color: #959595 !important; font-weight: 400 !important;}
-    .task-heading-mobile{color: #2F3990 !important;text-align: center !important;}
+    .mobile-label-font{font-size: 16px !important;line-height: 21px !important;letter-spacing: 0.02em !important;color: var(--ink) !important;} 
+    .taskstatustitle-mobile{ font-size: 16px !important;line-height: 21px !important;font-weight: 500 !important;color: var(--ink) !important;}
+    .enableapp-list-mobile{ font-size: 16px !important;line-height: 26px !important; color: var(--ink-2) !important; font-weight: 400 !important;}
+    .task-heading-mobile{color: var(--brand) !important;text-align: center !important;}
     .templated-name-mobile {font-size: 16px !important;line-height: 21px !important;}
-    .template-label-mobile{font-size: 16px !important;line-height: 21px !important;color: #959595 !important;}
-    .task-heading-mobile{color: #2F3990 !important;}
-    .enable-cataction-mobile{border: 1px solid #D9D9D9 !important;}
-    .p-navigating-mobile{font-style: italic;font-size: 16px;line-height: 26px;text-align: center;color: #535358;}
-    .assignee-userlist {font-weight: 400;font-size: 16px;line-height: 21px;color: #535358 !important;}
-    .Workspace-text-mobile{font-weight: 400;font-size: 16px;line-height: 21px;color: #818181;}
+    .template-label-mobile{font-size: 16px !important;line-height: 21px !important;color: var(--ink-2) !important;}
+    .task-heading-mobile{color: var(--brand) !important;}
+    .enable-cataction-mobile{border: 1px solid var(--border) !important;}
+    .p-navigating-mobile{font-style: italic;font-size: 16px;line-height: 26px;text-align: center;color: var(--ink-label);}
+    .assignee-userlist {font-weight: 400;font-size: 16px;line-height: 21px;color: var(--ink-label) !important;}
+    .Workspace-text-mobile{font-weight: 400;font-size: 16px;line-height: 21px;color: var(--ink-2);}
     .privatespace-desc-mobile{font-size: 16px;line-height: 26px;}
 }

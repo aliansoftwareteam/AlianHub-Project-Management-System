@@ -18,7 +18,7 @@ const sessionArgs = (extra = {}) => ({
 const TOOLS = [
     {
         name: 'session.activity',
-        description: `Report what you are doing on a task delegated to you: one of ${ACTIVITY_TYPES.join(', ')}. The first call must come within ten seconds of the announcement and carry its handle.`,
+        description: `Tells the people on a task what you are doing on it: one of ${ACTIVITY_TYPES.join(', ')}. Your first call must come within ten seconds of the announcement and carry its handle.`,
         input: { ...sessionArgs({ type: { type: 'string', enum: [...ACTIVITY_TYPES] }, text: { type: 'string' } }), required: ['sessionId', 'type', 'text'] },
         visibility: 'filtered',
         annotations: ANNOTATIONS,
@@ -26,7 +26,7 @@ const TOOLS = [
     },
     {
         name: 'session.complete',
-        description: 'Close a delegated session as done, with a one-line summary for the people on the task.',
+        description: 'Ends the work handed to you as done, with a one-line summary for the people on the task.',
         input: sessionArgs({ summary: { type: 'string' } }),
         visibility: 'filtered',
         annotations: ANNOTATIONS,
@@ -34,7 +34,7 @@ const TOOLS = [
     },
     {
         name: 'session.fail',
-        description: 'Close a delegated session as failed, saying why.',
+        description: 'Ends the work handed to you as failed, and says why.',
         input: sessionArgs({ reason: { type: 'string' } }),
         visibility: 'filtered',
         annotations: ANNOTATIONS,
@@ -50,7 +50,7 @@ const owns = (name) => offered().some((tool) => tool.name === String(name));
 const call = async (ctx, name, args = {}) => {
     const tool = TOOLS.find((t) => t.name === String(name));
     const oauth = Boolean(ctx && ctx.token && ctx.token.oauth);
-    if (oauth && !scopes.grantedScopes(ctx.token).includes(SCOPE)) throw Object.assign(new Error(`This token lacks the ${SCOPE} scope.`), { code: -32004 });
+    if (oauth && !scopes.grantedScopes(ctx.token).includes(SCOPE)) throw Object.assign(new Error(`This connection was not given the ${SCOPE} permission. Ask the person to connect you again and allow it.`), { code: -32004 });
     return tool.run(ctx, args, await require('./visibility').forCaller(ctx));
 };
 

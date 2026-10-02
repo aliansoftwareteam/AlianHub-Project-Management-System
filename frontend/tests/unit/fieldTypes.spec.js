@@ -381,7 +381,7 @@ describe('filter, group and sort', () => {
     });
 
     it('filters a url as text, and a rating or progress as a number', () => {
-        expect(customFilterCondition(row(link, ':~', ['example.com']))).toEqual({ [valuePath(LINK)]: { $regex: 'example\\.com', $options: 'i' } });
+        expect(customFilterCondition(row(link, ':~', ['example.com']))).toEqual({ [valuePath(LINK)]: { $regex: 'example.com', $options: 'i' } });
         const asNumber = { $convert: { input: `$${valuePath(SCORE)}`, to: 'double', onError: null, onNull: null } };
         expect(customFilterCondition(row(score, ':=', [4]))).toEqual({ $expr: { $eq: [asNumber, 4] } });
         expect(customFilterCondition(row(done, ':>', [50])).$expr.$and[1]).toEqual({ $gt: [{ $convert: { input: `$${valuePath(DONE)}`, to: 'double', onError: null, onNull: null } }, 50] });

@@ -217,7 +217,7 @@ describe('a conversation is not a task', () => {
         const withAgent = conversation([OWNER], { agentId: '6f0000000000000000000a91', agentName: 'Helper' });
         said(withAgent);
         const caller = withGrants(OWNER, [TASKS_GRANT, DOCS_GRANT, CHAT_SCOPE]);
-        expect(await rpc(caller, 'task.get', { taskId: idOf(withAgent) })).toEqual({ error: 'task not found' });
+        expect(await rpc(caller, 'task.get', { taskId: idOf(withAgent) })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         expect(await rpc(caller, 'task.comment', { taskId: idOf(withAgent), body: 'Noted' })).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible/) });
     });
 
@@ -234,8 +234,8 @@ describe('a conversation is not a task', () => {
         const other = withGrants(OWNER, [TASKS_GRANT, DOCS_GRANT, CHAT_SCOPE]);
         other.companyId = mockOtherCompany;
         const taskId = idOf(talks.own[OWNER]);
-        expect(await rpc(other, 'task.get', { taskId })).toEqual({ error: 'task not found' });
-        expect(await rpc(other, 'comments.list', { taskId })).toEqual({ error: 'task not found' });
+        expect(await rpc(other, 'task.get', { taskId })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+        expect(await rpc(other, 'comments.list', { taskId })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         expect(JSON.stringify(await rpc(other, 'tasks.search', {}))).not.toMatch(OF_CHAT);
         expect(await rpc(other, 'task.comment', { taskId, body: 'Noted' })).toMatchObject({ refused: true });
     });

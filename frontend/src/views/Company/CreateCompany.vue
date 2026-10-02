@@ -102,7 +102,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, reactive, ref } from "vue";
+import { computed, inject, nextTick, onMounted, reactive, ref } from "vue";
 
 defineOptions({ name: "CreateCompanyPage" });
 import { useRouter } from "vue-router";
@@ -168,7 +168,7 @@ onMounted(async () => {
         userEmail.value = result?.data?.Employee_Email || "";
     } finally {
         mainSpinner.value = false;
-        setTimeout(() => nameInput.value?.focus(), 50);
+        nextTick(() => nameInput.value?.focus());
     }
 });
 

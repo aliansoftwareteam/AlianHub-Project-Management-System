@@ -1,6 +1,9 @@
 <template>
-    <div v-if="items.length" class="live" :class="{ 'live--compact': compact }">
-        <template v-if="compact">
+    <div v-if="items.length || paused" class="live" :class="{ 'live--compact': compact }">
+        <template v-if="!items.length">
+            <span class="ah-label live__label">{{ $t('Pipeline.live') }}</span>
+        </template>
+        <template v-else-if="compact">
             <ul v-if="expanded" :id="listId" class="live__list" data-test="live-list">
                 <li v-for="item in all" :key="item.key" class="live__row">
                     <span class="ah-avatar live__avatar" :class="item.agent ? 'ah-avatar--agent ah-avatar--sm' : 'ah-avatar--sm'">
@@ -36,6 +39,7 @@
             </span>
         </template>
 
+        <span v-if="paused" class="ah-chip ah-chip--warn live__paused" role="status" data-test="live-paused">{{ $t('Ai.connected_paused') }}</span>
         <button v-if="running && canManage" type="button" class="live__pause" data-test="pause-all" :disabled="pausing" @click="onPauseAll">
             {{ $t('Pipeline.pause_all') }}
         </button>
@@ -79,6 +83,7 @@ import { useAgentFinishToast } from "./useAgentFinishToast";
 import { reasonOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
 import { useLiveAgents } from "./useLiveAgents";
+import { useAccounts } from "./useAccounts";
 
 defineOptions({ name: "AgentLiveStrip" });
 
@@ -100,6 +105,9 @@ const pausing = ref(false);
 const ok = (res) => res?.data?.status === true;
 
 const { people, live, running, refresh } = useLiveAgents({ onRuns: observe });
+// The policy the card in AI > Accounts sets; the feed notes the pause in it with each read of the agents.
+const { policy } = useAccounts();
+const paused = computed(() => Boolean(policy.value.connectedPaused));
 
 const all = computed(() => {
     const agentsLive = live.value

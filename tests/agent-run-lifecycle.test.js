@@ -113,7 +113,7 @@ describe('#9/#17 direct runs pass allowedActions and count refusals as a number'
     it('applies within allowedActions and records each refusal on the run', async () => {
         const d = deps();
         d.actions.perform.mockImplementation(async ({ action }) => {
-            if (action === 'task.comment') { const e = new Error('task.comment is outside this agent\'s allowed actions'); e.name = 'RefusedError'; e.auditId = 'ref1'; throw e; }
+            if (action === 'task.comment') { const e = new Error('This connection is not allowed to use task.comment. Ask the person to allow it in AlianHub.'); e.name = 'RefusedError'; e.auditId = 'ref1'; throw e; }
             return { auditId: 'aud1', result: { subtaskId: 'st1' } };
         });
         orchestrator.analyse.mockResolvedValue({ status: 'success', skill: 'qa-review', findings: [{ factId: 'f1', title: 'Missing alt', severity: 'high', why: 'w' }], summary: 's', usage: {} });

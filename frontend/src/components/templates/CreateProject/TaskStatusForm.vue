@@ -33,10 +33,10 @@
                 <div class="statuInputwrapper activeStatus" v-if="theModel.taskStatusField.value.defaultActive && Object.keys(theModel.taskStatusField.value.defaultActive).length > 0">
                     <ul class="status_ul">
                         <li class="d-flex align-items-center justify-content-between">
-                            <span class="taskInnerData w-100" :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}">
+                            <span class="taskInnerData w-100" :class="{'task-status-form-taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}">
                                 <div class="d-flex align-items-center ml-15px">
                                     <input type="color" :id="`activeTaskStatus${98}`" v-model.trim="theModel.taskStatusField.value.defaultActive.textColor" @input="theModel.taskStatusField.value.defaultActive.bgColor = theModel.taskStatusField.value.defaultActive.textColor+'35',inputColor()"  class="p-0 mr-8px d-inline-block border-radius-2-px border-0 bg-transparent cursor-pointer project__status-icon" disabled>
-                                    <span class="style_changes_value"   :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" v-if="!theModel.taskStatusField.value.defaultActive.isEditable" :style="[{'color': theModel.taskStatusField.value.defaultActive.textColor}]">{{theModel.taskStatusField.value.defaultActive.statusName ? theModel.taskStatusField.value.defaultActive.statusName : theModel.taskStatusField.value.defaultActive.name}}</span>
+                                    <span class="style_changes_value"   :class="{'task-status-form-taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" v-if="!theModel.taskStatusField.value.defaultActive.isEditable" :style="[{'color': theModel.taskStatusField.value.defaultActive.textColor}]">{{theModel.taskStatusField.value.defaultActive.statusName ? theModel.taskStatusField.value.defaultActive.statusName : theModel.taskStatusField.value.defaultActive.name}}</span>
                                     <input v-if="theModel.taskStatusField.value.defaultActive.isEditable" class="addStatusInput form-control" type="text"  v-model.trim="theModel.taskStatusField.value.defaultActive.statusName" @keypress.enter.prevent="saveTaskStatus('editType',theModel.taskStatusField.value.defaultActive)" @input="errorMsgTask = ''"/>
                                     <span class="position-ab" :style="[{top : clientWidth > 767 ? '8px' : '8px', right : clientWidth > 767 ? '10px' : '15px'}]">
                                         <img :src="saveData" class="cursor-pointer" v-if="theModel.taskStatusField.value.defaultActive.isEditable" @click="saveTaskStatus('editType',theModel.taskStatusField.value.defaultActive)">
@@ -63,7 +63,7 @@
                 />
                 <button class="cursor-pointer btn btn-primary addstatus-btn ml-0 mb-20px" type="button" @click="openTaskStatusSidebar()">+ {{$t('Projects.add_status')}}</button>
                 <div class="red">
-                    <span v-if="errorMsgTask" class="font-size-11">{{errorMsgTask}}</span>
+                    <span v-if="errorMsgTask" class="task-status-form-font-size-11">{{errorMsgTask}}</span>
                 </div>
                 <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}"
                 >{{$t('Projects.done_status')}}</h3>
@@ -92,7 +92,7 @@
                             <li class="d-flex align-items-center justify-content-between">
                             <div class="d-flex align-items-center w-100 ml-16px">
                                 <input type="color" :id="`CloseTaskStatus${98}`" v-model.trim="theModel.taskStatusField.value.defaultComplete.textColor" @input="theModel.taskStatusField.value.defaultComplete.bgColor = theModel.taskStatusField.value.defaultComplete.textColor+'35'" class="p-0 mr-8px d-inline-block border-radius-2-px border-0 bg-transparent cursor-pointer project__status-icon" disabled>
-                                <span class="style_changes_value" :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" v-if="!theModel.taskStatusField.value.defaultComplete.isEditable" :style="[{'color': theModel.taskStatusField.value.defaultComplete.textColor}]">{{theModel.taskStatusField.value.defaultComplete.name ? theModel.taskStatusField.value.defaultComplete.name : theModel.taskStatusField.value.defaultComplete.name}}</span>
+                                <span class="style_changes_value" :class="{'task-status-form-taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" v-if="!theModel.taskStatusField.value.defaultComplete.isEditable" :style="[{'color': theModel.taskStatusField.value.defaultComplete.textColor}]">{{theModel.taskStatusField.value.defaultComplete.name ? theModel.taskStatusField.value.defaultComplete.name : theModel.taskStatusField.value.defaultComplete.name}}</span>
                                 <input v-if="theModel.taskStatusField.value.defaultComplete.isEditable"  class="addStatusInput form-control" type="text" v-model.trim="theModel.taskStatusField.value.defaultComplete.name" @keypress.enter.prevent="saveTaskStatus('editType',theModel.taskStatusField.value.defaultComplete)" @input="errorMsgTask = ''" />
                                 <span class="position-ab save__delete-wrappper" :style="[{top : clientWidth > 767 ? '6px' : '10px'}]">
                                     <img :src="saveData" class="cursor-pointer"  v-if="theModel.taskStatusField.value.defaultComplete.isEditable" @click="saveTaskStatus('editType',theModel.taskStatusField.value.defaultComplete)">
@@ -564,6 +564,17 @@ const { t } = useI18n();
         }
     }
 </script>
+<style scoped>
+.task-status-form-font-size-11 {
+    font-size: 11px;
+}
+.task-status-form-taskInnerData-desktop {
+    font-size: 13px !important;
+    line-height: 19px !important;
+    font-weight: 400 !important;
+}
+</style>
+
 <style scoped>
 @import './style.css';
 </style>

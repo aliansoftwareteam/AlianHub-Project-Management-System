@@ -1,57 +1,57 @@
 .outline-primary {
     height: 30px;
-    background: #FFFFFF;
-    border: 1px solid #2F3990;
+    background: var(--surface);
+    border: 1px solid var(--brand);
     border-radius: 4px;
-    color: #2F3990;
+    color: var(--brand);
     cursor: pointer;
     font-family: var(--font-ui);
 }
 
 .outline-secondary {
     height: 30px;
-    background: #FFFFFF;
-    border: 1px solid #959595;
+    background: var(--surface);
+    border: 1px solid var(--ink-3);
     border-radius: 4px;
-    color: #959595;
+    color: var(--ink-2);
     cursor: pointer;
     font-family: var(--font-ui);
 }
 .outline-secondary-bg-gray{
-    border: 1px solid #E8E8E8;
-    background-color: #F4F5F7;
+    border: 1px solid var(--hairline);
+    background-color: var(--fill);
     Padding:3px 14px 3px 14px;
     font-size: 13px;
     line-height: 20px;
     font-weight: 500;
     border-radius: 4px;
-    color:#959595;
+    color:var(--ink-2);
     cursor: pointer;
     font-family: var(--font-ui);
 }
 .outline-required{
     height: 30px;
-    background: #FFFFFF;
-    border: 1.5px solid #CFCFCF;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
     border-radius: 7px;
-    color: #959595;
+    color: var(--ink-2);
     cursor: pointer;
     font-family: var(--font-ui);
 }
 .btn-primary {
     cursor: pointer;
-    background: #2F3990;
+    background: var(--brand);
     border-radius: 4px;
-    color: white;
+    color: var(--on-brand);
     border: none;
     height: 30px;
     font-family: var(--font-ui);
 }
 .btn-danger {
     cursor: pointer;
-    background: red;
+    background: var(--danger);
     border-radius: 4px;
-    color: white;
+    color: var(--on-danger);
     border: none;
     height: 30px;
     font-family: var(--font-ui);
@@ -64,10 +64,10 @@
    button classes here assume. */
 .archive-delete-btn-bg-red {
     cursor: pointer;
-    background: #E5484D;
+    background: var(--danger);
     border: none;
     border-radius: 4px;
-    color: #FFFFFF;
+    color: var(--on-danger);
     height: 38px;
     padding: 0 18px;
     font-weight: 500;
@@ -75,13 +75,13 @@
     transition: background 0.15s ease;
 }
 .archive-delete-btn-bg-red:hover {
-    background: #C93B3F;
+    background: var(--danger);
 }
 .archive-delete-btn-bg-red:active {
-    background: #B22F33;
+    background: var(--danger);
 }
 .archive-delete-btn-bg-red:focus-visible {
-    outline: 2px solid #E5484D;
+    outline: 2px solid var(--danger);
     outline-offset: 2px;
 }
 
@@ -89,19 +89,19 @@
    does not wear Delete's red. Same shape, the app's primary navy. */
 .archive-confirm-btn {
     cursor: pointer;
-    background: #2F3990;
+    background: var(--brand);
     border: none;
     border-radius: 4px;
-    color: #FFFFFF;
+    color: var(--on-brand);
     height: 38px;
     padding: 0 18px;
     font-weight: 500;
     font-family: var(--font-ui);
     transition: background 0.15s ease;
 }
-.archive-confirm-btn:hover { background: #27306F; }
-.archive-confirm-btn:active { background: #1F2757; }
-.archive-confirm-btn:focus-visible { outline: 2px solid #2F3990; outline-offset: 2px; }
+.archive-confirm-btn:hover { background: var(--brand-deep); }
+.archive-confirm-btn:active { background: var(--brand-deep); }
+.archive-confirm-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 .btn-secondary {
     cursor: pointer;

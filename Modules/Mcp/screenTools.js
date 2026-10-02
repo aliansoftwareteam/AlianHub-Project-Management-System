@@ -19,7 +19,7 @@ const VIEWS = Object.freeze({
 const PLACES = Object.freeze({ home: '', everything: '/everything', projects: '/project', inbox: '/inbox', planner: '/planner', docs: '/pages', goals: '/goals' });
 const THINGS = Object.freeze(['task', 'project', 'list', 'doc']);
 
-const NOT_FOUND = Object.freeze({ error: 'not found' });
+const NOT_FOUND = Object.freeze({ error: 'That place was not found, or the person cannot open it.' });
 const NO_ADDRESS = Object.freeze({ error: 'This AlianHub has no web address set, so no link can be given. Tell the person where to look instead.' });
 const WORKLOAD_NOTE = 'The workload view opens on the current week.';
 /* The web app reads a view's grouping and filters from a saved view, and "mine" from the address of the everything screen alone. */
@@ -114,13 +114,12 @@ const TOOLS = [
     {
         name: ACTION,
         action: ACTION,
-        description: 'The web address of a place in AlianHub, to give the person when they ask "show me" or "where do I see this". '
+        description: 'Gives the web address of a place in AlianHub, to share when the person asks "show me" or "where do I see this". Changes nothing. '
             + 'Say what to open: a task (taskId), a project (projectId), a list (sprintId), a doc (pageId), or one of the main screens: '
             + 'home (the person\'s own tasks for today), everything (all tasks across projects), projects, inbox, planner, docs, goals. '
-            + 'A project or a list can open on one view: list, board, calendar, gantt, table, workload (who has how much work, this week), dashboard or activity. '
-            + 'Asked for a grouping, a filter or mine, a project or a list opens on the saved view that already shows it that way, named in savedView; '
-            + 'with none, the plain link comes back with a note, since a link carries no grouping of its own. The everything screen takes mine. '
-            + 'It answers only for a thing the person can open; anything else is "not found".',
+            + 'A project or a list can open on one view: list, board, calendar, gantt, table, workload (who has how much work this week), dashboard or activity. '
+            + 'If you ask for a grouping, a filter or mine, it opens on the saved view that already shows it that way, named in savedView; if there is none, you get the plain link with a note. The everything screen takes mine. '
+            + 'It answers only for something the person can open; for anything else it says the place was not found.',
         input: {
             type: 'object',
             properties: {

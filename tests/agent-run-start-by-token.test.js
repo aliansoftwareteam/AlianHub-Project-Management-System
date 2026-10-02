@@ -66,7 +66,7 @@ const atWork = (projectId, taskId = T_OPEN_2) => mockDb.seed(SCHEMA_TYPE.AGENT_R
 
 /* [what the project is set to, how it is set, what the refusal says] */
 const HELD = [
-    ['has connected agents propose every change', () => { project(P_OPEN).agentPolicy = { connected: 'propose_all' }; }, /propose every change/],
+    ['has connected agents propose every change', () => { project(P_OPEN).agentPolicy = { connected: 'propose_all' }; }, /has to ask a person before every change/],
     ['already has as many agents at work as it takes', () => { project(P_OPEN).agentLimits = { atOnce: 1 }; atWork(P_OPEN); }, /already has 1 agent at work/],
 ];
 
@@ -77,7 +77,7 @@ beforeEach(() => {
     const { seedTask } = seed();
     seedTask(T_OPEN_2, 'Second open task', P_OPEN, L_OPEN);
     mockDb.seed(SCHEMA_TYPE.MAIN_CHATS, { _id: DM_SPACE, ProjectName: 'Direct messages', default: true });
-    mockDb.seed(SCHEMA_TYPE.TASKS, { _id: DM, TaskName: 'Olive and Ian', ProjectID: DM_SPACE, mainChat: true, AssigneeUserId: [OWNER, INSIDER], deletedStatusKey: 0 });
+    mockDb.seed(SCHEMA_TYPE.TASKS, { _id: DM, TaskName: 'Olive and Ian', CompanyId: CID, ProjectID: DM_SPACE, mainChat: true, AssigneeUserId: [OWNER, INSIDER], deletedStatusKey: 0 });
     const agent = (_id, name) => mockDb.seed(SCHEMA_TYPE.AGENTS, { _id, name, autonomy: 1, allowedActions: [], account: 'workspace', spendCapUsd: 10, paused: false, deletedStatusKey: 0, projectIds: [], skills: [{ key: 'qa-review', name: 'QA', enabled: true }] });
     agent(REVIEWER, 'Reviewer');
     agent(OTHER_AGENT, 'Reporter');

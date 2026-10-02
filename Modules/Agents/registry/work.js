@@ -19,7 +19,7 @@ const ACTIONS = [
     { key: 'page.comments.list', label: 'Read a doc\'s comments', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
     { key: 'page.comment.create', label: 'Comment on a doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
     { key: 'page.comment.reply', label: 'Reply to a comment on a doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
-    { key: 'page.comment.assign', label: 'Assign a doc comment thread', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
+    { key: 'page.comment.assign', label: 'Assign a doc comment', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: { key: 'project.project_details', write: false } },
 ];
 
 const RATINGS = {

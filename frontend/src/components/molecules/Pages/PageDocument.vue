@@ -53,7 +53,7 @@
                         <button v-if="!readOnly" type="button" class="ah-btn ah-btn--sm ah-btn--primary" :disabled="!isDirty || isSaving || isBehind" :title="$t('Docs.save_now_hint')" @click="savePage">
                             {{ isSaving ? $t('Docs.saving') : $t('Docs.save') }}
                         </button>
-                        <button v-if="!propsLocked" type="button" class="pd__icon pd__icon--danger" :title="$t('Docs.delete')" @click="deletePage">
+                        <button v-if="!propsLocked" type="button" class="pd__icon pd__icon--danger" :title="$t('Docs.delete')" @click="askingDelete = true">
                             <ShellIcon name="trash" :size="15" />
                         </button>
                         <button v-if="closable" type="button" class="pd__icon" :title="$t('Docs.close')" @click="requestClose">
@@ -233,6 +233,16 @@
                 :project-name="projectName"
                 @close="presenting = false"
             />
+
+            <ConfirmDelete
+                v-if="askingDelete"
+                :title="$t('Projects.page_delete_title')"
+                :description="$t('Projects.page_delete_with_children')"
+                :confirmLabel="$t('Docs.delete')"
+                :busy="deleting"
+                @confirm="confirmDelete"
+                @cancel="askingDelete = false"
+            />
         </template>
         <div v-else-if="loadFailed" class="pd__missing">
             <div class="ah-empty">{{ $t('Docs.page_missing') }}</div>
@@ -249,6 +259,7 @@ import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import WhoCanSeeModal from '@/components/molecules/WhoCanSee/WhoCanSeeModal.vue';
+import ConfirmDelete from '@/components/atom/ConfirmDelete/ConfirmDelete.vue';
 import TaskChipPicker from '@/components/molecules/Pages/TaskChipPicker.vue';
 import PageBlockEditor from '@/components/molecules/Pages/PageBlockEditor.vue';
 import PageComposeRail from '@/components/molecules/Pages/PageComposeRail.vue';
@@ -574,17 +585,26 @@ async function keepMineAsCopy() {
     }
 }
 
-function deletePage() {
-    if (!page.value) return;
-    if (!window.confirm(t('Projects.page_delete_with_children'))) return;
+const askingDelete = ref(false);
+const deleting = ref(false);
+
+function confirmDelete() {
+    if (!page.value || deleting.value) return;
+    deleting.value = true;
     const id = String(page.value._id);
     apiRequest('delete', `${env.PAGES}/${id}`)
         .then((response) => {
-            if (response.data?.status) {
-                page.value = null;
-                emit('deleted', id);
-            }
-        }).catch((error) => console.error('ERROR in delete page: ', error));
+            if (!response.data?.status) throw new Error(response.data?.statusText || 'not deleted');
+            page.value = null;
+            $toast.success(t('Projects.page_deleted_to_trash'), { position: 'top-right' });
+            emit('deleted', id);
+        }).catch((error) => {
+            console.error('ERROR in delete page: ', error);
+            $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+        }).finally(() => {
+            deleting.value = false;
+            askingDelete.value = false;
+        });
 }
 
 function requestClose() {
@@ -774,6 +794,7 @@ function onEditorReady() {
     if (baselinePending.value) {
         baselinePending.value = false;
         savedSnapshot.value = { ...savedSnapshot.value, html: contentHtml.value };
+        if (isDirty.value && !readOnly.value) autosave.changed();
     }
 }
 

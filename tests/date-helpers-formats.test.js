@@ -43,15 +43,15 @@ describe('formatDate', () => {
         expect(formatDate(NaN)).toBe('');
     });
 
-    it.failing('writes a day of the month for the moment token D (it prints a localized date instead)', () => {
+    it('writes a day of the month for the moment token D (it prints a localized date instead)', () => {
         expect(formatDate(monday, 'MMMM D, YYYY')).toBe('January 5, 2026');
     });
 
-    it.failing('writes the meridiem for the moment token A (it prints a literal A)', () => {
+    it('writes the meridiem for the moment token A (it prints a literal A)', () => {
         expect(formatDate(monday, 'h:mm A')).toBe('2:30 PM');
     });
 
-    it.failing('writes the ordinal day for the moment token Do (the header says it is covered)', () => {
+    it('writes the ordinal day for the moment token Do (the header says it is covered)', () => {
         expect(formatDate(monday, 'MMM Do')).toBe('Jan 5th');
     });
 });
@@ -75,7 +75,7 @@ describe('formatNotificationDate', () => {
         expect(formatNotificationDate({ seconds: monday.getTime() / 1000 })).toBe(formatNotificationDate(monday));
     });
 
-    it.failing('shows the minutes after the hour, not the month number', () => {
+    it('shows the minutes after the hour, not the month number', () => {
         expect(formatNotificationDate(monday)).toBe('05-01-2026 14:30 PM [IST]');
     });
 });

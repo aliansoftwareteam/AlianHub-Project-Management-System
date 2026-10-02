@@ -18,12 +18,12 @@ import VerifyInvitation from '@/views/Authentication/VerifyInvitation/VerifyInvi
 const PAUSE_ON_ACCEPTED = 1200;
 let reload;
 
-const openLink = async ({ signedInAs }) => {
+const openLink = async ({ signedInAs, openCompany = ref('') }) => {
     const $axios = { post: vi.fn(async () => ({ data: { status: true, key: 5, companyId: 'c9' } })) };
     const wrapper = mount(VerifyInvitation, {
         global: {
             mocks: { $t: (key) => key },
-            provide: { $axios, $userId: ref(signedInAs) },
+            provide: { $axios, $userId: ref(signedInAs), $companyId: openCompany },
             stubs: { 'router-link': { template: '<a><slot /></a>' } },
         },
     });
@@ -68,6 +68,16 @@ describe('the mailed invitation link, once the invitation is accepted', () => {
         await afterThePause();
         expect(replace).toHaveBeenCalledWith({ name: 'Log-in' });
         expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('tells the app which workspace is open before it leaves, so a signed-in person with no workspace is not sent to name one', async () => {
+        const openCompany = ref('');
+        let openWhenLeaving;
+        replace.mockImplementation(async () => { openWhenLeaving = openCompany.value; });
+        await openLink({ signedInAs: 'user-1', openCompany });
+        await afterThePause();
+
+        expect(openWhenLeaving).toBe('c9');
     });
 
     it('still goes on when the session cannot be renewed here', async () => {

@@ -33,33 +33,33 @@ const AGENT_STATUS_NAMES = Object.freeze(['in progress', 'in review']);
 const AGENT_STATUS_NAME_PATTERN = /progress|review|doing|testing|qa/;
 
 const ACTIONS = Object.freeze([
-    { key: 'tasks.next', label: 'Next assigned task', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-    { key: 'tasks.search', label: 'Search own tasks', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
-    { key: 'task.get', label: 'Read a task brief', risk: RISK.LOW, undoable: false, write: false, cost: 'read+summary', permission: 'task.task_list' },
+    { key: 'tasks.next', label: 'See the next task assigned', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+    { key: 'tasks.search', label: 'Search tasks', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'task.task_list' },
+    { key: 'task.get', label: 'Read a task', risk: RISK.LOW, undoable: false, write: false, cost: 'read+summary', permission: 'task.task_list' },
     { key: 'task.comment', label: 'Comment on a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_comment' },
-    { key: 'task.status.set', label: 'Set status (In progress / In review only)', risk: RISK.LOW, undoable: true, write: true, cost: 'write',
+    { key: 'task.status.set', label: 'Set the status', risk: RISK.LOW, undoable: true, write: true, cost: 'write',
       constraint: 'statusType must not be "close"; status name must be In progress or In review', permission: 'task.task_status' },
-    { key: 'task.link', label: 'Attach a PR, branch or doc', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_attachments' },
+    { key: 'task.link', label: 'Add a link to a task', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.task_attachments' },
     { key: 'task.assign', label: 'Assign a task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_assignee' },
-    { key: 'task.update', label: 'Update task fields', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+    { key: 'task.update', label: 'Change a task\'s details', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
       fields: ['TaskName', 'description', 'rawDescription', 'Task_Priority', 'DueDate', 'startDate', 'tagsArray', 'checklistArray', 'points', 'totalEstimatedTime'],
       permission: { byField: {
           TaskName: 'task.task_name_edit', description: 'task.task_description', rawDescription: 'task.task_description',
           Task_Priority: 'task.task_priority', DueDate: 'task.task_due_date', startDate: 'task.task_start_date',
           tagsArray: 'task.task_tag', checklistArray: 'task.task_checklist', points: 'task.task_estimated_hours', totalEstimatedTime: 'task.task_estimated_hours',
       } } },
-    { key: 'aifield.fill', label: 'Fill an AI field on a task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_custom_field' },
-    { key: 'task.sprint.move', label: 'Move a task between sprints', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_move' },
+    { key: 'aifield.fill', label: 'Fill in an AI field', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_custom_field' },
+    { key: 'task.sprint.move', label: 'Move a task to another list', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'task.task_move' },
     { key: 'subtask.create', label: 'Create a subtask', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'task.sub_task_create' },
-    { key: 'task.create', label: 'File a task (opening status, unassigned)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
+    { key: 'task.create', label: 'Create a task', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write',
       constraint: 'always the project\'s opening status; never assigned; only in a project the token can see', permission: 'task.task_create' },
     { key: 'timelog.start', label: 'Start a timer', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'sheet_settings.user_timesheet' },
     { key: 'timelog.stop', label: 'Stop a timer', risk: RISK.LOW, undoable: true, write: true, cost: 'write', permission: 'sheet_settings.user_timesheet' },
     { key: 'docs.read', label: 'Read a linked doc', risk: RISK.LOW, undoable: false, write: false, cost: 'read', permission: 'project.project_details' },
-    { key: 'page.draft', label: 'Draft a page (stays a draft until approved)', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'project.project_details' },
-    { key: 'chat.post', label: 'Post in a channel', risk: RISK.LOW, undoable: false, write: true, cost: 'write', permission: 'task.task_comment' },
+    { key: 'page.draft', label: 'Draft a doc', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', permission: 'project.project_details' },
+    { key: 'chat.post', label: 'Post in a chat channel', risk: RISK.LOW, undoable: false, write: true, cost: 'write', permission: 'task.task_comment' },
     { key: 'reminder.create', label: 'Create a reminder', risk: RISK.LOW, undoable: false, write: true, cost: 'write', permission: { key: 'task.task_list', write: false } },
-    { key: 'deploy.staging', label: 'Propose a staging deploy', risk: RISK.HIGH, undoable: false, write: true, cost: 'write',
+    { key: 'deploy.staging', label: 'Ask to publish to the test site', risk: RISK.HIGH, undoable: false, write: true, cost: 'write',
       gate: 'owner_admin', proposeOnly: true, permission: 'settings.settings_edit_company' },
 ]);
 
@@ -175,26 +175,26 @@ const isAgentSettableStatus = ({ statusType, name } = {}) => {
 
 /* The one decision every agent call goes through. Returns { allowed, reason, action }. */
 const evaluate = (key, params = {}, { allowedActions } = {}) => {
-    if (isNever(key)) return { allowed: false, code: 'never_listed', reason: `Agents cannot perform ${key} (never_listed)`, action: null };
+    if (isNever(key)) return { allowed: false, code: 'never_listed', reason: `An agent is never allowed to do this (never_listed). The person has to do it in AlianHub.`, action: null };
     const action = get(key);
-    if (!action) return { allowed: false, reason: `Agents cannot perform ${key || '(unknown action)'}`, action: null };
+    if (!action) return { allowed: false, reason: `That action is not available to agents (${key || 'none named'}).`, action: null };
     if (Array.isArray(allowedActions) && allowedActions.length && !allowedActions.includes(action.key)) {
-        return { allowed: false, reason: `Agents cannot perform ${action.key} (not in this agent's skills)`, action };
+        return { allowed: false, reason: `${action.key} is not switched on for this connection. Ask the person to allow it in AlianHub.`, action };
     }
     if (action.key === 'task.status.set') {
         const target = params.status || {};
         if (!isAgentSettableStatus({ statusType: target.statusType || target.type, name: target.name || target.text })) {
             const label = DONE_STATUS_TYPES.includes(normalizeName(target.statusType || target.type)) ? 'Done' : (target.name || target.text || target.statusType || '?');
-            return { allowed: false, reason: `Agents cannot perform task.status.set("${label}")`, action };
+            return { allowed: false, reason: `You cannot set a task to "${label}". Use In progress or In review, and a person closes the task.`, action };
         }
     }
     if (Array.isArray(action.fields)) {
         const fields = Object.keys(params.fields || {});
         const bad = fields.filter((f) => !action.fields.includes(f));
-        if (bad.length) return { allowed: false, reason: `Agents cannot perform ${action.key} on ${bad.join(', ')}`, action };
+        if (bad.length) return { allowed: false, reason: `${action.key} cannot change ${bad.join(', ')}. Leave that out.`, action };
     }
     if (action.proposeOnly && !params.__proposal) {
-        return { allowed: false, reason: `Agents cannot perform ${action.key} directly — it must be proposed`, action };
+        return { allowed: false, reason: `${action.key} needs a person's approval first, so it has to be sent as a proposal.`, action };
     }
     return { allowed: true, reason: '', action };
 };

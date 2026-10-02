@@ -137,7 +137,7 @@
         <ConfirmationSidebar
             v-model="showSidebar"
             :title="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
-            :message="archive ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
+            :message="$t(taskRemovalMessageKey(task, archive))"
             :confirmationString="`${archive ? 'archive' : 'delete'}`"
             :acceptButtonClass="archive ? 'btn-primary': 'btn-danger'"
             :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
@@ -156,6 +156,7 @@ import Priority from "@/components/molecules/PriorityCompo/PriorityComp.vue"
 import TaskStatus from "@/components/atom/TaskStatus/TaskStatus.vue"
 import ProjectTaskType from "@/components/atom/TaskTypeSelection/TaskTypeSelection.vue"
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
+import { taskRemovalMessageKey } from "@/utils/taskRemovalWords";
 // UTILS
 import taskClass from "@/utils/TaskOperations";
 import { useConvertDate, useCustomComposable, useGetterFunctions } from "@/composable";

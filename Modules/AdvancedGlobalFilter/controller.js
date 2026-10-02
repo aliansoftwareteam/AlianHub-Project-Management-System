@@ -11,7 +11,8 @@ const savedFilters = require("./helpers/savedFilters");
 const { keepVisibleProjectIds } = require('../../Config/projectAccess');
 const { visibleProjectIds } = require('../Agents/scope');
 const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
-const { keptFromAgent } = require('../Comments/helpers/agentChatRows');
+const { keptFromCaller } = require('../Comments/helpers/conversationRows');
+const { withoutConversationsOfOthers } = require('../Comments/helpers/conversationReaders');
 
 /* The files and links searches name their projects in the saved filter when there is one, so those ids
  * are kept to the projects the caller can open and may list tasks in, as the route does for `pids`. */
@@ -30,11 +31,14 @@ const visibleSprintStages = async (req, projectIds) => {
     return hidden.length ? [{ $match: { sprintId: { $nin: idForms(hidden.map(String)) } } }] : [];
 };
 
-/* The same joins of comments leave an agent's request no row of a conversation it is kept from. */
+/* The same joins of comments leave out the rows of a conversation the caller does not read. */
 const chatKeptStages = async (req) => {
-    const kept = await keptFromAgent(String(req.headers['companyid'] || ''), req.uid);
+    const kept = await keptFromCaller(String(req.headers['companyid'] || ''), req.uid);
     return Object.keys(kept).length ? [{ $match: kept }] : [];
 };
+
+/* And the joins of tasks leave out the conversation itself, which is stored as a task. */
+const ownConversationsStage = (req) => ({ $match: withoutConversationsOfOthers(req.uid) });
 
 /**
  * Helper functions
@@ -122,6 +126,7 @@ exports.searchTasks = async (req, res) => {
                     { ...additionalFilter },
                     { ProjectID: { $in: convertedProjectIds } },
                     { deletedStatusKey: { $in: [undefined, 0] } },
+                    withoutConversationsOfOthers(req.uid),
                     ...(searchStr ? [{ TaskName: { $regex: escapeRegex(searchStr), $options: "i" } }] : []),
                 ],
             },
@@ -338,7 +343,7 @@ exports.searchFiles = async (req, res) => {
                     localField: "_id",
                     foreignField: "ProjectID",
                     as: "taskData",
-                    pipeline: [...visibleSprints, { $match: { $expr: { $ne: ["$attachments", []] } } }],
+                    pipeline: [...visibleSprints, ownConversationsStage(req), { $match: { $expr: { $ne: ["$attachments", []] } } }],
                 },
             },
             {
@@ -467,6 +472,7 @@ exports.searchLinks = async (req, res) => {
                     foreignField: "ProjectID",
                     pipeline: [
                         ...visibleSprints,
+                        ownConversationsStage(req),
                         {
                             $match: {
                                 rawDescription: { $exists: true, $ne: null }

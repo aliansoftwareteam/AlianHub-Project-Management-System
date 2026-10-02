@@ -9,7 +9,7 @@ const { handleEvents } = require('../Company/eventController');
 const logger = require('../../Config/loggerConfig');
 const { requireTaskActionPermission, requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_ACTIONS, PRE_V2_TASK_ACTIONS, RELATION_ACTIONS, TASK_WRITE_ROUTES, actionEntry } = require('../../Config/taskWritePermissions');
-const { TASK_ACTION_FIELDS, PRE_V2_ACTION_FIELDS, specFor, writtenTaskId, prepareOrRefuse, sendFailure } = require('./helpers/taskWriteFields');
+const { TASK_ACTION_FIELDS, PRE_V2_ACTION_FIELDS, specFor, writtenTaskId, prepareOrRefuse, sendFailure, failureText } = require('./helpers/taskWriteFields');
 const { importTargetAccess, refuseImport } = require('../Importers/helpers/importAccess');
 const { taskPatchGuard, taskCreateGuard, relationGuard, agentsRefused } = require('../Agents/guard');
 
@@ -20,20 +20,24 @@ const PREPARED = Object.freeze({ unopenableAsMissing: true });
 const taskActionPermission = (actions) => requireTaskActionPermission(actions, PREPARED);
 const taskWritePermission = (route) => requireTaskWritePermission(TASK_WRITE_ROUTES[route].entry, PREPARED);
 
+/* Whatever the handler throws or rejects with is answered as a failed write, so a request never waits for an answer that is not coming. */
+const answering = (run, fail = sendFailure) => async (req, res) => {
+    try {
+        await run(req, res);
+    } catch (error) {
+        logger.error(`ERROR: ${error}`);
+        if (!res.headersSent) fail(res, error);
+    }
+};
+
 exports.init = (app) => {
-    app.patch('/api/tasks/', taskActionPermission(PRE_V2_TASK_ACTIONS), agentRule(PRE_V2_ACTION_FIELDS), async (req, res) => {
+    app.patch('/api/tasks/', taskActionPermission(PRE_V2_TASK_ACTIONS), agentRule(PRE_V2_ACTION_FIELDS), answering(async (req, res) => {
         const action = req.body && req.body.action;
         const payload = await prepareOrRefuse(req, res, specFor(PRE_V2_ACTION_FIELDS, action), `PATCH /api/tasks/ ${action}`);
         if (!payload) return;
-        task[action](payload)
-        .then((response) => {
-            res.send({status: true, statusText: 'Task updated successfully.',data:response});
-        })
-        .catch((error) => {
-            logger.error(`ERROR: ${error}`);
-            sendFailure(res, error);
-        });
-    });
+        const response = await task[action](payload);
+        res.send({status: true, statusText: 'Task updated successfully.',data:response});
+    }));
 
     app.post('/api/v2/tasks', taskWritePermission('POST /api/v2/tasks'), taskCreateGuard, async (req, res) => {
         try {
@@ -48,34 +52,28 @@ exports.init = (app) => {
                 }
             })
             .catch((error) => {
-                logger.error(`ERROR: ${error.message}`);
+                logger.error(`ERROR: ${failureText(error)}`);
                 sendFailure(res, error);
             });
         } catch (error) {
             logger.error(`ERROR: ${error.message}`);
-            res.send({status: false, statusText: error.message});
+            res.send({status: false, statusText: failureText(error)});
         }
     });
 
-    app.patch('/api/v2/tasks', taskActionPermission(TASK_ACTIONS), agentRule(TASK_ACTION_FIELDS), async (req, res) => {
+    app.patch('/api/v2/tasks', taskActionPermission(TASK_ACTIONS), agentRule(TASK_ACTION_FIELDS), answering(async (req, res) => {
         const action = req.body && req.body.action;
         const payload = await prepareOrRefuse(req, res, specFor(TASK_ACTION_FIELDS, action), action);
         if (!payload) return;
-        taskMongo[action](payload)
-        .then((response) => {
-            // A handler that matched no document resolves {status:false}; without this the
-            // envelope below would report a write that never happened as a success.
-            if (response && response.status === false) {
-                res.send(response);
-                return;
-            }
-            res.send({status: true, statusText: 'Task updated successfully.',data:response});
-        })
-        .catch((error) => {
-            logger.error(`ERROR: ${error}`);
-            sendFailure(res, error);
-        });
-    });
+        const response = await taskMongo[action](payload);
+        // A handler that matched no document resolves {status:false}; without this the
+        // envelope below would report a write that never happened as a success.
+        if (response && response.status === false) {
+            res.send(response);
+            return;
+        }
+        res.send({status: true, statusText: 'Task updated successfully.',data:response});
+    }));
 
     app.post('/api/v2/tasks/bulk', taskActionPermission(TASK_ACTIONS), async (req, res) => {
         try {
@@ -94,12 +92,12 @@ exports.init = (app) => {
                 res.send({ status: true, statusText: 'Bulk operation completed', data: response });
             })
             .catch((error) => {
-                logger.error(`ERROR bulk ${action}: ${error.message}`);
+                logger.error(`ERROR bulk ${action}: ${failureText(error)}`);
                 sendFailure(res, error);
             });
         } catch (error) {
             logger.error(`ERROR bulk dispatch: ${error.message}`);
-            res.send({ status: false, statusText: error.message });
+            res.send({ status: false, statusText: failureText(error) });
         }
     });
 
@@ -136,23 +134,18 @@ exports.init = (app) => {
         }
     });
 
-    app.patch('/api/v1/importTasks', taskWritePermission('PATCH /api/v1/importTasks'), agentsRefused('tasks.import'), async (req, res) => {
+    app.patch('/api/v1/importTasks', agentsRefused('tasks.import'), taskWritePermission('PATCH /api/v1/importTasks'), answering(async (req, res) => {
         const payload = await prepareOrRefuse(req, res, TASK_ACTION_FIELDS.createMultipleTasks, 'createMultipleTasks');
         if (!payload) return;
         const projectData = payload.projectData || {};
-        importTargetAccess(projectData.CompanyId, String(req.uid || ''), { projectId: String(projectData._id || ''), sprintId: payload.sprint && payload.sprint.id })
-        .then((target) => {
-            if (!target.allowed) return refuseImport(res, target);
-            return taskMongo.createMultipleTasks({ ...payload, sprint: target.sprint })
-            .then((response) => {
-                res.send({status: true, statusText: 'Task updated successfully.',data:response});
-            });
-        })
-        .catch((error) => {
-            console.error("ERRORsssss: ", error.message);
-            res.send({status: false, statusText: error.message});
-        });
-    });
+        const target = await importTargetAccess(projectData.CompanyId, String(req.uid || ''), { projectId: String(projectData._id || ''), sprintId: payload.sprint && payload.sprint.id });
+        if (!target.allowed) {
+            refuseImport(res, target);
+            return;
+        }
+        const response = await taskMongo.createMultipleTasks({ ...payload, sprint: target.sprint });
+        res.send({status: true, statusText: 'Task updated successfully.',data:response});
+    }, (res, error) => res.send({status: false, statusText: failureText(error)})));
     
     app.post('/api/v1/tabSyncTask',tabSyncTaskCtrl.getTabSyncTasks);
 

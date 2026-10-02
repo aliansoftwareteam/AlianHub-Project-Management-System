@@ -1025,6 +1025,8 @@ const schema = {
         savedReportId: { type: String, required: true },
         cadence: { type: String, default: 'weekly', required: false },
         recipients: { type: Array, default: [], required: false },
+        // Who last set the recipients: outside addresses are sent to only while this person is an owner or admin.
+        recipientsBy: { type: String, required: false },
         active: { type: Boolean, default: true, required: false },
         lastRunAt: { type: Date, required: false },
         nextRunAt: { type: Date, required: false },
@@ -2886,6 +2888,8 @@ const schema = {
     companies: {
         // { by, anchor } — set only by scripts/seed-scale.js, which writes to and drops no company without it.
         scaleSeed: { type: Object, required: false },
+        // The id of the migration that wrote this row for a workspace opened without one; its down() deletes no row without it.
+        rowRepairedBy: { type: String, required: false },
         // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone, connectedPaused, connectedPausedBy, connectedPausedAt }
         agentPolicy: {
             type: Object,
@@ -5103,6 +5107,8 @@ const schema = {
         status: { type: String, default: 'ready', required: false },
         recapPostedAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
+        editedBy: { type: String, required: false },
+        editedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false }
     },
     folders:{

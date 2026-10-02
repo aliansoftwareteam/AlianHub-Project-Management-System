@@ -53,8 +53,7 @@ describe('setRules', () => {
         expect(g('rules')).toEqual({});
     });
 
-    // Commits mutateRules with data: [] / op: added, which pushes an empty array into rawRules.
-    it.fails('leaves no raw rules when the server has none', async () => {
+    it('leaves no raw rules when the server has none', async () => {
         reply([]);
         await run('setRules');
         expect(g('rawRules')).toEqual([]);
@@ -199,8 +198,7 @@ describe('milestone status', () => {
         expect(g('projectMilestoneStatus')).toEqual([{ value: 'OPEN', isCount: 1 }]);
     });
 
-    // Resolves res[0] (the axios response indexed) instead of res.data[0].
-    it.fails('resolves the loaded settings document', async () => {
+    it('resolves the loaded settings document', async () => {
         reply([{ settings: [{ value: 'OPEN', isCount: 1 }] }]);
         expect(await run('setMileStoneStatus')).toEqual({ settings: [{ value: 'OPEN', isCount: 1 }] });
     });

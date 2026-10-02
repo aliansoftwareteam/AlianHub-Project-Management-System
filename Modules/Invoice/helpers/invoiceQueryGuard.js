@@ -1,4 +1,4 @@
-const { FORBIDDEN_OPERATORS: CALLER_FORBIDDEN_OPERATORS, TOO_DEEP, NESTED_TOO_DEEPLY, isPlainObject, forbiddenOperatorIn } = require('../../Company/helpers/callerQueryRules');
+const { FORBIDDEN_OPERATORS: CALLER_FORBIDDEN_OPERATORS, TOO_DEEP, NESTED_TOO_DEEPLY, isPlainObject, forbiddenOperatorIn, withPlainSearchText, SearchTextRefused } = require('../../Company/helpers/callerQueryRules');
 
 const MAX_LIMIT = 500;
 const MAX_STAGES = 20;
@@ -34,7 +34,12 @@ const checkStage = (stage) => {
         if (!Number.isInteger(n) || n < 0) throw new InvoiceQueryRefused('$skip must be a non-negative integer.');
         return { $skip: n };
     }
-    return stage;
+    try {
+        return { [name]: withPlainSearchText(spec) };
+    } catch (error) {
+        if (error instanceof SearchTextRefused) throw new InvoiceQueryRefused(error.message);
+        throw error;
+    }
 };
 
 /* Callers send either a lone stage object or an array of stages. */

@@ -18,11 +18,16 @@ function storedRow(task) {
     return bucket ? locate(bucket, task._id)?.row : null;
 }
 
+/* For a write that changes the store's row by itself: the views with their own copy hear the same fields. */
+export function tellViews(taskId, fields) {
+    listeners.forEach((listener) => listener(taskId, fields));
+}
+
 function show(task, fields) {
     Store.commit("projectData/mutateUpdateFirebaseTasks", {
         snap: null, op: "modified", pid: task.ProjectID, sprintId: task.sprintId, data: { ...task, ...fields }, updatedFields: { ...fields }
     });
-    listeners.forEach((listener) => listener(task._id, fields));
+    tellViews(task._id, fields);
 }
 
 /* A refusal answers its reason as HTTP 400, or as status false on a 200. */

@@ -116,8 +116,7 @@ describe('project and task names are escaped', () => {
         expect(host.textContent).toContain(EVIL);
     });
 
-    // A missing project name is printed as the word "undefined".
-    it.fails('does not print "undefined" when a name is missing', () => {
+    it('does not print "undefined" when a name is missing', () => {
         expect(text(T.projectMarkStar({}))).toBe('has been marked as star.');
         expect(text(T.createTask({ newTaskname: 'T' }))).toBe('In Project, created a new task named T.');
     });
@@ -126,8 +125,7 @@ describe('project and task names are escaped', () => {
         expect(T.projectMarkStar({ ProjectName: `R&D "x" (y)` })).toContain('R&amp;D &quot;x&quot; &#40;y&#41;');
     });
 
-    // The "new" name and several sentence parts are interpolated raw.
-    it.fails('escapes the new project name when renaming', () => {
+    it('escapes the new project name when renaming', () => {
         expect(T.EditProjectName({ previousTaskName: 'a', TaskName: EVIL })).not.toContain('<img');
     });
 });

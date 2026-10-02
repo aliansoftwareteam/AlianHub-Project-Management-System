@@ -157,8 +157,7 @@ describe('chat sprint and folder removal', () => {
         expect(() => store.commit('mainChat/mutateChatSprints', { op: 'removed', data: { id: 's1', projectId: 'p9' } })).not.toThrow();
     });
 
-    // the guard before findIndex is missing for folders, so an unknown project throws
-    it.fails('ignores removing a folder of a project it never cached', () => {
+    it('ignores removing a folder of a project it never cached', () => {
         expect(() => store.commit('mainChat/mutateChatFolders', { op: 'removed', data: { _id: 'f1', projectId: 'p9' } })).not.toThrow();
     });
 });
@@ -241,14 +240,12 @@ describe('live chat events', () => {
         expect(Object.keys(socket.handlers).sort()).toEqual(['chatTaskDelete', 'chatTaskInsert', 'chatTaskReplace', 'chatTaskUpdate']);
     });
 
-    // a deleted chat arrives as a bare document key; it is committed as an edit and wipes the chat's content
-    it.fails('drops a chat when the server says it was deleted', () => {
+    it('drops a chat when the server says it was deleted', () => {
         socket.handlers.chatTaskDelete({ _id: 'c1' });
         expect(chatIds(store)).toEqual([]);
     });
 
-    // a replaced chat is committed as a removal, so the chat vanishes instead of updating
-    it.fails('keeps a chat when the server replaces it', () => {
+    it('keeps a chat when the server replaces it', () => {
         socket.handlers.chatTaskReplace({ fullDocument: { _id: 'c1', text: 'replaced' } });
         expect(store.state.mainChat.chats.data).toEqual([{ _id: 'c1', text: 'replaced' }]);
     });

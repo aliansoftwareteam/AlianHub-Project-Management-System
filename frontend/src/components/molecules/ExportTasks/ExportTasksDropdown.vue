@@ -2,13 +2,13 @@
     <div v-if="modelValue" class="export-tasks__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="export-tasks__card">
             <div class="d-flex align-items-center justify-content-between export-tasks__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.export_tasks') }}</span>
-                <span class="cursor-pointer font-size-16 export-tasks__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="export-tasks-dropdown-font-size-16 export-tasks-dropdown-font-weight-700">{{ $t('Projects.export_tasks') }}</span>
+                <span class="cursor-pointer export-tasks-dropdown-font-size-16 export-tasks__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
-            <div class="font-size-12 gray81 export-tasks__hint">{{ $t('Projects.export_hint') }}</div>
+            <div class="export-tasks-dropdown-font-size-12 export-tasks-dropdown-gray81 export-tasks__hint">{{ $t('Projects.export_hint') }}</div>
             <div class="d-flex">
-                <button class="btn-primary font-size-13 mr-10px" :disabled="isBusy" @click="startExport('csv')">{{ $t('Projects.export_csv') }}</button>
-                <button class="btn-primary font-size-13" :disabled="isBusy" @click="startExport('xlsx')">{{ $t('Projects.export_xlsx') }}</button>
+                <button class="btn-primary export-tasks-dropdown-font-size-13 mr-10px" :disabled="isBusy" @click="startExport('csv')">{{ $t('Projects.export_csv') }}</button>
+                <button class="btn-primary export-tasks-dropdown-font-size-13" :disabled="isBusy" @click="startExport('xlsx')">{{ $t('Projects.export_xlsx') }}</button>
             </div>
         </div>
     </div>
@@ -104,6 +104,24 @@ function downloadJob(job) {
     .catch((error) => console.error('ERROR in download export: ', error));
 }
 </script>
+
+<style scoped>
+.export-tasks-dropdown-font-size-12 {
+    font-size: 12px;
+}
+.export-tasks-dropdown-font-size-13 {
+    font-size: 13px;
+}
+.export-tasks-dropdown-font-size-16 {
+    font-size: 16px;
+}
+.export-tasks-dropdown-font-weight-700 {
+    font-weight: 700 !important;
+}
+.export-tasks-dropdown-gray81 {
+    color: var(--ink-2);
+}
+</style>
 
 <style scoped>
 .export-tasks__overlay {

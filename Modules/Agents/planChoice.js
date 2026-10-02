@@ -1,10 +1,12 @@
 const plans = require('./projectSetup');
 const projects = require('./projectCreate');
+const planFiling = require('./planFiling');
 
 // The parts of a plan a person keeps when they approve it. A choice names parts of the stored plan by their place in
 // it ("lists": [0, 2]), so it can take parts out and never put one in or reword one: whatever it names that the
 // stored plan does not hold is refused, and a kind of part it does not name is not made at all. A part that cannot
-// be made without one that is left out is refused with both named, so nothing is made by halves.
+// be made without one that is left out is refused with both named, so nothing is made by halves. The plan is read
+// in the shape it is kept in (./planFiling.js), as its card and its executor read it.
 
 const PLANS = Object.freeze({ 'project.setup': { mayBeEmpty: false }, [projects.ACTION]: { mayBeEmpty: true } });
 const NOUN = Object.freeze({ statuses: 'status', lists: 'list', fields: 'field', views: 'view', rules: 'automation', tasks: 'task' });
@@ -73,7 +75,7 @@ const narrowOne = (change, chosen) => {
     if (!isRecord(chosen)) return { error: REFUSED.shape };
     const plan = Object.hasOwn(PLANS, change.action) ? PLANS[change.action] : null;
     if (!plan) return { error: REFUSED.whole };
-    const params = change.params || {};
+    const params = planFiling.storedParams(change.action, change.params);
     const places = {};
     for (const [part, list] of Object.entries(chosen)) {
         const read = placesOf(params, part, list);
@@ -85,28 +87,33 @@ const narrowOne = (change, chosen) => {
     const problem = unmet(params, kept);
     if (problem) return { error: problem };
     const narrowed = { ...params };
+    let held = 0;
     for (const part of partsIn(params)) {
         const items = (places[part] || []).map((at) => itemsOf(params, part)[at]);
+        held += itemsOf(params, part).length;
         if (items.length) narrowed[plans.PLAN_KEY[part]] = items;
         else delete narrowed[plans.PLAN_KEY[part]];
     }
-    return { change: { ...change, params: narrowed } };
+    return { change: { ...change, params: narrowed }, leftOut: held - kept.length };
 };
 
 const given = (choice) => choice !== undefined && choice !== null;
 
-/* The changes of a proposal with each plan kept to its chosen parts, or why the choice cannot be followed. */
+/* The changes of a proposal with each plan kept to its chosen parts, and how many parts that left out; or why the
+ * choice cannot be followed. */
 const narrow = (stored, choice) => {
     if (!isRecord(choice)) return { error: REFUSED.shape };
     const changes = listOf(stored).map(plain);
+    let leftOut = 0;
     for (const [index, chosen] of Object.entries(choice)) {
         const at = /^\d+$/.test(index) ? Number(index) : -1;
         if (at < 0 || at >= changes.length) return { error: REFUSED.change };
         const read = narrowOne(changes[at], chosen);
         if (read.error) return read;
         changes[at] = read.change;
+        leftOut += read.leftOut;
     }
-    return { changes };
+    return { changes, leftOut };
 };
 
 module.exports = { given, narrow, needsOf, keyOf, REFUSED };

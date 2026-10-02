@@ -83,7 +83,7 @@
 
                 <div v-else-if="loadError" class="ibx__state ibx__state--error">
                     {{ loadError }}
-                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="reload">{{ $t('Inbox.retry') }}</button>
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="retry">{{ $t('Inbox.retry') }}</button>
                 </div>
 
                 <EmptyState
@@ -302,6 +302,7 @@ import { renderNotice } from './renderNotice';
 import { SNOOZE_PRESETS, formatWhen, resolveTimeZone, snoozeTarget, toZonedInput } from './snoozePresets';
 import { laterStorageKey, migrateLegacyLater } from './laterMigration';
 import { wakeTimer } from './snoozeWake';
+import { holdInView, refreshLimit, rowInView, stitchRows } from './refreshInPlace';
 import { loadInboxDensity, saveInboxDensity } from './inboxDensity';
 import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
 import ApprovalQueue from './ApprovalQueue.vue';
@@ -427,37 +428,81 @@ const loadCounts = async () => {
     } catch (e) { /* badges are decoration */ }
 };
 
-const load = async (append = false) => {
-    if (!append) { loading.value = true; loadError.value = ''; }
+const blank = () => { items.value = []; approvals.value = []; queue.value = []; applied.value = []; };
+
+/* The list read again while it is on screen: the rows, the cursor, the focused row and the scroll stay where they are. */
+const showRefreshed = async (d) => {
+    const onRow = rows.value[cursor.value] ? rowKey(rows.value[cursor.value]) : '';
+    const focusInList = Boolean(listEl.value?.contains(document.activeElement));
+    const anchor = rowInView(listEl.value, '.ibx__card');
+    const fresh = d.items || [];
+    const next = stitchRows(items.value, fresh, rowKey, !!d.hasMore);
+    const keptPastRead = next.length > fresh.length;
+    items.value = next;
+    approvals.value = d.approvals || [];
+    queue.value = d.proposals || [];
+    applied.value = d.applied || [];
+    if (!keptPastRead) hasMore.value = !!d.hasMore;
+    nextSkip.value = keptPastRead ? next.length : (d.nextSkip || 0);
+    const at = onRow ? rows.value.findIndex((row) => rowKey(row) === onRow) : -1;
+    cursor.value = at >= 0 ? at : Math.min(cursor.value, Math.max(0, rows.value.length - 1));
+    await nextTick();
+    holdInView(listEl.value, anchor);
+    if (focusInList && !listEl.value?.contains(document.activeElement) && !overlayState.open) focusCursor();
+};
+
+/* Only the latest read is drawn: one that lands after the person moved to another tab, or after a newer read, is dropped. */
+let loadTurn = 0;
+const load = async (append = false, { inPlace = false, quiet = false } = {}) => {
+    const turn = ++loadTurn;
+    const refreshing = inPlace && !append;
+    if (!append && !refreshing) { loading.value = true; loadError.value = ''; }
     busy.value = true;
+    const refused = (text) => {
+        if (refreshing) {
+            if (!quiet) $toast.error(text, { position: 'top-right' });
+            return;
+        }
+        loadError.value = text;
+        if (!append) blank();
+    };
     try {
         const skip = append ? nextSkip.value : 0;
         const q = new URLSearchParams({ tab: tab.value, kind: tab.value === APPROVAL ? 'all' : kind.value, skip: String(skip), sort: 'newest' });
+        if (refreshing) q.set('limit', String(refreshLimit(items.value.length)));
         const res = await apiRequest('get', `${env.INBOX}?${q.toString()}`);
+        if (turn !== loadTurn) return;
         if (!res?.data?.status) {
-            loadError.value = res?.data?.statusText || t('Inbox.load_failed');
-            if (!append) { items.value = []; approvals.value = []; queue.value = []; applied.value = []; }
+            refused(res?.data?.statusText || t('Inbox.load_failed'));
             return;
         }
         const d = res.data.data || {};
+        if (refreshing) {
+            loadError.value = '';
+            await showRefreshed(d);
+            return;
+        }
         items.value = append ? [...items.value, ...(d.items || [])] : (d.items || []);
         if (!append) { approvals.value = d.approvals || []; queue.value = d.proposals || []; applied.value = d.applied || []; }
         hasMore.value = !!d.hasMore;
         nextSkip.value = d.nextSkip || 0;
         if (!append) cursor.value = 0;
     } catch (e) {
-        loadError.value = e?.message || t('Inbox.load_failed');
-        if (!append) { items.value = []; approvals.value = []; queue.value = []; applied.value = []; }
+        if (turn === loadTurn) refused(e?.message || t('Inbox.load_failed'));
     } finally {
-        loading.value = false;
-        busy.value = false;
+        if (turn === loadTurn) {
+            loading.value = false;
+            busy.value = false;
+        }
     }
 };
 
-const reload = async () => { await Promise.all([load(false), loadCounts()]); };
+/* "Loading…" is for the first read of a tab. Every later read of the same tab is drawn in place. */
+const reload = async ({ quiet = false } = {}) => { await Promise.all([load(false, { inPlace: true, quiet }), loadCounts()]); };
+const retry = async () => { await Promise.all([load(false), loadCounts()]); };
 const loadMore = () => load(true);
-// A reload redraws the list, which would drop a half-made decision in the approval tab; nothing that arrives here changes that tab's rows.
-const refresh = () => (busy.value || tab.value === APPROVAL ? loadCounts() : reload());
+// Nothing that arrives here changes the approval tab's rows, so there only the counts are read.
+const refresh = () => (busy.value || tab.value === APPROVAL ? loadCounts() : reload({ quiet: true }));
 const snoozeWake = wakeTimer(refresh);
 
 // A new arrival moves the per-user counters document; only a rise means a new row.

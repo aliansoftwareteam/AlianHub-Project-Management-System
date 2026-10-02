@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const registry = require('./registry');
+const routeWrites = require('./routeWrites');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
 const projectLimits = require('./projectLimits');
@@ -33,14 +34,14 @@ const STATUS_ACTIONS = new Set(['task.status.set', 'task.status.change']);
 const CREATE_ACTIONS = new Set(['task.add', 'subtask.add']);
 
 const REASON = Object.freeze({
-    WORKSPACE_CHECK: 'this workspace has a person check an agent\'s work before it is closed, so a person closes this task',
-    NEVER: 'this project has people close its tasks, so a person closes this task',
-    APPROVAL: 'this project has a person approve an agent\'s close',
-    PROPOSE_ALL: 'this project has connected agents propose every change',
+    WORKSPACE_CHECK: 'in this workspace a person checks an agent\'s work before a task is closed, so a person closes this task',
+    NEVER: 'in this project only people close tasks, so a person closes this task',
+    APPROVAL: 'in this project a person has to approve it before an agent closes a task',
+    PROPOSE_ALL: 'in this project a connected agent has to ask a person before every change',
     PROPOSE_ONLY: 'an agent never makes this kind of change on its own',
     NOT_UNDOABLE: 'this change cannot be undone',
-    WITH_SUBTASKS: 'this change takes the task\'s subtasks with it, which is more than one task',
-    CONNECTED_PAUSED: 'connected agents are paused in this workspace, so no connected agent takes work or changes anything until an owner or admin resumes them',
+    WITH_SUBTASKS: 'this change also changes the task\'s subtasks, so it is more than one task',
+    CONNECTED_PAUSED: 'connected agents are paused in this workspace, so nothing can be taken or changed until an owner or an admin resumes them',
 });
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -193,9 +194,10 @@ const pastTheCount = async ({ companyId, actor, action, params, projectIds, appl
  * approval turns one answer, a connected agent's change that would wait, into "act" and comes back with it;
  * it never answers for a close, for a refusal, for a proposeOnly action, or for the count of tasks.
  * `applying` is passed only by a caller that makes the change on an answer of "act": that is when the change is
- * counted. Every other caller is told what the count would answer and takes no place in it. */
-const ask = async ({ companyId, actor, action, params = {}, approved = false, standing = false, taint = null, applying = false }) => {
-    const entry = registry.get(action);
+ * counted. Every other caller is told what the count would answer and takes no place in it.
+ * `onRoute` is passed only by the guard of a web route, whose writes are also the ones ./routeWrites names. */
+const ask = async ({ companyId, actor, action, params = {}, approved = false, standing = false, taint = null, applying = false, onRoute = false }) => {
+    const entry = registry.get(action) || (onRoute ? routeWrites.get(action) : null);
     if (!isAgent(actor) || !entry || !entry.write || ASKS_NOTHING.has(entry.key)) return act;
     const given = params && typeof params === 'object' ? params : {};
     const paused = approved ? '' : await pausedFor(companyId, actor, given);

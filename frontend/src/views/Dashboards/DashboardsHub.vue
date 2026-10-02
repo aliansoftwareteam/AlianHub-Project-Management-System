@@ -34,7 +34,7 @@
                                     <button type="button" class="ah-pop__item" role="menuitem" @click="duplicate(d)">{{ $t('Dash.duplicate') }}</button>
                                     <template v-if="d.canEdit">
                                         <div class="ah-pop__sep"></div>
-                                        <button type="button" class="ah-pop__item" role="menuitem" @click="destroy(d)">{{ $t('Dash.delete') }}</button>
+                                        <button type="button" class="ah-pop__item" role="menuitem" @click="askDelete(d)">{{ $t('Dash.delete') }}</button>
                                     </template>
                                 </div>
                             </transition>
@@ -78,6 +78,16 @@
             </div>
         </div>
 
+        <ConfirmDelete
+            v-if="deleting"
+            :title="$t('Dash.delete_title', { name: deleting.title })"
+            :description="$t('Dash.delete_text')"
+            :confirmLabel="$t('Dash.delete')"
+            :busy="deleteBusy"
+            @confirm="destroy"
+            @cancel="deleting = null"
+        />
+
         <div v-if="createOpen" class="dash__modal" @click.self="createOpen = false">
             <div class="dash__modal-panel">
                 <h2 class="ah-h2">{{ $t('Dash.new_dashboard') }}</h2>
@@ -119,6 +129,8 @@ import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import ConfirmDelete from '@/components/atom/ConfirmDelete/ConfirmDelete.vue';
+import { useToast } from 'vue-toast-notification';
 import { CARD_CATALOG, catalogEntry } from '@/plugins/dashboard/cardCatalog';
 import { fetchDashboards, createDashboard, duplicateDashboard, removeDashboard, makeCardUid } from '@/plugins/dashboard/dashboardsApi';
 
@@ -126,6 +138,7 @@ defineOptions({ name: 'DashboardsHub' });
 
 const router = useRouter();
 const { t } = useI18n();
+const $toast = useToast();
 const companyId = inject('$companyId', ref(''));
 
 const tabs = [
@@ -255,13 +268,28 @@ const duplicate = async (d) => {
     }
 };
 
-const destroy = async (d) => {
+const deleting = ref(null);
+const deleteBusy = ref(false);
+
+const askDelete = (d) => {
     menuFor.value = '';
+    deleting.value = d;
+};
+
+const destroy = async () => {
+    const d = deleting.value;
+    if (!d || deleteBusy.value) return;
+    deleteBusy.value = true;
     try {
         await removeDashboard(d._id);
         dashboards.value = dashboards.value.filter((x) => x._id !== d._id);
+        deleting.value = null;
+        $toast.success(t('Dash.deleted', { name: d.title }), { position: 'top-right' });
     } catch (e) {
-        error.value = t('Dash.save_failed');
+        deleting.value = null;
+        $toast.error(t('Dash.delete_failed'), { position: 'top-right' });
+    } finally {
+        deleteBusy.value = false;
     }
 };
 

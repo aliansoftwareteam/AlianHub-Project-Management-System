@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const registry = require('./registry');
+const routeWrites = require('./routeWrites');
 const projectPolicy = require('./projectPolicy');
 const audit = require('./agentAudit');
 const { resolveActor, isAgent, attribution } = require('./actor');
@@ -102,8 +103,31 @@ const taskPatchChecks = async (body, at) => {
  * workspace's proposal policy and the undo record apply; a task route has none of the three. */
 const evaluateOnRoute = (action, params) => {
     const check = registry.evaluate(action, params);
-    if (check.allowed && !registry.ACTIONS.includes(check.action)) return { allowed: false, reason: `Agents cannot perform ${action} on this route` };
+    if (check.allowed && !registry.ACTIONS.includes(check.action)) return { allowed: false, reason: `An agent is not allowed to do this (${action}). The person has to do it in AlianHub.` };
     return check;
+};
+
+/* A write the route leaves to an agent as its person may (./routeWrites) passes: the route's own guards are the
+ * person's rule. Anything else is judged as on every guarded route. */
+const evaluateTaken = (action, params) => {
+    const taken = routeWrites.get(action);
+    return taken ? { allowed: true, reason: '', action: taken } : evaluateOnRoute(action, params);
+};
+
+const TASK_PARAMS = ['taskId', 'relatedTaskId'];
+const PROJECT_PARAMS = ['projectId', 'listProjectId'];
+
+/* What the person behind the token cannot open reads as what is not there: the project's rule is asked of neither,
+ * so its answer says nothing of a project they cannot open and takes no place in that project's count. */
+const withinReach = async (companyId, uid, params) => {
+    const seen = { ...params };
+    const open = new Set(await readableTaskIds(companyId, uid, TASK_PARAMS.map((name) => idText(seen[name])).filter(Boolean)));
+    TASK_PARAMS.filter((name) => seen[name] !== undefined && !open.has(idText(seen[name]))).forEach((name) => { delete seen[name]; });
+    for (const name of PROJECT_PARAMS.filter((key) => seen[key] !== undefined)) {
+        const id = idText(seen[name]);
+        if (!id || !(await canReadProject(companyId, uid, id)).allowed) delete seen[name];
+    }
+    return seen;
 };
 
 /* A route cannot file a proposal, so what a project holds for a person is refused here and named as the MCP tool's to file. */
@@ -206,19 +230,19 @@ const failureOf = (res, answer) => {
 
 /* `checksOf(req, body, companyId)` names the registry action, or actions, the request is; every one must be
  * allowed without a flag. A write is recorded, a read is not. */
-const routeGuard = (checksOf) => withActor(async (req, res, next, actor) => {
+const routeGuard = (checksOf, evaluate = evaluateOnRoute) => withActor(async (req, res, next, actor) => {
     const companyId = req.headers['companyid'] || '';
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const checks = [].concat(await checksOf(req, body, companyId));
     let writes = false;
     for (const { action, params } of checks) {
-        const check = evaluateOnRoute(action, params);
+        const check = evaluate(action, params);
         if (!check.allowed) return refuse(req, res, actor, { action, reason: check.reason, params, entityId: params.taskId });
         writes = writes || Boolean(check.action.write);
     }
     if (!writes) return next();
     for (const { action, params } of checks) {
-        const rule = await projectPolicy.ask({ companyId, actor, action, params, applying: true });
+        const rule = await projectPolicy.ask({ companyId, actor, action, params: await withinReach(companyId, req.uid, params), applying: true, onRoute: true });
         if (rule.decision !== projectPolicy.DECISION.ACT) return refuse(req, res, actor, { action, reason: heldOnRoute(rule), params, entityId: params.taskId });
     }
     const [{ action, params }] = checks;
@@ -252,8 +276,34 @@ const pageCreateGuard = (req, res, next) => pageCreateChecked(req, res, () => {
     return next();
 });
 
-/* For a write route the registry has no action for, or only one behind a flag: `action` names it in the refusal and its audit row. */
-const agentsRefused = (action) => routeGuard(() => ({ action, params: {} }));
+/* For a write the route leaves to an agent as its person may: `checksOf` names the change and the task or project
+ * it lands in, the project's rule for agents is asked of it as of the MCP tool for the same change, and it is recorded. */
+const projectAsked = (checksOf) => routeGuard(checksOf, evaluateTaken);
+
+/* For a write route the registry has no action for, or only one behind a flag: `action` names it in the refusal and
+ * its audit row. `refusesAs` is read by the perimeter, which answers before a route is chosen. */
+const agentsRefused = (action) => Object.assign(routeGuard(() => ({ action, params: {} })), { refusesAs: action });
+
+/* For a read that makes what it does not find. An agent's request is marked before anything else on the route to
+ * read alone; where there is nothing to read, the handler answers it through `req.refuseMaking`, as `action` refused. */
+const agentsReadAlone = (action) => {
+    const refused = agentsRefused(action);
+    return Object.assign(withActor((req, res, next) => {
+        req.refuseMaking = () => refused(req, res, () => {});
+        return next();
+    }), { refusesAs: action });
+};
+
+/* The reminder an agent sets is the registry's: on a task its person can open, in that task's project. Any other,
+ * one with no task or with a task that is hidden or missing alike, is a person's to set. */
+const reminderChecks = async (req, body, companyId) => {
+    const taskId = idText(body.taskId);
+    const home = taskId ? await projectOfTask(companyId, req.uid, taskId) : '';
+    const inItsProject = body.projectId === undefined || idText(body.projectId) === home;
+    return home && inItsProject ? { action: 'reminder.create', params: { taskId } } : { action: 'reminder.manage', params: {} };
+};
+
+const reminderCreateGuard = routeGuard(reminderChecks);
 
 /* What the project update takes from an agent, as its person may: what the project is called and says, when it is
  * due, where the work came from, what is attached to it, and the person's own marks on it. */
@@ -303,7 +353,7 @@ const chatGuard = (threadOf) => withActor(async (req, res, next, actor) => {
     const kind = named && typeof named === 'object' ? await conversationOf(companyId, named) : named;
     const held = kind === DIRECT || (kind === CHANNEL && !holdsChat(req.apiToken));
     if (!held) return next();
-    return refuse(req, res, actor, { action: CHAT_REFUSED[kind], reason: `Agents cannot perform ${CHAT_REFUSED[kind]}`, params: {} });
+    return refuse(req, res, actor, { action: CHAT_REFUSED[kind], reason: `An agent is not allowed to do this (${CHAT_REFUSED[kind]}). The person has to do it in AlianHub.`, params: {} });
 });
 
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -357,15 +407,29 @@ const PERIMETER = [
     { test: (m, p) => m !== 'GET' && /\/api\/v2\/api-tokens/i.test(p) && !/\/me$/.test(p), action: 'token.manage' },
 ];
 
+/* The name the route's own guard refuses an agent under, or '' where the route has none. */
+const ownRefusalOf = (req, path) => {
+    try {
+        const router = req.app && (req.app._router || req.app.router);
+        const method = String(req.method || '').toLowerCase();
+        const layer = ((router && router.stack) || []).find((entry) => entry.route && entry.route.methods[method] && entry.match(path));
+        const guard = layer && layer.route.stack.map((entry) => entry.handle).find((handle) => handle && handle.refusesAs);
+        return guard ? guard.refusesAs : '';
+    } catch (e) {
+        return '';
+    }
+};
+
 const agentPerimeter = withActor(async (req, res, next, actor) => {
     const path = String(req.originalUrl || req.path || '').split('?')[0];
     const hit = PERIMETER.find((r) => r.test(req.method, path));
     if (!hit) return runForAgentOf(actor.userId, { chat: holdsChat(req.apiToken) }, next);
     const body = req.body || {};
-    if (hit.action === 'delete' || body.action === 'deleteTask') {
-        return refuse(req, res, actor, { action: hit.action === 'delete' ? `${/task/i.test(path) ? 'task' : 'project'}.delete` : 'task.delete', reason: `Agents cannot perform ${/task/i.test(path) ? 'task.delete' : 'project.delete'}`, params: {} });
-    }
-    return refuse(req, res, actor, { action: hit.action, reason: `Agents cannot perform ${hit.action}`, params: {} });
+    const removal = `${/task/i.test(path) ? 'task' : 'project'}.delete`;
+    const refusedAs = (action, named = action) => refuse(req, res, actor, { action, reason: `An agent is not allowed to do this (${named}). The person has to do it in AlianHub.`, params: {} });
+    if (hit.action === 'delete') return refusedAs(ownRefusalOf(req, path) || removal);
+    if (body.action === 'deleteTask') return refusedAs('task.delete', removal);
+    return refusedAs(hit.action);
 });
 
-module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };
+module.exports = { taskPatchGuard, taskCreateGuard, relationGuard, pageCreateGuard, goalGuard, projectUpdateGuard, agentsRefused, agentsReadAlone, projectAsked, reminderCreateGuard, chatGuard, agentPerimeter, TASK_PATCH_ACTIONS, PROJECT_TAGS_EDIT };

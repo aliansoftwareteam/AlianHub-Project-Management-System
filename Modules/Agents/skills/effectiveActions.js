@@ -20,10 +20,10 @@ const effectiveActions = (agent, skill) => {
 };
 
 const reasonOutside = (agent, skill, action) => {
-    if (!isEmittable(action)) return `${action} is not an action an agent can emit`;
+    if (!isEmittable(action)) return `An agent cannot do ${action}.`;
     const declared = skill && Array.isArray(skill.emits) ? skill.emits.map(String) : [];
-    if (!declared.includes(action)) return `${action} is not an action this skill declares`;
-    return `${action} is outside this agent's allowed actions`;
+    if (!declared.includes(action)) return `${action} is not part of this skill.`;
+    return `This agent is not allowed to use ${action}.`;
 };
 
 const narrowChanges = (agent, skill, changes) => {

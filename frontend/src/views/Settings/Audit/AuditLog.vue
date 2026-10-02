@@ -133,11 +133,11 @@ import { apiRequest } from "@/services";
 import { useGetterFunctions } from "@/composable";
 import * as env from "@/config/env";
 import { taintSourcesLine, taintSourcesOf } from "@/views/Ai/taintText";
-import { detailLines, entityWords, eventKey, eventWords, reasonWords } from "@/views/Ai/auditWords";
+import { detailLines, entityWords, eventKey, eventWords, reasonWords, searchKeys } from "@/views/Ai/auditWords";
 
 defineOptions({ name: "AuditLogPage" });
 
-const { t, te } = useI18n();
+const { t, te, tm, rt } = useI18n();
 const $toast = useToast();
 const route = useRoute();
 const { getUser } = useGetterFunctions();
@@ -201,6 +201,8 @@ const integrityHint = (row) => t(integrityKey(row) + "_hint", { seq: row.integri
 const time = (at) => (at ? moment(at).format(moment(at).isSame(moment(), "day") ? "HH:mm" : "D MMM HH:mm") : "");
 const deadline = (at) => (at ? moment(at).format("D MMM HH:mm") : "");
 
+const wordsOf = (namespace) => Object.fromEntries(Object.entries(tm(namespace) || {}).map(([key, message]) => [key, rt(message)]));
+
 const query = (extra = {}) => {
     const q = { page: page.value, limit: 25, ...extra };
     if (scope.value === "agent") q.actorType = "agent";
@@ -208,7 +210,7 @@ const query = (extra = {}) => {
     if (scope.value === "gated") q.gated = "true";
     if (scope.value === "undone") q.undone = "true";
     if (scope.value === "refused") q.refused = "true";
-    if (search.value) q.q = search.value;
+    if (search.value) Object.assign(q, { q: search.value }, searchKeys(wordsOf, search.value));
     if (projectFilter.value) q.projectId = projectFilter.value.id;
     return Object.entries(q).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
 };

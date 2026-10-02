@@ -200,7 +200,7 @@ describe('an OAuth token is held to the one scope each data tool needs', () => {
     it.each(DATA_TOOLS)('%s is refused with insufficient scope when the grant lacks its scope, before anything is read', async (name) => {
         const needed = scopes.scopeForTool(name);
         const others = ['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write'].filter((s) => s !== needed);
-        await expect(call(name, ARGS[name], oauth(others))).rejects.toMatchObject({ code: -32004, message: `This token lacks the ${needed} scope.` });
+        await expect(call(name, ARGS[name], oauth(others))).rejects.toMatchObject({ code: -32004, message: `This connection was not given the ${needed} permission. Ask the person to connect you again and allow it.` });
         expect(actions.authorizeRead).not.toHaveBeenCalled();
         expect(actions.perform).not.toHaveBeenCalled();
         const messages = [{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: ARGS[name] } }];
@@ -234,14 +234,14 @@ describe.each(Object.keys(people))('the data tools answer a %s token exactly as 
         expect(await call('project.get', { projectId: P_A })).toMatchObject({ projectId: P_A, name: 'Apollo' });
         for (const [open, id] of [[want.openB, P_B], [want.openC, P_C], [false, P_PERSONAL], [false, 'nope']]) {
             const out = await call('project.get', { projectId: id });
-            if (open) expect(out.projectId).toBe(id); else expect(out).toEqual({ error: 'project not found' });
+            if (open) expect(out.projectId).toBe(id); else expect(out).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
         }
     });
 
     it('sprints.list hides a private sprint from anyone not on it, except owners and admins', async () => {
         expect((await call('sprints.list', { projectId: P_A })).sprints.map((s) => s.name).sort()).toEqual(want.sprintsA);
         const outB = await call('sprints.list', { projectId: P_B });
-        if (want.openB) expect(outB.sprints.map((s) => s.name)).toEqual(['B sprint']); else expect(outB).toEqual({ error: 'project not found' });
+        if (want.openB) expect(outB.sprints.map((s) => s.name)).toEqual(['B sprint']); else expect(outB).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
     });
 
     it('statuses.list gives the project\'s own statuses, and nothing for a project outside the filter', async () => {
@@ -251,16 +251,16 @@ describe.each(Object.keys(people))('the data tools answer a %s token exactly as 
             { key: 9, name: 'Done', type: 'close', color: '#0f0' },
         ]);
         const outB = await call('statuses.list', { projectId: P_B });
-        if (want.openB) expect(outB.statuses).toHaveLength(3); else expect(outB).toEqual({ error: 'project not found' });
+        if (want.openB) expect(outB.statuses).toHaveLength(3); else expect(outB).toEqual({ error: 'That project was not found. Ask the person which project they mean.' });
     });
 
     it('comments.list reads a task\'s comments only when the person can open the task, newest first and without deleted ones', async () => {
         expect((await call('comments.list', { taskId: fx.tA._id })).comments.map((c) => c.text)).toEqual(['second on A', 'first on A']);
         for (const [open, t, text] of [[want.openB, fx.tB, 'on B'], [want.openC, fx.tC, 'on C'], [want.commentsPriv, fx.tPriv, 'on the private sprint task']]) {
             const out = await call('comments.list', { taskId: t._id });
-            if (open) expect(out.comments.map((c) => c.text)).toEqual([text]); else expect(out).toEqual({ error: 'task not found' });
+            if (open) expect(out.comments.map((c) => c.text)).toEqual([text]); else expect(out).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         }
-        expect(await call('comments.list', { taskId: '6f00000000000000000000ff' })).toEqual({ error: 'task not found' });
+        expect(await call('comments.list', { taskId: '6f00000000000000000000ff' })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
     });
 
     it('pages.search never returns another person\'s private page or a page outside the filter', async () => {
@@ -278,7 +278,7 @@ describe.each(Object.keys(people))('the data tools answer a %s token exactly as 
         expect((await call('page.get', { pageId: fx.pgMine._id })).title).toBe('my private note');
         for (const [open, pg] of [[want.openB, fx.pgB], [want.openC, fx.pgC], [false, fx.pgTheirs], [false, fx.pgGone], [want.pages.includes('company handbook'), fx.pgCompany]]) {
             const out = await call('page.get', { pageId: pg._id });
-            if (open) expect(out.title).toBe(pg.title); else expect(out).toEqual({ error: 'page not found' });
+            if (open) expect(out.title).toBe(pg.title); else expect(out).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
         }
     });
 

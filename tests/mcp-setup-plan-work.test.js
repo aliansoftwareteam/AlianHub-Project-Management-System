@@ -124,7 +124,9 @@ const filed = async (args = PLAN, caller = as(OWNER)) => {
 const partOf = (out, name) => out.applied[0].result.parts.find((part) => part.part === name);
 const previewOf = async (id, uid = OWNER) => (await intentPreview.forProposals(CID, uid, [proposal(id)])).get(id)[0];
 
-beforeEach(() => {
+const WARM_UP_MS = 60000;
+
+const startOver = () => {
     seed();
     process.env.MCP_TOOLS_MANAGE = 'on';
     const projectRules = rows(SCHEMA_TYPE.RULES).find((rule) => rule.isParent && rule.key === 'project');
@@ -142,7 +144,17 @@ beforeEach(() => {
     }));
     jest.spyOn(memory, 'rememberApprovedChanges').mockResolvedValue([]);
     matcher.invalidateAll();
-});
+};
+
+/* An approved plan runs the web app's own routes, which are loaded on first use. One plan is approved here, with
+   time to spare, so that loading is not counted against the first test that approves one. */
+beforeAll(async () => {
+    startOver();
+    await approve(await filed());
+    await settle();
+    jest.restoreAllMocks();
+}, WARM_UP_MS);
+beforeEach(startOver);
 afterEach(async () => { await settle(); jest.restoreAllMocks(); });
 afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
@@ -218,14 +230,14 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
 
     it('refuses first tasks from a connection that may not create a task with its details', async () => {
         const plan = tasksOnly();
-        await refusedFor(as(INSIDER, { token: { grants: [] } }), plan, /^permission_denied: .*may not use/);
+        await refusedFor(as(INSIDER, { token: { grants: [] } }), plan, /^permission_denied: .*is not allowed to use/);
         delete process.env.MCP_TOOLS_MANAGE;
-        await refusedFor(as(INSIDER), plan, /^permission_denied: .*may not use/);
+        await refusedFor(as(INSIDER), plan, /^permission_denied: .*is not allowed to use/);
     });
 
     it('refuses what the skills of the connection leave out', async () => {
-        await refusedFor(as(INSIDER, { allowedActions: [TOOL] }), tasksOnly(), /^permission_denied: .*may not use/);
-        await refusedFor(as(OWNER, { allowedActions: [TOOL, TASK] }), { projectId: P_OPEN, rules: [reviewNotice({ conditions: [] })] }, /^permission_denied: .*may not use/);
+        await refusedFor(as(INSIDER, { allowedActions: [TOOL] }), tasksOnly(), /^permission_denied: .*is not allowed to use/);
+        await refusedFor(as(OWNER, { allowedActions: [TOOL, TASK] }), { projectId: P_OPEN, rules: [reviewNotice({ conditions: [] })] }, /^permission_denied: .*is not allowed to use/);
         await filed(tasksOnly(), as(INSIDER, { allowedActions: [TOOL, TASK] }));
     });
 
@@ -240,7 +252,7 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
 
     it('refuses a first task that closes itself where the project has people close its tasks', async () => {
         await projectPolicy.save(CID, P_OPEN, { done: 'never' }, OWNER);
-        await refusedFor(as(INSIDER), tasksOnly([{ name: 'Already done', status: 'Done' }]), /people close its tasks/);
+        await refusedFor(as(INSIDER), tasksOnly([{ name: 'Already done', status: 'Done' }]), /only people close tasks/);
         await filed(tasksOnly([{ name: 'Still open', status: 'In Progress' }]), as(INSIDER));
     });
 
@@ -249,8 +261,8 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
             expect(await rpc(as(OWNER), TOOL, { projectId: P_OPEN, ...plan })).toMatchObject({ ok: false, error: expect.stringMatching(error) });
         };
         await answer({ rules: [reviewNotice()] }, /^rules\[0\]: .*In Review/);
-        await answer({ tasks: [{ name: 'Brief', list: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a list of this plan or of the project/);
-        await answer({ tasks: [{ name: 'Brief', status: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a status of this plan or of the project/);
+        await answer({ tasks: [{ name: 'Brief', list: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a list in this plan or in the project/);
+        await answer({ tasks: [{ name: 'Brief', status: 'Nowhere' }] }, /^tasks\[0\] \(Brief\): "Nowhere" is not a status in this plan or in the project/);
         expect(await rpc(as(OUTSIDER), TOOL, { projectId: P_OPEN, tasks: [{ name: 'Brief', list: 'Private list' }] })).toMatchObject({ ok: false, error: expect.stringMatching(/^tasks\[0\] \(Brief\): "Private list" is not a list/) });
         expect(await rpc(as(INSIDER), TOOL, { projectId: P_PRIVATE, tasks: [{ name: 'Brief', assigneeId: OUTSIDER }] })).toMatchObject({ ok: false, error: expect.stringMatching(/^tasks\[0\] \(Brief\): /) });
         expect(waiting()).toHaveLength(0);
@@ -295,21 +307,33 @@ describe('approving makes each automation and each task as its own action, after
 
     it('makes an automation only for an owner or an admin who approves, and the rest for anyone who may', async () => {
         const id = await filed();
-        const out = await approve(id, INSIDER);
+        expect(await approve(id, INSIDER)).toMatchObject({ status: 403, error: expect.stringMatching(/owner or admin approves a part of this plan/) });
+        expect(proposal(id).status).toBe('pending');
+        const out = await approve(id, INSIDER, { 0: { statuses: [0], lists: [0], fields: [0], views: [0], rules: [], tasks: [0, 1, 2] } });
         expect(out.error).toBeUndefined();
-        expect(partOf(out, 'rules')).toMatchObject({ ok: false, items: [{ made: false, error: expect.stringMatching(/owner or an admin/) }] });
-        expect(out.applied[0].result.notMade).toEqual([{ part: 'rules', name: 'automation number 1', error: expect.stringMatching(/owner or an admin/) }]);
+        expect(out.applied[0].result.parts.map((part) => part.part)).toEqual(['statuses', 'lists', 'fields', 'views', 'tasks']);
+        expect(out.applied[0].result.notMade).toEqual([]);
         expect(liveRules()).toHaveLength(0);
         expect(partOf(out, 'tasks').ok).toBe(true);
         expect(taskNamed('Write the brief')).toBeTruthy();
     });
 
+    it('makes no automation for someone who stopped being an owner or an admin while the plan was being approved', async () => {
+        const id = await filed();
+        const out = await proposals.approve(CID, id, { decider: human(INSIDER), isPrivileged: true, ip: '' });
+        expect(partOf(out, 'rules')).toMatchObject({ ok: false, items: [{ made: false, error: expect.stringMatching(/owner or an admin/) }] });
+        expect(out.applied[0].result.notMade).toEqual([{ part: 'rules', name: 'automation number 1', error: expect.stringMatching(/owner or an admin/) }]);
+        expect(liveRules()).toHaveLength(0);
+    });
+
     it('makes no task for an approver who may not create one', async () => {
         ['project_custom_field', 'view_list', 'project_details', 'project_sprint_create'].forEach((key) => setRule(key, true, [3, 0]));
         const id = await filed(tasksOnly([TASKS[2]]), as(INSIDER));
-        const out = await approve(id, GUEST);
+        expect(await approve(id, GUEST)).toMatchObject({ status: 403, error: expect.stringMatching(/owner or admin approves a part of this plan/) });
+        expect(proposal(id).status).toBe('pending');
+        const out = await approve(id, GUEST, { 0: { lists: [0], statuses: [0], tasks: [] } });
         expect(partOf(out, 'lists').ok).toBe(true);
-        expect(partOf(out, 'tasks')).toMatchObject({ ok: false, items: [{ name: 'Collect the logins', made: false, error: expect.stringMatching(/approver may not/) }] });
+        expect(out.applied[0].result.parts.map((part) => part.part)).toEqual(['statuses', 'lists']);
         expect(taskNamed('Collect the logins')).toBeUndefined();
     });
 
@@ -328,7 +352,7 @@ describe('approving makes each automation and each task as its own action, after
         await projectPolicy.save(CID, P_OPEN, { done: 'never' }, OWNER);
         const out = await approve(id);
         expect(partOf(out, 'tasks').items).toEqual([
-            { name: 'Already done', made: false, error: expect.stringMatching(/people close its tasks/) },
+            { name: 'Already done', made: false, error: expect.stringMatching(/only people close tasks/) },
             { name: 'Collect the logins', made: true, taskId: expect.any(String), auditId: expect.any(String) },
         ]);
         expect(taskNamed('Already done')).toBeUndefined();
@@ -342,8 +366,8 @@ describe('approving makes each automation and each task as its own action, after
         });
         const out = await approve(String(saved._id));
         expect(partOf(out, 'lists').ok).toBe(true);
-        expect(partOf(out, 'rules').items[0]).toMatchObject({ made: false, error: expect.stringMatching(/not in this agent's skills/) });
-        expect(partOf(out, 'tasks').items[0]).toMatchObject({ made: false, error: expect.stringMatching(/not in this agent's skills/) });
+        expect(partOf(out, 'rules').items[0]).toMatchObject({ made: false, error: expect.stringMatching(/is not switched on for this connection/) });
+        expect(partOf(out, 'tasks').items[0]).toMatchObject({ made: false, error: expect.stringMatching(/is not switched on for this connection/) });
         expect(liveRules()).toHaveLength(0);
         expect(taskNamed('Brief')).toBeUndefined();
     });

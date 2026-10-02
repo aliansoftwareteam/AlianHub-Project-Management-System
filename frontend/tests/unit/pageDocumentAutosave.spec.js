@@ -84,6 +84,19 @@ describe('a doc saves itself', () => {
         wrapper.unmount();
     });
 
+    it('saves a title typed before the editor has finished drawing', async () => {
+        const wrapper = shallowMount(PageDocument, { props: { pageId: 'p1' } });
+        await flushPromises();
+        await wrapper.find('.pd__title').setValue('Plan B');
+        await wrapper.findComponent(PageBlockEditor).vm.$emit('ready');
+        expect(state(wrapper)).toBe('Docs.saving');
+
+        await pause();
+        expect(put).toHaveBeenCalledTimes(1);
+        expect(put.mock.calls[0][0]).toMatchObject({ title: 'Plan B', contentHtml: '<p>One</p>', autosave: true });
+        wrapper.unmount();
+    });
+
     it('saves at once when focus leaves the doc, and when the doc is closed, without asking', async () => {
         const confirm = vi.spyOn(window, 'confirm');
         const wrapper = await openDoc();

@@ -65,7 +65,7 @@ exports.getSprintBurndown = async (req, res) => {
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [
-                { sprintId: sprintObjId, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true },
+                { sprintId: sprintObjId, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true, mainChat: { $ne: true } },
                 '_id TaskKey statusType points totalEstimatedTime createdAt updatedAt',
             ],
         }, 'find');

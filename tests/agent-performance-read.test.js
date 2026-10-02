@@ -155,8 +155,8 @@ describe('with AGENT_PERFORMANCE_READ off', () => {
     });
 
     it('refuses a direct call before reading anything, whatever its arguments', async () => {
-        await expect(call(OWNER, ALL)).rejects.toMatchObject({ name: 'RefusedError', message: 'Agents cannot perform performance.read' });
-        await expect(call(OWNER, { projectId: P1 })).rejects.toMatchObject({ name: 'RefusedError', message: 'Agents cannot perform performance.read' });
+        await expect(call(OWNER, ALL)).rejects.toMatchObject({ name: 'RefusedError', message: 'That action is not available to agents (performance.read).' });
+        await expect(call(OWNER, { projectId: P1 })).rejects.toMatchObject({ name: 'RefusedError', message: 'That action is not available to agents (performance.read).' });
         expect(timesheetReads()).toHaveLength(0);
         expect(replays()).toHaveLength(0);
     });
@@ -176,7 +176,7 @@ describe('with AGENT_PERFORMANCE_READ on, the action is registered like the othe
     });
 
     it('is refused for an agent whose allowed actions leave it out', async () => {
-        await expect(call(OWNER, ALL, { allowedActions: ['task.get'] })).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(/not in this agent's skills/) });
+        await expect(call(OWNER, ALL, { allowedActions: ['task.get'] })).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(/is not switched on for this connection/) });
         expect(timesheetReads()).toHaveLength(0);
     });
 });
@@ -293,15 +293,15 @@ describe('access follows the person behind the agent and the projects it is narr
 
 describe('arguments are checked before anything is read', () => {
     it.each([
-        ['a range longer than the maximum', { projectId: P1, from: '2026-01-01', to: '2026-06-30' }, /at most 120 days/],
-        ['an inverted range', { projectId: P1, from: TO, to: FROM }, /from must not be after to/],
-        ['a missing from', { projectId: P1, to: TO }, /from and to are required/],
-        ['a missing to', { projectId: P1, from: FROM }, /from and to are required/],
+        ['a range longer than the maximum', { projectId: P1, from: '2026-01-01', to: '2026-06-30' }, /at most 120 days at a time/],
+        ['an inverted range', { projectId: P1, from: TO, to: FROM }, /first day must not be after the last day/],
+        ['a missing from', { projectId: P1, to: TO }, /Give the first and the last day/],
+        ['a missing to', { projectId: P1, from: FROM }, /Give the first and the last day/],
         ['a date that is not a calendar day', { projectId: P1, from: '2026-02-30', to: '2026-03-02' }, /YYYY-MM-DD/],
-        ['no project', { from: FROM, to: TO }, /projectId is required/],
-        ['a malformed project id', { projectId: 'p1', from: FROM, to: TO }, /not a valid project id/],
-        ['too many projects', { projectIds: [1, 2, 3, 4, 5, 6].map((n) => `6f00000000000000000001a${n}`), from: FROM, to: TO }, /at most 5 projects/],
-        ['an unknown metric', { ...ALL, metrics: ['revenue'] }, /unknown metric "revenue"/],
+        ['no project', { from: FROM, to: TO }, /Name at least one project/],
+        ['a malformed project id', { projectId: 'p1', from: FROM, to: TO }, /is not a project id/],
+        ['too many projects', { projectIds: [1, 2, 3, 4, 5, 6].map((n) => `6f00000000000000000001a${n}`), from: FROM, to: TO }, /at most 5 projects at a time/],
+        ['an unknown metric', { ...ALL, metrics: ['revenue'] }, /"revenue" is not a number you can ask for/],
     ])('refuses %s', async (_, args, reason) => {
         await expect(call(OWNER, args)).rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(reason) });
         expect(timesheetReads()).toHaveLength(0);

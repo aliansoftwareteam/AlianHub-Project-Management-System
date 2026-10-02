@@ -76,7 +76,7 @@ const v1Statuses = (companyId, conditions, projectIds) => (conditions && conditi
     : Promise.resolve([]));
 
 const visibleOnly = async (companyId, uid, match) => ({
-    $and: [match, { ProjectID: { $in: await access.visibleProjectIds(companyId, uid) } }],
+    $and: [match, { ProjectID: { $in: await access.visibleProjectIds(companyId, uid) }, mainChat: { $ne: true } }],
 });
 
 // POST /api/v1/automations
@@ -443,7 +443,7 @@ exports.dryRun = async (req, res) => {
         const taskId = oid(rawTaskId);
         if (!taskId) return refuse(res, 404, NOT_FOUND);
         const task = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId, deletedStatusKey: { $ne: 1 } }],
+            type: SCHEMA_TYPE.TASKS, data: [{ _id: taskId, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }],
         }, 'findOne');
         const visible = (await access.visibleProjectIds(companyId, req.uid)).map(String);
         if (!task || !visible.includes(String(task.ProjectID))) return refuse(res, 404, NOT_FOUND);
@@ -547,7 +547,7 @@ exports.backtest = async (req, res) => {
         const basis = await triggerState.backtestBasis(companyId, rule.trigger && rule.trigger.event, { since, projectIds, windowDays: WINDOW_DAYS });
         const match = { ...basis.match };
         if (Object.keys(conditionMatch).length) Object.assign(match, conditionMatch);
-        const scoped = { $and: [match, { ProjectID: { $in: projectIds } }] };
+        const scoped = { $and: [match, { ProjectID: { $in: projectIds }, mainChat: { $ne: true } }] };
         const [count, sample] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped] }, 'countDocuments').catch(() => 0),
             MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [scoped, 'TaskName TaskKey ProjectID statusKey', { limit: 5, sort: { updatedAt: -1 } }] }, 'find').catch(() => []),

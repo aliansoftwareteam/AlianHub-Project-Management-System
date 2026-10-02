@@ -27,9 +27,17 @@ function momentToLuxonFormat(fmt) {
         .replace(/MMMM/g, 'LLLL')
         .replace(/MMM/g, 'LLL')
         .replace(/\bMM\b/g, 'LL')   // bare MM = month
-        .replace(/\bDD\b/g, 'dd');  // bare DD = day-of-month
+        .replace(/\bDD\b/g, 'dd')   // bare DD = day-of-month
+        .replace(/\bD\b/g, 'd')
+        .replace(/\bA\b/g, 'a');
 }
 exports.momentToLuxonFormat = momentToLuxonFormat;
+
+function ordinal(n) {
+    const lastTwo = n % 100;
+    if (lastTwo >= 11 && lastTwo <= 13) return `${n}th`;
+    return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'}`;
+}
 
 /**
  * Format a JS Date / numeric millis / Firestore-style {seconds}
@@ -51,7 +59,9 @@ exports.formatDate = (input, fmt = 'yyyy-LL-dd') => {
         dt = DateTime.fromISO(String(input));
         if (!dt.isValid) dt = DateTime.fromJSDate(new Date(input));
     }
-    return dt.isValid ? dt.toFormat(momentToLuxonFormat(fmt)) : '';
+    if (!dt.isValid) return '';
+    const withOrdinal = typeof fmt === 'string' ? fmt.replace(/\bDo\b/g, `'${ordinal(dt.day)}'`) : fmt;
+    return dt.toFormat(momentToLuxonFormat(withOrdinal));
 };
 
 /**
@@ -60,10 +70,7 @@ exports.formatDate = (input, fmt = 'yyyy-LL-dd') => {
  *
  * Since every branch in the original code used the SAME format string,
  * the calendar wrapper was effectively a no-op — the output is always
- * the configured fixed format. We preserve the literal output
- * (including the original `MM` token in the time slot, which is
- * actually moment's "month number" rather than minutes — pre-existing
- * behaviour we don't change here).
+ * the configured fixed format.
  */
 exports.formatNotificationDate = (input) => {
     if (input == null) return 'N/A';
@@ -76,6 +83,5 @@ exports.formatNotificationDate = (input) => {
     // moment's `A` = uppercase AM/PM. luxon `a` is lowercase; uppercase
     // only the meridiem.
     const meridiem = dt.hour >= 12 ? 'PM' : 'AM';
-    // Preserve original `HH:MM` (month-in-time-slot) quirk.
-    return `${dt.toFormat('dd-LL-yyyy HH:LL')} ${meridiem} [IST]`;
+    return `${dt.toFormat('dd-LL-yyyy HH:mm')} ${meridiem} [IST]`;
 };

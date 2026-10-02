@@ -885,3 +885,43 @@ describe('a field shared with the copy', () => {
         expect(valuesIn(copy.id)).toEqual([{ [field]: { fieldValue: 4, _id: field } }]);
     });
 });
+
+describe('the people a copy keeps', () => {
+    const GONE = 'a00000000000000000000009';
+    const WITH_PEOPLE = { include: { tasks: true, assignees: true, dates: false } };
+    const taskNamed = (copy, name) => byName(copy.tasks, name, 'TaskName');
+
+    beforeEach(() => {
+        db().seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GONE, roleType: MEMBER_ROLE, status: 3, isDelete: true });
+    });
+
+    it('leaves out a person who no longer holds a seat, on the project, its tasks and their checklists', async () => {
+        const open = seedLaunch({ ProjectName: 'Open', ProjectCode: 'OPN', AssigneeUserId: [OWNER, MEMBER, GONE] });
+        seedTask(open, open.backlog, { TaskName: 'Shared', AssigneeUserId: [MEMBER, GONE], checklistArray: [{ id: 'c1', name: 'Step', AssigneeUserId: [GONE, MEMBER] }] });
+        const copy = copyOf(await duplicate(open.id, WITH_PEOPLE));
+
+        expect(copy.project.AssigneeUserId).toEqual([OWNER, MEMBER]);
+        expect(taskNamed(copy, 'Shared').AssigneeUserId).toEqual([MEMBER]);
+        expect(taskNamed(copy, 'Shared').checklistArray[0].AssigneeUserId).toEqual([MEMBER]);
+    });
+
+    it('leaves out a person who cannot open the new project, on its tasks and its private lists', async () => {
+        const secret = seedLaunch({ ProjectName: 'Secret', ProjectCode: 'SEC', isPrivateSpace: true, AssigneeUserId: [OWNER, MEMBER] });
+        rowsOf(SCHEMA_TYPE.SPRINTS).find((row) => String(row._id) === secret.glyphs).AssigneeUserId = [OWNER, OUTSIDER, GONE];
+        seedTask(secret, secret.backlog, { TaskName: 'Handed over', AssigneeUserId: [OUTSIDER, MEMBER], checklistArray: [{ id: 'c1', name: 'Step', AssigneeUserId: [OUTSIDER] }] });
+        const copy = copyOf(await duplicate(secret.id, WITH_PEOPLE));
+
+        expect([...copy.project.AssigneeUserId].sort()).toEqual([OWNER, MEMBER].sort());
+        expect(byName(copy.lists, 'Glyphs').AssigneeUserId).toEqual([OWNER]);
+        expect(taskNamed(copy, 'Handed over').AssigneeUserId).toEqual([MEMBER]);
+        expect(taskNamed(copy, 'Handed over').checklistArray[0].AssigneeUserId).toEqual([]);
+    });
+
+    it('keeps a team of the company and leaves out one that is not', async () => {
+        const team = `tId_${seed(SCHEMA_TYPE.TEAMS_MANAGEMENT, { name: 'Design', assigneeUsersArray: [MEMBER] })._id}`;
+        const open = seedLaunch({ ProjectName: 'Open', ProjectCode: 'OPN', AssigneeUserId: [OWNER, team, `tId_${oid()}`] });
+        const copy = copyOf(await duplicate(open.id, WITH_PEOPLE));
+
+        expect(copy.project.AssigneeUserId).toEqual([OWNER, team]);
+    });
+});

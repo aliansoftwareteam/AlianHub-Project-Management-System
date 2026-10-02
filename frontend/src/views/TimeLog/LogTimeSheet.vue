@@ -115,6 +115,7 @@ import { useI18n } from 'vue-i18n';
 import moment from 'moment';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { typedSearchText } from '@/utils/searchText';
 import { useTimer, formatMinutes, formatHm, formatClock } from '@/composable/useTimer';
 import { timeLogFailureKey } from '@/composable/timeLogFailure';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
@@ -229,7 +230,7 @@ const fetchAssigned = async () => {
         await loadProjectNames();
         const match = { AssigneeUserId: { $in: [uid.value] }, deletedStatusKey: { $in: [0, null] } };
         const q = search.value.trim();
-        if (q) match.TaskName = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+        if (q) match.TaskName = { $regex: typedSearchText(q), $options: 'i' };
         const findQuery = [{ $match: match }, { $sort: { updatedAt: -1 } }, { $limit: 30 }, { $project: { TaskName: 1, ProjectID: 1, sprintId: 1 } }];
         const res = await apiRequest('post', `${env.TASK}/find`, { findQuery });
         const list = Array.isArray(res && res.data) ? res.data : [];
