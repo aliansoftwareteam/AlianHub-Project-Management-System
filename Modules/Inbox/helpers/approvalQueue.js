@@ -1,30 +1,29 @@
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const access = require('../../Agents/access');
-const permissions = require('../../Agents/permissions');
+const approverRights = require('../../Agents/approverRights');
 const intentPreview = require('../../Agents/intentPreview');
 const changeLabels = require('../../Agents/changeLabels');
 const standingApprovals = require('../../Agents/standingApprovals');
 const logger = require('../../../Config/loggerConfig');
 
 // The queue is a view of the proposals the agent API already lists for this person
-// (access.readScopeOf), never a wider one. Deciding still goes through that API, so a row
-// shown here that the person may not decide is refused there.
+// (access.readScopeOf), never a wider one. Deciding still goes through that API, which reads
+// the same rule (Agents/approverRights) a row's `locked` is read from.
 
 const QUEUE_LIMIT = 100;
 const APPLIED_LIMIT = 20;
 const SOURCE_MCP = 'mcp';
-const SOURCE_SYSTEM = 'system';
 
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
 
 /* Whether "Always do this" is offered on the row, and the kind of change it would cover. */
-const alwaysOf = (caller, proposal) => {
-    const offered = access.mayDecideProposal(caller, proposal) && standingApprovals.offerable(proposal);
+const alwaysOf = (standing, proposal) => {
+    const offered = !standing.locked && standingApprovals.offerable(proposal);
     return offered ? { always: true, alwaysKind: standingApprovals.labelOf(proposal.changes[0].action) } : { always: false };
 };
 
-const toRow = (caller, previews, batches = new Map()) => (proposal) => ({
+const toRow = (previews, batches = new Map()) => (proposal, standing) => ({
     sourceType: 'proposal',
     sourceId: String(proposal._id),
     proposalId: String(proposal._id),
@@ -43,8 +42,10 @@ const toRow = (caller, previews, batches = new Map()) => (proposal) => ({
     ...(batches.has(String(proposal._id)) ? { batch: batches.get(String(proposal._id)) } : {}),
     cost: proposal.cost || null,
     gate: proposal.gate || null,
-    locked: !access.mayDecideProposal(caller, proposal),
-    ...alwaysOf(caller, proposal),
+    locked: standing.locked,
+    lockedWhy: standing.lockedWhy,
+    mayDecline: standing.mayDecline,
+    ...alwaysOf(standing, proposal),
     // approval.refusalFor refuses an edited approval of a change a connected agent filed.
     editable: proposal.source !== SOURCE_MCP,
     tainted: Boolean(proposal.taint && proposal.taint.reason),
@@ -53,13 +54,6 @@ const toRow = (caller, previews, batches = new Map()) => (proposal) => ({
     createdAt: proposal.createdAt,
     unread: true,
 });
-
-/* A change the system filed runs on the approver's own rights, so it is offered only to a person who could make it by hand. */
-const heldToOwnRights = (companyId, userId) => async (row) => {
-    if (row.source !== SOURCE_SYSTEM || row.locked) return row;
-    const answers = await Promise.all(row.changes.map((change) => permissions.holderMay(companyId, { userId: String(userId) }, change.action, change.params)));
-    return answers.every((answer) => answer.allowed) ? row : { ...row, locked: true };
-};
 
 const readQueue = async (companyId, userId) => {
     const caller = await access.personOf(companyId, userId);
@@ -75,8 +69,9 @@ const readQueue = async (companyId, userId) => {
         logger.error(`[inbox] proposal previews: ${error.message}`);
         return new Map();
     });
-    const [previews, batches] = await Promise.all([cards(intentPreview.forProposals), cards(intentPreview.forBatches)]);
-    return Promise.all(listed.map(toRow(caller, previews, batches)).map(heldToOwnRights(companyId, userId)));
+    const [previews, batches, standings] = await Promise.all([cards(intentPreview.forProposals), cards(intentPreview.forBatches), approverRights.standingsOf(companyId, caller, listed)]);
+    const row = toRow(previews, batches);
+    return listed.map((proposal, at) => row(proposal, standings[at]));
 };
 
 const waitingCount = (rows) => rows.filter((row) => !row.locked).length;
@@ -92,7 +87,7 @@ const readApplied = async (companyId, userId) => {
     }, 'find');
     const listed = (rows || []).map(plain).filter(access.staysInside(scope.projectIds));
     const previews = await intentPreview.forProposals(companyId, userId, listed).catch(() => new Map());
-    return listed.map(toRow(caller, previews)).map((row, at) => ({ ...row, always: false, unread: false, undoUntil: listed[at].undoUntil }));
+    return listed.map((proposal) => ({ ...toRow(previews)(proposal, approverRights.OPEN), always: false, unread: false, undoUntil: proposal.undoUntil }));
 };
 
 module.exports = { readQueue, readApplied, waitingCount, QUEUE_LIMIT };

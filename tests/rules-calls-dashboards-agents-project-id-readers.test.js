@@ -43,7 +43,8 @@ const ROWS = {
     [SCHEMA_TYPE.CALLS]: threeRows({ participants: [ME], deletedStatusKey: 0 }),
     [SCHEMA_TYPE.USERDASHBOARD]: threeRows({ visibility: 'project', ownerId: 'someone else', isDeleted: false }),
     [SCHEMA_TYPE.AGENT_RUNS]: threeRows({ agentId: 'a1', status: 'running', taskId: 't1', episode: { skill: 'qa' } }),
-    [SCHEMA_TYPE.AGENT_PROPOSALS]: threeRows({ agentId: 'a1', status: 'pending', taskId: 't1', gate: 'deploy', changes: [] }),
+    // Each reaches into the other project, so the read that takes such rows off a count finds them in either form too.
+    [SCHEMA_TYPE.AGENT_PROPOSALS]: threeRows({ agentId: 'a1', status: 'pending', taskId: 't1', gate: 'deploy', changes: [{ action: 'task.move', params: { taskId: 't1', projectId: OTHER_PROJECT } }] }),
 };
 
 const found = (type, filter) => (ROWS[type] || []).filter(matchesLikeMongo(filter));

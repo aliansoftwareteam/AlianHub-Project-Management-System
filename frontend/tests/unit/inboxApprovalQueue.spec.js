@@ -59,6 +59,26 @@ describe('a row of the approval queue', () => {
         expect(rowOf('p1').find('[data-test="queue-select"]').exists()).toBe(false);
     });
 
+    /* [what the row is, the fields the server sends, the chip, the note under it, whether Decline is offered] */
+    it.each([
+        ['one that needs an owner or admin', { gate: 'owner_admin', locked: true, lockedWhy: 'owner_admin', mayDecline: false }, en.Inbox.queue_locked, en.Ai.gate_locked, false],
+        ['one whose change the reader may not make by hand', { locked: true, lockedWhy: 'own_rights', mayDecline: false }, en.Inbox.queue_locked_rights, en.Ai.rights_locked, false],
+        ['one the reader\'s own agent asked for', { locked: true, lockedWhy: 'own_rights', mayDecline: true }, en.Inbox.queue_locked_rights, en.Ai.rights_locked, true],
+    ])('a locked row says why and never offers Approve: %s', async (_what, fields, chip, note, declines) => {
+        mountQueue([row('p1', fields)]);
+        expect(rowOf('p1').find('[data-test="queue-locked"]').text()).toBe(chip);
+        expect(rowOf('p1').find('[data-test="queue-locked-note"]').text()).toBe(note);
+        expect(rowOf('p1').find('[data-test="queue-approve"]').exists()).toBe(false);
+        expect(rowOf('p1').find('[data-test="queue-select"]').exists()).toBe(false);
+        expect(rowOf('p1').find('[data-test="queue-decline"]').exists()).toBe(declines);
+        if (!declines) return;
+        await rowOf('p1').find('[data-test="queue-decline"]').trigger('click');
+        await rowOf('p1').find('[data-test="queue-decline-skip"]').trigger('click');
+        await flushPromises();
+        expect(sendProposalDecision).toHaveBeenCalledWith('p1', 'decline', {});
+        expect(decided()).toEqual([expect.objectContaining({ id: 'p1', verb: 'decline' })]);
+    });
+
     it('approves as filed', async () => {
         mountQueue([row('p1')]);
         await rowOf('p1').find('[data-test="queue-approve"]').trigger('click');
