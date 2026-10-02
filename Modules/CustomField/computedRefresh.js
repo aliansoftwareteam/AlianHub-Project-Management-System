@@ -1,6 +1,7 @@
 const { AsyncResource } = require('async_hooks');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { originOf } = require('../../event/domainEventBus');
+const { isNotAnEdit } = require('../../utils/entityEvents');
 const logger = require('../../Config/loggerConfig');
 const { myCache } = require('../../Config/config');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
@@ -89,7 +90,7 @@ const isTask = (doc) => Boolean(doc) && Boolean(doc._id) && doc.mainChat !== tru
 
 function onTaskUpdate(payload) {
     const doc = payload && payload.data;
-    if (!isTask(doc) || !readsInput(payload.updatedFields)) return;
+    if (!isTask(doc) || isNotAnEdit(payload) || !readsInput(payload.updatedFields)) return;
     schedule(companyOf(payload), [doc._id, doc.ParentTaskId], originOf(payload).depth);
 }
 

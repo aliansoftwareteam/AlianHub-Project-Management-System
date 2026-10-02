@@ -111,6 +111,12 @@ describe('a formula or a rollup worked out again', () => {
         await jest.advanceTimersByTimeAsync(2000);
         expect(deliveries().map((body) => body.changedFields)).toEqual([['Task_Priority']]);
     });
+
+    it('is no more sent when the value went with its deleted field', async () => {
+        mockEmitter.emit('task:update', { data: taskDoc('URGENT'), updatedFields: { 'customField.6f00000000000000000000f1': null }, source: 'field_removed' });
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
 });
 
 describe('webhook debounce window is fixed, not sliding', () => {

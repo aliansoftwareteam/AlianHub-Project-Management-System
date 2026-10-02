@@ -76,11 +76,27 @@ const namedField = (req) => MongoDbCrudOpration(req.headers['companyid'], {
     data: [{ _id: new mongoose.Types.ObjectId(String(req.params.fieldId)) }, { global: 1, projectId: 1 }],
 }, 'findOne');
 
-/* Whoever may change the field: the field setting for a company-wide one, the field permission in each of its projects otherwise. */
+const namesProjectThatIsGone = async (req, field) => {
+    const ids = [...new Set(projectsOf(field).map(String))].filter((id) => OBJECT_ID.test(id));
+    if (!ids.length) return false;
+    const found = await MongoDbCrudOpration(req.headers['companyid'], {
+        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }, { _id: 1 }],
+    }, 'find');
+    return (found || []).length < ids.length;
+};
+
+const managedLikeCompanyWide = async (req) => {
+    const field = await namedField(req);
+    return isCompanyWide(field) || namesProjectThatIsGone(req, field);
+};
+
+/* Whoever may change the field: the field setting for a company-wide one, the field permission in each of its projects
+ * otherwise. A project the field names may be gone: nobody holds a permission there, so that project is passed and the
+ * field is then held to the field setting, or it could never be taken away. */
 const managesNamedField = [
     requireFieldId,
-    requireProjectAccess({ projectIds: async (req) => projectsOf(await namedField(req)), permissions: () => CUSTOM_FIELD_EDIT }),
-    requireFieldSettings(async (req) => isCompanyWide(await namedField(req))),
+    requireProjectAccess({ projectIds: async (req) => projectsOf(await namedField(req)), permissions: () => CUSTOM_FIELD_EDIT, passMissing: () => true }),
+    requireFieldSettings(managedLikeCompanyWide),
 ];
 
 const updateTouchesCompanyWide = async (req) => {

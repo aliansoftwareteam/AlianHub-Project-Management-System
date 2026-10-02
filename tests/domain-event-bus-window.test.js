@@ -139,4 +139,10 @@ describe('a formula or a rollup worked out again', () => {
         expect(published).toHaveLength(1);
         expect(published[0]).toMatchObject({ type: 'task.priority_changed', changedFields: ['Task_Priority'], depth: 0 });
     });
+
+    it('is no more an event when the value went with its deleted field', async () => {
+        emit('task:update', taskDoc(), { 'customField.6f00000000000000000000f1': null }, { source: 'field_removed' });
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(published).toEqual([]);
+    });
 });
