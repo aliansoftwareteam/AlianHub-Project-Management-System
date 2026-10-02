@@ -524,6 +524,7 @@ export default {
         seeding_sample: "Adding your sample project…",
         workspace_ready: "Ready. Opening your workspace…",
         workspace_failed: "Something went wrong creating the workspace. Try again, or contact your admin.",
+        workspace_failed_reason: "The workspace was not made: {reason}",
         free_limit: "You've already created a free workspace. Upgrade to add another.",
         referral_code: "Referral code (optional)",
         referral_invalid: "That referral code isn't valid. Continue without it?",
