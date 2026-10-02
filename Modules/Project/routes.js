@@ -17,6 +17,7 @@ const { requireSprintAccess } = require('../Sprints/helpers/sprintVisibility');
 const { CHAT_CHANNEL, isChatSpace, requireChatAccess } = require('../Sprints/helpers/chatAccess');
 const { READ, requireProjectAccess, keepVisibleProjects, projectIdsFrom, fieldsOf, permissionsForProjectUpdate, requireSupportedProjectUpdate, DELETE_OR_CLOSE, FIELD_PERMISSIONS } = require('../../Config/projectAccess');
 const { projectUpdateGuard, agentsRefused } = require('../Agents/guard');
+const { limitCallerFilters } = require('../Company/helpers/callerQueryRules');
 
 const CHECKLIST_ASSIGN_KEYS = ['assigneeAdd', 'assigneeRemove'];
 const SPRINT_EDIT = ['project.project_sprint_name_edit', 'project.sprint_type_change'];
@@ -35,7 +36,7 @@ const editsProjectViews = requireProjectAccess({ projectIds: (req) => req.params
 const viewsByPeople = agentsRefused('view.create');
 
 exports.init = (app) => {
-    app.post('/api/v1/project/search',projectFilterCtrl.projectFilter);
+    app.post('/api/v1/project/search', limitCallerFilters('query'), projectFilterCtrl.projectFilter);
     app.get('/api/v1/project/:id', readsProject((req) => req.params.id), Projectctrl.getProjectById);
     app.get('/api/v1/project', projectListCtrl.getProjectList);
     app.put('/api/v1/project/:id', requireSupportedProjectUpdate, projectUpdateGuard, requireProjectAccess({ projectIds: (req) => req.params.id, permissions: (req) => permissionsForProjectUpdate(req.body && req.body.updateObject, req.uid) }), projectUpdateNamesOnlyMembers, updateProjectCtrl.updateProject);
