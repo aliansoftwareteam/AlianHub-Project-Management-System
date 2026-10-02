@@ -6,7 +6,7 @@ test.describe('chat', () => {
     test.use(asRole('owner'));
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
-    // The first message of a new direct conversation makes the page log a 404 from POST /api/v2/tasks, which the console guard rejects.
+    // The first message of a new direct conversation is never shown: POST /api/v1/comments answers 404 and the page logs "MainChat: send failed".
     test.fixme('a reply in a thread is posted under its message', async ({ page, state }) => {
         const suffix = uniqueSuffix();
         const message = `Question ${suffix}`;

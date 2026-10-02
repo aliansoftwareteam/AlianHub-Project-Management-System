@@ -6,37 +6,69 @@
             <strong class="ipv__title" data-test="intent-title">{{ title }}</strong>
         </div>
         <dl v-if="lines.length" class="ipv__lines">
-            <div v-for="(line, i) in lines" :key="i" class="ipv__line" data-test="intent-line" :data-kind="line.kind">
+            <div v-for="(line, i) in lines" :key="i" class="ipv__line" :class="{ 'is-out': isOut(line.pick) || isOut(line.under) }" data-test="intent-line" :data-kind="line.kind">
                 <dt class="ipv__label">{{ line.label }}</dt>
                 <dd v-if="line.open" class="ipv__text ipv__open">
                     <button v-for="task in line.open" :key="task.taskId" type="button" class="ipv__task" data-test="intent-open-task" @click="emit('open-task', task)">{{ task.name }}</button>
                     <span v-if="line.text" data-test="intent-more">{{ line.text }}</span>
                 </dd>
+                <dd v-else-if="choosing && line.picks?.length" class="ipv__text ipv__picks">
+                    <label v-for="pick in line.picks" :key="pick.key" class="ipv__pick" :class="{ 'is-out': isOut(pick.key) }">
+                        <input type="checkbox" class="ah-check" data-test="intent-pick" :data-pick="pick.key" :checked="!isOut(pick.key)" :disabled="disabled" @change="toggle(pick.key)" />
+                        <span>{{ pick.name }}</span>
+                    </label>
+                </dd>
+                <dd v-else-if="choosing && line.pick" class="ipv__text">
+                    <label class="ipv__pick">
+                        <input type="checkbox" class="ah-check" data-test="intent-pick" :data-pick="line.pick" :checked="!isOut(line.pick)" :disabled="disabled" @change="toggle(line.pick)" />
+                        <span>{{ line.text }}</span>
+                    </label>
+                </dd>
                 <dd v-else class="ipv__text">{{ line.text }}</dd>
             </div>
         </dl>
+        <p v-if="choosing" class="ipv__hint" data-test="intent-pick-hint">{{ t('IntentPreview.pick_hint') }}</p>
+        <p v-if="choosing && went" class="ipv__hint ipv__went" role="status" data-test="intent-pick-also">{{ went }}</p>
     </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { kindLabel, linesOf, titleOf } from './intentLines';
+import { canChoose, pickNames, toggled } from './planPicks';
 
 defineOptions({ name: 'IntentPreview' });
 
 const props = defineProps({
     preview: { type: Object, required: true },
+    choosable: { type: Boolean, default: false },
+    leftOut: { type: Array, default: () => [] },
+    disabled: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['open-task']);
+const emit = defineEmits(['open-task', 'update:leftOut']);
 
 const { t, locale } = useI18n();
 
 const kind = computed(() => kindLabel(t, props.preview));
 const title = computed(() => titleOf(t, props.preview));
 const lines = computed(() => linesOf(t, locale.value, props.preview));
+const choosing = computed(() => props.choosable && canChoose(props.preview));
+const went = ref('');
+
+const isOut = (key) => choosing.value && Boolean(key) && props.leftOut.includes(key);
+
+const toggle = (key) => {
+    const next = toggled(props.preview, props.leftOut, key);
+    const leaving = next.includes(key);
+    const moved = (leaving ? next.filter((held) => !props.leftOut.includes(held)) : props.leftOut.filter((held) => !next.includes(held))).filter((held) => held !== key);
+    const names = pickNames(props.preview);
+    const named = { names: moved.map((held) => names.get(held)).filter(Boolean).join(', '), name: names.get(key) || '' };
+    went.value = moved.length ? t(leaving ? 'IntentPreview.pick_also_out' : 'IntentPreview.pick_also_kept', named, moved.length) : '';
+    emit('update:leftOut', next);
+};
 </script>
 
 <style scoped>
@@ -52,7 +84,18 @@ const lines = computed(() => linesOf(t, locale.value, props.preview));
 .ipv__open { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; white-space: normal; }
 .ipv__task { border: 0; padding: 0; background: transparent; color: var(--brand); font: inherit; text-align: left; text-decoration: underline; cursor: pointer; min-width: 0; overflow-wrap: anywhere; }
 .ipv__task:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm, 6px); }
+.ipv__picks { display: flex; flex-wrap: wrap; gap: 2px 14px; white-space: normal; }
+.ipv__pick { display: inline-flex; align-items: flex-start; gap: 6px; min-width: 0; min-height: var(--hit-min, 24px); cursor: pointer; }
+.ipv__pick .ah-check { flex: none; margin-top: 2px; }
+.ipv__pick span { min-width: 0; overflow-wrap: anywhere; }
+.ipv__line.is-out .ipv__text, .ipv__pick.is-out { color: var(--ink-2); text-decoration: line-through; }
+.ipv__hint { margin: 0; color: var(--ink-2); font-size: var(--fs-sm, 11.5px); line-height: 1.45; }
+.ipv__went { color: var(--ink); }
 @media (max-width: 480px) {
     .ipv__line { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 767px) {
+    .ipv__pick { min-height: 36px; align-items: center; }
+    .ipv__pick .ah-check { margin-top: 0; }
 }
 </style>

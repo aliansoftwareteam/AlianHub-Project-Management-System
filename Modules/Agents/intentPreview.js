@@ -8,6 +8,8 @@ const setup = require('./setupRequests');
 const computed = require('./computedFields');
 const plans = require('./projectSetup');
 const projects = require('./projectCreate');
+const planChoice = require('./planChoice');
+const planWorkPreview = require('./planWorkPreview');
 const automation = require('./automationPreview');
 const listSetup = require('./listSetupPreview');
 const projectCopy = require('./projectDuplicatePreview');
@@ -15,7 +17,7 @@ const dashboards = require('./dashboardRequests');
 
 // What a waiting change will make, as the lines its card shows (frontend IntentPreview). It is built for one viewer:
 // a project, list, parent task, person or custom field is named only when that viewer may see it, and everything
-// else on a line is the proposal's own text, handed over as text. Fields, a view and a whole plan are the project's own,
+// else on a line is the proposal's own text, handed over as text. Fields, a view and a whole plan, with its automations and first tasks, are the project's own,
 // so for a viewer who cannot open the project they have no preview at all, and neither has a rule (./automationPreview.js),
 // a folder or a list made a sprint (./listSetupPreview.js), or a copy of a project (./projectDuplicatePreview.js).
 // A project that is not there yet has no project to open: its card is the proposal's own text, for whoever is shown the proposal.
@@ -194,36 +196,45 @@ const viewPreview = (change, context) => {
     };
 };
 
-const namesLine = (kind, given, max, nameMax) => {
-    const names = listOf(given).slice(0, max).map((name) => textOf(name, nameMax)).filter(Boolean);
-    return names.length > 0 && { kind, names };
+const { keyOf } = planChoice;
+
+const namesLine = (kind, part, given, max, nameMax) => {
+    const kept = listOf(given).slice(0, max).map((name, at) => ({ name: textOf(name, nameMax), pick: keyOf(part, at) })).filter((entry) => entry.name);
+    return kept.length > 0 && { kind, names: kept.map((entry) => entry.name), picks: kept.map((entry) => entry.pick) };
 };
 
-const planViewLines = (view, projectId, context) => {
+const picked = (line, pick) => line && { ...line, pick };
+
+const planViewLines = (view, at, projectId, context) => {
     const name = textOf(view.name, setup.VIEW_NAME_MAX);
     if (!name) return [];
     const planned = listOf(view.showFields).map((field) => textOf(field, setup.FIELD_NAME_MAX)).filter(Boolean);
+    const pick = keyOf('views', at);
     return [
-        { kind: 'planView', name, layout: Object.hasOwn(setup.VIEW_KINDS, String(view.kind)) ? String(view.kind) : '' },
-        ...lookLines(objectOf(view.look), projectId, context, planned),
+        { kind: 'planView', name, layout: Object.hasOwn(setup.VIEW_KINDS, String(view.kind)) ? String(view.kind) : '', pick },
+        ...lookLines(objectOf(view.look), projectId, context, planned).filter(Boolean).map((line) => ({ ...line, under: pick })),
     ];
 };
 
-/* The parts of a plan: the statuses and lists by name, each field with its type, and each view followed by what it shows. */
+/* The parts of a plan: the statuses and lists by name, each field with its type, and each view followed by what it
+ * shows. A line says which part of the stored plan it is (`pick`, `picks` for a line of names), or which part it
+ * belongs under, so the person approving can leave that part out (./planChoice.js). */
 const planLines = (change, context) => {
     const params = paramsOf(change);
     return [
-        namesLine('newStatuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
-        namesLine('newLists', params.lists, plans.LISTS_MAX, TEXT_MAX),
-        ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map(fieldLine),
-        ...planViews(change).flatMap((view) => planViewLines(view, idOf(params.projectId), context)),
+        namesLine('newStatuses', 'statuses', params.statuses, plans.STATUSES_MAX, plans.STATUS_NAME_MAX),
+        namesLine('newLists', 'lists', params.lists, plans.LISTS_MAX, TEXT_MAX),
+        ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map((field, at) => picked(fieldLine(field), keyOf('fields', at))),
+        ...planViews(change).flatMap((view, at) => planViewLines(view, at, idOf(params.projectId), context)),
     ];
 };
 
-const planPreview = (change, context) => {
+/* The plan of a project that exists also lists its automations and first tasks, each a part of its own (./planWorkPreview.js). */
+const planPreview = async (change, context) => {
     const place = placeLine(paramsOf(change), context.named);
     if (!place) return null;
-    return { kind: 'setup', title: place.project, lines: [place, ...planLines(change, context)].filter(Boolean) };
+    const lines = [place, ...planLines(change, context), ...(await planWorkPreview.lines(change, context))].filter(Boolean);
+    return { kind: 'setup', title: place.project, lines, needs: planChoice.needsOf(paramsOf(change)) };
 };
 
 /* A project that is not there yet: its name, who will be on it, what it is for, and the plan that comes with it. */
@@ -235,6 +246,7 @@ const projectPreview = (change, context) => {
         kind: 'project',
         title,
         lines: [{ kind: 'members', only: 'approver' }, descriptionLine({ rawDescription: params.description }), ...planLines(change, context)].filter(Boolean),
+        needs: planChoice.needsOf(params),
     };
 };
 
@@ -280,7 +292,7 @@ const forProposals = async (companyId, uid, proposals) => {
     const named = await names.resolver({ companyId, userId: String(uid), projectIds: [] }, {
         projectIds: [...[...changes, ...setups].map((change) => idOf(paramsOf(change).projectId)), ...setups.map(projectCopy.sourceIdOf), ...[...tasks.values()].map((task) => task.projectId)].filter(Boolean),
         sprintIds: changes.map((change) => idOf(paramsOf(change).sprintId)).filter(Boolean),
-        userIds: [...changes.flatMap((change) => peopleOf(CREATES[change.action].fields(paramsOf(change)))), ...setups.flatMap((change) => looksOf(change).flatMap((look) => peopleOf({ AssigneeUserId: look.assigneeIds }))), ...setups.flatMap(valuesIn).flatMap((entry) => peopleIn(entry.value))],
+        userIds: [...changes.flatMap((change) => peopleOf(CREATES[change.action].fields(paramsOf(change)))), ...setups.flatMap((change) => looksOf(change).flatMap((look) => peopleOf({ AssigneeUserId: look.assigneeIds }))), ...setups.flatMap(valuesIn).flatMap((entry) => peopleIn(entry.value)), ...setups.filter((change) => change.action === PLAN).flatMap(planWorkPreview.peopleIn)],
     });
     const fieldNames = await fieldNamesFor(companyId, setups.filter((change) => named.project(idOf(paramsOf(change).projectId)).name));
     const built = { named, tasks, fieldNames, companyId, uid };

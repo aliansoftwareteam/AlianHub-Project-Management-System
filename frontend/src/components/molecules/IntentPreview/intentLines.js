@@ -184,6 +184,24 @@ export const LINE_KINDS = {
         if (!name) return null;
         return { label: t('IntentPreview.line_view'), text: LAYOUTS.includes(line.layout) ? t('IntentPreview.view_named', { name, layout: t(`IntentPreview.layout_${line.layout}`) }) : name };
     },
+    /* An automation of a plan, in the sentence the Automations page says it in, or why it is not one that can be made. */
+    planRule: (t, line) => {
+        const problem = textOf(line.problem);
+        if (problem) return { label: t('IntentPreview.line_rule'), text: t('IntentPreview.rule_problem', { problem }) };
+        return textOf(line.text) ? { label: t('IntentPreview.line_rule'), text: t('IntentPreview.rule_starts_off', { rule: textOf(line.text) }) } : null;
+    },
+    planTask: (t, line, locale) => {
+        const name = textOf(line.name);
+        if (!name) return null;
+        const person = textOf(line.assignee) || (countOf(line.hidden) ? t('IntentPreview.people_not_shown', { n: 1 }, 1) : '');
+        const details = [
+            textOf(line.list) && t('IntentPreview.task_in_list', { list: textOf(line.list) }),
+            textOf(line.status) && t('IntentPreview.task_in_status', { status: textOf(line.status) }),
+            person && t('IntentPreview.task_for', { person }),
+            textOf(line.due) && t('IntentPreview.task_due', { date: dateText(locale, line.due) }),
+        ].filter(Boolean);
+        return { label: t('IntentPreview.line_first_task'), text: details.length ? t('IntentPreview.task_with', { name, details: details.join(', ') }) : name };
+    },
     columns: (t, line) => {
         const shown = textsOf(line.names).join(', ');
         const others = countOf(line.others);
@@ -252,9 +270,16 @@ export const kindLabel = (t, preview) => {
     return headingOf(preview) ? t(headingOf(preview).kind) : '';
 };
 
+/* Which part of a plan a line stands for, or belongs under, so it can be left out (./planPicks.js). */
+const pickOf = (line) => ({
+    ...(typeof line.pick === 'string' ? { pick: line.pick } : {}),
+    ...(typeof line.under === 'string' ? { under: line.under } : {}),
+    ...(Array.isArray(line.picks) ? { picks: line.picks.map((key, at) => ({ key, name: textOf((Array.isArray(line.names) ? line.names : [])[at]) })).filter((pick) => typeof pick.key === 'string' && pick.name) } : {}),
+});
+
 export const linesOf = (t, locale, preview) => (Array.isArray(preview?.lines) ? preview.lines : [])
     .filter((line) => line && typeof line === 'object' && Object.hasOwn(LINE_KINDS, line.kind))
-    .map((line) => ({ kind: line.kind, ...LINE_KINDS[line.kind](t, line, locale) }))
+    .map((line) => ({ kind: line.kind, ...LINE_KINDS[line.kind](t, line, locale), ...pickOf(line) }))
     .filter((line) => line.text || line.open);
 
 /* "create the task “Fix the login bug”", to follow "<agent> wants to"; '' for a preview that cannot be put that way. */

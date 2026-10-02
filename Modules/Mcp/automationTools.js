@@ -45,6 +45,13 @@ const vetted = async (ctx, args, vis) => {
     return problem ? { answer: { ok: false, error: problem } } : { args };
 };
 
+/* What a rule is made of, for this tool and for a rule inside a plan (./setupTools.js). */
+const DRAFT = Object.freeze({
+    trigger: { ...KEY, description: 'A trigger key of automation.catalogue' },
+    conditions: { type: 'array', maxItems: rules.CONDITIONS_MAX, items: CONDITION },
+    actions: { type: 'array', minItems: 1, maxItems: rules.STEPS_MAX, items: STEP },
+});
+
 const TOOLS = [
     {
         name: 'automation.catalogue',
@@ -70,9 +77,7 @@ const TOOLS = [
             + 'Only owners and admins can have a rule proposed for them. If a part of what the person asked for cannot be written in the catalogue\'s terms, tell them which part; if the trigger cannot, do not call this.',
         input: input({
             projectId: ID,
-            trigger: { ...KEY, description: 'A trigger key of automation.catalogue' },
-            conditions: { type: 'array', maxItems: rules.CONDITIONS_MAX, items: CONDITION },
-            actions: { type: 'array', minItems: 1, maxItems: rules.STEPS_MAX, items: STEP },
+            ...DRAFT,
             enabled: { type: 'boolean', description: 'true to switch the rule on as soon as it is approved; left out, it is saved switched off' },
             reason: { type: 'string', maxLength: REASON_MAX, description: 'Why, in a line; it is kept in the audit log' },
         }, ['projectId', 'trigger', 'actions']),
@@ -84,4 +89,4 @@ const TOOLS = [
 
 const READ_SCOPES = Object.freeze({ 'automation.catalogue': 'projects:read' });
 
-module.exports = { TOOLS, READ_SCOPES };
+module.exports = { TOOLS, READ_SCOPES, DRAFT };
