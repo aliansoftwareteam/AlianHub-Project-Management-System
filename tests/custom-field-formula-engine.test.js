@@ -202,7 +202,7 @@ describe('aggregate (rollups)', () => {
         expect(F.aggregate('avg', [1, 1, 2]).value).toBe(1.333333);
     });
 
-    it.failing('does not count a blank string as a zero', () => {
+    it('does not count a blank string as a zero', () => {
         expect(F.aggregate('avg', ['', 4]).value).toBe(4);
     });
 });

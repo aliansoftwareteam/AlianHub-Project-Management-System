@@ -98,7 +98,7 @@ export const mutateChatFolders = (state,payload) => {
             state.mainChatFolders[pId][sprintIndex] = {...data};
         }
     }else if(op === "removed"){
-        const sprintIndex = state.mainChatFolders[pId] && state.mainChatFolders[pId].length > 0 && state.mainChatFolders[pId]?.findIndex((x) => x._id === data._id);
+        const sprintIndex = state.mainChatFolders[pId]?.findIndex((x) => x._id === data._id) ?? -1;
         if(sprintIndex !== -1) {
             state.mainChatFolders[pId].splice(sprintIndex, 1);
         }

@@ -80,8 +80,7 @@ describe('rules', () => {
     const parent = { _id: 'p', isParent: true, name: 'Task Rules', key: 'task_rules' };
     const child = { _id: 'c', isParent: false, parentId: 'p', name: 'Can  Edit  Task' };
 
-    // Children are looked up by parent.key only, so a parent keyed by its name loses them.
-    it.fails('mutateArrangedRules keeps children of a parent that has no explicit key', () => {
+    it('mutateArrangedRules keeps children of a parent that has no explicit key', () => {
         m.mutateArrangedRules(state, [{ _id: 'p', isParent: true, name: 'Task Rules' }, child]);
         expect(state.rules.task_rules.can_edit_task).toEqual(child);
     });
@@ -280,8 +279,7 @@ describe('task types, task statuses and project statuses', () => {
         expect(state.projectStaus).toEqual([]);
     });
 
-    // projectStaus[-1] is written for an unknown id, leaving a stray non-index property on the array.
-    it.fails('project status modify of an unknown id does not change the list', () => {
+    it('project status modify of an unknown id does not change the list', () => {
         state.projectStaus = [{ _id: 'a' }];
         m.mutateProjectStatus(state, { op: 'modified', data: { _id: 'ghost' } });
         expect(Object.keys(state.projectStaus)).toEqual(['0']);

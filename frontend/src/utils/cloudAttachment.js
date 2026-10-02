@@ -31,7 +31,7 @@ export const CLOUD_PROVIDERS = {
  * of rendering a blank tile.
  */
 export const isCloudAttachment = (attachment) =>
-    !!(attachment && attachment.source && CLOUD_PROVIDERS[attachment.source]);
+    !!(attachment && attachment.source && Object.prototype.hasOwnProperty.call(CLOUD_PROVIDERS, attachment.source));
 
 export const cloudProviderOf = (attachment) =>
     (isCloudAttachment(attachment) ? CLOUD_PROVIDERS[attachment.source] : null);
@@ -83,7 +83,7 @@ export const buildCloudAttachment = ({ provider, file, userId, id }) => {
     return {
         filename: name,
         extension: dot > -1 ? name.slice(dot + 1) : '',
-        size: Number((file && file.size) || 0),
+        size: Number(file && file.size) || 0,
         id,
         createdAt: new Date(),
         userId: String(userId || ''),

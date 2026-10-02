@@ -33,8 +33,7 @@ describe('cloudAttachment', () => {
             expect(cloudProviderOf(undefined)).toBeNull();
         });
 
-        // BUG: CLOUD_PROVIDERS[source] lookup matches Object.prototype keys (cloudAttachment.js:34)
-        it.fails('does not mistake inherited object keys for providers', () => {
+        it('does not mistake inherited object keys for providers', () => {
             expect(isCloudAttachment({ source: 'toString' })).toBe(false);
             expect(isCloudAttachment({ source: 'constructor' })).toBe(false);
         });
@@ -192,8 +191,7 @@ describe('cloudAttachment', () => {
             expect(buildCloudAttachment({ provider: 'google_drive', file: { name: '' }, id: 'x' }).filename).toBe('file');
         });
 
-        // BUG: Number('big') is NaN and is not guarded (cloudAttachment.js:86)
-        it.fails('turns a non-numeric size into 0 instead of NaN', () => {
+        it('turns a non-numeric size into 0 instead of NaN', () => {
             expect(buildCloudAttachment({ provider: 'dropbox', file: { size: 'big' }, id: 1 }).size).toBe(0);
         });
 
