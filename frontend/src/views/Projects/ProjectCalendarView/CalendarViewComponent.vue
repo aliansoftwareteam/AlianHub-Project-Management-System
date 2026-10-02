@@ -56,7 +56,18 @@
                     <span class="cv__tray-title">{{ $t('Views.unscheduled') }}</span>
                     <span class="ah-mono cv__tray-count">{{ unscheduled.length }}</span>
                 </div>
-                <p v-if="!unscheduled.length" class="cv__tray-empty ah-small">{{ $t('Views.tray_empty') }}</p>
+                <EmptyState
+                    v-if="noTasksYet"
+                    compact
+                    illustration="tasks"
+                    data-test="calendar-empty"
+                    :title="$t('Views.calendar_no_tasks_title')"
+                    :message="$t('Views.calendar_no_tasks_msg')"
+                    :actionLabel="$t('Views.add_a_task')"
+                    :actionAllowed="canAddFirstTask"
+                    @action="goToList"
+                />
+                <p v-else-if="!unscheduled.length" class="cv__tray-empty ah-small">{{ $t('Views.tray_empty') }}</p>
                 <div
                     v-for="task in unscheduled"
                     :key="task._id"
@@ -102,6 +113,8 @@
     import { eachRow } from "@/store/ProjectData/taskTree";
     import { ancestorsOf } from "@taskTreeRules";
     import { assignLanes } from "@/views/Projects/composables/sprintLanes";
+    import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
+    import { useAddFirstTask } from "@/views/Projects/composables/useAddFirstTask";
 
     defineOptions({ name: "CalendarViewComponent" });
 
@@ -156,6 +169,8 @@
     const visibleRange = ref({ start: null, end: null });
     const dragTask = ref(null);
 
+    const { canAddFirstTask, goToList } = useAddFirstTask(projectData);
+    const noTasksYet = computed(() => !projectData.value?.lastTaskId);
     const canSchedule = computed(() => checkPermission('task.task_due_date', projectData.value?.isGlobalPermission) === true);
 
     const monthLabel = computed(() => {
