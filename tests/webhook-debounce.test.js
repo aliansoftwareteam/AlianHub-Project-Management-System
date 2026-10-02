@@ -82,6 +82,37 @@ describe('webhook debounce', () => {
     });
 });
 
+describe('a formula or a rollup worked out again', () => {
+    beforeEach(() => {
+        jest.useFakeTimers();
+        dispatcher.start();
+    });
+
+    afterEach(async () => {
+        await jest.advanceTimersByTimeAsync(10000);
+        jest.useRealTimers();
+    });
+
+    const emitComputed = () => mockEmitter.emit('task:update', {
+        data: taskDoc('URGENT'),
+        updatedFields: { 'customField.6f00000000000000000000f1': { fieldValue: 4, fieldType: 'rollup', computedAt: new Date() } },
+        source: 'computed',
+    });
+
+    it('is not sent as a task update', async () => {
+        emitComputed();
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+
+    it('does not ride along with a person\'s change in the same window', async () => {
+        emitUpdate('HIGH');
+        emitComputed();
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(deliveries().map((body) => body.changedFields)).toEqual([['Task_Priority']]);
+    });
+});
+
 describe('webhook debounce window is fixed, not sliding', () => {
     beforeEach(() => {
         jest.useFakeTimers();

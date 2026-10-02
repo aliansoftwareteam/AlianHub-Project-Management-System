@@ -251,3 +251,59 @@ describe('what a refresh costs', () => {
         expect(mockDb.calls.every((call) => call.companyId === CID)).toBe(true);
     });
 });
+
+describe('a conversation row', () => {
+    const CHAT = id(9);
+    const conversation = () => row(CHAT, '', null, { mainChat: true, AssigneeUserId: [id(21), id(22)] });
+
+    it('is given no value and nothing is told of it', async () => {
+        const made = mockDb.seed(SCHEMA_TYPE.TASKS, conversation());
+        socketEmitter.emit('insert', { type: 'insert', data: { ...made }, module: 'task', companyId: CID });
+        change(CHAT, { subTasks: 1 });
+        await computedRefresh.flush();
+        expect(taskOf(CHAT).customField).toEqual({});
+        expect(heard.filter((payload) => String(payload.data._id) === CHAT && Object.keys(payload.updatedFields).some((key) => key.startsWith('customField.')))).toEqual([]);
+    });
+
+    it('is not counted under a task it names as its parent', async () => {
+        mockDb.seed(SCHEMA_TYPE.TASKS, { ...conversation(), ParentTaskId: PARENT, isParentTask: false });
+        add(FIRST, PARENT, 4);
+        await computedRefresh.flush();
+        expect([stored(PARENT, TENFOLD), stored(PARENT, TOTAL)]).toEqual([10, 4]);
+        expect(taskOf(CHAT).customField).toEqual({});
+    });
+});
+
+describe('what a refresh tells', () => {
+    const refreshes = () => heard.filter((payload) => Object.keys(payload.updatedFields || {}).some((key) => key.startsWith('customField.')) && String(payload.data._id) === PARENT);
+
+    it('says the change was worked out, not made by a person', async () => {
+        add(FIRST, PARENT, 4);
+        await computedRefresh.flush();
+        expect(refreshes().length).toBeGreaterThan(0);
+        refreshes().forEach((payload) => expect(payload).toMatchObject({ source: 'computed', actor: { kind: 'system', userId: null } }));
+    });
+
+    it('leaves the time the task was last changed alone', async () => {
+        add(FIRST, PARENT, 4);
+        await computedRefresh.flush();
+        const writes = mockDb.calls.filter((call) => call.type === SCHEMA_TYPE.TASKS && call.method === 'findOneAndUpdate');
+        expect(writes.length).toBeGreaterThan(0);
+        writes.forEach((call) => expect(call.data[2]).toMatchObject({ timestamps: false }));
+    });
+
+    it('keeps how deep in a chain of rules the write was', async () => {
+        const made = mockDb.seed(SCHEMA_TYPE.TASKS, row(FIRST, PARENT, 4));
+        socketEmitter.emit('insert', { type: 'insert', data: { ...made }, module: 'task', companyId: CID, actor: { kind: 'automation', userId: null }, depth: 2 });
+        countUnder(PARENT, 1);
+        await computedRefresh.flush();
+        expect(refreshes().map((payload) => payload.depth)).toEqual(refreshes().map(() => 2));
+        expect(refreshes().length).toBeGreaterThan(0);
+    });
+
+    it('starts at no depth after a person\'s own write', async () => {
+        add(FIRST, PARENT, 4);
+        await computedRefresh.flush();
+        refreshes().forEach((payload) => expect(payload.depth).toBe(0));
+    });
+});

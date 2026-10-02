@@ -23,6 +23,11 @@ const normalizeChangedFields = (updatedFields) => {
     return touched;
 };
 
+/* A formula or a rollup stored again after a write is sent as a task update so the open screens show the new
+ * number. Nobody made that change: it is no "task updated" for a webhook, a rule or the search index. */
+const COMPUTED_SOURCE = 'computed';
+const isComputedRefresh = (payload) => Boolean(payload) && payload.source === COMPUTED_SOURCE;
+
 /* Bounded FIFO of the last-seen state per entity, so a change can be described as
  * from → to. Each consumer gets its own store: the webhook dispatcher remembers
  * what it last *delivered*, the event bus what it last *observed*, and those are
@@ -43,4 +48,4 @@ const createSnapshotStore = ({ max = 5000 } = {}) => {
     };
 };
 
-module.exports = { MONGO_FIELD_OPS, normalizeChangedFields, createSnapshotStore };
+module.exports = { MONGO_FIELD_OPS, normalizeChangedFields, createSnapshotStore, COMPUTED_SOURCE, isComputedRefresh };

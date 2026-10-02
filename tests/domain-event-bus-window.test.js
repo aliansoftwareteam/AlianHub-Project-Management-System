@@ -122,3 +122,21 @@ describe('domain event bus task window is fixed, not sliding', () => {
         expect(published[0].actor).toEqual({ kind: 'user', userId: 'u2' });
     });
 });
+
+describe('a formula or a rollup worked out again', () => {
+    const emitComputed = (extra = {}) => emit('task:update', taskDoc(), { 'customField.6f00000000000000000000f1': { fieldValue: 4, fieldType: 'rollup', computedAt: new Date() } }, { source: 'computed', ...extra });
+
+    it('is no event for a rule, a goal or the search index', async () => {
+        emitComputed({ depth: 2 });
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(published).toEqual([]);
+    });
+
+    it('adds nothing to the event of a person\'s change in the same window', async () => {
+        emitPriority('HIGH');
+        emitComputed({ depth: 3 });
+        await jest.advanceTimersByTimeAsync(2000);
+        expect(published).toHaveLength(1);
+        expect(published[0]).toMatchObject({ type: 'task.priority_changed', changedFields: ['Task_Priority'], depth: 0 });
+    });
+});
