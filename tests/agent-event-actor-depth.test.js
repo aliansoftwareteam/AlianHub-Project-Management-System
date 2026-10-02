@@ -155,3 +155,33 @@ describe('a change an agent makes on the older path', () => {
         expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/exceeds 3/));
     });
 });
+
+describe('a field written again after someone\'s change', () => {
+    const FIELD = '6f00000000000000000f1e1d';
+    const write = (eventOrigin) => {
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: FIELD, fieldTitle: 'Notes', fieldType: 'text', type: 'task', global: true });
+        const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
+        return taskMongo.updateTaskCustomField({
+            companyId: CID, taskId: String(fx.top._id), customFieldId: FIELD, updateDetail: { fieldValue: 'Again', _id: FIELD },
+            userData: { id: OWNER, Employee_Name: 'Olivia Owner' }, storedTask: fx.top, filledByAi: true, eventOrigin,
+        });
+    };
+    const ofTheField = () => published.filter((envelope) => envelope.entity.id === String(fx.top._id) && envelope.changedFields.some((name) => name.startsWith('customField')));
+
+    it('after an agent\'s, is published as the agent\'s at that change\'s depth, and wakes no rule that did not opt in', async () => {
+        await write({ actor: { kind: 'agent', userId: OWNER }, depth: 3 });
+        await afterWindow();
+        expect(ofTheField()).toHaveLength(1);
+        expect(ofTheField()[0]).toMatchObject({ actor: { kind: 'agent', userId: OWNER }, depth: 3 });
+        expect(matcher.acceptsActor(plainRule, ofTheField()[0])).toBe(false);
+        expect(matcher.acceptsActor(optedIn, ofTheField()[0])).toBe(true);
+    });
+
+    it('after a person\'s, is published as it always was', async () => {
+        await write(null);
+        await afterWindow();
+        expect(ofTheField()).toHaveLength(1);
+        expect(ofTheField()[0]).toMatchObject({ actor: { kind: 'system', userId: null }, depth: 0 });
+        expect(matcher.acceptsActor(plainRule, ofTheField()[0])).toBe(true);
+    });
+});
