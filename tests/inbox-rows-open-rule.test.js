@@ -14,6 +14,8 @@ jest.mock('../Modules/Inbox/helpers/approvalQueue', () => ({ readQueue: jest.fn(
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/accessWorld');
 const { commentThreadAccess } = require('../Modules/Comments/helpers/threadAccess');
+const { runForAgentOf } = require('../Config/agentRequest');
+const { runNarrowed } = require('../Config/tokenNarrowing');
 const inbox = require('../Modules/Inbox/controller');
 const bell = require('../Modules/notification/app-notification/controller');
 
@@ -173,5 +175,38 @@ describe('the notices and mentions a person reads', () => {
         await answered(inbox.counts, { uid: OUTSIDER });
         const after = mockDb.store.userId.find((row) => String(row._id) === String(counters._id));
         expect([after.notification_counts || 0, after.mention_counts || 0]).toEqual([0, 0]);
+    });
+
+    it('leave the stored counters alone when an agent or a narrowed token asks for the counts', async () => {
+        const counters = mockDb.seed('userId', { userId: OUTSIDER, notification_counts: 9, mention_counts: 9 });
+        const stored = () => { const row = mockDb.store.userId.find((entry) => String(entry._id) === String(counters._id)); return [row.notification_counts, row.mention_counts]; };
+
+        await runForAgentOf(OUTSIDER, { chat: false }, () => answered(inbox.counts, { uid: OUTSIDER }));
+        expect(stored()).toEqual([9, 9]);
+        await runNarrowed({ userId: OUTSIDER, projectIds: [P_OPEN] }, () => answered(inbox.counts, { uid: OUTSIDER }));
+        expect(stored()).toEqual([9, 9]);
+    });
+
+    it('only lower the stored counters, so a notice that arrives meanwhile stays on the badge', async () => {
+        const counters = mockDb.seed('userId', { userId: OUTSIDER, notification_counts: 1, mention_counts: 0 });
+        await answered(inbox.counts, { uid: OUTSIDER });
+        const row = mockDb.store.userId.find((entry) => String(entry._id) === String(counters._id));
+
+        expect([row.notification_counts, row.mention_counts]).toEqual([1, 0]);
+    });
+
+    it('do not name, among the cleared ones, a task the person cannot open today', async () => {
+        const notices = rows(SCHEMA_TYPE.NOTIFICATIONS);
+        notices.filter((row) => row.receiverID === OUTSIDER && String(row.taskId) === T_OPEN).forEach((row) => notices.splice(notices.indexOf(row), 1));
+        const mention = rows(SCHEMA_TYPE.MENTIONS).find((row) => row.comment_message === 'mention in a task');
+        await answered(inbox.clear, { uid: OUTSIDER, body: { items: [{ sourceType: 'mention', sourceId: String(mention._id) }] } });
+        const cleared = async (uid) => (await answered(inbox.list, { uid, query: { tab: 'cleared', limit: '50' } })).data.items.map((item) => [item.message, item.taskName]);
+        expect(await cleared(OUTSIDER)).toEqual([['mention in a task', 'Open task']]);
+
+        Object.assign(rows(SCHEMA_TYPE.TASKS).find((task) => String(task._id) === T_OPEN), { sprintId: L_SECRET, TaskName: 'Renamed in private' });
+        expect(await cleared(OUTSIDER)).toEqual([]);
+
+        await answered(inbox.clear, { uid: INSIDER, body: { items: [{ sourceType: 'mention', sourceId: String(mention._id) }] } });
+        expect(await cleared(INSIDER)).toEqual([['mention in a task', 'Renamed in private']]);
     });
 });

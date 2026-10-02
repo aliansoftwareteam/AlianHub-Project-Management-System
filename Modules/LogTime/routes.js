@@ -20,21 +20,25 @@ const onAVisibleTask = requireProjectAccess({
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
+const findById = (companyId, type, id, fields) => MongoDbCrudOpration(companyId, { type, data: [{ _id: new mongoose.Types.ObjectId(String(id)) }, fields] }, 'findOne');
+
+/* The entry a request names, when it is the caller's own and the request leaves it where it is: the task, the
+ * project and, if one is named, the list are the entry's own. */
+const ownEntryInPlace = async (companyId, uid, body) => {
+    if (!OBJECT_ID.test(String(body.timeSheetId || '')) || !OBJECT_ID.test(companyId) || body.isEdit === false) return false;
+    const entry = await findById(companyId, SCHEMA_TYPE.TIMESHEET, body.timeSheetId, { Loggeduser: 1, TicketID: 1, ProjectId: 1 });
+    if (!entry || String(entry.Loggeduser) !== String(uid)) return false;
+    if (String(entry.ProjectId) !== String(body.projectId) || (body.ticketId && String(entry.TicketID) !== String(body.ticketId))) return false;
+    if (!body.sprintId) return true;
+    const task = OBJECT_ID.test(String(entry.TicketID || '')) ? await findById(companyId, SCHEMA_TYPE.TASKS, entry.TicketID, { sprintId: 1 }) : null;
+    return Boolean(task) && String(task.sprintId) === String(body.sprintId);
+};
+
 /* A time entry stays its person's to correct and to delete after they can no longer open its task: the week it
- * sits in is still theirs to put right. It opens that entry on its own task, and nothing else. */
+ * sits in is still theirs to put right. It is corrected or deleted where it is, and never moved through this door. */
 const ownEntryOr = (guard) => async (req, res, next) => {
-    try {
-        const body = req.body || {};
-        const companyId = String(req.headers['companyid'] || '');
-        const names = OBJECT_ID.test(String(body.timeSheetId || '')) && OBJECT_ID.test(companyId) && body.isEdit !== false;
-        const entry = names
-            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [{ _id: new mongoose.Types.ObjectId(String(body.timeSheetId)) }, { Loggeduser: 1, TicketID: 1 }] }, 'findOne')
-            : null;
-        const own = Boolean(entry) && String(entry.Loggeduser) === String(req.uid) && (!body.ticketId || String(entry.TicketID) === String(body.ticketId));
-        return own ? next() : guard(req, res, next);
-    } catch (error) {
-        return guard(req, res, next);
-    }
+    const own = await ownEntryInPlace(String(req.headers['companyid'] || ''), req.uid, req.body || {}).catch(() => false);
+    return own ? next() : guard(req, res, next);
 };
 
 /* The storage engine writes to the bucket named in the body, while the middleware only verified the companyid header. */

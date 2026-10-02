@@ -14,7 +14,7 @@ jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/accessWorld');
 
-const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, L_OPEN, T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, OPENS } = world;
+const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, L_OPEN, L_SECRET, T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, OPENS } = world;
 const { seed } = world.create(mockDb);
 
 const DM_SPACE = '6f0000000000000000000ca2';
@@ -116,6 +116,17 @@ describe('a person\'s own time entry', () => {
     it('is theirs to correct and to delete on a task they can no longer open', async () => {
         expect((await reaches(LOG, OUTSIDER, { isEdit: true, timeSheetId: OWN, ticketId: T_SECRET, projectId: P_OPEN })).through).toBe(true);
         expect((await reaches(REMOVE, OUTSIDER, { timeSheetId: OWN, ticketId: T_SECRET, projectId: P_OPEN })).through).toBe(true);
+    });
+
+    it.each([['correcting', LOG, { isEdit: true }], ['deleting', REMOVE, {}]])('stays where it is when %s it: the request names the entry\'s own project and list, or does not pass', async (what, route, extra) => {
+        const named = (place) => reaches(route, OUTSIDER, { ...extra, timeSheetId: OWN, ticketId: T_SECRET, ...place });
+
+        expect((await named({ projectId: P_OPEN })).through).toBe(true);
+        expect((await named({ projectId: P_OPEN, sprintId: L_SECRET })).through).toBe(true);
+        expect((await named({ projectId: P_PRIVATE })).through).toBe(false);
+        expect((await named({ projectId: P_PERSONAL })).through).toBe(false);
+        expect((await named({})).through).toBe(false);
+        expect((await named({ projectId: P_OPEN, sprintId: L_OPEN })).through).toBe(false);
     });
 
     it('opens nothing else: not new time on that task, not another person\'s entry, not another task', async () => {
