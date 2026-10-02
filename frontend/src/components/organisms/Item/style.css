@@ -43,11 +43,11 @@
 }
 .project-sb-ptitle{
     line-height: 16px;
-    color: #525255;
+    color: var(--ink);
 }
 .project-sb-desc
 {
-    color: #6b6b6b;
+    color: var(--ink-2);
     font-weight: 400;
     font-size: 13px;
     line-height: 21px;
@@ -97,7 +97,7 @@ span.greenLabel {
     margin-left: 10px;
 }
 .project-item.new_project_add {
-    border-left: 2px solid #3ba510;
+    border-left: 2px solid var(--ok);
 }
 @media(max-width: 767px)
 {

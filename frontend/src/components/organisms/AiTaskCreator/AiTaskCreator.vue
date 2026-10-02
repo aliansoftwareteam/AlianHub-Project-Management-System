@@ -461,7 +461,7 @@ function successMessage(totals) {
     display: flex;
     flex-direction: column;
     padding: 22px 24px 20px;
-    box-shadow: 0 24px 60px rgba(28, 26, 80, 0.28);
+    box-shadow: var(--shadow-modal);
 }
 
 /* Header */
@@ -534,7 +534,7 @@ function successMessage(totals) {
 }
 .aitc__textarea-wrap:focus-within {
     background: linear-gradient(120deg, #7C5CFF, #4D7CFF, #C44BFF);
-    box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.14);
+    box-shadow: 0 0 0 4px var(--brand-ring);
 }
 .aitc__textarea {
     width: 100%; box-sizing: border-box;

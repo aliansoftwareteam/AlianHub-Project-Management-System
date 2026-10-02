@@ -339,7 +339,7 @@ watch([() => props.cardData], async(newValue) => {
 
 <style scoped>
 .status-estimate:hover {
-    color: #2f3990;
+    color: var(--brand);
 }
 .status-estimate {
     line-height: 16px;
@@ -347,13 +347,13 @@ watch([() => props.cardData], async(newValue) => {
 
 .time-cell {
   text-align: right;
-  color: #6B6B6B;
+  color: var(--ink-2);
 }
 .user-cell {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #6B6B6B;
+  color: var(--ink-2);
 }
 .user-cell span:hover{
     cursor: pointer;
@@ -382,7 +382,7 @@ watch([() => props.cardData], async(newValue) => {
   display: flex;
   align-items: center;
   padding: 8px;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid var(--border);
 }
 .table-row:last-child{
     border-bottom: none;
@@ -420,7 +420,7 @@ watch([() => props.cardData], async(newValue) => {
 .table thead th {
   position: sticky;
   top: 0;
-  background-color: white;
+  background-color: var(--surface);
   z-index: 1;
 }
 </style>

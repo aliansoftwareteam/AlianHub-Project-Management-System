@@ -1091,20 +1091,20 @@
         height: calc(100vh - 106px) !important;
     }
     :deep(.vgl-item:not(.vgl-item--placeholder)) {
-        background-color: #ccc;
-        border: 1px solid black;
+        background-color: var(--fill);
+        border: 1px solid var(--border);
     }
     :deep(.vgl-item--resizing) {
         opacity: 90%;
     }
     :deep(.vgl-item--static) {
-        background-color: #cce;
+        background-color: var(--brand-tint);
     }
     .layout-json {
         padding: 10px;
         margin-top: 10px;
-        background-color: #ddd;
-        border: 1px solid black;
+        background-color: var(--fill);
+        border: 1px solid var(--border);
     }
     .columns {
         columns: 120px;
@@ -1115,8 +1115,8 @@
         height: calc(100% - 5px);
         margin: 5px;
         content: '';
-        background-image: linear-gradient(to right, lightgrey 1px, transparent 1px),
-            linear-gradient(to bottom, lightgrey 1px, transparent 1px);
+        background-image: linear-gradient(to right, var(--hairline) 1px, transparent 1px),
+            linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
             background-size: calc(calc(100% - 5px) / 12) 40px;
         background-repeat: repeat;
     }
@@ -1134,7 +1134,7 @@
         border-bottom-color:var(--border);
     }
     .vgl-item--placeholder {
-        background-color: #D4D4D4;
+        background-color: var(--border);
         opacity: 1;
         border-radius: 12px;
     }

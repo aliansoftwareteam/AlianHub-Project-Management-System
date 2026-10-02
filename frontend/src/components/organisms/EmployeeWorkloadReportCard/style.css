@@ -73,7 +73,7 @@
 }
 .ewr-period-box:focus-within {
     border-color: var(--brand);
-    box-shadow: 0 0 0 3px rgba(100, 115, 232, 0.12);
+    box-shadow: 0 0 0 3px var(--brand-ring);
 }
 .ewr-period-icon {
     width: 14px;
@@ -121,7 +121,7 @@
 }
 .ewr-search-box:focus-within {
     border-color: var(--brand);
-    box-shadow: 0 0 0 3px rgba(100, 115, 232, 0.12);
+    box-shadow: 0 0 0 3px var(--brand-ring);
     background: var(--surface);
 }
 .ewr-search-icon {
@@ -396,7 +396,7 @@
     font-weight: 600;
 }
 .ewr-over-planned {
-    color: #F59E0B;   /* warm amber — logged exceeded the employee's own plan */
+    color: var(--warn);   /* warm amber — logged exceeded the employee's own plan */
     font-weight: 600;
 }
 
@@ -426,7 +426,7 @@
     background: var(--danger-bg);
 }
 .ewr-task-over td:first-child {
-    box-shadow: inset 3px 0 0 #EF4444;
+    box-shadow: inset 3px 0 0 var(--danger);
 }
 .ewr-td-task-name {
     white-space: nowrap;

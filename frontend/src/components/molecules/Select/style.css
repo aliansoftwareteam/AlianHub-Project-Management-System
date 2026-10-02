@@ -1,13 +1,13 @@
 .select-option {
     text-align: left;
     position: relative;
-    color: #959595;
+    color: var(--ink-2);
 }
 .select-option-value{
     position: absolute;
-    background-color: white;
+    background-color: var(--surface);
     border-radius: 0px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border);
     width: 100%;
     left: 0;
     top: 30px;
@@ -23,14 +23,14 @@
     align-items: center;
 }
 .custom-select-options:hover{
-    background-color: #ececec;
+    background-color: var(--surface-hover);
     cursor: pointer;
 }
 .cutom-select-disabled {
-    background-color: #e9ecef;
+    background-color: var(--fill);
 }
 .select-option.focused {
-    border-color: #2f3990 !important;
+    border-color: var(--brand) !important;
 }
 .custom-selectoptions-wrapper::-webkit-scrollbar{
     display: none;
