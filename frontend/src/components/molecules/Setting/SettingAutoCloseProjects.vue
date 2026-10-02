@@ -15,7 +15,7 @@
                 <span class="acp-row-hint">{{ $t('Settings.auto_close_toggle_hint') }}</span>
             </div>
             <label class="acp-switch" :class="{ disabled: isBusy }">
-                <input type="checkbox" :checked="policy.enabled" :disabled="isBusy" @change="onToggle($event.target.checked)" />
+                <input type="checkbox" :aria-label="$t('Settings.auto_close_toggle_label')" :checked="policy.enabled" :disabled="isBusy" @change="onToggle($event.target.checked)" />
                 <span class="acp-slider"></span>
             </label>
         </div>
@@ -25,7 +25,7 @@
                 <span class="font-weight-500">{{ $t('Settings.auto_close_window_label') }}</span>
                 <span class="acp-row-hint">{{ $t('Settings.auto_close_window_hint') }}</span>
             </div>
-            <select class="acp-select" :value="policy.inactiveMonths" :disabled="!policy.enabled || isBusy" @change="onWindowChange(Number($event.target.value))">
+            <select class="acp-select" :aria-label="$t('Settings.auto_close_window_label')" :value="policy.inactiveMonths" :disabled="!policy.enabled || isBusy" @change="onWindowChange(Number($event.target.value))">
                 <option v-for="n in validInactiveMonths" :key="n" :value="n">{{ $t('Settings.auto_close_months_option', { n }, n) }}</option>
             </select>
         </div>

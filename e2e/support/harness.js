@@ -6,10 +6,10 @@ const { startServer } = require('./server');
 
 /* One server and one fixture set per run of a layer. The database is wiped first:
  * the setup wizard only runs on an empty instance. */
-async function startHarness({ name }) {
+async function startHarness({ name, env }) {
     const mongoUrl = resolveMongoUrl();
     await resetDatabase(mongoUrl);
-    const server = await startServer({ mongoUrl, logFile: path.join(STATE_DIR, `${name}-server.log`) });
+    const server = await startServer({ mongoUrl, logFile: path.join(STATE_DIR, `${name}-server.log`), env });
 
     const stop = async () => {
         const companyIds = await listCompanyIds(mongoUrl).catch(() => []);
