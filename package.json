@@ -135,6 +135,8 @@
     "env:doc:check": "node scripts/env-doc.js --check --strict",
     "i18n:check": "node scripts/i18n-check.js",
     "i18n:backfill": "node scripts/i18n-backfill.js",
+    "style:check": "node scripts/style-check.js",
+    "style:baseline": "node scripts/style-check.js --baseline",
     "api:doc": "node scripts/api-doc.js",
     "api:doc:check": "node scripts/api-doc.js --check --strict",
     "version:show": "node scripts/build-info.js",
