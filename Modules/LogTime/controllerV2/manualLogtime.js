@@ -13,7 +13,8 @@ const { pinSessionTenant } = require('../../../Config/tenant');
 const { resolveSheetScope, opensProject, SHEET_PERMISSION } = require('../../TimeSheet/helpers/timeScope');
 const { actingUser } = require('../../Sprints/helpers/actingUser');
 const { escapeHtml } = require('../../../utils/escapeHtml');
-const { nonMembersOf, NOT_A_MEMBER } = require('../../../Config/companyMembers');
+const { namedPeopleRefusal } = require('../../../Config/projectPeople');
+const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { companyOwnerOf } = require('../../Company/helpers/companyOwner');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
@@ -175,8 +176,15 @@ exports.manualLogTime = async (req, res) => {
         logger.warn(`manualLogtime refused: ${uid} for ${owner} in ${companyId}`);
         return refuse(res, 403, NOT_YOUR_TIME);
     }
+    /* Editing a colleague's entry keeps its person. Putting time on someone else is an owner's or an admin's, and
+     * time lands on someone else only in a project that person can open. */
     const newlyNamed = owner !== uid && !(storedEntry && String(storedEntry.Loggeduser) === owner);
-    if (newlyNamed && (await nonMembersOf(companyId, [owner])).length) return refuse(res, 400, NOT_A_MEMBER);
+    const movedProject = owner !== uid && Boolean(storedEntry) && String(storedEntry.ProjectId) !== String(req.body.projectId);
+    if (newlyNamed && !isPrivileged(await getRoleType(companyId, uid))) return refuse(res, 403, NOT_YOUR_TIME);
+    if (newlyNamed || movedProject) {
+        const refusal = await namedPeopleRefusal(companyId, req.body.projectId, [owner]);
+        if (refusal) return refuse(res, 400, refusal);
+    }
     const diffArr = req.body.timeDuration.split(':');
     const diffMin = (+diffArr[0]) * 60 + (+diffArr[1]);
     let data = {

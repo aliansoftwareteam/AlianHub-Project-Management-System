@@ -436,7 +436,7 @@ const createSchedule = async () => {
         if (body && body.status === false) { scheduleError.value = body.statusText || t('Reports.save_failed'); return; }
         sched.recipients = '';
         await loadSchedules();
-    } catch (e) { scheduleError.value = t('Reports.save_failed'); }
+    } catch (e) { scheduleError.value = e?.response?.data?.statusText || t('Reports.save_failed'); }
 };
 
 const removeSchedule = async (sc) => {

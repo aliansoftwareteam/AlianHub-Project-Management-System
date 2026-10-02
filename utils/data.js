@@ -22,6 +22,7 @@ const { toSlug } = require('../Modules/settings/ProjectSkills/skillRules');
 const { MEMBER_DEFAULT_PERMISSIONS } = require('../Modules/settings/securityPermissions/memberDefaults');
 const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER } = require('../Config/roleTypes');
 const { addMissingViews } = require('../Modules/projectTabs/catalogue');
+const { templatesProblem, templateWritesOf } = require('../Modules/ImportSettings/templateWrite');
 
 //IMPORT CURRENCY
 exports.importCurrency = (companyName) => {
@@ -1966,55 +1967,21 @@ exports.importTaskTypeTemplate = (companyName) => {
     });
 }
 
-exports.importSettingTemplate = (companyId, templates, cb) =>{
-    try {
-        let path = `${SCHEMA_TYPE.PROJECT_TEMPLATES}`;
-        let promisesArray = [];
-        templates.forEach((item) => {
-            item.Updated_At = new Date();
-            item.Created_At = new Date();
-            let obj = {
-                 type : path,
-                 data : item
-            }
-            promisesArray.push(
-                new Promise((resolve2, reject2) => {
-                    try {
-                        MongoDbCrudOpration(companyId, obj, "findOneAndUpdate")
-                        .then(() => {
-                            resolve2();
-                        })
-                    } catch (error) {
-                        logger.error(`Send Catch Error 1: ${error.messge}`);
-                        reject2.send({status: false, statusText: error.message});
-                        reject2(error);
-                    }
-                })
-            )
-        })
-        Promise.allSettled(promisesArray)
-        .then(() => {
-            cb({
-                status: true
-            });
-        })
+/* Each write's filter and update come from templateWritesOf; nothing a caller sends is used as either. */
+exports.importSettingTemplate = (companyId, templates, cb) => {
+    const problem = templatesProblem(templates);
+    if (problem) {
+        cb({ status: false, statusText: problem });
+        return;
+    }
+    templateWritesOf(companyId, templates)
+        .then((writes) => Promise.all(writes.map(({ method, data }) => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECT_TEMPLATES, data }, method))))
+        .then((stored) => cb({ status: true, statusText: 'Templates imported.', data: stored.filter(Boolean).map((row) => ({ _id: row._id, TemplateName: row.TemplateName })) }))
         .catch((error) => {
-            logger.error(`Send Catch Error 2: ${error.messge}`);
-            cb({
-                status: false,
-                error: error
-            });
-        })
-
-    }
-    catch(error){
-        logger.error(`Send Catch Error 3: ${error.messge}`);
-        cb({
-            status: false,
-            error: error
+            logger.error(`import templates: ${error && error.message}`);
+            cb({ status: false, statusText: 'The templates could not be imported.' });
         });
-    }
-}
+};
 
 exports.createDefaultMainChats = (companyId) => {
     return new Promise((resolve, reject) => {

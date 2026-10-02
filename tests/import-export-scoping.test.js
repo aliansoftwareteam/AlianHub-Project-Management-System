@@ -145,7 +145,10 @@ describe('PAG-03 import history belongs to the session user', () => {
 });
 
 describe('PAG-04 settings and rules imports are gated', () => {
-    const templates = [{ TemplateName: 'T', TemplateId: 't1', category: 'category' }];
+    const templates = [{
+        TemplateName: 'T', AssigneeUserId: [], LeadUserId: [], ProjectCurrency: { code: 'USD' }, ProjectRequiredDefaultComponent: 'ProjectListView',
+        TemplateRequiredComponent: [], TemplateTaskType: [], apps: [], projectStatusData: [], taskStatusData: [],
+    }];
 
     it('refuses a template import from a member', async () => {
         getRoleType.mockResolvedValue(3);

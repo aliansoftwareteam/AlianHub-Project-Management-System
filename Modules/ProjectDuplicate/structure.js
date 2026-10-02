@@ -10,11 +10,24 @@ const matcher = require('../Automations/engine/matcher');
 const { asList, announceFields } = require('../CustomField/helpers/fieldProjects');
 const { removeLinksOfTasks } = require('../CustomField/helpers/fieldLinkStore');
 const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
+const { TEAM_PREFIX, namedIds, nonMembersOf, foreignTeamsOf } = require('../../Config/companyMembers');
+const { keptOnProject } = require('../../Config/projectPeople');
 const rules = require('./rules');
 
 const asId = (id) => new mongoose.Types.ObjectId(String(id));
 const find = (companyId, type, filter, projection = null) => MongoDbCrudOpration(companyId, { type, data: [filter, projection, { lean: true }] }, 'find').then((rows) => rows || []);
 const insert = (companyId, type, docs) => (docs.length ? MongoDbCrudOpration(companyId, { type, data: [docs] }, 'insertMany') : Promise.resolve([]));
+
+/* A copy is a new project: of the people and teams the source names, it starts with those the company still has. */
+const seatedOnly = async (companyId, ids) => {
+    const named = namedIds(ids);
+    const isTeam = (id) => id.startsWith(TEAM_PREFIX);
+    const outside = new Set([
+        ...await nonMembersOf(companyId, named.filter((id) => !isTeam(id))),
+        ...await foreignTeamsOf(companyId, named.filter(isTeam)),
+    ]);
+    return named.filter((id) => !outside.has(id));
+};
 
 const automationsChanged = (companyId) => {
     removeCache(`automation_rules:${companyId}`);
@@ -79,7 +92,7 @@ const linkCustomFields = async (companyId, fieldIds, projectId) => {
 
 /* Everything of a project but its tasks, written from what readSource answers. `made` names what was written, so a failure later can take it back. */
 const writeStructure = async ({ companyId, caller, bundle, name, code, include, made }) => {
-    const { source } = bundle;
+    const source = { ...bundle.source, AssigneeUserId: await seatedOnly(companyId, bundle.source.AssigneeUserId) };
     const sourceId = String(source._id);
     const projectRef = made.projectId;
     const projectId = String(projectRef);
@@ -92,15 +105,20 @@ const writeStructure = async ({ companyId, caller, bundle, name, code, include, 
     const listRows = rules.listCopies(bundle.lists, projectRef, ids, include);
     const sourceLists = bundle.lists.filter((list) => ids.has(String(list._id)));
 
-    await insert(companyId, SCHEMA_TYPE.FOLDERS, folderRows);
-    await insert(companyId, SCHEMA_TYPE.SPRINTS, listRows);
-    await insert(companyId, SCHEMA_TYPE.PROJECT_RULES, rules.permissionCopies(bundle.permissions, projectId));
-
     const currency = rules.hasCurrency(source) ? undefined : await defaultCurrencyOf(companyId);
     const project = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
         data: rules.projectCopy(source, { id: projectRef, name, code: code || rules.nextProjectCode(source.ProjectCode, codes.map((row) => row.ProjectCode)), caller, companyId, include, ids, currency }),
     }, 'save');
+
+    // The project is written first: who may be named on its lists and tasks is read off the stored row.
+    const keepPeople = keptOnProject(companyId, projectId);
+    for (const list of listRows) {
+        if (Array.isArray(list.AssigneeUserId) && list.AssigneeUserId.length) list.AssigneeUserId = await keepPeople(list.AssigneeUserId);
+    }
+    await insert(companyId, SCHEMA_TYPE.FOLDERS, folderRows);
+    await insert(companyId, SCHEMA_TYPE.SPRINTS, listRows);
+    await insert(companyId, SCHEMA_TYPE.PROJECT_RULES, rules.permissionCopies(bundle.permissions, projectId));
     const sharedFields = await linkCustomFields(companyId, bundle.fieldIds, projectId);
     made.rules = await copyAutomations({ companyId, caller, sourceRules: bundle.rules, projectId, ids, notes });
 
@@ -108,7 +126,7 @@ const writeStructure = async ({ companyId, caller, bundle, name, code, include, 
     for (const list of listRows) placements.set(String(list._id), (await sprintPlacementOf(companyId, list)).set);
 
     return {
-        project, ids, notes, placements, sharedFields,
+        project, ids, notes, placements, sharedFields, keepPeople,
         sourceListIds: sourceLists.map((list) => list._id),
         counts: { folders: folderRows.length, lists: listRows.length, tasks: 0, automations: made.rules.length },
     };

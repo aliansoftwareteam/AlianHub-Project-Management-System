@@ -5,6 +5,7 @@ const { generateMeetingNotes } = require('../AI/meetingNotes');
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
 const { activeMemberIds } = require('../notification/activeMembers');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 
 const companyOf = (req) => req.headers['companyid'];
 const isObjectId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ''));
@@ -133,10 +134,12 @@ const TITLE_MAX = 200;
 const SUMMARY_MAX = 20000;
 const ACTION_ITEMS_MAX = 200;
 const STATUSES = ['ready', 'discarded'];
+const MAY_NOT_DISCARD = 'Only the person who started these notes, an owner or an admin can discard them.';
 const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 /* What a participant may change, each with the shape it is stored in. The transcript is what was said on the
- * call: it is written once, when the notes are saved, and no edit reaches it. */
+ * call: it is written once, when the notes are saved, and no edit reaches it. Discarding takes the notes from
+ * everyone on the call, so it is for the participant who started them, an owner or an admin. */
 const EDITABLE = {
     title: (value) => typeof value === 'string' && value.length <= TITLE_MAX,
     summary: (value) => typeof value === 'string' && value.length <= SUMMARY_MAX,
@@ -161,8 +164,15 @@ exports.updateNotes = async (req, res) => {
             if (!fits(body[key])) return res.status(400).send({ status: false, statusText: `${key} is not valid.` });
             patch[key] = body[key];
         }
-        if (patch.status === 'discarded') patch.deletedStatusKey = 1;
         if (!Object.keys(patch).length) return res.send({ status: false, statusText: 'Nothing to update.' });
+        if (patch.status === 'discarded') {
+            const notes = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CALLS, data: [ownNotesFilter(req, req.params.id), { createdBy: 1 }] }, 'findOne');
+            if (!notes) return res.send({ status: false, statusText: 'Notes not found.' });
+            if (String(notes.createdBy) !== String(req.uid) && !isPrivileged(await getRoleType(companyId, req.uid))) {
+                return res.status(403).send({ status: false, statusText: MAY_NOT_DISCARD });
+            }
+            patch.deletedStatusKey = 1;
+        }
         patch.editedBy = String(req.uid);
         patch.editedAt = new Date();
 
