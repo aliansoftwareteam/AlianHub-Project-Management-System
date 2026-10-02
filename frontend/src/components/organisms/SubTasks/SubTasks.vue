@@ -32,8 +32,7 @@
                     />
                     <button type="button" class="stx__name" :title="sub.TaskName" @click="open(sub)">{{ sub.TaskName }}</button>
                     <span v-if="assignee(sub)" class="ah-avatar ah-avatar--sm" :title="assignee(sub).Employee_Name">
-                        <img v-if="assignee(sub).Employee_profileImageURL" :src="assignee(sub).Employee_profileImageURL" :alt="assignee(sub).Employee_Name" />
-                        <template v-else>{{ initials(assignee(sub).Employee_Name) }}</template>
+                        <AvatarImage :src="assignee(sub).Employee_profileImageURL" :alt="assignee(sub).Employee_Name">{{ initials(assignee(sub).Employee_Name) }}</AvatarImage>
                     </span>
                     <span class="ah-mono stx__hours">{{ hours(sub.totalEstimatedTime) }}</span>
                 </div>
@@ -89,6 +88,7 @@ import { useI18n } from "vue-i18n";
 
 // COMPONENTS
 import CreateTask from "@/components/atom/CreateTask/CreateTask.vue";
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import SpinnerComp from "@/components/atom/SpinnerComp/SpinnerComp.vue";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue";
 

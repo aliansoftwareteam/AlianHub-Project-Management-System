@@ -89,8 +89,9 @@
                 <template v-for="item in visibleList" :key="item.requestId || item._id">
                 <div class="mbv__row" :class="{ 'is-pending': item.status !== 2 }" :style="gridStyle">
                     <div class="mbv__person">
-                        <img v-if="item.Employee_profileImageURL" class="ah-avatar" :src="item.Employee_profileImageURL" :alt="item.Employee_Name" />
-                        <span v-else-if="item.status === 2" class="ah-avatar">{{ initial(item) }}</span>
+                        <span v-if="item.Employee_profileImageURL || item.status === 2" class="ah-avatar">
+                            <AvatarImage :src="item.Employee_profileImageURL" :alt="item.Employee_Name">{{ initial(item) }}</AvatarImage>
+                        </span>
                         <span v-else class="mbv__avatar-pending" aria-hidden="true"></span>
                         <div class="mbv__person-text">
                             <div class="mbv__name">{{ item.Employee_Name || item.userEmail }}</div>
@@ -185,6 +186,7 @@
 
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";

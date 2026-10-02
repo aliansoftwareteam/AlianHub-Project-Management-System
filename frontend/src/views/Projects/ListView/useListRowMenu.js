@@ -168,17 +168,30 @@ export function useListRowMenu(projectSource, showArchived) {
     }
 
     /* The answer is written to the list on screen as a change from the server, so the row leaves it and its group counts are asked again. */
+    async function changeList(action, task, listId, op) {
+        const response = await apiRequest("patch", env.V2_TASKS, { action, taskId: String(task._id), sprintId: String(listId) });
+        if (response?.data?.status !== true) throw response;
+        const extraLists = (response.data.data?.extraLists || []).map((entry) => ({ projectId: entry.projectId, sprintId: entry.sprintId, addedBy: entry.addedBy, addedAt: entry.addedAt }));
+        const change = { snap: {}, op, pid: String(task.ProjectID), sprintId: String(listId), data: { ...task, extraLists }, updatedFields: { extraLists } };
+        commit("projectData/mutateUpdateFirebaseTasks", change);
+        commit("projectData/mutateTypesenseTableTasks", change);
+    }
+
+    async function addBackToList(task, listId) {
+        try {
+            await changeList("addToList", task, listId, "added");
+            $toast.success(t("TaskLists.added_back"), TOAST);
+        } catch (error) {
+            $toast.error(t(refusalKey(refusalCodeOf(error)), { max: MAX_EXTRA_LISTS }), TOAST);
+        }
+    }
+
     async function removeFromList(task, listId) {
         if (!rights.value.removeFromList || !listId || working.value) return;
         working.value = true;
         try {
-            const response = await apiRequest("patch", env.V2_TASKS, { action: "removeFromList", taskId: String(task._id), sprintId: String(listId) });
-            if (response?.data?.status !== true) throw response;
-            const extraLists = (response.data.data?.extraLists || []).map((entry) => ({ projectId: entry.projectId, sprintId: entry.sprintId, addedBy: entry.addedBy, addedAt: entry.addedAt }));
-            const change = { snap: {}, op: "modified", pid: String(task.ProjectID), sprintId: String(listId), data: { ...task, extraLists }, updatedFields: { extraLists } };
-            commit("projectData/mutateUpdateFirebaseTasks", change);
-            commit("projectData/mutateTypesenseTableTasks", change);
-            $toast.success(t("TaskLists.removed_here"), TOAST);
+            await changeList("removeFromList", task, listId, "modified");
+            showUndoToast({ message: t("TaskLists.removed_here"), undo: () => addBackToList(task, listId) });
         } catch (error) {
             $toast.error(t(refusalKey(refusalCodeOf(error)), { max: MAX_EXTRA_LISTS }), TOAST);
         } finally {
