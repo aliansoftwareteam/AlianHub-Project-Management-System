@@ -291,6 +291,7 @@ See [.claude/SECURITY-PATTERNS.md](.claude/SECURITY-PATTERNS.md) for detailed pr
 - [.claude/CONVENTIONS.md](.claude/CONVENTIONS.md) — Code naming, module organization, patterns
 - [.claude/FOLDER-STRUCTURE.md](.claude/FOLDER-STRUCTURE.md) — Project layout and file organization
 - [.claude/COMMON-TASKS.md](.claude/COMMON-TASKS.md) — How to add features, routes, tests, files
+- [.claude/AGENTS-AND-MCP.md](.claude/AGENTS-AND-MCP.md) — How an AI agent changes things, and how to add an agent action or MCP tool
 
 **Best Practices**
 - [.claude/SECURITY-PATTERNS.md](.claude/SECURITY-PATTERNS.md) — Security essentials (companyId scoping, JWT, validation)
