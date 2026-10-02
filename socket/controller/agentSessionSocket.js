@@ -1,3 +1,4 @@
+const { AsyncResource } = require('async_hooks');
 const { findRoomsByPrefixes } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { verifyCompanyMembership } = require('../../Config/jwt');
@@ -14,6 +15,10 @@ const cached = (key, now) => {
     return undefined;
 };
 
+/* Whether the person looking may open the task is not the business of the request that changed the session: bound
+ * here, where no request is running, it is read under no token's project list and no agent's mark. */
+const forTheViewer = AsyncResource.bind((decide) => decide());
+
 /* joinTaskDetail admits any live session to any task's room, so the relay decides per socket: the user the socket's
  * verified token names must belong to the workspace and be able to open the task. */
 const mayReceive = async (companyId, uid, task, now = Date.now()) => {
@@ -22,7 +27,7 @@ const mayReceive = async (companyId, uid, task, now = Date.now()) => {
     const hit = cached(key, now);
     if (hit !== undefined) return hit;
     const { canOpenTask } = require('../../Modules/AgentSessions/access');
-    const allowed = Boolean(await verifyCompanyMembership(String(uid), String(companyId))) && await canOpenTask(companyId, uid, task);
+    const allowed = await forTheViewer(async () => Boolean(await verifyCompanyMembership(String(uid), String(companyId))) && canOpenTask(companyId, uid, task));
     decisions.set(key, { allowed, until: now + DECISION_TTL_MS });
     return allowed;
 };

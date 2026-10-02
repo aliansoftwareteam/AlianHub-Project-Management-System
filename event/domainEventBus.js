@@ -1,4 +1,5 @@
 const EventEmitter = require('events');
+const { AsyncResource } = require('async_hooks');
 const { ulid } = require('ulid');
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { MongoDbCrudOpration } = require('../utils/mongo-handler/mongoQueries');
@@ -7,6 +8,7 @@ const telemetry = require('../Config/telemetry');
 const socketEmitter = require('./socketEventEmitter');
 const { normalizeChangedFields, createSnapshotStore, isNotAnEdit } = require('../utils/entityEvents');
 const actingAgent = require('../Modules/Agents/actingAgent');
+const providerContext = require('../Modules/AICore/providerContext');
 
 // Canonical domain-event bus — stage 1 of the automation engine (ADR 002).
 //
@@ -103,12 +105,12 @@ const originOf = (payload) => {
     return { actor: { userId: mark.userId ? String(mark.userId) : null, kind: 'agent' }, depth: (Number(mark.depth) || 0) + 1 };
 };
 
-const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, depth }) => ({
+const buildEnvelope = ({ companyId, type, doc, changedFields, previous, actor, depth, traceId }) => ({
     id: ulid(),
     companyId: String(companyId),
     type,
     occurredAt: new Date().toISOString(),
-    traceId: telemetry.traceIdNow() || telemetry.newTraceId(),
+    traceId: traceId || telemetry.traceIdNow() || telemetry.newTraceId(),
     actor,
     depth: Number(depth) || 0,
     scope: {
@@ -211,20 +213,30 @@ async function record(envelope) {
     }, 'save');
 }
 
+/* A listener acts for its own people (a rule for its maker, a notice for the person it is sent to), not for whoever
+ * made the change. Bound here, where no request is running, it is told under no token's project list, no agent's
+ * mark and no request. What it may know of the change is in the envelope: who made it and how deep in a chain,
+ * which the loop guards read, and the trace and the workspace, which are entered again from it. */
+const toListeners = AsyncResource.bind((envelope, recorded) => providerContext.run({ companyId: envelope.companyId },
+    () => telemetry.withTrace(envelope.traceId, () => {
+        bus.emit('domain.event', envelope);
+        bus.emit(envelope.type, envelope);
+        if (recorded) record(envelope).catch((error) => logger.error(`${LOG_PREFIX} could not record ${eventLabel(envelope)}: ${failureText(error)}`));
+    })));
+
+/* For an envelope built elsewhere (a form submission). */
+const tell = (envelope) => toListeners(envelope, false);
+
 function publish(envelope) {
     if (envelope.depth > MAX_DEPTH) {
         logger.error(`${LOG_PREFIX} dropped ${envelope.type} for ${envelope.entity.id} — depth ${envelope.depth} exceeds ${MAX_DEPTH}`);
         return;
     }
-    actingAgent.outside(() => {
-        bus.emit('domain.event', envelope);
-        bus.emit(envelope.type, envelope);
-        record(envelope).catch((error) => logger.error(`${LOG_PREFIX} could not record ${eventLabel(envelope)}: ${failureText(error)}`));
-    });
+    toListeners(envelope, true);
 }
 
 function flush(entry) {
-    const { companyId, doc, changed, actor, depth, emitType } = entry;
+    const { companyId, doc, changed, actor, depth, emitType, traceId } = entry;
     const type = classifyTaskEvent(emitType, changed);
     if (!type) return;
 
@@ -233,7 +245,7 @@ function flush(entry) {
     const data = trimTask(doc);
     taskSnapshots.remember(taskId, data);
 
-    publish(buildEnvelope({ companyId, type, doc, changedFields: changed, previous, actor, depth }));
+    publish(buildEnvelope({ companyId, type, doc, changedFields: changed, previous, actor, depth, traceId }));
 }
 
 const fieldValue = (doc, field) => {
@@ -297,12 +309,12 @@ function onTaskEvent(emitType) {
                 return;
             }
 
-            const entry = { companyId, doc, changed: new Set(changedNow), emitType, actor, depth };
-            entry.timer = actingAgent.outside(() => setTimeout(() => {
+            const entry = { companyId, doc, changed: new Set(changedNow), emitType, actor, depth, traceId: telemetry.traceIdNow() };
+            entry.timer = setTimeout(() => {
                 if (pending.get(key) !== entry) return;
                 pending.delete(key);
                 flushSafely(entry);
-            }, DEBOUNCE_MS));
+            }, DEBOUNCE_MS);
             pending.set(key, entry);
         } catch (error) {
             logger.error(`${LOG_PREFIX} event handling failed: ${failureText(error)}`);
@@ -377,6 +389,7 @@ module.exports = {
     listenForCalls,
     publishEntityEvent,
     publishTaskEvent,
+    tell,
     bus,
     isRecording,
     setRecording,

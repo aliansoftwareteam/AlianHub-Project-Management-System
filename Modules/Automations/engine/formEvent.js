@@ -77,8 +77,7 @@ const buildFormEnvelope = ({ companyId, form, submissionId, answers, task, actor
 const publishFormSubmitted = (input) => {
     try {
         const envelope = buildFormEnvelope(input);
-        domainEventBus.bus.emit('domain.event', envelope);
-        domainEventBus.bus.emit(EVENT_TYPE, envelope);
+        domainEventBus.tell(envelope);
         return envelope;
     } catch (error) {
         const { companyId, form, task } = input || {};

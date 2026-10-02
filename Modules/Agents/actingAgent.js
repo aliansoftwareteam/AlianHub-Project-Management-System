@@ -13,9 +13,6 @@ const storage = new AsyncLocalStorage();
 const runAs = (mark, fn) => (mark ? storage.run(mark, fn) : fn());
 const current = () => storage.getStore() || null;
 
-/* What the mark starts must not inherit it: a rule the event wakes is not the agent. */
-const outside = (fn) => storage.exit(fn);
-
 /* The tool's own name. `attribution` (./actor) words the audit log with it; `shownAs` words what people read. */
 const toolNameOf = (actor) => {
     if (actor.viaAccount === VIA_EXTERNAL) return actor.agentName || 'Outside client';
@@ -35,4 +32,4 @@ const historyFields = () => {
     return mark ? { actorType: ACTOR_AGENT, agentName: String(mark.agentName || ''), actedFor: String(mark.userId || '') } : {};
 };
 
-module.exports = { runAs, current, outside, toolNameOf, byline, shownAs, historyFields, VIA_EXTERNAL, VIA_PERSONAL };
+module.exports = { runAs, current, toolNameOf, byline, shownAs, historyFields, VIA_EXTERNAL, VIA_PERSONAL };
