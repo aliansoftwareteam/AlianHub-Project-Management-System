@@ -445,8 +445,6 @@ const approveReviewed = async () => {
 .aq__summary { padding: 0 2px; color: var(--ink); }
 .aq__review-list { display: flex; flex-direction: column; gap: var(--sp-3, 8px); max-height: 40dvh; overflow: auto; }
 .aq__review-item { padding-top: var(--sp-3, 8px); border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 4px; }
-/* In this column the 12ch basis .aq__what has for a row would be its height. */
-.aq__review-item .aq__what { flex: none; }
 .aq__row { border-left: 3px solid var(--agent); display: flex; flex-direction: column; gap: var(--gap-row, 7px); min-width: 0; }
 .aq__row.is-locked, .aq__row--done { border-left-color: var(--border); }
 .aq__done { display: flex; flex-direction: column; gap: var(--sp-3, 8px); padding-top: var(--sp-3, 8px); }
@@ -454,6 +452,8 @@ const approveReviewed = async () => {
 .aq__head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .aq__what { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere; color: var(--ink); }
 .aq__what strong { font-weight: 600; }
+/* In this column the 12ch basis .aq__what has for a row would be its height. */
+.aq__review-item .aq__what { flex: none; }
 .aq__when { margin-left: auto; font: 400 var(--fs-sm, 10px)/1 var(--font-ui); color: var(--ink-2); flex: none; }
 .aq__label { font: var(--text-label); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
 .aq__why { margin: 0; color: var(--ink); line-height: 1.45; overflow-wrap: anywhere; white-space: pre-line; }
