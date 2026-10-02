@@ -25,6 +25,23 @@ async function blockingViolations(page, label) {
         .map((v) => `${label} ${v.rule} (${v.impact}): ${v.help}: ${v.target}`);
 }
 
+/* The CI annotation keeps the first lines of an error, so one line per rule and set of combinations. */
+function summarise(found) {
+    const groups = new Map();
+    for (const line of new Set(found)) {
+        const [, combo, rule, target] = line.match(/^\[(.+?)\] (\S+) \(\w+\): .*?: (.*)$/);
+        const key = `${rule}\u0000${target}`;
+        groups.set(key, [...(groups.get(key) || []), combo]);
+    }
+    const byCombos = new Map();
+    for (const [key, combos] of groups) {
+        const [rule, target] = key.split("\u0000");
+        const id = `${rule} [${combos.join(', ')}]`;
+        byCombos.set(id, [...(byCombos.get(id) || []), target]);
+    }
+    return [...byCombos].map(([id, targets]) => `${id} ${targets.join(' ; ')}`.slice(0, 900));
+}
+
 const settle = async (page) => {
     await expect(page.getByRole('main').first()).toBeVisible();
     await page.waitForLoadState('networkidle').catch(() => {});
@@ -42,7 +59,16 @@ async function auditScreen(page, open) {
             found.push(...(await blockingViolations(page, `[${viewport.name} ${theme}]`)));
         }
     }
-    expect([...new Set(found)]).toEqual([]);
+    expect(summarise(found), `${found.length} findings`).toEqual([]);
+}
+
+async function openView(page, view) {
+    if ((page.viewportSize()?.width || 0) > 767) {
+        await page.getByRole('button', { name: view, exact: true }).click();
+        return;
+    }
+    await page.locator('.project-views-row').getByRole('button').first().click();
+    await page.getByRole('option', { name: new RegExp(`^${view}`) }).click();
 }
 
 async function projectWithTasks({ owner, state, label }) {
@@ -58,7 +84,10 @@ async function projectWithTasks({ owner, state, label }) {
 
 test.describe('accessibility: everyday screens in light and dark, desktop and 390px', () => {
     test.use(asRole('owner'));
-    test.beforeEach(async ({ page }) => skipFirstRun(page));
+    test.beforeEach(async ({ page }) => {
+        test.setTimeout(180000);
+        await skipFirstRun(page);
+    });
 
     test('task panel open', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
@@ -83,7 +112,7 @@ test.describe('accessibility: everyday screens in light and dark, desktop and 39
         const { url, name } = await projectWithTasks({ owner, state, label: 'A11Y BOARD' });
         await auditScreen(page, async () => {
             await page.goto(url);
-            await page.getByRole('button', { name: 'Board', exact: true }).click();
+            await openView(page, 'Board');
             await expect(page.locator('.kanban-card .card-title', { hasText: name })).toBeVisible();
         });
     });
@@ -98,7 +127,7 @@ test.describe('accessibility: everyday screens in light and dark, desktop and 39
             await page.getByRole('button', { name: new RegExp(`^${view}`) }).click();
             await auditScreen(page, async () => {
                 await page.goto(url);
-                await page.getByRole('button', { name: view, exact: true }).click();
+                await openView(page, view);
             });
         });
     }
