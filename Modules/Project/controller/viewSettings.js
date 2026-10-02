@@ -21,9 +21,9 @@ const findProject = (companyId, projectId) => MongoDbCrudOpration(companyId, {
     data: [{ _id: new mongoose.Types.ObjectId(projectId) }, { ProjectRequiredComponent: 1, taskStatusData: 1 }],
 }, 'findOne');
 
-const announce = (project, updatedFields) => {
+const announce = (companyId, project, updatedFields) => {
     removeCache('UserProjectData:', true);
-    socketEmitter.emit('update', { type: 'update', data: project, updatedFields, module: 'project' });
+    socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: project, updatedFields, module: 'project' });
 };
 
 const readRequest = async (req, res) => {
@@ -63,7 +63,7 @@ exports.saveViewSettings = async (req, res) => {
         }, 'findOneAndUpdate');
         if (!updated) return refuse(res, 404, 'Project not found.');
 
-        announce(updated, { ProjectRequiredComponent: 'settings' });
+        announce(context.companyId, updated, { ProjectRequiredComponent: 'settings' });
         return res.status(200).json({ status: true, statusText: 'View saved.', data: { viewId, settings: clean } });
     } catch (error) {
         logger.error(`saveViewSettings: ${(error && error.message) || error}`);
@@ -146,7 +146,7 @@ exports.createView = async (req, res) => {
         }, 'findOneAndUpdate');
         if (!updated) return refuse(res, 404, 'Project not found.');
 
-        announce(updated, { ProjectRequiredComponent: 'add' });
+        announce(context.companyId, updated, { ProjectRequiredComponent: 'add' });
         return res.status(200).json({ status: true, statusText: 'View added.', data: view, leftOut });
     } catch (error) {
         logger.error(`createView: ${(error && error.message) || error}`);

@@ -127,7 +127,7 @@
     import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
     import * as env from '@/config/env';
     import { apiRequest, apiRequestWithoutCompnay } from '../../../services'
-    import Swal from 'sweetalert2';
+    import Swal from '@/utils/lazySwal';
     import { useCustomComposable, useGetterFunctions } from '@/composable';
     import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
     import { buildCloudAttachment, isCloudAttachment, cloudTypeOf, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';

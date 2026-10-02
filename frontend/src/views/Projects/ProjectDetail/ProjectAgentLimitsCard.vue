@@ -55,13 +55,13 @@
 </template>
 
 <script setup>
-import { computed, inject, onBeforeUnmount, reactive, ref, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
+import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
-import { AGENTS_CHANGED_EVENT, LIMITS_CHANGE } from "@/views/Ai/agentFeed";
-import { noteAgentsPaused } from "@/views/Projects/composables/agentPause";
+import { useStoredProjectPart } from "@/views/Projects/liveProjects";
 
 defineOptions({ name: "ProjectAgentLimitsCard" });
 
@@ -71,7 +71,7 @@ const props = defineProps({
 
 const { t } = useI18n();
 const $toast = useToast();
-const socket = inject("$socket", null);
+const store = useStore();
 
 const uid = `plim-${Math.random().toString(36).slice(2, 8)}`;
 const ids = {
@@ -104,7 +104,7 @@ function take(pid, data) {
     Object.assign(directRange, data.directTasksRange || { min: 1, max: 0 });
     directMinutes.value = data.directTasksMinutes || 0;
     canEdit.value = data.canEdit === true;
-    noteAgentsPaused(pid, saved.paused);
+    store?.commit("projectData/noteAgentLimits", { projectId: pid, limits: { ...saved } });
 }
 
 async function request(type, pid, body, fallback) {
@@ -147,12 +147,7 @@ async function follow() {
     }
 }
 
-const onAgentsChanged = (change) => { if (change?.kind === LIMITS_CHANGE) follow(); };
-watch(() => socket?.value, (next, previous) => {
-    previous?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
-    next?.on?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
-}, { immediate: true });
-onBeforeUnmount(() => socket?.value?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged));
+useStoredProjectPart(() => props.projectId, "agentLimits", saved, follow);
 
 async function save(key) {
     const pid = props.projectId;

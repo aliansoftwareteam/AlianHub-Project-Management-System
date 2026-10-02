@@ -4,6 +4,9 @@
 
 import { AUTOMATION_HEADING, AUTOMATION_LINE_KINDS } from './automationLines';
 import { FOLDER_HEADING, SPRINT_HEADING, LIST_SETUP_LINE_KINDS } from './listSetupLines';
+import { PROJECT_COPY_HEADING, PROJECT_COPY_LINE_KINDS } from './projectCopyLines';
+import { COMPUTED_LINE_KINDS } from './computedLines';
+import { DASHBOARD_HEADING, DASHBOARD_LINE_KINDS } from './dashboardLines';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T/;
@@ -118,6 +121,7 @@ export const LINE_KINDS = {
         if (!type) return { label: t('IntentPreview.line_field'), text: name };
         return { label: t('IntentPreview.line_field'), text: options ? t('IntentPreview.field_with_options', { name, type, options }) : t('IntentPreview.field_named', { name, type }) };
     },
+    ...COMPUTED_LINE_KINDS,
     fieldValue: (t, line) => {
         const [field, task] = [textOf(line.field), textOf(line.task)];
         if (!field || !task) return null;
@@ -180,6 +184,8 @@ export const LINE_KINDS = {
     },
     ...AUTOMATION_LINE_KINDS,
     ...LIST_SETUP_LINE_KINDS,
+    ...PROJECT_COPY_LINE_KINDS,
+    ...DASHBOARD_LINE_KINDS,
 };
 
 const HEADINGS = Object.freeze({
@@ -189,10 +195,12 @@ const HEADINGS = Object.freeze({
     view: { kind: 'IntentPreview.new_view', wants: 'IntentPreview.wants_view' },
     setup: { kind: 'IntentPreview.new_setup', wants: 'IntentPreview.wants_setup' },
     project: { kind: 'IntentPreview.new_project', wants: 'IntentPreview.wants_project' },
+    projectCopy: PROJECT_COPY_HEADING,
     batch: { kind: 'IntentPreview.batch_kind' },
     automation: AUTOMATION_HEADING,
     folder: FOLDER_HEADING,
     sprint: SPRINT_HEADING,
+    dashboardCard: DASHBOARD_HEADING,
 });
 
 const isBatch = (preview) => Boolean(preview) && preview.kind === 'batch';

@@ -52,6 +52,9 @@ const MEMBER_ROLE = 3;
 const APPROVER_HELD = /approver may not make this change|needs an Owner or Admin/;
 
 const WRITES = registry.keys().filter((key) => registry.get(key).write);
+// Approved by the person it was asked for alone, whatever a role may do.
+const ASKER_ALONE = ['dashboard.card.add'];
+const BY_ROLE = WRITES.filter((key) => !ASKER_ALONE.includes(key));
 const KNOWN = [...registry.ACTIONS, ...groups.flatMap((group) => group.entries.map((entry) => entry.action))];
 
 let fx;
@@ -99,7 +102,7 @@ describe('approving a connected agent\'s change', () => {
         expect(WRITES.length).toBeGreaterThan(30);
     });
 
-    it.each(WRITES)('%s is not approved by a member whose role may not make it', async (action) => {
+    it.each(BY_ROLE)('%s is not approved by a member whose role may not make it', async (action) => {
         const needs = registry.permissionsFor(action, paramsOf());
         needs.flatMap(optionsOf).forEach((path) => setForMembers(path, true));
         expect((await asked(action)) || { error: '' }).toMatchObject({ error: expect.stringMatching(/^$|needs an Owner or Admin/) });
@@ -108,10 +111,21 @@ describe('approving a connected agent\'s change', () => {
         expect(await asked(action)).toMatchObject({ status: 403, error: expect.stringMatching(APPROVER_HELD) });
     });
 
-    it.each(WRITES)('%s is not approved by a guest whose role may not make it', async (action) => {
+    it.each(BY_ROLE)('%s is not approved by a guest whose role may not make it', async (action) => {
         mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: world.OUTSIDER, roleType: 0, status: 2, isDelete: false });
         registry.permissionsFor(action, paramsOf()).flatMap(optionsOf).forEach((path) => setForMembers(path, true));
         const out = await approval.refusalFor(CID, filedBy(action), { decider: { kind: 'human', userId: world.OUTSIDER }, isPrivileged: false });
         expect(out).toMatchObject({ status: 403, error: expect.stringMatching(APPROVER_HELD) });
+    });
+
+    it.each(ASKER_ALONE)('%s is approved by the person it was asked for, and by nobody else', async (action) => {
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: world.OUTSIDER, roleType: 0, status: 2, isDelete: false });
+        registry.permissionsFor(action, paramsOf()).flatMap(optionsOf).forEach((path) => setForMembers(path, true));
+        const decidedBy = (userId, isPrivileged) => approval.refusalFor(CID, filedBy(action), { decider: { kind: 'human', userId }, isPrivileged });
+
+        expect(await decidedBy(MEMBER, false)).toMatchObject({ status: 403, error: expect.stringMatching(/only the person/) });
+        expect(await decidedBy(world.ADMIN, true)).toMatchObject({ status: 403, error: expect.stringMatching(/only the person/) });
+        expect(await decidedBy(world.OUTSIDER, false)).toMatchObject({ status: 403 });
+        expect((await decidedBy(OWNER, true)) || { error: '' }).toMatchObject({ error: '' });
     });
 });

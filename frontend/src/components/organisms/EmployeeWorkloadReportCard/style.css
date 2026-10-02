@@ -7,7 +7,7 @@
     flex-direction: column;
     overflow: hidden;
     font-family: var(--font-ui);
-    color: #1F212A;
+    color: var(--ink);
     cursor: default;
 }
 
@@ -32,10 +32,10 @@
     display: inline-flex;
     align-items: center;
     padding: 3px 9px;
-    background: #F1F3F9;
+    background: var(--fill);
     border-radius: 12px;
     font-size: 11px;
-    color: #4A5061;
+    color: var(--ink-label);
     line-height: 1.4;
     text-transform: capitalize;
 }
@@ -48,8 +48,8 @@
     display: inline-flex;
     align-items: center;
     padding: 3px 11px;
-    background: #EEF0FE;
-    color: #6473E8;
+    background: var(--brand-tint);
+    color: var(--brand);
     border-radius: 12px;
     font-size: 11px;
     font-weight: 600;
@@ -63,8 +63,8 @@
     align-items: center;
     gap: 6px;
     position: relative;
-    background: #fff;
-    border: 1.5px solid #E2E6FA;
+    background: var(--surface);
+    border: 1.5px solid var(--hairline);
     border-radius: 20px;
     padding: 5px 10px 5px 12px;
     margin-right: 8px;
@@ -72,13 +72,13 @@
     transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 .ewr-period-box:focus-within {
-    border-color: #6473E8;
+    border-color: var(--brand);
     box-shadow: 0 0 0 3px rgba(100, 115, 232, 0.12);
 }
 .ewr-period-icon {
     width: 14px;
     height: 14px;
-    color: #6473E8;
+    color: var(--brand);
     flex-shrink: 0;
 }
 .ewr-period-select {
@@ -86,7 +86,7 @@
     outline: none;
     background: transparent;
     font-size: 12px;
-    color: #1F212A;
+    color: var(--ink);
     font-family: var(--font-ui);
     font-weight: 500;
     cursor: pointer;
@@ -102,7 +102,7 @@
     right: 10px;
     width: 10px;
     height: 10px;
-    color: #94A3B8;
+    color: var(--ink-2);
     pointer-events: none;
     flex-shrink: 0;
 }
@@ -112,34 +112,34 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: #fff;
-    border: 1.5px solid #E2E6FA;
+    background: var(--surface);
+    border: 1.5px solid var(--hairline);
     border-radius: 20px;
     padding: 5px 12px;
     box-shadow: 0 1px 3px rgba(100, 115, 232, 0.06);
     transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
 }
 .ewr-search-box:focus-within {
-    border-color: #6473E8;
+    border-color: var(--brand);
     box-shadow: 0 0 0 3px rgba(100, 115, 232, 0.12);
-    background: #fff;
+    background: var(--surface);
 }
 .ewr-search-icon {
     width: 13px;
     height: 13px;
-    color: #94A3B8;
+    color: var(--ink-2);
     flex-shrink: 0;
     transition: color 0.18s ease;
 }
 .ewr-search-box:focus-within .ewr-search-icon {
-    color: #6473E8;
+    color: var(--brand);
 }
 .ewr-search-input {
     border: none;
     outline: none;
     background: transparent;
     font-size: 12px;
-    color: #1F212A;
+    color: var(--ink);
     font-family: var(--font-ui);
     width: 175px;
     padding: 0;
@@ -147,7 +147,7 @@
     letter-spacing: 0.01em;
 }
 .ewr-search-input::placeholder {
-    color: #B0B8CC;
+    color: var(--ink-2);
     font-weight: 400;
 }
 .ewr-search-clear {
@@ -166,11 +166,11 @@
     line-height: 1;
 }
 .ewr-search-clear:hover {
-    background: #6473E8;
+    background: var(--brand);
 }
 .ewr-chip-loading {
-    background: #FEF6E7;
-    color: #B45309;
+    background: var(--warn-bg);
+    color: var(--warn-ink);
 }
 
 /* Colour legend for the Logged Hours column */
@@ -179,7 +179,7 @@
     align-items: center;
     gap: 14px;
     font-size: 11px;
-    color: #6B7280;
+    color: var(--ink-2);
     white-space: nowrap;
 }
 .ewr-legend-item {
@@ -195,18 +195,18 @@
     flex-shrink: 0;
 }
 .ewr-legend-dot-estimate {
-    background: #EF4444;
+    background: var(--danger);
 }
 .ewr-legend-dot-planned {
-    background: #F59E0B;
+    background: var(--warn);
 }
 .ewr-mini-spinner {
     display: inline-block;
     box-sizing: border-box;
     width: 10px;
     height: 10px;
-    border: 2px solid #E2E6FA;
-    border-top-color: #6473E8;
+    border: 2px solid var(--hairline);
+    border-top-color: var(--brand);
     border-radius: 50%;
     margin-right: 4px;
     animation: ewr-spin 0.7s linear infinite;
@@ -219,7 +219,7 @@
 .ewr-empty {
     padding: 24px 12px;
     text-align: center;
-    color: #6B7280;
+    color: var(--ink-2);
     font-size: 13px;
     flex-shrink: 0;
 }
@@ -232,7 +232,7 @@
     flex: 1;               /* grows to fill remaining card height    */
     overflow-y: auto;      /* this is now the sole scroll container  */
     overflow-x: hidden;
-    border: 1px solid #E5E7EB;
+    border: 1px solid var(--hairline);
     border-radius: 8px;
 }
 .ewr-table {
@@ -242,14 +242,14 @@
     font-size: 13px;
 }
 .ewr-table thead {
-    background: #FAFBFC;
+    background: var(--surface-2);
 }
 .ewr-table th {
     text-align: left;
     padding: 9px 10px;
     font-weight: 600;
-    color: #4A5061;
-    border-bottom: 1px solid #E5E7EB;
+    color: var(--ink-label);
+    border-bottom: 1px solid var(--hairline);
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
@@ -258,10 +258,10 @@
     position: sticky;
     top: 0;
     z-index: 2;
-    background: #FAFBFC;
+    background: var(--surface-2);
 }
 .ewr-table th:hover {
-    background: #F1F3F9;
+    background: var(--fill);
 }
 
 /* Column widths */
@@ -288,7 +288,7 @@
 
 .ewr-row td {
     padding: 8px 10px;
-    border-bottom: 1px solid #F1F3F9;
+    border-bottom: 1px solid var(--hairline);
     vertical-align: middle;
     box-sizing: border-box;
     overflow: hidden;
@@ -310,12 +310,12 @@
 .ewr-chevron {
     display: inline-block;
     font-size: 14px;
-    color: #94A3B8;
+    color: var(--ink-2);
     transition: transform 0.15s ease;
 }
 .ewr-chevron-open {
     transform: rotate(90deg);
-    color: #6473E8;
+    color: var(--brand);
 }
 
 /* Employee cell — flex INSIDE the td, not on the td itself */
@@ -336,13 +336,13 @@
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: #E2E6FA;
-    color: #6473E8;
+    background: var(--brand-tint);
+    color: var(--brand);
     font-size: 11px;
     font-weight: 600;
 }
 .ewr-name-text {
-    color: #1F212A;
+    color: var(--ink);
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
@@ -354,19 +354,19 @@
 .ewr-td-num {
     text-align: right;
     font-variant-numeric: tabular-nums;
-    color: #1F212A;
+    color: var(--ink);
     width: 130px;
 }
 .ewr-td-project {
     width: 20%;
-    color: #4A5061;
+    color: var(--ink-label);
     font-size: 12px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .ewr-muted {
-    color: #94A3B8;
+    color: var(--ink-2);
 }
 
 /* Only rows with tasks are clickable/expandable */
@@ -374,25 +374,25 @@
     cursor: pointer;
 }
 .ewr-row-clickable:hover td {
-    background: #FAFBFC;
+    background: var(--surface-2);
 }
 /* De-emphasise employees with no activity in the current filter */
 .ewr-row-empty td {
-    color: #B0B6C0;
+    color: var(--ink-2);
 }
 .ewr-row-empty .ewr-name-text {
-    color: #8A909C;
+    color: var(--ink-2);
     font-weight: 400;
 }
 
 /* Highlights */
 .ewr-missing {
-    color: #94A3B8;
+    color: var(--ink-2);
     font-style: italic;
 }
 /* Over-budget on the Logged column — lighter, cleaner pairing */
 .ewr-over-estimate {
-    color: #EF4444;   /* clean red — logged exceeded the task estimate */
+    color: var(--danger);   /* clean red — logged exceeded the task estimate */
     font-weight: 600;
 }
 .ewr-over-planned {
@@ -404,8 +404,8 @@
    Generous vertical padding gives clear space between each task. */
 .ewr-task-tr td {
     padding: 11px 10px;
-    background: #FAFBFC;
-    border-bottom: 1px solid #F1F3F9;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--hairline);
     font-size: 12px;
     vertical-align: middle;
     overflow: hidden;
@@ -423,7 +423,7 @@
    tasks are obvious at a glance. Declared AFTER .ewr-task-tr td so
    the background wins (same specificity). */
 .ewr-task-over td {
-    background: #FEF2F2;
+    background: var(--danger-bg);
 }
 .ewr-task-over td:first-child {
     box-shadow: inset 3px 0 0 #EF4444;
@@ -452,8 +452,8 @@
     gap: 5px;
     padding: 2px 8px;
     margin-right: 8px;
-    background: #DCFCE7;
-    color: #15803D;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
     font-size: 10px;
     font-weight: 600;
     line-height: 1;
@@ -469,7 +469,7 @@
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #22C55E;
+    background: var(--ok);
     box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
     animation: ewr-running-pulse 1.6s ease-in-out infinite;
 }
@@ -481,29 +481,29 @@
     display: inline-block;
     font-family: var(--font-mono);
     font-size: 10px;
-    color: #6473E8;
-    background: #EEF0FE;
+    color: var(--brand);
+    background: var(--brand-tint);
     padding: 1px 6px;
     border-radius: 4px;
     white-space: nowrap;
     margin-right: 8px;
 }
 .ewr-task-name {
-    color: #1F212A;
+    color: var(--ink);
 }
 .ewr-task-name-link {
     cursor: pointer;
 }
 .ewr-task-name-link:hover {
-    color: #6473E8;
+    color: var(--brand);
     text-decoration: underline;
 }
 .ewr-no-tasks {
-    color: #6B7280;
+    color: var(--ink-2);
     font-style: italic;
 }
 .ewr-task-more {
-    color: #94A3B8;
+    color: var(--ink-2);
     font-size: 11px;
     font-style: italic;
 }
@@ -511,17 +511,17 @@
 /* Totals footer row — sticky at the bottom of the scroll container */
 .ewr-total-row td {
     padding: 10px;
-    border-top: 2px solid #E5E7EB;
-    background: #FAFBFC;
+    border-top: 2px solid var(--hairline);
+    background: var(--surface-2);
     font-weight: 600;
-    color: #1F212A;
+    color: var(--ink);
     font-variant-numeric: tabular-nums;
     position: sticky;
     bottom: 0;
     z-index: 1;
 }
 .ewr-total-label {
-    color: #4A5061;
+    color: var(--ink-label);
 }
 
 /* Responsive — narrow numeric columns at small width */

@@ -124,7 +124,7 @@
 .rel-prod__title { color: var(--danger-ink); }
 .rel-checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .rel-check { display: flex; align-items: center; gap: 8px; font: var(--text-small); color: var(--ink); }
-.rel-check__box { width: 15px; height: 15px; flex: none; border-radius: 4px; border: 1.5px solid var(--border); display: grid; place-items: center; color: #fff; }
+.rel-check__box { width: 15px; height: 15px; flex: none; border-radius: 4px; border: 1.5px solid var(--border); display: grid; place-items: center; color: var(--on-brand); }
 .rel-check--ok .rel-check__box { background: var(--ok); border-color: var(--ok); }
 .rel-check--todo { color: var(--warn-ink); }
 .rel-check--todo .rel-check__box { border-color: var(--warn); }
@@ -228,7 +228,7 @@
     padding: 13px 15px;
     border-radius: var(--r-card);
     background: var(--rail);
-    color: #fff;
+    color: var(--rail-ink-strong);
     box-shadow: var(--shadow-pop);
     display: flex;
     flex-direction: column;
@@ -245,13 +245,13 @@
     border-radius: 7px;
     border: 1px solid rgba(255, 255, 255, .2);
     background: transparent;
-    color: #fff;
+    color: var(--rail-ink-strong);
     font: 500 11.5px/1 var(--font-ui);
     text-decoration: none;
     cursor: pointer;
 }
-.live-toast__btn:hover { color: #fff; text-decoration: none; background: rgba(255, 255, 255, .08); }
-.live-toast__btn--primary { flex: 1; text-align: center; font-weight: 600; background: rgba(255, 255, 255, .14); border-color: transparent; }
+.live-toast__btn:hover { color: var(--rail-ink-strong); text-decoration: none; background: var(--rail-hover); }
+.live-toast__btn--primary { flex: 1; text-align: center; font-weight: 600; background: var(--rail-active); border-color: transparent; }
 
 @media (max-width: 1280px) {
     .pipe-grid { grid-template-columns: repeat(3, 1fr); }

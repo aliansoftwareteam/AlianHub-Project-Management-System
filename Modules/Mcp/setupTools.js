@@ -3,10 +3,12 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { oid } = require('../Automations/engine/tools');
 const registry = require('../Agents/registry');
 const setup = require('../Agents/setupRequests');
+const computed = require('../Agents/computedFields');
 const actions = require('../Agents/actions');
 const permissions = require('../Agents/permissions');
 const plans = require('../Agents/projectSetup');
 const projects = require('../Agents/projectCreate');
+const copies = require('../Agents/projectDuplicate');
 const lists = require('../Agents/listSetup');
 const { LIST_NAME_MAX } = require('../Agents/workRequests');
 const manageFlag = require('./manageFlag');
@@ -17,11 +19,11 @@ const { loadProject } = require('./dataTools');
 const { GRANT } = manageFlag;
 const DENIED = permissions.REASON;
 
-// Setting a project up: custom fields, saved views, a whole plan in one call, a new project with its plan, a folder
-// with its lists, or a list made a sprint. These show to everyone on the project, so a call never makes one: it is
-// filed for the person to approve in AlianHub (their actions are proposeOnly, Agents/registry/setup.js, projectSetup.js,
-// projectCreate.js and listSetup.js), and what is approved runs the web app's own routes (Modules/Agents/setupRequests.js,
-// projectSetup.js, projectCreate.js and listSetup.js).
+// Setting a project up: custom fields, saved views, a whole plan in one call, a new project with its plan, a copy of
+// a project, a folder with its lists, or a list made a sprint. These show to everyone on the project, so a call never
+// makes one: it is filed for the person to approve in AlianHub (their actions are proposeOnly, Agents/registry/setup.js,
+// projectSetup.js, projectCreate.js, projectDuplicate.js and listSetup.js), and what is approved runs the web app's own
+// routes (Modules/Agents/setupRequests.js, projectSetup.js, projectCreate.js, projectDuplicate.js and listSetup.js).
 
 const RAW_OPTIONS_MAX = 100;
 const RAW_TEXT_MAX = 200;
@@ -50,6 +52,24 @@ const FIELD = Object.freeze({
     required: ['name', 'type'],
 });
 
+/* A field of fields.create, which also takes the two kinds AlianHub works out. */
+const CREATE_FIELD = Object.freeze({
+    ...FIELD,
+    properties: {
+        ...FIELD.properties,
+        type: { type: 'string', enum: [...setup.CREATE_TYPES] },
+        function: { type: 'string', enum: [...computed.FUNCTIONS], description: 'For a rollup: what it works out from the subtasks under each task, on every level' },
+        source: {
+            type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX,
+            description: `For a rollup: the name of the field it reads on those subtasks, one of this call or of the project, of type ${computed.SOURCE_TYPES.join(', ')}. Left out, count counts the subtasks`,
+        },
+        expression: {
+            type: 'string', minLength: 1, maxLength: computed.EXPRESSION_MAX,
+            description: 'For a formula: numbers, the task\'s own number fields by name in braces, + - * / and brackets, as in {Price} - {Cost}',
+        },
+    },
+});
+
 const VALUE = Object.freeze({
     type: 'object',
     additionalProperties: false,
@@ -64,13 +84,15 @@ const VALUE = Object.freeze({
 const NO_FIELD_SET = `${DENIED}: values are set as ${setup.FIELD_SET} sets one, which this connection may not use`;
 
 /* Values are refused at once where the caller could not set one by itself, where a task is not one of the project
- * the caller can open, or where a field would not take its value, so nobody is asked to approve a value that cannot
- * be set. A project the caller cannot open is left to the target check. */
+ * the caller can open, or where a field would not take its value, and a rollup or a formula where the field form
+ * would not save it, so nobody is asked to approve what cannot be made. A project the caller cannot open is left to the target check. */
 const fieldsToFile = async (ctx, args, vis) => {
-    if (args.values === undefined) return { args };
     const project = await loadProject(ctx, vis, args.projectId);
     if (!project) return { args };
     const projectId = String(project._id);
+    const unsaved = await setup.draftsMisfit({ companyId: ctx.companyId, projectId, definitions: args.fields });
+    if (unsaved) return { answer: { ok: false, error: unsaved } };
+    if (args.values === undefined) return { args };
     const refuse = async (reason) => { throw await actions.refusal(ctx.companyId, ctx.actor, { action: 'fields.create', params: { projectId }, reason, ip: ctx.ip, taint: ctx.taint, entityType: 'project', entityId: projectId }); };
     const usable = registry.has(setup.FIELD_SET) && manageFlag.mayUse(ctx, GRANT)
         && registry.evaluate(setup.FIELD_SET, { __proposal: true }, { allowedActions: ctx.allowedActions }).allowed;
@@ -174,6 +196,24 @@ const projectToFile = async (ctx, args) => {
     return { args };
 };
 
+const copyAsked = (args) => copies.draftOf({ ...args, sourceProjectId: args.projectId });
+
+/* A copy is refused at once where its person may not create a project by hand, and answered at once where the project
+ * is a personal list or has more tasks than a copy made this way takes, so nobody is asked to approve what could not
+ * be made. A project the caller cannot open is left to the target check. */
+const copyToFile = async (ctx, args, vis) => {
+    const draft = copyAsked(args);
+    const lacked = await copies.refusedFor(ctx.companyId, ctx.userId);
+    if (lacked) {
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: copies.ACTION, params: { sourceProjectId: draft.sourceProjectId, name: draft.name }, reason: `${CANNOT_CREATE} (${lacked})`, ip: ctx.ip, taint: ctx.taint, entityType: 'project' });
+    }
+    const project = await loadProject(ctx, vis, args.projectId);
+    if (!project) return { args };
+    if (project.isPersonal === true) return { answer: { ok: false, error: copies.PERSONAL } };
+    const large = draft.tasks ? copies.tooLarge(await copies.taskCount({ companyId: ctx.companyId, uid: ctx.userId, source: project })) : '';
+    return large ? { answer: { ok: false, error: large } } : { args };
+};
+
 const FOLDER_NAME = Object.freeze({ type: 'string', minLength: 1, maxLength: lists.NAME_MAX });
 const FOLDER_PARTS = Object.freeze({
     lists: NAMES(lists.LISTS_MAX, LIST_NAME_MAX, 'Lists to create inside it, by name'),
@@ -209,14 +249,16 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: projectTarget,
-        description: `Add up to ${setup.FIELDS_MAX} custom fields to one project in a single call, each with a name and a type: ${setup.FIELD_TYPES.join(', ')}. `
+        description: `Add up to ${setup.FIELDS_MAX} custom fields to one project in a single call, each with a name and a type: ${setup.CREATE_TYPES.join(', ')}. `
             + 'A dropdown takes its options as plain text. A field the project already has by that name is kept, not made twice, so read fields.list first. '
+            + `A rollup works a number out for each task from the subtasks under it (function: ${computed.FUNCTIONS.join(', ')}; source: the number field it reads), and a formula from the task's own number fields (expression). `
+            + 'Neither takes a value: AlianHub works the number out and task.fields.list reads it, a rollup\'s once it is approved, a formula\'s on a task once a field value of that task is next saved. '
             + `To give the fields their first values in the same approval, name them in values (at most ${setup.VALUES_MAX}): each a task of this project, a field by its name and the value. `
             + 'A value is set only on a task the person and the approver may both edit, and the answer says which were set. '
             + `${WAITS} Set or change a value later with task.field.set.`,
         input: input({
             projectId: ID,
-            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: FIELD },
+            fields: { type: 'array', minItems: 1, maxItems: setup.FIELDS_MAX, items: CREATE_FIELD },
             values: { type: 'array', minItems: 1, maxItems: setup.VALUES_MAX, items: VALUE },
             ...REASON,
         }, ['projectId', 'fields']),
@@ -294,6 +336,31 @@ const TOOLS = [
         check: (args) => projects.problemIn(args),
         prepare: projectToFile,
         params: (args) => projects.draftOf(args),
+    },
+    {
+        name: copies.ACTION,
+        action: copies.ACTION,
+        visibility: 'filtered',
+        strict: true,
+        filedUnder: GRANT,
+        target: (args) => ({ ...WRITE_TARGET, ...projectTarget(args) }),
+        description: 'Ask for a copy of a project the person can open, in a single call: the project and the name of the copy. '
+            + 'The copy takes the project\'s folders, lists, statuses, custom fields, saved views and settings. Its automations come too, switched off, where the approver may manage automations. '
+            + 'It takes no task unless tasks is true: set that only when the person asked, in words, for the tasks to be copied too. Copied tasks come without their assignees, and dates are kept only when dates is true. '
+            + `A project with more than ${copies.TASKS_MAX} tasks is not copied with its tasks here: ask for the copy without them, or the person duplicates it in AlianHub. `
+            + 'The copy is private, with only the person who approves it on it, whoever is on the project it is copied from; they add the others afterwards. '
+            + 'Read projects.list first, for the project. A personal list cannot be copied, and a token kept to some projects cannot use it. '
+            + `${WAITS} The person sees the copy as one preview, with how many tasks it would take, and approves it once. Undo moves the copy to the trash, unless a task or a doc was added to it since.`,
+        input: input({
+            projectId: { ...ID, description: 'The project to copy' },
+            name: { type: 'string', minLength: 1, maxLength: projects.NAME_MAX, description: `The name of the copy, at least ${projects.NAME_MIN} characters` },
+            tasks: { type: 'boolean', description: 'Copy the tasks too. Left out, only the setup is copied' },
+            dates: { type: 'boolean', description: 'Keep the dates of the project, its lists and its tasks. Left out, the copy has none' },
+            ...REASON,
+        }, ['projectId', 'name']),
+        check: (args) => copies.problemIn(copyAsked(args)),
+        prepare: copyToFile,
+        params: copyAsked,
     },
     {
         name: lists.FOLDER,

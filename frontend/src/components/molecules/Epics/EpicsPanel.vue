@@ -189,14 +189,14 @@ function deleteEpic(epic) {
 .epics__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .epics__card {
-    background: #fff;
+    background: var(--surface);
     border-radius: 10px;
     width: min(620px, 94vw);
     max-height: 74vh;
@@ -205,24 +205,24 @@ function deleteEpic(epic) {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
 }
 .epics__head { margin-bottom: 12px; }
-.epics__close { color: #9a9a9a; }
-.epics__close:hover { color: #e84a4a; }
+.epics__close { color: var(--ink-2); }
+.epics__close:hover { color: var(--danger); }
 .epics__create { margin-bottom: 14px; }
 .epics__input {
     width: 100%;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     padding: 7px 10px;
 }
 .epics__create-meta { gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .epics__select, .epics__date {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 6px;
     padding: 6px 8px;
-    background: #fff;
+    background: var(--surface);
 }
 .epics__create-meta .btn-primary { margin-left: auto; }
-.epics__row { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+.epics__row { padding: 10px 0; border-bottom: 1px solid var(--hairline); }
 .epics__row-main { min-width: 0; flex: 1; }
 .epics__row-actions { gap: 6px; flex: none; }
 .epics__dot {
@@ -241,26 +241,26 @@ function deleteEpic(epic) {
     text-transform: capitalize;
     white-space: nowrap;
 }
-.epics__badge--low { background: #eef0f3; color: #5b6470; }
+.epics__badge--low { background: var(--fill); color: var(--ink-label); }
 .epics__badge--medium { background: #e7f0fb; color: #1565c0; }
-.epics__badge--high { background: #fdecea; color: #c0392b; }
+.epics__badge--high { background: var(--danger-bg); color: var(--danger); }
 .epics__status-select {
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 12px;
     padding: 2px 6px;
-    background: #fff;
+    background: var(--surface);
     cursor: pointer;
 }
-.epics__status-select--open { color: #5b6470; }
-.epics__status-select--in_progress { color: #b06a00; border-color: #f0d8a8; background: #fff5e6; }
-.epics__status-select--done { color: #2e7d32; border-color: #bfe3c4; background: #e9f6ea; }
+.epics__status-select--open { color: var(--ink-label); }
+.epics__status-select--in_progress { color: #b06a00; border-color: #f0d8a8; background: var(--warn-bg); }
+.epics__status-select--done { color: var(--ok-ink); border-color: #bfe3c4; background: var(--ok-bg); }
 .epics__count { white-space: nowrap; }
 .epics__delete { color: #c9c9c9; padding: 0 4px; }
-.epics__delete:hover { color: #e84a4a; }
+.epics__delete:hover { color: var(--danger); }
 .epics__bar {
     height: 6px;
     border-radius: 3px;
-    background: #f0f0f0;
+    background: var(--fill);
     margin-top: 8px;
     overflow: hidden;
 }

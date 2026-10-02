@@ -1,6 +1,7 @@
 import { loadTaskDetailPanel } from '@/components/organisms/TaskDetailOverlay/lazyPanel';
 import { CUSTOM_FIELD_LOADERS } from '@/plugins/customFieldView/customFieldPlugin';
 import { ensureFormKit } from '@/plugins/customFieldView/lazyFormKit';
+import { SHELL_PART_LOADERS } from '@/config/shellParts';
 
 const IDLE_TIMEOUT_MS = 5000;
 const NO_IDLE_CALLBACK_DELAY_MS = 2000;
@@ -10,12 +11,13 @@ const whenIdle = (work) => {
     else setTimeout(work, NO_IDLE_CALLBACK_DELAY_MS);
 };
 
-const WORKSPACE_LOADERS = [loadTaskDetailPanel, ...Object.values(CUSTOM_FIELD_LOADERS), ensureFormKit];
+const WORKSPACE_LOADERS = [loadTaskDetailPanel, ...Object.values(CUSTOM_FIELD_LOADERS), ensureFormKit, ...Object.values(SHELL_PART_LOADERS)];
 
 let warmed = false;
 
-/* The first paint no longer carries the task panel, the field components or FormKit, but the first
- * minute of work nearly always needs them: they are fetched once the shell is up and the browser is idle.
+/* The first paint no longer carries the task panel, the field components, FormKit or the shell's palette,
+ * quick-create and dialogs, but the first minute of work nearly always needs them: they are fetched
+ * once the shell is up and the browser is idle.
  * A failed fetch is dropped here; the component asks again when it renders. */
 export const warmWorkspaceChunks = (loaders = WORKSPACE_LOADERS) => {
     if (warmed) return;

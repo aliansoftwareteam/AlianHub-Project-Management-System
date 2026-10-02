@@ -59,7 +59,7 @@ const app = { get: register('GET'), post: register('POST'), put: register('PUT')
 [
     'Tasks', 'Sprints', 'Pages', 'Importers', 'createProject', 'CustomField', 'Project', 'projectSetting', 'settings/templates', 'settings/ProjectStatusTemplate',
     'ProjectDuplicate', 'ProjectSnapshots', 'AIProjectGenerator', 'Automations', 'projectRules', 'ImportSettings', 'PublicShares', 'trackerUserPermission',
-    'settings/Members', 'settings/Roles', 'settings/securityPermissions', 'Milestone', 'Auth', 'Integrations',
+    'settings/Members', 'settings/Roles', 'settings/securityPermissions', 'Milestone', 'Auth', 'Integrations', 'UserDashboard',
 ].forEach((name) => require(`../Modules/${name}/routes`).init(app));
 
 const session = (uid) => ({ uid });
@@ -343,6 +343,13 @@ const PROPOSED_ON_THE_WEB = {
         'creating a project from a saved one': ['POST /api/v2/projects/templates/:id/use', { name: 'From a saved one' }, { id: TEMPLATE }],
         'creating a project from a generated plan': ['POST /api/v1/ai/project/execute', { plan: {} }],
         'importing a ClickUp space as a project': [...NO_ACTION['importing a ClickUp space as a project'], {}, 'tasks.import'],
+    },
+    'project.duplicate': {
+        'copying a project with its tasks': ['POST /api/v2/projects/:id/duplicate', { name: 'Copy', withTasks: true }, inProject, 'project.create'],
+    },
+    'dashboard.card.add': {
+        'changing the cards of the home dashboard': ['POST /api/v1/dashboard', { op: 'add', card: { key: 'DueSoonCard' } }],
+        'changing the cards of a dashboard': ['PUT /api/v1/dashboards/:id/cards', { cards: [] }, { id: TEMPLATE }],
     },
     'automation.create': {
         'adding an automation': ['POST /api/v2/automations', rule],

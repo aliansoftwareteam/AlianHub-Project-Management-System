@@ -1062,7 +1062,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
         logger.info(`[AIPG][${jobId}] step 5: saveProject start`);
         const savedProject = await withTimeout(saveProject(companyId, projectDoc), 45000, 'saveProject');
         tracker.project = projectDoc._id.toString();
-        try { socketEmitter.emit('insert', { type: 'insert', data: savedProject || projectDoc, module: 'projects' }); } catch (_e) { /* ignore */ }
+        try { socketEmitter.emit('insert', { type: 'insert', companyId: String(companyId), data: savedProject || projectDoc, module: 'project' }); } catch (_e) { /* ignore */ }
         emit({ event: 'progress', step: 'project', status: 'done', projectId: tracker.project });
         logger.info(`[AIPG][${jobId}] step 5: saveProject done (projectId=${tracker.project})`);
 

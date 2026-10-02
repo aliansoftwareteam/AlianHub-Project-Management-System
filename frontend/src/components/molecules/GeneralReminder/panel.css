@@ -21,8 +21,8 @@
     max-height: calc(100vh - 80px);
     display: flex;
     flex-direction: column;
-    background: #fff;
-    border: 1px solid #E6E7EF;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 12px;
     box-shadow: 0 16px 44px rgba(23, 24, 36, 0.2);
     overflow: hidden;
@@ -34,12 +34,12 @@
     align-items: center;
     gap: 10px;
     padding: 13px 14px;
-    border-bottom: 1px solid #EDEDF3;
+    border-bottom: 1px solid var(--hairline);
 }
 .grp__title {
     font-size: 14.5px;
     font-weight: 600;
-    color: #191A2B;
+    color: var(--ink);
 }
 .grp__headactions {
     display: flex;
@@ -51,13 +51,13 @@
     padding: 5px 11px;
     font-size: 12.5px;
     font-weight: 600;
-    color: #fff;
-    background: #2F3990;
+    color: var(--on-brand);
+    background: var(--brand);
     border: 0;
     border-radius: 7px;
 }
 .grp__add:hover {
-    background: #262E75;
+    background: var(--brand-deep);
 }
 .grp__close {
     display: inline-flex;
@@ -66,14 +66,14 @@
     width: 24px;
     height: 24px;
     font-size: 12px;
-    color: #8A8CA6;
+    color: var(--ink-2);
     background: transparent;
     border: 0;
     border-radius: 6px;
 }
 .grp__close:hover {
-    background: #F2F2F8;
-    color: #191A2B;
+    background: var(--fill);
+    color: var(--ink);
 }
 
 /* Filters */
@@ -81,31 +81,31 @@
     display: flex;
     gap: 6px;
     padding: 10px 14px;
-    border-bottom: 1px solid #EDEDF3;
+    border-bottom: 1px solid var(--hairline);
 }
 .grp__filter {
     padding: 4px 11px;
     font-size: 12px;
     font-weight: 500;
-    color: #6B6B70;
-    background: #F4F4FA;
+    color: var(--ink-2);
+    background: var(--fill);
     border: 0;
     border-radius: 999px;
 }
 .grp__filter:hover {
-    background: #EAEEFF;
-    color: #2F3990;
+    background: var(--brand-tint);
+    color: var(--brand);
 }
 .grp__filter.is-active {
-    background: #2F3990;
-    color: #fff;
+    background: var(--brand);
+    color: var(--on-brand);
 }
 
 /* States */
 .grp__state {
     padding: 26px 14px;
     font-size: 13px;
-    color: #84869B;
+    color: var(--ink-2);
     text-align: center;
 }
 
@@ -123,11 +123,11 @@
     border-radius: 9px;
 }
 .grp__item:hover {
-    background: #FAFAFD;
+    background: var(--surface-2);
 }
 .grp__item.is-done .grp__itemtitle {
     text-decoration: line-through;
-    color: #9092AC;
+    color: var(--ink-2);
 }
 /* Reset the button chrome first — default padding/line-height squashes the
    tick SVG inside the 18px box and makes it look clipped. */
@@ -145,8 +145,8 @@
     margin: 2px 0 0;
     line-height: 1;
     color: #fff;
-    background: #fff;
-    border: 1.5px solid #C9CDE0;
+    background: var(--surface);
+    border: 1.5px solid var(--hairline);
     border-radius: 4px;
     transition: background 0.12s ease, border-color 0.12s ease;
 }
@@ -156,11 +156,11 @@
     height: 11px;
 }
 .grp__check:hover {
-    border-color: #2F3990;
+    border-color: var(--brand);
 }
 .grp__check.is-on {
-    background: #2F3990;
-    border-color: #2F3990;
+    background: var(--brand);
+    border-color: var(--brand);
 }
 .grp__main {
     flex: 1;
@@ -169,7 +169,7 @@
 .grp__itemtitle {
     font-size: 13.5px;
     font-weight: 500;
-    color: #191A2B;
+    color: var(--ink);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -178,7 +178,7 @@
     margin-top: 2px;
     font-size: 12px;
     line-height: 1.4;
-    color: #6B6B70;
+    color: var(--ink-2);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -191,7 +191,7 @@
     gap: 8px;
     margin-top: 5px;
     font-size: 11.5px;
-    color: #84869B;
+    color: var(--ink-2);
 }
 .grp__when {
     display: inline-flex;
@@ -199,7 +199,7 @@
     gap: 4px;
 }
 .is-overdue .grp__when {
-    color: #9B2C2C;
+    color: var(--danger-ink);
     font-weight: 500;
 }
 /* Attachment links */
@@ -216,13 +216,13 @@
     max-width: 100%;
     padding: 3px 8px;
     font-size: 11.5px;
-    color: #2F3990;
-    background: #EAEEFF;
+    color: var(--brand);
+    background: var(--brand-tint);
     border: 0;
     border-radius: 999px;
 }
 .grp__file:hover {
-    background: #DDE3FF;
+    background: var(--brand-tint);
 }
 .grp__file:disabled {
     opacity: 0.55;
@@ -242,7 +242,7 @@
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: #9092AC;
+    color: var(--ink-2);
 }
 .grp__menuitem--sub {
     padding-left: 16px;
@@ -254,19 +254,19 @@
     align-items: center;
     gap: 3px;
     padding: 1px 7px;
-    background: #F4F4FA;
+    background: var(--fill);
     border-radius: 999px;
 }
 .grp__fired {
-    background: #E3F3EC;
-    color: #166B4E;
+    background: var(--ok-bg);
+    color: var(--ok-ink);
 }
 .grp__for {
     display: inline-flex;
     align-items: center;
     padding: 1px 7px;
-    background: #EAEEFF;
-    color: #2F3990;
+    background: var(--brand-tint);
+    color: var(--brand);
     border-radius: 999px;
     font-weight: 500;
 }
@@ -274,8 +274,8 @@
     display: inline-flex;
     align-items: center;
     padding: 1px 7px;
-    background: #FBF0DC;
-    color: #8A5A0B;
+    background: var(--warn-bg);
+    color: var(--warn-ink);
     border-radius: 999px;
 }
 /* Read-only checkbox in the "Assigned by me" view — shows state, not clickable. */
@@ -301,7 +301,7 @@
     opacity: 1;
 }
 .grp__menubtn:hover {
-    background: #EDEDF3;
+    background: var(--fill);
 }
 /* Fixed, not absolute: the row lives inside .grp__list which scrolls, and a
    scroll container clips absolutely-positioned children. Coordinates are
@@ -311,26 +311,26 @@
     z-index: 25;
     min-width: 172px;
     padding: 4px;
-    background: #fff;
-    border: 1px solid #E5E7EB;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(23, 24, 36, 0.14);
 }
 .grp__menuitem {
     padding: 7px 9px;
     font-size: 12.5px;
-    color: #191A2B;
+    color: var(--ink);
     border-radius: 6px;
     cursor: pointer;
 }
 .grp__menuitem:hover {
-    background: #F4F4FA;
+    background: var(--fill);
 }
 .grp__menuitem--danger {
-    color: #9B2C2C;
+    color: var(--danger-ink);
 }
 .grp__menuitem--danger:hover {
-    background: #FBEBEB;
+    background: var(--danger-bg);
 }
 
 @media (max-width: 640px) {
