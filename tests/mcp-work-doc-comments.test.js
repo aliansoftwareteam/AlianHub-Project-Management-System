@@ -69,7 +69,7 @@ const C_THREAD = '6f0000000000000000000801';
 const C_REPLY = '6f0000000000000000000802';
 const C_GONE = '6f0000000000000000000803';
 const C_ELSEWHERE = '6f0000000000000000000804';
-const NO_PAGE = 'not_visible: the page is not one the person behind this token can open';
+const NO_PAGE = 'not_visible: that doc was not found, or the person cannot open it. Ask the person which doc they mean.';
 
 const comments = (pageId) => rows(SCHEMA_TYPE.PAGE_COMMENTS).filter((row) => String(row.pageId) === pageId && row.isDeleted !== true);
 const comment = (id) => stored(SCHEMA_TYPE.PAGE_COMMENTS, id);
@@ -131,7 +131,7 @@ describe('page.comments.list', () => {
 
     it('answers a doc the person cannot open as it answers a missing id', async () => {
         const missing = await rpc(ctx(OWNER), 'page.comments.list', { pageId: MISSING });
-        expect(missing).toEqual({ error: 'page not found' });
+        expect(missing).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
         for (const uid of [OUTSIDER, GUEST]) expect(await rpc(ctx(uid), 'page.comments.list', { pageId: PG_PRIVATE_PROJECT })).toEqual(missing);
         for (const uid of [OWNER, ADMIN, OUTSIDER, GUEST]) {
             expect(await rpc(ctx(uid), 'page.comments.list', { pageId: PG_PERSONAL })).toEqual(missing);
@@ -143,8 +143,8 @@ describe('page.comments.list', () => {
     });
 
     it('stays inside the projects a token was narrowed to, and off the workspace\'s own docs', async () => {
-        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_PRIVATE_PROJECT })).toEqual({ error: 'page not found' });
-        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_COMPANY })).toEqual({ error: 'page not found' });
+        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_PRIVATE_PROJECT })).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
+        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_COMPANY })).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
         expect(await rpc(ctx(INSIDER), 'page.comments.list', { pageId: PG_COMPANY })).toEqual({ pageId: PG_COMPANY, comments: [] });
         expect((await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_OPEN, limit: 1 })).comments).toHaveLength(1);
     });
@@ -283,9 +283,9 @@ describe('scopes and outside clients', () => {
 
     it('needs the write scope for a write and the docs scope for the read', async () => {
         const before = commentsNow();
-        expect(await rpc(readOnly(OWNER), 'page.comment.create', say)).toMatchObject({ isError: true, error: 'This token is read-only.' });
-        expect(await rpc(outside(OWNER, ['docs:read']), 'page.comment.create', say)).toMatchObject({ isError: true, error: 'This token lacks the tasks:write scope.' });
-        expect(await rpc(outside(OWNER, ['tasks:write']), 'page.comments.list', { pageId: PG_OPEN })).toMatchObject({ isError: true, error: 'This token lacks the docs:read scope.' });
+        expect(await rpc(readOnly(OWNER), 'page.comment.create', say)).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
+        expect(await rpc(outside(OWNER, ['docs:read']), 'page.comment.create', say)).toMatchObject({ isError: true, error: 'This connection was not given the tasks:write permission. Ask the person to connect you again and allow it.' });
+        expect(await rpc(outside(OWNER, ['tasks:write']), 'page.comments.list', { pageId: PG_OPEN })).toMatchObject({ isError: true, error: 'This connection was not given the docs:read permission. Ask the person to connect you again and allow it.' });
         expect(commentsNow()).toBe(before);
         expect(await rpc(outside(OUTSIDER, ['tasks:write']), 'page.comment.create', say)).toMatchObject({ ok: true });
         expect((await rpc(readOnly(OUTSIDER), 'page.comments.list', { pageId: PG_OPEN })).comments).toHaveLength(3);

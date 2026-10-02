@@ -5,7 +5,7 @@ const workFlag = require('../../Mcp/workFlag');
 // by the web app's own create route as the person who approved (Agents/projectCreate.js). Taking it back is that
 // person moving it to the trash: an agent has no action that deletes a project.
 const ACTIONS = [
-    { key: 'project.create', label: 'Create a project, with its setup, from one plan', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', proposeOnly: true,
+    { key: 'project.create', label: 'Create a project', risk: RISK.MEDIUM, undoable: true, write: true, cost: 'write', proposeOnly: true,
       constraint: 'made only on approval, as the approver, who must be allowed to create a project by hand; private to the approver at first; each part of the plan is held to the keys project.setup holds it to',
       permission: 'project.project_create' },
 ];

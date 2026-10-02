@@ -169,18 +169,18 @@ describe('every new tool keeps to what the person behind the token can open', ()
 
     it('the reads answer "not found" outside it', async () => {
         for (const name of ['task.history', 'task.links.list']) {
-            expect(await rpc(ctx(MEMBER), name, { taskId: fx.private._id })).toEqual({ error: 'task not found' });
-            expect(await rpc(ctx(MEMBER), name, { taskId: fx.secret._id })).toEqual({ error: 'task not found' });
-            expect(await rpc(ctx(OWNER), name, { taskId: fx.personal._id })).toEqual({ error: 'task not found' });
-            expect(await rpc(ctx(OWNER), name, { taskId: fx.chat._id })).toEqual({ error: 'task not found' });
-            expect(await rpc(ctx(OWNER, { projectIds: [P_DEST] }), name, { taskId: fx.top._id })).toEqual({ error: 'task not found' });
+            expect(await rpc(ctx(MEMBER), name, { taskId: fx.private._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+            expect(await rpc(ctx(MEMBER), name, { taskId: fx.secret._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+            expect(await rpc(ctx(OWNER), name, { taskId: fx.personal._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+            expect(await rpc(ctx(OWNER), name, { taskId: fx.chat._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+            expect(await rpc(ctx(OWNER, { projectIds: [P_DEST] }), name, { taskId: fx.top._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         }
     });
 
     it.each([['a token without the grant', olderToken], ['a docs-only token', docsOnly], ['a read-only token', readOnly], ['an OAuth token without the scope', oauth]])('%s runs none of the task tools', async (_who, as) => {
         const before = snapshot();
         for (const name of TASK_TOOLS) {
-            expect(await rpc(as(OWNER), name, { taskId: fx.top._id })).toMatchObject({ isError: true, error: expect.stringMatching(/grant|read-only/) });
+            expect(await rpc(as(OWNER), name, { taskId: fx.top._id })).toMatchObject({ isError: true, error: expect.stringMatching(/permission|only read/) });
         }
         expect(snapshot()).toBe(before);
     });
@@ -275,7 +275,7 @@ describe('task.status.set for a token created to manage tasks', () => {
 
     it('without the grant behaves as before: in progress and in review only, and closing stays on the never-list', async () => {
         const closed = await rpc(olderToken(OWNER), 'task.status.set', { taskId: fx.top._id, status: 'Done' });
-        expect(closed).toMatchObject({ isError: true, refused: true, reason: 'Agents cannot perform task.status.set("Done")' });
+        expect(closed).toMatchObject({ isError: true, refused: true, reason: 'You cannot set a task to "Done". Use In progress or In review, and a person closes the task.' });
         expect(closed.neverAvailable).toContain('status.set("Done")');
         expect(stored(fx.top._id).statusKey).toBe(2);
         expect(await rpc(docsOnly(OWNER), 'task.status.set', { taskId: fx.top._id, status: 'Done' })).toMatchObject({ refused: true });
@@ -329,11 +329,11 @@ describe('task.create and subtask.create in one call', () => {
     it('refuses a fourth level, an assignee who cannot open the project, a task type or status the project lacks and a link that is not one', async () => {
         const before = snapshot();
         expect((await rpc(ctx(OWNER), 'subtask.create', { taskId: fx.grandchild._id, title: 'Too deep' })).error).toMatch(/three levels deep/);
-        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_PRIVATE, title: 'x', assigneeIds: [MEMBER] })).error).toBe('A person named here cannot open this project.');
+        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_PRIVATE, title: 'x', assigneeIds: [MEMBER] })).error).toBe('Someone named here cannot open this project. Pick people who are on the project, or ask the person to add them first.');
         expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', assigneeIds: [OUTSIDER] })).error).toMatch(/active members/);
-        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', taskType: 'Epic' })).error).toMatch(/taskType needs one of Task, Bug/);
+        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', taskType: 'Epic' })).error).toMatch(/task type must be one of Task, Bug/);
         expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', status: 'Shipped' })).error).toMatch(/does not exist in this project/);
-        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', links: [{ url: 'javascript:alert(1)' }] })).error).toMatch(/valid http\(s\) url/);
+        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', links: [{ url: 'javascript:alert(1)' }] })).error).toMatch(/web address starting with http/);
         expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, sprintId: world.S_DEST, title: 'x' })).reason).toMatch(/^not_visible/);
         expect(snapshot()).toBe(before);
     });
@@ -404,7 +404,7 @@ describe('comments', () => {
         expect(comment(posted.result.commentId).message).toBe('Second &lt;b&gt;try&lt;/b&gt;');
 
         for (const row of [theirs, elsewhere, othersAgent]) {
-            expect(await rpc(ctx(OWNER), 'comment.update', { taskId: fx.top._id, commentId: row._id, text: 'Rewritten' })).toMatchObject({ isError: true, error: expect.stringMatching(/not one an agent wrote for you/) });
+            expect(await rpc(ctx(OWNER), 'comment.update', { taskId: fx.top._id, commentId: row._id, text: 'Rewritten' })).toMatchObject({ isError: true, error: expect.stringMatching(/You can change only a comment an agent wrote/) });
         }
         expect([theirs, elsewhere, othersAgent].map((row) => comment(row._id).message)).toEqual(['Typed by hand', 'Other task', 'Someone else\'s agent']);
 
@@ -579,13 +579,13 @@ describe('page.create and page.update for a token created to write docs', () => 
     it('a token created to manage tasks writes no doc, and one created to write docs changes no task', async () => {
         const before = snapshot();
         for (const name of DOC_TOOLS) {
-            expect(await rpc(ctx(OWNER), name, { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/docs:manage grant/) });
+            expect(await rpc(ctx(OWNER), name, { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/docs:manage permission/) });
         }
         for (const [name, args] of [['task.update', { taskId: fx.top._id, title: 'x' }], ['task.archive', { taskId: fx.top._id }], ['tasks.batch', { operations: [{ tool: 'task.archive', arguments: { taskId: fx.top._id } }] }]]) {
-            expect(await rpc(docsOnly(OWNER), name, args)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
+            expect(await rpc(docsOnly(OWNER), name, args)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
         }
         for (const as of [olderToken, readOnly, oauth]) {
-            expect(await rpc(as(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/grant|read-only/) });
+            expect(await rpc(as(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/permission|only read/) });
         }
         expect(snapshot()).toBe(before);
     });
@@ -617,8 +617,8 @@ describe('an outside client whose grant holds a manage scope', () => {
         expect(await rpc(forDocs(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'Runbook, revised', text: 'New body' })).toMatchObject({ ok: true });
         expect(page(fx.pageOpen._id).title).toBe('Runbook, revised');
         const before = snapshot();
-        expect(await rpc(forDocs(OWNER), 'task.update', { taskId: fx.top._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
-        expect(await rpc(forTasks(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/docs:manage grant/) });
+        expect(await rpc(forDocs(OWNER), 'task.update', { taskId: fx.top._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
+        expect(await rpc(forTasks(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/docs:manage permission/) });
         expect(await rpc(forDocs(MEMBER), 'page.update', { pageId: fx.pagePrivate._id, title: 'x' })).toMatchObject({ isError: true });
         expect(snapshot()).toBe(before);
     });

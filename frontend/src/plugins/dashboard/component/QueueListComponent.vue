@@ -1,8 +1,8 @@
 <template>
     <div class="queue__list-wrapper">
         <div class="queue__title-wrapper d-flex align-items-center mb-10px">
-            <h2 class="font-size-22 font-weight-500 black font-ui m-0 d-flex align-items-center position-re quelist__title">{{ title }}<span class="font-size-13 font-weight-400 GunPowder ml-10px">({{ searchResultTotal }})</span></h2>
-            <button class="btn__task ml-10px border-radius-4-px black font-weight-400 border-0 font-size-12 cursor-pointer bg-colorlightgray mr-2px vertical-middle" @click="queueButtonClick"> + {{$t('Home.AddtoQueue')}}</button>
+            <h2 class="queue-list-component-font-size-22 queue-list-component-font-weight-500 queue-list-component-black font-ui m-0 d-flex align-items-center position-re quelist__title">{{ title }}<span class="queue-list-component-font-size-13 queue-list-component-font-weight-400 queue-list-component-GunPowder ml-10px">({{ searchResultTotal }})</span></h2>
+            <button class="btn__task ml-10px border-radius-4-px queue-list-component-black queue-list-component-font-weight-400 border-0 queue-list-component-font-size-12 cursor-pointer queue-list-component-bg-colorlightgray mr-2px vertical-middle" @click="queueButtonClick"> + {{$t('Home.AddtoQueue')}}</button>
             <div v-if="allProjectsArrayFilter.length">
                 <ConvertToSubTaskSidebar @dataToMainComp="(ele)=>{taskOperations(ele,'add')}" :allProjectsArrayFilter="allProjectsArrayFilter" v-if="openConvertSubTaskSidebar === true" :closeSideBar="openConvertSubTaskSidebar"  @isConvertSubtaskOPen="(val) => {openConvertSubTaskSidebar = val}" :openMoveSubTask="false" :isMergeTask="false" :isDuplicate="false" :isOpenSubTask="false" :selectedProjectObject="allProjectsArrayFilter[0]" :fromWhich="'dashboard'"/>   
             </div>
@@ -260,5 +260,32 @@ function debouncer(timeout = 1000) {
     })
 }
 </script>
+
+<style scoped>
+.queue-list-component-font-size-12 {
+    font-size: 12px;
+}
+.queue-list-component-font-size-13 {
+    font-size: 13px;
+}
+.queue-list-component-font-size-22 {
+    font-size: 22px;
+}
+.queue-list-component-font-weight-400 {
+    font-weight: 400 !important;
+}
+.queue-list-component-font-weight-500 {
+    font-weight: 500 !important;
+}
+.queue-list-component-bg-colorlightgray {
+    background-color: var(--fill);
+}
+.queue-list-component-GunPowder {
+    color: var(--ink-2);
+}
+.queue-list-component-black {
+    color: var(--ink);
+}
+</style>
 
 <style scoped src="../css/style.css"></style>

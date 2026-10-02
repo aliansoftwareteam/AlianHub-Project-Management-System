@@ -56,8 +56,8 @@ const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 
 const TOOL = 'list.sprint.set';
-const NO_PROJECT = 'not_visible: the project is not one the person behind this token can open';
-const NO_LIST = 'not_visible: the sprint is not one the person behind this token can open in that project';
+const NO_PROJECT = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
+const NO_LIST = 'not_visible: that list was not found in that project, or the person cannot open it. Ask the person which list they mean.';
 const PEOPLE = [OWNER, INSIDER, OUTSIDER, GUEST];
 const ASK = { projectId: P_OPEN, sprintId: L_OPEN, startDate: '2026-10-05', endDate: '2026-10-18', reason: 'Two weeks from Monday' };
 const FIRST = '2026-10-05T00:00:00.000Z';
@@ -124,7 +124,7 @@ describe('a list is never changed before a person has seen it', () => {
         const params = { projectId: P_OPEN, sprintId: L_OPEN, startDate: '2026-10-05', endDate: '2026-10-18' };
         expect(await projectPolicy.ask({ companyId: CID, actor: as(INSIDER).actor, action: TOOL, params })).toMatchObject({ decision: 'propose' });
         const call = (given) => actions.perform({ companyId: CID, actor: as(OWNER).actor, action: TOOL, params: given, reason: 'direct' });
-        await expect(call(params)).rejects.toThrow(/must be proposed/);
+        await expect(call(params)).rejects.toThrow(/has to be sent as a proposal/);
         await expect(call({ ...params, __proposal: true })).rejects.toThrow(/waits for a person's approval/);
         expect(list().isScrum).toBeUndefined();
     });
@@ -143,7 +143,7 @@ describe('who may ask', () => {
         expect(await rpc(as(GUEST), TOOL, ASK)).toMatchObject({ refused: true, reason: expect.stringMatching(/^permission_denied: project\.project_sprint_create/) });
         setRule('project_sprint_create', false, [3]);
         expect(await rpc(as(OUTSIDER), TOOL, ASK)).toMatchObject({ refused: true, reason: expect.stringMatching(/^permission_denied: project\.project_sprint_create/) });
-        expect(await rpc(readOnly(OWNER), TOOL, ASK)).toMatchObject({ isError: true, error: 'This token is read-only.' });
+        expect(await rpc(readOnly(OWNER), TOOL, ASK)).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
         expect(audits(TOOL).map((row) => row.meta.ran)).toEqual([false, false]);
         expect(waiting()).toHaveLength(0);
     });
@@ -159,7 +159,7 @@ describe('who may ask', () => {
 
     it('says what is wrong with the days', async () => {
         const bad = async (over) => (await rpc(as(OWNER), TOOL, { ...ASK, ...over })).rpcError;
-        expect(await bad({ startDate: '2026-10-19' })).toMatchObject({ code: -32602, message: expect.stringMatching(/startDate is after endDate/) });
+        expect(await bad({ startDate: '2026-10-19' })).toMatchObject({ code: -32602, message: expect.stringMatching(/startDate comes after endDate/) });
         expect(await bad({ endDate: '2026-02-30' })).toMatchObject({ code: -32602 });
         expect(await bad({ endDate: 'next week' })).toMatchObject({ code: -32602 });
         expect(await bad({ isScrum: false })).toMatchObject({ code: -32602 });
@@ -241,7 +241,7 @@ describe('undo makes the list what it was', () => {
         const id = await filed(as(INSIDER));
         await approve(id);
         list().endDate = new Date('2026-10-25T23:59:59.999Z');
-        expect((await undo(id)).results[0]).toMatchObject({ ok: false, reason: '"Open list" was changed since, so it stays as it is now' });
+        expect((await undo(id)).results[0]).toMatchObject({ ok: false, reason: '"Open list" was changed since, so it was kept as it is now.' });
         expect(boxOf()).toMatchObject({ isScrum: true, endDate: '2026-10-25T23:59:59.999Z' });
 
         const other = await filed(as(INSIDER), { ...ASK, sprintId: L_SECRET });

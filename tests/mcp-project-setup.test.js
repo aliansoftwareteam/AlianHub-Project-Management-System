@@ -61,7 +61,7 @@ const listed = listedThrough(server);
 
 const TOOL = 'project.setup';
 const KEYS = ['project.project_details', 'project.project_sprint_create', 'project.project_custom_field', 'task.task_custom_field', 'project.view_list'];
-const NO_PROJECT = 'not_visible: the project is not one the person behind this token can open';
+const NO_PROJECT = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
 const V_LIST = '6f0000000000000000000e11';
 const V_BOARD = '6f0000000000000000000e12';
 const PEOPLE = [OWNER, INSIDER, OUTSIDER, GUEST];
@@ -170,7 +170,7 @@ describe('a plan is never carried out before a person has seen it', () => {
         expect(await projectPolicy.ask({ companyId: CID, actor, action: TOOL, params })).toMatchObject({ decision: 'propose' });
         expect(await projectPolicy.ask({ companyId: CID, actor, action: TOOL, params, approved: true })).toEqual({ decision: 'act', reason: '' });
         const call = (given) => actions.perform({ companyId: CID, actor: as(OWNER).actor, action: TOOL, params: given, reason: 'direct' });
-        await expect(call(params)).rejects.toThrow(/must be proposed/);
+        await expect(call(params)).rejects.toThrow(/needs a person's approval first/);
         await expect(call({ ...params, __proposal: true })).rejects.toThrow(/waits for a person's approval/);
         expect(listsNamed('Backlog')).toHaveLength(0);
     });
@@ -211,7 +211,7 @@ describe('who may send a plan', () => {
             expect(await rpc(as(uid), TOOL, plan(projectId))).toMatchObject({ refused: true, reason: NO_PROJECT });
         }
         expect(await rpc({ ...as(INSIDER), projectIds: narrowed(INSIDER, [P_OPEN]).projectIds }, TOOL, plan(P_PRIVATE))).toMatchObject({ refused: true, reason: NO_PROJECT });
-        expect(await rpc(readOnly(OWNER), TOOL, plan(P_OPEN))).toMatchObject({ isError: true, error: 'This token is read-only.' });
+        expect(await rpc(readOnly(OWNER), TOOL, plan(P_OPEN))).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
         expect(waiting()).toHaveLength(0);
     });
 
@@ -288,7 +288,7 @@ describe('approving carries out each part as the web app would', () => {
         expect(out.error).toBeUndefined();
         const { result } = out.applied[0];
         expect(result.parts.map((part) => [part.part, part.ok])).toEqual([['statuses', false], ['lists', false], ['fields', false], ['views', true]]);
-        expect(partOf(result, 'lists').error).toMatch(/approver may not/);
+        expect(partOf(result, 'lists').error).toMatch(/person approving may not/);
         expect(statusNames()).toEqual(['To Do', 'In Progress', 'Done']);
         expect(listsNamed('Backlog')).toHaveLength(0);
         expect(liveFields()).toEqual([]);

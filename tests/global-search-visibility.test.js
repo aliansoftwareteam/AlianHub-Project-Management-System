@@ -146,6 +146,14 @@ describe('TSK-05 global search is limited to the projects the caller can see', (
         expect(res.body.data.comments[0]).toMatchObject({ taskId: TASK_MINE, taskKey: 'AH-1', taskName: 'Budget plan', folderObjId: FOLDER });
     });
 
+    it.each([[''], ['   '], ['\n\t'], ['a'], [null], [[]]])('answers a search for %j with nothing, without reading anything', async (query) => {
+        const res = await search(query);
+        expect(res.body).toEqual({ status: false, statusText: 'Query must be at least 2 characters.' });
+        expect(getRoleType).not.toHaveBeenCalled();
+        expect(visibleProjectIds).not.toHaveBeenCalled();
+        expect(mockDb.crud).not.toHaveBeenCalled();
+    });
+
     it('refuses a caller who is not a member of the company', async () => {
         getRoleType.mockResolvedValue(null);
         const res = await search();

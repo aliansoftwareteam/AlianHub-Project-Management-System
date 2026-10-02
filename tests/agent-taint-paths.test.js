@@ -221,13 +221,13 @@ describe('3. an action on a task in another project is outside the run\'s projec
 
     it('the policy compares the target task\'s project, not the run\'s own task', () => {
         const out = policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: OTHER_TASK }, rating: safe, run: tainted, task: TASK, targetProjectId: 'p2' });
-        expect(out).toMatchObject({ decision: 'propose', reason: 'task.comment writes outside the run\'s project; the run read external content (fetch example.com)' });
+        expect(out).toMatchObject({ decision: 'propose', reason: 'task.comment changes something outside the project this run is for; the run read external content (fetch example.com)' });
         expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: TASK._id }, rating: safe, run: tainted, task: TASK, targetProjectId: 'p1' })).toMatchObject({ decision: 'act' });
         expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: OTHER_TASK }, rating: safe, run: { _id: 'r2', projectId: 'p1' }, task: TASK, targetProjectId: 'p2' })).toMatchObject({ decision: 'act' });
     });
 
     it('a target task whose project could not be read counts as outside', () => {
-        expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: OTHER_TASK }, rating: safe, run: tainted, task: TASK, targetProjectId: '' })).toMatchObject({ decision: 'propose', reason: expect.stringContaining('writes outside the run\'s project') });
+        expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: OTHER_TASK }, rating: safe, run: tainted, task: TASK, targetProjectId: '' })).toMatchObject({ decision: 'propose', reason: expect.stringContaining('changes something outside the project this run is for') });
         expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: TASK._id }, rating: safe, run: tainted, task: TASK, targetProjectId: null })).toMatchObject({ decision: 'act' });
         expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: TASK._id }, rating: safe, run: tainted, task: TASK })).toMatchObject({ decision: 'act' });
     });
@@ -240,7 +240,7 @@ describe('3. an action on a task in another project is outside the run\'s projec
         const out = await execute(run);
         expect(out).toMatchObject({ status: 'waiting_approval', outcome: '1 change(s) applied, 2 proposed' });
         expect(runRow(run._id).decisions.map((d) => [d.action, d.decision])).toEqual([['task.comment', 'act'], ['task.comment', 'propose'], ['subtask.create', 'propose']]);
-        expect(runRow(run._id).decisions[1].reason).toBe('task.comment writes outside the run\'s project; the run read external content (file f1)');
+        expect(runRow(run._id).decisions[1].reason).toBe('task.comment changes something outside the project this run is for; the run read external content (file f1)');
         expect(proposals.create).toHaveBeenCalledWith(C, expect.objectContaining({ changes: [expect.objectContaining({ params: expect.objectContaining({ taskId: OTHER_TASK }) }), expect.objectContaining({ action: 'subtask.create' })] }));
     });
 

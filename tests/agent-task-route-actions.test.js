@@ -127,7 +127,7 @@ describe('what a token created for an agent changes through the task route', () 
         const answer = await send(PATCH, agentToken(uid), BODIES[name](T_OPEN));
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents|You cannot set a task to)/);
         expect(reached()).toBe(false);
         expect(snapshot()).toBe(before);
         expect(audits('agent.action_refused')).toHaveLength(1);

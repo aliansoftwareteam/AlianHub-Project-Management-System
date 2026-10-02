@@ -1,8 +1,8 @@
 <template>
     <div class="description-wrapper mobile__bg--withPadding">
         <div class="d-flex align-items-center justify-content-between description-padding">
-            <h4 class="task-details-subtitle black" :class="{'font-size-16 font-weight-600' : clientWidth <=767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" >{{ $t('Description.description') }}</h4>
-            <p class="blue cursor-pointer font-size-16 font-weight-700 m-0" v-if="clientWidth <=767" @click="editPermission === true ? toggleDescriptionEdit() : ''">{{ $t('Description.edit') }}</p>
+            <h4 class="task-details-subtitle description-black" :class="{'description-font-size-16 description-font-weight-600' : clientWidth <=767 , 'description-font-size-14 description-font-weight-700' : clientWidth > 767 }" >{{ $t('Description.description') }}</h4>
+            <p class="description-blue cursor-pointer description-font-size-16 description-font-weight-700 m-0" v-if="clientWidth <=767" @click="editPermission === true ? toggleDescriptionEdit() : ''">{{ $t('Description.edit') }}</p>
         </div>
         <div class="description-main">
             <div>
@@ -31,20 +31,20 @@
                         />
                     </div>
                     <div>
-                        <span v-if="desriptionError" class="red">{{ desriptionError }}</span>
+                        <span v-if="desriptionError" class="description-red">{{ desriptionError }}</span>
                     </div>
                 </div>
             </div>
         </div>
         <div class="description-action mt-10px mb-15px description-padding" v-if="isDescriptionEdit">
             <button
-                class="outline-primary mr-10px"
+                class="description-outline-primary mr-10px"
                 @click="toggleDescriptionEdit()"
             >
                 {{ $t('Description.cancel') }}
             </button>
             <button
-                class="btn-primary"
+                class="description-btn-primary"
                 @click="saveDescription()"
             >
                 {{ $t('Description.save') }}
@@ -142,5 +142,47 @@ function disablePaste(e) {
     }
 }
 </script>
+<style scoped>
+.description-font-size-14 {
+    font-size: 14px;
+}
+.description-font-size-16 {
+    font-size: 16px;
+}
+.description-font-weight-600 {
+    font-weight: 600 !important;
+}
+.description-font-weight-700 {
+    font-weight: 700 !important;
+}
+.description-black {
+    color: var(--ink);
+}
+.description-red {
+    color: var(--danger-ink);
+}
+.description-blue {
+    color: var(--brand) !important;
+}
+.description-btn-primary {
+    cursor: pointer;
+    background: var(--brand);
+    border-radius: 4px;
+    color: var(--on-brand);
+    border: none;
+    height: 30px;
+    font-family: var(--font-ui);
+}
+.description-outline-primary {
+    height: 30px;
+    background: var(--surface);
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    color: var(--brand);
+    cursor: pointer;
+    font-family: var(--font-ui);
+}
+</style>
+
 <style src="./style.css">
 </style>

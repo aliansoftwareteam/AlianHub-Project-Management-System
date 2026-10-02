@@ -237,9 +237,10 @@ describe('a member gets neither the entry nor the page', () => {
         expect((await items(3)).join(' ')).not.toContain('WorkflowBuilder.nav');
     });
 
-    it('asks the API for nothing at all when a member reaches the page anyway', async () => {
+    it('asks the workflow API for nothing at all when a member reaches the page anyway', async () => {
         const wrapper = await open(3);
-        expect(apiRequest).not.toHaveBeenCalled();
+        // The AI sidebar beside the page reads whether agents are paused, which a member may see.
+        expect(apiRequest.mock.calls.filter(([, url]) => url !== '/api/v2/agents/policy')).toEqual([]);
         expect(wrapper.find('.wb__readonly').text()).toBe('WorkflowBuilder.manage_owner_admin');
         expect(wrapper.findAll('button').map((button) => button.text())).not.toContain('WorkflowBuilder.new');
     });

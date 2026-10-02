@@ -15,7 +15,7 @@
                         'type':formData.milestoneName.type,
                         'event':$event.event})"
                 ></InputText>
-                <small class="red" v-if="formData.milestoneName.error">{{formData.milestoneName.error}}</small>
+                <small class="hourly-milestone-input-red" v-if="formData.milestoneName.error">{{formData.milestoneName.error}}</small>
             </div>
         </td>
         <!-- Calendar -->
@@ -104,7 +104,7 @@
                         :isDisabled="isSpinner"
                     ></InputText>
                 </div>
-                <small class="red" v-if="error">{{$t(`Milestone.${error.replaceAll(' ',"_")}`)}}</small>
+                <small class="hourly-milestone-input-red" v-if="error">{{$t(`Milestone.${error.replaceAll(' ',"_")}`)}}</small>
             </div>
         </td>
         <!-- amountPerHours -->
@@ -130,8 +130,8 @@
                     :isDisabled="isSpinner"
                 ></InputText>
             </div>
-            <small class="red" v-if="formData.amountPerHours.error">{{formData.amountPerHours.error}}</small>
-            <small class="red" v-if="errAmountPer">{{$t(`Milestone.${errAmountPer.replaceAll(' ',"_")}`)}}</small>
+            <small class="hourly-milestone-input-red" v-if="formData.amountPerHours.error">{{formData.amountPerHours.error}}</small>
+            <small class="hourly-milestone-input-red" v-if="errAmountPer">{{$t(`Milestone.${errAmountPer.replaceAll(' ',"_")}`)}}</small>
         </td>
         <!-- amount -->
         <td>
@@ -156,8 +156,8 @@
                     :isDisabled="isSpinner"
                 ></InputText>
             </div>
-            <small class="red" v-if="formData.amount.error">{{formData.amount.error}}</small>
-            <small class="red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
+            <small class="hourly-milestone-input-red" v-if="formData.amount.error">{{formData.amount.error}}</small>
+            <small class="hourly-milestone-input-red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
         </td>
         <!-- status -->
         <td>
@@ -690,6 +690,12 @@
         document.removeEventListener("keyup", handleEnter);
     };
 </script>
+<style scoped>
+.hourly-milestone-input-red {
+    color: var(--danger-ink);
+}
+</style>
+
 <style scoped>
 .hourly__togglepophover-btn{
     width: 202px !important;

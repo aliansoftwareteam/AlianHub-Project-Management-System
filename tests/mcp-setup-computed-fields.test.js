@@ -56,7 +56,7 @@ const web = asPerson(routeTable(require('../Modules/CustomField/routes').init));
 const TOOL = 'fields.create';
 const GRANT = 'tasks:manage';
 const PEOPLE = [OWNER, INSIDER, OUTSIDER, GUEST];
-const NO_PROJECT = 'not_visible: the project is not one the person behind this token can open';
+const NO_PROJECT = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
 const COST = '6f0000000000000000000f02';
 const CLIENT_NAME = '6f0000000000000000000f03';
 const SUB_1 = '6f0000000000000000000d11';
@@ -122,11 +122,11 @@ describe('asking for a rollup or a formula', () => {
     it('says at once what a rollup or a formula lacks, and files nothing', async () => {
         const refused = async (field, why) => expect((await ask(as(OWNER), [field])).rpcError).toMatchObject({ code: -32602, message: expect.stringMatching(why) });
         await refused({ name: 'Cost total', type: 'rollup', source: 'Cost' }, /needs a function/);
-        await refused({ name: 'Cost total', type: 'rollup', function: 'sum' }, /needs source/);
+        await refused({ name: 'Cost total', type: 'rollup', function: 'sum' }, /needs a source/);
         await refused({ name: 'Cost total', type: 'rollup', function: 'median', source: 'Cost' }, /function/);
         await refused({ name: 'Margin', type: 'formula' }, /needs an expression/);
-        await refused({ name: 'Margin', type: 'formula', expression: '{Cost} +' }, /cannot be read/);
-        await refused({ name: 'Margin', type: 'formula', expression: 'process.exit(1)' }, /cannot be read/);
+        await refused({ name: 'Margin', type: 'formula', expression: '{Cost} +' }, /cannot be understood/);
+        await refused({ name: 'Margin', type: 'formula', expression: 'process.exit(1)' }, /cannot be understood/);
         expect(waiting()).toHaveLength(0);
     });
 

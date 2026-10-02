@@ -42,23 +42,23 @@ const dayOf = (value) => {
  * arguments; the window is its UTC day bounds, the one reading every metric uses. */
 const parseArgs = (args = {}) => {
     const projectIds = [...new Set([...listOf(args.projectIds), ...listOf(args.projectId)].map(String))];
-    if (!projectIds.length) return { reason: 'projectId is required' };
+    if (!projectIds.length) return { reason: 'Name at least one project.' };
     const malformed = projectIds.find((id) => !OBJECT_ID.test(id));
-    if (malformed) return { reason: `"${malformed.slice(0, 40)}" is not a valid project id` };
-    if (projectIds.length > MAX_PROJECTS) return { reason: `at most ${MAX_PROJECTS} projects per call` };
+    if (malformed) return { reason: `"${malformed.slice(0, 40)}" is not a project id. Use an id from projects.list.` };
+    if (projectIds.length > MAX_PROJECTS) return { reason: `Ask for at most ${MAX_PROJECTS} projects at a time.` };
 
     if (args.from === undefined || args.from === null || args.from === '' || args.to === undefined || args.to === null || args.to === '') {
-        return { reason: 'from and to are required' };
+        return { reason: 'Give the first and the last day.' };
     }
     const from = dayOf(args.from);
     const to = dayOf(args.to);
-    if (!from || !to) return { reason: 'from and to must be calendar dates written YYYY-MM-DD' };
-    if (from > to) return { reason: 'from must not be after to' };
-    if ((to - from) / DAY_MS + 1 > MAX_RANGE_DAYS) return { reason: `the range may cover at most ${MAX_RANGE_DAYS} days` };
+    if (!from || !to) return { reason: 'The first and the last day must be dates written YYYY-MM-DD.' };
+    if (from > to) return { reason: 'The first day must not be after the last day.' };
+    if ((to - from) / DAY_MS + 1 > MAX_RANGE_DAYS) return { reason: `Ask for at most ${MAX_RANGE_DAYS} days at a time.` };
 
     const asked = listOf(args.metrics).map(String);
     const unknown = asked.find((m) => !METRICS.includes(m));
-    if (unknown) return { reason: `unknown metric "${unknown.slice(0, 40)}" (have: ${METRICS.join(', ')})` };
+    if (unknown) return { reason: `"${unknown.slice(0, 40)}" is not a number you can ask for. Choose from: ${METRICS.join(', ')}.` };
     const metrics = asked.length ? METRICS.filter((m) => asked.includes(m)) : [...METRICS];
 
     const end = new Date(to.getTime() + DAY_MS - 1);
@@ -169,7 +169,7 @@ const read = async ({ companyId, actor, args = {}, projectScope = [], allowedAct
     const uid = String(actor.userId);
     const outside = await outsideScope(companyId, uid, query.projectIds, projectScope);
     if (outside.length) {
-        throw await refuse(companyId, actor, { params: query, reason: `project ${outside.join(', ')} is not one this agent may read`, ip, entityType: 'project', entityId: outside[0] });
+        throw await refuse(companyId, actor, { params: query, reason: `project ${outside.join(', ')} was not found, or this connection may not read it. Ask the person which project they mean.`, ip, entityType: 'project', entityId: outside[0] });
     }
 
     const wants = (metric) => query.metrics.includes(metric);

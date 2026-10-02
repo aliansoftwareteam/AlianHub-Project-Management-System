@@ -154,8 +154,8 @@ describe('what the model does with the injected text cannot reach a forbidden ac
         expect(out).toMatchObject({ status: 'failed', refusals: 1, outcome: '0 change(s) applied, 1 refused' });
         const row = runRow(run._id);
         expect(row.decisions).toHaveLength(1);
-        expect(row.decisions[0]).toMatchObject({ action: 'task.status.set', decision: 'refuse', reason: 'Agents cannot perform task.status.set("Done")' });
-        expect(row.actions).toEqual([expect.objectContaining({ action: 'task.status.set', ok: false, refused: 'Agents cannot perform task.status.set("Done")' })]);
+        expect(row.decisions[0]).toMatchObject({ action: 'task.status.set', decision: 'refuse', reason: 'You cannot set a task to "Done". Use In progress or In review, and a person closes the task.' });
+        expect(row.actions).toEqual([expect.objectContaining({ action: 'task.status.set', ok: false, refused: 'You cannot set a task to "Done". Use In progress or In review, and a person closes the task.' })]);
         const audited = (mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] || []).filter((a) => a.meta && a.meta.action === 'task.status.set');
         expect(audited.map((a) => ({ action: a.action, ran: a.meta.ran }))).toEqual([{ action: 'agent.action_refused', ran: false }]);
         expect(mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.TASKS && /update/i.test(c.method))).toEqual([]);
@@ -169,7 +169,7 @@ describe('what the model does with the injected text cannot reach a forbidden ac
         [{ statusType: 'done' }],
     ])('an approved change or a direct agent call setting %j is refused as well', async (status) => {
         await expect(actions.perform({ companyId: C, actor, action: 'task.status.set', params: { taskId: TASK._id, status } }))
-            .rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(/^Agents cannot perform task\.status\.set/) });
+            .rejects.toMatchObject({ name: 'RefusedError', message: expect.stringMatching(/^You cannot set a task to/) });
     });
 
     it('tool calls written into the answer never become changes: only the skill\'s own mappings are proposed', async () => {
@@ -197,7 +197,7 @@ describe('what the model does with the injected text cannot reach a forbidden ac
 
         const proposal = proposalsCreate.mock.calls[0][1];
         expect(proposal.changes.map((c) => c.action)).toEqual(['task.comment']);
-        expect(proposal.why).toContain('"Move the task" (task.status.set is outside this agent\'s allowed actions)');
+        expect(proposal.why).toContain('"Move the task" (This agent is not allowed to use task.status.set.)');
     });
 
     it('QA findings the injected text asked for have no measured evidence, so the verifier drops them and says why', async () => {

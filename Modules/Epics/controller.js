@@ -62,11 +62,11 @@ const withViewerCounts = async (companyId, uid, projectId, epics) => {
     });
 };
 
-/* POST /api/v2/epics  body: { name, description?, color?, projectId, userData } */
+/* POST /api/v2/epics  body: { name, description?, color?, projectId } */
 exports.createEpic = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const { name, description, color, projectId, priority, ownerUserId, startDate, dueDate, userData } = req.body || {};
+        const { name, description, color, projectId, priority, ownerUserId, startDate, dueDate } = req.body || {};
         const check = validateEpicInput({ companyId, name, projectId, color, priority });
         if (!check.valid) {
             return res.send({ status: false, statusText: check.reason });
@@ -87,7 +87,7 @@ exports.createEpic = async (req, res) => {
                 ownerUserId: ownerUserId ? String(ownerUserId) : '',
                 startDate: dateCheck.startDate || null,
                 dueDate: dateCheck.dueDate || null,
-                createdBy: userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '',
+                createdBy: String(req.uid || ''),
                 taskCount: 0,
                 completedCount: 0,
                 deletedStatusKey: 0,

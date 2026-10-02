@@ -64,7 +64,7 @@ const TOOLS = [
     {
         name: 'tasks.next',
         action: 'tasks.next',
-        description: 'The next task assigned to you, highest priority and nearest due date first. Start here.',
+        description: 'Shows the next task assigned to the person: the most urgent first, then the soonest due. Changes nothing.',
         input: { type: 'object', properties: { projectId: { type: 'string' } } },
         visibility: 'filtered',
         paginated: true,
@@ -85,7 +85,7 @@ const TOOLS = [
     {
         name: 'tasks.search',
         action: 'tasks.search',
-        description: 'Search tasks you can see by text, status or project.',
+        description: 'Finds tasks the person can open, by text, status or project. Changes nothing.',
         paginated: true,
         input: {
             type: 'object',
@@ -119,7 +119,7 @@ const TOOLS = [
     {
         name: 'task.get',
         action: 'task.get',
-        description: 'A task as a brief: goal, acceptance criteria, relations, linked docs and what the comment thread has settled. Read this before writing code.',
+        description: 'Shows one task in full: its goal, what counts as done, linked tasks and docs, and what the comments settled. Read it before you work on the task. Changes nothing.',
         input: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
         visibility: 'filtered',
         run: async (ctx, args, vis) => {
@@ -139,7 +139,7 @@ const TOOLS = [
         action: 'task.comment',
         visibility: 'filtered',
         target: taskTarget,
-        description: 'Post a comment. Use it to report findings, ask a question, or leave a PR link with context.',
+        description: 'Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, body: { type: 'string' } }, required: ['taskId', 'body'] },
         params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.body, 20000) }),
     },
@@ -148,7 +148,7 @@ const TOOLS = [
         action: 'task.status.set',
         visibility: 'filtered',
         target: taskTarget,
-        description: 'Move a task to In progress or In review. Done is not available to agents — a person closes the task.',
+        description: 'Sets a task to In progress or In review at once. You cannot close a task: a person does that.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, status: { type: 'string' } }, required: ['taskId', 'status'] },
         params: (args) => ({ taskId: str(args.taskId, 40), status: { name: str(args.status, 60) } }),
     },
@@ -157,7 +157,7 @@ const TOOLS = [
         action: 'task.link',
         visibility: 'filtered',
         target: taskTarget,
-        description: 'Attach a pull request, branch or document URL to the task.',
+        description: 'Attaches a link to a task, such as a pull request, a branch or a doc, at once. The person can undo it.',
         input: {
             type: 'object',
             properties: { taskId: { type: 'string' }, url: { type: 'string' }, label: { type: 'string' }, kind: { type: 'string' } },
@@ -171,7 +171,7 @@ const TOOLS = [
         visibility: 'filtered',
         creates: true,
         target: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
-        description: 'File a new task in a project, in its opening status and unassigned. Use it for work you found that is not on the board yet; put the goal and acceptance criteria in the description.',
+        description: 'Adds a new task to a project, unassigned and in its first status, at once. Use it for work that is not on the board yet, and put the goal and what counts as done in the description.',
         input: {
             type: 'object',
             properties: { projectId: { type: 'string' }, title: { type: 'string' }, description: { type: 'string' }, sprintId: { type: 'string' }, priority: { type: 'string', enum: ['URGENT', 'HIGH', 'MEDIUM', 'LOW'] } },
@@ -185,7 +185,7 @@ const TOOLS = [
         visibility: 'filtered',
         creates: true,
         target: taskTarget,
-        description: 'Break the task down. One subtask per call.',
+        description: 'Adds one subtask to a task at once. Call it once for each subtask.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, title: { type: 'string' } }, required: ['taskId', 'title'] },
         params: (args) => ({ taskId: str(args.taskId, 40), title: str(args.title, 250), name: str(args.title, 250) }),
     },
@@ -194,7 +194,7 @@ const TOOLS = [
         action: 'timelog.start',
         visibility: 'filtered',
         target: taskTarget,
-        description: 'Start the timer on a task so the hours you spend are attributed to you.',
+        description: 'Starts a timer on a task at once, so the time is logged for the person.',
         input: { type: 'object', properties: { taskId: { type: 'string' } }, required: ['taskId'] },
         params: (args) => ({ taskId: str(args.taskId, 40) }),
     },
@@ -203,23 +203,23 @@ const TOOLS = [
         action: 'timelog.stop',
         visibility: 'filtered',
         target: taskTarget,
-        description: 'Stop the running timer and write the time log.',
+        description: 'Stops the running timer at once and saves the time as a time entry.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, note: { type: 'string' } }, required: ['taskId'] },
         params: (args) => ({ taskId: str(args.taskId, 40), note: str(args.note, 500) }),
     },
     {
         name: 'docs.read',
         action: 'docs.read',
-        description: 'Read a page linked from a task, by page id.',
+        description: 'Shows a doc linked from a task, given its id. Changes nothing.',
         input: { type: 'object', properties: { pageId: { type: 'string' } }, required: ['pageId'] },
         visibility: 'filtered',
         run: async (ctx, args, vis) => {
             const _id = oid(str(args.pageId, 40));
-            if (!_id) return { error: 'invalid pageId' };
+            if (!_id) return { error: 'That is not a doc id. Use an id from pages.search.' };
             const page = await MongoDbCrudOpration(ctx.companyId, {
                 type: SCHEMA_TYPE.PAGES, data: [{ _id, deletedStatusKey: { $ne: 1 } }],
             }, 'findOne');
-            if (!page || !vis.allowsPage(page)) return { error: 'page not found' };
+            if (!page || !vis.allowsPage(page)) return { error: 'That doc was not found. Ask the person which doc they mean.' };
             const out = {
                 pageId: String(page._id),
                 title: page.title || '',
@@ -236,7 +236,7 @@ const FLAGGED_TOOLS = [
     {
         name: performanceRead.ACTION,
         action: performanceRead.ACTION,
-        description: `Numbers for up to ${performanceRead.MAX_PROJECTS} projects over a date range of at most ${performanceRead.MAX_RANGE_DAYS} days: logged time (minutes), estimate against actual (minutes), sprint velocity (story points) and cumulative flow. Quote these numbers rather than estimating; each call is kept in the run's replay record.`,
+        description: `Shows numbers for up to ${performanceRead.MAX_PROJECTS} projects over at most ${performanceRead.MAX_RANGE_DAYS} days: time logged, estimated against actual time (both in minutes), story points finished per list, and how tasks moved between statuses. Quote these numbers rather than estimating. Changes nothing.`,
         input: {
             type: 'object',
             properties: {
@@ -258,7 +258,7 @@ const FLAGGED_TOOLS = [
             if (outside.length) {
                 throw await actions.refusal(ctx.companyId, ctx.actor, {
                     action: performanceRead.ACTION, params: { projectIds: asked }, ip: ctx.ip, entityType: 'project', entityId: outside[0],
-                    reason: `${visibility.NOT_VISIBLE}: project ${outside.join(', ')} is not one the person behind this token can open`,
+                    reason: `${visibility.NOT_VISIBLE}: project ${outside.join(', ')} was not found, or the person cannot open it. Ask the person which project they mean.`,
                 });
             }
             return performanceRead.read({ companyId: ctx.companyId, actor: ctx.actor, args, projectScope: ctx.projectIds, allowedActions: ctx.allowedActions, ip: ctx.ip });
@@ -266,8 +266,8 @@ const FLAGGED_TOOLS = [
     },
 ];
 
-const SEARCH_BY_LIST = 'Search tasks you can see by text, status, project or list. A list answers the tasks that live in it and the tasks added to it.';
-const SEARCH_FOR_PLANNING = 'Search tasks you can see by text, status, project, list, assignee or due date. Each task carries its assignees, dates, estimate, subtask count and the tasks above it.';
+const SEARCH_BY_LIST = 'Finds tasks the person can open, by text, status, project or list. A list answers the tasks that live in it and the tasks added to it. Changes nothing.';
+const SEARCH_FOR_PLANNING = 'Finds tasks the person can open, by text, status, project, list, assignee or due date. Each task shows its assignees, dates, estimate, subtask count and the tasks above it. Changes nothing.';
 
 const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...intentTools.offered(), ...contextTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
 
@@ -294,8 +294,8 @@ const toolsFor = (ctx) => offered().filter((tool) => holdsGrantFor(ctx, tool)).m
 const toolNames = () => offered().map((t) => t.name);
 
 const PAGE_INPUT = Object.freeze({
-    cursor: { type: 'string', description: 'nextCursor from the previous page' },
-    limit: { type: 'integer', description: `Page size, default ${cursor.PAGE_DEFAULT}, at most ${cursor.PAGE_MAX}` },
+    cursor: { type: 'string', description: 'The nextCursor from the previous page, to get the next page' },
+    limit: { type: 'integer', description: `How many to return: ${cursor.PAGE_DEFAULT} unless you ask for another number, and at most ${cursor.PAGE_MAX}` },
 });
 
 /* With a caller, the tools that caller may use; without one (the public manifest), every tool this server offers. */
@@ -326,15 +326,15 @@ const refuseBadArguments = (tool, args) => {
 };
 
 const scopeRefusal = (ctx, tool, write) => {
-    if (!holdsOptIn(ctx, tool)) return `This token lacks the ${tool.optIn} scope.`;
-    if (tool.grant && !manageFlag.holdsGrant(ctx.token, tool.grant)) return `This token does not hold the ${tool.grant} grant, which ${tool.name} needs.`;
-    if (tool.grant && !manageFlag.mayUse(ctx, tool.grant)) return 'This token is read-only.';
+    if (!holdsOptIn(ctx, tool)) return `This connection was not given the ${tool.optIn} permission. Ask the person to connect you again and allow it.`;
+    if (tool.grant && !manageFlag.holdsGrant(ctx.token, tool.grant)) return `This connection was not given the ${tool.grant} permission, which ${tool.name} needs. Ask the person to connect you again and allow it.`;
+    if (tool.grant && !manageFlag.mayUse(ctx, tool.grant)) return 'This connection can only read. Ask the person to connect you again and allow changes.';
     if (ctx.token && ctx.token.oauth) {
         const needed = scopes.scopeForTool(tool.name);
-        return needed && scopes.grantedScopes(ctx.token).includes(needed) ? '' : `This token lacks the ${needed || 'required'} scope.`;
+        return needed && scopes.grantedScopes(ctx.token).includes(needed) ? '' : `This connection was not given the ${needed || 'required'} permission. Ask the person to connect you again and allow it.`;
     }
-    if (write) return ctx.canWrite ? '' : 'This token is read-only.';
-    return hasScope(ctx.token, 'read') ? '' : 'This token lacks the read scope.';
+    if (write) return ctx.canWrite ? '' : 'This connection can only read. Ask the person to connect you again and allow changes.';
+    return hasScope(ctx.token, 'read') ? '' : 'This connection is not allowed to read. Ask the person to connect you again and allow it.';
 };
 
 /* The tools a caller both lists and may run, which is what the instructions and the prompts may name.

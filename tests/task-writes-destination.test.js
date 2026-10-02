@@ -26,6 +26,7 @@ const L_OPEN_CLOSED = '6f0000000000000000000b03';
 const L_OTHER = '6f0000000000000000000b04';
 const L_PRIVATE = '6f0000000000000000000b05';
 const L_PERSONAL = '6f0000000000000000000b06';
+const L_CHAT = '6f0000000000000000000b09';
 const FOLDER = '6f0000000000000000000f01';
 const T_OPEN = '6f0000000000000000000d01';
 const T_PRIVATE = '6f0000000000000000000d02';
@@ -100,6 +101,7 @@ beforeEach(() => {
     list(L_OTHER, 'Other list', OTHER, { folderId: FOLDER });
     list(L_PRIVATE, 'Private list', PRIVATE);
     list(L_PERSONAL, 'Personal list', PERSONAL);
+    list(L_CHAT, 'Direct', CHAT_SPACE);
     const task = (_id, TaskName, ProjectID, sprintId, extra = {}) => mockDb.seed(SCHEMA_TYPE.TASKS, {
         _id, TaskName, ProjectID, sprintId, CompanyId: C, statusKey: 1, TaskType: 'task', isParentTask: true, AssigneeUserId: [MEMBER], watchers: [], deletedStatusKey: 0, ...extra,
     });
@@ -211,10 +213,11 @@ describe('where a new task lands', () => {
         expect(payload.projectData).toMatchObject({ _id: OPEN, ProjectCode: 'OPE', ProjectName: 'Open' });
     });
 
-    it('is a chat space for a conversation', async () => {
-        const { payload } = await create(MEMBER, { ProjectID: CHAT_SPACE, sprintId: L_OPEN, mainChat: true, AssigneeUserId: [MEMBER, INSIDER] });
+    it('is a chat space for a conversation, in a list of that space', async () => {
+        const { payload } = await create(MEMBER, { ProjectID: CHAT_SPACE, sprintId: L_CHAT, mainChat: true, AssigneeUserId: [MEMBER, INSIDER] });
 
-        expect(payload.data.ProjectID).toBe(CHAT_SPACE);
+        expect(payload.data).toMatchObject({ ProjectID: CHAT_SPACE, sprintId: L_CHAT });
+        expect((await create(MEMBER, { ProjectID: CHAT_SPACE, sprintId: L_OPEN, mainChat: true, AssigneeUserId: [MEMBER, INSIDER] })).refused).toBe(404);
     });
 });
 

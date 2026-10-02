@@ -130,22 +130,22 @@ onMounted(load);
 
 <style scoped>
 .lwt { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
-.lwt-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
+.lwt-msg { color: var(--ink-2); font-size: 12px; padding: 10px 0; }
 .lwt-head { font-size: 12px; font-weight: 600; color: #0d9488; }
 .lwt-table-wrap { overflow: auto; }
 .lwt-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.lwt-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid #eef0f6; position: sticky; top: 0; background: #fff; }
+.lwt-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--hairline); position: sticky; top: 0; background: var(--surface); }
 /* Numeric column headers must right-align to line up with their right-aligned
    values (the element+class rule above otherwise wins over .lwt-num). */
 .lwt-table th.lwt-num { text-align: right; }
-.lwt-table td { padding: 5px 6px; border-bottom: 1px solid #f4f5f9; color: #3a3f52; }
+.lwt-table td { padding: 5px 6px; border-bottom: 1px solid var(--hairline); color: var(--ink-label); }
 .lwt-num { text-align: right; white-space: nowrap; min-width: 66px; }
 .lwt-user { font-weight: 600; white-space: nowrap; }
 .lwt-proj { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lwt-task { max-width: 260px; }
 .lwt-task-line { display: flex; align-items: center; overflow: hidden; }
 .lwt-task-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lwt-comment { font-size: 10px; color: #9aa0b4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
-.lwt-running { color: #16a34a; margin-right: 5px; font-size: 10px; flex: none; }
+.lwt-comment { font-size: 10px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+.lwt-running { color: var(--ok); margin-right: 5px; font-size: 10px; flex: none; }
 .lwt-day { font-weight: 600; color: #0f766e; }
 </style>

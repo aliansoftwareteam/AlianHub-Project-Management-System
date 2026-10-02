@@ -108,6 +108,9 @@ const isCompanyOwner = async (companyId, userId) => {
 exports.triggerReminders = async (req, res) => {
     try {
         const companyId = sessionTenantOf(req);
+        if (!(await isCompanyOwner(companyId, req.uid))) {
+            return res.status(403).send({ status: false, statusText: 'Only an owner or admin can send the time reminders.' });
+        }
         const result = await sendTimeRemindersForCompany(companyId);
         return res.send({ status: true, statusText: 'Reminders processed.', data: result });
     } catch (error) {

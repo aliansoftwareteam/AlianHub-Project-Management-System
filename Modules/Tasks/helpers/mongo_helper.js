@@ -309,8 +309,8 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                             ]
                         }
                         MongoDbCrudOpration(companyId, object, "updateOne").then((mainRes)=>{
-                            socketEmitter.emit('update', { type: "update", data: mainRes , updatedFields: {subTasks: mainRes.subTasks}, module: 'task', companyId });
-                        })
+                            if (mainRes) socketEmitter.emit('update', { type: "update", data: mainRes , updatedFields: {subTasks: mainRes.subTasks}, module: 'task', companyId });
+                        }).catch((error) => logger.error(`convert to subtask, the old parent's count: ${error && error.message}`));
                     }
                     /*When a task is converted into  asubtask, at that moment, if a subtask is added to the selected task, the count needs to be increased.*/
                     let object = {
@@ -322,8 +322,8 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         ]
                     }
                     MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((taskres)=>{
-                        socketEmitter.emit('update', { type: "update", data: taskres , updatedFields: {subTasks: taskres.subTasks}, module: 'task', companyId });
-                    })
+                        if (taskres) socketEmitter.emit('update', { type: "update", data: taskres , updatedFields: {subTasks: taskres.subTasks}, module: 'task', companyId });
+                    }).catch((error) => logger.error(`convert to subtask, the parent's count: ${error && error.message}`));
                     // update comment count
                     exports.removeCommentCount(companyId,projectData.id,convertTask.sprintId,convertTask._id,convertTask.ParentTaskId).catch((error) => {
                         logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
@@ -387,8 +387,9 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                     // so `reject(error)` would be a no-op. Log instead so
                     // the failure is visible.
                     logger.error(`convertToSubTaskFunction inner update error: ${error && error.message ? error.message : error}`);
+                    reject(error);
                 })
-            })
+            }).catch(reject)
         } catch (error) {
             reject(error);
         }
@@ -648,7 +649,7 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
                 ]
             }
             MongoDbCrudOpration(companyId, query, "updateOne").then(() => {
-                exports.removeCommentCount(companyId,projectData,oldSprintObj.id,parseSubTask._id).catch((error) => {
+                exports.removeCommentCount(companyId,projectData.id,oldSprintObj.id,parseSubTask._id).catch((error) => {
                     logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
                 })
                 resolve();
@@ -682,6 +683,7 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
                 });
             }).catch((error) => {
                 logger.error(`ERROR: ${error}`);
+                reject(error);
             });
         } catch (error) {
             reject(error);
@@ -698,7 +700,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
             if (mergeTask.folderObjId) placedUnder.folderObjId = mergeTask.folderObjId;
             else unsetObj.folderObjId = '';
             let obj;
-            if (subTask.ProjectID !== mergeTask.ProjectID) {
+            if (String(subTask.ProjectID) !== String(mergeTask.ProjectID)) {
                 let Ind = oldProject.taskStatusData.findIndex((x) => { return x.key === subTask.statusKey });
                 let typeInd = oldProject.taskTypeCounts.findIndex((x) => { return x.value === subTask.TaskType });
                 const statusData = oldProject.taskStatusData[Ind];
@@ -787,7 +789,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
                     const decObj = {
                         body: {
                             companyId: companyId,
-                            projectId: oldProject.id,
+                            projectId: String(subTask.ProjectID),
                             folderId: subTask?.folderObjId || null,
                             updateObject :{$inc: { tasks: -1}},
                         },
@@ -806,6 +808,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
                 })
             }).catch((err) => {
                 logger.error(`ERROR in merge task ${err}`);
+                reject(err);
             })
         } catch (error) {
             reject(error);

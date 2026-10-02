@@ -173,6 +173,12 @@ Read them once at module load (`process.env.NAME || default`), describe the key 
 
 `t('Namespace.key')` with a literal key; when the key is built at run time, end the literal with `_` or `.` (`t('Inbox.tab_' + kind)`) so the audit can resolve the prefix. `node scripts/i18n-rename-namespace.js <From> <To>` moves a namespace and rewrites every reference.
 
+Keys waiting for a translator, per locale, on 2026-10-02 (`npm run i18n:backfill -- --dry-run` prints today's count as "pending review"): `ar` 12,660 · `ge` 10,798 · `fr` 10,786 · `gr` 10,779 · `hi` 10,778 · `ch`, `gu`, `it` 10,777 each · `ru`, `spa` 10,776 each. `ja`, `ko` and `ptBr` show English as it is and have no list. A translator clears a key in three steps:
+
+1. Open `frontend/src/locales/<locale>.pending.json`: every key in it is listed with its English text, and is still English (or a machine translation) in `<locale>.js`.
+2. Write the translation at that key in `frontend/src/locales/<locale>.js`, keeping every `{placeholder}` as it is, then delete the key's line from `<locale>.pending.json`; nothing removes it for you.
+3. Run `npm run i18n:backfill` (it puts the file back in order) and `npm run i18n:check`, and commit both files together.
+
 ### Colours and style classes
 
 Colours come from the tokens in `frontend/src/assets/css/tokens.css` (`var(--surface)`, `var(--ink)`, `var(--brand)`, …) and the `ah-` classes built on them, so a screen follows the theme. `scripts/style-check.js` counts what each `.vue`, `.css` and `.scss` file under `frontend/src` still hard-codes, and `scripts/style-baseline.json` holds those two counts per file:

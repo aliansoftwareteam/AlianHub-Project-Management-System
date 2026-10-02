@@ -72,7 +72,7 @@
                         <li class="d-flex align-items-center justify-content-between">
                             <div class="d-flex align-items-center w-100 ml-16px">
                                 <input type="color" v-model.trim="theModel.projectStatusField.value.projectCompletedStatus.textColor" class="p-0 mr-8px d-inline-block border-radius-2-px border-0 bg-transparent cursor-pointer project__status-icon" disabled>
-                                <span class="style_changes_value" :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" :style="[{'color': theModel.projectStatusField.value.projectCompletedStatus.textColor}]">{{theModel.projectStatusField.value.projectCompletedStatus.name}}</span>
+                                <span class="style_changes_value" :class="{'project-status-form-taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" :style="[{'color': theModel.projectStatusField.value.projectCompletedStatus.textColor}]">{{theModel.projectStatusField.value.projectCompletedStatus.name}}</span>
                             </div>
                         </li>
                     </ul>
@@ -428,6 +428,14 @@ const { getters, commit } = useStore();
     }
 
 </script>
+<style scoped>
+.project-status-form-taskInnerData-desktop {
+    font-size: 13px !important;
+    line-height: 19px !important;
+    font-weight: 400 !important;
+}
+</style>
+
 <style scoped>
 @import './style.css';
 </style>

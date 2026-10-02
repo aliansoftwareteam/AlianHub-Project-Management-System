@@ -236,7 +236,7 @@ describe('a change a connected agent makes on its own is to one task and can be 
         const out = await rpc(ctx(OWNER), tool, { taskId: String(fx.top._id) });
         expect(out).toMatchObject({ ok: false, pending: true });
         expect(snapshot()).toBe(before);
-        expect(proposalRows()[0].why).toMatch(/takes the task's subtasks with it/);
+        expect(proposalRows()[0].why).toMatch(/also changes the task's subtasks/);
 
         const approved = await approve(out.proposalId, OWNER, true);
         await settle();

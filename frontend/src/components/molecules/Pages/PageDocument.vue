@@ -774,6 +774,7 @@ function onEditorReady() {
     if (baselinePending.value) {
         baselinePending.value = false;
         savedSnapshot.value = { ...savedSnapshot.value, html: contentHtml.value };
+        if (isDirty.value && !readOnly.value) autosave.changed();
     }
 }
 

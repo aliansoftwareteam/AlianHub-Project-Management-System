@@ -13,7 +13,7 @@ const idOf = (value) => (value === undefined || value === null ? '' : String(val
 
 const personOf = (actor) => {
     const uid = idOf(actor && actor.userId);
-    if (!OBJECT_ID.test(uid)) throw refuse('a doc change needs a person to make it as');
+    if (!OBJECT_ID.test(uid)) throw refuse('This change has to be made for a person. Ask the person to connect you again.');
     return uid;
 };
 
@@ -27,12 +27,12 @@ const answerOf = (handler, { companyId, uid, params = {}, body = {}, agentDraft 
 
 const dataOf = async (handler, request) => {
     const answer = await answerOf(handler, request);
-    if (!answer || answer.status !== true) throw refuse((answer && answer.statusText) || 'the doc was not saved');
+    if (!answer || answer.status !== true) throw refuse((answer && answer.statusText) || 'The doc was not saved. Try again, or tell the person.');
     return answer.data || {};
 };
 
 const blocksOf = (text) => {
-    if (typeof text !== 'string' || text.length > TEXT_MAX) throw refuse(`text needs at most ${TEXT_MAX} characters`);
+    if (typeof text !== 'string' || text.length > TEXT_MAX) throw refuse(`The text can be at most ${TEXT_MAX} characters. Shorten it and try again.`);
     return require('../Pages/helpers/pageContent').markdownToBlocks(text);
 };
 
@@ -45,7 +45,7 @@ const bodyOf = (text) => {
 
 const titleOf = (title) => {
     const clean = typeof title === 'string' ? title.trim() : '';
-    if (!clean || clean.length > TITLE_MAX) throw refuse(`title needs 1 to ${TITLE_MAX} characters`);
+    if (!clean || clean.length > TITLE_MAX) throw refuse(`The title must be between 1 and ${TITLE_MAX} characters. Shorten it and try again.`);
     return clean;
 };
 
@@ -69,12 +69,12 @@ const executors = {
     async 'page.update'({ companyId, actor, params }) {
         const uid = personOf(actor);
         const pageId = idOf(params.pageId);
-        if (!OBJECT_ID.test(pageId)) throw refuse('page not found');
+        if (!OBJECT_ID.test(pageId)) throw refuse('That doc was not found. Check the id, or ask the person which doc they mean.');
         const body = {
             ...(params.title !== undefined ? { title: titleOf(params.title) } : {}),
             ...(params.text !== undefined ? bodyOf(params.text) : {}),
         };
-        if (!Object.keys(body).length) throw refuse('name a title or a text to change');
+        if (!Object.keys(body).length) throw refuse('Give a new title, a new text, or both.');
         // The state about to be replaced is kept as a version first, so this change can always be put back.
         const kept = await answerOf(require('../Pages/versions').saveVersion, { companyId, uid, params: { id: pageId }, body: {} });
         const versionId = kept && kept.status === true && kept.data ? idOf(kept.data._id) : '';
