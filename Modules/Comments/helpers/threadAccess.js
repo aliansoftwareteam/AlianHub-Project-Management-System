@@ -13,6 +13,10 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const isId = (value) => OBJECT_ID.test(String(value || ''));
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 
+/* A list or a task is named by text or by a stored id, or left out. A query string can carry a condition in its
+ * place, and a condition is not a thread: the query the read runs would take it as written. */
+const namesId = (value) => value === undefined || value === null || typeof value === 'string' || value._bsontype === 'ObjectId';
+
 const INVALID = { allowed: false, statusCode: 400 };
 const NOT_FOUND = { allowed: false, statusCode: 404 };
 
@@ -50,7 +54,7 @@ const keptFromAgent = async (companyId, uid, thread) => {
 const commentThreadAccess = async (companyId, uid, { projectId, sprintId, taskId } = {}) => {
     const company = String(companyId || '');
     const user = String(uid || '');
-    if (!isId(projectId)) return INVALID;
+    if (!isId(projectId) || !namesId(sprintId) || !namesId(taskId)) return INVALID;
     if (!isId(company) || !isId(user)) return NOT_FOUND;
     if (await keptFromAgent(company, user, { projectId, sprintId, taskId })) return NOT_FOUND;
 

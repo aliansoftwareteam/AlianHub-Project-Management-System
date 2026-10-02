@@ -12,6 +12,7 @@ jest.mock('../Config/permissionGuard', () => ({
 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
 jest.mock('../Modules/PersonalList/ownership', () => ({ ...jest.requireActual('../Modules/PersonalList/ownership'), othersPersonalListIds: jest.fn(async () => []) }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ ...jest.requireActual('../Modules/Sprints/helpers/sprintVisibility'), hiddenSprintIds: jest.fn(async () => []) }));
 jest.mock('../Modules/Agents/privateWork', () => ({
     ...jest.requireActual('../Modules/Agents/privateWork'),
     privateWorkOf: jest.fn(async (companyId, uid) => ({ uid: String(uid), personalLists: ['6f0000000000000000000b09'], directSpaces: ['6f0000000000000000000b08'], myChats: ['6f0000000000000000000a08'], myRuns: [] })),

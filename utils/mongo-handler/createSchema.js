@@ -65,6 +65,8 @@ const notificationsSettingsSchema= new Schema(schema.notificationsSettings, {str
 const mentionsSchema= new Schema(schema.mentions, {strict: true, timestamps: true})
 notificationsSchema.index({ clearedAt: 1 }, { expireAfterSeconds: CLEARED_RETENTION_SECONDS, name: 'cleared_purge' });
 mentionsSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'cleared_purge' });
+notificationsSchema.index({ receiverID: 1, taskId: 1 });
+mentionsSchema.index({ mentionIds: 1, taskId: 1 });
 const projectRulesSchema= new Schema(schema.projectRules, {strict: true, timestamps: true})
 const subscriptionPlanSchema = new Schema(schema.subscriptionPlan, {strict: true, timestamps: true});
 // `planFeature` / `planFeatureDisplay` intentionally hold an open-ended

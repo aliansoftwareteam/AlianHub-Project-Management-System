@@ -259,12 +259,9 @@ const classifyTaskEvent = ({ type, doc, updatedFields, now = Date.now() }) => {
  * the project counter bump (internals.js fires { data: <project>, updatedFields:
  * {} } when it increments lastTaskId). Its _id is a project id, so the task
  * re-read finds nothing — and that must NOT go out as a phantom task.updated.
- * Returns: real task found → deliver; clean read + no task → drop; read errored
- * → best-effort delivery with whatever the socket gave us. */
-const shouldDeliverTask = (freshTask, readErrored) => {
-    if (freshTask && freshTask._id) return true;
-    return Boolean(readErrored);
-};
+ * A read that failed delivers nothing either: who may be told of a task is judged
+ * on the stored row, and what the socket carried may not say which list it is in. */
+const shouldDeliverTask = (freshTask) => Boolean(freshTask && freshTask._id);
 
 /* Whitelisted task payload — never ship the raw document. */
 const trimTaskForDelivery = (doc) => ({

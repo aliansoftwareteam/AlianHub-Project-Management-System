@@ -110,12 +110,12 @@
                                     v-for="c in d.chips.slice(0, 2)"
                                     :key="c.estimateId || c.taskId"
                                     class="wv__chip-task"
-                                    draggable="true"
-                                    :title="`${c.name} · ${amountLabel(size(c))}`"
+                                    :draggable="Boolean(c.name)"
+                                    :title="`${c.name || $t('Time.task_not_open')} · ${amountLabel(size(c))}`"
                                     @dragstart="onDragStart($event, u, d, c)"
                                     @dragend="onDragEnd"
-                                    @click="openChip(c)"
-                                >{{ c.name || c.taskId }}</span>
+                                    @click="c.name && openChip(c)"
+                                >{{ c.name || $t('Time.task_not_open') }}</span>
                                 <span v-if="d.chips.length > 2" class="wv__chip-task wv__chip-task--more">+{{ d.chips.length - 2 }}</span>
                             </div>
                         </template>

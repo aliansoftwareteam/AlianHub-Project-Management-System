@@ -1,4 +1,4 @@
-const { scopedTimeMatch, scopedEstimateMatch } = require('./timeScope');
+const { scopedTimeMatch, scopedEstimateMatch, hiddenListsOf } = require('./timeScope');
 const { toObjectIds, companyWideMatch } = require('../../Tasks/helpers/taskQueryGuard');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { dbCollections } = require('../../../Config/collections');
@@ -18,11 +18,22 @@ class TimesheetQueryRefused extends Error {
     }
 }
 
+const LIST_FIELD_OF_JOINABLE = Object.freeze({ [dbCollections.TASKS]: 'sprintId', [dbCollections.SPRINTS]: '_id' });
+
 /* Tasks, folders and sprints store the project as an ObjectId, and an aggregate never casts. A join into tasks
- * also leaves out a conversation the caller is not in, which is stored among them. */
-const inVisibleProjects = (from, field, scope) => ({
-    $match: { [field]: { $in: [...toObjectIds(scope.visible), ...scope.visible] }, ...(from === dbCollections.TASKS ? withoutConversationsOfOthers(scope.uid) : {}) },
-});
+ * also leaves out a conversation the caller is not in, which is stored among them, and a join into tasks or
+ * lists the private lists they are not on. */
+const inVisibleProjects = (from, field, scope) => {
+    if (!scope.hiddenLists) throw new TimesheetQueryRefused(`A join into ${from} cannot be scoped for this request.`);
+    const { hiddenLists } = scope;
+    return {
+        $match: {
+            [field]: { $in: [...toObjectIds(scope.visible), ...scope.visible] },
+            ...(hiddenLists.length && LIST_FIELD_OF_JOINABLE[from] ? { [LIST_FIELD_OF_JOINABLE[from]]: { $nin: idForms(hiddenLists) } } : {}),
+            ...(from === dbCollections.TASKS ? withoutConversationsOfOthers(scope.uid) : {}),
+        },
+    };
+};
 
 const matchStages = (match) => (Object.keys(match).length ? [{ $match: match }] : []);
 
@@ -115,11 +126,15 @@ const mentions = (value, key) => (Array.isArray(value)
 
 const NO_PRIVATE_WORK = Object.freeze({ uid: '', personalLists: [], directSpaces: [], myChats: [] });
 
-/* `build(scope)` turns the request into its pipeline. What a company-wide caller's joins are narrowed
- * with is read only when the query has a join, and only after a first pass has refused what it must,
- * so a refused query reads nothing. */
+/* `build(scope)` turns the request into its pipeline. What a caller's joins are narrowed with, the private lists
+ * a member is not on or an owner's or admin's exclusions, is read only when the query has a join, and only after
+ * a first pass has refused what it must, so a refused query reads nothing. */
 const withJoinScope = async (companyId, scope, query, build) => {
-    if (!scope.companyWide || !mentions(query, '$lookup')) return build(scope);
+    if (!mentions(query, '$lookup')) return build(scope);
+    if (!scope.companyWide) {
+        build({ ...scope, hiddenLists: [] });
+        return build({ ...scope, hiddenLists: await hiddenListsOf(companyId, scope) });
+    }
     build({ ...scope, privateWork: NO_PRIVATE_WORK });
     return build({ ...scope, privateWork: await privateWorkOf(companyId, scope.uid) });
 };

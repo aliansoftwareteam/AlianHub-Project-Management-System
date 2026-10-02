@@ -5,7 +5,7 @@ const logger = require("../../Config/loggerConfig");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { validateReactionInput, reactionToggle } = require('./helpers/reactionRules');
 const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
-const { canChangeComment } = require('../Comments/helpers/threadWriteAccess');
+const { canChangeComment, liveModuleOf } = require('../Comments/helpers/threadWriteAccess');
 
 const canReadTarget = async (companyId, uid, targetType, doc) => (targetType === 'task'
     ? canReadTask(companyId, uid, doc)
@@ -19,13 +19,13 @@ const canReadTarget = async (companyId, uid, targetType, doc) => (targetType ===
 
 /**
  * POST /api/v2/reactions
- * body: { targetType: 'task'|'comment', targetId, emoji, isProjectComment? }
+ * body: { targetType: 'task'|'comment', targetId, emoji }
  * The reactor is the authenticated caller, and the target must be one they can read.
  */
 exports.toggleReaction = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const { targetType, targetId, emoji, isProjectComment = false } = req.body || {};
+        const { targetType, targetId, emoji } = req.body || {};
         const userId = String(req.uid || '');
 
         const check = validateReactionInput({ companyId, targetType, targetId, emoji, userId });
@@ -57,7 +57,7 @@ exports.toggleReaction = async (req, res) => {
         if (targetType === 'task') {
             socketEmitter.emit('update', { type: "update", data: updated, updatedFields, module: 'task', companyId });
         } else {
-            socketEmitter.emit('update', { type: "update", data: updated, updatedFields, module: isProjectComment ? 'comments_project' : 'comments', companyId });
+            socketEmitter.emit('update', { type: "update", data: updated, updatedFields, module: liveModuleOf(doc), companyId });
         }
 
         return res.send({

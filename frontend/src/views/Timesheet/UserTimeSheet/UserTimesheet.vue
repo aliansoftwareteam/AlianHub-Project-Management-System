@@ -29,7 +29,7 @@
             </span>
             <span v-else-if="liveSession" class="ah-chip ah-chip--ok ut2-timer" :title="$t('Time.running_desktop')">
                 <span class="ah-dot ah-dot--ok"></span>
-                <span class="ut2-timer__task">{{ liveSession.taskName }}</span>
+                <span class="ut2-timer__task">{{ liveSession.taskName || $t('Time.task_not_open') }}</span>
             </span>
             <select v-if="isEveryone" v-model="personId" class="tv-select" :title="$t('Time.me')">
                 <option value="">{{ $t('Time.me') }}</option>
@@ -77,7 +77,7 @@
             <div v-for="row in displayRows" :key="row.taskId" class="ut2-row">
                 <div class="ut2-task">
                     <span class="tv-sq" :style="{ background: row.projectColor || 'var(--brand)' }"></span>
-                    <span class="ut2-task__name" :title="row.projectName || ''">{{ row.taskName || row.taskId }}</span>
+                    <span class="ut2-task__name" :title="row.projectName || ''">{{ row.taskName || $t('Time.task_not_open') }}</span>
                     <button
                         type="button"
                         class="ut2-bill"
@@ -263,7 +263,7 @@ const underHint = computed(() => {
         : t('Time.under_capacity_many', { days: `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`, h: formatHm(gap) });
     return { text, day: list[list.length - 1].date, minutes: list[list.length - 1].gapMinutes };
 });
-const recentTasks = computed(() => rows.value.map((r) => ({ taskId: r.taskId, taskName: r.taskName, projectId: r.projectId, projectName: r.projectName, sprintId: r.sprintId, projectColor: r.projectColor })));
+const recentTasks = computed(() => rows.value.filter((r) => r.taskName).map((r) => ({ taskId: r.taskId, taskName: r.taskName, projectId: r.projectId, projectName: r.projectName, sprintId: r.sprintId, projectColor: r.projectColor })));
 
 const load = async () => {
     loading.value = true;

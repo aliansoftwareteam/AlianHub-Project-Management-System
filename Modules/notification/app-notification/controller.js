@@ -2,10 +2,10 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { Notification_key } = require("../../../Config/notificationKey.js");
 const mongoose = require("mongoose")
-const { mentionsKeptFromAgent, noticesKeptFromAgent, withoutKept } = require("../../Comments/helpers/agentChatRows");
+const { mentionsKeptFromReader, noticesKeptFromReader, withoutKept } = require("../../Comments/helpers/readerRows");
 
-/* What an agent's request leaves alone among the notices or the mentions of the person. */
-const rowsKeptFromAgent = (req, userId, ofNotices) => (ofNotices ? noticesKeptFromAgent : mentionsKeptFromAgent)(req.headers['companyid'], userId);
+/* The notices or the mentions of the person that a request leaves alone: those of a thread they cannot open. */
+const rowsKept = (req, userId, ofNotices) => (ofNotices ? noticesKeptFromReader : mentionsKeptFromReader)(req.headers['companyid'], userId);
 
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 
@@ -50,7 +50,7 @@ exports.getMentionsMessages = async (req, res) => {
         const params = {
             type: SCHEMA_TYPE.MENTIONS,
             data: [
-                withoutKept(query, await mentionsKeptFromAgent(req.headers['companyid'], userId)),
+                withoutKept(query, await rowsKept(req, userId, false)),
                 {},
                 options
             ]
@@ -102,7 +102,7 @@ exports.getNotificationMessages = async (req, res) => {
         }
 
         const query = [
-            { $match: withoutKept({ $and: baseMatch }, await noticesKeptFromAgent(req.headers['companyid'], userId)) },
+            { $match: withoutKept({ $and: baseMatch }, await rowsKept(req, userId, true)) },
             { $sort: { createdAt: -1, _id: 1 } },
             { $skip: loadMore ? skip : 0 },
             { $limit: limit },
@@ -149,7 +149,7 @@ exports.updateMarkRead = async (req, res) => {
 
         const query = {
             type: isNotification ? SCHEMA_TYPE.NOTIFICATIONS : SCHEMA_TYPE.MENTIONS,
-            data: [withoutKept(filter, await rowsKeptFromAgent(req, userId, isNotification)), update],
+            data: [withoutKept(filter, await rowsKept(req, userId, isNotification)), update],
         };
 
         const response = await MongoDbCrudOpration(req.headers['companyid'], query, 'updateOne');
@@ -203,7 +203,7 @@ exports.updateMarkAllRead = async (req, res) => {
 
         const query = {
             type: key === 'notifications' ? SCHEMA_TYPE.NOTIFICATIONS : SCHEMA_TYPE.MENTIONS,
-            data: [withoutKept(params[0], await rowsKeptFromAgent(req, userId, key === 'notifications')), params[1]],
+            data: [withoutKept(params[0], await rowsKept(req, userId, key === 'notifications')), params[1]],
         };
 
         const response = await MongoDbCrudOpration(req.headers['companyid'], query, 'updateMany');

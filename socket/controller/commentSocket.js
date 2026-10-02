@@ -9,6 +9,7 @@ const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
 const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments, pageCommentRoomOf, readablePage, mayReceiveComments, inOrder } = require('../roomAccess');
 const { THREAD_MODULE } = require('../../Modules/Comments/helpers/chatThreads');
+const { liveModuleOf } = require('../../Modules/Comments/helpers/threadWriteAccess');
 
 exports.commentSocketHandler = ({ socket, namespace }) => {
     onJoin(socket, 'joinCommentRoom',
@@ -72,9 +73,11 @@ function setEventName(type) {
     }
 }
 
+/* The project's own room hears only a comment stored on the project itself. */
 const prefixOf = ({ module, data }) => {
-    if (module === 'comments' || module === THREAD_MODULE) return `comments_${data.projectId}_${data.sprintId}_${data.taskId}`;
-    if (module === 'comments_project') return `comments_project_${data.projectId}`;
+    const ofThread = `comments_${data.projectId}_${data.sprintId}_${data.taskId}`;
+    if (module === 'comments' || module === THREAD_MODULE) return ofThread;
+    if (module === 'comments_project') return liveModuleOf(data) === 'comments_project' ? `comments_project_${data.projectId}` : ofThread;
     return null;
 };
 

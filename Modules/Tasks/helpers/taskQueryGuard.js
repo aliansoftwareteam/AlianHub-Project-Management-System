@@ -172,7 +172,38 @@ const visibilityStage = async (companyId, uid) => {
     return { $match: { ProjectID: { $in: projects }, ...(hidden.length ? { sprintId: { $nin: hidden } } : {}), ...withoutConversationsOfOthers(uid) } };
 };
 
+/* A join reads another collection, which the stage put in front of the pipeline does not cover, and the field it
+ * joins on is whatever the stages before it left there. So each join starts with what the caller can open of the
+ * collection it reads: their projects, and of those the lists they see. */
+const joinScope = async (companyId, uid) => {
+    const privileged = isPrivileged(await getRoleType(companyId, uid));
+    if (privileged && !narrowingFor(uid)) {
+        const personal = idForms(await othersPersonalListIds(companyId, uid));
+        const outside = (field) => (personal.length ? { [field]: { $nin: personal } } : {});
+        return { [dbCollections.PROJECTS]: outside('_id'), [dbCollections.SPRINTS]: outside('projectId'), [dbCollections.FOLDERS]: outside('projectId') };
+    }
+    const open = await visibleProjectIds(companyId, uid);
+    const hidden = privileged ? [] : await hiddenSprintIds(companyId, uid, open);
+    return {
+        [dbCollections.PROJECTS]: { _id: { $in: idForms(open) } },
+        [dbCollections.SPRINTS]: { projectId: { $in: idForms(open) }, ...(hidden.length ? { _id: { $nin: hidden } } : {}) },
+        [dbCollections.FOLDERS]: { projectId: { $in: idForms(open) } },
+    };
+};
+
+const namesJoin = (stages) => stages.some((stage) => isPlainObject(stage) && isPlainObject(stage.$lookup));
+
+/* `stages` as validatePipeline answered them, each join narrowed to what `uid` can open. Nothing is read for a query without one. */
+const withScopedJoins = async (companyId, uid, stages) => {
+    if (!namesJoin(stages)) return stages;
+    const scope = await joinScope(companyId, uid);
+    return stages.map((stage) => (isPlainObject(stage.$lookup)
+        ? { $lookup: { ...stage.$lookup, pipeline: [{ $match: scope[stage.$lookup.from] }, ...(stage.$lookup.pipeline || [])] } }
+        : stage));
+};
+
 module.exports = {
+    withScopedJoins,
     MAX_LIMIT,
     TOP_LEVEL_STAGES,
     SUB_PIPELINE_STAGES,

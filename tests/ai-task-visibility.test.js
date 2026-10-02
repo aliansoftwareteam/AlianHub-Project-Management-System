@@ -9,6 +9,7 @@ jest.mock('../Modules/AICore/llmProvider', () => ({
     getProvider: () => ({ name: 'fake', chat: (...a) => mockChat(...a) }),
 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskReadAccess', () => require('./fixtures/taskReadByProject').taskReadByProject());
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { myCache } = require('../Config/config');

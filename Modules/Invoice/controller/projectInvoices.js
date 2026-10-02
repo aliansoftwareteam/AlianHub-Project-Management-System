@@ -10,6 +10,8 @@ const { recordAuditFromReq } = require('../../Audit/recorder');
 const { resolveRate } = require('../../TimeSheet/helpers/billingRules');
 const math = require('../../Milestone/helpers/billingMath');
 const billing = require('../../Milestone/controller/billing');
+const { openTasksById } = require('../../Tasks/helpers/openNames');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 
 // Client invoices raised against a project (handoff 19c).
 //
@@ -167,16 +169,12 @@ exports.getInvoice = async (req, res) => {
 
         const taskIds = [...new Set((invoice.lines || []).flatMap((l) => l.taskIds || []).map(String))];
         const timelogIds = [...new Set((invoice.lines || []).flatMap((l) => l.timelogIds || []).map(String))];
-        const [tasks, timelogs] = await Promise.all([
-            taskIds.length ? MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.TASKS,
-                data: [{ _id: { $in: taskIds } }, '_id TaskKey TaskName statusType'],
-            }, 'find') : [],
-            timelogIds.length ? MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.TIMESHEET,
-                data: [{ _id: { $in: timelogIds } }, '_id TicketID Loggeduser LogTimeDuration LogStartTime LogDescription'],
-            }, 'find') : [],
-        ]);
+        /* A line names its time rows by id: the rows read are those of the invoice's own project. */
+        const timelogs = timelogIds.length ? await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TIMESHEET,
+            data: [{ _id: { $in: timelogIds }, ProjectId: { $in: idForms(String(invoice.ProjectID)) } }, '_id TicketID Loggeduser LogTimeDuration LogStartTime LogDescription'],
+        }, 'find') : [];
+        const openTasks = await openTasksById(companyId, req.uid, [...taskIds, ...(timelogs || []).map((l) => l.TicketID)], { TaskKey: 1, TaskName: 1, statusType: 1 });
         const names = await billing.resolveUserNames(companyId, (timelogs || []).map((l) => String(l.Loggeduser)));
 
         return res.send({
@@ -185,14 +183,16 @@ exports.getInvoice = async (req, res) => {
             data: {
                 invoice,
                 trace: {
-                    tasks: (tasks || []).map((t) => ({ _id: String(t._id), key: t.TaskKey || '', name: t.TaskName || '', done: String(t.statusType || '') === billing.DONE_STATUS_TYPE })),
+                    tasks: taskIds.map((taskId) => (openTasks[taskId]
+                        ? { _id: taskId, key: openTasks[taskId].TaskKey || '', name: openTasks[taskId].TaskName || '', done: String(openTasks[taskId].statusType || '') === billing.DONE_STATUS_TYPE }
+                        : { _id: taskId, key: '', name: '', done: false, hidden: true })),
                     timelogs: (timelogs || []).map((l) => ({
                         _id: String(l._id),
                         taskId: String(l.TicketID || ''),
                         userName: names.get(String(l.Loggeduser)) || '',
                         minutes: Number(l.LogTimeDuration) || 0,
                         at: Number(l.LogStartTime) || 0,
-                        note: String(l.LogDescription || '').slice(0, 200),
+                        note: openTasks[String(l.TicketID || '')] ? String(l.LogDescription || '').slice(0, 200) : '',
                     })),
                 },
             },

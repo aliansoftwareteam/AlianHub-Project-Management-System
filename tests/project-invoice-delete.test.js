@@ -44,7 +44,7 @@ describe('TIM-06 DELETE /api/v2/invoices/:id', () => {
     it('is registered', () => {
         const app = { get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() };
         routes.init(app);
-        expect(app.delete).toHaveBeenCalledWith('/api/v2/invoices/:id', ctrl.deleteInvoice);
+        expect(app.delete).toHaveBeenCalledWith('/api/v2/invoices/:id', expect.any(Function), ctrl.deleteInvoice);
     });
 
     it('soft-deletes a draft for an owner, clears the cache, emits and audits', async () => {

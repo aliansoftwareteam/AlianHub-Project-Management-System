@@ -3,6 +3,9 @@ const { getRoleType, isPrivileged, evaluatePermission } = require('../../../Conf
 const { visibleProjectIds } = require('../../Agents/scope');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { othersPersonalListIds } = require('../../PersonalList/ownership');
+const { hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
+const { SCHEMA_TYPE } = require('../../../Config/schemaType');
+const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 
 const SCOPE_COMPANY = 'company';
 const SCOPE_SELF = 'self';
@@ -68,8 +71,33 @@ const resolveSheetScope = async (companyId, uid, permissionKeys) => {
         const keys = Array.isArray(permissionKeys) ? permissionKeys : [permissionKeys];
         everyone = (await Promise.all(keys.map((key) => grantsEveryone(companyId, uid, key)))).some(Boolean);
     }
-    return { ...scope, everyone, visible: await visibleProjectsFor(companyId, scope) };
+    const visible = await visibleProjectsFor(companyId, scope);
+    const reading = { ...scope, everyone, visible };
+    return everyone && !scope.companyWide ? readingEveryone(companyId, reading) : reading;
 };
+
+/* The private lists of the projects a scope reads that its person is not on. An owner or admin reads past them. */
+const hiddenListsOf = async (companyId, scope) => {
+    if (scope.hiddenLists) return scope.hiddenLists;
+    return scope.companyWide || !scope.visible ? [] : hiddenSprintIds(companyId, scope.uid, scope.visible);
+};
+
+/* `scope` as it reads other people's rows: with the tasks it leaves theirs out for. Asked only by a read that
+ * shows everyone's time or plans; a person reading their own needs none of it. */
+const readingEveryone = async (companyId, scope) => {
+    const hiddenLists = await hiddenListsOf(companyId, scope);
+    return { ...scope, everyone: true, hiddenLists, closedTasks: await tasksOf(companyId, hiddenLists) };
+};
+
+/* The tasks of the private lists a person is not on. Their time and plans are their people's: someone who reads
+ * everyone's time in a project reads, of those tasks, only what they logged or planned themselves. */
+const tasksOf = async (companyId, listIds) => {
+    if (!listIds.length) return [];
+    const tasks = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ sprintId: { $in: listIds } }, { _id: 1 }] }, 'find');
+    return (tasks || []).map((task) => String(task._id));
+};
+
+const closedTasksOf = (scope) => (scope && scope.everyone && scope.closedTasks) || [];
 
 /* userIds and projectIds are the filters the client asked for; null means none. A project id
  * is matched in both stored forms until every time row holds it as an ObjectId (task 040). */
@@ -84,6 +112,7 @@ const scopedTimeMatch = (scope, { userIds = null, projectIds = null } = {}) => {
     } else {
         Object.assign(match, withoutHidden(scope));
     }
+    if (closedTasksOf(scope).length) match.$or = [{ Loggeduser: scope.uid }, { TicketID: { $nin: idForms(closedTasksOf(scope)) } }];
     return match;
 };
 
@@ -94,6 +123,7 @@ const scopedEstimateMatch = (scope) => {
     if (!scope.everyone) match.$or = [{ UserId: scope.uid }, { UserId: { $exists: false }, userId: scope.uid }];
     if (scope.visible && (scope.everyone || scope.roleType === null)) match.ProjectId = { $in: idForms(scope.visible) };
     else Object.assign(match, withoutHidden(scope));
+    if (closedTasksOf(scope).length) match.$or = [{ UserId: scope.uid }, { TaskId: { $nin: idForms(closedTasksOf(scope)) } }];
     return match;
 };
 
@@ -107,6 +137,8 @@ module.exports = {
     resolveTimeScope,
     visibleProjectsFor,
     resolveSheetScope,
+    hiddenListsOf,
+    readingEveryone,
     scopedTimeMatch,
     scopedEstimateMatch,
     withoutHidden,

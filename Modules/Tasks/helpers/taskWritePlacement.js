@@ -5,7 +5,7 @@ const { canReadProject } = require('../../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprintById } = require('../../Sprints/helpers/sprintVisibility');
 const { sprintPlacementOf } = require('./sprintPlacement');
-const { canReadTask } = require('./taskReadAccess');
+const { readableTasks } = require('./taskReadAccess');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TASK_ACCESS_FIELDS = Object.freeze({ ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 });
@@ -51,19 +51,7 @@ const readableTaskIds = async (companyId, uid, taskIds) => {
     const ids = [...new Set((taskIds || []).map(idOf))].filter((id) => OBJECT_ID.test(id));
     if (!ids.length) return [];
     const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: ids.map(oid) } }, TASK_ACCESS_FIELDS] }, 'find') || [];
-    const verdicts = new Map();
-    const readable = (row) => {
-        const place = `${idOf(row.ProjectID)}|${idOf(row.sprintId)}`;
-        if (!verdicts.has(place)) {
-            verdicts.set(place, canReadProject(companyId, uid, idOf(row.ProjectID)).then((project) => project.allowed === true && canReadTask(companyId, uid, row)));
-        }
-        return verdicts.get(place);
-    };
-    const kept = [];
-    for (const row of rows) {
-        if (row.mainChat !== true && await readable(row)) kept.push(idOf(row._id));
-    }
-    return kept;
+    return (await readableTasks(companyId, uid, rows.filter((row) => row.mainChat !== true))).map((row) => idOf(row._id));
 };
 
 const flatStatus = (row) => (row && row.convertStatus ? row.convertStatus : row);
