@@ -8,7 +8,11 @@ jest.mock('../utils/mongo-handler/mongoQueries', () => ({
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
-jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
+let mockShownNoTasks = [];
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => {
+    const held = require('./fixtures/taskListRules').taskListHeldEverywhere();
+    return { ...held, keepTaskListProjectIds: async (companyId, uid, projectIds) => (mockShownNoTasks.includes(String(uid)) ? [] : held.keepTaskListProjectIds(companyId, uid, projectIds)) };
+});
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 
@@ -45,6 +49,7 @@ const CHAT = 'e00000000000000000000003';
 const P1 = 'e00000000000000000000004';
 const K1 = 'e00000000000000000000005';
 const S1 = 'e00000000000000000000006';
+const S2 = 'e00000000000000000000007';
 const MARKUP = '<img src=x onerror=alert(1)> & "launch" </script>';
 
 const routes = (() => {
@@ -87,6 +92,7 @@ const seedRules = () => {
 beforeEach(() => {
     myCache.flushAll();
     jest.clearAllMocks();
+    mockShownNoTasks = [];
     mockDb = fakeMongo.create();
     [[OWNER, 1], [ADMIN, 2], [MEMBER, MEMBER_ROLE], [TEAMMATE, MEMBER_ROLE], [WATCHER, WATCHER_ROLE]].forEach(([userId, roleType]) => {
         mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false });
@@ -106,6 +112,7 @@ beforeEach(() => {
     seedTask(P1, OPEN, PRIVATE_LIST, { TaskName: 'Private plan' });
     seedTask(K1, CLOSED, CLOSED_LIST, { TaskName: 'Closed plan' });
     seedTask(S1, PERSONAL, PERSONAL_LIST, { TaskName: 'My errand' });
+    seedTask(S2, OPEN, LIST, { TaskName: 'Staffing plan' });
 });
 
 describe('a board is read through its list', () => {
@@ -222,26 +229,35 @@ describe('who may open a board', () => {
 
 describe('a card and the task behind it', () => {
     it('gives a viewer who may not open the task the card\'s place and nothing of the task', async () => {
-        await save(MEMBER, [OPEN, LIST], { baseRevision: 0, upsert: [card('a', T2), card('c', CHAT, 70, 80)] });
+        await save(MEMBER, [OPEN, LIST], { baseRevision: 0, upsert: [card('a', T2), card('c', S2, 70, 80)] });
         const mine = (await read(MEMBER, [OPEN, LIST])).body.data.elements;
-        expect(mine[1]).toEqual({ id: 'c', type: 'task', taskId: CHAT, x: 70, y: 80, z: 0, title: 'Between two people', taskKey: 'AP-3' });
-        for (const uid of [TEAMMATE, OWNER, ADMIN]) {
-            const res = await read(uid, [OPEN, LIST]);
-            expect(res.body.data.elements[1]).toEqual({ id: 'c', type: 'task', x: 70, y: 80, z: 0, withheld: true });
-            expect(JSON.stringify(res.body)).not.toContain('Between two people');
-            expect(JSON.stringify(res.body)).not.toContain(CHAT);
-        }
+        expect(mine[1]).toEqual({ id: 'c', type: 'task', taskId: S2, x: 70, y: 80, z: 0, title: 'Staffing plan', taskKey: 'AP-7' });
+        mockShownNoTasks = [TEAMMATE];
+        const res = await read(TEAMMATE, [OPEN, LIST]);
+        expect(res.body.data.elements[1]).toEqual({ id: 'c', type: 'task', x: 70, y: 80, z: 0, withheld: true });
+        expect(JSON.stringify(res.body)).not.toContain('Staffing plan');
+        expect(JSON.stringify(res.body)).not.toContain(S2);
     });
 
     it('gives the same to that viewer in the answer to their own save, and in a conflict', async () => {
-        await save(MEMBER, [OPEN, LIST], { baseRevision: 0, upsert: [card('a', T2), card('c', CHAT)] });
+        await save(MEMBER, [OPEN, LIST], { baseRevision: 0, upsert: [card('a', T2), card('c', S2)] });
+        mockShownNoTasks = [TEAMMATE];
         const moved = await save(TEAMMATE, [OPEN, LIST], { baseRevision: 1, upsert: [card('a', T2, 300, 300)] });
         const stale = await save(TEAMMATE, [OPEN, LIST], { baseRevision: 1, upsert: [card('a', T2, 400, 400)] });
         expect([moved.statusCode, stale.statusCode]).toEqual([200, 409]);
         [moved, stale].forEach((res) => {
             expect(res.body.data.elements[1]).toEqual({ id: 'c', type: 'task', x: 10, y: 20, z: 0, withheld: true });
-            expect(JSON.stringify(res.body)).not.toContain('Between two people');
+            expect(JSON.stringify(res.body)).not.toContain('Staffing plan');
         });
+    });
+
+    it('holds no card for a conversation, for the people in it or anyone else', async () => {
+        for (const uid of [MEMBER, TEAMMATE, OWNER, ADMIN]) {
+            const res = await save(uid, [OPEN, LIST], { baseRevision: 0, upsert: [card('c', CHAT)] });
+            expect(res.body.data.elements).toEqual([]);
+            expect(JSON.stringify(res.body)).not.toContain('Between two people');
+        }
+        expect(boards()).toEqual([]);
     });
 
     it('leaves out a new card for a task the writer may not open, or one outside the list, with one answer', async () => {
