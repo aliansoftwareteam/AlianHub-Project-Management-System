@@ -68,7 +68,7 @@
 }
 
 /* The small modals the AI pages open (agent wizard, run-on-task picker). */
-.aw-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 70; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.aw-backdrop { position: fixed; inset: 0; background: var(--scrim); z-index: 70; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .aw { width: 560px; max-width: 100%; max-height: 86dvh; display: flex; flex-direction: column; border-radius: var(--r-modal); box-shadow: var(--shadow-modal); }
 .aw__head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--hairline); }
 .aw__head .ah-btn { margin-left: auto; }

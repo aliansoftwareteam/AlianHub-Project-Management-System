@@ -207,8 +207,29 @@ const mayReceiveComments = (identity, change, prefix) => {
 const mayReceiveList = (identity, change) => sameCompany(identity, change)
     && stillAllowed(identity, `list:${change.projectId}:${change.sprintId}`, () => canOpenSprintBoard(identity, change.projectId, change.sprintId));
 
+const projectSubject = (projectId) => `project:${projectId}`;
+
+/* The answer GET /api/v1/project/:id gives this person. */
+const mayReceiveProject = (identity, change, projectId) => sameCompany(identity, change) && isId(projectId)
+    && stillAllowed(identity, projectSubject(projectId), async () => (await canReadProject(identity.companyId, identity.uid, String(projectId))).allowed);
+
+/* The rule GET /api/v1/project/sprintFolder/:id lists by: a private list is its people's, their teams', the
+ * owners' and the admins'. `list` is the stored row, or how it was shared before a change. */
+const seesList = async (identity, list) => (await isPrivilegedHere(identity))
+    || canSeeSprint(list, await sprintIdentities(identity.companyId, identity.uid));
+
+/* A change to who may open a project is told to the people it lets in, so the answers kept from before it are dropped. */
+const forgetProjectVerdicts = (companyId, projectId) => {
+    const company = `${companyId}:`;
+    const subject = `:${projectSubject(projectId)}`;
+    [...verdicts.keys()].filter((key) => key.startsWith(company) && key.endsWith(subject)).forEach((key) => verdicts.delete(key));
+};
+
 const mayReceiveCompany = (identity, companyId) => Boolean(identity) && identity.companyId === String(companyId || '')
     && stillAllowed(identity, 'seat', () => isCompanyMember(identity, identity.companyId));
+
+/* Owners and admins read a whole company row over HTTP; everyone else reads its member fields. */
+const readsWholeCompany = (identity) => stillAllowed(identity, 'company-row', () => isPrivilegedHere(identity));
 
 /* A send waits for its verdict, so sends go out one after another: two changes to a row reach a room in the
  * order they were made. */
@@ -229,7 +250,8 @@ const toSeated = (rooms, companyId, send) => {
         for (const entry of rooms) {
             // eslint-disable-next-line no-await-in-loop
             if (!entry.socket || !(await mayReceiveCompany(entry.socket.identity, id))) continue;
-            if (entry.socket.rooms.has(entry.roomName)) send(entry);
+            // eslint-disable-next-line no-await-in-loop
+            if (entry.socket.rooms.has(entry.roomName)) await send(entry);
         }
     });
 };
@@ -257,7 +279,11 @@ module.exports = {
     mayReceiveTask,
     mayReceiveComments,
     mayReceiveList,
+    mayReceiveProject,
+    seesList,
+    forgetProjectVerdicts,
     mayReceiveCompany,
+    readsWholeCompany,
     toSeated,
     toCompanyRoom,
     COMPANY_ROOM,

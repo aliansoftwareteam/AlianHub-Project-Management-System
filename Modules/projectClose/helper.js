@@ -179,7 +179,7 @@ async function closeOneProject(companyId, project, inactiveMonths) {
     });
 
     socketEmitter.emit('update', {
-        type: 'update', data: updated, updatedFields: { status: closeStatus.value, statusType: 'close' }, module: 'project',
+        type: 'update', companyId: String(companyId), data: updated, updatedFields: { status: closeStatus.value, statusType: 'close' }, module: 'project',
     });
 
     if (HandleHistory) {

@@ -21,7 +21,7 @@ const pto = require('../Modules/Pto/controller');
 const { requireMovedTaskFields } = require('../Modules/TimeSheet/helpers/planMoveAccess');
 const world = require('./fixtures/accessWorld');
 
-const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, P_OPEN, P_PRIVATE, P_PERSONAL, settle } = world;
+const { CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, P_OPEN, P_PRIVATE, P_PERSONAL, OPENS, settle } = world;
 const { seed, rows, task, setRule } = world.create(mockDb);
 
 const DAY = '2026-09-02';
@@ -115,6 +115,30 @@ describe('moving planned work to another day', () => {
 
         expect((await through(MOVE, session(uid), toNextDay(uid, taskId))).code).toBe(404);
         expect(snapshot()).toBe(before);
+    });
+
+    it.each(['off', 'enforce'].flatMap((mode) => [
+        ['an owner', OWNER],
+        ['an admin', ADMIN],
+        ['a member on the private work', INSIDER],
+        ['a member outside it', OUTSIDER],
+        ['a guest', GUEST],
+    ].map(([label, uid]) => [label, mode, uid])))('moves the own plan of %s, with permission enforcement %s, only on a task that person can open', async (label, mode, uid) => {
+        process.env.PERMISSION_ENFORCEMENT_MODE = mode;
+
+        for (const taskId of [T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL]) {
+            if (!planOf(uid, taskId)) plan(uid, taskId, String(task(taskId).ProjectID));
+            const before = snapshot();
+
+            const answer = await through(MOVE, session(uid), toNextDay(uid, taskId));
+
+            if (OPENS[uid].includes(taskId)) {
+                expect([taskId, answer.code, dayOf(planOf(uid, taskId))]).toEqual([taskId, 200, NEXT_DAY]);
+            } else {
+                expect([taskId, answer.code]).toEqual([taskId, 404]);
+                expect(snapshot()).toBe(before);
+            }
+        }
     });
 });
 

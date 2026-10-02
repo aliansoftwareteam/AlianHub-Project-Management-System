@@ -94,6 +94,8 @@ import { warmWorkspaceChunks } from '@/config/warmChunks';
 import {socketHelper} from './composable/socketHelper';
 import { useFieldDefinitionsSync } from '@/plugins/customFieldView/fieldDefinitionsSync';
 import { useAgentChangeNotice } from '@/views/Ai/agentChangeNotice';
+import { useLiveProjects } from '@/views/Projects/liveProjects';
+import { useLiveLists } from '@/views/Projects/liveLists';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import { initOffline } from '@/offline';
@@ -699,6 +701,8 @@ provide("$mainTour", mainTour);
 provide("$socket",socket);
 useFieldDefinitionsSync(socket);
 useAgentChangeNotice(socket, companyId);
+useLiveProjects(socket, companyId);
+useLiveLists(socket, companyId);
 
 </script>
 

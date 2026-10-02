@@ -21,6 +21,7 @@
             <label class="time-reminder-switch" :class="{ disabled: isBusy }">
                 <input
                     type="checkbox"
+                    :aria-label="$t('TimeReminder.toggle_label')"
                     :checked="settings.enabled"
                     :disabled="isBusy"
                     @change="onToggle($event.target.checked)"
@@ -227,12 +228,12 @@ watch(
     padding: 20px;
     background: var(--surface);
     color: var(--ink);
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 10px;
 }
 .time-reminder-subtitle {
     margin: 4px 0 16px 0;
-    color: #6b7280;
+    color: var(--ink-2);
     font-size: 13px;
     line-height: 1.5;
 }
@@ -241,7 +242,7 @@ watch(
     justify-content: space-between;
     align-items: center;
     padding: 12px 0;
-    border-top: 1px solid #f3f4f6;
+    border-top: 1px solid var(--hairline);
 }
 .time-reminder-row-label {
     display: flex;
@@ -250,12 +251,12 @@ watch(
     max-width: 70%;
 }
 .time-reminder-row-hint {
-    color: #6b7280;
+    color: var(--ink-2);
     font-size: 12px;
 }
 .time-reminder-recipients {
     padding-top: 8px;
-    border-top: 1px solid #f3f4f6;
+    border-top: 1px solid var(--hairline);
 }
 .time-reminder-recipients-head {
     display: flex;
@@ -268,7 +269,7 @@ watch(
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: #4b5563;
+    color: var(--ink-2);
     cursor: pointer;
     white-space: nowrap;
 }
@@ -281,20 +282,20 @@ watch(
 .time-reminder-search-input {
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px 12px;
     font-size: 13px;
-    color: #111827;
+    color: var(--ink);
     outline: none;
 }
 .time-reminder-search-input:focus {
-    border-color: #4f46e5;
+    border-color: var(--brand);
 }
 .time-reminder-list {
     max-height: 260px;
     overflow-y: auto;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 8px;
 }
 .time-reminder-list-item {
@@ -302,7 +303,7 @@ watch(
     align-items: center;
     gap: 10px;
     padding: 10px 12px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--hairline);
     cursor: pointer;
     margin: 0;
 }
@@ -320,15 +321,15 @@ watch(
 }
 .time-reminder-member-name {
     font-size: 13px;
-    color: #111827;
+    color: var(--ink);
 }
 .time-reminder-member-email {
     font-size: 11px;
-    color: #6b7280;
+    color: var(--ink-2);
 }
 .time-reminder-empty {
     margin: 12px 0;
-    color: #6b7280;
+    color: var(--ink-2);
     font-size: 13px;
 }
 .time-reminder-actions {
@@ -339,11 +340,11 @@ watch(
 }
 .time-reminder-count {
     font-size: 12px;
-    color: #4b5563;
+    color: var(--ink-2);
 }
 .time-reminder-save-btn {
-    background: #4f46e5;
-    color: #fff;
+    background: var(--brand);
+    color: var(--on-brand);
     border-radius: 8px;
     padding: 6px 16px;
     font-size: 13px;
@@ -375,7 +376,7 @@ watch(
 .time-reminder-slider {
     position: absolute;
     inset: 0;
-    background: #d1d5db;
+    background: var(--border);
     border-radius: 24px;
     transition: background 0.15s ease;
 }
@@ -386,12 +387,12 @@ watch(
     height: 18px;
     left: 3px;
     bottom: 3px;
-    background: #fff;
+    background: var(--knob);
     border-radius: 50%;
     transition: transform 0.15s ease;
 }
 .time-reminder-switch input:checked + .time-reminder-slider {
-    background: #4f46e5;
+    background: var(--brand);
 }
 .time-reminder-switch input:checked + .time-reminder-slider::before {
     transform: translateX(20px);

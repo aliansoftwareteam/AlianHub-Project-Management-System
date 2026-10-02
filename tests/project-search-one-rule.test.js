@@ -257,3 +257,82 @@ describe('the archive search follows project and sprint visibility', () => {
         expect(await archived(ADMIN)).toEqual(everythingOf('private', 'public'));
     });
 });
+
+describe('the fields a search returns', () => {
+    const SEARCHED = [
+        ['by project name', { type: 'projectName', search: 'Launch' }],
+        ['by saved filter', { type: 'projectFilter', query: { $and: [] }, sortByField: {} }],
+        ['by saved filter and project name', { type: 'projectFilter_projectName', search: 'Launch', query: { $and: [] }, sortByField: {} }],
+    ];
+
+    beforeEach(() => {
+        seedProject({ isPrivateSpace: false, AssigneeUserId: [], ProjectCode: 'LAU', budget: 9000, taskStatusData: [{ key: 1 }] });
+    });
+
+    it.each(SEARCHED)('%s: are the project id when the caller names none', async (_label, body) => {
+        const [found] = await search(MEMBER, body);
+        expect(Object.keys(found)).toEqual(['_id']);
+    });
+
+    it.each(SEARCHED)('%s: are the id and the name, whatever else the caller names', async (_label, body) => {
+        const [found] = await search(MEMBER, { ...body, fields: 'ProjectName, budget,taskStatusData,AssigneeUserId,$$ROOT,sprints.name' });
+        expect(Object.keys(found).sort()).toEqual(['ProjectName', '_id']);
+        const [forOwner] = await search(OWNER, { ...body, fields: 'ProjectName,budget' });
+        expect(Object.keys(forOwner).sort()).toEqual(['ProjectName', '_id']);
+    });
+
+    it.each(SEARCHED)('%s: are the project id when fields is not text', async (_label, body) => {
+        const [found] = await search(MEMBER, { ...body, fields: { budget: 1 } });
+        expect(Object.keys(found)).toEqual(['_id']);
+    });
+});
+
+describe('a search that joins sprints follows sprint visibility', () => {
+    const JOINED = [
+        ['by sprint name', { type: 'sprint', search: 'Plan' }],
+        ['by folder name', { type: 'folder', search: 'Plan' }],
+        ['by saved filter and sprint name', { type: 'projectFilter_sprint', search: 'Plan', query: { $and: [] }, sortByField: {} }],
+        ['by saved filter and folder name', { type: 'projectFilter_folder', search: 'Plan', query: { $and: [] }, sortByField: {} }],
+    ];
+    const PRIVATE_SPRINT = { name: 'Plan', deletedStatusKey: 0, private: true, AssigneeUserId: [GUEST] };
+    const OPEN_SPRINT = { name: 'Plan', deletedStatusKey: 0 };
+
+    /* The fake has no join by `let`, so the sprint join is read from the pipeline and its plain matches are applied to the row. */
+    const joinsSprint = async (uid, body, sprint) => {
+        const real = mockDb.crud;
+        let pipeline = null;
+        mockDb.crud = (companyId, query, method) => {
+            if (method !== 'aggregate') return real(companyId, query, method);
+            [pipeline] = query.data;
+            return Promise.resolve([]);
+        };
+        try {
+            await search(uid, body);
+        } finally {
+            mockDb.crud = real;
+        }
+        const joins = pipeline.filter((stage) => stage.$lookup && stage.$lookup.from === 'sprints');
+        expect(joins).toHaveLength(1);
+        return joins[0].$lookup.pipeline
+            .filter((stage) => stage.$match && !stage.$match.$expr)
+            .every((stage) => fakeMongo.matches(sprint, stage.$match));
+    };
+
+    it.each(JOINED)('%s: a private sprint is joined for the people it is shared with, and for owners and admins', async (_label, body) => {
+        expect(await joinsSprint(MEMBER, body, PRIVATE_SPRINT)).toBe(false);
+        expect(await joinsSprint(GUEST, body, PRIVATE_SPRINT)).toBe(true);
+        expect(await joinsSprint(OWNER, body, PRIVATE_SPRINT)).toBe(true);
+        expect(await joinsSprint(ADMIN, body, PRIVATE_SPRINT)).toBe(true);
+    });
+
+    it.each(JOINED)('%s: a sprint shared with a team is joined for its members', async (_label, body) => {
+        const sprint = { ...PRIVATE_SPRINT, AssigneeUserId: [`tId_${seedTeamOf(MEMBER)}`] };
+        expect(await joinsSprint(MEMBER, body, sprint)).toBe(true);
+        expect(await joinsSprint(GUEST, body, sprint)).toBe(false);
+    });
+
+    it.each(JOINED)('%s: an open sprint is joined for everyone', async (_label, body) => {
+        expect(await joinsSprint(MEMBER, body, OPEN_SPRINT)).toBe(true);
+        expect(await joinsSprint(GUEST, body, OPEN_SPRINT)).toBe(true);
+    });
+});

@@ -29,7 +29,7 @@ describe('the plain label of an agent action', () => {
     });
 
     it('falls back to the label it was handed for an action with no words yet', () => {
-        expect(agentActionLabel(t, 'tasks.search', 'Search own tasks')).toBe('Search own tasks');
+        expect(agentActionLabel(t, 'something.new', 'Do a new thing')).toBe('Do a new thing');
         expect(agentActionLabel(t, 'something.new', '')).toBe('');
         expect(agentActionLabel(t, '', 'Kept')).toBe('Kept');
     });
@@ -93,9 +93,10 @@ describe('an agent\'s row in the audit log', () => {
         expect(events()[0].classes()).not.toContain('ah-mono');
     });
 
-    it('shows the key for an agent action with no words, and for a person\'s row', async () => {
+    it('words an action that only reads, and a person\'s row, with the key on hover', async () => {
         await open([agentRow('tasks.search'), { _id: 'r2', action: 'member.update', actorId: 'u1', actorName: 'Ada', createdAt: new Date().toISOString(), meta: {} }]);
-        expect(events().map((event) => event.text())).toEqual(['tasks.search', 'member.update']);
-        expect(events().every((event) => event.classes().includes('ah-mono'))).toBe(true);
+        expect(events().map((event) => event.text())).toEqual([en.AgentActions.tasks_search, en.AuditEvents.member_update]);
+        expect(events().map((event) => event.attributes('title'))).toEqual(['tasks.search', 'member.update']);
+        expect(events().some((event) => event.classes().includes('ah-mono'))).toBe(false);
     });
 });

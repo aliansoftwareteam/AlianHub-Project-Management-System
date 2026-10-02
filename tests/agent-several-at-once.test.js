@@ -364,24 +364,26 @@ describe('who may change a project\'s limits for agents', () => {
     it.each([['an owner', OWNER], ['an admin', ADMIN]])('%s changes them, and the change is recorded and announced to the company', async (_who, uid) => {
         const out = await put(uid, { atOnce: 5 });
         expect(out).toMatchObject({ code: 200, body: { status: true, data: { limits: { atOnce: 5, paused: false }, defaults: { atOnce: 3, paused: false }, atOnceRange: { min: 1, max: 20 }, canEdit: true } } });
-        expect(project().agentLimits).toMatchObject({ atOnce: 5, paused: false, updatedBy: uid });
+        expect(project().agentLimits).toMatchObject({ atOnce: 5, updatedBy: uid });
+        expect(project().agentLimits.paused).toBeUndefined();
         expect(changes()).toHaveLength(1);
         expect(changes()[0]).toMatchObject({ actorId: uid, entityType: 'project', entityId: P_OPEN, meta: { from: { agentsAtOnce: 3, agentsPaused: false }, to: { agentsAtOnce: 5, agentsPaused: false } } });
         expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', companyId: CID, updatedFields: { agentLimits: expect.objectContaining({ atOnce: 5 }) } }));
     });
 
-    it('a save tells the company\'s open browsers, which no project event reaches, and names no project', async () => {
+    it('a save is announced once, as a change to the project, and sends no agents signal of its own', async () => {
         await put(OWNER, { paused: true });
-        const told = socketEmitter.emit.mock.calls.filter(([event, change]) => event === 'update' && change.module === 'agent' && change.data.kind === 'limits');
+        const told = socketEmitter.emit.mock.calls.filter(([event, change]) => event === 'update' && change.module === 'project');
         expect(told).toHaveLength(1);
-        expect(told[0][1]).toMatchObject({ type: 'update', companyId: CID, data: { kind: 'limits' } });
-        expect(JSON.stringify(told[0][1])).not.toContain(P_OPEN);
+        expect(told[0][1]).toMatchObject({ type: 'update', companyId: CID, updatedFields: { agentLimits: expect.objectContaining({ paused: true }) } });
+        expect(String(told[0][1].data._id)).toBe(P_OPEN);
+        expect(socketEmitter.emit.mock.calls.filter(([, change]) => change && change.module === 'agent' && change.data.kind === 'limits')).toEqual([]);
     });
 
     it('a refused save tells nobody', async () => {
         await put(MEMBER, { paused: true });
         await put(OWNER, { atOnce: 99 });
-        expect(socketEmitter.emit.mock.calls.filter(([, change]) => change && change.module === 'agent' && change.data.kind === 'limits')).toEqual([]);
+        expect(socketEmitter.emit.mock.calls.filter(([, change]) => change && change.module === 'project')).toEqual([]);
     });
 
     it('a pause keeps who paused and when, and the limit beside it', async () => {

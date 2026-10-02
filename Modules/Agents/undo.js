@@ -46,6 +46,9 @@ const GOAL_KINDS = Object.freeze(['goalValue', 'goalSource']);
 const SETUP_KINDS = Object.freeze(['fields', 'view', 'setup', 'project', 'projectCopy', 'folder']);
 /* A rule is taken back by the Automations page's own delete, which asks whether the person undoing may. */
 const AUTOMATION_KIND = 'automation';
+/* A dashboard belongs to no project either, and its owner alone takes a card of it back. */
+const DASHBOARD_KIND = 'dashboardCard';
+const dashboards = () => require('./dashboardRequests');
 const work = () => require('./workRequests');
 const goalWork = () => require('./goalRequests');
 const setupWork = () => require('./setupRequests');
@@ -244,6 +247,7 @@ const inverses = {
     ...require('./projectDuplicate').inverses,
     ...require('./listSetup').inverses,
     ...require('./automationRequests').inverses,
+    ...require('./dashboardRequests').inverses,
 };
 
 const isUndoable = (row) => Boolean(row && row.meta && row.meta.undo && inverses[row.meta.undo.kind] && !row.meta.undoneAt);
@@ -294,6 +298,7 @@ const targetVisible = async (companyId, uid, u) => {
     }
     if (u.kind === 'batch' || SETUP_KINDS.includes(u.kind)) return true;
     if (u.kind === AUTOMATION_KIND) return true;
+    if (u.kind === DASHBOARD_KIND) return dashboards().mayWithdraw(companyId, uid, u.dashboardId);
     if (u.kind === 'page' || u.kind === 'pageVersion') {
         const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, sharedWith: 1, deletedStatusKey: 1 });
         /* Undoing a page takes it to the trash, which a person the doc is only shared with may not do; putting
@@ -337,7 +342,7 @@ const undoStateOf = async (companyId, row, actor, ctx = {}) => {
     const undoUntil = undoUntilOf(row, run, full.undoHours);
     const projectId = await projectIdOfRow(companyId, row, run);
     if (!isUndoable(row)) return state(REASON.NOT_UNDOABLE, undoUntil, projectId);
-    const inAProject = !GOAL_KINDS.includes(row.meta.undo.kind);
+    const inAProject = ![...GOAL_KINDS, DASHBOARD_KIND].includes(row.meta.undo.kind);
     if (inAProject && (!projectId || !full.visibleProjectIds.includes(projectId))) return state(REASON.NOT_VISIBLE, undoUntil, projectId);
     if (Date.now() >= undoUntil.getTime()) return state(REASON.WINDOW_PASSED, undoUntil, projectId);
     if (!(await targetVisible(companyId, actor.userId, row.meta.undo))) return state(REASON.TARGET_NOT_VISIBLE, undoUntil, projectId);

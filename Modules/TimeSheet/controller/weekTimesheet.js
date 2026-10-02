@@ -9,6 +9,7 @@ const { removeCache } = require('../../../utils/commonFunctions');
 const { parsePeriod } = require('../../TimesheetApproval/helpers/approvalRules');
 const R = require('../helpers/weekRules');
 const { workingDaysOf, weekendOf } = require('../../Company/helpers/companyWeek');
+const { resolveTimeScope, withoutHidden, openProjects } = require('../helpers/timeScope');
 
 const RUNNING_WINDOW_SEC = 10 * 60;
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
@@ -55,13 +56,13 @@ exports.getWeekTimesheet = async (req, res) => {
         if (!startDt.isValid || !endDt.isValid || endDt < startDt) {
             return res.status(400).json({ status: false, statusText: 'start and end must be valid dates.' });
         }
-        const roleType = await getRoleType(companyId, req.uid);
-        const userId = isPrivileged(roleType) && q.userId ? String(q.userId) : String(req.uid);
+        const scope = await resolveTimeScope(companyId, req.uid);
+        const userId = scope.companyWide && q.userId ? String(q.userId) : String(req.uid);
         const hoursPerDay = Number(q.hoursPerDay) > 0 ? Number(q.hoursPerDay) : 8;
         const days = R.dayKeys(q.start, q.end);
 
-        const match = { Loggeduser: userId, LogStartTime: { $gte: Math.floor(startDt.toSeconds()), $lte: Math.floor(endDt.toSeconds()) } };
-        if (q.projectId) match.ProjectId = { $in: idForms(String(q.projectId)) };
+        const match = { Loggeduser: userId, LogStartTime: { $gte: Math.floor(startDt.toSeconds()), $lte: Math.floor(endDt.toSeconds()) }, ...withoutHidden(scope) };
+        if (q.projectId) match.ProjectId = { $in: idForms(openProjects(scope, [String(q.projectId)])) };
         const entries = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [match, { TicketID: 1, ProjectId: 1, LogTimeDuration: 1, LogStartTime: 1, billable: 1 }],
@@ -101,7 +102,7 @@ exports.getWeekTimesheet = async (req, res) => {
             approvalFor(companyId, userId, prevStart, prevEnd),
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
-                data: [{ Loggeduser: userId, startTimeTracker: { $gte: Math.floor(Date.now() / 1000) - RUNNING_WINDOW_SEC } }, { TicketID: 1, ProjectId: 1, LogStartTime: 1, LogDescription: 1 }],
+                data: [{ Loggeduser: userId, startTimeTracker: { $gte: Math.floor(Date.now() / 1000) - RUNNING_WINDOW_SEC }, ...withoutHidden(scope) }, { TicketID: 1, ProjectId: 1, LogStartTime: 1, LogDescription: 1 }],
             }, 'findOne').catch(() => null),
         ]);
 

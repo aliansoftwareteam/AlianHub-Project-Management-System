@@ -177,11 +177,11 @@ describe('who is told that a thread has something new', () => {
     });
 });
 
-describe('the rows an owner or admin reaches through a join', () => {
+describe('the private work an owner or admin does not read', () => {
     const message = (thread) => ({ ...thread, message: 'A message' });
     const kept = async (uid, clauseOf, row) => !matches(row, clauseOf(await privateWorkOf(CID, uid)));
 
-    it.each([['the owner', OWNER], ['an admin who is in it', ADMIN]])('the messages of a conversation kept in a project are joined for %s only when they are in it', async (who, uid) => {
+    it.each([['the owner', OWNER], ['an admin who is in it', ADMIN]])('the messages of a conversation kept in a project are among it for %s unless they are in it', async (who, uid) => {
         expect(await kept(uid, commentClause, message({ projectId: P_OPEN, sprintId: L_OPEN, taskId: CONVERSATION }))).toBe(!isIn(uid));
         expect(await kept(uid, commentClause, message({ projectId: DM_SPACE, taskId: DM }))).toBe(!isIn(uid));
         expect(await kept(uid, commentClause, message({ projectId: P_OPEN, sprintId: L_OPEN, taskId: T_OPEN }))).toBe(false);

@@ -2,13 +2,14 @@ const { scopedTimeMatch, scopedEstimateMatch } = require('./timeScope');
 const { toObjectIds, companyWideMatch } = require('../../Tasks/helpers/taskQueryGuard');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { dbCollections } = require('../../../Config/collections');
-const { privateWorkOf, commentClause } = require('../../Agents/privateWork');
+const { privateWorkOf } = require('../../Agents/privateWork');
+const { FORBIDDEN_OPERATORS, isPlainObject } = require('../../Company/helpers/callerQueryRules');
 const { withoutConversationsOfOthers } = require('../../Comments/helpers/conversationReaders');
 
-const REFUSED_OPERATORS = Object.freeze(['$out', '$merge', '$unionWith', '$graphLookup', '$function', '$accumulator', '$where']);
+const REFUSED_OPERATORS = Object.freeze(FORBIDDEN_OPERATORS.filter((operator) => operator !== '$lookup'));
 
-const PROJECT_FIELD_OF_JOINABLE = Object.freeze({ tasks: 'ProjectID' });
-const PROJECT_FIELD_OF_JOINABLE_INSIDE_TASKS = Object.freeze({ ...PROJECT_FIELD_OF_JOINABLE, folders: 'projectId', sprints: 'projectId' });
+const PROJECT_FIELD_OF_JOINABLE = Object.freeze({ [dbCollections.TASKS]: 'ProjectID' });
+const PROJECT_FIELD_OF_JOINABLE_INSIDE_TASKS = Object.freeze({ ...PROJECT_FIELD_OF_JOINABLE, [dbCollections.FOLDERS]: 'projectId', [dbCollections.SPRINTS]: 'projectId' });
 
 class TimesheetQueryRefused extends Error {
     constructor(reason) {
@@ -17,56 +18,42 @@ class TimesheetQueryRefused extends Error {
     }
 }
 
-const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
-    && [Object.prototype, null].includes(Object.getPrototypeOf(value));
-
 /* Tasks, folders and sprints store the project as an ObjectId, and an aggregate never casts. A join into tasks
  * also leaves out a conversation the caller is not in, which is stored among them. */
 const inVisibleProjects = (from, field, scope) => ({
     $match: { [field]: { $in: [...toObjectIds(scope.visible), ...scope.visible] }, ...(from === dbCollections.TASKS ? withoutConversationsOfOthers(scope.uid) : {}) },
 });
 
-/* What a company-wide caller's join leaves out of the two collections that hold private work: someone
- * else's personal list, and a chat the caller is not in. */
-const PRIVATE_WORK_IN = Object.freeze({
-    [dbCollections.TASKS]: (privateWork) => companyWideMatch(privateWork.uid, privateWork.personalLists),
-    [dbCollections.COMMENTS]: (privateWork) => commentClause(privateWork),
-});
+const matchStages = (match) => (Object.keys(match).length ? [{ $match: match }] : []);
 
-/* An owner or admin may join any collection. A join into tasks or comments starts with the exclusion a
- * direct read of them gets; one it cannot be put in front of is refused rather than let through. */
-const companyWideLookup = (spec, scope, joinable) => {
-    if (!isPlainObject(spec) || typeof spec.from !== 'string') {
-        throw new TimesheetQueryRefused('A join in a timesheet query names its collection as text.');
+/* What an owner's or admin's join leaves out: someone else's personal list, and in tasks a chat the caller is not in. */
+const companyWideExclusion = (from, projectField, scope) => {
+    if (from !== dbCollections.TASKS) {
+        const hidden = scope.hidden || [];
+        return matchStages(hidden.length ? { [projectField]: { $nin: idForms(hidden) } } : {});
     }
-    const exclusion = Object.prototype.hasOwnProperty.call(PRIVATE_WORK_IN, spec.from) ? PRIVATE_WORK_IN[spec.from] : null;
-    if (!exclusion) return walk(spec, scope, joinable);
-    if (spec.pipeline !== undefined && !Array.isArray(spec.pipeline)) {
-        throw new TimesheetQueryRefused(`A join into ${spec.from} takes its pipeline as a list of stages.`);
-    }
-    if (!scope.privateWork) throw new TimesheetQueryRefused(`A join into ${spec.from} cannot be scoped for this request.`);
-    const { pipeline = [], ...rest } = spec;
-    const leading = exclusion(scope.privateWork);
-    return {
-        ...walk(rest, scope, joinable),
-        pipeline: [...(Object.keys(leading).length ? [{ $match: leading }] : []), ...walk(pipeline, scope, joinable)],
-    };
+    if (!scope.privateWork) throw new TimesheetQueryRefused(`A join into ${from} cannot be scoped for this request.`);
+    return matchStages(companyWideMatch(scope.privateWork.uid, scope.privateWork.personalLists));
 };
 
-/* A $lookup reads another collection, so the $match put in front of the pipeline does
- * not cover it: a non-admin may join tasks, and from inside that join the folders and
- * sprints they sit in, each limited to the projects the caller can open. */
+/* A $lookup reads another collection, so the $match put in front of the pipeline does not cover
+ * it. The collection is one the screens join: tasks, and from inside that join the folders and
+ * sprints they sit in. Each join starts with what the caller may read of it: the projects a
+ * non-admin can open, and for an owner or admin everything but other people's private work. */
 const scopeLookup = (spec, scope, joinable) => {
-    if (scope.companyWide) return companyWideLookup(spec, scope, joinable);
     const from = isPlainObject(spec) ? spec.from : undefined;
     const projectField = typeof from === 'string' && Object.prototype.hasOwnProperty.call(joinable, from) ? joinable[from] : null;
-    if (!projectField || !Array.isArray(spec.pipeline)) {
-        throw new TimesheetQueryRefused('A timesheet query can only join tasks, and the folders and sprints of those tasks, through a pipeline.');
+    if (!projectField) {
+        throw new TimesheetQueryRefused('A timesheet query can only join tasks, and the folders and sprints of those tasks.');
     }
-    const { pipeline, ...rest } = spec;
+    if (scope.companyWide ? (spec.pipeline !== undefined && !Array.isArray(spec.pipeline)) : !Array.isArray(spec.pipeline)) {
+        throw new TimesheetQueryRefused(`A join into ${from} takes its pipeline as a list of stages.`);
+    }
+    const { pipeline = [], ...rest } = spec;
+    const leading = scope.companyWide ? companyWideExclusion(from, projectField, scope) : [inVisibleProjects(from, projectField, scope)];
     return {
         ...walk(rest, scope, joinable),
-        pipeline: [inVisibleProjects(from, projectField, scope), ...walk(pipeline, scope, PROJECT_FIELD_OF_JOINABLE_INSIDE_TASKS)],
+        pipeline: [...leading, ...walk(pipeline, scope, PROJECT_FIELD_OF_JOINABLE_INSIDE_TASKS)],
     };
 };
 

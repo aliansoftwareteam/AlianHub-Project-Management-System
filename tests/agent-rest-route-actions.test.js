@@ -389,6 +389,10 @@ const PROPOSED_ON_THE_WEB = {
     'project.duplicate': {
         'copying a project with its tasks': ['POST /api/v2/projects/:id/duplicate', { name: 'Copy', withTasks: true }, inProject, 'project.create'],
     },
+    'dashboard.card.add': {
+        'adding a card to the home dashboard': ['POST /api/v1/dashboard', { op: 'add', card: { key: 'DueSoonCard' } }, {}, 'dashboard.manage'],
+        'adding a card to a dashboard': ['PUT /api/v1/dashboards/:id/cards', { cards: [{ key: 'DueSoonCard' }] }, { id: TEMPLATE }, 'dashboard.manage'],
+    },
     'automation.create': {
         'adding an automation': ['POST /api/v2/automations', rule],
         'changing an automation': ['PUT /api/v2/automations/:id', rule, { id: RULE }, 'automation.update'],

@@ -4,7 +4,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..', '..');
 const SCANNED = ['Modules', 'socket', 'event', 'utils', 'Config', 'middlewares'];
 /* The relays of these modules send an event only to sockets of the company it names. */
-const MODULES = ['task', 'userIdNotification', 'generalReminder'];
+const MODULES = ['task', 'userIdNotification', 'generalReminder', 'project', 'sprints', 'folders'];
 const RELAYED_TYPES = ['update', 'insert', 'delete'];
 
 const sourceFiles = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }) : []).flatMap((entry) => {

@@ -95,6 +95,20 @@ describe('POST /createproject takes the creator from the session', () => {
         expect(savedProject().projectCreatedBy).toBe(ME);
     });
 
+    it('announces the project in its company once it is made, and announces nothing for a refusal', async () => {
+        const emit = jest.spyOn(require('../event/socketEventEmitter'), 'emit').mockImplementation(() => true);
+        const res = await post(projectBody());
+        const announced = emit.mock.calls.map(([, payload]) => payload).filter((payload) => payload.module === 'project');
+        expect(announced).toHaveLength(1);
+        expect(announced[0]).toMatchObject({ type: 'insert', companyId: C });
+        expect(String(announced[0].data._id)).toBe(String(res.body.data._id));
+
+        emit.mockClear();
+        await post(projectBody(), null);
+        expect(emit).not.toHaveBeenCalled();
+        emit.mockRestore();
+    });
+
     it('refuses a request without a signed-in user and writes nothing', async () => {
         const res = await post(projectBody(), null);
 

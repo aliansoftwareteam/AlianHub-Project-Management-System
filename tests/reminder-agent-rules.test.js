@@ -72,8 +72,8 @@ beforeEach(() => {
 });
 
 describe('a task reminder set by an agent on the reminder route', () => {
-    it.each(AGENTS)('%s sets one for its person on a task that person can open, and it is recorded', async (label, as) => {
-        const answer = await ask(CREATE, as(INSIDER), { body: { taskId: T_SECRET, reminderAt: WHEN, reminderText: 'Check the review' } });
+    it('an agent run sets one for its person on a task that person can open, and it is recorded', async () => {
+        const answer = await ask(CREATE, agentRun(INSIDER), { body: { taskId: T_SECRET, reminderAt: WHEN, reminderText: 'Check the review' } });
 
         expect(answer.body.status).toBe(true);
         expect(reminders().filter((row) => String(row.taskId) === T_SECRET)).toEqual([expect.objectContaining({ userId: INSIDER, createdBy: INSIDER, reminderText: 'Check the review', fired: false })]);
@@ -81,10 +81,20 @@ describe('a task reminder set by an agent on the reminder route', () => {
         expect(audits('agent.action')[0].meta).toMatchObject({ action: 'reminder.create', state: 'applied', reason: 'via REST', onBehalfOf: INSIDER });
     });
 
-    it.each(AGENTS)('%s sets it for its own person, whoever the request names', async (label, as) => {
-        await ask(CREATE, as(INSIDER), { body: { taskId: T_OPEN, reminderAt: WHEN, userId: OWNER, createdBy: OWNER } });
+    it('an agent run sets it for its own person, whoever the request names', async () => {
+        await ask(CREATE, agentRun(INSIDER), { body: { taskId: T_OPEN, reminderAt: WHEN, userId: OWNER, createdBy: OWNER } });
 
         expect(reminders().filter((row) => String(row.taskId) === T_OPEN).map((row) => [row.userId, row.createdBy])).toEqual([[INSIDER, INSIDER]]);
+    });
+
+    /* A reminder cannot be undone, and a connected agent's change that cannot be undone waits for a person. */
+    it('a token created for an agent sets none on the route, where the change would have to wait for a person, and that is recorded', async () => {
+        const answer = await ask(CREATE, agentToken(INSIDER), { body: { taskId: T_OPEN, reminderAt: WHEN, reminderText: 'Check the review' } });
+
+        expect(answer.code).toBe(403);
+        expect(answer.body.statusText).toMatch(/cannot be undone/);
+        expect(reminders()).toHaveLength(1);
+        expect(refusedActions()).toEqual(['reminder.create']);
     });
 
     it.each([

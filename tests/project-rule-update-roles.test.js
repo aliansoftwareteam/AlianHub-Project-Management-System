@@ -44,6 +44,19 @@ describe('updating a project rule', () => {
         expect(writtenUpdate()).toEqual([]);
     });
 
+    it.each([[{ $ne: null }], [[RULE]], ['a1'], [undefined], [null], [7]])('refuses the rule id %j', async (id) => {
+        const res = await call({ id, projectId: PROJECT, key: '$set', updateObject: { roles: [{ key: 3, permission: true }] } });
+        expect(res.statusCode).toBe(400);
+        expect(mockCrud).not.toHaveBeenCalled();
+    });
+
+    it('names the rule by its id and its project', async () => {
+        await call({ id: RULE, projectId: PROJECT, key: '$set', updateObject: { roles: [{ key: 3, permission: true }] } });
+        const [filter] = mockCrud.mock.calls.find(([, , method]) => method === 'findOneAndUpdate')[1].data;
+        expect(filter._id).toBe(RULE);
+        expect(filter.projectId.$in.map(String)).toEqual(expect.arrayContaining([PROJECT]));
+    });
+
     it('refuses roles that are not role entries', async () => {
         for (const roles of ['all', [{ key: 3, permission: true, extra: { $where: 'x' } }], [{ permission: true }], Array.from({ length: 101 }, (_, key) => ({ key, permission: true }))]) {
             const res = await call({ id: RULE, projectId: PROJECT, key: '$set', updateObject: { roles } });

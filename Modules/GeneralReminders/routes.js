@@ -1,6 +1,7 @@
 const controller = require('./controller');
 const logger = require('../../Config/loggerConfig');
 const { agentsRefused } = require('../Agents/guard');
+const { requireCompanyAdmin } = require('../../Config/permissionGuard');
 
 /* A reminder may be raised for another member, who is then mailed. */
 const remindersByPeople = agentsRefused('reminder.manage');
@@ -12,8 +13,7 @@ exports.init = (app) => {
     app.post('/api/v1/general-reminders', remindersByPeople, controller.createReminder);
     // List the caller's own reminders (?filter=upcoming|done).
     app.get('/api/v1/general-reminders', controller.listMine);
-    // Process every due reminder for the caller's company (manual; cron does this too).
-    app.post('/api/v1/general-reminders/run-due', remindersByPeople, controller.runDueForCompany);
+    app.post('/api/v1/general-reminders/run-due', remindersByPeople, requireCompanyAdmin(), controller.runDueForCompany);
     // Fire one reminder now (testing).
     app.post('/api/v1/general-reminders/:id/run-now', remindersByPeople, controller.runNow);
     // Edit a reminder. Re-arms it when the time or lead time changes.

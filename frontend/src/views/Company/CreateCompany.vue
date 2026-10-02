@@ -116,7 +116,7 @@ import { apiRequestWithoutCompnay, getAuth, useAuth } from "@/services";
 import * as env from "@/config/env";
 import { connectAiWelcomePath } from "@/router/ai/connect";
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const router = useRouter();
 const { getters, commit } = useStore();
 const { logOut } = useAuth();
@@ -198,9 +198,17 @@ const fail = (message) => {
     progress.value = 0;
 };
 
-const failureMessage = ({ freeLimit, reason } = {}) => {
+// The server names its reason by a code; its own sentence is English and stands in only for a code this build does not know.
+const reasonInWords = ({ code, reason }) => {
+    const key = `Auth.workspace_reason_${code}`;
+    if (typeof code === "string" && te(key)) return t(key);
+    return typeof reason === "string" ? reason : "";
+};
+
+const failureMessage = ({ freeLimit, code, reason } = {}) => {
     if (freeLimit) return t("Auth.free_limit");
-    return reason ? t("Auth.workspace_failed_reason", { reason }) : t("Auth.workspace_failed");
+    const why = reasonInWords({ code, reason });
+    return why ? t("Auth.workspace_failed_reason", { reason: why }) : t("Auth.workspace_failed");
 };
 
 const create = (withSample) => {
@@ -234,7 +242,7 @@ const create = (withSample) => {
         const data = JSON.parse(event.data)?.data;
         if (data?.step === 1) { progress.value = 35; statusText.value = t("Auth.creating_workspace"); return; }
         if (data?.step === 2) { progress.value = 70; statusText.value = t("Auth.seeding_sample"); return; }
-        if (data?.error) refuse({ freeLimit: data.freeCompanyLimitReached, reason: typeof data.error === "string" ? data.error : "" });
+        if (data?.error) refuse({ freeLimit: data.freeCompanyLimitReached, code: data.code, reason: data.error });
         else openWorkspace(data?.companyId);
     };
     // The stream only reports progress: the workspace may still be made, and the reply below says whether it was.
@@ -264,7 +272,7 @@ const create = (withSample) => {
         Cst_stateCode: ""
     }).then((res) => {
         if (res.data?.status === true) openWorkspace(res.data.companyId);
-        else refuse({ freeLimit: res.data?.freeCompanyLimitReached, reason: res.data?.statusText });
+        else refuse({ freeLimit: res.data?.freeCompanyLimitReached, code: res.data?.code, reason: res.data?.statusText });
     }).catch((err) => {
         console.error("ERROR IN CREATE COMPANY", err);
         refuse();

@@ -3,6 +3,7 @@ const { searchComments } = require('../Comments/controller');
 const { keepVisibleProjects } = require('../../Config/projectAccess');
 const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
 const logger = require('../../Config/loggerConfig');
+const { limitCallerFilters } = require('../Company/helpers/callerQueryRules');
 
 const visibleProjects = keepVisibleProjects({
     get: (req) => {
@@ -26,15 +27,16 @@ const taskListProjects = async (req, res, next) => {
 };
 
 const searchedProjects = [visibleProjects, taskListProjects];
+const searchFilters = limitCallerFilters('filterQuery', 'publicQuery', 'privateQuery');
 
 exports.init = (app) => {
     app.post('/api/v1/advance/filter/create', ctrl.saveFilter);
     app.get('/api/v1/advance/filter/:userId/:filterType', ctrl.getFilter);
     app.put('/api/v1/advance/filter/update', ctrl.updateFilter);
     app.delete('/api/v1/advance/filter/delete/:cid/:id', ctrl.deleteFilter);
-    app.post('/api/v1/advance/filter/search/tasks', ...searchedProjects, ctrl.searchTasks);
-    app.post('/api/v1/advance/filter/search/projects', ctrl.searchProjects);
-    app.post('/api/v1/advance/filter/search/files', ...searchedProjects, ctrl.searchFiles);
-    app.post('/api/v1/advance/filter/search/links', ...searchedProjects, ctrl.searchLinks);
-    app.post('/api/v1/advance/filter/search/comments', ...searchedProjects, searchComments);
+    app.post('/api/v1/advance/filter/search/tasks', searchFilters, ...searchedProjects, ctrl.searchTasks);
+    app.post('/api/v1/advance/filter/search/projects', searchFilters, ctrl.searchProjects);
+    app.post('/api/v1/advance/filter/search/files', searchFilters, ...searchedProjects, ctrl.searchFiles);
+    app.post('/api/v1/advance/filter/search/links', searchFilters, ...searchedProjects, ctrl.searchLinks);
+    app.post('/api/v1/advance/filter/search/comments', searchFilters, ...searchedProjects, searchComments);
 };

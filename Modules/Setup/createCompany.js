@@ -8,6 +8,7 @@ const iCtr = require('../ImportSettings/controller');
 const { addAndRemoveUserInMongodbNotificationCount } = require('../Auth/controller');
 const createUserRef = require('../Auth/controller/createUser');
 const { updateCompanyFun } = require('../Company/controller/updateCompany');
+const { COUNTRY_NOT_ASKED } = require('../Company/helpers/companyDetails');
 const { updateUserFun } = require('../Users/controller');
 const { storeRefferalCode } = require('../Affiliate/controller');
 const { planObj } = require('./defaultSubscriptionData');
@@ -39,7 +40,7 @@ async function createOwner({ firstName, lastName, email, password }) {
  * Settings > General; phone, state and city may stay empty. */
 const COMPANY_DEFAULTS = {
     Cst_Phone: '',
-    Cst_Country: 'N/A',
+    Cst_Country: COUNTRY_NOT_ASKED,
     Cst_City: '',
     Cst_State: '',
     Cst_DialCode: { name: '', dialCode: '', code: '' },

@@ -19,6 +19,7 @@ jest.mock('../Modules/Agents/privateWork', () => ({
 
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');
 const { visibleProjectIds } = require('../Modules/Agents/scope');
+const { othersPersonalListIds } = require('../Modules/PersonalList/ownership');
 const userSheet = require('../Modules/TimeSheet/controller/userTimeSheet');
 const workloadSheet = require('../Modules/TimeSheet/controller/workloadTimeSheet');
 const projectSheet = require('../Modules/TimeSheet/controller/projectTimeSheet');
@@ -158,19 +159,18 @@ describe('16c /timesheet query guard', () => {
         expect(mockCrud).not.toHaveBeenCalled();
     });
 
-    it('lets an admin join other collections in the company database, as sent', async () => {
-        getRoleType.mockResolvedValue(1);
-        evaluatePermission.mockResolvedValue(true);
-        const spec = { from: 'users', localField: 'Loggeduser', foreignField: '_id', as: 'u' };
-        const r = await call(aggregateSheet.getTimeSheetByAggregate, lookup(spec));
-        expect(r.code).toBe(200);
-        expect(mockCrud.mock.calls[0][1].data[0].find((stage) => stage.$lookup).$lookup).toEqual(spec);
-    });
+    it.each(['users', 'comments', 'company_users', 'timesheets', 'apiTokens', 'webhooks', 'secrets', 'folders', 'sprints'])(
+        'an owner or admin joins tasks, and folders and sprints from inside that join: %s at the top is a 400', async (from) => {
+            getRoleType.mockResolvedValue(1);
+            evaluatePermission.mockResolvedValue(true);
+            const r = await call(aggregateSheet.getTimeSheetByAggregate, lookup({ from, pipeline: [], as: 'rows' }));
+            expect(r.code).toBe(400);
+            expect(mockCrud).not.toHaveBeenCalled();
+        });
 
-    describe('an owner\'s or admin\'s join into tasks or comments', () => {
+    describe('an owner\'s or admin\'s join into tasks', () => {
         const PERSONAL_LIST = '6f0000000000000000000b09';
         const DIRECT_SPACE = '6f0000000000000000000b08';
-        const MY_CHAT = '6f0000000000000000000a08';
         const joinOf = async (body, at = (pipeline) => pipeline.find((stage) => stage.$lookup).$lookup) => {
             getRoleType.mockResolvedValue(2);
             evaluatePermission.mockResolvedValue(true);
@@ -187,14 +187,6 @@ describe('16c /timesheet query guard', () => {
             [{ ProjectID: DIRECT_SPACE, mainChat: true, AssigneeUserId: [OTHER] }, false],
             [{ ProjectID: DIRECT_SPACE, mainChat: true, AssigneeUserId: [ME, OTHER] }, true],
         ];
-        const COMMENTS = [
-            [{ projectId: P1, taskId: 'default' }, true],
-            [{ projectId: PERSONAL_LIST, taskId: 'x' }, false],
-            [{ projectId: DIRECT_SPACE, taskId: '6f0000000000000000000a07' }, false],
-            [{ projectId: DIRECT_SPACE, taskId: MY_CHAT }, true],
-            [{ projectId: new mongoose.Types.ObjectId(DIRECT_SPACE), taskId: new mongoose.Types.ObjectId(MY_CHAT) }, true],
-        ];
-
         it.each([
             ['with a pipeline', { from: 'tasks', let: { t: '$TicketID' }, pipeline: [{ $match: { $expr: { $eq: ['$_id', '$$t'] } } }], as: 't' }],
             ['on a local and a foreign field', { from: 'tasks', localField: 'TicketID', foreignField: '_id', as: 't' }],
@@ -205,24 +197,29 @@ describe('16c /timesheet query guard', () => {
             expect(joined).toMatchObject({ from: 'tasks', as: 't', ...(spec.localField ? { localField: 'TicketID', foreignField: '_id' } : { let: spec.let }) });
         });
 
-        it.each([
-            ['with a pipeline', { from: 'comments', let: { t: '$TicketID' }, pipeline: [{ $match: { type: 'text' } }], as: 'c' }],
-            ['on a local and a foreign field', { from: 'comments', localField: 'TicketID', foreignField: 'taskId', as: 'c' }],
-        ])('comments, %s: the same', async (label, spec) => {
-            const joined = await joinOf(lookup(spec));
-            COMMENTS.forEach(([doc, expected]) => expect([doc, reads(joined, doc)]).toEqual([doc, expected]));
-            expect(joined.pipeline.slice(1)).toEqual(spec.pipeline || []);
-        });
-
-        it('is narrowed wherever it sits: inside another join, and inside a facet', async () => {
-            const nested = { from: 'users', as: 'u', pipeline: [{ $lookup: { from: 'tasks', localField: '_id', foreignField: 'AssigneeUserId', as: 't' } }] };
-            const inner = await joinOf(lookup(nested), (pipeline) => pipeline.find((stage) => stage.$lookup).$lookup.pipeline[0].$lookup);
-            expect(reads(inner, { ProjectID: PERSONAL_LIST })).toBe(false);
+        it('is narrowed wherever it sits: inside a facet, and for the folders and sprints joined from inside it', async () => {
+            const faceted = await joinOf({ queryeta: [{ $facet: { a: [{ $lookup: { from: 'tasks', localField: 'TicketID', foreignField: '_id', as: 't' } }] } }] },
+                (pipeline) => pipeline.find((stage) => stage.$facet).$facet.a[0].$lookup);
+            expect(reads(faceted, { ProjectID: PERSONAL_LIST })).toBe(false);
 
             mockCrud.mockClear();
-            const faceted = await joinOf({ queryeta: [{ $facet: { a: [{ $lookup: { from: 'comments', localField: 'TicketID', foreignField: 'taskId', as: 'c' } }] } }] },
-                (pipeline) => pipeline.find((stage) => stage.$facet).$facet.a[0].$lookup);
-            expect(reads(faceted, { projectId: PERSONAL_LIST })).toBe(false);
+            othersPersonalListIds.mockResolvedValueOnce([PERSONAL_LIST]);
+            const nested = { from: 'tasks', as: 't', pipeline: [{ $lookup: { from: 'sprints', localField: 'sprintId', foreignField: '_id', as: 's' } }] };
+            const tasks = await joinOf(lookup(nested));
+            const sprints = tasks.pipeline.find((stage) => stage.$lookup).$lookup;
+            expect(reads(sprints, { projectId: new mongoose.Types.ObjectId(PERSONAL_LIST) })).toBe(false);
+            expect(reads(sprints, { projectId: new mongoose.Types.ObjectId(P1) })).toBe(true);
+        });
+
+        it.each([
+            ['users inside a tasks join', { from: 'tasks', as: 't', pipeline: [{ $lookup: { from: 'users', as: 'u', pipeline: [] } }] }],
+            ['apiTokens inside a facet inside a tasks join', { from: 'tasks', as: 't', pipeline: [{ $facet: { a: [{ $lookup: { from: 'apiTokens', as: 'k', pipeline: [] } }] } }] }],
+        ])('refuses %s with 400', async (label, spec) => {
+            getRoleType.mockResolvedValue(2);
+            evaluatePermission.mockResolvedValue(true);
+            const r = await call(aggregateSheet.getTimeSheetByAggregate, lookup(spec));
+            expect(r.code).toBe(400);
+            expect(mockCrud).not.toHaveBeenCalled();
         });
 
         it.each([

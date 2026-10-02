@@ -1311,13 +1311,6 @@ module.exports = {
                                     projectData: { id: destProjectId, ProjectName: destProject.ProjectName },
                                     taskId: id,
                                     sprintObj,
-                                    parentTaskId: task.ParentTaskId,
-                                    oldSprintObj: {
-                                        id: task.sprintId,
-                                        folderId: task.folderObjId || null,
-                                        name: task.sprintArray?.name || '',
-                                        folderName: task.sprintArray?.folderName || '',
-                                    },
                                     oldProject,
                                     userData,
                                 }).catch((error) => {

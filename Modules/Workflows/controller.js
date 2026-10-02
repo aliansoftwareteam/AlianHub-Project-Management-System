@@ -1,9 +1,10 @@
 const logger = require('../../Config/loggerConfig');
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const { getRoleType } = require('../../Config/permissionGuard');
-const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { nonMembersOf, guestsOf, NOT_A_MEMBER, NOT_A_GUEST } = require('../../Config/companyMembers');
+const { ROLE_GUEST } = require('../../Config/roleTypes');
 const access = require('../Agents/access');
-const { personDecides } = require('../Agents/personDecides');
+const { personDecides, isSignedInSession } = require('../Agents/personDecides');
 const revert = require('../Agents/revert');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
@@ -39,6 +40,8 @@ const REASON_MAX = 500;
 const AGENT_STEP_ID = 'sAgent';
 
 const UNAVAILABLE = 'The workflow engine is off. Set WORKFLOW_ENGINE=on to use workflows.';
+// Steps sent with a start are a workflow nobody saved, and what runs with no person there is set by a person signed in.
+const STEPS_BY_A_PERSON = 'An API token starts a saved workflow. Steps written into the request need a person signed in to AlianHub.';
 
 const fail = (res, statusText, code) => res.status(code || 400).send({ status: false, statusText, message: statusText });
 const ok = (res, statusText, data) => res.send({ status: true, statusText, data });
@@ -156,10 +159,15 @@ const validateSteps = (raw) => {
     return steps;
 };
 
+/* Every person a step names owns or takes over an approval, which a member of the company decides. */
 const outsidersIn = async (companyId, steps) => {
     const named = stepTypes.peopleIn(steps);
-    const outside = new Set(await nonMembersOf(companyId, named.map((person) => person.id)));
-    return named.filter((person) => outside.has(person.id)).map((person) => `${person.path}: ${NOT_A_MEMBER}`);
+    const ids = named.map((person) => person.id);
+    const [outside, guests] = await Promise.all([nonMembersOf(companyId, ids), guestsOf(companyId, ids)]);
+    return named.flatMap((person) => {
+        if (outside.includes(person.id)) return [`${person.path}: ${NOT_A_MEMBER}`];
+        return guests.includes(person.id) ? [`${person.path}: ${NOT_A_GUEST}`] : [];
+    });
 };
 
 const refuseOutsiders = async (companyId, steps) => {
@@ -221,6 +229,7 @@ exports.startRun = async (req, res) => {
             if (!saved) return fail(res, 'Workflow not found.', 404);
             if (!saved.enabled) return fail(res, 'This workflow is turned off. Turn it on before starting a run.', 409);
         }
+        if (!saved && body.steps !== undefined && !isSignedInSession(req)) return fail(res, STEPS_BY_A_PERSON, 403);
         const steps = saved ? validateSteps(saved.steps) : stepsFor(body);
         await refuseOutsiders(ctx.companyId, steps);
         const dedupeKey = key ? `api:${ctx.caller.actor.userId}:${key}` : null;
@@ -416,14 +425,14 @@ exports.listDefinitions = async (req, res) => {
  * "somebody else got there first" answer are the ones it already had.
  *
  * Who may answer is not the manage rule on its own: an approval names an owner,
- * and the owner of the step answers it whatever their role. An Owner or an Admin
+ * and the owner of the step answers it when they hold a member's seat. An Owner or an Admin
  * may answer any of them, because they can already retry, skip and compensate
  * the step the approval is holding. A past owner may not: a request handed on is
  * not theirs any more. */
 const ownsApproval = (caller, request) => Boolean(request.ownerUserId)
     && String(request.ownerUserId) === String(caller.actor.userId);
 
-const mayDecide = (caller, request) => caller.privileged || ownsApproval(caller, request);
+const mayDecide = (caller, request) => caller.privileged || (Boolean(caller.member) && ownsApproval(caller, request));
 
 const approvalRow = (request, run, step, names) => {
     const owners = (request.owners || []).map(String);
@@ -695,7 +704,9 @@ exports.reassignApproval = async (req, res) => {
         const toUserId = String((req.body || {}).toUserId || '');
         if (!OBJECT_ID.test(toUserId)) return fail(res, 'A valid toUserId is required.');
         if (toUserId === String(ctx.request.ownerUserId || '')) return fail(res, 'This approval is already theirs.', 409);
-        if ((await getRoleType(ctx.companyId, toUserId)) === null) return fail(res, 'That person is not a member of this company.');
+        const theirRole = await getRoleType(ctx.companyId, toUserId);
+        if (theirRole === null) return fail(res, 'That person is not a member of this company.');
+        if (theirRole === ROLE_GUEST) return fail(res, NOT_A_GUEST);
         const moved = await approvals.reassign(ctx.companyId, {
             runId: req.params.id,
             stepId: req.params.stepId,
