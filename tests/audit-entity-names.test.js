@@ -21,6 +21,7 @@ const registry = require('../Modules/Agents/registry');
 const CID = '6f00000000000000000000c1';
 const OWNER = '6f0000000000000000000001';
 const MEMBER = '6f0000000000000000000002';
+const SEAT = '6f0000000000000000000f02';
 const TASK = '6f0000000000000000000a01';
 const HIDDEN_TASK = '6f0000000000000000000a02';
 const PROJECT = '6f0000000000000000000b01';
@@ -65,7 +66,7 @@ beforeEach(() => {
     mockOpen.projects = new Set([PROJECT]);
     readableTaskIds.mockClear();
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
-    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: MEMBER, roleType: 3, status: 2, isDelete: false });
+    mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { _id: SEAT, userId: MEMBER, roleType: 3, status: 2, isDelete: false });
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: OWNER, Employee_Name: 'Olivia Owner' });
     mockDb.seed(SCHEMA_TYPE.USERS, { _id: MEMBER, Employee_Name: 'Mina Member' });
     mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK, TaskName: 'Fix login', ProjectID: PROJECT });
@@ -77,7 +78,7 @@ beforeEach(() => {
 
 describe('the audit list names what a row is about', () => {
     it('gives a task, a project, a list, an agent and a member their names when the row holds only the id', async () => {
-        [row(), row({ entityType: 'project', entityId: PROJECT }), row({ entityType: 'sprint', entityId: LIST }), row({ entityType: 'agent', entityId: AGENT }), row({ entityType: 'member', entityId: MEMBER })]
+        [row(), row({ entityType: 'project', entityId: PROJECT }), row({ entityType: 'sprint', entityId: LIST }), row({ entityType: 'agent', entityId: AGENT }), row({ entityType: 'member', entityId: MEMBER }), row({ entityType: 'member', entityId: SEAT })]
             .forEach((r) => mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, r));
         const rows = byEntity((await list()).data);
         expect(rows[`task:${TASK}`].entityLabel).toBe('Fix login');
@@ -85,6 +86,7 @@ describe('the audit list names what a row is about', () => {
         expect(rows[`sprint:${LIST}`].entityLabel).toBe('Backlog');
         expect(rows[`agent:${AGENT}`].entityLabel).toBe('Planner');
         expect(rows[`member:${MEMBER}`].entityLabel).toBe('Mina Member');
+        expect(rows[`member:${SEAT}`].entityLabel).toBe('Mina Member');
     });
 
     it('asks the task read rule as the reader, and names nothing the reader cannot open', async () => {

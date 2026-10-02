@@ -54,7 +54,7 @@ describe('the reasons the server writes as codes', () => {
     });
 
     it('are sentences, not keys', () => {
-        const wrong = Object.entries(sentences).filter(([, text]) => /[a-z]_[a-z]/.test(text) || !/^[A-Z"]/.test(text)).map(([key, text]) => `${key}: ${text}`);
+        const wrong = Object.entries(sentences).filter(([, text]) => /[a-z]_[a-z]/.test(text) || !/^[A-Z{]/.test(text)).map(([key, text]) => `${key}: ${text}`);
         expect(wrong).toEqual([]);
     });
 });
