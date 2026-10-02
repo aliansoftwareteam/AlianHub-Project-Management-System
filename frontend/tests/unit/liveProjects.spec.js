@@ -19,7 +19,7 @@ vi.mock('@/composable/commonFunction', () => ({ isBundledPriorityImage: vi.fn() 
 import * as mutations from '@/store/ProjectData/mutations';
 import projectData from '@/store/ProjectData/index';
 import ProjectHeader from '@/views/Projects/components/ProjectHeader.vue';
-import { GATHER_MS, GATHER_MAX_MS, PROJECT_CHANGED_EVENT, useLiveProjects } from '@/views/Projects/liveProjects';
+import { GATHER_MS, GATHER_MAX_MS, PROJECT_CHANGED_EVENT, READ_GAP_MS, useLiveProjects } from '@/views/Projects/liveProjects';
 
 const APP = fs.readFileSync(path.resolve(__dirname, '../../src/App.vue'), 'utf8');
 const COMPANY = 'c1';
@@ -67,7 +67,8 @@ const mountHost = (held = { data: [alpha()], privateSnap: null, publicSnap: null
 };
 
 const changed = (projectId, kind = 'changed', companyId = COMPANY) => socket.fire({ kind, companyId, projectId });
-const gathered = async () => { await vi.advanceTimersByTimeAsync(GATHER_MS); await flushPromises(); };
+const gathered = async (ms = GATHER_MS) => { await vi.advanceTimersByTimeAsync(ms); await flushPromises(); };
+const afterTheGap = () => gathered(READ_GAP_MS);
 const reads = () => apiRequest.mock.calls.filter(([type]) => type === 'get').map(([, url]) => url);
 const stored = (id) => store.state.projectData.allProjects.data?.find((project) => project._id === id);
 const shown = () => store.getters['projectData/projects'].data.map((project) => project._id);
@@ -200,7 +201,8 @@ describe('a project that is gone', () => {
         await gathered();
         apiRequest.mockImplementation(() => Promise.reject(new Error('Network Error')));
         changed('p1');
-        await gathered();
+        await afterTheGap();
+        expect(reads()).toHaveLength(2);
         expect(stored('p1').ProjectName).toBe('Alpha');
     });
 });
@@ -222,6 +224,23 @@ describe('a burst of changes', () => {
         changed('p1', 'changed');
         await gathered();
         expect(stored('p1').ProjectName).toBe('Restored');
+    });
+
+    it('reads a project that keeps changing every few seconds at most, and never misses its last change', async () => {
+        mountHost();
+        server.p1 = row({ ProjectName: 'First' });
+        changed('p1');
+        await gathered();
+        expect(reads()).toHaveLength(1);
+        server.p1 = row({ ProjectName: 'Second' });
+        changed('p1');
+        await gathered();
+        expect(reads()).toHaveLength(1);
+        server.p1 = row({ ProjectName: 'Last' });
+        changed('p1');
+        await afterTheGap();
+        expect(reads()).toHaveLength(2);
+        expect(stored('p1').ProjectName).toBe('Last');
     });
 
     it('does not wait for ever while changes keep arriving', async () => {
@@ -320,7 +339,7 @@ describe('the Agents paused chip of an open project', () => {
 
         server.p1 = row({ agentLimits: { paused: false } });
         changed('p1');
-        await gathered();
+        await afterTheGap();
         expect(chip().exists()).toBe(false);
     });
 });

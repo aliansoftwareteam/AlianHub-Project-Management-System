@@ -6,11 +6,13 @@ import * as env from "@/config/env";
 /* A project was made, saved or trashed, here or by someone else. The signal carries its id alone, and is sent
  * only to people who may open it. What it holds is read from the project route, which answers this person only,
  * and goes into the store the sidebar, Home and the project page read. Changes that arrive close together, or
- * while the page is out of sight, cost one read a project. */
+ * while the page is out of sight, cost one read a project, and a project that keeps changing is read every few
+ * seconds at most: every open browser that may open it reads on the same signal. */
 
 export const PROJECT_CHANGED_EVENT = "projectChanged";
 export const GATHER_MS = 400;
 export const GATHER_MAX_MS = 2000;
+export const READ_GAP_MS = 3000;
 const REMOVED = "removed";
 const TRASHED = 1;
 const NOT_OPEN_TO_THIS_PERSON = [403, 404];
@@ -24,6 +26,7 @@ export function useLiveProjects(socket, companyId) {
     let bound = null;
     let waiting = new Map();
     let firstAt = 0;
+    let lastReadAt = 0;
     let timer = null;
 
     const company = () => String(unref(companyId) || "");
@@ -45,6 +48,7 @@ export function useLiveProjects(socket, companyId) {
             return;
         }
         const askedIn = company();
+        lastReadAt = Date.now();
         let project = null;
         try {
             const res = await apiRequest("get", `${env.PROJECT}/${id}`, undefined, undefined, { background: true });
@@ -70,7 +74,8 @@ export function useLiveProjects(socket, companyId) {
         timer = null;
         if (hidden()) return;
         const now = Date.now();
-        timer = setTimeout(read, Math.max(0, Math.min(GATHER_MS, firstAt + GATHER_MAX_MS - now)));
+        const gathered = Math.min(now + GATHER_MS, firstAt + GATHER_MAX_MS);
+        timer = setTimeout(read, Math.max(0, gathered - now, lastReadAt + READ_GAP_MS - now));
     }
 
     const onChanged = (change) => {

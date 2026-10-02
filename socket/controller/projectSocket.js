@@ -32,12 +32,13 @@ const relay = (change) => {
     if (!kind || !findRoomsByPrefix(room).length) return undefined;
     return inOrder(async () => {
         if (movesWhoMayOpen(change)) forgetProjectVerdicts(companyId, projectId);
-        for (const entry of findRoomsByPrefix(room)) {
-            const identity = entry.socket && entry.socket.identity;
-            // eslint-disable-next-line no-await-in-loop
-            if (!identity || !(await mayReceiveCompany(identity, companyId)) || !(await mayReceiveProject(identity, change, projectId))) continue;
-            if (entry.socket.rooms.has(entry.roomName)) entry.socket.emit(EVENT, { kind, companyId, projectId });
-        }
+        const entries = findRoomsByPrefix(room).filter((entry) => entry.socket && entry.socket.identity);
+        // Asked together: every other relay waits behind this one, and a person's tabs share one answer.
+        const mayReceive = async ({ identity }) => (await mayReceiveCompany(identity, companyId)) && mayReceiveProject(identity, change, projectId);
+        const allowed = await Promise.all(entries.map((entry) => mayReceive(entry.socket)));
+        entries.forEach((entry, at) => {
+            if (allowed[at] && entry.socket.rooms.has(entry.roomName)) entry.socket.emit(EVENT, { kind, companyId, projectId });
+        });
     });
 };
 
