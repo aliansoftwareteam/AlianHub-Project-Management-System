@@ -302,7 +302,7 @@
                                                 <p v-if="scopeError" class="ah-field__error">{{ scopeError }}</p>
                                             </div>
                                         </template>
-                                        <div v-if="taskGrantOffered || docsGrantOffered" class="ah-field">
+                                        <div v-if="taskGrantOffered || docsGrantOffered || chatGrantOffered" class="ah-field">
                                             <div class="acct-policy">
                                                 <label v-if="taskGrantOffered" class="acct-policy__row">
                                                     <input v-model="tokenForm.manageTasks" class="ah-check" type="checkbox" data-test="token-grant-tasks" />
@@ -316,6 +316,13 @@
                                                     <span>
                                                         {{ $t('Accounts.token_grant_docs') }}
                                                         <small>{{ $t('Accounts.token_grant_docs_effect') }}</small>
+                                                    </span>
+                                                </label>
+                                                <label v-if="chatGrantOffered" class="acct-policy__row">
+                                                    <input v-model="tokenForm.readChat" class="ah-check" type="checkbox" data-test="token-grant-chat" />
+                                                    <span>
+                                                        {{ $t('Accounts.token_grant_chat') }}
+                                                        <small>{{ $t('Accounts.token_grant_chat_effect') }}</small>
                                                     </span>
                                                 </label>
                                             </div>
@@ -529,7 +536,7 @@ import ConnectedApps from "./ConnectedApps.vue";
 import WorkspaceDoneCheck from "./WorkspaceDoneCheck.vue";
 import { oauthAvailable } from "@/views/OAuth/oauthShared";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
-import { DOCS_GRANT, EXPIRY_OVER_MAX, TASKS_GRANT, TOKEN_SCOPES, canGrantDocs, canGrantTasks, defaultExpiryFor, expiryChoicesFor, grantsOf, tokenFormProblem } from "./tokenPolicy";
+import { CHAT_GRANT, DOCS_GRANT, EXPIRY_OVER_MAX, TASKS_GRANT, TOKEN_SCOPES, canGrantChat, canGrantDocs, canGrantTasks, defaultExpiryFor, expiryChoicesFor, grantsOf, tokenFormProblem } from "./tokenPolicy";
 import { reasonOf } from "./useAgents";
 import { skillLabel } from "./plainLabels";
 import { mcpUrlFor } from "./mcpUrl";
@@ -591,7 +598,7 @@ const loadError = ref("");
 const copied = ref("");
 
 const form = reactive({ mode: "personal", provider: "claude-code", label: "", email: "" });
-const tokenForm = reactive({ name: "", mode: "personal", provider: "claude-code", projectId: "", expiresInDays: defaultExpiryFor(tokenPolicy.value), scopes: [...TOKEN_SCOPES], manageTasks: false, manageDocs: false });
+const tokenForm = reactive({ name: "", mode: "personal", provider: "claude-code", projectId: "", expiresInDays: defaultExpiryFor(tokenPolicy.value), scopes: [...TOKEN_SCOPES], manageTasks: false, manageDocs: false, readChat: false });
 
 const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
 const privileged = computed(() => isOwnerOrAdmin(companyUser.value.roleType));
@@ -638,6 +645,7 @@ const expiryChoices = computed(() => expiryChoicesFor(tokenPolicy.value));
 
 const taskGrantOffered = computed(() => canGrantTasks(tokenForm, tokenPolicy.value));
 const docsGrantOffered = computed(() => canGrantDocs(tokenForm, tokenPolicy.value));
+const chatGrantOffered = computed(() => canGrantChat(tokenForm, tokenPolicy.value));
 
 const isOverMax = (tk) => tk.reason === "over-max-lifetime";
 
@@ -655,6 +663,7 @@ const tokenMeta = (tk) => [
     tokenPolicy.value.strict ? scopesOf(tk) : "",
     (tk.grants || []).includes(TASKS_GRANT) ? t("Accounts.token_grant_tasks_short") : "",
     (tk.grants || []).includes(DOCS_GRANT) ? t("Accounts.token_grant_docs_short") : "",
+    (tk.grants || []).includes(CHAT_GRANT) ? t("Accounts.token_grant_chat_short") : "",
     tk.lastUsedAt ? t("Accounts.used_on", { d: new Date(tk.lastUsedAt).toLocaleString() }) : t("Accounts.never_used"),
     tk.agentAccount && tk.agentAccount.mode ? t(`Accounts.mode_${tk.agentAccount.mode}`) : "",
     tk.projectIds && tk.projectIds.length ? t("Accounts.scoped_projects", { n: tk.projectIds.length }) : ""
@@ -821,6 +830,7 @@ const onMint = async () => {
         tokenForm.scopes = [...TOKEN_SCOPES];
         tokenForm.manageTasks = false;
         tokenForm.manageDocs = false;
+        tokenForm.readChat = false;
     } catch (error) {
         if (error.code === EXPIRY_OVER_MAX) expiryError.value = t("Accounts.token_expiry_over_max", { n: error.maxExpiryDays || tokenPolicy.value.maxExpiryDays });
         else mintError.value = error.message;

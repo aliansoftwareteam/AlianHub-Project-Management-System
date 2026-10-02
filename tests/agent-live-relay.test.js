@@ -86,6 +86,70 @@ describe('the live agents signal', () => {
     });
 });
 
+describe('a change a person\'s own agent applied', () => {
+    const PERSON = '6f0000000000000000000a11';
+    const TEAMMATE = '6f0000000000000000000a12';
+    const GUEST = '6f0000000000000000000a13';
+    const UNSEATED = '6f0000000000000000000a14';
+    const AUDIT = '6f0000000000000000000d01';
+    const ROLES = { [PERSON]: 3, [TEAMMATE]: 3, [GUEST]: 0 };
+
+    const seat = (companyId, socketId, uid) => {
+        const emit = jest.fn();
+        const toRoom = jest.fn();
+        const roomName = `selected_companies_${companyId}**${socketId}`;
+        const socket = { id: socketId, rooms: new Set([roomName]), identity: { companyId, uid }, emit };
+        helper.upsertRoom({ roomName, socketId, socket, namespace: { to: jest.fn(() => ({ emit: toRoom })) } });
+        return { emit, toRoom };
+    };
+    const applied = (userId, companyId = C) => change({ kind: 'change', userId, auditId: AUDIT }, companyId);
+
+    let sockets;
+    let room;
+
+    beforeEach(() => {
+        room = join(C, 's1');
+        mockCrud.mockImplementation(async (companyId, query) => {
+            const roleType = ROLES[query.data[0].userId];
+            return roleType === undefined ? null : { roleType };
+        });
+        sockets = {
+            desk: seat(C, 'p1', PERSON),
+            phone: seat(C, 'p2', PERSON),
+            teammate: seat(C, 'p3', TEAMMATE),
+            guest: seat(C, 'p4', GUEST),
+            elsewhere: seat(OTHER_COMPANY, 'p5', PERSON),
+            unseated: seat(C, 'p6', UNSEATED),
+        };
+    });
+    afterEach(() => {
+        ['p1', 'p2', 'p3', 'p4', 'p6'].forEach((id) => helper.removeRoom(`selected_companies_${C}**${id}`));
+        helper.removeRoom(`selected_companies_${OTHER_COMPANY}**p5`);
+    });
+
+    it('reaches every socket of that person in that company, naming the company and the change', async () => {
+        await relay(applied(PERSON));
+        expect(sockets.desk.emit).toHaveBeenCalledTimes(1);
+        expect(sockets.desk.emit).toHaveBeenCalledWith(EVENT, { kind: 'change', companyId: C, auditId: AUDIT });
+        expect(sockets.phone.emit).toHaveBeenCalledWith(EVENT, { kind: 'change', companyId: C, auditId: AUDIT });
+    });
+
+    it('reaches no teammate, no guest, no other company and never the company\'s room', async () => {
+        await relay(applied(PERSON));
+        ['teammate', 'guest', 'elsewhere', 'unseated'].forEach((who) => expect(sockets[who].emit).not.toHaveBeenCalled());
+        Object.values(sockets).forEach((socket) => expect(socket.toRoom).not.toHaveBeenCalled());
+        expect(room).not.toHaveBeenCalled();
+    });
+
+    it('reaches nobody once the person holds no seat, and nobody when it names no person or no change', async () => {
+        await relay(applied(UNSEATED));
+        await relay(applied(''));
+        await relay(change({ kind: 'change', userId: PERSON }));
+        await relay({ type: 'update', module: 'agent', data: { kind: 'change', userId: PERSON, auditId: AUDIT } });
+        Object.values(sockets).forEach((socket) => expect(socket.emit).not.toHaveBeenCalled());
+    });
+});
+
 describe('the open runs in the live summary', () => {
     it('name their project, skill and spend, so one read serves every project page', async () => {
         mockCrud.mockReset();
