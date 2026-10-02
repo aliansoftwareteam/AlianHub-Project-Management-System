@@ -242,6 +242,7 @@ const ACTIONS = Object.freeze({
     'email.send': 'Send an email',
     'email_in.manage': 'Change how email comes in as tasks',
     'export.workspace': 'Export the workspace',
+    'fields.delete': 'Delete a custom field',
     'file.delete': 'Delete a file',
     'form.manage': 'Make or change a form',
     'notification.send': 'Send a notification',
