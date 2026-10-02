@@ -8,7 +8,7 @@ const { agentOf } = require('../../../Config/agentRequest');
 const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const { othersPersonalListIds } = require('../../PersonalList/ownership');
 const { taskListProjectIds } = require('./taskListProjects');
-const { FORBIDDEN_OPERATORS: CALLER_FORBIDDEN_OPERATORS, TOO_DEEP, isPlainObject, forbiddenOperatorIn } = require('../../Company/helpers/callerQueryRules');
+const { FORBIDDEN_OPERATORS: CALLER_FORBIDDEN_OPERATORS, TOO_DEEP, isPlainObject, forbiddenOperatorIn, withPlainSearchText, SearchTextRefused } = require('../../Company/helpers/callerQueryRules');
 
 const MAX_LIMIT = 1000;
 const MAX_STAGES = 40;
@@ -44,6 +44,15 @@ const checkSkip = (value) => {
     const n = Number(value);
     if (!Number.isInteger(n) || n < 0) throw new QueryRefused('$skip', 'it must be a non-negative integer');
     return n;
+};
+
+const withPlainText = (name, spec) => {
+    try {
+        return withPlainSearchText(spec);
+    } catch (error) {
+        if (error instanceof SearchTextRefused) throw new QueryRefused(name, error.message);
+        throw error;
+    }
 };
 
 let validateStages;
@@ -85,7 +94,7 @@ validateStages = (stages, allowed) => {
         if (forbidden) throw new QueryRefused(forbidden, `found inside ${name}`);
         if (name === '$limit') return { $limit: clampLimit(spec) };
         if (name === '$skip') return { $skip: checkSkip(spec) };
-        return stage;
+        return { [name]: withPlainText(name, spec) };
     });
 };
 
