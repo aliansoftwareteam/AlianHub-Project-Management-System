@@ -115,7 +115,7 @@
                         </div>
                     </div>
                     <div v-else class="tv-row-actions">
-                        <button type="button" class="ah-btn ah-btn--primary ah-btn--grow" :disabled="!!busy" @click="approve(card)">
+                        <button v-if="!card.row.locked" type="button" class="ah-btn ah-btn--primary ah-btn--grow" :disabled="!!busy" @click="approve(card)">
                             {{ busy === card.key ? $t('Time.approving') : $t('Time.approve') }}
                         </button>
                         <button v-if="card.kind === 'timesheet'" type="button" class="ah-btn ah-btn--secondary" @click="openDetail(card.row)">{{ $t('Time.detail') }}</button>

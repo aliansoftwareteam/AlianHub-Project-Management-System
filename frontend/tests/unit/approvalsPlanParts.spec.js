@@ -122,6 +122,14 @@ describe('a waiting plan on the Approvals page', () => {
         expect(card().find('[data-test="intent-preview"]').exists()).toBe(true);
         expect(card().findAll('[data-test="intent-pick"]')).toHaveLength(0);
     });
+
+    it('offers no Approve on a proposal the reader may not approve, as the Inbox does', async () => {
+        serverProposals = [proposal('p1', { locked: true, lockedWhy: 'own_rights' }), proposal('p2', { changes: [moveTask] })];
+        await open();
+        const [locked, approvable] = wrapper.findAll('.ap__card--agent');
+        expect(locked.find('.tv-row-actions .ah-btn--primary').exists()).toBe(false);
+        expect(approvable.find('.tv-row-actions .ah-btn--primary').exists()).toBe(true);
+    });
 });
 
 describe('a waiting proposal that is not a plan, on the Approvals page', () => {
