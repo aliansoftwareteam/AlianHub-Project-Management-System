@@ -34,6 +34,11 @@ describe('formatMinutes', () => {
         expect(formatMinutes(75)).toBe('1h 15m');
     });
 
+    it('rolls minutes that round up to 60 into the next hour', () => {
+        expect(formatMinutes(119.6)).toBe('2h');
+        expect(formatMinutes(59.6)).toBe('1h');
+    });
+
     it('shows nothing worked as 0h', () => {
         expect(formatMinutes(0)).toBe('0h');
         expect(formatMinutes(-30)).toBe('0h');

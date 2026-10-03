@@ -23,7 +23,7 @@ export function shareFields(store, fieldIds, projectId) {
     const known = store.getters['settings/finalCustomFields'] || [];
     (fieldIds || []).forEach((id) => {
         const field = known.find((item) => String(item._id) === String(id));
-        if (field && !linkedTo(field, projectId)) {
+        if (field && field.global !== true && !linkedTo(field, projectId)) {
             store.commit('settings/mutateFinalCustomFields', { op: 'modified', data: { ...field, projectId: [...[].concat(field.projectId || []), projectId] } });
         }
     });

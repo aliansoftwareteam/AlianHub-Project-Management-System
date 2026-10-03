@@ -22,6 +22,12 @@ describe('aiErrorKey', () => {
         expect(aiErrorKey({ code: 'nope' }, 'TaskAi.custom')).toBe('TaskAi.custom');
         expect(aiErrorKey({ code: 'ai_off' }, 'TaskAi.custom')).toBe('TaskAi.ai_off');
     });
+
+    it('does not read a code that only names an inherited property', () => {
+        expect(aiErrorKey({ code: 'toString' })).toBe('TaskAi.failed');
+        expect(aiErrorKey({ code: 'constructor' })).toBe('TaskAi.failed');
+        expect(aiErrorKey({ code: '__proto__' })).toBe('TaskAi.failed');
+    });
 });
 
 describe('payloadOf', () => {
