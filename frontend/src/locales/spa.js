@@ -875,6 +875,8 @@ export default {
         "card_waiting": "Waiting on you",
         "card_waiting_hint": "Agent proposals and workflow approvals you can decide.",
         "waiting_approve_named": "Approve: {what}",
+        "waiting_review_parts": "Review parts",
+        "waiting_review_named": "Review the parts of: {what}",
         "waiting_open_named": "Open in the AI Inbox: {what}",
         "waiting_open_inbox": "Open in the Inbox",
         "waiting_untitled": "A proposed change",
