@@ -8,6 +8,7 @@ const { AsyncLocalStorage } = require('async_hooks');
 const ACTOR_AGENT = 'agent';
 const VIA_EXTERNAL = 'external';
 const VIA_PERSONAL = 'personal';
+const AGENT_NAME_MAX = 60;
 const storage = new AsyncLocalStorage();
 
 const runAs = (mark, fn) => (mark ? storage.run(mark, fn) : fn());
@@ -30,9 +31,17 @@ const byline = (agentName, personName) => (personName ? `${agentName}, for ${per
 
 const shownAs = (actor) => byline(toolNameOf(actor), actor.personName || (actsForAPerson(actor) ? 'Member' : ''));
 
+/* The mark of a change `actor` makes for the person `userId`, one hop below the event at `depth` it answers. */
+const markOf = (actor, userId, depth = 0) => ({
+    userId: String(userId || ''),
+    agentId: String(actor.agentId || actor.clientId || '') || null,
+    agentName: String(toolNameOf(actor)).slice(0, AGENT_NAME_MAX),
+    depth: Math.max(0, Number(depth) || 0),
+});
+
 const historyFields = () => {
     const mark = current();
     return mark ? { actorType: ACTOR_AGENT, agentName: String(mark.agentName || ''), actedFor: String(mark.userId || '') } : {};
 };
 
-module.exports = { runAs, current, outside, toolNameOf, byline, shownAs, historyFields, VIA_EXTERNAL, VIA_PERSONAL };
+module.exports = { runAs, current, outside, markOf, toolNameOf, byline, shownAs, historyFields, VIA_EXTERNAL, VIA_PERSONAL };

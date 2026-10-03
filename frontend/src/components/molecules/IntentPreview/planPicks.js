@@ -19,6 +19,9 @@ const neededBy = (preview, key) => (Array.isArray(needsIn(preview)[key]) ? needs
 
 export const canChoose = (preview) => keysIn(preview).length > 0;
 
+/* A proposal is a plan approved part by part when one of its changes has a part with a box to tick. */
+export const hasParts = (changes) => (Array.isArray(changes) ? changes : []).some((change) => canChoose(change?.preview));
+
 /* The parts of the plan with no line on the card: those the server says it cannot show, and any whose line has no
  * words here. They are left out whatever is ticked. */
 export const hiddenParts = (preview) => {

@@ -15,6 +15,11 @@ export const unappliedOf = (data) => (Array.isArray(data?.applied) ? data.applie
 const count = (list) => (Array.isArray(list) ? list.length : 0);
 const laterOf = (data) => ({ waiting: count(data?.left?.waiting), retry: count(data?.left?.retry) });
 
+export const laterLine = (t, data) => {
+    const later = laterOf(data);
+    return [later.waiting ? t('Inbox.queue_left_waiting') : '', later.retry ? t('Inbox.queue_left_retry') : ''].filter(Boolean).join(' ');
+};
+
 /* Why each part of an undo stayed as it was, in the server's words. */
 const keptByUndo = (data) => (Array.isArray(data?.results) ? data.results : []).filter((part) => part && part.ok === false).map((part) => part.message || part.reason || '').filter(Boolean);
 
