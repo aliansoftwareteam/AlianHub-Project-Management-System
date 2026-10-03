@@ -321,6 +321,7 @@ const mentionableAgents = ref([]);
 const ownAiHeldBy = ref('');
 const WHY_NO_OWN_AI = { project_manager_off: 'AgentChat.own_ai_manager_off' };
 const mentionNote = computed(() => (WHY_NO_OWN_AI[ownAiHeldBy.value] ? t(WHY_NO_OWN_AI[ownAiHeldBy.value]) : ''));
+const listOf = (value) => (Array.isArray(value) ? value : []);
 async function loadMentionableAgents() {
     const taskId = effectiveTaskId.value;
     const key = conversationKey.value;
@@ -333,8 +334,8 @@ async function loadMentionableAgents() {
     // An in-product agent needs a model on the server; the person's own connected AI does not.
     const [inProduct, own] = await Promise.all([canUseAi() ? fetchChatAgents(thread) : [], fetchOwnAiInChat(thread)]);
     if (key !== conversationKey.value) return;
-    mentionableAgents.value = [...inProduct, ...own.agents];
-    ownAiHeldBy.value = own.why;
+    mentionableAgents.value = [...listOf(inProduct), ...listOf(own && own.agents)];
+    ownAiHeldBy.value = (own && own.why) || '';
 }
 watch([conversationKey, () => canUseAi()], loadMentionableAgents, { immediate: true });
 
