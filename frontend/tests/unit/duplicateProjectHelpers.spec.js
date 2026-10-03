@@ -93,6 +93,12 @@ describe('shareFields', () => {
         expect(store.commit).not.toHaveBeenCalled();
     });
 
+    it('leaves a field of every project without a project list', () => {
+        const store = storeWith([{ _id: 'f1', global: true }]);
+        shareFields(store, ['f1'], 'p2');
+        expect(store.commit).not.toHaveBeenCalled();
+    });
+
     it('skips ids the store does not know', () => {
         const store = storeWith([{ _id: 'f1', projectId: [] }]);
         shareFields(store, ['missing'], 'p2');

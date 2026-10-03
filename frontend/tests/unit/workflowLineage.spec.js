@@ -205,6 +205,7 @@ describe('chainOf', () => {
     it('answers an empty chain for no steps', () => {
         expect(chainOf()).toEqual([]);
         expect(chainOf([])).toEqual([]);
+        expect(chainOf(null)).toEqual([]);
     });
 });
 
