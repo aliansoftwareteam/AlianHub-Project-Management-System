@@ -425,7 +425,7 @@ const agentPerimeter = withActor(async (req, res, next, actor) => {
     const path = String(req.originalUrl || req.path || '').split('?')[0];
     const hit = PERIMETER.find((r) => r.test(req.method, path));
     if (!hit) {
-        req.agentMark = markOf(actor, actor.userId);
+        if (req.apiToken) req.agentMark = markOf(actor, actor.userId);
         return runForAgentOf(actor.userId, { chat: holdsChat(req.apiToken) }, () => runAs(req.agentMark, next));
     }
     const body = req.body || {};

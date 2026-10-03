@@ -173,3 +173,16 @@ describe('a person\'s own change through the same route', () => {
         expect(matcher.acceptsActor(plainRule, priorityEvents()[0])).toBe(true);
     });
 });
+
+describe('a request marked as an agent run that carries no token', () => {
+    it('gets no mark, and no person named by its body', async () => {
+        const req = { agentRun: { _id: '6f0000000000000000000103', agentId: '6f0000000000000000000104', agentName: 'Triage' }, method: 'POST', originalUrl: '/api/v1/comments', path: '/api/v1/comments', headers: { companyid: CID }, body: { userData: { id: world.OTHER } } };
+        const res = { status: () => res, json: () => res, send: () => res };
+        let markInside = 'not reached';
+        await agentPerimeter(req, res, () => { markInside = actingAgent.current(); });
+
+        expect(markInside).toBeNull();
+        expect(req.agentMark).toBeUndefined();
+        expect((await resolveActor(req)).userId).toBe('');
+    });
+});
