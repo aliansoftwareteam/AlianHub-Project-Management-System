@@ -18,6 +18,7 @@ const { CANNOT_OPEN_PROJECT, peopleWhoOpen, cannotOpen } = require('../../../Con
 const { openProject, isChatSpace, startsOwnConversation, listOf, listRef, listLeftBy, readableTaskIds, flatStatus, coveredByMapping, moveMappingInto, conversionRules } = require('./taskWritePlacement');
 
 const { IMPORT_MARK_FIELDS } = require('./importMark');
+const { byline } = require('../../Agents/actingAgent');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
@@ -549,11 +550,14 @@ const employeeNameOf = async (uid) => {
     return name || UNKNOWN_USER;
 };
 
-/* The actor is the signed-in user; the name is escaped here because every history and notification message renders it as HTML. */
+/* The actor is the signed-in user; the name is escaped here because every history and notification message renders it as HTML.
+ * An agent token's request is named as its change over MCP is: "Claude, for Priya". */
 const sessionActor = async (req) => {
     const uid = String((req && req.uid) || '').trim();
     if (!OBJECT_ID.test(uid)) refuse(401, 'A signed-in user is required for this request.');
-    return { id: uid, Employee_Name: escapeText(await employeeNameOf(uid)) };
+    const name = escapeText(await employeeNameOf(uid));
+    const mark = req.agentMark;
+    return { id: uid, Employee_Name: mark ? byline(escapeText(mark.agentName), name) : name };
 };
 
 /* A filter that names no task would match the first task in the collection once the driver drops the empty id. */

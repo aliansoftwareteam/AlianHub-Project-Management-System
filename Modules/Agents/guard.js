@@ -11,6 +11,7 @@ const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 const { canReadProject, fieldsOf } = require('../../Config/projectAccess');
 const { refuse } = require('./personDecides');
 const { runForAgentOf } = require('../../Config/agentRequest');
+const { runAs, markOf } = require('./actingAgent');
 const { CHAT_SCOPE } = require('../../Config/mcpOAuth');
 const { holdsGrant } = require('../Mcp/manageFlag');
 const dataFlag = require('../Mcp/dataFlag');
@@ -423,7 +424,10 @@ const ownRefusalOf = (req, path) => {
 const agentPerimeter = withActor(async (req, res, next, actor) => {
     const path = String(req.originalUrl || req.path || '').split('?')[0];
     const hit = PERIMETER.find((r) => r.test(req.method, path));
-    if (!hit) return runForAgentOf(actor.userId, { chat: holdsChat(req.apiToken) }, next);
+    if (!hit) {
+        req.agentMark = markOf(actor, actor.userId);
+        return runForAgentOf(actor.userId, { chat: holdsChat(req.apiToken) }, () => runAs(req.agentMark, next));
+    }
     const body = req.body || {};
     const removal = `${/task/i.test(path) ? 'task' : 'project'}.delete`;
     const refusedAs = (action, named = action) => refuse(req, res, actor, { action, reason: `An agent is not allowed to do this (${named}). The person has to do it in AlianHub.`, params: {} });
