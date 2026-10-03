@@ -50,7 +50,7 @@ const invalidateAgentAccountCache = (userId) => myCache.del(`agentAccount:${user
  * `req.mcp` (set by the MCP server) both mark the caller as an agent. */
 const resolveActor = async (req) => {
     const token = req.apiToken || null;
-    const userId = String(req.uid || (req.body && req.body.userData && (req.body.userData.id || req.body.userData._id)) || '');
+    const userId = String(req.uid || '');
     const base = { userId, tokenId: token ? String(token._id) : null, tokenName: token ? token.name : null, runId: null, agentId: null, agentName: null };
 
     if (req.agentRun) {
