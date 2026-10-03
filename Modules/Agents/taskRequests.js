@@ -8,7 +8,7 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const socketEmitter = require('../../event/socketEventEmitter');
 const tools = require('../Automations/engine/tools');
 const permissions = require('./permissions');
-const { runAs, byline, toolNameOf } = require('./actingAgent');
+const { runAs, byline, markOf } = require('./actingAgent');
 const { descriptionBlockFrom } = require('../Tasks/helpers/descriptionBlock');
 
 // Task changes an agent makes the way a person makes them: each goes through the task routes' own
@@ -31,7 +31,6 @@ const ARCHIVED_WITH_PARENT = 3;
 const ASSIGN_MODES = Object.freeze(['set', 'add', 'remove']);
 const LINK_KINDS = Object.freeze(['pr', 'branch', 'doc', 'url']);
 const LINKS_MAX = 10;
-const AGENT_NAME_MAX = 60;
 const NO_KEY = '--';
 const KEY_READS = 10;
 const KEY_WAIT_MS = 30;
@@ -53,8 +52,8 @@ const personOf = (actor) => {
 const whoOf = (actor, depth = 0) => {
     const uid = personOf(actor);
     if (!actor || actor.kind !== 'agent') return { uid, via: '', mark: null };
-    const via = String(toolNameOf(actor)).slice(0, AGENT_NAME_MAX);
-    return { uid, via, mark: { userId: uid, agentId: idOf(actor.agentId || actor.clientId) || null, agentName: via, depth: Math.max(0, Number(depth) || 0) } };
+    const mark = markOf(actor, uid, depth);
+    return { uid, via: mark.agentName, mark };
 };
 
 /* The person's name arrives escaped from the route's own preparation; the agent's is escaped here. */
