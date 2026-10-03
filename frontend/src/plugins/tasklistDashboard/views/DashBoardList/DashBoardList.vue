@@ -18,8 +18,8 @@
         />
     </div>
     <template v-else>
-        <div class="w-100 pr-20px pl-20px mt-20px list_view_dashboard style-scroll" v-if="isLoading || sprintLoading">
-            <div class="bg-white border-radius-8-px p-10px mb-15px">
+        <div class="w-100 pr-20px pl-20px mt-20px list_view_dashboard dash-board-list-style-scroll" v-if="isLoading || sprintLoading">
+            <div class="dash-board-list-bg-white border-radius-8-px p-10px mb-15px">
                 <div class="d-flex align-items-center mb-20px">
                     <img :src="triangleBlack" alt="triangleBlack">
                     <Skelaton class="border-radius-5-px ml-10px" style="height: 20px; width: 150px;"/>
@@ -32,7 +32,7 @@
                     </div>
                 </div>
             </div>
-            <div v-for="i in 5" :key="i" class="bg-white border-radius-8-px p-10px mb-15px">
+            <div v-for="i in 5" :key="i" class="dash-board-list-bg-white border-radius-8-px p-10px mb-15px">
                 <div class="d-flex align-items-center">
                     <img :src="triangleBlack" alt="triangleBlack">
                     <Skelaton class="border-radius-5-px ml-10px" style="height: 20px; width: 150px;"/>
@@ -46,7 +46,7 @@
                         <input type="text" :placeHolder="$t('PlaceHolder.search')" class="form-control search-datas-das" v-model="taskSearch">
                         <DropDown mode="listbox" :id="cardUID" :title="$t('Projects.search_in')" class="position-ab dropdown-image-horizontal" :bodyClass="{'search__in-dropdown' : true}">
                         <template #head>
-                            <h4 class="black font-size-13 font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': containerWidth > 767}">
+                            <h4 class="dash-board-list-black dash-board-list-font-size-13 dash-board-list-font-weight-500 p-10px m-0 search__in" :class="{'border-bottom': containerWidth > 767}">
                                 {{$t('Projects.search_in')}}
                             </h4>
                         </template>
@@ -78,7 +78,7 @@
                     </div>
                 </div>
             </div>
-            <div class="list_view_dashboard style-scroll" v-if="groupedTasks.length || (!searchTask ? allTaskGetters.length : searchTaskData.length)" id="list_scroll"  @scroll="scrollFunction">
+            <div class="list_view_dashboard dash-board-list-style-scroll" v-if="groupedTasks.length || (!searchTask ? allTaskGetters.length : searchTaskData.length)" id="list_scroll"  @scroll="scrollFunction">
                 <template v-if="groupById !== 4">
                     <SprintListing
                         v-for="(sprint, index) in groupedTasks"
@@ -101,7 +101,7 @@
                         <div class="new-row item_head">
                             <div class="new-col1 colum-1-calss" :style="`${containerWidth > sideScrollWidth ? 'border:0px' : ''};`" :class="[{'new-col-mobile' : containerWidth < 768}]">
                                 <div class="common-section head heading">
-                                    <span class="font-size-12 dark-gray font-weight-500">{{ $t('Projects.col_title') }}</span>
+                                    <span class="dash-board-list-font-size-12 dash-board-list-dark-gray dash-board-list-font-weight-500">{{ $t('Projects.col_title') }}</span>
                                 </div>
                             </div>
                             <div class="new-col2" v-if="containerWidth > 768">
@@ -109,7 +109,7 @@
                                     <div  v-for="(head,i) in filteredHeaders" :key="i">
                                     <span
                                         :title="head.label"
-                                        class="task_right dark-gray font-weight-500 font-size-12 text-ellipse"
+                                        class="task_right dash-board-list-dark-gray dash-board-list-font-weight-500 dash-board-list-font-size-12 text-ellipse"
                                         :class="{
                                             'item-head-draggable-div' : false,
                                             'custom__field_list_view':head.key !== 'AssigneeUserId' && head.key !== 'commentCounts' && head.key !== 'DueDate' && head.key !== 'Task_Priority' && head.key !== 'TaskKey' && head.key !== 'created_date' && head.key !== 'created_by'
@@ -1157,5 +1157,39 @@ function filterSprintsIdQuery () {
     height: 30px;
     min-width: 110px;
     border-radius: 6px;
+}
+</style>
+
+<style scoped>
+.dash-board-list-black {
+    color: var(--ink);
+}
+.dash-board-list-dark-gray {
+    color: var(--ink);
+}
+.dash-board-list-bg-white {
+    background-color: var(--surface);
+}
+.dash-board-list-font-weight-500 {
+    font-weight: 500 !important;
+}
+.dash-board-list-font-size-12 {
+    font-size: 12px;
+}
+.dash-board-list-font-size-13 {
+    font-size: 13px;
+}
+.dash-board-list-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.dash-board-list-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.dash-board-list-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
 }
 </style>

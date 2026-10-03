@@ -1,9 +1,9 @@
 <template>
-    <div class="projectRightside overflow-y-auto style-scroll">
+    <div class="projectRightside overflow-y-auto project-detail-right-side-style-scroll">
         <div class="projectRightside__details" v-if="checkPermission('project.project_details',projectData?.isGlobalPermission)!== null">
-            <h4 class="font-ui detailsHead" :class="`${clientWidth > 767 ? 'font-size-14 font-weight-700' : 'font-size-16 font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
+            <h4 class="font-ui detailsHead" :class="`${clientWidth > 767 ? 'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-700' : 'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_status_change',projectData?.isGlobalPermission)!== null">
-                <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.status')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500 status__title' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.status')}}</h4>
                 <ProjectStatus
                     class="d-flex nohover__project-rightside d-inline-block text-ellipsis"
                     :projectKey="projectData.status"
@@ -11,7 +11,7 @@
                 />
             </div>
             <div class="d-flex project-right-side-label" v-if="projectData?.projectCreatedBy">
-                <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('Comment.created_by')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500 status__title' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('Comment.created_by')}}</h4>
                 <UserProfile
                     decorative
                     :showDot="false"
@@ -26,13 +26,13 @@
                 />
                 <span 
                     class="project-type-name text-ellipsis project-created-by"
-                    :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                    :class="{'project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400' : clientWidth > 767, 'project-detail-right-side-font-size-16' : clientWidth <=767}"
                     :title="createdByUser?.Employee_Name || 'N/A'">
                     {{ createdByUser?.Employee_Name || 'N/A' }}
                 </span>
             </div>
             <div class="d-flex project-right-side-label" v-if="projectData?.isPrivateSpace && checkPermission('project.project_assignee',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.assignee')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500 status__title' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.assignee')}}</h4>
                 <Assignee
                     class="nohover__project-rightside ml-5px"
                     :numOfUsers="2"
@@ -46,14 +46,14 @@
                 />
             </div>
             <div class="d-flex project-right-side-label">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.key')}}</h4>
-                <span class="projectKeyClass hover__on-projectrightside text-ellipsis cursor-default" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.key')}}</h4>
+                <span class="projectKeyClass hover__on-projectrightside text-ellipsis cursor-default" :class="{'project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400' : clientWidth > 767 ,'project-detail-right-side-font-size-16' : clientWidth <=767}"
                     :style="[{padding : clientWidth > 767 ? '10px 10px 10px 0' : '10px 0px'}]"
                     :title="projectData.ProjectCode"
                 >{{projectData.ProjectCode ? projectData.ProjectCode : 'N/A'}}</span>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_type',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.type')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.type')}}</h4>
                 <ProjectType
                     class="hover__on-projectrightside text-ellipsis"
                     :projectData="projectData"
@@ -61,20 +61,20 @@
                 />
             </div>
             <div class="d-flex project-right-side-label" v-if="projectData.ProjectType === 'Hourly'">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.billing_period')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.billing_period')}}</h4>
                 <BillingPeriod :projectData="projectData" @selected="updateBillingPeriod($event)" class="hover__on-projectrightside text-ellipsis"/>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_currency',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.currency')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.currency')}}</h4>
                 <Currency :projectData="projectData" @selected="updateCurrency($event)"  class="hover__on-projectrightside text-ellipsis" />
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_amount',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.amount')}}</h4>
-                <span class="project-amount cursor-pointer hover__on-projectrightside text-ellipsis" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.amount')}}</h4>
+                <span class="project-amount cursor-pointer hover__on-projectrightside text-ellipsis" :class="{'project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400' : clientWidth > 767 ,'project-detail-right-side-font-size-16' : clientWidth <=767}"
                 :style="[{padding : clientWidth > 767 ? '2px' : '10px 0px'}]" :title="projectData?.ProjectCurrency?.symbol + ' ' + (projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0) ">{{projectData?.ProjectCurrency?.symbol}} {{projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0}}</span>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_source',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.source')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.source')}}</h4>
                 <ProjectSourceSelect
                     class="hover__on-projectrightside"
                     mode="inline"
@@ -84,12 +84,12 @@
                 />
             </div>
             <div class="d-flex project-right-side-label">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">
                     {{$t('ProjectDetails.proposal_id')}}<span class="text-red asterisk" v-if="isUpworkSource">*</span>
                 </h4>
                 <InputText
                     v-if="proposalIdEditable"
-                    class="hover__on-projectrightside--input box-sizing-box font-size-13 font-weight-400"
+                    class="hover__on-projectrightside--input box-sizing-box project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400"
                     inputId="project-proposal-id"
                     height="36px"
                     width="calc(100% - 38%)"
@@ -103,14 +103,14 @@
                 />
                 <span v-else
                     class="projectKeyClass hover__on-projectrightside text-ellipsis"
-                    :class="[{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}, canEditDetails ? 'cursor-pointer' : 'cursor-default']"
+                    :class="[{'project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400' : clientWidth > 767 ,'project-detail-right-side-font-size-16' : clientWidth <=767}, canEditDetails ? 'cursor-pointer' : 'cursor-default']"
                     :style="[{padding : clientWidth > 767 ? '10px 10px 10px 0' : '10px 0px'}]"
                     :title="projectData.proposalId || proposalIdHint"
                     @click="editProposalId()"
                 >{{projectData.proposalId ? projectData.proposalId : 'N/A'}}</span>
             </div>
             <div class="d-flex project-right-side-label">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.skills')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.skills')}}</h4>
                 <SkillsSelect
                     class="hover__on-projectrightside"
                     :modelValue="projectData.skills || []"
@@ -119,7 +119,7 @@
                 />
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_start_date',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.start_date')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.start_date')}}</h4>
                 <StartEndDate
                     v-if="checkPermission('project.project_start_date',projectData?.isGlobalPermission) === true"
                     class="hover__on-projectrightside text-ellipsis"
@@ -135,12 +135,12 @@
                     :position="`right`"
                 ></StartEndDate>
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-if="projectData.StartDate">{{convertDateFormat(projectData.StartDate)}}</span>
-                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_start_date')}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-if="projectData.StartDate">{{convertDateFormat(projectData.StartDate)}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_start_date')}}</span>
                 </template>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_end_date',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.end_date')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.end_date')}}</h4>
                 <StartEndDate
                     v-if="checkPermission('project.project_end_date',projectData?.isGlobalPermission) === true"
                     class="hover__on-projectrightside text-ellipsis"
@@ -155,12 +155,12 @@
                     :position="`right`"
                 ></StartEndDate>
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-if="projectData.EndDate">{{convertDateFormat(projectData.EndDate)}}</span>
-                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_end_date')}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-if="projectData.EndDate">{{convertDateFormat(projectData.EndDate)}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_end_date')}}</span>
                 </template>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_due_date',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767, 'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('Projects.due_date')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767, 'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('Projects.due_date')}}</h4>
                 <DueDateCompo
                     v-if="checkPermission('project.project_due_date',projectData?.isGlobalPermission) === true"
                     class="hover__on-projectrightside text-ellipsis"
@@ -171,8 +171,8 @@
                     :position="`right`"
                 />
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-if="projectData.DueDate">{{convertDateFormat(projectData.DueDate)}}</span>
-                    <span class="font-size-13 font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_due_date')}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-if="projectData.DueDate">{{convertDateFormat(projectData.DueDate)}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_due_date')}}</span>
                 </template>
             </div>
             <ProjectWorkingDays
@@ -863,4 +863,41 @@ const handleClose = () => {
 
 </script>
 <style src='./style.css'>
+</style>
+
+<style scoped>
+.project-detail-right-side-font-weight-400 {
+    font-weight: 400 !important;
+}
+.project-detail-right-side-font-weight-500 {
+    font-weight: 500 !important;
+}
+.project-detail-right-side-font-weight-600 {
+    font-weight: 600 !important;
+}
+.project-detail-right-side-font-weight-700 {
+    font-weight: 700 !important;
+}
+.project-detail-right-side-font-size-13 {
+    font-size: 13px;
+}
+.project-detail-right-side-font-size-14 {
+    font-size: 14px;
+}
+.project-detail-right-side-font-size-16 {
+    font-size: 16px;
+}
+.project-detail-right-side-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.project-detail-right-side-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.project-detail-right-side-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

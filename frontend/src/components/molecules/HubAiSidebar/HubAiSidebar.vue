@@ -2,7 +2,7 @@
     <div>
         <Sidebar width="923px" className="hub-ai-sidebar" :uniqueId="content.uID">
             <template #head-left>
-                <span class="blue font-weight-700 font-size-18">{{selectedPrompt.title}}</span>
+                <span class="hub-ai-sidebar-blue hub-ai-sidebar-font-weight-700 hub-ai-sidebar-font-size-18">{{selectedPrompt.title}}</span>
             </template>
             <template #head-right>
                 <div @click="closeButton(true)" class="close-image d-flex align-items-center justify-content-center"><img src="@/assets/images/svg/delete.svg" /></div>
@@ -13,20 +13,20 @@
                         <div class="hubai_image_div">
                             <img src="@/assets/images/svg/ai_image_white.svg" class="ai_image"/>
                         </div>
-                        <span class="ai-color font-size-16 font-weight-700 pl-15px">{{$t('AI.hub_ai')}}</span>
+                        <span class="ai-color hub-ai-sidebar-font-size-16 hub-ai-sidebar-font-weight-700 pl-15px">{{$t('AI.hub_ai')}}</span>
                     </div>
                     <div>
                         <template v-if="Object.keys(hubResponse).length > 0">
-                            <span class="black font-weight-bold" v-if="hubResponse?.title">{{$t('AI.title')}}: </span>
+                            <span class="hub-ai-sidebar-black hub-ai-sidebar-font-weight-bold" v-if="hubResponse?.title">{{$t('AI.title')}}: </span>
                             <p>{{hubResponse?.title}}</p>
-                            <span v-if="hubResponse.description" class="black font-weight-bold">{{$t('ProjectDetails.description')}}: </span> 
+                            <span v-if="hubResponse.description" class="hub-ai-sidebar-black hub-ai-sidebar-font-weight-bold">{{$t('ProjectDetails.description')}}: </span> 
                             <div class="p15x-0px" id="description-single" v-if="hubResponse.description" v-html="richHtml(hubResponse.description)"></div>
                             <span class="error_class" v-if="hubResponse.error">{{hubResponse.error}}</span>
                             <template v-if="!isSendMessage && !isErrorGenerateSingle">
-                                <button v-for="(buttons,ind) in content.displayButton" :class="[{'pointer-event-none': isButtonClicked}]" :key="ind" class="btn-primary mr-10-px font-size-16 font-weight-400" @click="handleButtonClick(buttons,hubResponse)"> {{buttons.name}}</button>
-                                <button class="outline-primary font-size-16 font-weight-400 mr-10-px" @click="copyText(hubResponse,'single')">{{$t('AI.copy')}}</button>
+                                <button v-for="(buttons,ind) in content.displayButton" :class="[{'pointer-event-none': isButtonClicked}]" :key="ind" class="btn-primary mr-10-px hub-ai-sidebar-font-size-16 hub-ai-sidebar-font-weight-400" @click="handleButtonClick(buttons,hubResponse)"> {{buttons.name}}</button>
+                                <button class="outline-primary hub-ai-sidebar-font-size-16 hub-ai-sidebar-font-weight-400 mr-10-px" @click="copyText(hubResponse,'single')">{{$t('AI.copy')}}</button>
                             </template>
-                            <button v-if="!isSendMessage && (chatContent.length === 0 || isErrorGenerateSingle === true)" class="outline-primary font-size-16 font-weight-400" @click="$emit('regenerate')">{{$t('AI.regenerate')}}</button>
+                            <button v-if="!isSendMessage && (chatContent.length === 0 || isErrorGenerateSingle === true)" class="outline-primary hub-ai-sidebar-font-size-16 hub-ai-sidebar-font-weight-400" @click="$emit('regenerate')">{{$t('AI.regenerate')}}</button>
                             <div v-if="isSendMessage && chatContent.length === 0" class="blinking-div"></div>
                         </template>
                         <template v-else>
@@ -57,18 +57,18 @@
                                         <div class="hubai_image_div">
                                             <img src="@/assets/images/svg/ai_image_white.svg" class="ai_image"/>
                                         </div>
-                                        <span class="ai-color font-size-16 font-weight-700 pl-15px">{{$t('AI.hub_ai')}}</span>
+                                        <span class="ai-color hub-ai-sidebar-font-size-16 hub-ai-sidebar-font-weight-700 pl-15px">{{$t('AI.hub_ai')}}</span>
                                     </div>
-                                    <span v-if="item.content?.title" class="black font-weight-bold">{{$t('AI.title')}}: </span>
+                                    <span v-if="item.content?.title" class="hub-ai-sidebar-black hub-ai-sidebar-font-weight-bold">{{$t('AI.title')}}: </span>
                                     <p v-if="item.content?.title">{{item.content?.title}}</p>
-                                    <span v-if="item.content?.description" class="black font-weight-bold">{{$t('ProjectDetails.description')}}: </span> 
+                                    <span v-if="item.content?.description" class="hub-ai-sidebar-black hub-ai-sidebar-font-weight-bold">{{$t('ProjectDetails.description')}}: </span> 
                                     <div v-if="item.content?.description" class="p15x-0px" id="description-multi" v-html="renderHtmlFun(item.content.description)"></div>
                                     <span class="error_class" v-if="item.error">{{item.error}}</span>
                                     <template v-if="!isSendMessage && !isErrorGenerate">
-                                        <button v-for="(buttons,ind) in content.displayButton" :key="ind" :class="[{'pointer-event-none': isButtonClicked}]" class="btn-primary mr-10-px font-size-16 font-weight-400" @click="handleButtonClick(buttons,item?.content)"> {{buttons.name}}</button>
-                                        <button class="outline-primary font-size-16 font-weight-400 mr-10-px" @click="copyText(item?.content,'multi')">{{$t('AI.copy')}}</button>
+                                        <button v-for="(buttons,ind) in content.displayButton" :key="ind" :class="[{'pointer-event-none': isButtonClicked}]" class="btn-primary mr-10-px hub-ai-sidebar-font-size-16 hub-ai-sidebar-font-weight-400" @click="handleButtonClick(buttons,item?.content)"> {{buttons.name}}</button>
+                                        <button class="outline-primary hub-ai-sidebar-font-size-16 hub-ai-sidebar-font-weight-400 mr-10-px" @click="copyText(item?.content,'multi')">{{$t('AI.copy')}}</button>
                                     </template>
-                                    <button v-if="!isSendMessage && (index == chatContent.length - 1 || isErrorGenerate === true)" class="outline-primary font-size-16 font-weight-400" @click="regenerate()">{{$t('AI.regenerate')}}</button>
+                                    <button v-if="!isSendMessage && (index == chatContent.length - 1 || isErrorGenerate === true)" class="outline-primary hub-ai-sidebar-font-size-16 hub-ai-sidebar-font-weight-400" @click="regenerate()">{{$t('AI.regenerate')}}</button>
                                 </div>
                             </div>
                             <!-- <div v-if="isSendMessage" class="blinking-div"></div> -->
@@ -557,4 +557,28 @@ function renderHtmlFun (data) {
     }
 }
 
+</style>
+
+<style scoped>
+.hub-ai-sidebar-black {
+    color: var(--ink);
+}
+.hub-ai-sidebar-blue {
+    color: var(--brand) !important;
+}
+.hub-ai-sidebar-font-weight-bold {
+    font-weight: bold;
+}
+.hub-ai-sidebar-font-weight-400 {
+    font-weight: 400 !important;
+}
+.hub-ai-sidebar-font-weight-700 {
+    font-weight: 700 !important;
+}
+.hub-ai-sidebar-font-size-16 {
+    font-size: 16px;
+}
+.hub-ai-sidebar-font-size-18 {
+    font-size: 18px !important;
+}
 </style>

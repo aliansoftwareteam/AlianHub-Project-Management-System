@@ -6,22 +6,22 @@
 <div class="ProjectShareGraphicContentWrapper">
     <div class="modalHeader bg-light-gray mb-30px"
     :style="[{padding : clientWidth > 767 ? '16.5px' : '18.5px'}]"
-    :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
+    :class="{'border-radius-5-px  project-workspace-task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
     >
         <h3 class="text-blue">{{name.value && name.value !== "" ? name.value : ''}}</h3>
     </div>
     <div class="ProjectContentbody ProjectShareGraphicContent">
         <div class="shareHrDesignWokspacePrivateWrapper d-flex justify-content-between">
-            <div class="jadePowerWorkspace" @click="switchWorkSpace(false)" :class="{'add':!theModel.privateSpaceValue.value && checkPublicPlan() == true, 'font-size-13 border-radius-5-px ': clientWidth > 767, 'font-size-16 border-radius-6-px ': clientWidth <= 767,'disablePlan' : checkPublicPlan() === false}">
+            <div class="jadePowerWorkspace" @click="switchWorkSpace(false)" :class="{'add':!theModel.privateSpaceValue.value && checkPublicPlan() == true, 'project-workspace-font-size-13 border-radius-5-px ': clientWidth > 767, 'project-workspace-font-size-16 border-radius-6-px ': clientWidth <= 767,'disablePlan' : checkPublicPlan() === false}">
                 <img :src="jadeworkspaceBlue" alt="images" v-if="!theModel.privateSpaceValue.value && checkPublicPlan() === true" />
                 <img :src="jadeworkspaceGray" alt="images" v-if="theModel.privateSpaceValue.value || checkPublicPlan() === false" />
-                <p :class="{'Workspace-desktop-text': clientWidth > 767 , 'Workspace-text-mobile': clientWidth <= 767}">{{`${selectedCompany.Cst_CompanyName}'s ${$t("Projects.workspace")}`}}</p>
+                <p :class="{'project-workspace-Workspace-desktop-text': clientWidth > 767 , 'project-workspace-Workspace-text-mobile': clientWidth <= 767}">{{`${selectedCompany.Cst_CompanyName}'s ${$t("Projects.workspace")}`}}</p>
                 <!-- <p>{{userDetail.companies && userDetail.companies.filter((x) => x.id === $CompanyDatabase)[0].Cst_CompanyName}}'s Workspace</p> -->
             </div>
-            <div class="shareGraphicPrivate" @click="switchWorkSpace(true)" :class="{'add':theModel.privateSpaceValue.value , 'font-size-13 border-radius-5-px ': clientWidth > 767, 'font-size-16 border-radius-6-px ': clientWidth <= 767,'disablePlan' : checkPrivatePlan() === false }">
+            <div class="shareGraphicPrivate" @click="switchWorkSpace(true)" :class="{'add':theModel.privateSpaceValue.value , 'project-workspace-font-size-13 border-radius-5-px ': clientWidth > 767, 'project-workspace-font-size-16 border-radius-6-px ': clientWidth <= 767,'disablePlan' : checkPrivatePlan() === false }">
                 <img :src="pratcceBlue" alt="images" v-if="theModel.privateSpaceValue.value" />
                 <img :src="pratcceGray" alt="images" v-if="!theModel.privateSpaceValue.value" />
-                <p :class="{'Workspace-desktop-text': clientWidth > 767 , 'Workspace-text-mobile': clientWidth <= 767}">{{$t("Projects.private")}}</p>
+                <p :class="{'project-workspace-Workspace-desktop-text': clientWidth > 767 , 'project-workspace-Workspace-text-mobile': clientWidth <= 767}">{{$t("Projects.private")}}</p>
             </div>
         </div>
         
@@ -54,8 +54,8 @@
                 </ul>
             </span>
         </div>
-        <p v-if="theModel.privateSpaceValue.value === false" :class="{'privatespace-desc-desktop': clientWidth > 767 , 'privatespace-desc-mobile': clientWidth <= 767}">{{$t('ProjectWorkplace.msg1')}}</p>
-        <p v-if="theModel.privateSpaceValue.value === ''" :class="{'privatespace-desc-desktop': clientWidth > 767 , 'privatespace-desc-mobile': clientWidth <= 767}">{{$t('ProjectWorkplace.msg2')}}</p>
+        <p v-if="theModel.privateSpaceValue.value === false" :class="{'project-workspace-privatespace-desc-desktop': clientWidth > 767 , 'project-workspace-privatespace-desc-mobile': clientWidth <= 767}">{{$t('ProjectWorkplace.msg1')}}</p>
+        <p v-if="theModel.privateSpaceValue.value === ''" :class="{'project-workspace-privatespace-desc-desktop': clientWidth > 767 , 'project-workspace-privatespace-desc-mobile': clientWidth <= 767}">{{$t('ProjectWorkplace.msg2')}}</p>
     </div>
 </div>
 </template>
@@ -183,5 +183,44 @@ import UpgradePlanModal from "@/components/atom/UpgradePlanModal/UpgradePlanModa
     background-color: var(--fill);
     border: 1px solid var(--border) !important;
     pointer-events: none;
+}
+</style>
+
+<style scoped>
+.project-workspace-font-size-13 {
+    font-size: 13px;
+}
+.project-workspace-font-size-16 {
+    font-size: 16px;
+}
+.project-workspace-task-heading-desktop {
+    font-weight: 700 !important;
+    font-size: 18px !important;
+    line-height: 27px !important;
+    color: var(--ink) !important;
+    text-align: center !important;
+}
+.project-workspace-Workspace-desktop-text {
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 19px;
+    color: var(--ink-2);
+    text-align: center;
+}
+.project-workspace-privatespace-desc-desktop {
+    font-style: italic;
+    font-weight: 400;
+    font-size: 13px;
+    line-height: 19px;
+}
+.project-workspace-Workspace-text-mobile {
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 21px;
+    color: var(--ink-2);
+}
+.project-workspace-privatespace-desc-mobile {
+    font-size: 16px;
+    line-height: 26px;
 }
 </style>

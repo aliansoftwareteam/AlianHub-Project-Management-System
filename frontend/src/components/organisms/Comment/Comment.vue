@@ -1,10 +1,10 @@
 <template>
     <div>
-        <div v-if="showDay" class="position-re bg-gray my-1 w-100 show__day">
+        <div v-if="showDay" class="position-re comment-bg-gray my-1 w-100 show__day">
             <span class="position-ab px-1 border-radius-5-px cursor-default show__day-format">{{convertDateFormat(message.createdAt)}}</span>
         </div>
         <div v-if="showUnread" class="d-flex justify-content-center w-100 mt-10px">
-            <span class="border-radius-10-px cursor-default text-center unread__message-text bg-lightgreen py-10px">{{showUnread}} {{$t('Comments.unread_message')}}</span>
+            <span class="border-radius-10-px cursor-default text-center unread__message-text comment-bg-lightgreen py-10px">{{showUnread}} {{$t('Comments.unread_message')}}</span>
         </div>
         <div class="message d-flex align-items-center mt-1" :style="{marginTop: (!showMessageTime ? '5px' : '')}" :class="{'right-message': message.sent, 'justify-content-between': !message.sent}">
             <div class="d-flex" :style="{paddingLeft: (!message.sent && !showUser ? '35px' : '')}">
@@ -34,20 +34,20 @@
                 />
                 <div>
                     <div class="cursor-default mb-5px" :class="{'text-right': message.sent, 'text-left': !message.sent}">
-                        <span v-if="showUser" class="font-size-14 font-weight-700 mr-5px color63 show__user">
+                        <span v-if="showUser" class="comment-font-size-14 comment-font-weight-700 mr-5px comment-color63 show__user">
                             {{!message.sent ? authorName : ''}}
                         </span>
                         <span v-if="showUser && !message.sent && agentAuthor" class="ah-chip ah-chip--agent ah-chip--mono mr-5px">{{ $t('Comments.agent_tag') }}</span>
                         <span v-else-if="showUser && !message.sent && automationAuthor" class="ah-chip ah-chip--automation ah-chip--mono mr-5px">{{ $t('Comments.automation_tag') }}</span>
-                        <span class="font-size-12 font-weight-300 gray text-lowercase show" v-if="showMessageTime">
+                        <span class="comment-font-size-12 font-weight-300 comment-gray text-lowercase show" v-if="showMessageTime">
                             {{getDateType(new Date(message.createdAt).getTime())}}
                         </span>
                     </div>
                     <div class="d-flex position-re" :class="{'justify-content-end': message.sent}">
-                        <span v-if="!message.isDeleted && message.sent && new Date(message.createdAt)?.getTime() !== new Date(message.updatedAt)?.getTime()" class="font-size-10">({{$t('Comments.edited')}})</span>
-                        <div :id="message._id" class="border-radius-10-px p-10px message_id-sent" :class="{'bg-white': !message.sent, 'bg-light-blue': message.sent}" :style="`${message.type !== 'text' || message.type !== 'link' ? 'width: auto;' : ''}`">
+                        <span v-if="!message.isDeleted && message.sent && new Date(message.createdAt)?.getTime() !== new Date(message.updatedAt)?.getTime()" class="comment-font-size-10">({{$t('Comments.edited')}})</span>
+                        <div :id="message._id" class="border-radius-10-px p-10px message_id-sent" :class="{'comment-bg-white': !message.sent, 'comment-bg-light-blue': message.sent}" :style="`${message.type !== 'text' || message.type !== 'link' ? 'width: auto;' : ''}`">
                             <template v-if="message.isDeleted">
-                                <pre class="red font-italic" v-html="message.userId === userId ? $t('Comments.You_deleted_this_message') : $t('Comments.This_message_is_deleted')"/>
+                                <pre class="comment-red comment-font-italic" v-html="message.userId === userId ? $t('Comments.You_deleted_this_message') : $t('Comments.This_message_is_deleted')"/>
                             </template>
                             <template v-else>
                                 <Spinner
@@ -98,7 +98,7 @@
                                 <template v-else>
                                     <template v-if="message.hasReply">
                                         <div>
-                                            <div @click="$emit('highlight', message.reply)" class="d-flex align-items-center border-radius-10-px cursor-pointer p-10px mb-5px message_replay" :class="{'bg-light-gray': !message.sent, 'bg-fresh-air' : message.sent}">
+                                            <div @click="$emit('highlight', message.reply)" class="d-flex align-items-center border-radius-10-px cursor-pointer p-10px mb-5px message_replay" :class="{'comment-bg-light-gray': !message.sent, 'comment-bg-fresh-air' : message.sent}">
                                                 <span
                                                     v-if="replyAgentAuthor"
                                                     class="ah-avatar ah-avatar--agent message__profile-image message__agent-avatar mr-10px"
@@ -149,7 +149,7 @@
                                 </template>
                             </template>
                         </div>
-                        <span v-if="!message.isDeleted && !message.sent && new Date(message.createdAt).getTime() !== new Date(message.updatedAt).getTime()"  class="font-size-10">({{$t('Comments.edited')}})</span>
+                        <span v-if="!message.isDeleted && !message.sent && new Date(message.createdAt).getTime() !== new Date(message.updatedAt).getTime()"  class="comment-font-size-10">({{$t('Comments.edited')}})</span>
                         <ReactionBar
                             v-if="!message.isDeleted"
                             :reactions="localReactions"
@@ -456,4 +456,49 @@ onMounted(async () => {
 }
 
 
+</style>
+
+<style scoped>
+.comment-gray {
+    color: var(--ink-2);
+}
+.comment-red {
+    color: var(--danger-ink);
+}
+.comment-color63 {
+    color: var(--ink);
+}
+.comment-bg-white {
+    background-color: var(--surface);
+}
+.comment-bg-light-blue {
+    background-color: var(--brand-tint);
+}
+.comment-bg-fresh-air {
+    background-color: var(--brand-tint);
+}
+.comment-bg-gray {
+    background-color: var(--fill);
+}
+.comment-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.comment-bg-lightgreen {
+    background-color: var(--ok-bg);
+}
+.comment-font-italic {
+    font-style: italic;
+}
+.comment-font-weight-700 {
+    font-weight: 700 !important;
+}
+.comment-font-size-10 {
+    font-size: 10px;
+}
+.comment-font-size-12 {
+    font-size: 12px;
+}
+.comment-font-size-14 {
+    font-size: 14px;
+}
 </style>

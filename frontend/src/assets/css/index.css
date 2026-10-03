@@ -36,11 +36,11 @@
     height: 25px;
     width: 25px;
     border-radius: 50%;
-    background-color: white;
-    border: 1px solid #f4f5f7;
+    background-color: var(--surface);
+    border: 1px solid var(--hairline);
 }
 .subtask__item-assignee .asignee-profile {
-    border: 2px solid #fff !important;
+    border: 2px solid var(--surface) !important;
 }
 .profile-sm-square {
     object-fit: cover;
@@ -58,15 +58,15 @@
     object-fit: cover;
     height: 73px;
     width: 73px;
-    background: #D9D9D9;
-    border: 2px solid #2F3990;
+    background: var(--fill);
+    border: 2px solid var(--brand);
     box-shadow: 0px 4px 6px rgba(47, 57, 144, 0.25);
     border-radius: 15px;
 }
 .mobile-back-drop {
     height: 100dvh;
     width: 100%;
-    background-color: #00000033;
+    background-color: var(--scrim);
     top: 0;
     left: 0;
 }
@@ -76,16 +76,16 @@
     align-items: center;
     justify-content: center;
     background-color: transparent;
-    border: 1px solid red;
-    color: red;
+    border: 1px solid var(--danger);
+    color: var(--danger);
     padding: 0 3.05px;
     font-size: 10px;
     line-height: 29px;
 }
 .secondary-count-block {
     background-color: transparent !important;
-    color: red !important;
-    border: 1px solid red !important;
+    color: var(--danger) !important;
+    border: 1px solid var(--danger) !important;
 }
 .count-block.parent-count-block{
     border-radius: 3px !important;
@@ -363,7 +363,7 @@ input[type="color"]::-moz-color-swatch {
     position: absolute;
     width: 6px;
     height: 6px;
-    background-color: red;
+    background-color: var(--danger);
     border-radius: 6px;
     left: 14px;
     top: -6px;

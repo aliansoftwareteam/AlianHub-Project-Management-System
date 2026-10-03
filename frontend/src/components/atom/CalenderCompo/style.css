@@ -254,23 +254,23 @@ button.dp__btn.dp__month_year_select {
 .vue__time-picker .dropdown ul li{
     font-size: 14px;
     font-family: var(--font-ui);
-    color: #000;
+    color: var(--ink);
 }
 .tracker-timesheet-calender .calendar-comp::placeholder{
     font-size: 16px!important;
-    color: #000!important;
+    color: var(--ink)!important;
     position: relative;
     top: 1px;
 }
 .logdetailview-calender .calendar-comp::placeholder{
     font-size: 16px!important;
-    color: #000!important;
+    color: var(--ink)!important;
     position: relative;
     top: 2px;
 }
 .due-date-home-calender-wrapper .due-date-home-cal .calendar-comp::placeholder{
     font-size: 16px!important;
-    color: #000!important;
+    color: var(--ink)!important;
     position: relative;
     top: 1px;
 }
@@ -324,7 +324,7 @@ button.dp__btn.dp__month_year_select {
 }
 @media(max-width:  767px){
     .task-detail-right-side-label .calendar-comp {background-image: none;text-align: right;font-size: 16px;padding-right: 0 !important;padding-left: 0 !important;}
-    .task-detail-right-side-label .calendar-comp::placeholder, .task-detail-right-side-label input#inputId::placeholder{color: #000 !important;font-size: 16px !important;}
+    .task-detail-right-side-label .calendar-comp::placeholder, .task-detail-right-side-label input#inputId::placeholder{color: var(--ink) !important;font-size: 16px !important;}
     body:has(.tab-list-header .tab-list-header-ul li:last-child.active) .dp--menu-wrapper{
         left: 10px !important;
     }

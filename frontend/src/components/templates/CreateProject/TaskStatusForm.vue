@@ -7,10 +7,10 @@
 <template>
 <div class="statusHeader statusHeader_two">
     <h3 v-if="fromWhich == ''" class="heading_text bg-light-gray mt-0px"
-    :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px  task-heading-mobile': clientWidth <= 767}"
+    :class="{'border-radius-5-px  task-status-form-task-heading-desktop': clientWidth > 767 , 'border-radius-8-px  task-heading-mobile': clientWidth <= 767}"
     >{{$t('Templates.setup_status')}}</h3>
     <h3 v-else class="heading_text bg-light-gray mt-0px"
-    :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px  task-heading-mobile': clientWidth <= 767}"
+    :class="{'border-radius-5-px  task-status-form-task-heading-desktop': clientWidth > 767 , 'border-radius-8-px  task-heading-mobile': clientWidth <= 767}"
     >{{$t('Templates.what_task')}}?</h3>
     <div class="taskStatusSection style-scroll">
         <TemplateSelectForm
@@ -28,7 +28,7 @@
             @left-focus="onLeftFocus"
         >
             <template #list>
-                <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}"
+                <h3 :class="{'task-status-form-taskstatustitle-desktop': clientWidth > 767 , 'task-status-form-taskstatustitle-mobile': clientWidth <= 767}"
                 >{{$t('Projects.active_status')}}</h3>
                 <div class="statuInputwrapper activeStatus" v-if="theModel.taskStatusField.value.defaultActive && Object.keys(theModel.taskStatusField.value.defaultActive).length > 0">
                     <ul class="status_ul">
@@ -62,10 +62,10 @@
                     :projectData="projectData"
                 />
                 <button class="cursor-pointer btn btn-primary addstatus-btn ml-0 mb-20px" type="button" @click="openTaskStatusSidebar()">+ {{$t('Projects.add_status')}}</button>
-                <div class="red">
+                <div class="task-status-form-red">
                     <span v-if="errorMsgTask" class="task-status-form-font-size-11">{{errorMsgTask}}</span>
                 </div>
-                <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}"
+                <h3 :class="{'task-status-form-taskstatustitle-desktop': clientWidth > 767 , 'task-status-form-taskstatustitle-mobile': clientWidth <= 767}"
                 >{{$t('Projects.done_status')}}</h3>
                 <DragDropField
                     :group="{ name: 'task_status_group' }"
@@ -85,7 +85,7 @@
                     :projectData="projectData"
                 />
                 <div>
-                    <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile mt-030': clientWidth <= 767}"
+                    <h3 :class="{'task-status-form-taskstatustitle-desktop': clientWidth > 767 , 'task-status-form-taskstatustitle-mobile mt-030': clientWidth <= 767}"
                     >{{$t('Projects.close_status')}}</h3>
                     <div class="statuInputwrapper activeStatus" v-if="theModel.taskStatusField.value.defaultComplete && Object.keys(theModel.taskStatusField.value.defaultComplete).length > 0">
                         <ul class="status_ul">
@@ -577,4 +577,29 @@ const { t } = useI18n();
 
 <style scoped>
 @import './style.css';
+</style>
+
+<style scoped>
+.task-status-form-red {
+    color: var(--danger-ink);
+}
+.task-status-form-taskstatustitle-desktop {
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    line-height: 21px !important;
+    color: var(--ink) !important;
+}
+.task-status-form-task-heading-desktop {
+    font-weight: 700 !important;
+    font-size: 18px !important;
+    line-height: 27px !important;
+    color: var(--ink) !important;
+    text-align: center !important;
+}
+.task-status-form-taskstatustitle-mobile {
+    font-size: 16px !important;
+    line-height: 21px !important;
+    font-weight: 500 !important;
+    color: var(--ink) !important;
+}
 </style>

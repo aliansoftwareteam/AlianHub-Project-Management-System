@@ -3,7 +3,7 @@
         <div v-if="isFolder === true">
             <Sidebar width="607px" :top="clientWidth <= 767 ? '0px' : '46px'" className="converted__sidebar" :title="$t('ProjectDetails.convert_list')">
                 <template #head-left>
-                    <div class="blue font-ui screenShotPreview">{{$t('ProjectDetails.convert_list')}}</div>
+                    <div class="convert-to-list-blue font-ui screenShotPreview">{{$t('ProjectDetails.convert_list')}}</div>
                 </template>
                 <template #head-right>
                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="$emit('closeSidebar',false)">{{$t('Projects.cancel')}}</button>
@@ -13,9 +13,9 @@
                         <div class="position-re overflow-x-visible overflow-y-auto overflow-y-auto::-webkit-scrollbar" :style="[{ maxHeight : clientWidth > 767 ? 'calc(100vh - 172px)' : 'calc(100vh - 90px)'}]">
                         <div class="d-flex align-items-center justify-content-between position-sti z-index-1 project__icon-wrapper">
                             <div class="d-flex align-items-center text-ellipsis projectDivInList">
-                                <span v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center font-weight-400 inital-box ml-6px" :style="[{'background-color': selectedProjectData.projectIcon.data}]">{{ selectedProjectData.ProjectName.charAt(0).toUpperCase()}}</span>
+                                <span v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center convert-to-list-font-weight-400 inital-box ml-6px" :style="[{'background-color': selectedProjectData.projectIcon.data}]">{{ selectedProjectData.ProjectName.charAt(0).toUpperCase()}}</span>
                                 <img v-if="selectedProjectData.projectIcon && selectedProjectData.projectIcon.type === 'image'" class="profile-sm-square ml-6px" :src="selectedProjectData.projectIcon.data" alt=""/>
-                                <span class="text-ellipsis Project-name-sidebar-inlist font-weight-500 font-ui pl-10px" :class="{'font-size-13' : clientWidth > 767, 'font-size-16' : clientWidth <= 767}"  @click="showSidebar = true">{{selectedProjectData.ProjectCode}} | {{selectedProjectData.ProjectName}}</span>
+                                <span class="text-ellipsis Project-name-sidebar-inlist convert-to-list-font-weight-500 font-ui pl-10px" :class="{'convert-to-list-font-size-13' : clientWidth > 767, 'convert-to-list-font-size-16' : clientWidth <= 767}"  @click="showSidebar = true">{{selectedProjectData.ProjectCode}} | {{selectedProjectData.ProjectName}}</span>
                             </div>
                         </div>
                         <SideBarSprintFolderData
@@ -39,7 +39,7 @@
                             <img @click="$emit('closeSidebar',false)" :src="closeImage" alt="closeImage" class="position-ab cursor-pointer close_image-icon">
                         </template>
                         <template #body>
-                            <span class="d-block text-center convert-list-message font-size-16 font-weight-400 font-ui gray81 pt-17px important__note-desc" ><span class="red">{{$t('Converttolist.important')}}:</span> {{$t('Converttolist.you_will_lose')}}</span>
+                            <span class="d-block text-center convert-list-message convert-to-list-font-size-16 convert-to-list-font-weight-400 font-ui convert-to-list-gray81 pt-17px important__note-desc" ><span class="convert-to-list-red">{{$t('Converttolist.important')}}:</span> {{$t('Converttolist.you_will_lose')}}</span>
                         </template>
                     </ConfirmationSidebar>
                 </template>
@@ -56,7 +56,7 @@
                     <img @click="$emit('closeSidebar',false)" :src="closeImage" alt="closeImage" class="position-ab cursor-pointer close_image-icon">
                 </template>
                 <template #body>
-                    <span class="d-block text-center convert-list-message font-size-16 font-weight-400 font-ui gray81 pt-17px important__note-desc"><span class="red">{{$t('Converttolist.important')}}:</span> {{$t('Converttolist.you_will_lose')}}</span>
+                    <span class="d-block text-center convert-list-message convert-to-list-font-size-16 convert-to-list-font-weight-400 font-ui convert-to-list-gray81 pt-17px important__note-desc"><span class="convert-to-list-red">{{$t('Converttolist.important')}}:</span> {{$t('Converttolist.you_will_lose')}}</span>
                 </template>
             </ConfirmationSidebar>
         </div>
@@ -238,3 +238,26 @@
 <style scoped src="./style.css"></style>
 <style src="../ConvertToSubTaskSidebar/theme.css"></style>
 
+<style scoped>
+.convert-to-list-blue {
+    color: var(--brand) !important;
+}
+.convert-to-list-red {
+    color: var(--danger-ink);
+}
+.convert-to-list-gray81 {
+    color: var(--ink-2);
+}
+.convert-to-list-font-weight-400 {
+    font-weight: 400 !important;
+}
+.convert-to-list-font-weight-500 {
+    font-weight: 500 !important;
+}
+.convert-to-list-font-size-13 {
+    font-size: 13px;
+}
+.convert-to-list-font-size-16 {
+    font-size: 16px;
+}
+</style>

@@ -1,5 +1,5 @@
 <template>
-    <div class="overflow-auto style-scroll mobile__bg--withPadding mt-10px">
+    <div class="overflow-auto linked-docs-style-scroll mobile__bg--withPadding mt-10px">
         <div class="w-100 d-flex align-items-center justify-content-between">
             <span class="linked-docs__title">{{$t('Projects.linked_docs')}}</span>
             <div v-if="!mode" class="d-flex align-items-center linked-docs__actions">
@@ -17,18 +17,18 @@
             >
                 <div class="d-flex align-items-center linked-docs__row-main" @click="$emit('open', doc)">
                     <span class="linked-docs__icon" v-html="ICON_DOC"></span>
-                    <span class="font-size-13 font-weight-400 linked-docs__name linked-docs__name--link" :title="doc.title">{{ doc.title || $t('Projects.untitled_page') }}</span>
-                    <span v-if="doc.visibility === 'private'" class="font-size-11 font-weight-500 linked-docs__chip">{{$t('Projects.doc_private')}}</span>
+                    <span class="linked-docs-font-size-13 linked-docs-font-weight-400 linked-docs__name linked-docs__name--link" :title="doc.title">{{ doc.title || $t('Projects.untitled_page') }}</span>
+                    <span v-if="doc.visibility === 'private'" class="linked-docs-font-size-11 linked-docs-font-weight-500 linked-docs__chip">{{$t('Projects.doc_private')}}</span>
                 </div>
                 <span
-                    class="font-size-14 cursor-pointer linked-docs__remove"
+                    class="linked-docs-font-size-14 cursor-pointer linked-docs__remove"
                     :class="{'pointer-event-none': busyId === String(doc._id)}"
                     :title="$t('Projects.doc_unlink')"
                     @click.stop="unlink(doc)"
                 >&#10005;</span>
             </div>
         </div>
-        <div v-else-if="!mode && !isLoading" class="ah-muted font-size-12 py-10px">
+        <div v-else-if="!mode && !isLoading" class="ah-muted linked-docs-font-size-12 py-10px">
             {{$t('Projects.task_no_docs')}}
         </div>
 
@@ -39,12 +39,12 @@
                     ref="inputRef"
                     v-model="searchQuery"
                     type="text"
-                    class="linked-docs__input font-size-13"
+                    class="linked-docs__input linked-docs-font-size-13"
                     :placeholder="$t('Projects.search_pages')"
                 />
                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="closeRow">{{$t('Projects.cancel')}}</button>
             </div>
-            <div v-if="isSearching" class="ah-muted font-size-12 py-5px">{{$t('Projects.searching')}}</div>
+            <div v-if="isSearching" class="ah-muted linked-docs-font-size-12 py-5px">{{$t('Projects.searching')}}</div>
             <div v-else-if="candidates.length > 0" class="linked-docs__results">
                 <div
                     v-for="doc in candidates"
@@ -54,10 +54,10 @@
                     @click="link(doc)"
                 >
                     <span class="linked-docs__icon" v-html="ICON_DOC"></span>
-                    <span class="font-size-13 font-weight-400 linked-docs__name">{{ doc.title || $t('Projects.untitled_page') }}</span>
+                    <span class="linked-docs-font-size-13 linked-docs-font-weight-400 linked-docs__name">{{ doc.title || $t('Projects.untitled_page') }}</span>
                 </div>
             </div>
-            <div v-else class="ah-muted font-size-12 py-5px">
+            <div v-else class="ah-muted linked-docs-font-size-12 py-5px">
                 {{ searchQuery ? $t('Projects.no_pages_match') : $t('Projects.doc_all_linked') }}
             </div>
         </div>
@@ -70,7 +70,7 @@
                     ref="inputRef"
                     v-model="newTitle"
                     type="text"
-                    class="linked-docs__input font-size-13"
+                    class="linked-docs__input linked-docs-font-size-13"
                     :placeholder="$t('Projects.page_title_placeholder')"
                     @keyup.enter="createDoc"
                 />
@@ -82,7 +82,7 @@
                 >{{$t('Projects.create')}}</button>
                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" @click="closeRow">{{$t('Projects.cancel')}}</button>
             </div>
-            <div class="ah-muted font-size-12 py-5px">{{$t('Projects.doc_create_hint')}}</div>
+            <div class="ah-muted linked-docs-font-size-12 py-5px">{{$t('Projects.doc_create_hint')}}</div>
         </div>
     </div>
 </template>
@@ -332,5 +332,39 @@ watch(() => props.refreshKey, loadLinked);
 .linked-docs__results {
     max-height: 220px;
     overflow-y: auto;
+}
+</style>
+
+<style scoped>
+.linked-docs-font-weight-400 {
+    font-weight: 400 !important;
+}
+.linked-docs-font-weight-500 {
+    font-weight: 500 !important;
+}
+.linked-docs-font-size-11 {
+    font-size: 11px;
+}
+.linked-docs-font-size-12 {
+    font-size: 12px;
+}
+.linked-docs-font-size-13 {
+    font-size: 13px;
+}
+.linked-docs-font-size-14 {
+    font-size: 14px;
+}
+.linked-docs-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.linked-docs-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.linked-docs-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
 }
 </style>
