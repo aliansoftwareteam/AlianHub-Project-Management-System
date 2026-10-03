@@ -62,7 +62,7 @@ const open = async () => {
     await router.isReady();
     const store = createStore({ modules: { settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType: MEMBER }) } } } });
     const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
-    wrapper = mount(WaitingOnYouCard, { attachTo: document.body, global: { plugins: [store, router, i18n] } });
+    wrapper = mount(WaitingOnYouCard, { attachTo: document.body, global: { plugins: [store, router, i18n], mocks: { $t: i18n.global.t } } });
     await flushPromises();
     return wrapper;
 };

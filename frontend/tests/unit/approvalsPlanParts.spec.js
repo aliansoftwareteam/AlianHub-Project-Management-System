@@ -51,7 +51,7 @@ let wrapper;
 const open = async () => {
     const store = createStore({ modules: { settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType: OWNER }) } } } });
     const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
-    wrapper = mount(Approvals, { attachTo: document.body, global: { plugins: [store, i18n] } });
+    wrapper = mount(Approvals, { attachTo: document.body, global: { plugins: [store, i18n], mocks: { $t: i18n.global.t } } });
     await flushPromises();
     return wrapper;
 };
