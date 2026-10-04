@@ -5050,6 +5050,8 @@
     "Home.waiting_approved": "Approved.",
     "Home.waiting_open_inbox": "Open in the Inbox",
     "Home.waiting_open_named": "Open in the AI Inbox: {what}",
+    "Home.waiting_review_named": "Review the parts of: {what}",
+    "Home.waiting_review_parts": "Review parts",
     "Home.waiting_untitled": "A proposed change",
     "Home.week": "Week",
     "Home.working_hours": "Working hours {from}–{to}",

@@ -22,6 +22,8 @@ const runs = require('../Modules/Agents/runs');
 const agentsCtrl = require('../Modules/Agents/controller');
 const commentsCtrl = require('../Modules/Comments/controller');
 const { agentPerimeter } = require('../Modules/Agents/guard');
+const actions = require('../Modules/Agents/actions');
+const { resolveActor } = require('../Modules/Agents/actor');
 
 const { CID, OWNER, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, L_OPEN, L_SECRET, T_OPEN, T_SECRET, T_PRIVATE, settle } = world;
 const { seed, rows } = world.create(mockDb);
@@ -166,6 +168,27 @@ describe('a comment that names a workspace agent, posted with a token created fo
 
         expect(startedByMention()).toHaveLength(1);
         expect(startedByMention()[0]).toMatchObject({ agentId: REVIEWER, taskId: T_OPEN, startedBy: INSIDER });
+    });
+
+    it('starts that agent one hop deeper, as the same comment made over MCP does', async () => {
+        await comment(agentToken(INSIDER));
+        const [web] = startedByMention();
+        rows(SCHEMA_TYPE.AGENT_RUNS).length = 0;
+
+        const actor = await resolveActor({ ...agentToken(INSIDER), mcp: true });
+        await actions.perform({ companyId: CID, actor, action: 'task.comment', params: { taskId: T_OPEN, body: naming }, reason: 'review', depth: 0 });
+        await settle();
+        const [overMcp] = startedByMention();
+
+        expect(overMcp).toBeTruthy();
+        expect(web.triggerDepth).toBe(overMcp.triggerDepth);
+        expect(web.triggerDepth).toBe(1);
+    });
+
+    it('leaves a person\'s comment at the start of a chain', async () => {
+        await comment(session(INSIDER));
+
+        expect(startedByMention()[0].triggerDepth).toBe(0);
     });
 
     it.each(HELD)('is posted and starts nothing where the project %s, and that is recorded', async (label, set) => {

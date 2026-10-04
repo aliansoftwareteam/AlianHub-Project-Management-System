@@ -32,8 +32,9 @@ const startMentionedAgents = async (req, companyId, comment) => {
     const { resolveActor, isAgent } = require("../Agents/actor");
     const actor = await resolveActor(req);
     if (actor.runId) return;
+    const mark = require("../Agents/actingAgent").current();
     await require("../Agents/triggers").fromComment(companyId, {
-        authorId: comment.userId, taskId: comment.taskId, message: comment.message,
+        authorId: comment.userId, taskId: comment.taskId, message: comment.message, depth: mark ? mark.depth + 1 : 0,
         ...(isAgent(actor) ? { postedBy: actor, path: `${req.method} ${String(req.originalUrl || '').split('?')[0]}`, ip: req.ip || '' } : {}),
     });
 };
