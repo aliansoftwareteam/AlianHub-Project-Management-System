@@ -1,72 +1,42 @@
 <!-- =========================================================================================
     Created By : Dipsha Kalariya
     Commnet : This component is used to display project task type detail for blank project form as step-4 in create project module.
+    Now a thin wrapper over the reusable <TemplateSelectForm>: it owns the task-type data,
+    store/API operations and the right-column list; the shell owns the template picker UI.
 ========================================================================================== -->
 <template>
 <div class="statusHeader statusHeader_one">
     <div :class="{'border-radius-5-px': clientWidth > 767 , 'border-radius-8-px': clientWidth <= 767 } ">
-        <h3 v-if="fromWhich == ''" class="heading_text mt-0 bg-light-gray" 
+        <h3 v-if="fromWhich == ''" class="heading_text mt-0 bg-light-gray"
         :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
         >{{$t('Projects.add_task_need')}}</h3>
-        <h3 v-else class="heading_text mt-0 bg-light-gray" 
+        <h3 v-else class="heading_text mt-0 bg-light-gray"
         :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px task-heading-mobile': clientWidth <= 767}"
         >{{$t('Projects.what_task_want')}}</h3>
     </div>
     <div class="taskStatusSection style-scroll">
-        <div class="statusTaskWrapper d-flex justify-content-between">
-            <div class="taskStatusLeft" id="createprojecttasktypetemplate_driver">
-                <div class="d-flex justify-content-between w-90">
-                    <label class="templetes mb-6px" :class="{'template-label-desktop': clientWidth > 767 , 'template-label-mobile': clientWidth <= 767}">{{$t('Templates.templates')}} ({{taskTypeTemplates.length}})</label>
-                    <img class="cursor-pointer" src="@/assets/images/svg/pluss.svg" id="createprojecttasktype_driver" @click="activeTemplate()"/>
-                </div>
-                <ul class="templated_name_ul position-re">
-                    <li v-for="(tempVal,index) in taskTypeTemplates" v-bind:key="index" class="cursor-pointer" :class="[{'temp_save_value':tempVal.isShowSave}]">
-                        <span v-if="!tempVal.isEditable" :class="[{'temp_save_dot':tempVal.isShowSave, 'templated-name-desktop': clientWidth > 767, 'templated-name-mobile': clientWidth <= 767}]" :style="`${theModel.taskTypeField.value._id === tempVal._id ? 'color: #3845B3 !important; font-weight: 500' : ''}`" :title="tempVal.TemplateName"  @click="setTemplateData(tempVal)" class="templated_name text-ellipsis text-capitalize" > {{tempVal.TemplateName}} </span>
-                            <input type="text" class="statusInputText form-control edit-input statuseditInput" :maxlength="50" v-if="tempVal.isEditable" v-model.trim="taskTypeName" @keypress.enter="editTaskTypeTemplate(tempVal,index)" @input="errTempMsg=''"/>
-                            <span class="position-ab"  v-if="tempInd === index" :style="[{paddingTop : clientWidth > 767 ? '8px' : '1px', right : clientWidth > 767 ? '20px' : '20px'}]">
-                                <img :src="saveIcon" class="cursor-pointer" v-if="tempVal.isEditable" @click="editTaskTypeTemplate(tempVal,index)">
-                                <img :src="deletered" class="cursor-pointer ml-10px" v-if="tempVal.isEditable" @click="tempVal.isEditable = false,errTempMsg=''">
-                            </span>
-                        <span class="task-leftside" v-if="!tempVal.isEditable && tempVal.isShowSave !== true && tempVal.TemplateName !== 'Custom'">
-                            <img v-if="clientWidth > 767 || (clientWidth <= 767 && tempVal.showEditIcon)"  :src="templateEditIcon" alt="editicon" class="taskleftEditIcon" @click="taskTypeName = tempVal.TemplateName, tempVal.isEditable = true, addTaskType = false, isTemplate = false, errTempMsg = '', openEditTemplate(index)"/>
-                            <img v-if="!tempVal.default && (clientWidth > 767 || (clientWidth <= 767 && tempVal.showEditIcon))"  :src="templateDeleteIcon" alt="deleteicon" class="taskleftdeleteIcon" @click="tempInd = '', isDeleteTemp = true, deleteTemplateObj = tempVal"/>
-                        </span>
-                        <button type="button" :class="[{'pointer-event-none':isSpinner}]" class="save_template" v-if="tempVal.isShowSave" @click="saveTaskTypeTemplateData(tempVal)">{{$t('Templates.save_template')}}</button>
-                    </li>
-                </ul>
-                <ConfirmationSidebar
-                    v-model="isDeleteTemp"
-                    :acceptButtonClass="`btn-danger`"
-                    :acceptButton="$t('Projects.delete')"
-                    title="Delete Template"
-                    message="Are you sure you want to delete the template?"
-                    :isShowInput="false"
-                    @confirm="handleConfirm"
-                >
-                    <template #body>
-                        <div></div>
-                    </template>
-                </ConfirmationSidebar>
-                <button class="add_template" type="button" @click="activeTemplate()">+ {{$t('Templates.new_template')}}</button>
-                <div class="d-flex position-re">
-                    <input v-if="isTemplate" :placeholder="$t('PlaceHolder.Enter_Template')" class="add_new_temp form-control" :maxlength="50"  type="text" @keypress.enter.prevent="addNewTaskTypeTemplate()" v-model.trim="templateName" @input="removeValidation()"/>
-                    <span class="position-ab edit-rightinput save__closeimg-wrapper">
-                        <img :src="saveIcon" class="cursor-pointer"  v-if="isTemplate" @click="addNewTaskTypeTemplate(), templateName = ''">
-                        <img :src="deletered" class="cursor-pointer ml-10px" v-if="isTemplate" @click="isTemplate = false, templateName = '',errTempMsg= ''">
-                    </span>
-                </div>
-                <div class="err_temp_status">
-                    <div class="red font-size-11">{{theModel.taskTypeField.error}}</div>
-                    <span v-if="errTempMsg" class="err_temp red font-size-12">{{ errTempMsg }}</span>
-                </div>
-            </div>
-            <div class="taskStatusRight taskyou_need_right" id="createprojecttasktypetemplatestatus_driver">
+        <TemplateSelectForm
+            ref="templateFormRef"
+            :templates="taskTypeTemplates"
+            :modelValue="theModel.taskTypeField.value"
+            :fieldError="theModel.taskTypeField.error"
+            :isSaving="isSpinner"
+            containerId="createprojecttasktypetemplate_driver"
+            addIconId="createprojecttasktype_driver"
+            rightId="createprojecttasktypetemplatestatus_driver"
+            rightClass="taskyou_need_right"
+            @update:modelValue="setTemplateData"
+            @create="onCreateTemplate"
+            @rename="onRenameTemplate"
+            @delete="onDeleteTemplate"
+            @save="saveTaskTypeTemplateData"
+            @left-focus="onLeftFocus"
+        >
+            <template #list>
                 <label :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}" >{{$t('Projects.task_type')}}</label>
-                <DragDropField v-if="theModel.taskTypeField.value && Object.keys(theModel.taskTypeField.value).length > 0" :group="{ name: 'task_type_group' }" :isDeletable="true" :isChangeColor="false" :modelValue="theModel.taskTypeField.value.taskTypes"  @enter:updateFieldValue="addedTaskType" @click:updateFieldValue="addedTaskType" @input:deleteFieldValue="manageDeleteData" @resetTaskTypeErr="taskTypeError=''" @renameUpdate="(val) => {renameUpdate(val)}" :addTaskType="addTaskType" @disbaleButton="(val)=>{$emit('disableNext',val)}" :isTemplate="isTemplate" :useDataArray="useTaskTypeArr" @update:modelValue="manageSelectedOption" :from="'task_type'"/>
+                <DragDropField v-if="theModel.taskTypeField.value && Object.keys(theModel.taskTypeField.value).length > 0" :group="{ name: 'task_type_group' }" :isDeletable="true" :isChangeColor="false" :modelValue="theModel.taskTypeField.value.taskTypes"  @enter:updateFieldValue="addedTaskType" @click:updateFieldValue="addedTaskType" @input:deleteFieldValue="manageDeleteData" @resetTaskTypeErr="taskTypeError=''" @disbaleButton="(val)=>{$emit('disableNext',val)}" :addTaskType="addTaskType" :useDataArray="useTaskTypeArr" @update:modelValue="manageSelectedOption" :from="'task_type'"/>
                 <div class="addStatusBtn searchValue mb-0">
-                    <!-- <input type="file" style="display: none;" ref="task_type_image" accept="image/*" @change="checkFile"> -->
-
-                    <button class="cursor-pointer btn btn-primary" type="button" v-if="!addTaskType" @click="taskTypeName = '',isTaskSidebarOpen = true,isTemplate = false,$emit('openTaskTYpe',true),taskTypeTemplates.map((x)=>{return x.isEditable = false})" id="createprojecttasktypenew_driver">+ {{$t('Home.add_task_type')}}</button>
+                    <button class="cursor-pointer btn btn-primary" type="button" v-if="!addTaskType" @click="openTaskTypeSidebar()" id="createprojecttasktypenew_driver">+ {{$t('Home.add_task_type')}}</button>
                     <div class="d-flex align-items-center justify-content-between" v-else>
                         <button class="cursor-pointer upload-image-btn up__btn btn-primary" type="button">
                             <img v-if="addNewtaskImage" :src="addNewtaskImage" class="projecttasktypeform__image__after"/>
@@ -80,8 +50,8 @@
                 <div class="red pt-5px" >
                     <span v-if="taskTypeError" class="font-size-12 red">{{taskTypeError}}</span>
                 </div>
-            </div>
-        </div>
+            </template>
+        </TemplateSelectForm>
     </div>
     <TaskStatusSidebar v-if="isTaskSidebarOpen" :isTaskSidebarOpen="isTaskSidebarOpen" @closesidebar="isTaskSidebarOpen = false" :title="$t(`Projects.list_of_task_type`)" :options="statusOPtion" @selected="updateTaskStatus" @removed="removeTaskStatus" :isAddStatus="true" :type="'task_type'" :useDataArray="useTaskTypeArr"/>
 </div>
@@ -92,22 +62,18 @@ import { ref, onMounted, watch, inject } from 'vue';
 import DragDropField from '@/components/atom/DragDropField/DragDropField.vue';
 const {getters, commit} = useStore();
 import {useToast} from 'vue-toast-notification';
-import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import TaskStatusSidebar from '@/components/molecules/TaskStatusSidebar/TaskStatusSidebar.vue';
+import TemplateSelectForm from '@/components/molecules/TemplateSelectForm/TemplateSelectForm.vue';
 import { useI18n } from "vue-i18n";
 import * as env from '@/config/env';
 import { apiRequest } from "@/services";
 const { t } = useI18n();
 
-    const templateEditIcon = require('@/assets/images/svg/edit_icon.svg');
-    const templateDeleteIcon = require('@/assets/images/svg/closeLeftHover.svg');
-    const saveIcon = require("@/assets/images/svg/right_tick_green.svg");
-    const deletered = require("@/assets/images/svg/deletered.svg");
-    // const companyId = inject("$companyId");
-    const taskTypeTemplates = ref([]);  
+    const taskTypeTemplates = ref([]);
     const isSpinner = ref(false);
     const clientWidth = inject("$clientWidth");
     const $toast = useToast();
+    const templateFormRef = ref(null);
     const props = defineProps({
         modelValue: {
             type: Object,
@@ -123,10 +89,8 @@ const { t } = useI18n();
         }
     });
     const emit = defineEmits([
-        'update:modelValue','disableNext','openTaskTYpe','updateModel','renameTaskTypeSetting','setTemplateDataTaskType','saveTemplate','spinnerOn'
+        'update:modelValue','disableNext','openTaskTYpe','updateModel','renameTaskTypeSetting','setTemplateDataTaskType','saveTemplate','spinnerOn','updateStatus'
     ]);
-    const isDeleteTemp = ref(false);
-    const deleteTemplateObj = ref({});
     const theModel = ref(props.modelValue);
     const fromWhich = ref(props.from)
     const useTaskTypeArr = ref([]);
@@ -144,7 +108,7 @@ const { t } = useI18n();
                     return x._id === props.projectData.TaskTypeTemplateId;
                 })
                 if(index !== -1){
-                    theModel.value.taskTypeField.value = Object.keys(theModel.value.taskTypeField.value).length ? theModel.value.taskTypeField.value : taskTypeTemplates.value[index]    
+                    theModel.value.taskTypeField.value = Object.keys(theModel.value.taskTypeField.value).length ? theModel.value.taskTypeField.value : taskTypeTemplates.value[index]
                 }else{
                     const customObj = {
                         TemplateName : 'Custom',
@@ -200,7 +164,7 @@ const { t } = useI18n();
                     return x._id === props.projectData.TaskTypeTemplateId;
                 })
                 if(index !== -1){
-                    theModel.value.taskTypeField.value = Object.keys(theModel.value.taskTypeField.value).length ? theModel.value.taskTypeField.value : taskTypeTemplates.value[index]    
+                    theModel.value.taskTypeField.value = Object.keys(theModel.value.taskTypeField.value).length ? theModel.value.taskTypeField.value : taskTypeTemplates.value[index]
                 }else{
                     const customObj = {
                         TemplateName : 'Custom',
@@ -218,18 +182,11 @@ const { t } = useI18n();
     watch(()=> props.modelValue ,(val)=>{
         theModel.value = val;
     })
-    const isTemplate = ref(false);
-    const templateName = ref('');
     const addTaskType = ref(false);
     const taskTypeName = ref("");
     const taskTypeError = ref("");
     const addNewtaskImage = ref("");
-    const tempInd = ref(null)
-    function activeTemplate(){
-        isTemplate.value = true;
-        addTaskType.value = false;
-        taskTypeTemplates.value.map((x)=>{return x.isEditable = false});
-    }
+
     function manageSelectedOption(e){
         theModel.value.taskTypeField.value.taskTypes = e;
         let indexKey = taskTypeTemplates.value.findIndex((x)=>{
@@ -247,12 +204,17 @@ const { t } = useI18n();
     function manageDeleteData(item){
         addTaskTypeStatus('deleteType',item);
     }
+    function openTaskTypeSidebar(){
+        taskTypeName.value = '';
+        isTaskSidebarOpen.value = true;
+        emit('openTaskTYpe',true);
+        templateFormRef.value?.closeInputs();
+    }
+    function onLeftFocus(){
+        addTaskType.value = false;
+        (theModel.value.taskTypeField.value?.taskTypes || []).forEach((x) => { x.isEditable = false; });
+    }
     function setTemplateData(itemData) {
-        taskTypeTemplates.value.forEach(template => {
-            template.showEditIcon = false;
-        });
-        itemData.showEditIcon = true;
-        
         theModel.value.taskTypeField = {};
         theModel.value.taskTypeField.value = itemData;
         statusOPtion.value = theModel.value.taskTypeField.value.taskTypes;
@@ -287,7 +249,7 @@ const { t } = useI18n();
                     }).catch((err) => {
                         console.error("Error setTemplateData hook: ", err)
                     });
-    
+
                     emit('setTemplateDataTaskType',useTaskTypeArr.value,notMatchedProjects)
                 })
             }else{
@@ -296,21 +258,9 @@ const { t } = useI18n();
         }
         emit('update:modelValue', theModel.value);
     }
-    const errTempMsg = ref("");
-    async function addNewTaskTypeTemplate(){
-        if(templateName.value === "" || templateName.value === null){
-            errTempMsg.value = t('errorPage.Template_name_is_required');
-            return;
-        }
-        if(templateName.value.toLowerCase() === 'custom'){
-            $toast.error(t("Toast.Can_not_create_template_name_Custom"),{position: 'top-right'});
-            return;
-        }
-        let mainId = taskTypeTemplates.value.findIndex(item=>{
-            return item.TemplateName.replaceAll(" ", "_").toLowerCase() === templateName.value.replaceAll(" ", "_").toLowerCase();
-        })
+    async function onCreateTemplate(name){
         const insertObj = {
-            TemplateName : templateName.value,
+            TemplateName : name,
             taskTypes : [
                 {
                     'default': true,
@@ -327,25 +277,19 @@ const { t } = useI18n();
                 }
             ]
         }
-        if(mainId === -1){
-            const object = {
-                updateObject:insertObj
+        const object = {
+            updateObject:insertObj
+        }
+        await apiRequest("post",env.TASK_TYPE_TEMPLATE,object).then((res) => {
+            if(res.status === 200 && res?.data?._id) {
+                commit("settings/mutateTaskType", {data: {...insertObj, _id: res?.data?._id || ''}, op: "added"});
+                commit("settings/setProjectTaskTypeArray", {data: JSON.parse(JSON.stringify(({...insertObj, _id: res?.data?._id || '',newAdded:true}))), op: "added"});
+                theModel.value.taskTypeField.value = {...insertObj, _id: res?.data?._id || ''};
+                $toast.success(t("Toast.Template_has_been_created_Successfully"),{position: 'top-right'});
+            }else{
+                $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
             }
-            await apiRequest("post",env.TASK_TYPE_TEMPLATE,object).then((res) => {
-                if(res.status === 200 && res?.data?._id) {
-                    commit("settings/mutateTaskType", {data: {...insertObj, _id: res?.data?._id || ''}, op: "added"});
-                    commit("settings/setProjectTaskTypeArray", {data: JSON.parse(JSON.stringify(({...insertObj, _id: res?.data?._id || '',newAdded:true}))), op: "added"});
-                    theModel.value.taskTypeField.value = {...insertObj, _id: res?.data?._id || ''};
-                    $toast.success(t("Toast.Template_has_been_created_Successfully"),{position: 'top-right'});
-                }else{
-                    $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-                }
-                templateName.value = "";
-            })
-        }
-        if(mainId !== -1){
-            errTempMsg.value = t('errorPage.This_template_name_is_already_exists');
-        }
+        })
         emit('update:modelValue', theModel.value);
     }
     function addTaskTypeStatus(type,rowData){
@@ -428,99 +372,58 @@ const { t } = useI18n();
             isSpinner.value = false;
         })
     }
-    function removeValidation () {
-        errTempMsg.value = '';
-    }
     function resetTaskTypeData () {
         taskTypeError.value = "";
     }
-    async function editTaskTypeTemplate (temp,ind) {
-        if(taskTypeName.value !== ''){
-            if(taskTypeName.value.toLowerCase() === 'custom'){
-                $toast.error(t("Toast.Can_not_create_template_name_Custom"),{position: 'top-right'});
-                return;
+    async function onRenameTemplate (temp,name) {
+        const object = {
+            type: "updateOne",
+            key: "$set",
+            updateObject:{ TemplateName : name },
+            id:temp._id
+        };
+        await apiRequest("put",env.TASK_TYPE_TEMPLATE,object).then((res) => {
+            if(res.status === 200){
+                let index = taskTypeTemplates.value.findIndex((x) => x._id === temp._id);
+                if(index !== -1) {
+                    let modifiedObj = {...taskTypeTemplates.value[index],TemplateName: name,isEditable:false};
+                    commit("settings/mutateTaskType", {data: {...modifiedObj, _id: temp._id}, op: "modified"});
+                }
+                $toast.success(t("Toast.Template_name_updated_successfully"),{position: 'top-right'});
+            }else{
+                $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
             }
-            const duplicateNameIndex = taskTypeTemplates.value.findIndex(
-                (object, i) => object.TemplateName === taskTypeName.value && i !== ind
-            );
-            let mainId = taskTypeTemplates.value.findIndex(item=>{
-                return item.TemplateName=== taskTypeName.value;
-            })
-            let obj = {
-                TemplateName : taskTypeName.value
-            }
-            if(mainId === -1 || duplicateNameIndex === -1){
-                const object = {
-                    type: "updateOne",
-                    key: "$set",
-                    updateObject:{...obj},
-                    id:temp._id
-                };
-                await apiRequest("put",env.TASK_TYPE_TEMPLATE,object).then((res) => {
-                    if(res.status === 200){
-                        let index = taskTypeTemplates.value.findIndex((x) => x._id === temp._id);
-                        if(index !== -1) {
-                            let modifiedObj = {...taskTypeTemplates.value[index],TemplateName: taskTypeName.value,isEditable:false};
-                            commit("settings/mutateTaskType", {data: {...modifiedObj, _id: temp._id}, op: "modified"});
-                        }
-                        $toast.success(t("Toast.Template_name_updated_successfully"),{position: 'top-right'});
-                    }else{
-                        $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-                    }
-                }).catch((err) => {
-                    console.error(err)
-                    $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-                })
-            }
-            if(mainId !== -1 && duplicateNameIndex !== -1){
-                errTempMsg.value = t('errorPage.This_template_name_is_already_exists');
-            }
-        }else{
-            errTempMsg.value = t('errorPage.Template_name_is_required');
-        }
+        }).catch((err) => {
+            console.error(err)
+            $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
+        })
     }
-    async function handleConfirm(){
+    async function onDeleteTemplate(temp){
         try {
-            await apiRequest("delete",`${env.TASK_TYPE_TEMPLATE}/${deleteTemplateObj.value._id}`).then(async(response) => {
+            await apiRequest("delete",`${env.TASK_TYPE_TEMPLATE}/${temp._id}`).then((response) => {
                 if(response.status === 200){
                     theModel.value.taskTypeField.value = taskTypeTemplates.value[0] || {};
-                    commit("settings/mutateTaskType", {data: {_id: deleteTemplateObj.value._id}, op: "removed"});
-                    commit("settings/setProjectTaskTypeArray", {data: {_id: deleteTemplateObj.value._id}, op: "removed"});
+                    commit("settings/mutateTaskType", {data: {_id: temp._id}, op: "removed"});
+                    commit("settings/setProjectTaskTypeArray", {data: {_id: temp._id}, op: "removed"});
                     $toast.success(t("Toast.Template_has_been_created_Successfully"),{position: 'top-right'});
                 }else{
                     $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
                 }
-                isDeleteTemp.value = false;
             }).catch((err) =>{
                 console.error(err,"Error in Delete Template");
                 $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-            });   
+            });
         } catch (error) {
             console.error(error,"Error in Delete Template");
             $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
         }
-    }
-    function renameUpdate(val) {
-        addTaskType.value = val;
-        isTemplate.value = val;
-        taskTypeTemplates.value.map((x)=>{return x.isEditable = false});
-    }
-    function openEditTemplate(index){
-        taskTypeTemplates.value.forEach((x,ind) => {
-            if(ind === index){
-                x.isEditable = true;
-            }else{
-                x.isEditable = false;
-            }
-        })
-        tempInd.value = index;
     }
     function updateTaskStatus (event) {
         emit('updateStatus',event,'remove')
         let index = theModel.value.taskTypeField.value.taskTypes.findIndex((typ) => {
             return typ.key === event.key;
         })
-        if(index === -1) {            
+        if(index === -1) {
             theModel.value.taskTypeField.value.taskTypes.push(event);
         }
         let indexKey = taskTypeTemplates.value.findIndex((x)=>{
@@ -553,11 +456,14 @@ const { t } = useI18n();
 </script>
 <style scoped>
 @import './style.css';
-
+</style>
+<style>
 /* Bound the task-type list so a long list scrolls and "+ Add task type" stays visible
-   below it (mirrors the left Templates list). :deep() reaches the ul that DragDropField
-   renders; .taskyou_need_right scopes this to the task-type column only. */
-.taskyou_need_right :deep(.status_ul) {
+   below it (mirrors the left Templates list). Global (not scoped): .taskyou_need_right now
+   lives on <TemplateSelectForm>'s right column and .status_ul is rendered by DragDropField,
+   so a scoped rule can't reach across both boundaries. The .taskyou_need_right ancestor
+   keeps this scoped to the task-type column only. */
+.taskyou_need_right .status_ul {
     max-height: 220px;
     overflow-y: auto;
 }

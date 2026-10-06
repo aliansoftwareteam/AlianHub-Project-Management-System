@@ -7,3 +7,7 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 001 | Fix task-type settings UI (overlap, sticky add, sidebar audit) | active | medium | — | active/001-task-type-settings-ui |
 | 002 | Make the task-type migration production-ready | active | high | — | active/002-task-type-migration-prod |
 | 003 | Show library task-type icons in the time tracker | done | medium | — | done/003-tracker-task-type-icons |
+| 004 | Reusable template-selection form component (task types + statuses) | active | medium | — | active/004-reusable-template-select-form |
+| 005 | First-run experience — close the 13 gaps | active | high | — | active/005-first-run-experience |
+| 006 | Remove auto-assignee from task creation | done | medium | — | done/006-remove-task-auto-assignee |
+| 007 | Fix "Invalid URL" on member invitation links | done | high | — | done/007-fix-invite-link-invalid-url |

@@ -88,6 +88,8 @@ const SCHEMA_TYPE = {
     AUTOMATION_RULES: "automation_rules",
     INTEGRATION_CONNECTIONS: "integration_connections",
     CLOUD_STORAGE_CONNECTIONS: "cloud_storage_connections",
+    FORMS: "forms",
+    FORM_SUBMISSIONS: "form_submissions",
 }
 
 module.exports = {

@@ -29,6 +29,11 @@ const {
     taskStatusChange, taskPriorityChange,
 } = require('../notificationTemplate');
 
+// convertToTask's inner failure path neither resolves nor rejects, so awaiting
+// it can hang forever. Long enough that a slow-but-working conversion is never
+// cut short, short enough that one bad task cannot hold a request open.
+const CONVERT_DEADLINE_MS = 20000;
+
 // ----------------- Internal helpers (not exported on the mixin) -----------------
 
 const toObjectId = (id) => {
@@ -756,7 +761,7 @@ module.exports = {
     },
 
     // ---------------------- MOVE ----------------------
-    // payload: { companyId, userData, taskIds, sprintObj, projectData, isSubTask }
+    // payload: { companyId, userData, taskIds, sprintObj, projectData }
     //   sprintObj   — destination sprint object (same shape the single-task
     //                 picker builds: { id, name, folderId?, folderName?, ... }).
     //   projectData — destination project summary { id, ProjectCode, ProjectName }.
@@ -773,7 +778,9 @@ module.exports = {
     //                        the destination project, falling back to the
     //                        destination's first status/type when no name
     //                        matches. Same-project moves skip conversion.
-    bulkMove({ companyId, userData, taskIds, sprintObj, projectData, isSubTask = false }) {
+    //   • subtasks — a selected parent's subtasks travel with it, each
+    //                        keeping its own assignees and watchers.
+    bulkMove({ companyId, userData, taskIds, sprintObj, projectData }) {
         return new Promise(async (resolve, reject) => {
             try {
                 if (!companyId) return reject(new Error('companyId required'));
@@ -823,13 +830,90 @@ module.exports = {
                     return built;
                 };
 
-                // Sequential per single-task behavior to avoid sprint-count races.
+                // A subtask lives in its parent's sprint and is only ever rendered
+                // nested under it, so a parent that moves alone leaves its subtasks
+                // somewhere nobody can reach: the destination looks them up by the
+                // DESTINATION's sprintId and finds none, and the source list only
+                // renders parents. The parent still advertises "2 subtasks" and opens
+                // empty. Single-task move has always carried them — the sidebar sets
+                // isSubTask whenever the task has any — and bulk passed false.
+                //
+                // They are enumerated here rather than handed to moveTask's own
+                // isSubTask branch on purpose. That branch applies ONE
+                // assignee/watcher pair across the whole family, which is right for
+                // the single-task sidebar (a person picked them for this move) and
+                // wrong here, where every task has to keep its own. So each task,
+                // parent or subtask, moves on its own values.
+                const selectedIds = new Set(tasks.map((t) => String(t._id)));
+                const queue = [];
+                const queued = new Set();
+                const enqueue = (task, carried) => {
+                    const key = String(task._id);
+                    if (queued.has(key)) return;
+                    queued.add(key);
+                    queue.push({ task, carried });
+                };
+
                 for (const task of tasks) {
+                    if (task.isParentTask !== true) {
+                        // Its parent is selected too, so the parent's pass below picks
+                        // it up. Moving it here as well would move it twice.
+                        if (selectedIds.has(String(task.ParentTaskId || ''))) continue;
+
+                        // On its own, though, it does not move at all. A subtask has no
+                        // existence outside its parent: the list renders subtasks nested
+                        // under the parent and looks them up one sprint at a time, so a
+                        // subtask sitting in a sprint its parent is not in appears in
+                        // neither. The single-task action refuses this outright — a
+                        // subtask's own Move opens a picker of PARENT TASKS, never a
+                        // bare sprint. Bulk used to allow it and quietly produce exactly
+                        // the state this whole change exists to stop.
+                        //
+                        // Giving a subtask a different parent is a real thing to want;
+                        // it is just a different action, and the bar has it.
+                        skipped.push({ taskId: String(task._id), reason: 'subtask-moves-with-its-parent' });
+                        continue;
+                    }
+
+                    // Looked up BEFORE the parent is queued: a failed lookup must not
+                    // quietly move the parent on its own and strand them, which is the
+                    // bug being fixed.
+                    //
+                    // Deliberately NOT scoped to the parent's own sprint. A subtask in
+                    // a different sprint from its parent renders in neither, so that
+                    // state is only ever corruption — and every selection that has
+                    // been bulk-moved before this fix has some. Matching on parentage
+                    // alone means selecting the parent gathers them all back, which is
+                    // the one way an already-stranded subtask can be reached at all.
+                    //
+                    // ParentTaskId is a String on the task schema, not an ObjectId.
+                    const children = await MongoDbCrudOpration(companyId, {
+                        type: dbCollections.TASKS,
+                        data: [{
+                            ParentTaskId: String(task._id),
+                            isParentTask: false,
+                            deletedStatusKey: { $nin: [1] },
+                        }],
+                    }, 'find').catch((error) => {
+                        logger.error(`bulkMove subtasks of ${task._id}: ${error.message}`);
+                        return null;
+                    });
+
+                    if (children === null) {
+                        errors.push({ taskId: String(task._id), reason: 'could not read its subtasks' });
+                        continue;
+                    }
+                    enqueue(task, false);
+                    children.forEach((child) => enqueue(child, true));
+                }
+
+                // Sequential per single-task behavior to avoid sprint-count races.
+                for (const { task, carried } of queue) {
                     try {
                         // No-op guard: already in the destination sprint/folder.
                         if (String(task.sprintId) === String(sprintObj.id) &&
                             String(task.folderObjId || '') === String(sprintObj.folderId || '')) {
-                            skipped.push({ taskId: String(task._id), reason: 'already-in-target' });
+                            if (!carried) skipped.push({ taskId: String(task._id), reason: 'already-in-target' });
                             continue;
                         }
                         const oldProject = await buildOldProject(task.ProjectID);
@@ -850,7 +934,8 @@ module.exports = {
                             moveTaskId: task._id,
                             oldSprintObj,
                             oldProject,
-                            isSubTask,
+                            // Each task moves as itself; the family was expanded above.
+                            isSubTask: false,
                             assignee: Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId : [],
                             watcher: Array.isArray(task.watchers) ? task.watchers : [],
                             userData,
@@ -866,6 +951,327 @@ module.exports = {
                 resolve(summarize({ updated, skipped, errors }));
             } catch (error) {
                 logger.error(`bulkMove error: ${error.message}`);
+                reject(error);
+            }
+        });
+    },
+
+    // ---------------------- CONVERT TO SUBTASK ----------------------
+    // payload: { companyId, userData, taskIds, parentTaskId }
+    //
+    // Makes every selected task a subtask of one chosen parent. The destination
+    // sprint, folder and project are NOT parameters: a subtask lives where its
+    // parent lives, so they are read off the parent and the existing
+    // convertToSubTask path does the relocation.
+    //
+    // Reuses that path per task rather than reimplementing it, so history, the
+    // parent's subTasks counter, comment counts, the per-task socket events and
+    // the cross-project status/type remap all behave exactly as the single-task
+    // action does.
+    //
+    // It does NOT inherit that path's reporting. convertToSubTask settles its
+    // per-task promises with Promise.allSettled and then resolves success
+    // regardless of what rejected inside, so a partial failure reads as a clean
+    // run. Every conversion here is verified by re-reading the task, and only a
+    // task that actually ended up under the parent is counted as updated.
+    bulkConvertToSubTask({ companyId, userData, taskIds, parentTaskId }) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                if (!companyId) return reject(new Error('companyId required'));
+                const parentObjId = toObjectId(parentTaskId);
+                if (!parentObjId) return reject(new Error('a valid parentTaskId is required'));
+
+                const parent = await MongoDbCrudOpration(companyId, {
+                    type: dbCollections.TASKS,
+                    data: [{ _id: parentObjId }],
+                }, 'findOne');
+                if (!parent) return reject(new Error('parent task not found'));
+                if (parent.deletedStatusKey === 1) return reject(new Error('that parent task has been deleted'));
+                // Only one level of nesting exists, so a subtask cannot take children.
+                if (parent.isParentTask !== true) return reject(new Error('a subtask cannot be a parent'));
+
+                const { tasks, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
+                const updated = [];
+                const errors = [];
+
+                const loadProject = makeProjectLoader(companyId);
+                const destProject = await loadProject(parent.ProjectID);
+                if (!destProject) return reject(new Error('the parent task\'s project could not be read'));
+
+                const destStatuses = Array.isArray(destProject.taskStatusData) ? destProject.taskStatusData : [];
+                const destTypes = Array.isArray(destProject.taskTypeCounts) ? destProject.taskTypeCounts : [];
+                const norm = (s) => String(s || '').trim().toLowerCase();
+                const defaultStatus = destStatuses.find((s) => s.type !== 'close') || destStatuses[0] || null;
+                const mapStatus = (srcStatus) => {
+                    const pick = destStatuses.find((d) => norm(d.name) === norm(srcStatus?.name)) || defaultStatus;
+                    return pick ? { key: pick.key, name: pick.name, type: pick.type, bgColor: pick.bgColor, textColor: pick.textColor } : null;
+                };
+                const mapType = (srcType) => {
+                    const pick = destTypes.find((d) => norm(d.name) === norm(srcType?.name)) || destTypes[0] || null;
+                    return pick ? { value: pick.value, key: pick.key, name: pick.name } : null;
+                };
+
+                // convertToSubTaskFunction reads the SOURCE project's lists and
+                // applies the `.convertStatus`/`.convertType` grafted onto each
+                // entry when the task crosses projects. Same shape bulkMove builds.
+                const oldProjectCache = new Map();
+                const buildOldProject = async (srcProjectId) => {
+                    const key = String(srcProjectId);
+                    if (oldProjectCache.has(key)) return oldProjectCache.get(key);
+                    const src = await loadProject(srcProjectId);
+                    const built = src ? {
+                        id: src._id,
+                        ProjectName: src.ProjectName,
+                        taskStatusData: (Array.isArray(src.taskStatusData) ? src.taskStatusData : [])
+                            .map((s) => ({ ...s, convertStatus: mapStatus(s) })),
+                        taskTypeCounts: (Array.isArray(src.taskTypeCounts) ? src.taskTypeCounts : [])
+                            .map((t) => ({ ...t, convertType: mapType(t) })),
+                    } : null;
+                    oldProjectCache.set(key, built);
+                    return built;
+                };
+
+                const selectedIds = new Set(tasks.map((t) => String(t._id)));
+                const candidates = [];
+                for (const task of tasks) {
+                    const id = String(task._id);
+                    if (id === String(parent._id)) {
+                        skipped.push({ taskId: id, reason: 'is-the-chosen-parent' });
+                        continue;
+                    }
+                    if (String(task.ParentTaskId || '') === String(parent._id)) {
+                        skipped.push({ taskId: id, reason: 'already-a-subtask-of-this-parent' });
+                        continue;
+                    }
+                    // Converting a parent carries its own subtasks across, so a
+                    // subtask whose parent is also selected is handled by that pass.
+                    // Doing it again would reparent it twice and count it twice.
+                    if (task.isParentTask !== true && selectedIds.has(String(task.ParentTaskId || ''))) {
+                        skipped.push({ taskId: id, reason: 'carried-with-its-parent' });
+                        continue;
+                    }
+                    candidates.push(task);
+                }
+
+                // Sequential, per bulkMove: the sprint counters and the parent's
+                // subTasks counter are read-modify-write and would race.
+                for (const task of candidates) {
+                    const id = String(task._id);
+                    try {
+                        const oldProject = await buildOldProject(task.ProjectID);
+                        if (!oldProject) {
+                            skipped.push({ taskId: id, reason: 'project-not-found' });
+                            continue;
+                        }
+                        await this.convertToSubTask({
+                            companyId,
+                            projectData: { id: destProject._id, ProjectName: destProject.ProjectName },
+                            sprintId: parent.sprintId,
+                            selectedTaskId: id,
+                            taskId: parent._id,
+                            oldProject,
+                            // A converted parent's own subtasks come across with it and
+                            // land beside it under the new parent, because only one
+                            // level of nesting exists. Leaving them behind would strand
+                            // them under a task that is no longer a parent.
+                            isSubTask: task.isParentTask === true && Number(task.subTasks || 0) > 0,
+                            userData,
+                        });
+
+                        // Verified rather than trusted — see the note above.
+                        const after = await MongoDbCrudOpration(companyId, {
+                            type: dbCollections.TASKS,
+                            data: [{ _id: task._id }, 'ParentTaskId isParentTask deletedStatusKey'],
+                        }, 'findOne').catch(() => null);
+
+                        if (after && after.isParentTask === false
+                            && String(after.ParentTaskId || '') === String(parent._id)
+                            && after.deletedStatusKey !== 1) {
+                            updated.push(id);
+                        } else {
+                            errors.push({ taskId: id, reason: 'conversion did not take effect' });
+                        }
+                    } catch (error) {
+                        logger.error(`bulkConvertToSubTask task ${id}: ${error.message}`);
+                        errors.push({ taskId: id, reason: error.message });
+                    }
+                }
+
+                emitBulkSummary('bulkConvertToSubTask', { taskIds: updated, parentTaskId: String(parent._id) });
+                resolve(summarize({ updated, skipped, errors }));
+            } catch (error) {
+                logger.error(`bulkConvertToSubTask error: ${error.message}`);
+                reject(error);
+            }
+        });
+    },
+
+    // ---------------------- CONVERT TO TASK ----------------------
+    // payload: { companyId, userData, taskIds, sprintObj, projectData }
+    //   sprintObj / projectData — where the promoted tasks land, same shape and
+    //   same picker as bulkMove.
+    //
+    // Promotes selected subtasks to top-level tasks. Reuses the single-task
+    // convertToTask per subtask, so the parent's subTasks counter, the sprint
+    // counters, the comment count, the per-task socket events and the
+    // cross-project status/type remap all behave as they do today.
+    //
+    // Two things about that path this has to defend against, both harmless once
+    // and dangerous twenty times:
+    //
+    //   1. It marks the task deletedStatusKey:1 FIRST and rewrites it as
+    //      top-level second. A failure in between leaves the task deleted —
+    //      gone from the board. Every task is verified afterwards, and one left
+    //      deleted is put back the way it was rather than reported as lost.
+    //
+    //   2. Its inner failure path only logs: it neither resolves nor rejects, so
+    //      the promise never settles and an await on it hangs forever. One bad
+    //      task would otherwise hang the whole request. Each call is raced
+    //      against a deadline and judged on the task's actual state instead.
+    bulkConvertToTask({ companyId, userData, taskIds, sprintObj, projectData }) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                if (!companyId) return reject(new Error('companyId required'));
+                if (!sprintObj || !sprintObj.id) return reject(new Error('sprintObj required'));
+                if (!projectData || !projectData.id) return reject(new Error('projectData required'));
+
+                const { tasks, skipped } = await loadScopedTasks(companyId, taskIds, { includeArchived: false });
+                const updated = [];
+                const errors = [];
+
+                const loadProject = makeProjectLoader(companyId);
+                const destProject = await loadProject(projectData.id);
+                if (!destProject) return reject(new Error('destination project not found'));
+
+                const destStatuses = Array.isArray(destProject.taskStatusData) ? destProject.taskStatusData : [];
+                const destTypes = Array.isArray(destProject.taskTypeCounts) ? destProject.taskTypeCounts : [];
+                const norm = (s) => String(s || '').trim().toLowerCase();
+                const defaultStatus = destStatuses.find((s) => s.type !== 'close') || destStatuses[0] || null;
+                const mapStatus = (srcStatus) => {
+                    const pick = destStatuses.find((d) => norm(d.name) === norm(srcStatus?.name)) || defaultStatus;
+                    return pick ? { key: pick.key, name: pick.name, type: pick.type, bgColor: pick.bgColor, textColor: pick.textColor } : null;
+                };
+                const mapType = (srcType) => {
+                    const pick = destTypes.find((d) => norm(d.name) === norm(srcType?.name)) || destTypes[0] || null;
+                    return pick ? { value: pick.value, key: pick.key, name: pick.name } : null;
+                };
+
+                // convertToTask decides "is this cross-project?" with a plain !==
+                // on these two ids. An ObjectId is never !== equal to another
+                // ObjectId instance, so a same-project conversion would take the
+                // remapping branch. Both sides are handed over as strings, which
+                // is what the single-task callers pass.
+                const destProjectId = String(destProject._id);
+                const oldProjectCache = new Map();
+                const buildOldProject = async (srcProjectId) => {
+                    const key = String(srcProjectId);
+                    if (oldProjectCache.has(key)) return oldProjectCache.get(key);
+                    const src = await loadProject(srcProjectId);
+                    const built = src ? {
+                        id: String(src._id),
+                        ProjectName: src.ProjectName,
+                        taskStatusData: (Array.isArray(src.taskStatusData) ? src.taskStatusData : [])
+                            .map((s) => ({ ...s, convertStatus: mapStatus(s) })),
+                        taskTypeCounts: (Array.isArray(src.taskTypeCounts) ? src.taskTypeCounts : [])
+                            .map((t) => ({ ...t, convertType: mapType(t) })),
+                    } : null;
+                    oldProjectCache.set(key, built);
+                    return built;
+                };
+
+                const candidates = [];
+                for (const task of tasks) {
+                    if (task.isParentTask === true) {
+                        skipped.push({ taskId: String(task._id), reason: 'already-a-top-level-task' });
+                        continue;
+                    }
+                    candidates.push(task);
+                }
+
+                // Sequential, per bulkMove: the sprint counters and each parent's
+                // subTasks counter are read-modify-write and would race.
+                for (const task of candidates) {
+                    const id = String(task._id);
+                    const wasDeletedStatusKey = task.deletedStatusKey;
+                    try {
+                        const oldProject = await buildOldProject(task.ProjectID);
+                        if (!oldProject) {
+                            skipped.push({ taskId: id, reason: 'project-not-found' });
+                            continue;
+                        }
+
+                        let timer = null;
+                        const deadline = new Promise((settle) => {
+                            timer = setTimeout(() => settle('timeout'), CONVERT_DEADLINE_MS);
+                        });
+                        try {
+                            await Promise.race([
+                                this.convertToTask({
+                                    companyId,
+                                    projectData: { id: destProjectId, ProjectName: destProject.ProjectName },
+                                    taskId: id,
+                                    sprintObj,
+                                    parentTaskId: task.ParentTaskId,
+                                    oldSprintObj: {
+                                        id: task.sprintId,
+                                        folderId: task.folderObjId || null,
+                                        name: task.sprintArray?.name || '',
+                                        folderName: task.sprintArray?.folderName || '',
+                                    },
+                                    oldProject,
+                                    userData,
+                                }).catch((error) => {
+                                    logger.error(`bulkConvertToTask convert ${id}: ${error && error.message}`);
+                                }),
+                                deadline,
+                            ]);
+                        } finally {
+                            if (timer) clearTimeout(timer);
+                        }
+
+                        // Judged on the task itself, never on what the call said.
+                        const after = await MongoDbCrudOpration(companyId, {
+                            type: dbCollections.TASKS,
+                            data: [{ _id: task._id }, 'isParentTask ParentTaskId deletedStatusKey sprintId'],
+                        }, 'findOne').catch(() => null);
+
+                        const landed = after && after.isParentTask === true
+                            && !String(after.ParentTaskId || '')
+                            && after.deletedStatusKey !== 1;
+
+                        if (landed) {
+                            updated.push(id);
+                            continue;
+                        }
+
+                        // Left mid-flight. Put it back on the board rather than
+                        // leaving it deleted and calling it a failure.
+                        if (after && after.deletedStatusKey === 1 && wasDeletedStatusKey !== 1) {
+                            await MongoDbCrudOpration(companyId, {
+                                type: dbCollections.TASKS,
+                                data: [{ _id: task._id }, { $set: { deletedStatusKey: wasDeletedStatusKey } }, { returnDocument: 'after' }],
+                            }, 'findOneAndUpdate').then((restored) => {
+                                socketEmitter.emit('update', {
+                                    type: 'update', data: restored,
+                                    updatedFields: { deletedStatusKey: wasDeletedStatusKey }, module: 'task',
+                                });
+                            }).catch((error) => {
+                                logger.error(`bulkConvertToTask restore ${id}: ${error && error.message}`);
+                            });
+                            errors.push({ taskId: id, reason: 'conversion failed; the task was restored where it was' });
+                            continue;
+                        }
+                        errors.push({ taskId: id, reason: 'conversion did not take effect' });
+                    } catch (error) {
+                        logger.error(`bulkConvertToTask task ${id}: ${error.message}`);
+                        errors.push({ taskId: id, reason: error.message });
+                    }
+                }
+
+                emitBulkSummary('bulkConvertToTask', { taskIds: updated, targetSprintId: sprintObj?.id, targetProjectId: projectData?.id });
+                resolve(summarize({ updated, skipped, errors }));
+            } catch (error) {
+                logger.error(`bulkConvertToTask error: ${error.message}`);
                 reject(error);
             }
         });

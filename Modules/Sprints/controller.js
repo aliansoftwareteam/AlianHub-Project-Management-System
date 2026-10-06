@@ -9,6 +9,7 @@ const { unsetAllCounts } = require("../notification-count/controller");
 const requestQueue = new RequestQueue();
 const { getCachedCompanyData } = require('../../utils/planHelper');
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
+const scrumRules = require("./scrumRules");
 
 exports.addSprint = (req, res) => {
     exports.addSprintFun(req).then((data) => {
@@ -321,6 +322,22 @@ exports.updateSprintFun = (req) => {
         try {
             const { companyId, projectId, folderId = null, updateObject, userData, sprintName = null, folderName = "", projectData = null, mainChat = false, updatedValueDeleteStatusKey, historyData } = req.body;
             const { id } = req.params;
+
+            // This applies a client-supplied update document verbatim, with
+            // upsert. Harmless while a sprint was only a container, but the
+            // Scrum lifecycle fields must be written by the start/complete
+            // actions alone — otherwise anyone can close a sprint, move its
+            // dates or forge a commitment snapshot and skip the state machine.
+            // Nothing that ships today writes these, so nothing today changes.
+            const lifecycleField = scrumRules.findLifecycleWrite(updateObject);
+            if (lifecycleField) {
+                resolve({
+                    status: false,
+                    statusText: `"${lifecycleField}" is managed by the sprint lifecycle. Use the start or complete action instead.`,
+                });
+                return;
+            }
+
             const schema = SCHEMA_TYPE.SPRINTS;
             let obj = {
                 type: schema,
@@ -332,7 +349,33 @@ exports.updateSprintFun = (req) => {
                 ]
             }
 
-            MongoQ.MongoDbCrudOpration(companyId, obj, "findOneAndUpdate").then((response) => {
+            // Archiving (2) or closing (5) cascades the key onto EVERY task in
+            // the sprint, done or not — which is exactly the rollover a running
+            // Scrum sprint must not have done behind its back. Only look the
+            // sprint up for those two values, so the denormalised `$inc`
+            // task-count path stays a single write.
+            const archiveOrClose = updateObject && updateObject.$set
+                && Object.prototype.hasOwnProperty.call(updateObject.$set, 'deletedStatusKey')
+                ? Number(updateObject.$set.deletedStatusKey)
+                : null;
+
+            const lifecycleCheck = (archiveOrClose === 2 || archiveOrClose === 5)
+                ? MongoQ.MongoDbCrudOpration(companyId, {
+                    type: schema,
+                    data: [{ _id: new mongoose.Types.ObjectId(id) }, 'isScrum state name'],
+                }, "findOne").then((current) => {
+                    const state = scrumRules.deriveState(current);
+                    if (state === scrumRules.STATE_ACTIVE || state === scrumRules.STATE_OVERDUE) {
+                        const running = new Error('SPRINT_RUNNING');
+                        running.sprintRunning = (current && current.name) || '';
+                        throw running;
+                    }
+                }, () => { /* a failed pre-check must not block an ordinary archive */ })
+                : Promise.resolve();
+
+            lifecycleCheck
+            .then(() => MongoQ.MongoDbCrudOpration(companyId, obj, "findOneAndUpdate"))
+            .then((response) => {
                 resolve({ status: true, statusText: "Sprint_updated_successfully",data:response });
                 if(mainChat) return;
 
@@ -465,6 +508,13 @@ exports.updateSprintFun = (req) => {
                 // }
             })
             .catch((error) => {
+                if (error && error.sprintRunning !== undefined) {
+                    resolve({
+                        status: false,
+                        statusText: `"${error.sprintRunning}" is still running. Complete the sprint first — archiving it now would close its unfinished tasks too.`,
+                    });
+                    return;
+                }
                 logger.error(`ERROR in update sprint function => ${error}`);
             })
         } catch (error) {
@@ -725,6 +775,13 @@ exports.getPerProjectCount = (companyId,projectId,collectionName) => {
                     resolve(false);
                 }
             })
+            // Without this the promise never settles when anything above throws, and every caller
+            // waits forever — addSprintFun in particular, which is how a project ended up with no
+            // list and no tasks rather than with an error.
+            .catch((error) => {
+                logger.error(`ERROR in getPerProjectCount: ${error && error.message}`);
+                resolve(false);
+            })
         } catch (error) {
             logger.error(`ERROR in getPerProjectCount ${error.message}`);
             reject(error);
@@ -734,6 +791,13 @@ exports.getPerProjectCount = (companyId,projectId,collectionName) => {
 
 exports.checkPlanPermission = async (companyData, totalCreated, type) => {
     try {
+        // A company document without planFeature is normal for a few seconds during creation, and
+        // JSON.parse(JSON.stringify(undefined)) throws rather than returning undefined. That throw
+        // used to escape into a .then with no .catch, so the caller's promise never settled and
+        // sprint creation hung forever. No plan recorded means no per-project cap.
+        if (!companyData || companyData.planFeature === undefined || companyData.planFeature === null) {
+            return true;
+        }
         let planfeatures = JSON.parse(JSON.stringify(companyData.planFeature));
 
         let perProjectData = type === 'sprints' ? planfeatures?.sprintPerProject : planfeatures?.folderPerProject;

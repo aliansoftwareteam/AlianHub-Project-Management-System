@@ -89,6 +89,8 @@ const dbCollections = {
     AUTOMATION_RULES: "automation_rules",
     INTEGRATION_CONNECTIONS: "integration_connections",
     CLOUD_STORAGE_CONNECTIONS: "cloud_storage_connections",
+    FORMS: "forms",
+    FORM_SUBMISSIONS: "form_submissions",
 }
 
 /** DOCUMENT ID'S NAME WHICH IS USED IN THE "SETTINGS" COLLECTION NAME **/

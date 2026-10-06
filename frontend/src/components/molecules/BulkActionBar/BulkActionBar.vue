@@ -197,16 +197,42 @@
                 </div>
             </BulkMenu>
 
-            <!-- MOVE — opens the shared move sidebar (project + sprint/folder
-                 picker) in bulk mode; backend auto-maps status/type. -->
+            <!-- MOVE — the sprint/folder picker for tasks, or the parent-task
+                 picker when everything selected is a subtask. Same branch the
+                 single-task action makes. See openMove. -->
             <button
                 class="bulk-action-bar__btn"
                 :class="{ 'bulk-action-bar__btn--disabled': !canMove }"
                 :title="canMove ? 'Move selected tasks' : 'No permission to move'"
                 :disabled="!canMove"
-                @click="canMove && (showMove = true, closeMenu())"
+                @click="canMove && openMove()"
             >
                 <span>Move</span>
+            </button>
+
+            <!-- CONVERT TO SUBTASK — opens the same task picker the single
+                 action uses, in bulk mode; it returns the chosen parent task. -->
+            <button
+                class="bulk-action-bar__btn"
+                :class="{ 'bulk-action-bar__btn--disabled': !canConvertToSubTask }"
+                :title="canConvertToSubTask ? 'Make selected tasks subtasks of one task' : 'No permission to convert'"
+                :disabled="!canConvertToSubTask"
+                @click="canConvertToSubTask && (showConvertToSubTask = true, closeMenu())"
+            >
+                <span>Convert to Subtask</span>
+            </button>
+
+            <!-- CONVERT TO TASK — promotes selected subtasks to top level. Reuses
+                 the same sprint picker bulk move uses, since a promoted task needs
+                 somewhere to land. -->
+            <button
+                class="bulk-action-bar__btn"
+                :class="{ 'bulk-action-bar__btn--disabled': !canConvertToTask }"
+                :title="canConvertToTask ? 'Promote selected subtasks to tasks' : 'No permission to convert'"
+                :disabled="!canConvertToTask"
+                @click="canConvertToTask && (showConvertToTask = true, closeMenu())"
+            >
+                <span>Convert to Task</span>
             </button>
 
             <!-- DELETE -->
@@ -273,6 +299,45 @@
         @isConvertSubtaskOPen="showMove = false"
         @bulkMoveConfirm="onBulkMoveConfirm"
     />
+
+    <!-- Bulk convert to subtask: the same sidebar, showing the task list rather
+         than the sprint picker. isMoveTask/isDuplicate/isConvertTask all stay
+         false because that combination is what makes it list tasks. -->
+    <ConvertToSubTaskSidebar
+        v-if="showConvertToSubTask"
+        :closeSideBar="showConvertToSubTask"
+        :isOpenSubTask="true"
+        :isBulkConvert="true"
+        :task="{}"
+        @isConvertSubtaskOPen="showConvertToSubTask = false"
+        @bulkConvertConfirm="onBulkConvertConfirm"
+    />
+
+    <!-- Move, when everything selected is a subtask. openMoveSubTask is the mode
+         the single-task action uses for exactly this: it lists PARENT TASKS and
+         labels the button Move, because a subtask has nowhere to go but under
+         another task. -->
+    <ConvertToSubTaskSidebar
+        v-if="showMoveSubtask"
+        :closeSideBar="showMoveSubtask"
+        :openMoveSubTask="true"
+        :isBulkConvert="true"
+        :task="{}"
+        @isConvertSubtaskOPen="showMoveSubtask = false"
+        @bulkConvertConfirm="onMoveSubtaskConfirm"
+    />
+
+    <!-- Bulk convert to task: the destination picker, identical to bulk move —
+         a promoted subtask becomes a top-level task and needs a sprint. -->
+    <ConvertToSubTaskSidebar
+        v-if="showConvertToTask"
+        :closeSideBar="showConvertToTask"
+        :isMoveTask="true"
+        :isBulkMove="true"
+        :task="{}"
+        @isConvertSubtaskOPen="showConvertToTask = false"
+        @bulkMoveConfirm="onBulkConvertToTaskConfirm"
+    />
 </template>
 
 <script setup>
@@ -305,6 +370,9 @@ const userId = inject('$userId', null);
 const showDeleteConfirm = ref(false);
 const showArchiveConfirm = ref(false);
 const showMove = ref(false);
+const showConvertToSubTask = ref(false);
+const showConvertToTask = ref(false);
+const showMoveSubtask = ref(false);
 const isWorking = ref(false);
 const barRef = ref(null);
 
@@ -363,6 +431,16 @@ const canChangeTags = computed(() => checkPermission('task.task_tag', projectDat
 const canDelete = computed(() => checkPermission('task.task_delete', projectData?.value?.isGlobalPermission) === true);
 const canArchive = computed(() => checkPermission('task.task_archive', projectData?.value?.isGlobalPermission) === true);
 const canMove = computed(() => checkPermission('task.task_move', projectData?.value?.isGlobalPermission) === true);
+// Both keys, exactly as the single-task action gates itself: one to convert, one
+// to create a subtask.
+const canConvertToSubTask = computed(() =>
+    checkPermission('task.task_convert_to_subtask', projectData?.value?.isGlobalPermission) === true
+    && checkPermission('task.sub_task_create', projectData?.value?.isGlobalPermission) === true);
+// Both keys, exactly as the single action gates itself: one to convert, one to
+// create a task.
+const canConvertToTask = computed(() =>
+    checkPermission('task.convert_to_task', projectData?.value?.isGlobalPermission) === true
+    && checkPermission('task.task_create', projectData?.value?.isGlobalPermission) === true);
 
 const availableStatuses = computed(() => {
     const data = projectData?.value?.taskStatusData;
@@ -609,6 +687,12 @@ function reportResult(action, response) {
             'project-not-found': 'project not found',
             'invalid-id': 'invalid id',
             'invalid-type': 'invalid operation',
+            'already-in-target': 'already there',
+            'is-the-chosen-parent': 'it is the parent you chose',
+            'already-a-subtask-of-this-parent': 'already a subtask of that task',
+            'carried-with-its-parent': 'moved with its parent task',
+            'already-a-top-level-task': 'already a task, not a subtask',
+            'subtask-moves-with-its-parent': 'a subtask moves with its parent — use Convert to Task or Convert to Subtask',
         })[topReason] || topReason || 'skipped';
         msg += ` — ${skipped} skipped (${reasonLabel})`;
     }
@@ -696,9 +780,13 @@ function onBulkMoveConfirm({ project, sprint } = {}) {
     const proj = projectData?.value;
     const sourceGroups = new Map(); // `${folderId}::${sprintId}` -> { ref, units }
     let totalUnits = 0;
+    // A parent counts itself plus its subtasks, so a subtask never counts on its
+    // own: either its parent is selected too and is already counting it, or the
+    // subtask does not move at all — a subtask goes where its parent goes.
     for (const id of selection.selectedTaskIds.value) {
         const t = findTaskInStore(id)?.task;
         if (!t) continue;
+        if (!t.isParentTask) continue;
         const folderId = t.folderObjId || '';
         const sid = String(t.sprintId);
         const ref = folderId
@@ -720,7 +808,6 @@ function onBulkMoveConfirm({ project, sprint } = {}) {
             ProjectName: project.ProjectName,
         },
         sprintObj: sprint,
-        isSubTask: false,
     }, {
         onSuccess: () => {
             // Decrement each source sprint badge (mirrors single-move's
@@ -741,6 +828,112 @@ function onBulkMoveConfirm({ project, sprint } = {}) {
                 commit('projectData/mutateSprints', { op: 'modified', data: { ...destRef } });
             }
         },
+    });
+}
+
+// A subtask cannot be moved into a bare sprint — it is rendered nested under its
+// parent and looked up one sprint at a time, so a subtask away from its parent
+// shows up nowhere. The single-task action already branches on this: Move on a
+// parent opens the sprint picker, Move on a subtask opens a picker of parent
+// tasks. Bulk does the same.
+//
+// A subtask whose parent is also selected is not "loose": it travels with the
+// parent through the ordinary sprint move.
+const looseSubtaskIds = computed(() => {
+    const ids = [...selection.selectedTaskIds.value].map(String);
+    const selected = new Set(ids);
+    return ids.filter((id) => {
+        const t = findTaskInStore(id)?.task;
+        return t && t.isParentTask !== true && !selected.has(String(t.ParentTaskId || ''));
+    });
+});
+const movingOnlySubtasks = computed(() =>
+    selection.selectedTaskIds.value.length > 0
+    && looseSubtaskIds.value.length === selection.selectedTaskIds.value.length);
+
+function openMove() {
+    closeMenu();
+    if (movingOnlySubtasks.value) {
+        showMoveSubtask.value = true;
+        return;
+    }
+    showMove.value = true;
+}
+
+// Moving subtasks under a chosen parent IS a re-parent, so it runs the same
+// request the convert action does. The wording follows the single-task flow,
+// which calls this Move.
+function onMoveSubtaskConfirm({ task } = {}) {
+    if (!task || !task._id) return;
+    showMoveSubtask.value = false;
+
+    const crossesSprints = [...selection.selectedTaskIds.value].some((id) => {
+        const t = findTaskInStore(id)?.task;
+        return t && String(t.sprintId) !== String(task.sprintId);
+    });
+
+    runBulk('bulkConvertToSubTask', { parentTaskId: String(task._id) }, {
+        onSuccess: () => { if (crossesSprints) refreshSprintCounts(); },
+    });
+}
+
+// Bulk convert to subtask. The sidebar returns the parent task; the sprint,
+// folder and project all follow from it on the server, because a subtask lives
+// where its parent lives.
+function onBulkConvertConfirm({ task } = {}) {
+    if (!task || !task._id) return;
+    showConvertToSubTask.value = false;
+
+    // Converting into a parent that sits in another sprint moves the task there,
+    // and the sidebar sprint badges are not socket-driven. Rather than replay the
+    // server's arithmetic here — a converted parent takes its own subtasks along,
+    // so it is not simply one per selected task — re-read the sprints afterwards.
+    // Costs one request and cannot drift.
+    const crossesSprints = [...selection.selectedTaskIds.value].some((id) => {
+        const t = findTaskInStore(id)?.task;
+        return t && String(t.sprintId) !== String(task.sprintId);
+    });
+
+    runBulk('bulkConvertToSubTask', { parentTaskId: String(task._id) }, {
+        onSuccess: () => { if (crossesSprints) refreshSprintCounts(); },
+    });
+}
+
+// mutateSprints ignores an 'added' op for a sprint it already holds, so the
+// ordinary load would not refresh anything — each row is committed as modified.
+async function refreshSprintCounts() {
+    const pid = projectData?.value?._id;
+    if (!pid) return;
+    try {
+        const res = await apiRequest('get', `/api/v1/${env.GET_SPRINT_OR_PROJECT}/${pid}?collection=sprints`);
+        (res?.data || []).forEach((row) => {
+            commit('projectData/mutateSprints', { op: 'modified', data: { ...row, id: row._id } });
+        });
+    } catch (error) {
+        // The badges stay stale until the next load; not worth an error toast on
+        // top of a conversion that succeeded.
+        console.error('ERROR in refresh sprint counts: ', error);
+    }
+}
+
+// Bulk convert to task. The picker returns a project and sprint, exactly as it
+// does for bulk move; the server promotes each selected subtask into it.
+function onBulkConvertToTaskConfirm({ project, sprint } = {}) {
+    if (!project || !sprint || !sprint.id) return;
+    showConvertToTask.value = false;
+
+    // The sprint badges are not socket-driven, and a promotion into a different
+    // sprint moves the task there. Re-read them rather than replaying the
+    // server's arithmetic — see refreshSprintCounts.
+    runBulk('bulkConvertToTask', {
+        projectData: {
+            id: project._id,
+            ProjectCode: project.ProjectCode,
+            ProjectName: project.ProjectName,
+        },
+        sprintObj: sprint,
+    }, {
+        onSuccess: () => refreshSprintCounts(),
     });
 }
 

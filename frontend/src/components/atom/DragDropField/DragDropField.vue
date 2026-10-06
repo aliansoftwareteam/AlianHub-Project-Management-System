@@ -1,6 +1,6 @@
 <template>
     <div class="ddf__root">
-        <draggable v-model="itemData" tag="ul" class="status_ul" @update:modelValue="$emit('update:modelValue',$event)" @change="updateItem(itemData,$event)" :item-key="makeUniqueId(5)" :group="group.name ? group.name : ''" :move="checkMove" :handle="props.from === 'task_type' ? '.drag-handle' : null">
+        <draggable v-model="itemData" tag="ul" class="status_ul" @update:modelValue="$emit('update:modelValue',$event)" @change="updateItem(itemData,$event)" :item-key="makeUniqueId(5)" :group="group.name ? group.name : ''" :move="checkMove" :handle="props.from === 'task_type' ? '.drag-handle' : '.drag-image-wrapper'">
             <template #item="{ element, index }">
                 <li class=" d-flex align-items-center justify-content-between position-re">
                     <span class="taskInnerData"  v-if="!element.isEditable">
@@ -8,8 +8,8 @@
                             <span v-if="props.from === 'task_type'" class="drag-handle" title="Drag to reorder">
                                 <img :src="dragDots" class="drag-handle__img" alt="drag" />
                             </span>
-                            <span v-else class="drag-image-wrapper position-ab">
-                                <img :src="dragIcon" class="dragImage position-re" />
+                            <span v-else class="drag-image-wrapper position-ab" title="Drag to reorder">
+                                <img :src="dragIcon" class="dragImage position-re" :style="[{verticalAlign: 'middle'}]" />
                             </span>
                         <template v-if="!element.isEditable && !isChangeColor" >
                             <TaskTypeIcon
@@ -218,6 +218,14 @@ input.form-control.edit-input {
 }
 .drag-handle:active { cursor: grabbing; }
 .drag-handle__img { width: 9px; height: 16px; display: block; }
+/* Status cards drag by their icon only (handle=.drag-image-wrapper). touch-action:none lets a
+   touch on the icon start the drag; the rest of the card keeps default touch-action so mobile
+   users can still scroll the list by dragging the card body. */
+.drag-image-wrapper {
+    cursor: grab;
+    touch-action: none;
+}
+.drag-image-wrapper:active { cursor: grabbing; }
 /* grip sits at the card start — drop the left indent that made room for the old
    absolute drag icon. */
 .taskyou_need_right ul.status_ul li { padding-left: 8px; }

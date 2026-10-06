@@ -1,11 +1,14 @@
 <template>
   <div class="agile-report">
     <div class="agile-report__bar">
-      <span class="agile-report__label">Last {{ limit }} sprints — committed vs completed (points)</span>
+      <span class="agile-report__label">Last {{ limit }} completed sprints — committed vs completed (points)</span>
+      <span v-if="skipped" class="agile-report__note">{{ skipped }} older sprint(s) skipped — no commitment was recorded when they ran.</span>
       <button class="agile-report__pdf" :disabled="!hasData" @click="exportPdf">Export PDF</button>
     </div>
     <div v-if="loading" class="agile-report__msg">Loading…</div>
-    <div v-else-if="!hasData" class="agile-report__msg">No sprint data yet.</div>
+    <div v-else-if="!hasData" class="agile-report__msg">
+      No completed sprints yet. Velocity is measured from what a sprint committed to when it started, so a sprint has to be started and completed before it appears here.
+    </div>
     <ApexChart v-else ref="chartRef" type="line" height="360" :options="chartOptions" :series="series" />
   </div>
 </template>
@@ -26,6 +29,7 @@ const props = defineProps({
 const limit = 10;
 const loading = ref(false);
 const rows = ref([]); // [{ name, committed, completed, rollingAvg }]
+const skipped = ref(0);
 const chartRef = ref(null);
 
 const hasData = computed(() => rows.value.length > 0);
@@ -55,6 +59,7 @@ const load = async () => {
     try {
         const res = await apiRequest('get', `/api/v1/agile/velocity?projectId=${encodeURIComponent(pid)}&limit=${limit}`);
         rows.value = (res.data && res.data.status && res.data.data && res.data.data.sprints) ? res.data.data.sprints : [];
+        skipped.value = (res.data && res.data.data && Number(res.data.data.skipped)) || 0;
     } catch (e) {
         rows.value = [];
     } finally {
@@ -80,6 +85,7 @@ onMounted(load);
 .agile-report { padding: 12px; }
 .agile-report__bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
 .agile-report__label { font-size: 13px; color: #555; }
+.agile-report__note { font-size: 11.5px; color: #8b90a0; }
 .agile-report__pdf { margin-left: auto; border: 1px solid #2F3990; color: #2F3990; background: #fff; border-radius: 6px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
 .agile-report__pdf:disabled { opacity: 0.5; cursor: not-allowed; }
 .agile-report__msg { color: #888; font-size: 14px; padding: 40px; text-align: center; }

@@ -756,6 +756,64 @@ const schema = {
         expiresAt: { type: Date, required: false },
         passwordHash: { type: String, required: false },
     },
+    /* Forms — a form belongs to a project and files every submission as a task in
+     * one sprint. That sprint IS the response list: there is no separate response
+     * store, nothing to read them in, and nothing to keep in step with the tasks.
+     *
+     * `questions` is an untyped Array on purpose: a question's shape depends on
+     * what it binds to, and pinning a sub-schema here would mean editing this file
+     * for every new field type. The module validates it instead. Everything else
+     * stays declared — this sub-schema is strict, so an undeclared path is dropped
+     * on save and only shows up later as data that vanished.
+     *
+     * Each question is { id, label, help, fieldKey, fieldSource, required, order }
+     * where fieldSource is 'task' | 'custom' and fieldKey names what it fills.
+     */
+    forms: {
+        title: { type: String, required: true },
+        description: { type: String, default: '', required: false },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        // Where submissions land. Held on the form so a submission needs no
+        // lookup and cannot be pointed at another project's sprint.
+        sprintId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        questions: { type: Array, default: [], required: false },
+        // Applied to every submission task.
+        defaults: { type: Object, default: {}, required: false },
+        // Presentation of the public page: layout, theme, colours, toggles.
+        settings: { type: Object, default: {}, required: false },
+        // Shown after submitting.
+        successMessage: { type: String, default: '', required: false },
+        // 'draft' | 'live' — a draft has no working public link.
+        state: { type: String, default: 'draft', required: false },
+        submissionCount: { type: Number, default: 0, required: false },
+        // Taken when the form is published, exactly as an email inbox does it:
+        // the public submission handler has no logged-in user and no company
+        // context, so everything it needs to build a task is frozen here rather
+        // than looked up per submission.
+        CompanyId: { type: String, default: '', required: false },
+        projectSnapshot: { type: Object, default: {}, required: false },
+        sprintArray: { type: Object, default: {}, required: false },
+        userSnapshot: { type: Object, default: {}, required: false },
+        templateSnapshot: { type: Object, default: {}, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // One row per public form submission, stored whether or not a task was
+    // created from it: the form's own response table is the record of what was
+    // submitted, and task creation is optional.
+    form_submissions: {
+        formId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        CompanyId: { type: String, default: '', required: false },
+        // [{ questionId, label, value }] — the label is copied in as given, so
+        // renaming or deleting a question later cannot rewrite past answers.
+        answers: { type: Array, default: [], required: false },
+        // Empty when the form does not create tasks.
+        taskId: { type: String, default: '', required: false },
+        taskKey: { type: String, default: '', required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Submissions arriving through a public intake form
     intakeItems: {
         publicShareId: { type: mongoose.Schema.Types.ObjectId, required: true },
@@ -1104,6 +1162,13 @@ const schema = {
         Cst_CompanyName: {
             type: String,
             required: true
+        },
+        // What the team mainly does, answered once during setup. Decides which sample content the
+        // company starts with, and which templates are worth showing first. Blank for every company
+        // created before the question existed, which the code treats as "no preference".
+        teamFocus: {
+            type: String,
+            default: ''
         },
         Cst_DialCode: {
             type: Map,
@@ -1806,6 +1871,15 @@ const schema = {
         statusType: {
             type: String,
             required: true,
+        },
+        // Per-project sprint cadence. Shaped like the existing autoArchive and
+        // autoCloseProjects rules so the nightly cron that reads it follows a
+        // pattern already in the codebase.
+        // { enabled, lengthDays, startWeekday, autoClose, autoCreateNext, rolloverTarget }
+        sprintCadence: {
+            type: Object,
+            default: {},
+            required: false
         },
         taskStatusData: {
             type: Array,
@@ -2901,6 +2975,64 @@ const schema = {
         },
         url : {
             type: String,
+            required: false
+        },
+        // ── Scrum ────────────────────────────────────────────────────
+        // A sprint doc is a plain container until someone opts it in. Chat
+        // channels (mainChat) and Forms response lists live in this same
+        // collection and never get these set, so they are unaffected.
+        //
+        // Declared, not inferred: the schema is strict, so an undeclared path is
+        // dropped on write — it appears to work until the next reload. That is
+        // exactly why burndown.js has been reading a startDate that never existed.
+        isScrum: {
+            type: Boolean,
+            default: false,
+            required: false
+        },
+        // The one designated container per project for un-sprinted work.
+        // tasks.sprintId is required, so a backlog cannot be "no sprint".
+        isBacklog: {
+            type: Boolean,
+            default: false,
+            required: false
+        },
+        goal: {
+            type: String,
+            default: '',
+            required: false
+        },
+        startDate: {
+            type: Date,
+            required: false
+        },
+        endDate: {
+            type: Date,
+            required: false
+        },
+        // planned | active | closed
+        state: {
+            type: String,
+            default: '',
+            required: false
+        },
+        // Snapshot taken once, when the sprint starts: { points, tasks, minutes, at }.
+        // Without it "committed vs completed" is a tautology and scope added
+        // mid-sprint is invisible.
+        commitment: {
+            type: Object,
+            default: {},
+            required: false
+        },
+        // What the close actually did: { at, by, done, notDone, movedTo, counts }.
+        closeReport: {
+            type: Object,
+            default: {},
+            required: false
+        },
+        // Set on a sprint created by rolling over from another one.
+        rolledFrom: {
+            type: mongoose.Schema.Types.ObjectId,
             required: false
         }
     },

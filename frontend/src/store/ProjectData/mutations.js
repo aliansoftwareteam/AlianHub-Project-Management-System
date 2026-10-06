@@ -194,6 +194,29 @@ function returnItemCountDetails(tasks, groupBy, updatedFields = null, taskId) {
 }
 
 // HANDLE TASK
+/* A task has just been attached to `taskIndex` as a subtask. Raise that parent's
+   subtask count by one.
+
+   Counted UP rather than recomputed from subtaskArray.length, which is what the
+   line here used to try. That array is paginated at 35 and only filled when a row
+   is expanded, so a parent with 40 subtasks — or one never opened — would have had
+   its count rewritten downwards. That is why the recompute was commented out, and
+   why it stays out.
+
+   Guarded on dragDropcheck so only a genuine re-parent counts. The same branch
+   also runs for every ordinary field change on a subtask, and a partially loaded
+   subtaskArray means "not in the array" cannot be read as "newly added" on its own.
+
+   The parent's own document update follows from the server carrying the
+   authoritative count, and merges straight over this. This exists so the arrow
+   appears immediately rather than after that round trip. */
+function bumpParentSubtaskCount(state, pid, sprintId, taskIndex, dragDropcheck) {
+    if (dragDropcheck !== true) return;
+    const parent = state.tasks?.[pid]?.[sprintId]?.tasks?.[taskIndex];
+    if (!parent) return;
+    parent.subTasks = (Number(parent.subTasks) || 0) + 1;
+}
+
 export const mutateUpdateFirebaseTasks = (state, payload) => {
     const {pid, sprintId, op, data, snap, updatedFields,dragDropcheck, groupBy: payloadGroupBy} = payload;
 
@@ -275,11 +298,16 @@ export const mutateUpdateFirebaseTasks = (state, payload) => {
                             }else{
                                 state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
                             }
+                            bumpParentSubtaskCount(state, pid, sprintId, taskIndex, dragDropcheck);
                         }
-                        // state.tasks[pid][sprintId].tasks[taskIndex].subTasks = state?.tasks?.[pid]?.[sprintId]?.tasks[taskIndex]?.subtaskArray?.length || 0;
                     }
-                    else if(dragDropcheck === true && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray === undefined && data.ParentTaskId){
+                    // taskIndex is -1 when the parent is not in this view — filtered
+                    // out, in another group, or past the 35-row page. Reading
+                    // tasks[-1].subtaskArray threw from inside the mutation, which
+                    // aborts the commit and leaves the drop half applied.
+                    else if(dragDropcheck === true && taskIndex !== -1 && state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray === undefined && data.ParentTaskId){
                         state.tasks[pid][sprintId].tasks[taskIndex].subtaskArray = [data];
+                        bumpParentSubtaskCount(state, pid, sprintId, taskIndex, dragDropcheck);
                     }
                 } else {
                     const taskIndex = state.tasks[pid][sprintId].tasks.findIndex((x) => x._id === data._id);

@@ -16,6 +16,136 @@ from [Conventional Commits](https://www.conventionalcommits.org/) on `main`.
 
 ---
 
+## [14.36.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.35.0...v14.36.0) (2026-10-06)
+
+
+### 🚀 Features
+
+* **tasks:** stop pre-assigning the creator on new tasks ([a14900d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a14900d146c4be1b1a428e851ca3a5d0a9c4c061))
+
+
+### 🐛 Bug Fixes
+
+* **auth:** stop appending stray characters to member invitation links ([b89bdca](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b89bdca775c2eddc293ffefe1ab6d307a5e2af22))
+
+## [14.35.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.34.0...v14.35.0) (2026-08-26)
+
+
+### 🚀 Features
+
+* carry subtasks through bulk move, and add both convert actions in bulk ([92b0098](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92b0098cf9cb0316be0c3b255abcacdf4f86ef29))
+* **tracker:** tell people the estimate was passed, even when tracking is not capped ([8abb21c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8abb21c0ee799bc8b33dad2cf075834bb6039bd0))
+
+
+### 🐛 Bug Fixes
+
+* show a dragged-in subtask straight away instead of after a reload ([1fe8323](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1fe8323c540be6b2c81b01bee34aca57e262ff22))
+* **tracker:** the task type icon was invisible on the running-tracker header ([e43b962](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/e43b9624318bef999405d17b59495caccd94a6dc))
+
+## [14.34.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.33.0...v14.34.0) (2026-08-26)
+
+
+### 🚀 Features
+
+* close the 13 first-run experience gaps ([b883526](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b883526ccff03c981e30891401733642b445179c))
+* the demo project is split across three sprints with subtasks under them ([bf31fc7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/bf31fc778d0ee1665d4f2a9e9f0591a85d0c2b54))
+* the demo project now looks worked-in instead of empty ([85857e8](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/85857e8a2218811288479f90743dbda8281881cd))
+
+
+### 🐛 Bug Fixes
+
+* demo project views lost their names, and its tasks now teach properly ([f6d04f4](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f6d04f49e4304bf24a291e038efa4d425f0cfbdd))
+* leave MONGODB_URL empty in .env.example so the wizard's answer wins ([4bcdc6e](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4bcdc6e7ffb6ffb61826b70441fd8daac15c3fa4))
+* new tasks could not be created in the demo project ([a6843a7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a6843a7822960d94ea9401ce14572d8a71f76c22))
+* read the real project and task requirements instead of copying payload shapes ([c9eac49](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c9eac495b99ed5610755e742a1f23eafbdde9204))
+* the demo project was never created, and the wizard skip bypassed the backend ([2c352ba](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/2c352ba9b28a68aeaefce00535beb66293684481))
+* the demo project was only populated when no setup answer was given ([a4b9365](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a4b9365abf160e1cf6b0b75151a9b766ec3dcf13))
+* the installer's database answer was recorded and then ignored ([b710f7c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b710f7c61b747b259248e930c6a4d1e2c35526ba))
+* the permission catalogue repair no longer runs on a live company by default ([c8ede23](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c8ede2324f5af7ed272b292c0a7c3f56a0c372a4))
+
+## [14.33.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.32.0...v14.33.0) (2026-08-24)
+
+
+### 🚀 Features
+
+* declare the Scrum lifecycle fields on the sprint schema ([12fef70](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/12fef7059d9b9badeea2e623fe70314a46c4e879))
+* icons for the sprint lifecycle menu items ([4b78387](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4b78387232321453a7a5d71f2e1105bf2d287600))
+* run a sprint from the sprint list ([6b2cc79](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/6b2cc79256ae04c43a249dfaf631d1b4cab4568b))
+* sprint report, and velocity that can see scope creep ([8159d27](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/8159d279e4c0ab60596e5950d12659ce3707f17a))
+* start and complete a Scrum sprint ([b04daa1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b04daa17733884c62282d58d65cca75c1ce53f1d))
+* the project backlog sprint ([f7e0eb9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f7e0eb9e3a37e02f1a1f8bca2bfbb7160815d08b))
+* warn about unfinished subtasks under a finished parent ([9c84f38](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/9c84f38b74c76b74e1db4ba0de5aaaaa0d23f486))
+
+
+### 🐛 Bug Fixes
+
+* completing a sprint took the server down ([67e93c9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/67e93c9274ffc2ef4789f74bec820274425aebb8))
+* draw the burndown against the sprint's real box ([2657197](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/265719788457b0592f5286d4dc3ecd9f3c8d05aa))
+* keep the backlog and folders out of the burndown picker ([f76b51d](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f76b51d5706200ba8f7bae40f477e61f86e5e6a1))
+* show the reason when a sprint action is refused ([0b54343](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0b5434328f0eb07b7f6ba1c345a05f2ba42f1264))
+* stop the sprint state chip breaking the header layout ([f2ec129](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f2ec129e86f32431bd59ac4a792bd638f5a50afc))
+
+
+### 📘 Documentation
+
+* manual test cases for the Scrum sprint lifecycle ([82e42a3](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/82e42a3441960f305e4a2b91fb5c484161798e48))
+* test cases for the whole Scrum sprint feature ([0ea0162](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0ea01622711fce4c82866ddeb4ea746bfbe53171))
+
+## [14.32.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.31.1...v14.32.0) (2026-08-21)
+
+
+### 🚀 Features
+
+* accept a file upload on a public form ([5d1361c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/5d1361c231fb1d32c32321751d2a1648b1d76b6d))
+* add the forms builder view ([d6b5d2c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d6b5d2cdca93fb0718093c5dc2a116b2fb3dc888))
+* add the forms module ([a3dab80](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/a3dab80ab3e041958b925d3a85f26fe69dc68eff))
+* let a public share point at a form ([db37147](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/db371477fdab8d154143ecf1b9a505aa12a78580))
+* open a submitted file from the response table ([388bc14](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/388bc1441b444bf1f38e94b823e0066c64c704de))
+* register the forms and form-submissions collections ([77d94e9](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/77d94e98148ef9657ab9d36690c678d4855fec11))
+* register the forms view in the project view switcher ([9218250](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/92182506c9f32d087e5b79e60c4371c63af54d91))
+* show a parent task's estimate as its own plus its subtasks' ([b94a891](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/b94a891d8409912d75bcc33028d9e9300d0c2897))
+
+
+### 🐛 Bug Fixes
+
+* give the sent-confirmation room above the form ([83b75c7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/83b75c759dff94821806f5e6fb11340117ed6249))
+* re-take the snapshot when a live form's settings change ([09c911a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/09c911aa52ee703e92564f25ccb71edf2ee824fa))
+* refuse a submission with nothing filled in ([4b7b8e0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/4b7b8e004118921ce385e150b3af8c23f4f22002))
+
+
+### ♻️ Refactors
+
+* drop the resubmit-button setting ([f03dab7](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/f03dab70dfa62d3047d873ba0c8d249a787c4344))
+
+## [14.31.1](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.31.0...v14.31.1) (2026-08-19)
+
+
+### 🐛 Bug Fixes
+
+* **public-share:** keep a link that carries a port ([c4a84ed](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c4a84edabde26485e2f792fece14ad8f0518d2b3))
+
+## [14.31.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.30.0...v14.31.0) (2026-08-19)
+
+
+### 🚀 Features
+
+* **create-project:** rebuild project-status on the task-status structure ([747833a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/747833aa4caedbe5d34f1d142417a84f052818e4))
+* **create-project:** reusable template-select form + mobile stepper ([fc4bc39](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/fc4bc395636b0564bcdfdf7fa34007d67de91b4a))
+* **create-project:** status drag-by-icon + desktop status-step fill ([df7301a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/df7301a540b804eedb5e3534aabf0693b59c21d7))
+* **docs:** add Docs as a project view ([ba65d1a](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/ba65d1a9a658456efb34665595c532a38ca5641e))
+* **docs:** open the first doc when the Docs view loads ([90de697](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/90de697d18b640ce2dae05a0977093d53cd3af31))
+* **public-share:** fetch doc pages on demand, and make the twisty work ([deaad31](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/deaad315369f7edbcc2d75dfb9da600af6d5ead3))
+* **public-share:** render video embeds and checklists in a shared doc ([111dc9b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/111dc9b690a4bc5242a9bfb18b4da334f4eab2b6))
+* **public-share:** share a doc's sub-pages and rebuild the reader UI ([c5e91db](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/c5e91db5ec5541d4a01a805dbb69ef6515e872d1))
+* **public-share:** switch shared pages without a reload using CSS :target ([1747fe6](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/1747fe69d7b46681ad178b904f36e50ca4849466))
+
+
+### 🐛 Bug Fixes
+
+* **docs:** give a link with no scheme an https:// prefix ([d27c06c](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/d27c06c07eee9b994564338ba82cfbdbba5fa1f6))
+* **docs:** rebuild the Docs view when the project changes ([0cee2bd](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/0cee2bd1f1284949fbb4af4fa8bc5acc16bfce6f))
+* **task-detail:** render uploaded task-type icon in the title header ([515b02b](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/commit/515b02b0e2822bc3da3ea0fa6682900d3bd5d992))
+
 ## [14.30.0](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/compare/v14.29.0...v14.30.0) (2026-08-14)
 
 

@@ -37,7 +37,7 @@
     margin-left:5px;
 }
 
-.task-name span {
+.task-name .task-name__edit {
     margin-left:5px
 }
 
@@ -70,7 +70,7 @@
 {
     width: calc(100% - 163px);
 }
-.task-detail-sidebar .task-detail-title ul li.task-name span
+.task-detail-sidebar .task-detail-title ul li.task-name .task-name__edit
 {
     width: calc(100% - 35px);
 }
@@ -84,7 +84,7 @@
     {
         width: calc(100% - 98px);
     }
-    .task-detail-sidebar .task-detail-title ul li.task-name span
+    .task-detail-sidebar .task-detail-title ul li.task-name .task-name__edit
     {
         width: calc(100% - 35px);
     }
@@ -95,7 +95,7 @@
     {
         width: calc(100% - 82px);
     }
-    .task-detail-sidebar .task-detail-title ul li.task-name span
+    .task-detail-sidebar .task-detail-title ul li.task-name .task-name__edit
     {
         width: calc(100% - 30px);
     }

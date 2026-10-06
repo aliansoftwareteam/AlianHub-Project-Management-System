@@ -165,6 +165,13 @@ const cloudStorageConnectionsSchema = new Schema(schema.cloudStorageConnections,
 // Every lookup is "this user's connection to this provider" — unique so a
 // double-tap on Connect can't leave two rows with divergent refresh tokens.
 cloudStorageConnectionsSchema.index({ userId: 1, provider: 1 }, { unique: true });
+const formsSchema = new Schema(schema.forms, {strict: true, timestamps: true});
+// "the forms in this project" is the only way a form is ever listed.
+formsSchema.index({ ProjectID: 1, deletedStatusKey: 1 });
+const formSubmissionsSchema = new Schema(schema.form_submissions, {strict: true, timestamps: true});
+// The response table is always "this form's submissions, newest first".
+formSubmissionsSchema.index({ formId: 1, createdAt: -1 });
+
 // Global search: one combined text index per collection.
 taskSchema.index({ TaskName: 'text', rawDescription: 'text' });
 projectsSchema.index({ ProjectName: 'text' });
@@ -204,8 +211,14 @@ timeSheetSchema.index({ userId: 1, ProjectId: 1 });
 userIdSchema.index({ userId: 1 });
 
 // sprints/folders/projects: secondary lookups.
-sprints.index({ ProjectID: 1, deletedStatusKey: 1 });
-folders.index({ ProjectID: 1 });
+//
+// These two indexed `ProjectID`, which neither collection has — both declare
+// `projectId` (schema.js). So the index covered nothing and the hot
+// sprint-and-folder list query has been running unindexed.
+sprints.index({ projectId: 1, deletedStatusKey: 1 });
+folders.index({ projectId: 1 });
+// Scrum: the cron's due-sprint scan and the sprint pickers.
+sprints.index({ projectId: 1, isScrum: 1, state: 1, endDate: 1 });
 projectsSchema.index({ deletedStatusKey: 1 });
 
 // --- Global DB collections (the "global" company DB) ------------------------
@@ -262,6 +275,8 @@ module.exports = {
     automationRulesSchema,
     integrationConnectionsSchema,
     cloudStorageConnectionsSchema,
+    formsSchema,
+    formSubmissionsSchema,
     historySchema,
     userIdSchema, 
     usersSchema,

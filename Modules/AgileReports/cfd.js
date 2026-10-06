@@ -43,7 +43,10 @@ exports.getCFD = async (req, res) => {
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
             data: [
-                { projectId: projectObjId, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true },
+                // Tasks declare ProjectID, not projectId (schema.js). Matching the
+                // wrong name returned nothing, so CFD has answered "No tasks yet."
+                // for every project since it shipped.
+                { ProjectID: projectObjId, deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true },
                 '_id statusType createdAt updatedAt',
             ],
         }, 'find');

@@ -1,4 +1,5 @@
 const { myCache } = require("../../../Config/config");
+const { reconcileCompanyRules } = require('./reconcileRules');
 const { removeCache } = require("../../../utils/commonFunctions");
 const { dbCollections } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
@@ -74,7 +75,15 @@ exports.getSecurityPermissions = async (req, res) => {
                 error: "Company ID is required in headers."
             });
         }
-        const response = await exports.fetchRules(companyId);
+        let response = await exports.fetchRules(companyId);
+
+        // Repair a company that predates a permission. Deliberately only here and not inside
+        // fetchRules: fetchRules is a hot path (getProjectList calls it on every load), and the
+        // repair re-seeds the rules collection, so triggering it from an ordinary page load would
+        // put a delete-then-insert in front of every user. This screen is admin-only and rarely
+        // opened, which is where that work belongs.
+        response = await reconcileCompanyRules(companyId, response);
+
         return res.status(200).json(response && response.length ? response : []);
     } catch (error) {
         console.error(`Error getting security & permissions:`, error);
@@ -98,7 +107,13 @@ exports.fetchRules = (companyId) => {
             MongoDbCrudOpration(companyId, ruleObj, 'find')
                 .then(rules => {
                     const rulesToCache = rules && rules.length ? rules : [];
-                    myCache.set(cacheKey, JSON.stringify(rulesToCache), 604800); // Cache for 1 week
+                    // An empty read is never cached. This is a hot path — getProjectList calls it on
+                    // every load — and caching nothing for a week would fail every permission check
+                    // closed for that company. Empty means the collection is mid-write or seeding
+                    // never finished, both of which resolve on their own.
+                    if (rulesToCache.length) {
+                        myCache.set(cacheKey, JSON.stringify(rulesToCache), 604800); // Cache for 1 week
+                    }
                     resolve(rulesToCache);
                 })
                 .catch(error => reject(error));

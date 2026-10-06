@@ -58,6 +58,11 @@ const verifyJWTTokenWithCRoute = [
     // neither JWT list, and app.use only guards the prefixes it is given. The handlers now
     // take the author from req.uid, which this is what sets.
     "/api/v2/pages",
+    // Forms (Modules/Forms). Managing a form is company data: the prefix has to be
+    // listed here or every handler below is reachable with no token, and the author
+    // they record comes from req.uid, which this is what sets. The PUBLIC submission
+    // endpoint is deliberately not under this prefix.
+    "/api/v2/forms",
     "/api/v1/importTasks",
     "/api/v1/wasabi/retriveObject",
     "/api/v1/wasabi/deleteFile",

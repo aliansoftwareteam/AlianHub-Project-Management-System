@@ -96,7 +96,9 @@ const images = {
     WhiteboardView: {image: require('@/assets/images/png/Board.png'), description: 'whiteboard_view'},
     CanvasView: {image: require('@/assets/images/png/Activity.png'), description: 'canvas_view'},
     MapView: {image: require('@/assets/images/png/Workload.png'), description: 'map_view'},
-    ProjectDashboard: {image: require('@/assets/images/png/Workload.png'), description: 'dashboard_view'}
+    ProjectDashboard: {image: require('@/assets/images/png/Workload.png'), description: 'dashboard_view'},
+    DocsView: {image: require('@/assets/images/png/Activity.png'), description: 'docs_view'},
+    FormsView: {image: require('@/assets/images/png/Table.png'), description: 'forms_view'}
 }
 const viewItem = ref('')
 const companyId = inject('$companyId')

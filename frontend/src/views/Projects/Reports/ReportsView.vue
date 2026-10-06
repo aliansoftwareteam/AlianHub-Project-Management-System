@@ -7,6 +7,7 @@
       <BurndownChart v-if="tab === 'burndown'" :projectData="projectData" :sprints="sprints" />
       <VelocityChart v-else-if="tab === 'velocity'" :projectData="projectData" />
       <CFDChart v-else-if="tab === 'cfd'" :projectData="projectData" />
+      <SprintReport v-else-if="tab === 'sprint'" :projectData="projectData" :sprints="sprints" />
     </div>
   </div>
 </template>
@@ -20,6 +21,7 @@ import { ref } from 'vue';
 import BurndownChart from './BurndownChart.vue';
 import VelocityChart from './VelocityChart.vue';
 import CFDChart from './CFDChart.vue';
+import SprintReport from './SprintReport.vue';
 
 defineProps({
     projectData: { type: Object, default: () => ({}) },
@@ -31,6 +33,7 @@ const tabs = [
     { key: 'burndown', label: 'Burndown' },
     { key: 'velocity', label: 'Velocity' },
     { key: 'cfd', label: 'Cumulative Flow' },
+    { key: 'sprint', label: 'Sprint Report' },
 ];
 </script>
 

@@ -31,6 +31,12 @@ exports.connect = (db) => {
             const installation = require("../../installationSteps.json");
             MONGODB_URL = installation?.envVar?.MONGODB_URL;
         }
+        // Before the wizard's database step both of those are empty. Saying so plainly beats the
+        // "cannot read properties of undefined" this used to throw one line further down.
+        if (!MONGODB_URL) {
+            reject(new Error('No database configured yet. Finish the installation wizard, or set MONGODB_URL in .env.'));
+            return;
+        }
         try {
             const baseMongoUrl = MONGODB_URL.replace(/\/+$/, ''); // strip trailing slashes
             // Note: do NOT append ?authSource=admin for mongodb+srv — Atlas SRV TXT records handle auth

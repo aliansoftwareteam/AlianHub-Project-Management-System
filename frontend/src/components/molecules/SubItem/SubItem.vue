@@ -421,6 +421,16 @@ function updateItem(value = null) {
     }
     apiRequest("patch", reqUrl, axiosData)
     .then((res) => {
+        // A refusal arrives as HTTP 200 with status:false. Committing its empty
+        // `data` blanks the row in the store, and the success toast below would
+        // then report the opposite of what happened.
+        if (res?.data?.status === false) {
+            showSpinner.value = false;
+            showSidebar.value = false;
+            archive.value = false;
+            $toast.error(res?.data?.statusText || t(`Toast.something_went_wrong`), {position: "top-right"});
+            return;
+        }
         if (props.folder) {
             commit("projectData/mutateFolders",{op:'modified',data:{...res?.data?.data}});
         }
@@ -435,11 +445,6 @@ function updateItem(value = null) {
                 type = 'Sprint';
             }
             emit("updateFolderAndSprint",res?.data?.data,type);
-        }
-        if(!res.data.status) {
-            showSpinner.value = false;
-            $toast.error(t(`Toast.something_went_wrong`), {position: "top-right"})
-            return;
         }
         $toast.success(t(`Toast.${props.folder ? 'Folder' : 'Sprint'} ${value !== null ? 'restored' : archive.value ? 'archived' : 'deleted'} successfully`), {position: "top-right"})
         showSidebar.value = false;

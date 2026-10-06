@@ -1,5 +1,5 @@
 <template>
-    <div v-if="modelValue" class="pg" @click.self="requestClose">
+    <div v-if="isOpen" class="pg" :class="{ 'pg--embedded': embedded }" @click.self="embedded ? null : requestClose()">
         <div class="pg__shell">
             <!-- ─── Sidebar: the page tree ─────────────────────────────── -->
             <aside class="pg__side">
@@ -87,7 +87,7 @@
                             <button type="button" class="pg__icon-btn pg__icon-btn--danger" :title="$t('Projects.delete')" @click="deletePage">
                                 <span v-html="ICONS.trash"></span>
                             </button>
-                            <button type="button" class="pg__icon-btn" :title="$t('Projects.close')" @click="requestClose">
+                            <button v-if="!embedded" type="button" class="pg__icon-btn" :title="$t('Projects.close')" @click="requestClose">
                                 <span v-html="ICONS.close"></span>
                             </button>
                         </div>
@@ -194,7 +194,7 @@
 
                 <!-- Nothing open yet. -->
                 <div v-else class="pg__blank">
-                    <button type="button" class="pg__icon-btn pg__blank-close" :title="$t('Projects.close')" @click="requestClose">
+                    <button v-if="!embedded" type="button" class="pg__icon-btn pg__blank-close" :title="$t('Projects.close')" @click="requestClose">
                         <span v-html="ICONS.close"></span>
                     </button>
                     <span class="pg__blank-icon" v-html="ICONS.doc"></span>
@@ -251,6 +251,10 @@ const props = defineProps({
     // Open straight onto this doc. Set when the panel is opened from somewhere that
     // already named one — the Docs list on a task, for instance.
     openDocId: { type: String, default: '' },
+    // Rendered as a project view rather than an overlay: no backdrop, fills its
+    // container, and there is nothing to close back to — so the close controls
+    // and click-outside are dropped.
+    embedded: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -347,7 +351,11 @@ const toggle = (id) => {
 
 const nameOf = (id) => (id ? (getUser(String(id))?.Employee_Name || '—') : '—');
 
-watch(() => props.modelValue, (open) => {
+// Embedded as a view there is no open/close cycle, so it is open from the start
+// and the watch below must fire immediately or the tree would never load.
+const isOpen = computed(() => props.embedded || props.modelValue);
+
+watch(isOpen, (open) => {
     if (open) {
         fetchPages();
         // The tree lists this project's docs; a doc opened from a task may be linked from
@@ -360,12 +368,36 @@ watch(() => props.modelValue, (open) => {
         showLinker.value = false;
         showShare.value = false;
     }
-});
+}, { immediate: true });
 
 // Opening the panel twice from two different docs without closing it in between: the
 // watch above only fires on open, so the id changing while open has to be honoured too.
 watch(() => props.openDocId, (id) => {
-    if (id && props.modelValue) openPage(id);
+    if (id && isOpen.value) openPage(id);
+});
+
+// Switching projects does not remount this component — only the injected project
+// changes — so nothing above re-ran and the previous project's tree and open doc
+// stayed on screen until a tab change or reload forced a rebuild.
+watch(() => (props.projectData && props.projectData._id) || '', (id, previous) => {
+    if (!id || !previous || id === previous) return;
+    // Nothing here autosaves (see isDirty), and the switch has already happened,
+    // so a confirm could not undo it. Say plainly that the edits are going rather
+    // than dropping them in silence.
+    if (isDirty.value) {
+        $toast.warning(t('Projects.page_unsaved_lost_on_switch'), { position: 'top-right' });
+    }
+    current.value = null;
+    draftTitle.value = '';
+    contentHtml.value = '';
+    savedSnapshot.value = { title: '', html: '' };
+    baselinePending.value = false;
+    pages.value = [];
+    expanded.value = new Set();
+    query.value = '';
+    showLinker.value = false;
+    showShare.value = false;
+    if (isOpen.value) fetchPages();
 });
 
 function fetchPages() {
@@ -376,6 +408,13 @@ function fetchPages() {
         // tree shows what exists rather than hiding it behind twisties.
         if (!expanded.value.size) {
             expanded.value = new Set(pages.value.filter((p) => p.parentPageId).map((p) => String(p.parentPageId)));
+        }
+        // As a view, landing on "pick a doc" reads as an empty project even when
+        // it has docs, so start on the first one. Only when nothing is open and
+        // no doc was asked for — and with no docs at all the empty state is still
+        // the right answer. The panel keeps its picker: it is opened FROM a doc.
+        if (props.embedded && !current.value && !props.openDocId && rows.value.length) {
+            openPage(rows.value[0]._id);
         }
     })
     .catch((error) => console.error('ERROR in fetch pages: ', error));
@@ -685,7 +724,29 @@ function openEditor() {
  * and Quill's html are routinely different with nobody having typed a character — which is
  * why closing an untouched doc still asked about unsaved changes.
  */
+// Typing "www.alianhub.com" into the link box stored it verbatim, and a href with
+// no scheme is resolved against the current page — so the link went to
+// localhost:8080/www.alianhub.com instead of the site. Give a scheme-less URL an
+// https:// prefix before Quill stores it.
+//
+// Anything that already carries a scheme is passed straight through to Quill's own
+// sanitiser, so its protocol whitelist still rejects javascript: and friends — this
+// only fills in what the user left out.
+const URL_HAS_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+function patchLinkSanitizer(quill) {
+    const Link = quill && quill.constructor && quill.constructor.import('formats/link');
+    if (!Link || Link.__alianhubAbsolute) return;
+    const original = Link.sanitize.bind(Link);
+    Link.sanitize = (value) => {
+        const url = String(value == null ? '' : value).trim();
+        if (!url || URL_HAS_SCHEME.test(url) || url.startsWith('#') || url.startsWith('/')) return original(url);
+        return original(`https://${url}`);
+    };
+    Link.__alianhubAbsolute = true;
+}
+
 function onEditorReady(quill) {
+    patchLinkSanitizer(quill);
     // Flush first. The stored html was written straight into the element, and Quill only
     // takes it in when its MutationObserver next runs — a microtask later. Reading before
     // that returns our own string rather than Quill's rendering of it, and the difference
@@ -757,6 +818,24 @@ onBeforeUnmount(() => {
     display: flex;
     overflow: hidden;
     box-shadow: 0 18px 48px rgba(23, 25, 35, 0.22);
+}
+/* As a project view it sits in the page flow, so it drops the backdrop, the
+   centring and the floating-card treatment and simply fills its container. */
+.pg--embedded {
+    position: static;
+    inset: auto;
+    background: transparent;
+    z-index: auto;
+    display: block;
+    height: 100%;
+}
+.pg--embedded .pg__shell {
+    width: 100%;
+    height: 100%;
+    min-height: 520px;
+    border-radius: 8px;
+    box-shadow: none;
+    border: 1px solid #eef0f6;
 }
 
 /* ── sidebar ─────────────────────────────────────────── */

@@ -71,7 +71,11 @@ exports.init = (app) => {
     // Body: { action: 'bulkUpdateStatus' | 'bulkDelete' | ..., taskIds: [..], ...payload }
     // CompanyId comes from the verified header set by the auth middleware;
     // it overrides anything the client put in the body to prevent spoofing.
-    app.post('/api/v2/tasks/bulk', (req, res) => {
+    // requireTaskActionPermission mirrors the single PATCH above: it enforces only
+    // for PAT/MCP requests, and only for actions named in TASK_ACTION_PERMISSION.
+    // No bulk action is named there yet, so nothing changes today — the point is
+    // that the map now governs both endpoints instead of only the single one.
+    app.post('/api/v2/tasks/bulk', requireTaskActionPermission(), (req, res) => {
         try {
             const action = req.body && req.body.action;
             if (!action || typeof action !== 'string' || !action.startsWith('bulk')) {

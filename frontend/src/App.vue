@@ -25,6 +25,7 @@
                     </AdvanceSearchModal>
                     <router-view/>
                     <TourCom ref="mainTour"/>
+                    <FirstRunChecklist/>
                 </div>
 			</template>
 			<div v-else-if="!companyId?.length && $route.name === 'Create_Company'" class="d-flex align-items-center justify-content-center lds-roller h-100dvh">
@@ -76,6 +77,7 @@
 import { computed, defineComponent, onMounted, provide, ref, watch, inject} from 'vue'
 // COMPONENTS
 import TourCom from "@/components/organisms/Tour/TourComponet.vue"
+import FirstRunChecklist from "@/components/molecules/FirstRunChecklist/FirstRunChecklist.vue"
 import HeaderComponent from '@/components/organisms/Header/Header.vue'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
 import AdvanceSearchModal from '@/components/atom/Modal/Modal.vue'

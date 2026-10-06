@@ -73,6 +73,9 @@
     .a-dot { width: 7px; height: 7px; border-radius: 50%; background: #F59E0B; box-shadow: 0 0 0 3px #FEF3C7; flex-shrink: 0; }
 
     .a-actions { display: flex; gap: 9px; margin-top: 14px; }
+    /* Nothing stopped, so there is no Resume and Dismiss stands alone — put it where a
+       single dialog action belongs. */
+    .a-actions.solo { justify-content: flex-end; }
     .btn {
       height: 34px; border-radius: 9px; font-size: 13px; font-weight: 700; cursor: pointer;
       border: 1px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
@@ -93,12 +96,12 @@
 <body>
   <div class="alert" id="alert">
     <div class="alert-head">
-      <div class="a-icon">
+      <div class="a-icon" id="head_icon">
         <!-- stop glyph -->
         <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
       </div>
       <div class="a-head-text">
-        <div class="a-title">Time tracking stopped</div>
+        <div class="a-title" id="title">Time tracking stopped</div>
         <div class="a-kicker">AlianHub Time Tracker</div>
       </div>
       <div class="a-close" id="close_icon" title="Dismiss">
@@ -124,6 +127,8 @@
     const OUT_MS = 200;
     let closing = false;
     let stoppedAt = null;
+    // True when the estimate was passed but tracking carried on (company cap off).
+    let stillRunning = false;
 
     // Fit the window to the card's real laid-out height (task names/reasons vary
     // in length), keeping the bottom edge anchored above the taskbar.
@@ -140,8 +145,11 @@
     }
 
     // Build the human reason line from the stop reason + (optional) task name.
-    function reasonText(reason, taskName) {
+    function reasonText(reason, taskName, stillRunning) {
       const t = taskName ? ' on <b>“' + escapeHtml(taskName) + '”</b>' : '';
+      // Nothing was stopped — the company allows tracking past the estimate. Saying
+      // "stopped" here reads as though the timer died, which is the opposite of the truth.
+      if (stillRunning) return 'Went past the estimated hours' + t + '. Tracking is still running.';
       switch (reason) {
         case 'estimate':
           return 'Reached the estimated hours' + (taskName ? ' on <b>“' + escapeHtml(taskName) + '”</b>' : '') + ' — tracking has stopped.';
@@ -154,16 +162,18 @@
       }
     }
 
-    // Live "Stopped X ago" so a returning user instantly knows how long it's been off.
+    // Live "Stopped X ago" so a returning user instantly knows how long it's been off — or
+    // "Over by X" when nothing stopped, which is how long the task has run past its estimate.
     function fmtAgo() {
-      if (!stoppedAt) return 'Stopped just now';
+      const word = stillRunning ? 'Over by' : 'Stopped';
+      if (!stoppedAt) return stillRunning ? 'Over the estimate just now' : 'Stopped just now';
       const s = Math.max(0, Math.floor((Date.now() - stoppedAt) / 1000));
-      if (s < 5) return 'Stopped just now';
-      if (s < 60) return 'Stopped ' + s + ' second' + (s > 1 ? 's' : '') + ' ago';
+      if (s < 5) return stillRunning ? 'Over the estimate just now' : 'Stopped just now';
+      if (s < 60) return word + ' ' + s + ' second' + (s > 1 ? 's' : '') + (stillRunning ? '' : ' ago');
       const m = Math.floor(s / 60);
-      if (m < 60) return 'Stopped ' + m + ' minute' + (m > 1 ? 's' : '') + ' ago';
+      if (m < 60) return word + ' ' + m + ' minute' + (m > 1 ? 's' : '') + (stillRunning ? '' : ' ago');
       const h = Math.floor(m / 60);
-      return 'Stopped ' + h + ' hour' + (h > 1 ? 's' : '') + ' ago';
+      return word + ' ' + h + ' hour' + (h > 1 ? 's' : '') + (stillRunning ? '' : ' ago');
     }
     function tickAgo() {
       const el = document.getElementById('ago');
@@ -175,7 +185,21 @@
     ipcRenderer.on('alert:render', (event, data) => {
       data = data || {};
       stoppedAt = typeof data.stoppedAt === 'number' ? data.stoppedAt : Date.now();
-      document.getElementById('reason').innerHTML = reasonText(data.reason, data.taskName);
+      // Only an explicit false means "still running" — an older caller that sends no flag
+      // at all is reporting a real stop, and every word below stays as it was.
+      stillRunning = data.stopped === false;
+
+      if (stillRunning) {
+        // The card exists to say the estimate is past, not that anything ended: the title,
+        // the stop glyph and the Resume button all otherwise read as "your timer died".
+        document.getElementById('title').textContent = 'Estimate exceeded';
+        document.getElementById('head_icon').innerHTML =
+          '<svg viewBox="0 0 24 24"><path d="M12 5.2a1.5 1.5 0 0 1 1.5 1.63l-.5 6.4a1 1 0 0 1-2 0l-.5-6.4A1.5 1.5 0 0 1 12 5.2zm0 10.3a1.55 1.55 0 1 1 0 3.1 1.55 1.55 0 0 1 0-3.1z"/></svg>';
+        document.getElementById('resume_btn').style.display = 'none';
+        document.querySelector('.a-actions').classList.add('solo');
+      }
+
+      document.getElementById('reason').innerHTML = reasonText(data.reason, data.taskName, stillRunning);
       tickAgo();
       // Wait for layout to settle, then fit the window. (No auto-dismiss — this
       // card is PERSISTENT: it stays until the user acts.)

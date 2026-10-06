@@ -14,6 +14,10 @@ const { updateMemberFunction } = require('../../settings/Members/controller.js')
 const logger = require("../../../Config/loggerConfig.js");
 const { emitListener } = require("../../Company/eventController.js");
 
+const buildVerifyInvitationLink = (userId, companyId, docId, token) =>
+    `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${docId}&linkId=${token}`)}`;
+exports.buildVerifyInvitationLink = buildVerifyInvitationLink;
+
 
 async function batchUpdate(arr, eventId) {
     return new Promise((resolve, reject) => {
@@ -220,7 +224,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                     let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                                 } else {
-                                    let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${re._id}&linkId=${token}`)}`;
+                                    let link = buildVerifyInvitationLink(userId, companyId, re._id, token);
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                                 }
                             }).catch((error) => {
@@ -262,7 +266,7 @@ exports.sendInvitationEmailFun = (bodyData) => {
                                     let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}`;
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                                 } else {
-                                    let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${resp._id}&linkId=${token}`)})}`;
+                                    let link = buildVerifyInvitationLink(userId, companyId, resp._id, token);
                                     sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                                 }
                             }).catch((error)=>{
@@ -435,7 +439,7 @@ exports.sendInvitationEmail = (req,res) => {
                             let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${re._id}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                         } else {
-                            let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${re._id}&linkId=${token}`)})}`;
+                            let link = buildVerifyInvitationLink(userId, companyId, re._id, token);
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),re);
                         }
                     }).catch((error) => {
@@ -477,7 +481,7 @@ exports.sendInvitationEmail = (req,res) => {
                             let link = `${config.WEBURL}/#/invitation?companyId=${companyId}-${resp._id}`;
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                         } else {
-                            let link = `${config.WEBURL}/#/verify-invitation?id=${btoa(`userId=${userId}&companyId=${companyId}&docId=${resp._id}&linkId=${token}`)})}`;
+                            let link = buildVerifyInvitationLink(userId, companyId, resp._id, token);
                             sendMailFunction(require("../../Template/sendEmailInvitation")(link, companyName),resp);
                         }
                     }).catch((error)=>{

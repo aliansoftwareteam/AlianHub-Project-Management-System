@@ -50,6 +50,7 @@
 <script setup>
     // PACKAGES
     import { useStore } from 'vuex';
+    import { markFirstRunStep, FIRST_RUN_STEPS } from '@/composable/firstRunProgress';
     import { useToast } from 'vue-toast-notification';
     import {computed, defineComponent, inject, onMounted, ref, watch} from 'vue'
 
@@ -93,6 +94,8 @@
     const rulesGetter = computed(() => getters["settings/notificationSettings"]);
     //onMounted
     onMounted(() => {
+
+        markFirstRunStep(FIRST_RUN_STEPS.NOTIFICATIONS);
         isSpinner.value = true;
         if(rulesGetter.value && !Object.keys(rulesGetter.value).length) {
             dispatch("settings/setNotificationRules", {

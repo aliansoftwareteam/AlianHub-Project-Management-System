@@ -113,6 +113,7 @@
                                                 <img v-if="![null, 0, 1, 2, 3].includes(roleObj.key) && checkPermission('settings.settings_role_management') === true" class="erp_app ml-10px" :src="deleteIcon" alt="edit" @click.stop.prevent="deleteRole(roleObj)">
                                             </span>
                                         </div>
+                                        <div v-if="!roleObj.showRoleInput && roleDescription(roleObj.key)" class="roleDesc">{{ roleDescription(roleObj.key) }}</div>
                                         <div v-else class="d-flex justify-content-between position-re">
                                             <InputText :isOutline="false" :placeholder="$t('PlaceHolder.Enter_role')" v-model="roleName" @enter="roleObj.showRoleInput = false,roleChange(roleObj.key === null ? 'add' : 'update', roleObj.key,null,roleName,roles,rolesGetter)" />
                                             <span class="position-ab bg-white pl-15px pr-15px green__close-wrapper" :style="[{height : clientWidth > 767 ? '24px' : '30px' }]">
@@ -658,6 +659,12 @@
         })
     }
 
+    // Only the four roles every company is seeded with have a description. A company that renamed
+    // one, or added its own, gets nothing here rather than a description that would be a guess.
+    function roleDescription (key) {
+        return [0, 1, 2, 3].includes(key) ? t(`Members.role_desc.${key}`) : '';
+    }
+
     function roleChange (type,key,index,roleName,role,roleGetters) {
         handleRoleChanges(type,key,index,roleName,role,roleGetters).then((resp) => {
             let op = type === 'add' ? 'added' : 'modified';
@@ -701,5 +708,13 @@
     }
 </script>
 <style scoped>
-@import './style.css'
+@import './style.css';
+
+.roleDesc {
+    font-size: 11px;
+    line-height: 1.35;
+    color: #8c8c8c;
+    margin-top: 2px;
+    white-space: normal;
+}
 </style> 

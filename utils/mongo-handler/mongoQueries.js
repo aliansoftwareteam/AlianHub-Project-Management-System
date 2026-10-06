@@ -86,7 +86,9 @@ const {
     calendarFeedsSchema,
     automationRulesSchema,
     integrationConnectionsSchema,
-    cloudStorageConnectionsSchema
+    cloudStorageConnectionsSchema,
+    formsSchema,
+    formSubmissionsSchema
 } = require('./createSchema');
 
 
@@ -264,6 +266,10 @@ exports.checkType = (type) => {
             return integrationConnectionsSchema
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
             return cloudStorageConnectionsSchema
+        case SCHEMA_TYPE.FORMS:
+            return formsSchema
+        case SCHEMA_TYPE.FORM_SUBMISSIONS:
+            return formSubmissionsSchema
         default:
             return ""
     }
@@ -444,6 +450,10 @@ exports.tableType = (type) => {
                 return `${dbCollections.INTEGRATION_CONNECTIONS}`
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
                 return `${dbCollections.CLOUD_STORAGE_CONNECTIONS}`
+        case SCHEMA_TYPE.FORMS:
+                return `${dbCollections.FORMS}`
+        case SCHEMA_TYPE.FORM_SUBMISSIONS:
+                return `${dbCollections.FORM_SUBMISSIONS}`
         default:
             return ""
     }

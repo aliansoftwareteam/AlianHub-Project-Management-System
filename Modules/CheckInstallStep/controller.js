@@ -22,6 +22,49 @@ const { resolveServiceFile } = require('../../utils/safeServiceFile.js');
 // isn't set yet (fresh clone, partially-edited .env, or this file getting required
 // before dotenv has run). Preserves the original "strip trailing slash" behaviour.
 const __defaultApiUrl = process.env.APIURL || 'http://localhost:4000/';
+
+// Write a single key into .env so it survives the restart the installer ends with. The installer
+// otherwise only records its answers in installationSteps.json, which the app reads only when the
+// matching environment variable is absent — and `npm run setup` fills .env in first.
+// Never throws: an unwritable .env must not stop an install that is otherwise fine.
+const envFilePath = path.join(__dirname, '..', '..', '.env');
+function persistEnvValue(key, value) {
+    try {
+        if (!fs.existsSync(envFilePath)) return;
+        const line = `${key}="${String(value).replace(/"/g, '\\"')}"`;
+        const current = fs.readFileSync(envFilePath, 'utf8');
+        const pattern = new RegExp(`^${key}=.*$`, 'm');
+        const next = pattern.test(current)
+            ? current.replace(pattern, line)
+            : `${current.replace(/\s*$/, '')}\n${line}\n`;
+        fs.writeFileSync(envFilePath, next);
+        logger.info(`persistEnvValue: ${key} written to .env`);
+    } catch (error) {
+        logger.error(`persistEnvValue(${key}) failed: ${error.message}`);
+    }
+}
+
+// Close and forget every cached mongo connection, so the next query reconnects using the current
+// MONGODB_URL. Never throws — a connection that will not close is still safe to forget.
+function resetMongoConnections() {
+    try {
+        const connector = require('../../middlewares/mongoConnector/helper.js');
+        const open = Array.isArray(connector.connections) ? connector.connections : [];
+        for (const entry of open) {
+            try {
+                if (entry && entry.connection && typeof entry.connection.close === 'function') {
+                    entry.connection.close();
+                }
+            } catch (closeError) {
+                logger.error(`resetMongoConnections close(${entry && entry.db}): ${closeError.message}`);
+            }
+        }
+        connector.connections.length = 0;
+        logger.info(`resetMongoConnections: dropped ${open.length} cached connection(s)`);
+    } catch (error) {
+        logger.error(`resetMongoConnections failed: ${error.message}`);
+    }
+}
 exports.envVar = {
     "JWT_SECRET": require('crypto').randomBytes(16).toString('hex'),
     "PRECOMPANYKEY": require('crypto').randomBytes(4).toString('hex'),
@@ -162,6 +205,19 @@ exports.checkMongoConnection = (req, cb) => {
         }
         mongoose.connect(mongoURL, {}).then(() => {
             exports.envVar.MONGODB_URL = bodyData.mongodbUrl; // Done
+
+            // The database the installer asks for has to become the one the app actually uses.
+            // mongoConnector reads process.env.MONGODB_URL and only falls back to
+            // installationSteps.json when that is absent — and `npm run setup` always writes a
+            // localhost default into .env, so without this the answer given here was stored and
+            // then ignored: the whole install would silently go to a local database instead.
+            process.env.MONGODB_URL = bodyData.mongodbUrl;
+            persistEnvValue('MONGODB_URL', bodyData.mongodbUrl);
+            // Connections are cached by database name, so anything opened against the previous URL
+            // during boot would keep being reused and the rest of the install would still write to
+            // the wrong database. Nothing has been written yet at this step, so dropping them is safe.
+            resetMongoConnections();
+
             serviceFun.writeFile(installStepsFilePath, JSON.stringify({installSteps: exports.installSteps, envVar: exports.envVar}, null, 4), () => {
                 cb({
                     status: true,

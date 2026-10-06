@@ -79,7 +79,7 @@
                 <img src="@/assets/images/svg/tour_image.svg" class="cursor-pointer" id="tour_icon" @click="getTourDetails(),tourVisible = true">
             </div>
             <div>
-                <a :href="brandSettings && brandSettings?.helpLink ? brandSettings?.helpLink : 'javascript:void(0)'" :target="brandSettings && brandSettings?.helpLink  ? '_blank' : ''" class="help__icon">
+                <a id="help_driver" :href="brandSettings && brandSettings?.helpLink ? brandSettings?.helpLink : 'javascript:void(0)'" :target="brandSettings && brandSettings?.helpLink  ? '_blank' : ''" class="help__icon">
                     <img :src="questionMarkIcon" alt="help" class="question__icon">
                 </a>
             </div>

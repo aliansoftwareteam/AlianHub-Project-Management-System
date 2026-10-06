@@ -248,8 +248,6 @@
             status.value = project.value.taskStatusData[statusIndex];
         }
 
-        assignee.value = defaultAssignee();
-
         if (!props.assigneeOptionsData && props.assigneeOptionsData.length) {
             assigneeOptions.value = props.assigneeOptionsData
         } else {
@@ -276,27 +274,12 @@
         }
     }
 
-    /**
-     * The assignee a freshly-emptied card starts with — the creator, matching the inline
-     * row in the sprint list (CreateTask.vue).
-     *
-     * Returns a NEW array every time on purpose. The reset after a save runs while the
-     * payload still holds the previous array by reference, so emptying that array in
-     * place would strip the assignee off the task being created.
-     */
-    function defaultAssignee() {
-        return userId.value ? [userId.value] : [];
-    }
-
     function resetTaskFields() {
         dueDate.value = "";
         taskName.value.value = "";
         taskName.value.error = "";
         priority.value = "MEDIUM";
-        // Back to the default, not to empty. The card stays mounted after a save, so
-        // onMounted never runs again — clearing this outright left every task after the
-        // first one unassigned.
-        assignee.value = defaultAssignee();
+        assignee.value = [];
     }
 
     function saveTask() {

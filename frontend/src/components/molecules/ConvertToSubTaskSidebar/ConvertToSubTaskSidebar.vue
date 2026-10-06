@@ -228,6 +228,14 @@
             type: Boolean,
             default: false
         },
+        // Bulk convert to subtask. Same task picker, but the sidebar performs
+        // nothing: it hands the chosen parent task back and the caller
+        // (BulkActionBar) fires one bulkConvertToSubTask request for the whole
+        // selection. Mirrors isBulkMove.
+        isBulkConvert: {
+            type: Boolean,
+            default: false
+        },
         item: {
             type: Object,
             default: () => {}
@@ -264,6 +272,7 @@
     const selectedIndex = ref(0);
     const selecteFolderIndex = ref(0);
     const isTaskSelected = ref(false);
+    const selectedParentTask = ref(null);
     const selectedValue = ref('');
     const taskData = ref({
         value: props.content,
@@ -283,7 +292,7 @@
             else { return projectsGetter.value.data; }
         }
     });
-    const emit = defineEmits(["isConvertSubtaskOPen","dataToMainComp","createTask","bulkMoveConfirm"])
+    const emit = defineEmits(["isConvertSubtaskOPen","dataToMainComp","createTask","bulkMoveConfirm","bulkConvertConfirm"])
     const projectData = (props.selectedProjectObject == undefined || Object.keys(props.selectedProjectObject).length == 0) ? inject("selectedProject") : '';
     const isSidebarOPen = ref(props.closeSideBar);
     const selectedProjectData = ref(props.selectedProjectObject == undefined ? projectData.value : props.selectedProjectObject);
@@ -1097,6 +1106,17 @@
     }
 
     function callMergeTaskForItem(value) {
+        // Bulk convert: hand the chosen parent back instead of converting one
+        // task through the nested refs. Deliberately before those calls, so the
+        // per-task path is never entered in bulk mode.
+        if (props.isBulkConvert === true) {
+            if (!selectedParentTask.value || !selectedParentTask.value._id) {
+                return;
+            }
+            emit('bulkConvertConfirm', { task: selectedParentTask.value });
+            closeSidebar();
+            return;
+        }
         if (selectedValue.value === 'sprint' && sprintRefs.value[selectedIndex.value] && sprintRefs.value[selectedIndex.value].taskOperationFun) {
             sprintRefs.value[selectedIndex.value].taskOperationFun(value);
         }
@@ -1112,6 +1132,9 @@
     function taskSelctFun (e) {
         if(e && Object.keys(e).length > 0){
             isTaskSelected.value = true;
+            // Kept for the bulk picker, which needs the task itself rather than
+            // just knowing that one was chosen.
+            selectedParentTask.value = e;
         }
     }
 
