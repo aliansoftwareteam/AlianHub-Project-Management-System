@@ -17,7 +17,7 @@
                 
                 <div v-if="isMultiSelect && selectedItems.length" class="custom-field-input d-flex align-items-center" :class="{'w-65': clientWidth > 480}">
                     <template v-if="displayType === 'text' || displayType === 'project'">
-                        <span v-for="(item, ind) in selectedItems.slice(0, 2)" :key="ind" class="ml-1 black font-size-14 text-ellipsis mw-90px">
+                        <span v-for="(item, ind) in selectedItems.slice(0, 2)" :key="ind" class="ml-1 drop-down-list-component-black drop-down-list-component-font-size-14 text-ellipsis mw-90px">
                             {{ getDisplayText(item) }}
                             <span v-if="ind < selectedItems.slice(0, 3).length - 1">,</span>
                         </span>
@@ -61,7 +61,7 @@
                                 class="status_square ml-1" 
                                 :style="{backgroundColor: items?.find(e => e?.key === item)?.textColor}"
                             ></span>
-                            <span class="ml-1 black font-size-14 text-ellipsis mw-90px">
+                            <span class="ml-1 drop-down-list-component-black drop-down-list-component-font-size-14 text-ellipsis mw-90px">
                                 {{ getDisplayText(item) }}
                                 <span v-if="ind < selectedItems.slice(0, 3).length - 1">,</span>
                             </span>
@@ -74,7 +74,7 @@
                 
                 <div v-else-if="!isMultiSelect && (selectedItem || selectedItem === 0)" class="custom-field-input d-flex align-items-center" :class="{'w-65': clientWidth > 480}">
                     <template v-if="displayType === 'text'">
-                        <span class="ml-1 black font-size-14">
+                        <span class="ml-1 drop-down-list-component-black drop-down-list-component-font-size-14">
                             {{ getDisplayText(selectedItem) }}
                         </span>
                     </template>
@@ -107,7 +107,7 @@
                             class="status_square" 
                             :style="{backgroundColor: items?.find(e => e?.key === selectedItem)?.textColor}"
                         ></span>
-                        <span class="ml-1 black font-size-14">
+                        <span class="ml-1 drop-down-list-component-black drop-down-list-component-font-size-14">
                             {{ getDisplayText(selectedItem) }}
                         </span>
                     </template>
@@ -222,7 +222,7 @@
                             <template v-else-if="displayType === 'project'">
                                 <div class="d-flex align-items-center justify-content-between w-100 project-custom-checkbox" :class="{'h-20': clientWidth > 767}">
                                     <span class="d-flex align-items-center">
-                                        <span v-if="item.projectIcon && item.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center font-weight-400 inital-box" :style="[{'background-color': item.projectIcon.data}]">
+                                        <span v-if="item.projectIcon && item.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center drop-down-list-component-font-weight-400 inital-box" :style="[{'background-color': item.projectIcon.data}]">
                                             {{ item.ProjectName.charAt(0).toUpperCase()}}
                                         </span>
                                         <WasabiImage v-if="item.projectIcon && item.projectIcon.type === 'image'" :data="{ url: item.projectIcon.data }" class="inital-box" />
@@ -252,7 +252,7 @@
                 
                 <template v-else>
                     <DropDownOption>
-                        <div class="font-size-13 p0x-15px gray81">
+                        <div class="drop-down-list-component-font-size-13 p0x-15px drop-down-list-component-gray81">
                             {{$t('UserTimesheet.no_records_found')}}
                         </div>
                     </DropDownOption>
@@ -399,3 +399,21 @@ const assignedToMe = () => {
 </script>
 
 <style scoped src="../../../components/molecules/CardFieldComponent/style.css"></style>
+
+<style scoped>
+.drop-down-list-component-black {
+    color: var(--ink);
+}
+.drop-down-list-component-font-size-14 {
+    font-size: 14px;
+}
+.drop-down-list-component-font-weight-400 {
+    font-weight: 400 !important;
+}
+.drop-down-list-component-font-size-13 {
+    font-size: 13px;
+}
+.drop-down-list-component-gray81 {
+    color: var(--ink-2);
+}
+</style>

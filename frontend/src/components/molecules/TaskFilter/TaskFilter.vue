@@ -29,7 +29,7 @@
                 <div class="bottom-filter-section">
                     <div class="d-flex justify-content-between w-100 mb-13px" v-if="clientWidth > 767">
                         <div class="filter-title">
-                            <h2 class="m-0 font-size-18">{{ isEdit === true ? selectedRow.name : $t('Filters.filter')}}</h2>
+                            <h2 class="m-0 task-filter-font-size-18">{{ isEdit === true ? selectedRow.name : $t('Filters.filter')}}</h2>
                         </div>
                         <div class="filter-info d-flex">
                             <a href="https://help.alianhub.com/" target="_blank">
@@ -38,7 +38,7 @@
                             </a>
                         </div>
                     </div>
-                    <div v-if="!isValidate" role="alert" aria-live="polite" aria-atomic="true" class="alert alert-danger font-size-13">{{$t('Filters.pleaseselectvalid')}}</div>
+                    <div v-if="!isValidate" role="alert" aria-live="polite" aria-atomic="true" class="alert alert-danger task-filter-font-size-13">{{$t('Filters.pleaseselectvalid')}}</div>
                     <div class="table-data task-table-data">
                         <FieldsTable
                             :inputs="inputs"
@@ -55,8 +55,8 @@
                     </div>
                     <div class="d-flex w-100 add-filter-wrapper">
                         <div class="add-section mb-13px" :class="{'d-flex justify-content-between w-100' : clientWidth <= 767}" v-if="keysArray.length">
-                            <span><a href="#" class="mr-10px"  @click.stop.prevent="clearFilter($event), $refs.closeFilterRef.click()" v-if="clientWidth <= 767" :class="{'font-weight-500 font-size-18' : clientWidth <=767}">{{$t('Filters.clearall')}}</a></span>
-                            <a href="#" class="tf-link" @click.stop.prevent="addRow" :class="{'font-weight-400 font-size-12' : clientWidth > 767 , 'font-weight-500 font-size-18' : clientWidth <= 767}">+ {{$t('Filters.addfilter')}}</a>
+                            <span><a href="#" class="mr-10px"  @click.stop.prevent="clearFilter($event), $refs.closeFilterRef.click()" v-if="clientWidth <= 767" :class="{'task-filter-font-weight-500 task-filter-font-size-18' : clientWidth <=767}">{{$t('Filters.clearall')}}</a></span>
+                            <a href="#" class="tf-link" @click.stop.prevent="addRow" :class="{'task-filter-font-weight-400 task-filter-font-size-12' : clientWidth > 767 , 'task-filter-font-weight-500 task-filter-font-size-18' : clientWidth <= 767}">+ {{$t('Filters.addfilter')}}</a>
                         </div>
                     </div>
                     <FieldsActions
@@ -566,3 +566,21 @@ const handleConfirm = async (val) => {
 }
 </script>
 <style> @import "./style.css"; </style>
+
+<style scoped>
+.task-filter-font-size-12 {
+    font-size: 12px;
+}
+.task-filter-font-size-13 {
+    font-size: 13px;
+}
+.task-filter-font-size-18 {
+    font-size: 18px !important;
+}
+.task-filter-font-weight-400 {
+    font-weight: 400 !important;
+}
+.task-filter-font-weight-500 {
+    font-weight: 500 !important;
+}
+</style>

@@ -40,7 +40,7 @@
                                 <img v-else class="profile-sm-square mobile-projectlist-icon" :src="projectData.projectIcon.data" alt=""/>
                             </template>
                             <div class="list-text-wrapper">
-                                <span class="text-ellipsis project-actions-bar-font-weight-bold black list-view-header-title ml-12px" @dblclick="$emit('startEditName')" :title="projectData.ProjectName">
+                                <span class="text-ellipsis project-actions-bar-font-weight-bold project-actions-bar-black list-view-header-title ml-12px" @dblclick="$emit('startEditName')" :title="projectData.ProjectName">
                                     {{ projectData?.ProjectName }}
                                 </span>
                             </div>
@@ -53,7 +53,7 @@
                     </template>
                     <template #options>
                         <div id="projectoptionslist_driver">
-                            <div v-if="projectData?.isPrivateSpace && clientWidth <= 767" class="d-flex align-items-center project-actions-bar-hover-bg-lighter-gray-dropdown project-actions-bar-hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px project-actions-bar-bg-gray91 border-radius-8-px border-bottom mb-20px">
+                            <div v-if="projectData?.isPrivateSpace && clientWidth <= 767" class="d-flex align-items-center project-actions-bar-hover-bg-lighter-gray-dropdown project-actions-bar-hover-purple cursor-pointer text-nowrap drop-down-item project-actions-bar-gray81 p-7px project-actions-bar-bg-gray91 border-radius-8-px border-bottom mb-20px">
                                 <Assignee
                                     class="assignee-data ml-15px"
                                     :users="projectData.AssigneeUserId"
@@ -229,6 +229,12 @@ const deleteIcon = require('@/assets/images/svg/Delete_Icon.svg');
 </style>
 
 <style scoped>
+.project-actions-bar-black {
+    color: var(--ink);
+}
+.project-actions-bar-gray81 {
+    color: var(--ink-2);
+}
 .project-actions-bar-hover-purple:hover {
     color: var(--brand) !important;
 }

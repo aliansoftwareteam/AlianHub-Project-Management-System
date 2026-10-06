@@ -2,33 +2,33 @@
     <div v-if="modelValue" class="timport__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="timport__card">
             <div class="d-flex align-items-center justify-content-between timport__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.import_trello') }}</span>
-                <span class="cursor-pointer font-size-16 timport__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="import-trello-modal-font-size-16 import-trello-modal-font-weight-700">{{ $t('Projects.import_trello') }}</span>
+                <span class="cursor-pointer import-trello-modal-font-size-16 timport__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
 
-            <div class="font-size-12 gray81 timport__hint">{{ $t('Projects.import_trello_hint') }}</div>
+            <div class="import-trello-modal-font-size-12 import-trello-modal-gray81 timport__hint">{{ $t('Projects.import_trello_hint') }}</div>
 
-            <span class="font-size-12 timport__sample" @click="downloadSample">&#8595; {{ $t('Projects.download_sample') }}</span>
+            <span class="import-trello-modal-font-size-12 timport__sample" @click="downloadSample">&#8595; {{ $t('Projects.download_sample') }}</span>
 
-            <input ref="fileEl" type="file" accept=".json,application/json" class="font-size-13 timport__file" @change="parseFile" />
+            <input ref="fileEl" type="file" accept=".json,application/json" class="import-trello-modal-font-size-13 timport__file" @change="parseFile" />
 
-            <div v-if="board" class="font-size-13 timport__preview">
+            <div v-if="board" class="import-trello-modal-font-size-13 timport__preview">
                 {{ $t('Projects.import_trello_found', { lists: listCount, cards: cardCount }) }}
             </div>
 
             <div class="d-flex align-items-center timport__controls" v-if="board && cardCount">
-                <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
+                <span class="import-trello-modal-font-size-13 import-trello-modal-font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
                 <select v-model="selectedSprintId" class="ah-input timport__select">
                     <option v-for="sprint in sprintOptions" :key="'tr-'+sprint.id" :value="sprint.id">
                         {{ listLabel(sprint) }}
                     </option>
                 </select>
-                <button class="btn-primary font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId" @click="startImport">
+                <button class="btn-primary import-trello-modal-font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId" @click="startImport">
                     {{ isImporting ? $t('Projects.importing') : $t('Projects.start_import') }}
                 </button>
             </div>
 
-            <div v-if="resultText" class="font-size-13 timport__result">{{ resultText }}</div>
+            <div v-if="resultText" class="import-trello-modal-font-size-13 timport__result">{{ resultText }}</div>
         </div>
     </div>
 </template>
@@ -183,4 +183,25 @@ function startImport() {
 .timport__controls { margin-top: 4px; }
 .ah-input.timport__select { width: auto; min-width: 200px; }
 .timport__result { margin-top: 12px; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; }
+</style>
+
+<style scoped>
+.import-trello-modal-font-weight-500 {
+    font-weight: 500 !important;
+}
+.import-trello-modal-font-weight-700 {
+    font-weight: 700 !important;
+}
+.import-trello-modal-font-size-12 {
+    font-size: 12px;
+}
+.import-trello-modal-font-size-13 {
+    font-size: 13px;
+}
+.import-trello-modal-font-size-16 {
+    font-size: 16px;
+}
+.import-trello-modal-gray81 {
+    color: var(--ink-2);
+}
 </style>

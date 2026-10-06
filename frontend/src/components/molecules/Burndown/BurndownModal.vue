@@ -2,19 +2,19 @@
     <div v-if="modelValue" class="burndown__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="burndown__card">
             <div class="d-flex align-items-center justify-content-between burndown__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.burndown') }}</span>
-                <span class="cursor-pointer font-size-16 burndown__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="burndown-modal-font-size-16 burndown-modal-font-weight-700">{{ $t('Projects.burndown') }}</span>
+                <span class="cursor-pointer burndown-modal-font-size-16 burndown__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
             <div class="d-flex align-items-center burndown__controls">
-                <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
+                <span class="burndown-modal-font-size-13 burndown-modal-font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
                 <select v-model="selectedSprintId" class="ah-input burndown__select">
                     <option v-for="sprint in sprintOptions" :key="'bd-'+sprint.id" :value="sprint.id">
                         {{ listLabel(sprint) }}
                     </option>
                 </select>
             </div>
-            <div v-if="isLoading" class="gray81 font-size-13 burndown__empty">{{ $t('Projects.searching') }}</div>
-            <div v-else-if="!days.length" class="gray81 font-size-13 burndown__empty">{{ $t('Projects.no_burndown_data') }}</div>
+            <div v-if="isLoading" class="burndown-modal-gray81 burndown-modal-font-size-13 burndown__empty">{{ $t('Projects.searching') }}</div>
+            <div v-else-if="!days.length" class="burndown-modal-gray81 burndown-modal-font-size-13 burndown__empty">{{ $t('Projects.no_burndown_data') }}</div>
             <ApexChart
                 v-else
                 type="line"
@@ -155,5 +155,22 @@ const chartOptions = computed(() => ({
 .burndown__empty {
     padding: 40px 0;
     text-align: center;
+}
+</style>
+<style scoped>
+.burndown-modal-font-size-16 {
+    font-size: 16px;
+}
+.burndown-modal-font-weight-700 {
+    font-weight: 700 !important;
+}
+.burndown-modal-font-size-13 {
+    font-size: 13px;
+}
+.burndown-modal-font-weight-500 {
+    font-weight: 500 !important;
+}
+.burndown-modal-gray81 {
+    color: var(--ink-2);
 }
 </style>

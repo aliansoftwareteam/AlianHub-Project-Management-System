@@ -16,7 +16,7 @@
             </div>
             <div class="select-option-value" v-if="showOption">
                 <div class="cutsom-select-search p-8px" v-if="enableSearch">
-                    <input ref="searchBox" type="text" @click.stop @keydown.enter.prevent v-model="search" :placeHolder="$t('PlaceHolder.search')" class="form-control gray">
+                    <input ref="searchBox" type="text" @click.stop @keydown.enter.prevent v-model="search" :placeHolder="$t('PlaceHolder.search')" class="form-control select-gray">
                 </div>
                 <div class="custom-selectoptions-wrapper overflow-y-auto">
                     <div class="d-flex flex-column py-10px">
@@ -25,8 +25,8 @@
                                 v-for="(item, index) in options.filter((x) => x[displayKey].trim().toLowerCase().includes(search.trim().toLowerCase()))"
                                 :key="index"
                                 @click.stop="selectOption(item)"
-                                :class="{'bg-blue white hover-white': JSON.stringify(item) === JSON.stringify(modelValue)}"
-                                class="custom-select-options text-ellipsis font-size-14 gray4b"
+                                :class="{'bg-blue select-bg-blue select-white select-hover-white': JSON.stringify(item) === JSON.stringify(modelValue)}"
+                                class="custom-select-options text-ellipsis select-font-size-14 select-gray4b"
                             >
                             <slot name="item" :item="item">
                                 <img v-if="item?.image?.includes('http')" :src="item.image" alt="task_type" class="mr-5px">
@@ -161,4 +161,25 @@ function selectOption(item) {
 
 <style>
 @import './style.css';
+</style>
+
+<style scoped>
+.select-gray {
+    color: var(--ink-2);
+}
+.select-gray4b {
+    color: var(--ink);
+}
+.select-bg-blue {
+    background-color: var(--brand);
+}
+.select-white {
+    color: var(--on-brand) !important;
+}
+.select-hover-white:hover {
+    color: var(--on-brand) !important;
+}
+.select-font-size-14 {
+    font-size: 14px;
+}
 </style>
