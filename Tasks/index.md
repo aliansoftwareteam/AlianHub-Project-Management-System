@@ -9,3 +9,5 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 003 | Show library task-type icons in the time tracker | done | medium | — | done/003-tracker-task-type-icons |
 | 004 | Reusable template-selection form component (task types + statuses) | active | medium | — | active/004-reusable-template-select-form |
 | 005 | First-run experience — close the 13 gaps | active | high | — | active/005-first-run-experience |
+| 006 | Remove auto-assignee from task creation | done | medium | — | done/006-remove-task-auto-assignee |
+| 007 | Fix "Invalid URL" on member invitation links | done | high | — | done/007-fix-invite-link-invalid-url |
