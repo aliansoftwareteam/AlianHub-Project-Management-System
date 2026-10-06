@@ -192,9 +192,9 @@ Tool names are the ones a connected agent sees. "Reads" are listed once, in the 
 The seven jobs outside the count, against today's code. They are not run for the count.
 
 - **Job 6, duplicate a project.** `project.duplicate`: waits, one approval. It would read as should pass with approval (`Modules/Mcp/setupTools.js:362`, #1467).
-- **Job 14, comment and reply.** `task.comment` is applied at once. A reply in a task's comment thread has no tool: `page.comment.reply` is for docs. These are the person's own words.
-- **Job 16, restore a doc version.** `page.update` keeps the old text as a version, but no tool lists or restores versions (`Modules/Agents/pageRequests.js:79`). A person's decision.
-- **Job 18, timesheet.** `timesheet.read` only. No tool submits or approves. Approving is a person's decision.
+- **Job 14, comment and reply.** `task.comment` is applied at once, and the mention is told. The reply is `comment.create`, or `task.comment` on a connection that manages tasks, with `replyTo` set to the comment's id from `comments.list`: at once, in that comment's thread, and refused for a comment that is not on the task. It would read as should pass (`Modules/Agents/commentReplies.js`, `tests/mcp-thread-versions-timesheet.test.js`). The words are still the person's own, which is why it stays out of the count.
+- **Job 16, restore a doc version.** `page.update` keeps the old text as a version (`Modules/Agents/pageRequests.js:79`). `page.versions.list` and `page.version.get` read the versions, who saved each and when, and one version's text (`Modules/Mcp/dataTools.js`, `tests/mcp-thread-versions-timesheet.test.js`). No tool restores one: the restore route refuses an agent (`agentsRefused('page.version.restore')`, `Modules/Pages/routes.js`), and putting a version back is the person's decision. It cannot pass; the agent can tell the person which version to restore.
+- **Job 18, timesheet.** `timesheet.week` reads where the person's own week stands (not submitted, submitted, approved, sent back, reopened). `timesheet.week.submit` asks to send it: waits, and only that person can approve it (`Modules/Agents/timesheetWeek.js`, `Modules/Mcp/timesheetTools.js`, `tests/mcp-thread-versions-timesheet.test.js`, `tests/mcp-approver-rights.test.js`). No tool approves, sends back or reopens a week: that is a person's decision, and the review routes take a signed-in person alone (`decidedByPerson('timesheet.review')`). The submit half reads as one approval; the approve half cannot pass.
 - **Job 21, automation rule.** `automation.catalogue` and `automation.create` (`Modules/Mcp/automationTools.js:68`): waits, and only an owner's or an admin's agent may ask for it. It would read as should pass with approval. The rule starts switched off unless the proposal says otherwise.
 - **Job 22, dashboard card.** `dashboard.card.add` with `newDashboard` and `card: tasks_by_status`: waits, one approval (`Modules/Mcp/dashboardTools.js:25`, `Modules/Agents/dashboardRequests.js:30`). It would read as should pass with approval.
 - **Job 25, invite and private project.** No tool invites a person or changes who can open a project. `permissions.edit` is on the never-list.
@@ -231,7 +231,7 @@ They are measured too. They count only if one of the fifteen fails.
 2. **A move of a task always waits.** It cannot be undone, so it is never applied at once, on any project setting (`Modules/Agents/projectPolicy.js:167`, #1476). Jobs 5 and 20 both end in a move.
 3. **The third level of subtasks is refused.** It is a product rule (`Modules/Tasks/helpers/taskTreeRules.js:4`). Job 4 cannot pass until the job is rewritten.
 
-Not in the count but still without a tool: a reply in a task's comment thread (job 14), a doc's versions (job 16), a timesheet's submit and approve (job 18), an invitation and who can open a project (job 25).
+Not in the count but still without a tool: an invitation and who can open a project (job 25). Restoring a doc version (job 16) and approving a timesheet week (job 18) stay a person's on purpose; a reply in a thread, reading versions and sending a week now have tools (see "The jobs not picked, read again").
 
 ## Where this differs from the list in `task.md`
 

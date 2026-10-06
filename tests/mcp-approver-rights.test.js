@@ -53,7 +53,7 @@ const APPROVER_HELD = /approver may not make this change|needs an Owner or Admin
 
 const WRITES = registry.keys().filter((key) => registry.get(key).write);
 // Approved by the person it was asked for alone, whatever a role may do.
-const ASKER_ALONE = ['dashboard.card.add'];
+const ASKER_ALONE = ['dashboard.card.add', 'timesheet.week.submit'];
 const BY_ROLE = WRITES.filter((key) => !ASKER_ALONE.includes(key));
 const KNOWN = [...registry.ACTIONS, ...groups.flatMap((group) => group.entries.map((entry) => entry.action))];
 

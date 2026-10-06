@@ -10,6 +10,9 @@ const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
 const { PAGE_TEXT_MAX, pageText } = require('./pageText');
+const { REPLY_TO, replyParams } = require('./commentReply');
+const pageVersions = require('../Pages/helpers/pageVersions');
+const versionRules = require('../Pages/helpers/pageVersionRules');
 const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
 const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
@@ -50,6 +53,7 @@ const loadProject = async (ctx, vis, projectId) => {
 const NO_PROJECT = Object.freeze({ error: 'That project was not found. Ask the person which project they mean.' });
 const NO_TASK = Object.freeze({ error: 'That task was not found. Ask the person which task they mean.' });
 const NO_PAGE = Object.freeze({ error: 'That doc was not found. Ask the person which doc they mean.' });
+const NO_VERSION = Object.freeze({ error: 'That version of the doc was not found. List the doc\'s versions and pick one of those.' });
 
 const projectRow = (p) => ({
     projectId: String(p._id),
@@ -80,6 +84,7 @@ const commentRow = (c) => ({
     text: c.message || '',
     type: c.type || 'text',
     authorId: idOf(c.userId),
+    ...(c.parentId ? { replyTo: idOf(c.parentId) } : {}),
     ...(c.actorType ? { actorType: c.actorType } : {}),
     createdAt: c.createdAt || null,
 });
@@ -91,6 +96,21 @@ const pageRow = (p) => ({
     private: p.visibility === 'private',
     updatedAt: p.updatedAt || null,
 });
+
+const versionRow = (v, named, projectId) => ({
+    versionId: v._id,
+    title: v.title,
+    name: v.name,
+    reason: v.reason,
+    savedAt: v.savedAt,
+    savedBy: isId(v.savedBy) ? named.person(v.savedBy, projectId) : { id: v.savedBy, name: null },
+});
+
+/* A doc the person can open, as page.get reads it. */
+const openPage = async (ctx, vis, pageId) => {
+    const page = isId(pageId) ? await findOne(ctx, SCHEMA_TYPE.PAGES, { _id: oid(String(pageId)), deletedStatusKey: { $ne: 1 } }) : null;
+    return page && vis.allowsPage(page) ? page : null;
+};
 
 const entryRow = (e) => ({
     timesheetId: String(e._id),
@@ -254,6 +274,40 @@ const TOOLS = [
         },
     },
     {
+        name: 'page.versions.list',
+        action: 'page.versions.list',
+        description: 'Lists the saved versions of a doc the person can open, newest first: who saved each one, when, why, and its name if it has one. Read one with page.version.get. Changes nothing. Putting an earlier version back is for the person to do in AlianHub.',
+        input: { type: 'object', properties: { pageId: { type: 'string' }, ...LIMIT }, required: ['pageId'] },
+        visibility: 'filtered',
+        readParams: () => ({}),
+        run: async (ctx, args, vis) => {
+            const page = await openPage(ctx, vis, args.pageId);
+            if (!page) return { ...NO_PAGE };
+            const rows = (await pageVersions.rowsOf(ctx.companyId, page._id)).filter((v) => versionRules.versionVisibleTo(v, page, ctx.userId)).slice(0, clampLimit(args.limit));
+            const projectId = idOf(page.ProjectID);
+            const named = await names.resolver(ctx, { projectIds: projectId ? [projectId] : [], userIds: rows.map((v) => String(v.savedBy || '')).filter(isId) });
+            return { pageId: String(page._id), versions: rows.map((v) => versionRow(versionRules.versionRow(v), named, projectId)) };
+        },
+    },
+    {
+        name: 'page.version.get',
+        action: 'page.version.get',
+        description: 'Shows one saved version of a doc the person can open: who saved it, when, and its full text as it was then. Changes nothing.',
+        input: { type: 'object', properties: { pageId: { type: 'string' }, versionId: { type: 'string' } }, required: ['pageId', 'versionId'] },
+        visibility: 'filtered',
+        readParams: () => ({}),
+        run: async (ctx, args, vis) => {
+            const page = await openPage(ctx, vis, args.pageId);
+            if (!page) return { ...NO_PAGE };
+            const version = await pageVersions.versionOf(ctx.companyId, page._id, str(args.versionId, 40));
+            if (!versionRules.versionVisibleTo(version, page, ctx.userId)) return { ...NO_VERSION };
+            const body = versionRules.versionBody(version);
+            const projectId = idOf(page.ProjectID);
+            const named = await names.resolver(ctx, { projectIds: projectId ? [projectId] : [], userIds: isId(body.savedBy) ? [body.savedBy] : [] });
+            return { pageId: String(page._id), ...versionRow(body, named, projectId), text: str(body.rawText, PAGE_TEXT_MAX) };
+        },
+    },
+    {
         name: 'timesheet.read',
         action: 'timesheet.read',
         description: 'Shows time entries, newest first: the person\'s own by default. Someone else\'s are shown only where the web app\'s timesheet screens would show them to the person. Changes nothing.',
@@ -303,9 +357,9 @@ const TOOLS = [
         action: 'comment.create',
         visibility: 'filtered',
         target: (args) => ({ taskId: str(args.taskId, 40) }),
-        description: 'Adds a comment to a task the person can open, at once, and the person can undo it. The text is saved as plain text.',
-        input: { type: 'object', properties: { taskId: { type: 'string' }, text: { type: 'string' } }, required: ['taskId', 'text'] },
-        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000) }),
+        description: `Adds a comment to a task the person can open, at once, and the person can undo it. The text is saved as plain text. ${REPLY_TO}`,
+        input: { type: 'object', properties: { taskId: { type: 'string' }, text: { type: 'string' }, replyTo: { type: 'string' } }, required: ['taskId', 'text'] },
+        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000), ...replyParams(args) }),
     },
     {
         name: 'timelog.create',
@@ -344,6 +398,8 @@ const SCOPES = Object.freeze({
     'comments.list': 'tasks:read',
     'pages.search': 'docs:read',
     'page.get': 'docs:read',
+    'page.versions.list': 'docs:read',
+    'page.version.get': 'docs:read',
     'timesheet.read': 'time:read',
     'comment.create': 'tasks:write',
     'timelog.create': 'time:write',

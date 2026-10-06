@@ -24,6 +24,7 @@ const { cleanPageContent } = require('../Tasks/helpers/cleanRichText');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
+const commentReplies = require('./commentReplies');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 const { cannotOpen, CANNOT_OPEN_PROJECT } = require('../../Config/projectPeople');
 const { canCreatePageIn } = require('../Pages/helpers/pageAccess');
@@ -154,7 +155,8 @@ const startsNamedAgents = (companyId, actor, { taskId, body, depth, approvedBy }
 });
 
 const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action, body) => {
-    const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth));
+    const parent = params.replyTo ? await commentReplies.threadRootOn(companyId, params.taskId, params.replyTo) : null;
+    const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth), { parent });
     const a = attribution(actor);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
@@ -162,8 +164,9 @@ const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action
     }, 'updateOne').catch(() => {});
     if (!actor.runId) await startsNamedAgents(companyId, actor, { taskId: params.taskId, body, depth, approvedBy });
     const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId) : null;
+    if (parent) await commentReplies.announceReply(companyId, r.commentId, parent, mentioned);
     return {
-        result: { commentId: r.commentId, ...(mentioned ? { mentioned } : {}) },
+        result: { commentId: r.commentId, ...(parent ? { threadOf: String(parent._id) } : {}), ...(mentioned ? { mentioned } : {}) },
         undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId,
     };
 };
