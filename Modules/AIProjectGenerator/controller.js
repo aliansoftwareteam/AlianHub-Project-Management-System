@@ -6,7 +6,7 @@ const { dbCollections } = require('../../Config/collections');
 const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 
-const multer = require('multer');
+const multer = require('../../utils/contextMulter');
 
 const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { isProviderError } = require('../AICore/providerError');

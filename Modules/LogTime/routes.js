@@ -1,6 +1,6 @@
 const { handleMulterStorage } = require(`../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const ctrlV2 = require('./controllerV2');
-const multer = require("multer");
+const multer = require('../../utils/contextMulter');
 const { DEFAULT_LIMITS } = require('../../utils/uploadConfig');
 const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } = require('../storage/bucketAccess');
 const { ownSessionRefusal } = require('./controllerV2/sessionUser');

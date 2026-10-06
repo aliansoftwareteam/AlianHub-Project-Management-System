@@ -1,6 +1,6 @@
 const { handleProfileGetForUser, handleTaskTypeImageGet } = require(`../../../common-storage/common-${process.env.STORAGE_TYPE}.js`);
 const ctrl = require('./controller');
-const multer = require("multer");
+const multer = require('../../../utils/contextMulter');
 const { DEFAULT_LIMITS } = require('../../../utils/uploadConfig');
 const { requireStoredFileRead } = require('../downloadScope');
 const { REMOVE, requireStoredFileChange, uploadScopeRefusal } = require('../changeScope');
