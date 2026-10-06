@@ -356,6 +356,7 @@ const executors = {
     ...require('./listSetup').executors,
     ...require('./automationRequests').executors,
     ...require('./dashboardRequests').executors,
+    ...require('./timesheetWeek').executors,
 };
 
 module.exports = {

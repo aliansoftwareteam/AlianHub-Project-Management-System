@@ -7,6 +7,7 @@ import { FOLDER_HEADING, SPRINT_HEADING, LIST_SETUP_LINE_KINDS } from './listSet
 import { PROJECT_COPY_HEADING, PROJECT_COPY_LINE_KINDS } from './projectCopyLines';
 import { COMPUTED_LINE_KINDS } from './computedLines';
 import { DASHBOARD_HEADING, DASHBOARD_LINE_KINDS } from './dashboardLines';
+import { TIMESHEET_HEADING, TIMESHEET_LINE_KINDS } from './timesheetLines';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME = /^\d{4}-\d{2}-\d{2}T/;
@@ -244,6 +245,7 @@ export const LINE_KINDS = {
     ...LIST_SETUP_LINE_KINDS,
     ...PROJECT_COPY_LINE_KINDS,
     ...DASHBOARD_LINE_KINDS,
+    ...TIMESHEET_LINE_KINDS,
 };
 
 const HEADINGS = Object.freeze({
@@ -259,6 +261,7 @@ const HEADINGS = Object.freeze({
     folder: FOLDER_HEADING,
     sprint: SPRINT_HEADING,
     dashboardCard: DASHBOARD_HEADING,
+    timesheetWeek: TIMESHEET_HEADING,
 });
 
 const isBatch = (preview) => Boolean(preview) && preview.kind === 'batch';

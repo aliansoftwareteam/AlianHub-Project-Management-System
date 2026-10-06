@@ -5,7 +5,7 @@ const { recordAudit } = require('../../Audit/recorder');
 const { ACTOR_SERVICE, serviceStamp } = require('../../Agents/serviceIdentity');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const knowledgeEvents = require('../../Knowledge/ingest/events');
-const { canPostToThread } = require('../../Comments/helpers/threadWriteAccess');
+const { canPostToThread, threadOf } = require('../../Comments/helpers/threadWriteAccess');
 const { sprintPlacementOf } = require('../../Tasks/helpers/sprintPlacement');
 const { slotUnder } = require('../../Tasks/helpers/taskTree');
 const { cleanDescription, cleanHtml } = require('../../Tasks/helpers/cleanRichText');
@@ -119,16 +119,23 @@ const THREAD_REFUSED = 'the task\'s comment thread is not one the person this ru
 /* Server-side comments follow the thread rule the web app's comment routes apply, evaluated for
  * the person the write is made for (`context.actingUserId`); with no person there is nothing to
  * evaluate, so nothing is written. */
-const addComment = async (companyId, taskId, body, context = {}) => {
+/* A reply (`parent`, the first comment of its thread on this task) is placed where its parent is, as the web app's
+ * comment route places one, and is held to the parent's thread as well as the task's. */
+const addComment = async (companyId, taskId, body, context = {}, { parent = null } = {}) => {
     const task = await getTask(companyId, taskId);
     const text = String(body || '').trim();
     if (!text) throw new DeterministicError('comment body is empty');
 
-    const projectId = oid(task.ProjectID);
+    const projectId = oid(parent ? parent.projectId : task.ProjectID);
     if (!projectId) throw new DeterministicError(`task ${taskId} has no usable project id`);
 
-    const access = await canPostToThread(companyId, context.actingUserId, commentThreadOf(task));
-    if (!access.allowed) throw new DeterministicError(THREAD_REFUSED);
+    const threads = [commentThreadOf(task), ...(parent ? [threadOf(parent)] : [])];
+    for (const thread of threads) {
+        // eslint-disable-next-line no-await-in-loop
+        const access = await canPostToThread(companyId, context.actingUserId, thread);
+        if (!access.allowed) throw new DeterministicError(THREAD_REFUSED);
+    }
+    const sprintId = parent ? parent.sprintId : task.sprintId;
 
     // comments.taskId is Mixed, so Mongoose stores whatever form it is given. Reads match
     // both forms (Comments/helpers/taskIdMatch), but ObjectId is the canonical form task 040
@@ -139,7 +146,8 @@ const addComment = async (companyId, taskId, body, context = {}) => {
             project: false,
             projectId,
             taskId: oid(taskId),
-            sprintId: task.sprintId || undefined,
+            sprintId: sprintId || undefined,
+            ...(parent ? { parentId: oid(parent._id) } : {}),
             userId: context.userId || (context.ruleId ? `automation:${context.ruleId}` : 'automation'),
             type: 'text',
             message: text,
