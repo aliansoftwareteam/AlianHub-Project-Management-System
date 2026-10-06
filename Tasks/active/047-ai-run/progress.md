@@ -1,6 +1,6 @@
 # Progress: 047, AI-run
 
-State at build 812 (`14.36.0-beta.812`), 2026-10-02 23:45 IST. Tracker: AP-441.
+State at build 815 (`14.36.0-beta.815`), 2026-10-06 09:00 IST. Tracker: AP-441.
 
 How to read a line: `[x]` is merged into `beta`, with its PR and build number. "Inside build 762" means the PR reached `beta` inside a combined PR:
 
@@ -18,6 +18,7 @@ How to read a line: `[x]` is merged into `beta`, with its PR and build number. "
 | 805 | #1524, a side batch | 803 | #1509, the twenty-second |
 | 806 | #1525, the twenty-third | 809 | #1544, the twenty-fifth |
 | 810 | #1547, the twenty-fourth | 812 | #1550, the twenty-sixth |
+| 814 | #1553, the twenty-seventh | 815 | #1556, the twenty-eighth |
 
 Build 763 is #1394 alone. Build 768 is the docs PR #1411. "In review (#n)" has an open PR. "Needs the owner" waits for a step only the owner can take.
 
@@ -81,6 +82,8 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] A project made or changed shows without a reload (#1466, inside build 790). Lists and folders follow live (#1482, inside build 794)
 - [x] T-2 The connected AI as a named member (#1410, inside build 769)
 - [x] T-2 "@" your own connected AI in chat puts the question in its work queue (#1537, inside build 812)
+- [x] A change an agent token makes over the web routes is named in history and counted in a rule chain as one over MCP (#1555, inside build 815)
+- [x] S-2 A plan is approved part by part on Home's "Waiting on you" card and on the Approvals page too (#1554, inside build 815)
 - [x] T-4 Agent work visible in List, Table and Board, with a filter (#1409, inside build 769)
 - [x] T-4 Group by "Who is working" in List, Table and Board (#1534, inside build 809)
 - [x] T-5 Several agents at once (#1414, inside build 770)
@@ -129,12 +132,9 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 ## What is left
 
 **Can be done without the owner**
-- A full hand check of build 812 in light and dark; the coordinator measured three screens only.
-- The twenty-seventh batch (`chore/integrate-batch-27`, no pull request yet): four more guide chapters (#1539), specs for 25 web helpers (#1543), colours batch 7 (#1542) and legacy classes batch 3 (#1540). On that branch hard-coded colours stand at 445 and legacy classes at 527. It is held until its screens are seen: legacy classes batch 3 changes 40 files that nobody has looked at.
-- Four small bugs the helper specs found (a duration that prints "1h 60m", an error key read from inherited names, a null list of steps, a field of every project given the new project on a copy).
-- Agent changes made over the web routes: name them in history and count them in a rule chain the way changes over MCP are. Its own slice.
-- Home's "Waiting on you" card and the Approvals page still approve a plan whole.
+- A full hand check of the newest screens at 390 px and of the Settings pages; the coordinator measured contrast on nine screens of build 814 in light and dark and found nothing new.
 - The benchmark gaps still open that have no slice: a reply in a task's comment thread, a doc's versions, a timesheet's submit and approve.
+- File uploads run outside the request's agent context. Nothing reads it there today; recorded so a later change does not rely on it.
 
 **Needs the owner**
 - Turn on `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` in the local `.env`, and connect their Claude with the manage grant. AI-4a, AI-4e and AI-1 wait for this. So do the hand checks, with a real connection, of #1387, #1390, #1398, #1402, #1404, #1406, #1409, #1410, #1414, #1420, #1423, #1425, #1427, #1429, #1430 and #1433.
@@ -271,9 +271,16 @@ Each is reversible. The PR is named so the choice can be found.
 - 12-hour time is written `2:57 PM` on every screen; the planner, Home's agenda and about 25 admin pages still use the browser's own format (#1545).
 - The Template page's Back and Delete are ghost buttons; dialog shadows use the heavier modal shadow (#1541).
 
+### Choices to review, builds 813 to 815
+
+Each is reversible. The PR is named so the choice can be found.
+- A change an agent token makes over the web reads "Claude, for Priya" in task history and notifications; a rule that did not ask for agent changes no longer wakes on it (#1555).
+- On Home, a plan opens inside its row, not in a dialog; a plan locked for the reader shows no Approve on the Approvals page (#1554).
+- A field of every project is left alone when a project is copied (#1552).
+
 ## Last step
 
-Builds 811 and 812 reached `beta` on 2026-10-02 at 22:51 and 23:23 IST: the docs PR #1548 and the twenty-sixth batch (#1550, eleven PRs). The local server answers build 812; migration 073 was dry-run first (one index) and applied at start. Every slice of task 047 that does not need the owner is now merged. What is left needs a connected AI (AI-4a, AI-4e, AI-1), a new account (S-6), or the owner's time (the one-week trial). This docs PR ticks the lines above and regenerates the beta log and the API reference.
+Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 IST: the docs PR #1551, the twenty-seventh batch (#1553: colours batch 7, legacy classes batch 3, four guide chapters, 25 helper specs and the four bugs they found) and the twenty-eighth (#1556: agent changes over the web named and counted; plan parts on Home and Approvals). The local server answers build 815. Every slice of task 047 that does not need the owner is merged; what is left needs a connected AI, a new account or the owner's time. This docs PR ticks the lines above and regenerates the beta log.
 
 ## Blockers
 
@@ -332,3 +339,8 @@ Builds 811 and 812 reached `beta` on 2026-10-02 at 22:51 and 23:23 IST: the docs
 - 22:51 and 23:23: the docs PR (#1548, build 811) and the twenty-sixth batch (#1550, build 812) merged. The batch's first run failed although every web test passed: the new "@" menu threw an unhandled error inside another PR's spec, and the runner counts that as a failure. The coordinator's local run had shown it and its summary had not printed the line.
 - A narrow last read of #1535 found that detaching queued work from the request that happens to pick it up also detached an agent run from the request that started it. #1549 writes the starter's limits on the run.
 - Usage at 23:00: 71% of the week with eighteen hours to its reset. The twenty-seventh batch and a full hand check wait for the reset or for the owner's word.
+
+### 2026-10-03 to 2026-10-06
+- 07:28 on 3 October: the twenty-seventh batch merged (#1553, build 814). Its colour and class changes were measured in the page, light and dark, on nine screens against the numbers taken on build 813 that morning: nothing new below the contrast line.
+- The twenty-eighth batch (#1556, build 815) merged on 2026-10-04 at 11:09 after a review that found no hole. Its local full run could not be used: the machine was short of memory and every test timed out, so CI was the test run.
+- The local server had stopped overnight three times (2 to 3, 3 to 4, 4 to 6 October) and was restarted each morning.
