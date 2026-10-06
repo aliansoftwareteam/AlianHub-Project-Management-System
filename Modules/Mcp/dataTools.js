@@ -276,17 +276,20 @@ const TOOLS = [
     {
         name: 'page.versions.list',
         action: 'page.versions.list',
-        description: 'Lists the saved versions of a doc the person can open, newest first: who saved each one, when, why, and its name if it has one. Read one with page.version.get. Changes nothing. Putting an earlier version back is for the person to do in AlianHub.',
-        input: { type: 'object', properties: { pageId: { type: 'string' }, ...LIMIT }, required: ['pageId'] },
+        description: 'Lists the saved versions of a doc the person can open, newest first: who saved each one, when, why, and its name if it has one. When nextCursor comes back, pass it as cursor for older versions. Read one with page.version.get. Changes nothing. Putting an earlier version back is for the person to do in AlianHub.',
+        input: { type: 'object', properties: { pageId: { type: 'string' }, cursor: { type: 'string', description: 'The nextCursor of the previous page, for older versions' }, ...LIMIT }, required: ['pageId'] },
         visibility: 'filtered',
         readParams: () => ({}),
         run: async (ctx, args, vis) => {
             const page = await openPage(ctx, vis, args.pageId);
             if (!page) return { ...NO_PAGE };
-            const rows = (await pageVersions.rowsOf(ctx.companyId, page._id)).filter((v) => versionRules.versionVisibleTo(v, page, ctx.userId)).slice(0, clampLimit(args.limit));
+            // A doc keeps far fewer versions than rowsOf reads, so every one the person may see is paged here.
+            const visible = (await pageVersions.rowsOf(ctx.companyId, page._id)).filter((v) => versionRules.versionVisibleTo(v, page, ctx.userId));
+            const { rows, nextCursor } = await cursor.page(ctx, 'page.versions.list', args, ({ skip, limit }) => visible.slice(skip, skip + limit));
             const projectId = idOf(page.ProjectID);
             const named = await names.resolver(ctx, { projectIds: projectId ? [projectId] : [], userIds: rows.map((v) => String(v.savedBy || '')).filter(isId) });
-            return { pageId: String(page._id), versions: rows.map((v) => versionRow(versionRules.versionRow(v), named, projectId)) };
+            const versions = rows.map((v) => versionRow(versionRules.versionRow(v), named, projectId));
+            return nextCursor ? { pageId: String(page._id), versions, nextCursor } : { pageId: String(page._id), versions };
         },
     },
     {

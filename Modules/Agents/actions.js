@@ -155,8 +155,8 @@ const startsNamedAgents = (companyId, actor, { taskId, body, depth, approvedBy }
 });
 
 const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action, body) => {
-    const parent = params.replyTo ? await commentReplies.threadRootOn(companyId, params.taskId, params.replyTo) : null;
-    const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth), { parent });
+    const reply = params.replyTo ? await commentReplies.repliedTo(companyId, params.taskId, params.replyTo) : null;
+    const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth), { replyTo: reply ? String(reply.comment._id) : '' });
     const a = attribution(actor);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
@@ -164,9 +164,9 @@ const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action
     }, 'updateOne').catch(() => {});
     if (!actor.runId) await startsNamedAgents(companyId, actor, { taskId: params.taskId, body, depth, approvedBy });
     const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId) : null;
-    if (parent) await commentReplies.announceReply(companyId, r.commentId, parent, mentioned);
+    if (reply) await commentReplies.announceReply(companyId, r.commentId, reply.comment, mentioned);
     return {
-        result: { commentId: r.commentId, ...(parent ? { threadOf: String(parent._id) } : {}), ...(mentioned ? { mentioned } : {}) },
+        result: { commentId: r.commentId, ...(reply ? { threadOf: reply.rootId } : {}), ...(mentioned ? { mentioned } : {}) },
         undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId,
     };
 };

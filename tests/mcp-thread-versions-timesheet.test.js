@@ -43,6 +43,7 @@ const actions = require('../Modules/Agents/actions');
 const proposals = require('../Modules/Agents/proposals');
 const memory = require('../Modules/Agents/memory');
 const week = require('../Modules/Agents/timesheetWeek');
+const intentPreview = require('../Modules/Agents/intentPreview');
 const { NOT_ON_TASK } = require('../Modules/Agents/commentReplies');
 const { notifyReply } = require('../Modules/Comments/helpers/threadNotices');
 const tools = require('../Modules/Mcp/tools');
@@ -62,6 +63,7 @@ const V_OLD = '6f0000000000000000000e21';
 const V_NEW = '6f0000000000000000000e22';
 const V_HIDDEN = '6f0000000000000000000e23';
 const MONDAY = '2026-09-28';
+const FOLDER = '6f0000000000000000000c09';
 
 const human = (userId) => ({ kind: 'human', userId });
 const approve = (id, uid) => proposals.approve(CID, id, { decider: human(uid), isPrivileged: [OWNER, ADMIN].includes(uid), ip: '' });
@@ -156,6 +158,34 @@ describe('replying in a task\'s comment thread', () => {
     });
 });
 
+describe('a reply as a person writes one', () => {
+    it('answers a reply whose first comment was deleted, in that thread, as the comment route does', async () => {
+        comments().find((row) => String(row._id) === ROOT).isDeleted = true;
+        const out = await rpc(as(INSIDER), 'comment.create', { taskId: T_OPEN, text: 'Done', replyTo: REPLY });
+        expect(out).toMatchObject({ ok: true, result: { threadOf: ROOT } });
+        expect(String(comments().find((row) => String(row._id) === out.result.commentId).parentId)).toBe(ROOT);
+    });
+
+    it('takes every placement field of the comment it answers', async () => {
+        const root = comments().find((row) => String(row._id) === ROOT);
+        root.folderId = FOLDER;
+        const out = await rpc(as(INSIDER), 'comment.create', { taskId: T_OPEN, text: 'Done', replyTo: ROOT });
+        const saved = comments().find((row) => String(row._id) === out.result.commentId);
+        expect([String(saved.folderId), saved.project]).toEqual([FOLDER, false]);
+    });
+
+    it('says on the waiting card whom it answers, only to a viewer who can read that thread', async () => {
+        const proposal = (taskId, replyTo) => ({ _id: `p-${replyTo}`, source: 'mcp', changes: [{ action: 'comment.create', params: { taskId, body: 'Done', replyTo } }] });
+        const cardFor = async (uid, taskId, replyTo) => (await intentPreview.forBatches(CID, uid, [proposal(taskId, replyTo)], { bareChanges: true })).get(`p-${replyTo}`);
+        const itemOf = (card) => card.lines.find((line) => line.kind === 'batchItem');
+
+        expect(itemOf(await cardFor(INSIDER, T_OPEN, ROOT))).toMatchObject({ what: 'comment', value: 'Done', replyTo: 'Mia Member' });
+        expect(itemOf(await cardFor(OWNER, T_SECRET, SECRET_ROOT))).toMatchObject({ replyTo: 'Ian Insider' });
+        expect(itemOf(await cardFor(OUTSIDER, T_SECRET, SECRET_ROOT))).not.toHaveProperty('replyTo');
+        expect(itemOf(await cardFor(INSIDER, T_OPEN, SECRET_ROOT))).not.toHaveProperty('replyTo');
+    });
+});
+
 describe('reading a doc\'s versions', () => {
     it('lists the versions the person may see, newest first, with who saved each and when', async () => {
         const out = await rpc(as(OUTSIDER), 'page.versions.list', { pageId: PAGE });
@@ -167,6 +197,17 @@ describe('reading a doc\'s versions', () => {
     it('shows a version kept while the doc was private to its author alone', async () => {
         expect((await rpc(as(INSIDER), 'page.versions.list', { pageId: PAGE })).versions.map((row) => row.versionId)).toEqual([V_HIDDEN, V_NEW, V_OLD]);
         expect(await rpc(as(OUTSIDER), 'page.version.get', { pageId: PAGE, versionId: V_HIDDEN })).toMatchObject({ error: expect.stringMatching(/not found/) });
+    });
+
+    it('pages back to the oldest version', async () => {
+        for (let i = 0; i < 30; i += 1) version(`6f00000000000000000010${String(i).padStart(2, '0')}`, PAGE, INSIDER, `2026-09-10T${String(i % 24).padStart(2, '0')}:00:00Z`, `Draft ${i}`);
+        const first = await rpc(as(OUTSIDER), 'page.versions.list', { pageId: PAGE, limit: 25 });
+        expect(first.versions).toHaveLength(25);
+        expect(first.nextCursor).toEqual(expect.any(String));
+        const second = await rpc(as(OUTSIDER), 'page.versions.list', { pageId: PAGE, limit: 25, cursor: first.nextCursor });
+        expect(second.versions.map((row) => row.versionId)).toEqual(expect.arrayContaining([V_NEW, V_OLD]));
+        expect(second.versions.map((row) => row.versionId)).not.toContain(V_HIDDEN);
+        expect(second).not.toHaveProperty('nextCursor');
     });
 
     it('reads one version\'s text as it was then', async () => {
