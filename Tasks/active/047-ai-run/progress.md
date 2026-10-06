@@ -340,6 +340,7 @@ Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 I
 - A narrow last read of #1535 found that detaching queued work from the request that happens to pick it up also detached an agent run from the request that started it. #1549 writes the starter's limits on the run.
 - Usage at 23:00: 71% of the week with eighteen hours to its reset. The twenty-seventh batch and a full hand check wait for the reset or for the owner's word.
 
-- 2026-10-03 07:28: the twenty-seventh batch merged (#1553, build 814). Its colour and class changes were measured in the page, light and dark, on nine screens against the numbers taken on build 813 that morning: nothing new below the contrast line.
+### 2026-10-03 to 2026-10-06
+- 07:28 on 3 October: the twenty-seventh batch merged (#1553, build 814). Its colour and class changes were measured in the page, light and dark, on nine screens against the numbers taken on build 813 that morning: nothing new below the contrast line.
 - The twenty-eighth batch (#1556, build 815) merged on 2026-10-04 at 11:09 after a review that found no hole. Its local full run could not be used: the machine was short of memory and every test timed out, so CI was the test run.
 - The local server had stopped overnight three times (2 to 3, 3 to 4, 4 to 6 October) and was restarted each morning.
