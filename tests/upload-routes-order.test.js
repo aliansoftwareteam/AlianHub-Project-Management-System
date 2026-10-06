@@ -67,13 +67,13 @@ describe('a route that reads a file from the request', () => {
 
     it('is the only kind of route the upload library is loaded for', () => {
         const loaders = SERVER_DIRS.flatMap((dir) => filesUnder(path.join(ROOT, dir)))
-            .filter((file) => /require\((['"])(multer|busboy|formidable|express-fileupload|multiparty)\1\)/.test(fs.readFileSync(file, 'utf8')))
+            .filter((file) => /require\((['"])([./]*utils\/contextMulter|multer|busboy|formidable|express-fileupload|multiparty)\1\)/.test(fs.readFileSync(file, 'utf8')))
             .map((file) => path.relative(ROOT, file)).sort();
 
         expect(loaders).toEqual([
             'Modules/AI/transcribe.js', 'Modules/AIProjectGenerator/briefExtractor.js', 'Modules/AIProjectGenerator/controller.js', 'Modules/Company/routes.js',
             'Modules/Forms/helpers/formUpload.js', 'Modules/LogTime/routes.js', 'Modules/Pages/helpers/pageImages.js',
-            'Modules/storage/server/helpers/bucket.helper.js', 'Modules/storage/wasabi/routes.js',
+            'Modules/storage/server/helpers/bucket.helper.js', 'Modules/storage/wasabi/routes.js', 'utils/contextMulter.js',
         ]);
     });
 });

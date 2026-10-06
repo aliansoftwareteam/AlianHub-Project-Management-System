@@ -3,7 +3,7 @@
 // answers chat (so a self-hosted instance uploads nothing to OpenAI), otherwise
 // OpenAI at OPENAI_BASE_URL with config.OPENAI_API_KEY or config.AI_API_KEY.
 // Each call is booked to the workspace's AI budget by the audio minute.
-const multer = require('multer');
+const multer = require('../../utils/contextMulter');
 const config = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
 const aiSwitch = require('../AICore/aiSwitch');

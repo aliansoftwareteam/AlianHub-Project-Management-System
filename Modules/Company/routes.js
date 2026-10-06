@@ -1,5 +1,5 @@
 const ctrl = require('./controller');
-const multer = require("multer");
+const multer = require('../../utils/contextMulter');
 const { handleEvents } = require('./eventController');
 const updateCompanyCtrl = require('./controller/updateCompany');
 const { requireLiveCompanyMembership } = require('../../Config/jwt');

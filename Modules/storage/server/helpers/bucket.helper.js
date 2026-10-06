@@ -380,7 +380,7 @@ exports.getBucketSizeStorage = () => {
     })
 }
 
-const multer = require('multer');
+const multer = require('../../../../utils/contextMulter');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
 const { updateCompanyFun, getCompanyDataFun } = require('../../../Company/controller/updateCompany');
