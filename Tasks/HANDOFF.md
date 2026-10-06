@@ -1,6 +1,6 @@
 # Handoff: where to start next session
 
-Updated 2026-10-02 23:45 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
+Updated 2026-10-06 09:00 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
 
 ## State
 
@@ -8,8 +8,8 @@ Updated 2026-10-02 23:45 IST. Read this first, then `Tasks/index.md` and the two
   - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent that comes with AlianHub is the person's own Claude or ChatGPT over MCP (decision 30). New agent slots go here.
   - Task 046, "great next to ClickUp" (`Tasks/active/046-better-than-clickup/`, tracker AP-441): no new parity features; fixes, proof and the held PRs remain.
   - In each folder, `progress.md` has every slice with its PR and build, the decisions and what waits for the owner.
-- **`beta` is at build 812** (`14.36.0-beta.812`, #1550). This docs PR becomes the next build.
-- **Live on localhost: build 812.** Nothing is merged and not built. Migrations 071, 072 and 073 are applied (each was dry-run first: 072 and 073 only create indexes). The next free number is 074.
+- **`beta` is at build 815** (`14.36.0-beta.815`, #1556). This docs PR becomes the next build.
+- **Live on localhost: build 815.** Nothing is merged and not built. No migration after 073. The local server stops when the Mac sleeps: start it with the "alianhub-api" launch entry (`npm run nodemon`, Node 20) and check `/health`.
 - **Hand-checked:** builds 782, 792 to 802, 803 to 806 (eleventh sweep), and by the coordinator 809 (Group by "Who is working"), 810 (the Inbox) and 812 (the task panel's tabs, the story point scale dialog and the export card in dark, measured in the page). The notes are in `Tasks/active/046-better-than-clickup/hand-check-2026-10-01.md`, a working note that is not committed. **Not hand-checked:** the rest of batch 26 (the list is under "Next steps"), and nothing that needs a connected AI (the MCP flags are off locally).
 - `docs/API.md` and `docs/api/openapi.json` are in sync with build 812 once this docs PR merges.
 - **Usage:** the week stood at 71% at 23:00 with the reset on 3 October at 17:30 IST. Full slots take about 5% of the week per hour. Nothing is running.
