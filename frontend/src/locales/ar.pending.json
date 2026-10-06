@@ -6416,6 +6416,7 @@
     "IntentPreview.priority_low": "Low",
     "IntentPreview.priority_medium": "Medium",
     "IntentPreview.priority_urgent": "Urgent",
+    "IntentPreview.reply_to": "replying to {name}: {text}",
     "IntentPreview.rollup_avg": "the average of {source} on the subtasks under each task",
     "IntentPreview.rollup_count": "how many subtasks are under each task",
     "IntentPreview.rollup_count_filled": "how many subtasks under each task have {source} filled in",

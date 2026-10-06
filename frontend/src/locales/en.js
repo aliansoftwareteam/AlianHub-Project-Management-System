@@ -9609,6 +9609,7 @@ export default {
         batch_what_list_add: "Added to list",
         batch_what_list_remove: "Taken out of list",
         batch_item_on: "{value}, on “{task}”",
+        reply_to: "replying to {name}: {text}",
         batch_assign_set: "Set to {people}",
         batch_assign_add: "Add {people}",
         batch_assign_remove: "Remove {people}",

@@ -31,8 +31,6 @@ const weekOf = (day) => {
 /* Today in the person's own zone, for a week that is not named. */
 const todayOf = async (uid) => DateTime.now().setZone(await zoneOf(uid)).toISODate();
 
-const dayProblem = (day) => (day === undefined || day === null || day === '' || isDay(day) ? '' : 'The day must be written YYYY-MM-DD.');
-
 const handled = (handler, { companyId, uid, query = {}, body = {} }) => new Promise((resolve, reject) => {
     const res = { statusCode: 200 };
     res.status = (code) => { res.statusCode = code; return res; };
@@ -121,4 +119,4 @@ const executors = {
     },
 };
 
-module.exports = { READ, SUBMIT, NOTE_MAX, NOT_THEIRS, executors, weekOf, todayOf, weekStatus, draftOf, dayProblem, approverRefusal, submitProblem, preview };
+module.exports = { READ, SUBMIT, NOTE_MAX, NOT_THEIRS, executors, weekOf, todayOf, weekStatus, draftOf, approverRefusal, submitProblem, preview };

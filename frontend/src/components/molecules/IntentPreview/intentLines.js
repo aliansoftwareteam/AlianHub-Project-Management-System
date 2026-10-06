@@ -111,7 +111,10 @@ const BATCH_ITEM_VALUES = Object.freeze({
     list_add: placeText,
     list_remove: placeText,
     description: cutText,
-    comment: cutText,
+    comment: (t, line) => {
+        const text = cutText(t, line);
+        return text && textOf(line.replyTo) ? t('IntentPreview.reply_to', { name: textOf(line.replyTo), text }) : text;
+    },
 });
 
 export const LINE_KINDS = {

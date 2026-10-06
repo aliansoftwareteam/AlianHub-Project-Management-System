@@ -119,35 +119,36 @@ const THREAD_REFUSED = 'the task\'s comment thread is not one the person this ru
 /* Server-side comments follow the thread rule the web app's comment routes apply, evaluated for
  * the person the write is made for (`context.actingUserId`); with no person there is nothing to
  * evaluate, so nothing is written. */
-/* A reply (`parent`, the first comment of its thread on this task) is placed where its parent is, as the web app's
- * comment route places one, and is held to the parent's thread as well as the task's. */
-const addComment = async (companyId, taskId, body, context = {}, { parent = null } = {}) => {
+/* A reply (`replyTo`, a comment on this task) is placed by the web app's comment route's own rule, and is held to
+ * that thread as well as the task's. */
+const addComment = async (companyId, taskId, body, context = {}, { replyTo = '' } = {}) => {
     const task = await getTask(companyId, taskId);
     const text = String(body || '').trim();
     if (!text) throw new DeterministicError('comment body is empty');
 
-    const projectId = oid(parent ? parent.projectId : task.ProjectID);
+    const projectId = oid(task.ProjectID);
     if (!projectId) throw new DeterministicError(`task ${taskId} has no usable project id`);
 
-    const threads = [commentThreadOf(task), ...(parent ? [threadOf(parent)] : [])];
+    // comments.taskId is Mixed, so Mongoose stores whatever form it is given. Reads match
+    // both forms (Comments/helpers/taskIdMatch), but ObjectId is the canonical form task 040
+    // migrates to, so new rows are written that way.
+    const placed = { project: false, projectId, taskId: oid(taskId), sprintId: task.sprintId || undefined };
+    const placement = replyTo
+        ? await require('../../Comments/helpers/commentThreads').placeReply(companyId, { ...placed, parentId: String(replyTo) })
+        : { allowed: true, data: placed };
+    if (!placement.allowed) throw new DeterministicError(THREAD_REFUSED);
+
+    const threads = [commentThreadOf(task), ...(replyTo ? [threadOf(placement.data)] : [])];
     for (const thread of threads) {
         // eslint-disable-next-line no-await-in-loop
         const access = await canPostToThread(companyId, context.actingUserId, thread);
         if (!access.allowed) throw new DeterministicError(THREAD_REFUSED);
     }
-    const sprintId = parent ? parent.sprintId : task.sprintId;
 
-    // comments.taskId is Mixed, so Mongoose stores whatever form it is given. Reads match
-    // both forms (Comments/helpers/taskIdMatch), but ObjectId is the canonical form task 040
-    // migrates to, so new rows are written that way.
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
         data: {
-            project: false,
-            projectId,
-            taskId: oid(taskId),
-            sprintId: sprintId || undefined,
-            ...(parent ? { parentId: oid(parent._id) } : {}),
+            ...placement.data,
             userId: context.userId || (context.ruleId ? `automation:${context.ruleId}` : 'automation'),
             type: 'text',
             message: text,
