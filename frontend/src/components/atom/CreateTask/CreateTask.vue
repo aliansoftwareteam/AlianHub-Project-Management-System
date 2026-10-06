@@ -133,13 +133,6 @@ const props = defineProps({
         type: Object,
         default: null
     },
-    // Pre-fill the creator as assignee when the inline task row opens. Defaults
-    // to true so a new task is self-assigned instead of starting unassigned;
-    // pass false to opt a call site out.
-    addDefaultAssignee: {
-        type: Boolean,
-        default: true
-    },
     startDate: {
         type: Date
     },
@@ -206,20 +199,7 @@ onMounted(() => {
     if(statusIndex !== -1) {
         status.value = project?.value.taskStatusData[statusIndex];
     }
-
-    assignee.value = defaultAssignee();
 })
-
-/**
- * The assignee a freshly-emptied row starts with.
- *
- * Returns a NEW array every time on purpose. The reset after a save runs while the
- * payload still holds the previous array by reference, so emptying that array in place
- * would strip the assignee off the task being created.
- */
-function defaultAssignee() {
-    return props.addDefaultAssignee && userId.value ? [userId.value] : [];
-}
 
 function changePriority(val) {
     priority.value = val.value
@@ -245,10 +225,7 @@ function resetTaskFields() {
     taskName.value.value = "";
     taskName.value.error = "";
     priority.value = "MEDIUM";
-    // Back to the default, not to empty. The row stays mounted after a save, so onMounted
-    // never runs again — clearing this outright meant the default assignee survived
-    // exactly one task and every one after it was created unassigned.
-    assignee.value = defaultAssignee();
+    assignee.value = [];
 }
 
 function saveTask() {
