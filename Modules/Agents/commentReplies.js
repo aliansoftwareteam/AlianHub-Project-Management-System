@@ -1,7 +1,8 @@
 const tools = require('../Automations/engine/tools');
 const logger = require('../../Config/loggerConfig');
 const { findComment, findThreadRoot, canHoldThread, isTaskComment } = require('../Comments/helpers/commentThreads');
-const { notifyReply } = require('../Comments/helpers/threadNotices');
+/* Required when a reply is sent: the notice module loads storage and its SDK, which the agent actions do not need at load. */
+const notifyReply = (...args) => require('../Comments/helpers/threadNotices').notifyReply(...args);
 
 // An agent's reply in a task's comment thread. It answers a comment on the very task the reply is written on, so it
 // reaches no thread its person could not read through that task. The comment is found as the comment route finds it.
