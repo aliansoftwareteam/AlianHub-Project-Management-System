@@ -128,7 +128,7 @@ const findRunningTimer = (companyId, taskId, userId) => MongoDbCrudOpration(comp
 
 /* ── the executors ─────────────────────────────────────────────────────────── */
 
-/* The people a comment names in the editor's own markup are told the way the comment route tells them.
+/* The people a comment names are told the way the comment route tells them.
  * A delivery that fails is logged: the comment is already written. */
 const announceMentions = async (companyId, commentId) => {
     try {
@@ -154,7 +154,24 @@ const startsNamedAgents = (companyId, actor, { taskId, body, depth, approvedBy }
     ...(isAgent(actor) && !approvedBy ? { postedBy: actor, asked: true } : {}),
 });
 
-const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action, body) => {
+/* A person the comment names who cannot open the task is not told, and the answer says so. */
+const mentionAnswer = (marked, notifiedIds, authorId) => {
+    const notified = new Set(notifiedIds.map(String));
+    const nameOf = new Map(marked.people.map((p) => [p.userId, p.name]));
+    const row = (userId) => ({ userId, name: nameOf.get(userId) || '' });
+    const notNotified = marked.named.map((p) => p.userId)
+        .filter((userId) => !notified.has(userId) && userId !== String(authorId || ''))
+        .map((userId) => ({ ...row(userId), reason: 'cannot open this task, so was not notified' }));
+    return {
+        mentioned: [...notified].map(row),
+        ...(notNotified.length ? { notNotified } : {}),
+        ...(marked.notFound.length ? { notFound: marked.notFound } : {}),
+    };
+};
+
+const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action, written) => {
+    const marked = params.notifyMentions ? await require('../Comments/helpers/namedMentions').markMentions(companyId, written) : null;
+    const body = marked ? marked.message : written;
     const reply = params.replyTo ? await commentReplies.repliedTo(companyId, params.taskId, params.replyTo) : null;
     const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth), { replyTo: reply ? String(reply.comment._id) : '' });
     const a = attribution(actor);
@@ -166,7 +183,7 @@ const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action
     const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId) : null;
     if (reply) await commentReplies.announceReply(companyId, r.commentId, reply.comment, mentioned);
     return {
-        result: { commentId: r.commentId, ...(reply ? { threadOf: reply.rootId } : {}), ...(mentioned ? { mentioned } : {}) },
+        result: { commentId: r.commentId, ...(reply ? { threadOf: reply.rootId } : {}), ...(mentioned ? mentionAnswer(marked, mentioned, actor.userId) : {}) },
         undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId,
     };
 };
