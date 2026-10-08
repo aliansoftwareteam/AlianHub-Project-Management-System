@@ -41,6 +41,7 @@ const parse = (text, rel) => {
         name: meta.name,
         blueprint: meta.blueprint,
         department: meta.department,
+        ...(meta.team ? { team: meta.team } : {}),
         tools: meta.tools,
         handsTo: meta.hands_to,
         gates: meta.gates,

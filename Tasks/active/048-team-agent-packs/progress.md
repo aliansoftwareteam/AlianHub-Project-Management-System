@@ -9,7 +9,10 @@ Confirmed by the owner on 2026-10-08: "go with your recommendations". Decisions 
 - [x] Manufacturing roles, written to the example's depth: 22 roles, #1571
 - [ ] The owner reviews each set (merged in build 825 before the owner's read; changes come as a small docs PR)
 
-**Part 2: team packs** · **Part 3: the dispatcher** · **Part 4: workflows** · **Part 5: the company view** · **Part 6: blueprints**: not started.
+**Part 5: the company view**
+- [ ] Org chart and flow board in AI > Company view behind `DISPATCHER` (draft PR feat/company-view; read-only, two reads)
+
+**Part 2: team packs** · **Part 4: workflows** · **Part 6: blueprints**: not started.
 
 ## Log
 

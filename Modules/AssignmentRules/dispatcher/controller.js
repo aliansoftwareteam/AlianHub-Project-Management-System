@@ -5,6 +5,7 @@ const flag = require('./flag');
 const settings = require('./settings');
 const decisions = require('./decisions');
 const audit = require('./audit');
+const company = require('./company');
 
 const companyOf = (req) => String(req.headers['companyid'] || '');
 
@@ -62,6 +63,18 @@ exports.getNeedsRouting = async (req, res) => {
         return fail(res, 'read needs routing')(error);
     }
 };
+
+const companyPanel = (read, what) => async (req, res) => {
+    try {
+        const data = await read(companyOf(req), req.uid);
+        return res.json({ status: true, statusText: what, data });
+    } catch (error) {
+        return fail(res, `read ${what}`)(error);
+    }
+};
+
+exports.getOrgChart = companyPanel(company.orgChart, 'Company org chart');
+exports.getFlowBoard = companyPanel(company.flowBoard, 'Company flow board');
 
 exports.getTaskDecision = async (req, res) => {
     try {

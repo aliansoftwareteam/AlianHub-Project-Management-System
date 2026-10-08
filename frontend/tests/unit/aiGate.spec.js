@@ -10,7 +10,7 @@ import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vu
 import aiRoutes from '@/router/ai';
 
 const STATES = ['unknown', 'on', 'unconfigured', 'off_instance', 'off_workspace'];
-const CONFIG_ONLY = ['AiSkills', 'AiAgent', 'AgentTeammates', 'AgentRouting', 'AiHealth', 'AiAccounts', 'WorkflowRun', 'WorkflowLineage', 'WorkflowBuilder', 'Connections', 'AiConnect', 'ConnectAiWelcome'];
+const CONFIG_ONLY = ['AiSkills', 'AiAgent', 'AgentTeammates', 'AgentRouting', 'AiHealth', 'AiCompany', 'AiAccounts', 'WorkflowRun', 'WorkflowLineage', 'WorkflowBuilder', 'Connections', 'AiConnect', 'ConnectAiWelcome'];
 
 const expected = (route, state) => {
     if (!MODEL_DRIVEN_ROUTES.includes(route)) return null;

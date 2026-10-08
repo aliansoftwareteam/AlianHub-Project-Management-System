@@ -14,6 +14,10 @@ export const addRoutingRule = (projectId, rule) => apiRequest("post", `${BASE}/p
 
 export const fetchNeedsRouting = (projectId) => apiRequest("get", `${BASE}/project/${projectId}/needs-routing`, undefined).then(dataOf);
 
+export const fetchOrgChart = () => apiRequest("get", `${BASE}/company/org-chart`, undefined).then(dataOf);
+
+export const fetchFlowBoard = () => apiRequest("get", `${BASE}/company/flow-board`, undefined).then(dataOf);
+
 export const fetchTaskRouting = (taskId) => apiRequest("get", `${BASE}/task/${taskId}`, undefined).then(dataOf);
 
 export const actOnRouting = (taskId, decisionId, action, body = {}) => apiRequest("post", `${BASE}/task/${taskId}/decisions/${decisionId}/${action}`, body).then(dataOf);

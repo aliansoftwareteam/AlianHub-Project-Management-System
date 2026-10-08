@@ -30,6 +30,8 @@ exports.init = (app) => {
     app.put('/api/v2/assignment-rules/dispatcher/project/:projectId', agentsRefused('project.settings'), dispatcher.whenOn, editsRules, dispatcher.saveSettings);
     app.post('/api/v2/assignment-rules/dispatcher/project/:projectId/rules', agentsRefused('project.settings'), dispatcher.whenOn, editsRules, dispatcher.addRule);
     app.get('/api/v2/assignment-rules/dispatcher/project/:projectId/needs-routing', readsProject, dispatcher.getNeedsRouting);
+    app.get('/api/v2/assignment-rules/dispatcher/company/org-chart', dispatcher.getOrgChart);
+    app.get('/api/v2/assignment-rules/dispatcher/company/flow-board', dispatcher.getFlowBoard);
     app.get('/api/v2/assignment-rules/dispatcher/task/:taskId', readsTask, dispatcher.getTaskDecision);
     app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/accept', decidedByPerson('dispatcher.suggestion.accept'), dispatcher.whenOn, leadsTaskProject, dispatcher.actOnDecision('accept'));
     app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/dismiss', decidedByPerson('dispatcher.suggestion.dismiss'), dispatcher.whenOn, leadsTaskProject, dispatcher.actOnDecision('dismiss'));
