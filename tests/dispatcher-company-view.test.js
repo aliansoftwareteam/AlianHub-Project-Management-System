@@ -210,6 +210,22 @@ describe('company view: flow board', () => {
         expect(JSON.stringify(body)).not.toContain('Hidden');
     });
 
+    it('counts a backlog past the rows it reads in full, held and waiting included', async () => {
+        const project = seedProject('Launch');
+        for (let i = 0; i < 203; i += 1) seedQueue(project, seedTask(project), TRIAGER, { openedAt: new Date(Date.now() - (300 - i) * 60000) });
+        for (let i = 0; i < 4; i += 1) seedQueue(project, seedTask(project), TRIAGER, { proposalId: oid() });
+        for (let i = 0; i < 202; i += 1) seedDecision(project, seedTask(project));
+        for (let i = 0; i < 201; i += 1) seedDecision(project, seedTask(project), { state: 'needs_routing', role: null, source: null });
+        seedQueue(project, seedTask(project, { statusType: 'close' }), TRIAGER, { openedAt: new Date(0) });
+        const { body } = await call(FLOW_ROUTE);
+        const triager = laneOf(body.data, TRIAGER);
+        expect(triager.queued.count).toBe(203);
+        expect(triager.held.count).toBe(4);
+        expect(triager.waiting.count).toBe(202);
+        expect(triager.queued.items).toHaveLength(5);
+        expect(body.data.unrouted.count).toBe(201);
+    });
+
     it('caps the tasks it lists and answers off while the flag is off', async () => {
         const project = seedProject('Launch');
         for (let i = 0; i < 8; i += 1) seedQueue(project, seedTask(project, { TaskName: `T${i}` }), TRIAGER);

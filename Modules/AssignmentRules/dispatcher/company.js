@@ -115,11 +115,14 @@ async function readTasks(companyId, uid, taskIds) {
 }
 
 const lane = () => ({ count: 0, items: [] });
-const add = (target, item) => {
-    target.count += 1;
-    if (target.items.length < SHOWN) target.items.push(item);
-};
+const show = (target, item) => { if (target.items.length < SHOWN) target.items.push(item); };
 
+const tally = async (companyId, type, match, by) => ((await MongoDbCrudOpration(companyId, {
+    type, data: [[{ $match: match }, { $group: { _id: by, n: { $sum: 1 } } }]],
+}, 'aggregate')) || []).map((row) => ({ ...row._id, projectId: String(row._id.projectId), n: row.n }));
+
+/* Totals come from counting queries, so a backlog past the READ rows listed is still counted in full. A row among
+ * those read that the person may not open, or whose task is closed, is taken back off its total. */
 async function flowBoard(companyId, uid, now = new Date()) {
     if (!flag.enabled()) return { on: false, stuckDays: STUCK_DAYS, unrouted: lane(), roles: [] };
     const { projects, open } = await scope(companyId, uid);
@@ -127,40 +130,61 @@ async function flowBoard(companyId, uid, now = new Date()) {
     const projectName = new Map(projects.map((project) => [project.projectId, project.name]));
     const roleIn = new Map(projects.map((project) => [project.projectId, new Set(project.settings.roles)]));
     const ids = [...open];
-    const [decisions, rows] = ids.length ? await Promise.all([
-        find(companyId, SCHEMA_TYPE.DISPATCH_DECISIONS, [{ projectId: { $in: ids }, state: { $in: WAITING_STATES } }, null, { sort: { createdAt: -1 }, limit: READ }]),
-        find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
-            { rule: HANDED_OVER, status: OPEN, leftQueue: null, 'facts.role': { $in: [...byRole.keys()] }, projectId: { $in: idForms(ids) } }, {}, { sort: { openedAt: 1 }, limit: READ },
-        ]),
-    ]) : [[], []];
+    const decisionMatch = { projectId: { $in: ids }, state: { $in: WAITING_STATES } };
+    const queueMatch = { rule: HANDED_OVER, status: OPEN, leftQueue: null, 'facts.role': { $in: [...byRole.keys()] }, projectId: { $in: idForms(ids) } };
+    const heldMatch = { ...queueMatch, $or: [{ proposalId: { $exists: true, $ne: null } }, { 'claim.until': { $gt: now } }] };
+    const [decisions, rows, decisionTotals, queueTotals, heldTotals] = ids.length ? await Promise.all([
+        find(companyId, SCHEMA_TYPE.DISPATCH_DECISIONS, [decisionMatch, null, { sort: { createdAt: -1 }, limit: READ }]),
+        find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [queueMatch, {}, { sort: { openedAt: 1 }, limit: READ }]),
+        tally(companyId, SCHEMA_TYPE.DISPATCH_DECISIONS, decisionMatch, { projectId: '$projectId', role: '$role', state: '$state' }),
+        tally(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, queueMatch, { projectId: '$projectId', role: '$facts.role' }),
+        tally(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, heldMatch, { projectId: '$projectId', role: '$facts.role' }),
+    ]) : [[], [], [], [], []];
     const tasks = await readTasks(companyId, uid, [...decisions.map((decision) => decision.taskId), ...rows.map((row) => row.taskId)]);
 
     const lanes = new Map([...byRole.keys()].map((key) => [key, { key, name: settingsOf.roleName(key), waiting: lane(), queued: lane(), held: lane(), stuck: lane() }]));
     const unrouted = lane();
+    const counts = (role, projectId) => (roleIn.get(projectId) || new Set()).has(role) && lanes.get(role);
     const item = (task, projectId, more = {}) => ({ taskId: String(task._id), taskKey: task.TaskKey || '', taskName: task.TaskName || '', projectId, project: projectName.get(projectId) || '', ...more });
 
+    decisionTotals.forEach(({ projectId, role, state, n }) => {
+        if (state === 'needs_routing') unrouted.count += n;
+        else if (counts(role, projectId)) counts(role, projectId).waiting.count += n;
+    });
+    queueTotals.forEach(({ projectId, role, n }) => { if (counts(role, projectId)) lanes.get(role).queued.count += n; });
+    heldTotals.forEach(({ projectId, role, n }) => {
+        if (!counts(role, projectId)) return;
+        lanes.get(role).queued.count -= n;
+        lanes.get(role).held.count += n;
+    });
+
     decisions.forEach((decision) => {
-        const task = tasks.get(String(decision.taskId));
-        if (!task || String(task.ProjectID) !== String(decision.projectId)) return;
         const projectId = String(decision.projectId);
-        if (decision.state === 'needs_routing') return add(unrouted, item(task, projectId));
-        const target = lanes.get(decision.role);
-        if (target && roleIn.get(projectId).has(decision.role)) add(target.waiting, item(task, projectId, { source: decision.source || '' }));
-        return undefined;
+        const roleLane = counts(decision.role, projectId);
+        const target = decision.state === 'needs_routing' ? unrouted : roleLane && roleLane.waiting;
+        if (!target) return;
+        const task = tasks.get(String(decision.taskId));
+        if (!task || String(task.ProjectID) !== projectId) { target.count -= 1; return; }
+        show(target, item(task, projectId, decision.state === 'needs_routing' ? {} : { source: decision.source || '' }));
     });
 
     rows.forEach((row) => {
         const role = row.facts && row.facts.role;
         const projectId = String(row.projectId);
+        const target = counts(role, projectId);
+        if (!target) return;
+        const why = row.proposalId ? 'approval' : (liveClaim(row, now) ? 'claimed' : '');
+        const bucket = why ? target.held : target.queued;
         const task = tasks.get(String(row.taskId));
-        const target = lanes.get(role);
-        if (!task || !target || String(task.ProjectID) !== projectId || !roleIn.get(projectId).has(role)) return;
+        if (!task || String(task.ProjectID) !== projectId) { bucket.count -= 1; return; }
         const lastActive = new Date(task.updatedAt || task.createdAt || row.openedAt).getTime();
         const stuck = now.getTime() - lastActive > STUCK_DAYS * DAY_MS;
-        const why = row.proposalId ? 'approval' : (liveClaim(row, now) ? 'claimed' : '');
         const entry = item(task, projectId, { why, stuck });
-        add(why ? target.held : target.queued, entry);
-        if (stuck) add(target.stuck, entry);
+        show(bucket, entry);
+        if (stuck) {
+            target.stuck.count += 1;
+            show(target.stuck, entry);
+        }
     });
 
     const order = new Map(playbooks.all().map((role, index) => [settingsOf.roleKey(role), index]));
