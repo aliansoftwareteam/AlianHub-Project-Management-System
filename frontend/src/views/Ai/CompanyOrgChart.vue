@@ -28,7 +28,7 @@
                                 <div class="cv-role__line ah-small" data-test="supervisor">
                                     <span v-if="!role.supervisors.length">{{ $t('CompanyView.org_no_supervisor') }}</span>
                                     <span v-for="person in role.supervisors" :key="person.id">
-                                        {{ $t(person.via === 'agent' ? 'CompanyView.org_supervised_by' : 'CompanyView.org_set_up_by', { name: person.name || '—' }) }}
+                                        {{ $t(person.via === 'agent' ? 'CompanyView.org_supervised_by' : 'CompanyView.org_set_up_by', { name: person.name || $t('CompanyView.org_unknown_person') }) }}
                                     </span>
                                 </div>
                             </li>

@@ -3547,6 +3547,7 @@
     "CompanyView.org_set_up_by": "Set up by {name}",
     "CompanyView.org_supervised_by": "Supervised by {name}",
     "CompanyView.org_title": "Org chart",
+    "CompanyView.org_unknown_person": "an unknown person",
     "CompanyView.retry": "Retry",
     "CompanyView.title": "Company view",
     "ConnectAi.apps_off": "Connecting an app by its address is switched off on this install. The person who runs the server can switch it on. Until then, use a token: that works today.",

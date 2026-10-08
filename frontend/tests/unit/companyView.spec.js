@@ -83,6 +83,12 @@ describe('org chart panel', () => {
         expect(reviewer.find('[data-test="supervisor"]').text()).toBe('Set up by Mia');
     });
 
+    it('names a supervisor with no name through the translations', () => {
+        const nameless = { ...ORG, blueprints: [{ ...ORG.blueprints[0], teams: [{ team: 'Support', roles: [{ ...ORG.blueprints[0].teams[0].roles[0], supervisors: [{ id: 'u9', name: '', via: 'agent' }] }] }] }] };
+        const wrapper = mount(CompanyOrgChart, { props: { data: nameless }, global });
+        expect(wrapper.find('[data-test="supervisor"]').text()).toBe('Supervised by an unknown person');
+    });
+
     it('says so when no role is on', () => {
         const wrapper = mount(CompanyOrgChart, { props: { data: { on: true, blueprints: [] } }, global });
         expect(wrapper.find('[data-test="org-empty"]').exists()).toBe(true);

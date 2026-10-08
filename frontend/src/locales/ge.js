@@ -13182,6 +13182,7 @@ export default {
         "org_supervised_by": "Supervised by {name}",
         "org_set_up_by": "Set up by {name}",
         "org_no_supervisor": "No supervisor yet",
+        "org_unknown_person": "an unknown person",
         "org_agents_label": "Agents",
         "flow_title": "Flow board",
         "flow_lead": "Tasks per role. Stuck means no activity for {days} days.",
