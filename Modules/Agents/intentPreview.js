@@ -2,6 +2,8 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { oid } = require('../Automations/engine/tools');
 const names = require('../Mcp/names');
+const { commentThreadAccess } = require('../Comments/helpers/threadAccess');
+const { threadOf } = require('../Comments/helpers/threadWriteAccess');
 const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 const { isTaskFieldOf } = require('../CustomField/helpers/fieldValueInput');
 const setup = require('./setupRequests');
@@ -17,6 +19,7 @@ const automation = require('./automationPreview');
 const listSetup = require('./listSetupPreview');
 const projectCopy = require('./projectDuplicatePreview');
 const dashboards = require('./dashboardRequests');
+const timesheetWeek = require('./timesheetWeek');
 
 // What a waiting change will make, as the lines its card shows (frontend IntentPreview). It is built for one viewer:
 // a project, list, parent task, person or custom field is named only when that viewer may see it, and everything
@@ -24,7 +27,8 @@ const dashboards = require('./dashboardRequests');
 // so for a viewer who cannot open the project they have no preview at all, and neither has a rule (./automationPreview.js),
 // a folder or a list made a sprint (./listSetupPreview.js), or a copy of a project (./projectDuplicatePreview.js).
 // A project that is not there yet has no project to open: its card is the proposal's own text, for whoever is shown the proposal.
-// A card for a dashboard is previewed only for a viewer who can open that dashboard (./dashboardRequests.js).
+// A card for a dashboard is previewed only for a viewer who can open that dashboard (./dashboardRequests.js), and a
+// timesheet week only for the person whose week it is (./timesheetWeek.js).
 // A kind of change with no entry in BUILDERS has none.
 // A connected agent's batch is several changes on one card (forBatches): how many tasks, what changes on them, the
 // first few tasks by name with the rest behind "show all", and a line for each change whose value the lines above
@@ -266,7 +270,7 @@ const projectPreview = async (change, context, filed) => {
     };
 };
 
-const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview, ...listSetup.BUILDERS, ...projectCopy.BUILDERS, [dashboards.ACTION]: dashboards.preview });
+const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview, ...listSetup.BUILDERS, ...projectCopy.BUILDERS, [dashboards.ACTION]: dashboards.preview, [timesheetWeek.SUBMIT]: timesheetWeek.preview });
 const BUILDERS = Object.freeze({ ...Object.fromEntries(Object.keys(CREATES).map((action) => [action, createPreview])), ...SETUPS });
 const builderOf = (change) => (change && Object.hasOwn(BUILDERS, change.action) ? BUILDERS[change.action] : null);
 const isSetup = (change) => Boolean(change) && Object.hasOwn(SETUPS, change.action);
@@ -372,6 +376,11 @@ const otherTask = (what) => (change, { tasks }) => ({ what, value: (tasks.get(lo
 const inList = (what) => (change, context) => ({ what, ...placeOf(paramsOf(change).listProjectId, paramsOf(change).sprintId, context) });
 const titled = (what) => (change) => ({ what, value: textOf(paramsOf(change).title) });
 const said = (what, key) => (change) => ({ what, ...clipped(paramsOf(change)[key]) });
+/* A reply names whom it answers only for a viewer who can read that comment's thread on the same task. */
+const commented = (change, { replyAuthors }) => {
+    const to = replyAuthors && replyAuthors.get(lower(paramsOf(change).replyTo));
+    return { ...said('comment', 'body')(change), ...(to && to.name && to.taskId === lower(paramsOf(change).taskId) ? { replyTo: to.name } : {}) };
+};
 const only = (what) => () => ({ what });
 
 /* What one change of a batch changes, for one viewer: the kind, and what it sets where the viewer may see that. */
@@ -381,7 +390,7 @@ const CHANGED = Object.freeze({
     'task.move': moved, 'task.sprint.move': moved,
     'task.archive': only('archive'), 'task.restore': only('restore'),
     'task.add': titled('task'), 'task.create': titled('task'), 'subtask.add': titled('subtask'), 'subtask.create': titled('subtask'),
-    'task.comment': said('comment', 'body'), 'comment.create': said('comment', 'body'),
+    'task.comment': commented, 'comment.create': commented,
     'task.link': (change) => ({ what: 'link', value: textOf(paramsOf(change).label) || textOf(paramsOf(change).url) }),
     'task.relation.add': otherTask('relation_add'), 'task.relation.remove': otherTask('relation_remove'),
     'task.lists.add': inList('list_add'), 'task.lists.remove': inList('list_remove'),
@@ -427,6 +436,23 @@ const changeLinesOf = (changes, context) => {
     return { summary, spelledOut: spelledOut.filter(Boolean) };
 };
 
+/* The author of each comment a reply answers, by the comment's id, for a viewer who can read its thread. */
+const replyAuthorsFor = async (companyId, uid, changes) => {
+    const asked = [...new Set(changes.filter((change) => Object.hasOwn(CHANGED, change.action) && CHANGED[change.action] === commented).map((change) => lower(paramsOf(change).replyTo)).filter(Boolean))];
+    if (!asked.length) return new Map();
+    const rows = (await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMMENTS, data: [{ _id: { $in: asked.map(oid) }, isDeleted: { $ne: true } }, { userId: 1, projectId: 1, sprintId: 1, taskId: 1 }],
+    }, 'find')) || [];
+    const readable = [];
+    for (const row of rows) {
+        // eslint-disable-next-line no-await-in-loop
+        if ((await commentThreadAccess(companyId, uid, threadOf(row))).allowed) readable.push(row);
+    }
+    if (!readable.length) return new Map();
+    const named = await names.resolver({ companyId, userId: String(uid), projectIds: [] }, { projectIds: readable.map((row) => idOf(row.projectId)), userIds: readable.map((row) => idOf(row.userId)).filter(Boolean) });
+    return new Map(readable.map((row) => [lower(row._id), { taskId: lower(row.taskId), name: named.person(idOf(row.userId), idOf(row.projectId)).name || '' }]));
+};
+
 const taskIdsOf = (changes) => [...new Set(changes.flatMap((change) => [paramsOf(change).taskId, paramsOf(change).relatedTaskId]).map(lower).filter(Boolean))];
 
 /* The name of each custom field a batch sets, under the project of the task it sets it on: "<project>:<field>". */
@@ -464,7 +490,7 @@ const forBatches = async (companyId, uid, proposals, { bareChanges = false } = {
         sprintIds: all.map((change) => idOf(paramsOf(change).sprintId)).filter(Boolean),
         userIds: all.flatMap((change) => [...listOf(paramsOf(change).userIds), ...(change.action === FIELD_SET ? peopleIn(paramsOf(change).value) : [])]).map(idOf).filter(Boolean),
     });
-    const context = { named, tasks, fieldNames: await setFieldNames(companyId, all, tasks) };
+    const context = { named, tasks, fieldNames: await setFieldNames(companyId, all, tasks), replyAuthors: await replyAuthorsFor(companyId, uid, all) };
     return new Map(batches.map((proposal) => {
         const changes = changesOf(proposal);
         const ids = taskIdsOf(changes);

@@ -12,6 +12,7 @@ const { TASK_ACCESS_FIELDS } = require('./visibility');
 const manageFlag = require('./manageFlag');
 const { listOf, loadProject, NO_PROJECT, NO_TASK } = require('./dataTools');
 const { planRow } = require('./taskRows');
+const { REPLY_TO, REPLY_INPUT, replyParams } = require('./commentReply');
 const { PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, LINK_KINDS, LINKS_MAX } = require('../Agents/taskRequests');
 const pageRequests = require('../Agents/pageRequests');
 const v2 = require('./v2Flag');
@@ -461,9 +462,9 @@ const VARIANTS = Object.freeze({
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: `Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link. ${MENTIONS}`,
-        input: input({ taskId: ID, body: { type: 'string', minLength: 1, maxLength: 20000 }, ...REASON }, ['taskId', 'body']),
-        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.body, 20000), notifyMentions: true }),
+        description: `Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link. ${MENTIONS} ${REPLY_TO}`,
+        input: input({ taskId: ID, body: { type: 'string', minLength: 1, maxLength: 20000 }, ...REPLY_INPUT, ...REASON }, ['taskId', 'body']),
+        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.body, 20000), notifyMentions: true, ...replyParams(args) }),
     },
     'comment.create': {
         name: 'comment.create',
@@ -472,9 +473,9 @@ const VARIANTS = Object.freeze({
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: `Adds a comment to a task the person can open, at once, and the person can undo it. The text is saved as plain text. ${MENTIONS}`,
-        input: input({ taskId: ID, text: { type: 'string', minLength: 1, maxLength: 20000 }, ...REASON }, ['taskId', 'text']),
-        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000), notifyMentions: true }),
+        description: `Adds a comment to a task the person can open, at once, and the person can undo it. The text is saved as plain text. ${MENTIONS} ${REPLY_TO}`,
+        input: input({ taskId: ID, text: { type: 'string', minLength: 1, maxLength: 20000 }, ...REPLY_INPUT, ...REASON }, ['taskId', 'text']),
+        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000), notifyMentions: true, ...replyParams(args) }),
     },
 });
 

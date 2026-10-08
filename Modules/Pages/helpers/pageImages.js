@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const multer = require('multer');
+const multer = require('../../../utils/contextMulter');
 const { putLocalFile } = require('../../../common-storage/putLocalFile');
 const { guardFile, getLimits } = require('../../../utils/imageGuard');
 

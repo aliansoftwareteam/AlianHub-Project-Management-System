@@ -13,6 +13,7 @@ const { ACTION: NEW_PROJECT } = require('../Agents/projectCreate');
 const { ACTION: PROJECT_COPY } = require('../Agents/projectDuplicate');
 const dashboards = require('../Agents/dashboardRequests');
 const planWork = require('../Agents/planWork');
+const timesheetWeek = require('../Agents/timesheetWeek');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
 // approval re-asks everything the original call was asked and adds the
@@ -28,9 +29,9 @@ const refused = (error, status = 403) => ({ error, status });
 const PLAN = 'project.setup';
 const actionsOf = (change) => [change.action, ...(change.action === PLAN ? planWork.actionsIn(change.params) : [])];
 
-/* A new project sits in no project yet, and a dashboard in none at all: like a goal each is the workspace's, which a
+/* A new project sits in no project yet, and a dashboard or a timesheet week in none at all: like a goal each is the workspace's, which a
  * token kept to some projects is refused. So is a copy of a project, which also needs the project it is copied from to be one that can be opened. */
-const WORKSPACE_WIDE = Object.freeze([NEW_PROJECT, PROJECT_COPY, dashboards.ACTION]);
+const WORKSPACE_WIDE = Object.freeze([NEW_PROJECT, PROJECT_COPY, dashboards.ACTION, timesheetWeek.SUBMIT]);
 const targetOf = (params = {}, action = '') => {
     const target = WORKSPACE_WIDE.includes(action) ? { ...goalTokens.WRITE_TARGET } : {};
     if (action === PROJECT_COPY) target.projectId = String(params.sourceProjectId || '');
@@ -84,14 +85,16 @@ const grantFiler = async (companyId, p, changes) => {
 
 const LACKS = Object.freeze({ STANDING: 'standing', RIGHT: 'right', SIGHT: 'sight' });
 
-const approvedByRequesterAlone = (change) => Boolean(change) && change.action === dashboards.ACTION;
+/* The changes only the person they were asked for approves, each with why anyone else may not. */
+const REQUESTER_ALONE = Object.freeze({ [dashboards.ACTION]: dashboards.approverRefusal, [timesheetWeek.SUBMIT]: timesheetWeek.approverRefusal });
+const approvedByRequesterAlone = (change) => Boolean(change) && Object.hasOwn(REQUESTER_ALONE, change.action);
 
 /* What the approver themselves is asked of one change of a proposal filed over MCP: null when they may approve it;
  * otherwise { error, lacks }. The approval below and the lists (Agents/approverRights) both ask it here, so a row
  * is offered as open exactly when its approval would be taken. */
 const approverRefusal = async (companyId, userId, proposal, change) => {
     const params = change.params || {};
-    const notTheirs = approvedByRequesterAlone(change) ? dashboards.approverRefusal(userId, proposal.requestedBy) : '';
+    const notTheirs = approvedByRequesterAlone(change) ? REQUESTER_ALONE[change.action](userId, proposal.requestedBy) : '';
     if (notTheirs) return { error: notTheirs, lacks: LACKS.STANDING };
     const own = await holderMayInEach(companyId, { kind: 'human', userId: String(userId) }, change.action, params);
     if (!own.allowed) return { error: `The approver may not make this change: ${own.reason}`, lacks: LACKS.RIGHT };
