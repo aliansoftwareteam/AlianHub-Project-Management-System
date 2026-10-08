@@ -3,7 +3,7 @@ slug: supplier-scorecard
 name: Supplier Scorecard
 blueprint: manufacturing
 department: Purchasing
-tools: [tasks.search, task.get, comments.list, task.history, task.relations.list, page.get, pages.search, page.versions.list, page.create, page.update, task.link, task.comment]
+tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.history, task.relations.list, page.get, pages.search, page.versions.list, page.create, page.update, task.link, task.comment]
 hands_to: []
 gates: [the purchasing manager approves the scores before they are shared with anyone]
 ---
@@ -40,14 +40,15 @@ If 1, 2 or 5 is missing it asks the person once, in one message. Without a scori
 
 ## How it works, step by step
 
-1. **Read the rules.** Open the scoring rules doc and the last scorecard (`pages.search`, `page.versions.list`) to compare.
-2. **Collect deliveries.** Search purchase order tasks closed in the period (`tasks.search`), and for each line read the promised date, the received date and quantity from the fields or the history.
-3. **Collect quality.** Search non-conformance tasks of the period naming each supplier, and note which were found to be the supplier's cause.
-4. **Count.** Per supplier: lines, on time, short or over, non-conformances, average days to answer a chase. Lines with a missing received date are counted as "not recorded", never as on time.
-5. **Draft.** Create a doc "Supplier scorecard [period] draft 1": a table per supplier, the change against last period, a short read-out, and a list of records that were incomplete.
-6. **Self-check.** Run the quality checklist below.
-7. **Hand to the manager.** Comment on the period's scorecard task with the doc link and the three facts that matter most. Mention the purchasing manager.
-8. **Revise.** Apply comments as a new version and reply to each comment.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the rules.** Open the scoring rules doc and the last scorecard (`pages.search`, `page.versions.list`) to compare.
+3. **Collect deliveries.** Search purchase order tasks closed in the period (`tasks.search`), and for each line read the promised date, the received date and quantity from the fields or the history.
+4. **Collect quality.** Search non-conformance tasks of the period naming each supplier, and note which were found to be the supplier's cause.
+5. **Count.** Per supplier: lines, on time, short or over, non-conformances, average days to answer a chase. Lines with a missing received date are counted as "not recorded", never as on time.
+6. **Draft.** Create a doc "Supplier scorecard [period] draft 1": a table per supplier, the change against last period, a short read-out, and a list of records that were incomplete.
+7. **Self-check.** Run the quality checklist below.
+8. **Hand to the manager.** Comment on the period's scorecard task with the doc link and the three facts that matter most. Mention the purchasing manager.
+9. **Revise.** Apply comments as a new version and reply to each comment.
 
 ## What it delivers in AlianHub
 
@@ -81,7 +82,7 @@ If 1, 2 or 5 is missing it asks the person once, in one message. Without a scori
 
 ## AlianHub tools it uses
 
-Reading: `tasks.search`, `task.get`, `comments.list`, `task.history`, `task.relations.list`, `page.get`, `pages.search`, `page.versions.list`. Writing: `page.create`, `page.update`, `task.link`, `task.comment`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `task.relations.list`, `page.get`, `pages.search`, `page.versions.list`. Writing: `page.create`, `page.update`, `task.link`, `task.comment`. All through the person's own connection and rights.
 
 ## Example
 

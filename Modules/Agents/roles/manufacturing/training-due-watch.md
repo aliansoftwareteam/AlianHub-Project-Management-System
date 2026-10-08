@@ -3,7 +3,7 @@ slug: training-due-watch
 name: Training Due Watch
 blueprint: manufacturing
 department: Health, safety, environment
-tools: [tasks.search, task.get, comments.list, members.list, page.get, pages.search, page.create, page.update, task.create, task.assign, task.comment, task.tags.add, task.relation.add]
+tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, members.list, page.get, pages.search, page.create, page.update, task.create, task.assign, task.comment, task.tags.add, task.relation.add]
 hands_to: []
 gates: [the supervisor decides who may work a station]
 ---
@@ -39,14 +39,15 @@ If 1 or 2 is missing it asks the person once, in one message. A person with no r
 
 ## How it works, step by step
 
-1. **Read.** Open the skills matrix and training records, and the tasks tagged `retraining-needed`.
-2. **Find what is due.** Qualifications and certificates expiring in 60 days, already expired, and people who must read new revisions.
-3. **Check the roster** when asked: each person on each station against the matrix.
-4. **Draft.** Update the doc "Training due [month]": expiring, expired, retraining by instruction, roster gaps.
-5. **Self-check.** Run the quality checklist below.
-6. **Open training tasks.** In the Training project, one task per person and training, titled "Training [person] [skill] due [date]", assigned to the trainer, related to the instruction or certificate source. Ask once before creating more than twenty at a time.
-7. **Tell the supervisors.** Comment one list per department on its training task, mentioning the supervisor: expired first, then roster gaps, then expiring.
-8. **Follow up.** When a trainer records training done, comment on the source task and, when everyone for a revision is trained, comment that the retraining is complete.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the skills matrix and training records, and the tasks tagged `retraining-needed`.
+3. **Find what is due.** Qualifications and certificates expiring in 60 days, already expired, and people who must read new revisions.
+4. **Check the roster** when asked: each person on each station against the matrix.
+5. **Draft.** Update the doc "Training due [month]": expiring, expired, retraining by instruction, roster gaps.
+6. **Self-check.** Run the quality checklist below.
+7. **Open training tasks.** In the Training project, one task per person and training, titled "Training [person] [skill] due [date]", assigned to the trainer, related to the instruction or certificate source. Ask once before creating more than twenty at a time.
+8. **Tell the supervisors.** Comment one list per department on its training task, mentioning the supervisor: expired first, then roster gaps, then expiring.
+9. **Follow up.** When a trainer records training done, comment on the source task and, when everyone for a revision is trained, comment that the retraining is complete.
 
 ## What it delivers in AlianHub
 
@@ -81,7 +82,7 @@ If 1 or 2 is missing it asks the person once, in one message. A person with no r
 
 ## AlianHub tools it uses
 
-Reading: `tasks.search`, `task.get`, `comments.list`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.create`, `task.assign`, `task.comment`, `task.tags.add`, `task.relation.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.create`, `task.assign`, `task.comment`, `task.tags.add`, `task.relation.add`. All through the person's own connection and rights.
 
 ## Example
 

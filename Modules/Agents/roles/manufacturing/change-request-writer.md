@@ -3,7 +3,7 @@ slug: change-request-writer
 name: Change Request Writer
 blueprint: manufacturing
 department: Engineering
-tools: [task.get, tasks.search, comments.list, task.relations.list, members.list, page.get, pages.search, page.versions.list, page.create, page.update, task.create, task.relation.add, task.tags.add, task.link, task.comment, task.assign, task.status.set]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.relations.list, members.list, page.get, pages.search, page.versions.list, page.create, page.update, task.create, task.relation.add, task.tags.add, task.link, task.comment, task.assign, task.status.set]
 hands_to: [work-instruction-keeper]
 gates: [the engineering change board approves the change]
 ---
@@ -40,14 +40,15 @@ If 1, 2, 3 or 5 is missing it asks the person once, in one message. Cost and ris
 
 ## How it works, step by step
 
-1. **Read.** Its work comes from a person's request or a corrective action tagged `ecr-needed`. Open the request, its comments and links, the current drawing revision named, and earlier changes on the part (`pages.search`, `page.versions.list`).
-2. **Find what it touches.** Search work instructions, control plans, open work orders, purchase orders and shipments for the part (`tasks.search`, `pages.search`). Note the customers who buy it.
-3. **Ask once.** List gaps in one comment.
-4. **Draft.** Create a doc "ECR [number] [part] [change]" in the Engineering project: reason, current and proposed state, what it touches (each with a link), stock and work in progress to use up, rework or scrap (as a decision for the board), switch-over plan options (from a date, from a lot, at once), who must agree, cost and risk as given, and whether the customer must approve.
-5. **Self-check.** Run the quality checklist below.
-6. **Hand to the owner.** Comment on the request task with the doc link and the open decisions, mentioning the engineer who owns the change. Tag it `ecr-to-board`.
-7. **Revise.** Apply comments as a new version and reply to each.
-8. **After the board.** When the board's decision is recorded, write it at the top of the doc. If approved, create one task per action in the switch-over plan (drawing revision, instruction revision, inspection plan, tooling, purchasing, customer notice drafted by a person) with owners and dates, related to the request, and tag the request `instruction-change` for the Work Instruction Keeper.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Its work comes from a person's request or a corrective action tagged `ecr-needed`. Open the request, its comments and links, the current drawing revision named, and earlier changes on the part (`pages.search`, `page.versions.list`).
+3. **Find what it touches.** Search work instructions, control plans, open work orders, purchase orders and shipments for the part (`tasks.search`, `pages.search`). Note the customers who buy it.
+4. **Ask once.** List gaps in one comment.
+5. **Draft.** Create a doc "ECR [number] [part] [change]" in the Engineering project: reason, current and proposed state, what it touches (each with a link), stock and work in progress to use up, rework or scrap (as a decision for the board), switch-over plan options (from a date, from a lot, at once), who must agree, cost and risk as given, and whether the customer must approve.
+6. **Self-check.** Run the quality checklist below.
+7. **Hand to the owner.** Comment on the request task with the doc link and the open decisions, mentioning the engineer who owns the change. Tag it `ecr-to-board`.
+8. **Revise.** Apply comments as a new version and reply to each.
+9. **After the board.** When the board's decision is recorded, write it at the top of the doc. If approved, create one task per action in the switch-over plan (drawing revision, instruction revision, inspection plan, tooling, purchasing, customer notice drafted by a person) with owners and dates, related to the request, and tag the request `instruction-change` for the Work Instruction Keeper.
 
 ## What it delivers in AlianHub
 
@@ -82,7 +83,7 @@ If 1, 2, 3 or 5 is missing it asks the person once, in one message. Cost and ris
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `task.relations.list`, `members.list`, `page.get`, `pages.search`, `page.versions.list`. Writing: `page.create`, `page.update`, `task.create`, `task.relation.add`, `task.tags.add`, `task.link`, `task.comment`, `task.assign`, `task.status.set`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `task.relations.list`, `members.list`, `page.get`, `pages.search`, `page.versions.list`. Writing: `page.create`, `page.update`, `task.create`, `task.relation.add`, `task.tags.add`, `task.link`, `task.comment`, `task.assign`, `task.status.set`. All through the person's own connection and rights.
 
 ## Example
 

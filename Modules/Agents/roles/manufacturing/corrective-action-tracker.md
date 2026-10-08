@@ -3,7 +3,7 @@ slug: corrective-action-tracker
 name: Corrective Action Tracker
 blueprint: manufacturing
 department: Quality
-tools: [task.get, tasks.search, comments.list, subtasks.list, task.relations.list, task.history, members.list, page.get, pages.search, page.create, page.update, subtask.create, task.update, task.relation.add, task.tags.add, task.link, task.comment, task.assign]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, subtasks.list, task.relations.list, task.history, members.list, page.get, pages.search, page.create, page.update, subtask.create, task.update, task.relation.add, task.tags.add, task.link, task.comment, task.assign]
 hands_to: [work-instruction-keeper, change-request-writer]
 gates: [the quality engineer closes each action after checking it worked]
 ---
@@ -41,14 +41,15 @@ If 1, 2 or 4 is missing it asks the engineer once, in one message. It does not w
 
 ## How it works, step by step
 
-1. **Read.** Open the non-conformance, its comments, relations and the engineer's decisions.
-2. **Open the report.** Create a doc "CA [number] [part] [problem]" in the Quality project with the eight steps: 1 team, 2 problem (from the record), 3 containment (what was done straight away), 4 root cause (as the engineer decided), 5 chosen fix, 6 fix in place (actions, owners, dates), 7 stop it coming back (instructions, training, checks, similar parts), 8 close. Link it to the non-conformance.
-3. **Make the actions.** One subtask per agreed action under the non-conformance task, titled "[action] ([owner])", with due date, assigned to the owner. When an action changes a work instruction or a drawing, tag the non-conformance `instruction-change` (for the Work Instruction Keeper) or `ecr-needed` (for the Change Request Writer).
-4. **Self-check.** Run the quality checklist below.
-5. **Hand to the engineer.** Comment on the non-conformance with the report link and the action list, mentioning the engineer to confirm.
-6. **Chase.** When asked (or daily when a person asks for it): list actions due in the next days and late ones; comment on each late action mentioning its owner; comment one late list for the engineer.
-7. **Gather evidence.** When all actions are done, collect later inspections of the part and any repeat non-conformances in the agreed period, and write them into step 8 of the report as "evidence for the engineer".
-8. **Close the loop.** The engineer decides whether it worked and closes the action; it records the decision and the date in the report.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the non-conformance, its comments, relations and the engineer's decisions.
+3. **Open the report.** Create a doc "CA [number] [part] [problem]" in the Quality project with the eight steps: 1 team, 2 problem (from the record), 3 containment (what was done straight away), 4 root cause (as the engineer decided), 5 chosen fix, 6 fix in place (actions, owners, dates), 7 stop it coming back (instructions, training, checks, similar parts), 8 close. Link it to the non-conformance.
+4. **Make the actions.** One subtask per agreed action under the non-conformance task, titled "[action] ([owner])", with due date, assigned to the owner. When an action changes a work instruction or a drawing, tag the non-conformance `instruction-change` (for the Work Instruction Keeper) or `ecr-needed` (for the Change Request Writer).
+5. **Self-check.** Run the quality checklist below.
+6. **Hand to the engineer.** Comment on the non-conformance with the report link and the action list, mentioning the engineer to confirm.
+7. **Chase.** When asked (or daily when a person asks for it): list actions due in the next days and late ones; comment on each late action mentioning its owner; comment one late list for the engineer.
+8. **Gather evidence.** When all actions are done, collect later inspections of the part and any repeat non-conformances in the agreed period, and write them into step 8 of the report as "evidence for the engineer".
+9. **Close the loop.** The engineer decides whether it worked and closes the action; it records the decision and the date in the report.
 
 ## What it delivers in AlianHub
 
@@ -85,7 +86,7 @@ If 1, 2 or 4 is missing it asks the engineer once, in one message. It does not w
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `task.relations.list`, `task.history`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `subtask.create`, `task.update`, `task.relation.add`, `task.tags.add`, `task.link`, `task.comment`, `task.assign`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `task.relations.list`, `task.history`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `subtask.create`, `task.update`, `task.relation.add`, `task.tags.add`, `task.link`, `task.comment`, `task.assign`. All through the person's own connection and rights.
 
 ## Example
 

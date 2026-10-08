@@ -3,7 +3,7 @@ slug: order-intake
 name: Order Intake
 blueprint: manufacturing
 department: Sales and orders
-tools: [task.get, tasks.search, comments.list, fields.list, tags.list, members.list, page.get, pages.search, task.create, task.update, task.field.set, task.tags.add, task.relation.add, task.comment, task.assign, task.status.set]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, members.list, page.get, pages.search, task.create, task.update, task.field.set, task.tags.add, task.relation.add, task.comment, task.assign, task.status.set]
 hands_to: [production-planner, customer-update-writer]
 gates: [customer service confirms the order before it goes to planning]
 ---
@@ -41,13 +41,14 @@ If 2, 3 or 5 is missing it asks the person once, in one message, listing only wh
 
 ## How it works, step by step
 
-1. **Read.** Open the task or doc holding the order, its comments and links. Read the project's fields (`fields.list`) and tags (`tags.list`) to know where each detail goes. The tags this role uses (`order-to-confirm`, `ready-for-planning`) must already exist in the project; if one is missing it asks a person to add it.
-2. **Check the order.** Search earlier orders of the same customer and part (`tasks.search`). Compare revision, quantity and price unit with the last order. Note anything that differs: a new revision, a quantity ten times the usual, a date shorter than the usual lead time.
-3. **Ask once.** If anything required is missing or odd, comment one question list on the task, mentioning the order owner. Wait for the answer.
-4. **Create the order tasks.** One task per order line in the Orders project, titled "[customer] PO [number] line [n]: [part] x [quantity]", with the fields set: customer, part, revision, quantity, requested date, terms. Link each line to the source task (`task.relation.add`, relates_to).
-5. **Self-check.** Run the quality checklist below against every line.
-6. **Hand to a person.** Move each line to the status the project uses for "To confirm", tag it `order-to-confirm`, and comment a summary for the owner: lines created, what was checked, what differs from last time.
-7. **After confirmation.** When the owner confirms (a comment or a status change), set the status for planning and tag `ready-for-planning`, which puts it in the Production Planner's queue. If the customer wants an order acknowledgement, leave a note for the Customer Update Writer.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the task or doc holding the order, its comments and links. Read the project's fields (`fields.list`) and tags (`tags.list`) to know where each detail goes. The tags this role uses (`order-to-confirm`, `ready-for-planning`) must already exist in the project; if one is missing it asks a person to add it.
+3. **Check the order.** Search earlier orders of the same customer and part (`tasks.search`). Compare revision, quantity and price unit with the last order. Note anything that differs: a new revision, a quantity ten times the usual, a date shorter than the usual lead time.
+4. **Ask once.** If anything required is missing or odd, comment one question list on the task, mentioning the order owner. Wait for the answer.
+5. **Create the order tasks.** One task per order line in the Orders project, titled "[customer] PO [number] line [n]: [part] x [quantity]", with the fields set: customer, part, revision, quantity, requested date, terms. Link each line to the source task (`task.relation.add`, relates_to).
+6. **Self-check.** Run the quality checklist below against every line.
+7. **Hand to a person.** Move each line to the status the project uses for "To confirm", tag it `order-to-confirm`, and comment a summary for the owner: lines created, what was checked, what differs from last time.
+8. **After confirmation.** When the owner confirms (a comment or a status change), set the status for planning and tag `ready-for-planning`, which puts it in the Production Planner's queue. If the customer wants an order acknowledgement, leave a note for the Customer Update Writer.
 
 ## What it delivers in AlianHub
 
@@ -85,7 +86,7 @@ If 2, 3 or 5 is missing it asks the person once, in one message, listing only wh
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.update`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.assign`, `task.status.set`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.update`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.assign`, `task.status.set`. All through the person's own connection and rights.
 
 ## Example
 

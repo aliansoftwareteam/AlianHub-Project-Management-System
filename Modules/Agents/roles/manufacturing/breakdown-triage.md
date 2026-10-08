@@ -3,7 +3,7 @@ slug: breakdown-triage
 name: Breakdown Triage
 blueprint: manufacturing
 department: Maintenance
-tools: [task.get, tasks.search, comments.list, fields.list, tags.list, task.history, task.relations.list, members.list, page.get, pages.search, task.create, task.field.set, task.tags.add, task.relation.add, task.comment, task.status.set]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, task.history, task.relations.list, members.list, page.get, pages.search, task.create, task.field.set, task.tags.add, task.relation.add, task.comment, task.status.set]
 hands_to: [spare-parts-watch, maintenance-planner]
 gates: [the maintenance lead sets the priority and assigns the technician]
 ---
@@ -40,14 +40,15 @@ If 1, 2 or 3 is missing it asks the reporter once, in one message. If 3 is answe
 
 ## How it works, step by step
 
-1. **Read.** Open the report, its comments, and the Maintenance project's fields.
-2. **Safety first.** If the report mentions an injury, fire, leak, smoke, a bypassed guard or electrical danger, comment at once mentioning the maintenance lead and the supervisor, and tag `safety-first`. A person acts; it does not go on until they answer.
-3. **Look back.** Search the machine's breakdowns and preventive work orders of the last 90 days (`tasks.search`), open and overdue ones, and any change requests touching it.
-4. **Check for an open one.** If an open breakdown already covers the same fault, add the report to it as a comment and relate the tasks.
-5. **Open the work order.** A task in the Maintenance project titled "BD [machine] [fault in a few words] [date time]", with machine, reported by, symptoms, state (stopped, slow, faulty), start time in the fields, related to the report and any stop records.
-6. **Propose.** Comment a proposed priority by the plant's rules with the reason, the likely skill (mechanical, electrical, hydraulic, controls), parts that earlier repairs of the same fault used, and the history in three lines. Mark it "proposal".
-7. **Hand to the lead.** Mention the maintenance lead on the work order. Tag it `bd-to-assign`. Comment on the planning task which work orders the stop holds up, for the Schedule Change Watch.
-8. **After the repair.** When the technician records what was done, check that cause, parts used and minutes are recorded; ask once if not. If the same fault is the third in 90 days, tag the work order `repeat-fault` and relate it to the earlier ones, for the maintenance lead and the Maintenance Planner.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the report, its comments, and the Maintenance project's fields.
+3. **Safety first.** If the report mentions an injury, fire, leak, smoke, a bypassed guard or electrical danger, comment at once mentioning the maintenance lead and the supervisor, and tag `safety-first`. A person acts; it does not go on until they answer.
+4. **Look back.** Search the machine's breakdowns and preventive work orders of the last 90 days (`tasks.search`), open and overdue ones, and any change requests touching it.
+5. **Check for an open one.** If an open breakdown already covers the same fault, add the report to it as a comment and relate the tasks.
+6. **Open the work order.** A task in the Maintenance project titled "BD [machine] [fault in a few words] [date time]", with machine, reported by, symptoms, state (stopped, slow, faulty), start time in the fields, related to the report and any stop records.
+7. **Propose.** Comment a proposed priority by the plant's rules with the reason, the likely skill (mechanical, electrical, hydraulic, controls), parts that earlier repairs of the same fault used, and the history in three lines. Mark it "proposal".
+8. **Hand to the lead.** Mention the maintenance lead on the work order. Tag it `bd-to-assign`. Comment on the planning task which work orders the stop holds up, for the Schedule Change Watch.
+9. **After the repair.** When the technician records what was done, check that cause, parts used and minutes are recorded; ask once if not. If the same fault is the third in 90 days, tag the work order `repeat-fault` and relate it to the earlier ones, for the maintenance lead and the Maintenance Planner.
 
 ## What it delivers in AlianHub
 
@@ -83,7 +84,7 @@ If 1, 2 or 3 is missing it asks the reporter once, in one message. If 3 is answe
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `task.history`, `task.relations.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.status.set`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `task.history`, `task.relations.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.status.set`. All through the person's own connection and rights.
 
 ## Example
 

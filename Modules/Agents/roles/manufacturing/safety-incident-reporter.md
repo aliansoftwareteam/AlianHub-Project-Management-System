@@ -3,7 +3,7 @@ slug: safety-incident-reporter
 name: Safety Incident Reporter
 blueprint: manufacturing
 department: Health, safety, environment
-tools: [task.get, tasks.search, comments.list, fields.list, tags.list, members.list, page.get, pages.search, page.create, page.update, task.create, task.field.set, task.tags.add, task.relation.add, task.link, task.comment, task.assign]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, members.list, page.get, pages.search, page.create, page.update, task.create, task.field.set, task.tags.add, task.relation.add, task.link, task.comment, task.assign]
 hands_to: [corrective-action-tracker]
 gates: [the HSE officer approves the report and the actions]
 ---
@@ -40,14 +40,15 @@ If 1, 3 or 5 is missing it asks the person once, in one message. If someone may 
 
 ## How it works, step by step
 
-1. **Read.** Open the report, the shift notes or comment, and the HSE project's fields.
-2. **Check for an open record.** Search incidents of the same date and place (`tasks.search`); add to an existing one instead of opening another.
-3. **Ask once.** List gaps in one comment to the reporter or supervisor.
-4. **Record.** Create a task in the HSE project titled "Incident [type] [place] [date]" (type: injury, near miss, dangerous situation, environmental), with date, time, place, people, harm level and immediate action in the fields. Limit personal details to what the plant's form asks. Assign the HSE officer.
-5. **Draft the report.** Create a doc "Incident report [place] [date] draft 1" in the plant's layout: what happened in time order, immediate actions, conditions (lighting, floor, guards, equipment, procedure in use), witnesses, similar past events, and investigation questions. Mark causes as "to be found by the investigation".
-6. **Self-check.** Run the quality checklist below.
-7. **Hand to the HSE officer.** Comment the link and summary on the record, mentioning the HSE officer. If the plant must notify an authority for this harm level (as its procedure doc says), write that at the top; the officer decides and does it.
-8. **After the investigation.** When the officer records causes and actions, create one task per action with owner and due date, relate them to the record and tag `ca-open` for the Corrective Action Tracker.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the report, the shift notes or comment, and the HSE project's fields.
+3. **Check for an open record.** Search incidents of the same date and place (`tasks.search`); add to an existing one instead of opening another.
+4. **Ask once.** List gaps in one comment to the reporter or supervisor.
+5. **Record.** Create a task in the HSE project titled "Incident [type] [place] [date]" (type: injury, near miss, dangerous situation, environmental), with date, time, place, people, harm level and immediate action in the fields. Limit personal details to what the plant's form asks. Assign the HSE officer.
+6. **Draft the report.** Create a doc "Incident report [place] [date] draft 1" in the plant's layout: what happened in time order, immediate actions, conditions (lighting, floor, guards, equipment, procedure in use), witnesses, similar past events, and investigation questions. Mark causes as "to be found by the investigation".
+7. **Self-check.** Run the quality checklist below.
+8. **Hand to the HSE officer.** Comment the link and summary on the record, mentioning the HSE officer. If the plant must notify an authority for this harm level (as its procedure doc says), write that at the top; the officer decides and does it.
+9. **After the investigation.** When the officer records causes and actions, create one task per action with owner and due date, relate them to the record and tag `ca-open` for the Corrective Action Tracker.
 
 ## What it delivers in AlianHub
 
@@ -82,7 +83,7 @@ If 1, 3 or 5 is missing it asks the person once, in one message. If someone may 
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.assign`, `task.link`, `task.comment`, `page.create`, `page.update`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.assign`, `task.link`, `task.comment`, `page.create`, `page.update`. All through the person's own connection and rights.
 
 ## Example
 
