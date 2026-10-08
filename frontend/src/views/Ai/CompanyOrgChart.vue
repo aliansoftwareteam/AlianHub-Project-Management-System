@@ -9,7 +9,7 @@
                 <div class="ah-label">{{ blueprintLabel(group.blueprint) }}</div>
                 <div class="cv-teams">
                     <div v-for="team in group.teams" :key="team.team" class="ah-card cv-team" :data-team="team.team">
-                        <div class="cv-team__name">{{ team.team }}</div>
+                        <div class="cv-team__name">{{ teamLabel(team.team) }}</div>
                         <ul class="cv-roles">
                             <li v-for="role in team.roles" :key="role.key" class="cv-role" :data-role="role.key">
                                 <div class="cv-role__top">
@@ -44,7 +44,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
-import { blueprintName } from "@/utils/dispatcher";
+import { blueprintName, teamName } from "@/utils/dispatcher";
 
 defineOptions({ name: "CompanyOrgChart" });
 
@@ -58,4 +58,5 @@ defineEmits(["retry"]);
 const { t, te } = useI18n();
 const blueprints = computed(() => props.data?.blueprints || []);
 const blueprintLabel = (blueprint) => blueprintName(t, te, blueprint);
+const teamLabel = (team) => teamName(t, te, team);
 </script>
