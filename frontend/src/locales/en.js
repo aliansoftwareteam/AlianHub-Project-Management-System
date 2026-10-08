@@ -13492,7 +13492,7 @@ export default {
         it_company: "IT company",
         manufacturing: "Manufacturing",
         agency: "Agency",
-        ecommerce: "Ecommerce",
+        ecommerce: "E-commerce",
         professional_services: "Professional services",
         education: "Education",
         construction: "Construction",
