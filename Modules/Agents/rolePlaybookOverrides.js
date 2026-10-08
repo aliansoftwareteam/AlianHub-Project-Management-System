@@ -76,4 +76,6 @@ const restore = async (companyId, blueprint, slug) => {
     return { role: built, from, to: built.body };
 };
 
+rolePlaybooks.useOverrides(async (companyId, role) => (await forCompany(companyId)).get(keyOf(role.blueprint, role.slug)) || null);
+
 module.exports = { BODY_MAX, CACHE_SECONDS, keyOf, forCompany, apply, applyAll, findFor, save, restore, clear };

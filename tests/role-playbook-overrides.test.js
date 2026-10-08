@@ -218,6 +218,18 @@ describe('where the tuned text is used', () => {
         expect(await download()).not.toContain('Read the brand voice document first.');
     });
 
+    it('is the "who it is" line the dispatcher reads, only for the workspace that edited it', async () => {
+        const key = `${BLUEPRINT}/${SLUG}`;
+        const builtIn = await rolePlaybooks.whoFor(C1, key);
+        expect(builtIn).toBe(rolePlaybooks.summary(rolePlaybooks.find(BLUEPRINT, SLUG), 300));
+        await put(EDITED);
+        expect(await rolePlaybooks.whoFor(C1, key)).toBe('The Bug Triager of this workspace. Read the brand voice document first.');
+        expect(await rolePlaybooks.whoFor(C2, key)).toBe(builtIn);
+        await restore();
+        expect(await rolePlaybooks.whoFor(C1, key)).toBe(builtIn);
+        expect(await rolePlaybooks.whoFor(C1, 'no/such-role')).toBe('');
+    });
+
     it('is in the MCP role prompt, and the built-in text comes back after a restore', async () => {
         const name = prompts.rolePromptName(rolePlaybooks.find(BLUEPRINT, SLUG));
         const edited = new Map([[`${BLUEPRINT}/${SLUG}`, EDITED]]);
