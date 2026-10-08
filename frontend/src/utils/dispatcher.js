@@ -83,3 +83,16 @@ export const rowIsComplete = (row) => Boolean(row.role && String(row.value).trim
 export const priorityChoices = (list) => (Array.isArray(list) ? list : [])
     .filter((priority) => priority && priority.isDeleted !== true && priority.value && priority.name)
     .map((priority) => ({ value: priority.value, label: priority.name }));
+
+export const COMPANY_SIZES = Object.freeze(["small", "medium", "large"]);
+
+/* The starter roles of a company blueprint go in one request per playbook blueprint, each narrowed to those roles by `only`. */
+export async function applyStarterRoles(groups, projectIds) {
+    const applied = [];
+    for (const group of groups) {
+        applied.push(await applyTeamPack({ blueprint: group.blueprint, teams: group.teams, only: group.roles, projectIds }));
+    }
+    return applied;
+}
+
+export const undoStarterRoles = (applied) => Promise.all(applied.map((one) => undoTeamPack(one)));

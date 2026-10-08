@@ -41,6 +41,15 @@ const normaliseProjectIds = (req, res, next) => {
     }
 };
 
+/* A company blueprint turns on only its first few roles, so a request may narrow the chosen teams to some of their roles. */
+const onlyOf = (body, inTeams) => {
+    if (body.only === undefined || body.undo === true) return inTeams;
+    if (!Array.isArray(body.only) || !body.only.length) throw new RuleError('only must list at least one role.');
+    const unknown = body.only.map(String).filter((key) => !inTeams.includes(key));
+    if (unknown.length) throw new RuleError(`The role "${unknown[0]}" is not in the chosen teams.`);
+    return inTeams.filter((key) => body.only.map(String).includes(key));
+};
+
 const rolesOfPack = (body) => {
     const pack = packs().find((one) => one.blueprint === String((body && body.blueprint) || ''));
     if (!pack) throw new RuleError('There is no such company blueprint.');
@@ -48,7 +57,8 @@ const rolesOfPack = (body) => {
     if (!asked.length) throw new RuleError('Pick at least one team.');
     const unknown = asked.filter((team) => !pack.teams.some((one) => one.team === team));
     if (unknown.length) throw new RuleError(`There is no team "${unknown[0]}" in this blueprint.`);
-    return { blueprint: pack.blueprint, teams: asked, roles: pack.teams.filter((one) => asked.includes(one.team)).flatMap((one) => one.roles.map((role) => role.key)) };
+    const inTeams = pack.teams.filter((one) => asked.includes(one.team)).flatMap((one) => one.roles.map((role) => role.key));
+    return { blueprint: pack.blueprint, teams: asked, roles: onlyOf(body, inTeams) };
 };
 
 const bodyWith = (current, roles) => ({ mode: current.mode, threshold: current.threshold, modelGuess: current.modelGuess, rules: current.rules, roles });

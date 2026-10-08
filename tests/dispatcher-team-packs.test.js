@@ -275,4 +275,35 @@ describe('team packs', () => {
         expect((await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering'], projectIds: ['nope'] } })).statusCode).toBe(400);
         expect(dispatcherOf(project)).toBeUndefined();
     });
+    it('turns on only the roles named in only, for a company blueprint\'s first three, and leaves a project\'s mode as it is', async () => {
+        seedRules(GRANTS);
+        const quiet = seedProject();
+        const live = seedProject();
+        await call('PUT', SETTINGS, { params: { projectId: String(live._id) }, body: { mode: 'suggest', threshold: 80, roles: [], rules: [] } });
+        const first = ['it-company/bug-triager', 'it-company/support-agent', 'it-company/tech-lead'];
+        const res = await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering', 'support'], only: first, projectIds: [String(quiet._id), String(live._id)] } });
+        expect(res.statusCode).toBe(200);
+        res.body.data.projects.forEach((project) => {
+            expect(project.added).toHaveLength(3);
+            expect(project.added).toEqual(expect.arrayContaining(first));
+        });
+        expect(res.body.data.projects.map((project) => project.mode)).toEqual(['off', 'suggest']);
+        expect(dispatcherOf(quiet).mode).toBe('off');
+        expect(dispatcherOf(live).mode).toBe('suggest');
+    });
+
+    it('refuses an only role outside the chosen teams or an empty only, and writes nothing', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        const id = String(project._id);
+        expect((await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering'], only: [DESIGN_LEAD], projectIds: [id] } })).statusCode).toBe(400);
+        expect((await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering'], only: [], projectIds: [id] } })).statusCode).toBe(400);
+        expect(dispatcherOf(project)).toBeUndefined();
+    });
+
+    it('lists the company blueprints beside the packs', async () => {
+        const res = await call('GET', PACKS, { uid: VIEWER });
+        const it = res.body.data.companyBlueprints.find((one) => one.id === 'it-company');
+        expect(it.sizes.small.starter).toEqual(['Bug Triager', 'Support Agent', 'Tech Lead']);
+    });
 });
