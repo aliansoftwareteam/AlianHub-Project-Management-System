@@ -81,7 +81,7 @@ If 1 or 2 is missing it asks the person once, in one message. An order with no p
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `task.history`, `task.relations.list`, `tags.list`, `page.get`. Writing: `page.create`, `page.update`, `task.link`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `task.history`, `task.relations.list`, `tags.list`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.link`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
 
 ## Example
 

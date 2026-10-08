@@ -86,7 +86,7 @@ If 1, 2 or 4 is missing it asks the engineer once, in one message. It does not w
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `task.relations.list`, `task.history`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `subtask.create`, `task.update`, `task.relation.add`, `task.tags.add`, `task.link`, `task.comment`, `task.assign`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `task.relations.list`, `task.history`, `members.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `subtask.create`, `task.update`, `task.relation.add`, `task.tags.add`, `task.link`, `task.comment`, `task.assign`. All through the person's own connection and rights.
 
 ## Example
 

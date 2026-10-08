@@ -84,7 +84,7 @@ If 1, 2 or 3 is missing it asks the reporter once, in one message. If 3 is answe
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `task.history`, `task.relations.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.status.set`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `task.history`, `task.relations.list`, `members.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.status.set`. All through the person's own connection and rights.
 
 ## Example
 

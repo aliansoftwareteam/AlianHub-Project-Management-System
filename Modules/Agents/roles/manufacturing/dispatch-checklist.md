@@ -82,7 +82,7 @@ If 1, 3 or 5 is missing it asks the person once, in one message. Without the cus
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `fields.list`, `tags.list`, `task.relations.list`, `page.get`, `pages.search`. Writing: `subtask.create`, `page.create`, `task.comment`, `task.tags.add`, `task.relation.add`, `task.link`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `fields.list`, `tags.list`, `task.relations.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `subtask.create`, `page.create`, `task.comment`, `task.tags.add`, `task.relation.add`, `task.link`. All through the person's own connection and rights.
 
 ## Example
 
