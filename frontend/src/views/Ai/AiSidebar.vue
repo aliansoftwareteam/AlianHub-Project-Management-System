@@ -66,6 +66,7 @@ import { useAgents } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
 import { useLiveAgents } from "./useLiveAgents";
 import { useAccounts } from "./useAccounts";
+import { useCompanyView } from "./useCompanyView";
 import { fetchConnectedAgents } from "./useRunnableAgents";
 import { AGENTS_CHANGED_EVENT, POLICY_CHANGE } from "./agentFeed";
 import { CONNECT_AI_ROUTE } from "@/router/ai/connect";
@@ -84,6 +85,7 @@ const { canManage } = useAgentAccess();
 // The same policy the card in AI > Accounts sets (WorkspaceConnectedPause), so the two never disagree.
 const { policy, loadPolicy, saveConnectedPaused } = useAccounts();
 const socket = inject("$socket", null);
+const { on: companyViewOn, loadOrgChart } = useCompanyView();
 const busy = ref(false);
 const connectedApps = ref(0);
 const paused = computed(() => Boolean(policy.value.connectedPaused));
@@ -106,6 +108,7 @@ const setup = computed(() => [
     // is theirs too rather than a link that can only end in a refusal.
     ...(canManage.value ? [{ name: "WorkflowBuilder", label: "WorkflowBuilder.nav", icon: "layout" }] : []),
     { name: "AiAccounts", label: "Accounts.nav", icon: "key" },
+    ...(companyViewOn.value ? [{ name: "AiCompany", label: "CompanyView.nav", icon: "members" }] : []),
     { name: "AiPipeline", label: "Pipeline.nav_pipeline", icon: "layout" },
     { name: "AiRelease", label: "Pipeline.nav_release", icon: "share" },
     { name: "AiHealth", label: "AiHealth.nav", icon: "reports" },
@@ -171,6 +174,7 @@ watch(() => socket?.value, (next, previous) => {
 
 onMounted(() => {
     readPaused();
+    loadOrgChart().catch(() => {});
     if (canManage.value) fetchConnectedAgents().then((apps) => { connectedApps.value = apps.length; });
 });
 onBeforeUnmount(() => socket?.value?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged));

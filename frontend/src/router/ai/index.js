@@ -54,6 +54,12 @@ export default [
         meta: { title: 'Ask', requiresAuth: true }
     },
     {
+        path: '/:cid/ai/company',
+        name: 'AiCompany',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/CompanyView.vue'),
+        meta: { title: 'Company view', requiresAuth: true }
+    },
+    {
         path: '/:cid/ai/pipeline',
         name: 'AiPipeline',
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiPipeline.vue'),
