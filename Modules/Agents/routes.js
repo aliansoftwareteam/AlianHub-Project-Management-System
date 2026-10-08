@@ -10,6 +10,7 @@ const projectLimitsCtrl = require('./projectLimitsController');
 const projectManagerCtrl = require('./manager/controller');
 const standingApprovalsCtrl = require('./standingApprovalsController');
 const changeNoticeCtrl = require('./changeNoticeController');
+const roleSkillCtrl = require('./roleSkillController');
 const { agentPerimeter } = require('./guard');
 const { setByPerson } = require('./personDecides');
 
@@ -44,6 +45,8 @@ exports.init = (app) => {
     app.get('/api/v2/agents/metrics', metricsCtrl.getMetrics);
     app.get('/api/v2/agents/alerts', metricsCtrl.getAlerts);
     app.post('/api/v2/agents/alerts/evaluate', metricsCtrl.evaluateAlerts);
+
+    app.get('/api/v2/agents/roles/:blueprint/:slug/skill', roleSkillCtrl.downloadRoleSkill);
 
     app.get('/api/v2/agents/skills/catalogues', skillsCtrl.getCatalogues);
     app.get('/api/v2/agents/skills/egress-check', skillsCtrl.egressCheck);
