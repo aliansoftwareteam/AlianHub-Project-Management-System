@@ -3,6 +3,7 @@ slug: documentation-writer
 name: Documentation Writer
 blueprint: it-company
 department: Engineering
+team: engineering
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, task.links.list, pages.search, page.get, page.versions.list, page.comments.list, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.link, screen.link]
 hands_to: [knowledge-base-writer]
 gates: [the feature owner approves each doc]

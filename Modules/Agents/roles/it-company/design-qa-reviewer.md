@@ -3,6 +3,7 @@ slug: design-qa-reviewer
 name: Design QA Reviewer
 blueprint: it-company
 department: Design
+team: design
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.links.list, page.get, pages.search, task.create, subtask.create, task.relation.add, task.comment, task.tags.add, task.status.set]
 hands_to: [bug-triager, release-manager]
 gates: [the design lead decides which differences block the release]

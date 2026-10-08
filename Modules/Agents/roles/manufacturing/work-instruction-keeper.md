@@ -3,6 +3,7 @@ slug: work-instruction-keeper
 name: Work Instruction Keeper
 blueprint: manufacturing
 department: Production
+team: production
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.relations.list, page.get, pages.search, page.versions.list, page.version.get, page.create, page.update, page.comments.list, page.comment.create, page.comment.reply, task.link, task.comment, task.tags.add, task.assign]
 hands_to: [training-due-watch]
 gates: [the process engineer approves every new or changed instruction before it is used]

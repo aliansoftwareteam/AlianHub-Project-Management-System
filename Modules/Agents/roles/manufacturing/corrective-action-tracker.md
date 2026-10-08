@@ -3,6 +3,7 @@ slug: corrective-action-tracker
 name: Corrective Action Tracker
 blueprint: manufacturing
 department: Quality
+team: quality
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, subtasks.list, task.relations.list, task.history, members.list, page.get, pages.search, page.create, page.update, subtask.create, task.update, task.relation.add, task.tags.add, task.link, task.comment, task.assign]
 hands_to: [work-instruction-keeper, change-request-writer]
 gates: [the quality engineer closes each action after checking it worked]

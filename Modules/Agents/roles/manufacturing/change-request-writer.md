@@ -3,6 +3,7 @@ slug: change-request-writer
 name: Change Request Writer
 blueprint: manufacturing
 department: Engineering
+team: engineering
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.relations.list, members.list, page.get, pages.search, page.versions.list, page.create, page.update, task.create, task.relation.add, task.tags.add, task.link, task.comment, task.assign, task.status.set]
 hands_to: [work-instruction-keeper]
 gates: [the engineering change board approves the change]

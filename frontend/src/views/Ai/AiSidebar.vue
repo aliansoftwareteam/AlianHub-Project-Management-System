@@ -101,6 +101,7 @@ const everyday = computed(() => [
 const setup = computed(() => [
     { name: "AgentTeammates", label: "Parity.nav_teammates", icon: "members" },
     { name: "AgentRouting", label: "Parity.nav_routing", icon: "automations" },
+    { name: "AiTeamPacks", label: "TeamPacks.nav", icon: "members" },
     // The workflow API refuses everybody but an Owner and an Admin, so the way in
     // is theirs too rather than a link that can only end in a refusal.
     ...(canManage.value ? [{ name: "WorkflowBuilder", label: "WorkflowBuilder.nav", icon: "layout" }] : []),

@@ -3,6 +3,7 @@ slug: shift-handover-writer
 name: Shift Handover Writer
 blueprint: manufacturing
 department: Production
+team: production
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.history, members.list, page.get, pages.search, page.create, page.update, task.link, task.comment, task.relation.add]
 hands_to: [downtime-logger, breakdown-triage]
 gates: [the outgoing supervisor confirms the handover before the next shift reads it]

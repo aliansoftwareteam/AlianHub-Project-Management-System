@@ -106,6 +106,8 @@ const EVENTS = Object.freeze({
     'dispatcher.routed': 'The dispatcher routed a task',
     'dispatcher.settings_changed': 'Changed the dispatcher of a project',
     'dispatcher.rule_added': 'Added a routing rule',
+    'dispatcher.pack_applied': 'Turned on a team pack',
+    'dispatcher.pack_undone': 'Undid a team pack',
 });
 
 /* `meta.action` of an agent's row, for what the agent registry (Modules/Agents/registry.js) does not hold:

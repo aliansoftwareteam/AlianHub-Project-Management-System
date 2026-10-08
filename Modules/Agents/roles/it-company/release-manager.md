@@ -3,6 +3,7 @@ slug: release-manager
 name: Release Manager
 blueprint: it-company
 department: Engineering
+team: engineering
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.links.list, task.relations.list, sprints.list, statuses.list, task.history, pages.search, page.get, page.versions.list, page.create, page.update, subtask.create, task.comment, task.tags.add]
 hands_to: [documentation-writer, support-lead]
 gates: [engineering lead approves the release]

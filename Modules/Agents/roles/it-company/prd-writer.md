@@ -3,6 +3,7 @@ slug: prd-writer
 name: PRD Writer
 blueprint: it-company
 department: Product
+team: product
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.links.list, task.relations.list, pages.search, page.get, page.versions.list, page.comments.list, goals.list, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.link, task.tags.add]
 hands_to: [design-lead, tech-lead]
 gates: [the product manager approves the PRD]
