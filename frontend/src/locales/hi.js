@@ -13114,7 +13114,14 @@ export default {
         "people": "People",
         "analytics": "Analytics",
         "leadership": "Leadership",
-        "administration": "Administration"
+        "administration": "Administration",
+        "front_desk": "Front desk",
+        "billing": "Billing",
+        "facilities": "Facilities",
+        "patient_experience": "Patient experience",
+        "supplies": "Supplies",
+        "management": "Management",
+        "staff_rosters": "Staff rosters"
     },
     "TeamPacks": {
         "nav": "Team packs",
@@ -13201,7 +13208,7 @@ export default {
         "professional_services": "Professional services",
         "education": "Education",
         "construction": "Construction",
-        "clinic_admin": "Clinic administration"
+        "clinic": "Clinic administration"
     },
     "CompanyBlueprint": {
         "title": "Company blueprint",
