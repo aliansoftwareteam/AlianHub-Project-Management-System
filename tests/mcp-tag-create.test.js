@@ -154,9 +154,9 @@ describe('a tag is never added before a person has seen it', () => {
         expect(tagNamed(P_OPEN, 'Direct')).toBeUndefined();
     });
 
-    it('is refused in a project where agents are paused, and files nothing', async () => {
+    it('is refused in a project where agents are paused, says so, and files nothing', async () => {
         stored(SCHEMA_TYPE.PROJECTS, P_OPEN).agentLimits = { paused: true };
-        expect(await rpc(as(INSIDER), TOOL, { projectId: P_OPEN, name: 'Paused' })).toMatchObject({ refused: true });
+        expect(await rpc(as(INSIDER), TOOL, { projectId: P_OPEN, name: 'Paused' })).toMatchObject({ refused: true, reason: expect.stringMatching(/^agents are paused in this project/) });
         expect(waiting()).toHaveLength(0);
     });
 
