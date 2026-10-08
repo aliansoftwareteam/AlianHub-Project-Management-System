@@ -824,7 +824,7 @@
     },
     {
       "name": "task.comment",
-      "description": "Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link.",
+      "description": "Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link. To mention a member so they are notified, write @[Their Name](their member id) with the id from members.list, or @Their Name exactly as members.list shows it; @[All](everyone) reaches everyone who can open the task. Only people who can open the task are notified, and never the person you act for: the answer lists who was told in mentioned, a named person who was not, and why, in notNotified, and a name that matched no one in notFound.",
       "inputSchema": {
         "type": "object",
         "properties": {
