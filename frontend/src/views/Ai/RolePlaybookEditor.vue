@@ -1,5 +1,5 @@
 <template>
-    <section class="ah-card" data-test="role-playbooks" aria-labelledby="role-playbooks-title">
+    <section v-if="shown" class="ah-card" data-test="role-playbooks" aria-labelledby="role-playbooks-title">
         <div class="ah-card__head">
             <span id="role-playbooks-title" class="ah-h3">{{ $t('RolePlaybooks.title') }}</span>
             <span class="ah-mono rpb-note">{{ canEdit ? $t('RolePlaybooks.you_can_edit') : $t('RolePlaybooks.read_only') }}</span>
@@ -49,6 +49,8 @@ const canEdit = ref(false);
 const maxLength = ref(30000);
 const loaded = ref(false);
 const loadError = ref("");
+const on = ref(false);
+const shown = computed(() => loaded.value && (on.value || Boolean(loadError.value)));
 const chosen = ref("");
 const draft = ref("");
 const busy = ref(false);
@@ -62,6 +64,7 @@ const urlOf = (id) => `${env.AGENT_ROLES}/${id.split("/").map(encodeURIComponent
 const reasonOf = (res, fallback) => res?.data?.statusText || res?.data?.message || fallback;
 
 const take = (data) => {
+    on.value = data.on !== false;
     roles.value = data.roles || [];
     canEdit.value = Boolean(data.canEdit);
     maxLength.value = data.maxLength || maxLength.value;

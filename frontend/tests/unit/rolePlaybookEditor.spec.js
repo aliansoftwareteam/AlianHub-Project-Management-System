@@ -21,6 +21,13 @@ const mountIt = async () => {
 beforeEach(() => apiRequest.mockReset());
 
 describe('the role playbook editor in the AI settings', () => {
+    it('hides itself, with no error, while role playbooks are off on the server', async () => {
+        apiRequest.mockReturnValueOnce(Promise.resolve({ data: { status: true, data: { on: false, roles: [] } } }));
+        const wrapper = await mountIt();
+        expect(wrapper.find('[data-test="role-playbooks"]').exists()).toBe(false);
+        expect(apiRequest).toHaveBeenCalledTimes(1);
+    });
+
     it('shows the built-in text and offers no restore until it is edited', async () => {
         apiRequest.mockReturnValueOnce(answer([role(), role({ slug: 'tech-lead', name: 'Tech Lead' })]));
         const wrapper = await mountIt();

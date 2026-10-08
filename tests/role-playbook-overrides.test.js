@@ -174,10 +174,12 @@ describe('tuning a role playbook for a workspace', () => {
         expect(store.size).toBe(0);
     });
 
-    it('is not there while MCP_ROLE_PROMPTS is off', async () => {
+    it('refuses edits and lists no role, without an error, while MCP_ROLE_PROMPTS is off', async () => {
         delete process.env.MCP_ROLE_PROMPTS;
         expect((await put(EDITED)).code).toBe(404);
-        expect((await list()).code).toBe(404);
+        const off = await list();
+        expect(off.code).toBe(200);
+        expect(off.body.data).toEqual({ on: false, roles: [] });
     });
 
     it('keeps one workspace\'s text from another', async () => {
