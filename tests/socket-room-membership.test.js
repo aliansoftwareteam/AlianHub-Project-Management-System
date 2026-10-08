@@ -86,6 +86,7 @@ const seedHome = () => {
         privateTask: task(db, project, privateList, { AssigneeUserId: [OWNER] }),
         personalTask: task(db, personal, personalList, { AssigneeUserId: [MEMBER] }),
         conversation: task(db, directSpace, directList, { mainChat: true, AssigneeUserId: [OWNER, ADMIN] }),
+        proposal: db.seed(SCHEMA_TYPE.AGENT_PROPOSALS, { projectId: String(project._id), source: 'mcp', requestedBy: OWNER, status: 'pending', changes: [] }),
     };
 };
 
@@ -192,7 +193,7 @@ const countChanged = (companyId, userId) => socketEmitter.emit('update', { type:
 const reminderChanged = (companyId, userId) => socketEmitter.emit('update', { type: 'update', module: 'generalReminder', companyId, data: { _id: NOTHING, userId, title: 'Call back' } });
 const companyChanged = (companyId) => socketEmitter.emit('update', { type: 'update', module: 'companies', data: { data: { _id: companyId, Cst_CompanyName: 'Renamed' } }, updatedFields: {} });
 const pinged = (companyId, userId) => Object.keys(PINGS).forEach((module) => socketEmitter.emit('update', {
-    type: 'update', module, companyId, data: { kind: 'proposal', userId },
+    type: 'update', module, companyId, data: { kind: 'proposal', userId, proposal: home.proposal },
 }));
 const typing = (socket, prefix) => socket.emit('commentTyping', { roomPrefix: prefix, typing: true });
 const loseSeat = (db, userId) => {

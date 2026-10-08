@@ -19,7 +19,7 @@ const DECLINED_ABOUT = 'Changes a person declined in this project, each with the
 const agentFor = (ctx) => {
     const name = (ctx.actor && ctx.actor.agentName) || 'MCP';
     const filer = ctx.oauth ? `oauth:${ctx.oauth.clientId}` : `${SOURCE}:${String((ctx.token && ctx.token._id) || '')}`;
-    return { _id: (ctx.actor && ctx.actor.agentId) || filer, name: `${name} (MCP)` };
+    return { _id: (ctx.actor && ctx.actor.agentId) || filer, name: ctx.oauth ? name : `${name} (MCP)` };
 };
 
 /* Who filed it, so approval can ask again whether they still may: a personal token by its id, an outside

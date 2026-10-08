@@ -338,12 +338,12 @@ function fetchTrash() {
 
 watch(view, (value) => { if (value === 'trash') fetchTrash(); });
 
-const SHARES_CHANGED = 'docSharesChanged';
+const DOCS_SIGNALS = ['docSharesChanged', 'docsChanged'];
 let listening = null;
 function listenOn(socket) {
-    if (listening) listening.off(SHARES_CHANGED, fetchPages);
+    if (listening) DOCS_SIGNALS.forEach((event) => listening.off(event, fetchPages));
     listening = socket && typeof socket.on === 'function' ? socket : null;
-    if (listening) listening.on(SHARES_CHANGED, fetchPages);
+    if (listening) DOCS_SIGNALS.forEach((event) => listening.on(event, fetchPages));
 }
 /* The socket is replaced when the connection is made again. */
 watch(() => store.getters['settings/getSocketInstance'], listenOn, { immediate: true });

@@ -50,7 +50,7 @@ const throughApps = async (companyId, ownerIds, now) => {
     if (!rows.length) return [];
     const nameOf = await clientNames(rows);
     return rows.map((row) => ({
-        ownerId: String(row.userId), name: toolNameOf({ viaAccount: VIA_EXTERNAL, agentName: nameOf(row) }), lastUsedAt: new Date(row.lastUsedAt), madeAt: row.createdAt,
+        ownerId: String(row.userId), name: toolNameOf({ viaAccount: VIA_EXTERNAL, agentName: nameOf.labelOf(row) }), lastUsedAt: new Date(row.lastUsedAt), madeAt: row.createdAt,
         reaches: () => (row.scopes || []).includes(QUEUE_SCOPE),
     }));
 };

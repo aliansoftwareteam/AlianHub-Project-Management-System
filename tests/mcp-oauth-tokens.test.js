@@ -203,13 +203,13 @@ describe('an OAuth access token on /mcp', () => {
 describe('a client ID metadata document client (a URL, no client row)', () => {
     const DOCUMENT_CLIENT = { clientId: 'https://agent.s10s4.test/oauth/client.json', kind: 'metadata_document', tokenEndpointAuthMethod: 'none', scopes: [], redirectUris: [REDIRECT] };
 
-    it('is accepted and named after its host', async () => {
+    it('is accepted and named after its host, as an app', async () => {
         const { raw, grant } = await mint({ client: DOCUMENT_CLIENT });
         const res = await post(request({ token: raw, body: call('tasks.search') }));
         expect(res.statusCode).toBe(200);
         const [ctx] = tools.call.mock.calls[0];
         expect(ctx.oauth).toMatchObject({ clientId: DOCUMENT_CLIENT.clientId, grantId: grant.grantId });
-        expect(ctx.actor).toMatchObject({ clientId: DOCUMENT_CLIENT.clientId, agentName: 'agent.s10s4.test' });
+        expect(ctx.actor).toMatchObject({ clientId: DOCUMENT_CLIENT.clientId, agentName: 'agent.s10s4.test (app)' });
         expect(store(SCHEMA_TYPE.OAUTH_CLIENTS)).toHaveLength(0);
     });
 
@@ -440,7 +440,7 @@ describe('attribution of an OAuth call', () => {
         expect(tools.call.mock.calls[0][0].userId).toBe(actor.delegatedBy);
         expect(attribution(actor)).toEqual({
             actorId: client.clientId, actorType: 'agent', agentId: null, viaAccount: 'external',
-            clientId: client.clientId, grantId: grant.grantId, delegatedBy: USER, label: 'S10S4 Agent for Priya',
+            clientId: client.clientId, grantId: grant.grantId, delegatedBy: USER, label: 'S10S4 Agent (app · 127.0.0.1) for Priya',
         });
     });
 

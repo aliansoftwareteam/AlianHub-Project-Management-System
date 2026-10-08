@@ -151,7 +151,7 @@ import { readLookLength } from '@/utils/lookTokens';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { criticalPath } from '@/views/Projects/composables/criticalPath';
 import { fsCollisionLinks } from '@/views/Projects/composables/ganttCollisions';
-import { shiftDependants } from '@/views/Projects/composables/ganttShift';
+import { shiftDependants } from '@ganttShift';
 import { workingDaysFor, countsEveryDay } from '@workingDays';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { showUndoToast } from '@/composable/useUndoToast';

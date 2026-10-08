@@ -207,11 +207,53 @@ describe('a link that opens it grouped, filtered or on the person\'s own tasks',
         for (const args of [
             { screen: 'everything', groupBy: 'priority' }, { screen: 'everything', mine: true, due: 'today' }, { screen: 'home', mine: true },
             { screen: 'task', taskId: T_OPEN, mine: true }, { screen: 'project', projectId: P_OPEN, view: 'gantt', groupBy: 'priority' },
-            { screen: 'project', projectId: P_OPEN, groupBy: 'colour' }, { screen: 'project', projectId: P_OPEN, due: 'someday' },
+            { screen: 'project', projectId: P_OPEN, due: 'someday' },
             { screen: 'project', projectId: P_OPEN, search: 'invoice' },
         ]) {
             expect((await link(ctx(OWNER), args)).rpcError).toMatchObject({ code: -32602 });
         }
+    });
+
+    it('takes a field by its name, as the person says it, and opens the saved view grouped by it', async () => {
+        const project = mockDb.store[SCHEMA_TYPE.PROJECTS].find((row) => String(row._id) === P_OPEN);
+        project.ProjectRequiredComponent.find((row) => row._id === V_OFF).viewStatus = true;
+        expect(await link(ctx(OWNER), { screen: 'list', sprintId: L_OPEN, groupBy: 'stage' })).toEqual({
+            url: `${AT}/project/${P_OPEN}/s/${L_OPEN}?tab=ProjectListView&view=${V_OFF}`, screen: 'list', view: 'list', savedView: 'Switched off',
+        });
+        expect((await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'Priority' })).savedView).toBe('By priority');
+    });
+
+    it('with no saved view grouped that way, hands over the one view.create to offer instead of listing the tasks', async () => {
+        process.env.MCP_TOOLS_WORK = 'on';
+        const out = await link(ctx(OWNER), { screen: 'list', sprintId: L_OPEN, groupBy: 'Stage' });
+        expect(out).toMatchObject({ url: `${AT}/project/${P_OPEN}/s/${L_OPEN}?tab=ProjectListView`, view: 'list' });
+        expect(out.note).toMatch(/do not list the tasks[\s\S]*view\.create[\s\S]*saveView/i);
+        expect(out.saveView).toEqual({ tool: 'view.create', arguments: { projectId: P_OPEN, name: 'By Stage', kind: 'list', groupBy: F_STAGE } });
+    });
+
+    it('says which fields share a name, and that a name is no field of the project, with no link', async () => {
+        const twin = '6f0000000000000000000f12';
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: twin, fieldTitle: 'Stage', fieldType: 'text', type: 'task', isDelete: true, global: true });
+        const out = await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'Stage' });
+        expect(out.url).toBeUndefined();
+        expect(out.error).toMatch(/more than one field[\s\S]*Stage/i);
+        expect(out.fields).toEqual([{ fieldId: F_STAGE, name: 'Stage', type: 'dropdown' }, { fieldId: twin, name: 'Stage', type: 'text' }]);
+        const none = await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'colour' });
+        expect(none.url).toBeUndefined();
+        expect(none.error).toMatch(/no field named "colour"/);
+    });
+
+    it('takes a field id only of a field of this project, and offers a view to save only to a caller that can file one', async () => {
+        process.env.MCP_TOOLS_WORK = 'on';
+        const other = '6f0000000000000000000f13';
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: other, fieldTitle: 'Region', fieldType: 'dropdown', type: 'task', isDelete: true, global: false, projectId: [P_PRIVATE] });
+        const out = await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: other });
+        expect(out.url).toBeUndefined();
+        expect(out.error).toMatch(/no field with the id/);
+        const reading = await link(readOnly(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'assignee' });
+        expect(reading.url).toBe(`${AT}/project/${P_OPEN}/p?tab=ProjectListView`);
+        expect(reading.saveView).toBeUndefined();
+        expect(reading.note).not.toMatch(/view\.create/);
     });
 
     it('answers a project the person cannot open as before, and writes nothing', async () => {

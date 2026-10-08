@@ -11,7 +11,7 @@ const approveInWorkspace = (db, companyId, clientId, over = {}) => {
     const existing = (db.store[SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS] || []).find((row) => row.companyId === String(companyId) && row.clientId === String(clientId));
     if (existing) return existing;
     return db.seed(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, {
-        companyId: String(companyId), clientId: String(clientId), clientName: 'approved in test', clientKind: 'dynamic',
+        companyId: String(companyId), clientId: String(clientId), clientName: '', clientKind: 'dynamic',
         status: 'approved', scopes: [...ALL_SCOPES], privateSprints: false, decidedAt: new Date(), updatedAt: new Date(), ...over,
     });
 };

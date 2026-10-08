@@ -72,12 +72,12 @@ describe('follow-up 98: an outside client in the audit log', () => {
         expect(body.data[0].outsideAgent).toEqual({ clientId: CLIENT, clientName: 'Coder', delegatedBy: DELEGATOR, delegatedByName: 'Dev Delegator' });
     });
 
-    it('names a client with no registered row by its approval in this workspace', async () => {
+    it('names a client with no registered row by its approval in this workspace, with its host', async () => {
         const documentClient = 'https://agent.example.test/client.json';
         mockDb.seed(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, { companyId: CID, clientId: documentClient, clientName: 'Doc Agent', status: 'approved' });
         mockDb.seed(SCHEMA_TYPE.AUDIT_LOGS, outsideRow(documentClient, DELEGATOR));
         const [row] = (await list({})).data;
-        expect(row.outsideAgent.clientName).toBe('Doc Agent');
+        expect(row.outsideAgent.clientName).toBe('Doc Agent (agent.example.test)');
     });
 
     it('does not name a client this workspace never approved, nor a person outside it', async () => {

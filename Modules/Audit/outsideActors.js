@@ -4,6 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const { VIA_EXTERNAL } = require('../Agents/actor');
 const { pseudonymOf } = require('./redact');
+const { withHost, hostOfClient } = require('../OAuthServer/clientLabel');
 
 const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
 
@@ -18,8 +19,10 @@ const clientNamesIn = async (companyId, clientIds) => {
     const names = new Map(approvals.filter((a) => a.clientName).map((a) => [String(a.clientId), String(a.clientName)]));
     const known = [...new Set(approvals.map((a) => String(a.clientId)))];
     if (!known.length) return names;
-    const clients = await find(SCHEMA_TYPE.GOLBAL, SCHEMA_TYPE.OAUTH_CLIENTS, [{ clientId: { $in: known } }, { clientId: 1, name: 1 }]);
-    clients.forEach((c) => { if (c.name && known.includes(String(c.clientId))) names.set(String(c.clientId), String(c.name)); });
+    const clients = await find(SCHEMA_TYPE.GOLBAL, SCHEMA_TYPE.OAUTH_CLIENTS, [{ clientId: { $in: known } }, { clientId: 1, name: 1, redirectUris: 1 }]);
+    const rows = new Map(clients.filter((c) => known.includes(String(c.clientId))).map((c) => [String(c.clientId), c]));
+    rows.forEach((c, clientId) => { if (c.name) names.set(clientId, String(c.name)); });
+    names.forEach((name, clientId) => names.set(clientId, withHost(name, hostOfClient(clientId, rows.get(clientId)))));
     return names;
 };
 

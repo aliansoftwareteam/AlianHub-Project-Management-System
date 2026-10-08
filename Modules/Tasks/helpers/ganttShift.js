@@ -1,4 +1,4 @@
-/* The Gantt's rescheduling rule: when a move pushes a blocker's end later, every task it blocks
+/* The Gantt's rescheduling rule, which an agent's date change follows too (the web app reads it through the @ganttShift alias): when a move pushes a blocker's end later, every task it blocks
  * (finish-to-start, the only dependency AlianHub stores) moves later by whole days, keeping its
  * length. Moving a blocker earlier pulls nothing back. CommonJS so the jest suite can require it. */
 

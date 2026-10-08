@@ -334,4 +334,34 @@ describe('what the agent is told', () => {
         expect(listed.description).toMatch(/more than one task, nothing runs[\s\S]*one proposal that a person approves or declines whole/);
         expect(instructions.forCaller(ctx(OWNER))).toMatch(/When a tool answers that a change is waiting[\s\S]*tell the person, and do not try another way/);
     });
+
+    it('the tool names the dotted step names as the canonical form', async () => {
+        const listed = (await server.handleRpc(ctx(OWNER), { jsonrpc: '2.0', id: 1, method: 'tools/list' })).result.tools.find((tool) => tool.name === 'tasks.batch');
+        expect(listed.description).toMatch(/task\.update[\s\S]*task_update/);
+    });
+});
+
+describe('step names as an MCP client lists them', () => {
+    it('takes task_status_set and the prefixed mcp__alianhub__task_update as the dotted tools', async () => {
+        const [task] = twenty;
+        const out = await batch(ctx(OWNER), [
+            { tool: 'task_status_set', arguments: { taskId: String(task._id), status: 'To Do' } },
+            { tool: 'mcp__alianhub__task_update', arguments: { taskId: String(task._id), title: 'Renamed' } },
+        ]);
+        expect(out).toMatchObject({ ok: true, applied: 2, notApplied: 0 });
+        expect(out.items.map((item) => item.tool)).toEqual(['task.status.set', 'task.update']);
+        expect(stored(task._id)).toMatchObject({ TaskName: 'Renamed', status: expect.objectContaining({ text: 'To Do' }) });
+    });
+
+    it('files underscore steps that name more than one task as one proposal', async () => {
+        const out = await batch(ctx(OWNER), twenty.slice(0, 2).map((task) => ({ tool: 'task_status_set', arguments: { taskId: String(task._id), status: 'To Do' } })));
+        expect(out).toMatchObject({ pending: true, waiting: 2 });
+        expect(proposalRows()[0].changes.map((change) => change.action)).toEqual(['task.status.change', 'task.status.change']);
+    });
+
+    it('still refuses a name that is no tool', async () => {
+        const [task] = twenty;
+        const out = await batch(ctx(OWNER), [{ tool: 'task_explode', arguments: { taskId: String(task._id) } }]);
+        expect(out.items[0]).toMatchObject({ ok: false, error: expect.stringMatching(/task_explode is not a write tool/) });
+    });
 });

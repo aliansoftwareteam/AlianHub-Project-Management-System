@@ -1,4 +1,4 @@
-const { shiftDependants } = require('../frontend/src/views/Projects/composables/ganttShift');
+const { shiftDependants } = require('../Modules/Tasks/helpers/ganttShift');
 
 /* Local dates, so the suite reads the same in every time zone. 2026-09-01 is a Tuesday. */
 const day = (d, h = 0) => new Date(2026, 8, d, h);
