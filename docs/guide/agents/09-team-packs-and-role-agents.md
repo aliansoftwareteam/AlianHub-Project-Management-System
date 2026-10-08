@@ -2,7 +2,7 @@
 
 A role playbook is a written job description for an AI. It says who the AI is in a team, what it looks after, what it needs before it starts, what it hands over, and what it never does. It is plain text. It gives no new power: your AI still acts as you, with your rights.
 
-AlianHub ships playbooks for several company blueprints, for example an IT company and a manufacturer. Each playbook names its team, such as engineering or quality. The full, current set lives in [Modules/Agents/roles](../../../Modules/Agents/roles), one folder per blueprint. A person who runs your server can switch the features on or off. See "Who switches what on" at the end.
+AlianHub ships playbooks for seven company blueprints: an IT company, a manufacturer, an agency, an online store (ecommerce), a professional services firm, a school (education) and a construction firm. Each playbook names its team, such as engineering or quality. The full, current set lives in [Modules/Agents/roles](../../../Modules/Agents/roles), one folder per blueprint. A person who runs your server can switch the features on or off. See "Who switches what on" at the end.
 
 ## Roles, grouped by team
 
@@ -32,11 +32,11 @@ A team groups the roles that work together. The tables below show, for example, 
 | Health and safety | Safety Incident Reporter, Training Due Watch |
 | Engineering | Change Request Writer |
 
+A role's name and its slug are unique across all blueprints, so where two blueprints have a similar role the second carries a prefix: the construction firm's Construction Project Planner (`construction-project-planner`) and the professional services firm's Practice Invoice Preparer, Practice Research Brief Writer and Practice Timesheet Checker (`proserv-...`).
+
 A team is not the same as a department. Several departments can share one team: in the IT company, the QA and DevOps roles sit in Engineering, and the Leadership roles sit in Product.
 
 ## Team packs
-
-Team packs, and the grouping by team above, arrive with pull request #1585. Until it is merged, the app does not group roles by team.
 
 ### Turn on a team pack with one click
 
@@ -87,7 +87,7 @@ You can also download a role as a skill and install it in Claude. You get a zip 
 
 - Only a signed-in person who is a member of the workspace can download one.
 - The skill works through the AlianHub connector. Connect AlianHub to your AI first.
-- The download address is `/api/v2/agents/roles/<team pack>/<role>/skill`, for example `it-company/bug-triager`. There is no button for it in the app yet.
+- The download address is `/api/v2/agents/roles/<blueprint>/<role>/skill`, for example `it-company/bug-triager`. There is no button for it in the app yet.
 
 A skill, like an ask, is fixed text. It gives the AI no tool and no right it did not already have.
 
