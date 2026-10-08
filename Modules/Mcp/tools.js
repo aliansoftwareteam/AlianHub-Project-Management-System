@@ -534,8 +534,19 @@ const applyBatch = async (ctx, tool, args) => {
     };
 };
 
+/* MCP clients list `task.update` as `task_update` (or `mcp__alianhub__task_update`), since their tool names allow no dots. */
+const canonicalStep = (ctx, given) => {
+    const name = String(given);
+    const listed = toolsFor(ctx);
+    if (listed.some((t) => t.name === name)) return name;
+    const bare = name.replace(/^mcp__.+?__/, '');
+    const match = listed.find((t) => t.name === bare || t.name.replace(/\./g, '_') === bare);
+    return match ? match.name : name;
+};
+
 /* A batch of one operation is that operation's own call, which waits or runs by the rule for a single change. */
-function runBatch(ctx, tool, args) {
+function runBatch(ctx, tool, asked) {
+    const args = { ...asked, operations: asked.operations.map((operation) => ({ ...operation, tool: canonicalStep(ctx, operation.tool) })) };
     const given = args.operations.length;
     if (given > 1 && tasksNamed(ctx, args.operations) > 1) return fileBatch(ctx, tool, args);
     if (given > manageTools.BATCH_AT_ONCE_MAX) throw Object.assign(new Error(`${tool.name}: ${manageTools.batchNotWaiting(given)}`), { code: -32602 });
