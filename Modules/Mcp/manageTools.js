@@ -340,7 +340,9 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Changes a task\'s title, description, priority, due date, start date or estimate at once, and the person can undo it. One call may change several; a detail you leave out is not touched.',
+        description: 'Changes a task\'s title, description, priority, due date, start date or estimate at once, and the person can undo it. One call may change several; a detail you leave out is not touched. '
+            + 'When a new due date ends the task later and other tasks wait on it (it blocks them), they move later by the same working days, as the Gantt moves them, in this one change and one undo: '
+            + 'waitingTasks.moved lists them, and waitingTasks.startTooEarly lists any the person may not reschedule, which now start before this task ends. Do not move the moved ones again.',
         input: input({
             taskId: ID,
             title: { type: 'string', minLength: 1, maxLength: TITLE_MAX },

@@ -100,11 +100,16 @@ const inverses = {
         await setTask(companyId, u.taskId, { AssigneeUserId: u.previous || [] });
         return { taskId: u.taskId, restored: u.previous };
     },
-    async update(companyId, u) {
+    async update(companyId, u, actor) {
         const set = {}; const unset = {};
         Object.entries(u.previous || {}).forEach(([k, v]) => { if (v === null) unset[k] = 1; else set[k] = v; });
         await setTask(companyId, u.taskId, set, Object.keys(unset).length ? unset : undefined);
-        return { taskId: u.taskId, restored: Object.keys(u.previous || {}) };
+        const shifted = Array.isArray(u.shifted) ? u.shifted : [];
+        for (const row of shifted) {
+            if (!actor || !(await taskReadable(companyId, actor.userId, row.taskId))) continue;
+            await setTask(companyId, row.taskId, { startDate: row.startDate, DueDate: row.DueDate });
+        }
+        return { taskId: u.taskId, restored: Object.keys(u.previous || {}), ...(shifted.length ? { movedBack: shifted.map((row) => row.taskId) } : {}) };
     },
     async sprint(companyId, u) {
         const before = await findRow(companyId, SCHEMA_TYPE.TASKS, u.taskId, { ProjectID: 1, sprintId: 1 });
