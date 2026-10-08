@@ -76,7 +76,7 @@ const CREATE_OPTIONS = Object.freeze({
     },
 });
 
-const MENTIONS = 'To mention a member so they are notified, write @[Their Name](their member id); @[All](everyone) reaches everyone who can open the task.';
+const MENTIONS = 'To mention a member so they are notified, write @[Their Name](their member id) with the id from members.list, or @Their Name exactly as members.list shows it; @[All](everyone) reaches everyone who can open the task. Only people who can open the task are notified: the answer lists them in mentioned, a named person who cannot open it in notNotified, and a name that matched no one in notFound.';
 
 /* The activity log stores each entry as a line of markup with dates as DATE_<milliseconds>. */
 const plainEntry = (message) => String(message || '')

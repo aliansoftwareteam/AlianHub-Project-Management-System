@@ -49,9 +49,44 @@
                                 @click="category = option.key"
                             >{{ option.label }}</button>
                         </div>
+                        <div v-if="teamOptions.length" class="ac-team">
+                            <label class="ah-field__label" for="ac-team">{{ $t('AgentCatalogue.team_filter') }}</label>
+                            <select id="ac-team" v-model="teamKey" class="ah-input" data-test="catalogue-team">
+                                <option value="">{{ $t('AgentCatalogue.team_any') }}</option>
+                                <option v-for="option in teamOptions" :key="option.key" :value="option.key">{{ option.label }}</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <p v-if="!shown.length" class="ah-empty">{{ $t('AgentCatalogue.no_match') }}</p>
+                    <template v-if="teamKey">
+                        <p v-if="needsKey" class="ah-small ac-team__key" data-test="catalogue-needs-key">{{ $t('AgentCatalogue.role_needs_key') }}</p>
+                        <p v-if="!shownRoles.length" class="ah-empty">{{ $t('AgentCatalogue.no_match') }}</p>
+                        <div v-else class="ac-grid">
+                            <article v-for="role in shownRoles" :key="role.key" class="ac-card" data-test="catalogue-role" :data-role="role.key">
+                                <div class="ac-card__head">
+                                    <strong class="ac-card__name">{{ role.name }}</strong>
+                                    <span class="ah-chip">{{ role.department }}</span>
+                                </div>
+                                <p class="ac-card__about">{{ role.summary }}</p>
+                                <details class="ac-card__tools">
+                                    <summary class="ah-small">{{ $t('AgentCatalogue.role_tools', { n: role.tools.length }, role.tools.length) }}</summary>
+                                    <div class="ac-card__skills">
+                                        <span v-for="tool in role.tools" :key="tool" class="ah-chip ah-chip--mono">{{ tool }}</span>
+                                    </div>
+                                </details>
+                                <div class="ac-card__foot">
+                                    <button
+                                        type="button"
+                                        class="ah-btn ah-btn--secondary ah-btn--sm"
+                                        data-test="catalogue-role-pack"
+                                        :aria-label="$t('AgentCatalogue.role_open_packs_named', { name: role.name })"
+                                        @click="openPacks"
+                                    >{{ $t('AgentCatalogue.role_open_packs') }}</button>
+                                </div>
+                            </article>
+                        </div>
+                    </template>
+                    <p v-else-if="!shown.length" class="ah-empty">{{ $t('AgentCatalogue.no_match') }}</p>
                     <div v-else class="ac-grid">
                         <article v-for="tpl in shown" :key="tpl.slug" class="ac-card" :class="{ 'ac-card--blocked': blockOf(tpl, skillManifest) }" data-test="catalogue-card" :data-slug="tpl.slug">
                             <div class="ac-card__head">
@@ -92,7 +127,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref } from "vue";
+import { computed, getCurrentInstance, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import ConnectAiHint from "@/components/molecules/AiUnavailable/ConnectAiHint.vue";
@@ -100,6 +135,7 @@ import { aiAvailability, AI_STATE } from "@/composable/aiAvailability";
 import { useAgents } from "./useAgents";
 import { autonomyName, autonomyTip, skillAbout, skillLabel } from "./plainLabels";
 import { requirementsOf, indexSkills } from "./skillInputs";
+import { blueprintName, fetchTeamPacks, teamName } from "@/utils/dispatcher";
 import { CATALOGUE_CATEGORIES, CATALOGUE_TEMPLATES, blockOf, draftToPrefill, filterTemplates, templateAbout, templateName, templateToPrefill } from "./agentCatalogue";
 
 defineOptions({ name: "AgentCatalogue" });
@@ -108,7 +144,8 @@ const emit = defineEmits(["close", "pick"]);
 
 const MIN_DESCRIPTION = 12;
 
-const { t } = useI18n();
+const { t, te } = useI18n();
+const router = getCurrentInstance()?.proxy?.$router;
 const { skillManifest, loadSkills, draftAgent } = useAgents();
 
 const query = ref("");
@@ -125,6 +162,31 @@ const categoryOptions = computed(() => [
 ]);
 
 const shown = computed(() => filterTemplates(t, CATALOGUE_TEMPLATES, { query: query.value, category: category.value }));
+
+const packs = ref([]);
+const teamKey = ref("");
+const teamOptions = computed(() => packs.value.flatMap((pack) => pack.teams.map((team) => ({
+    key: `${pack.blueprint}/${team.team}`,
+    blueprint: pack.blueprint,
+    team: team.team,
+    roles: team.roles,
+    label: t("AgentCatalogue.team_option", { blueprint: blueprintName(t, te, pack.blueprint), team: teamName(t, te, team.team) })
+}))));
+const pickedTeam = computed(() => teamOptions.value.find((option) => option.key === teamKey.value) || null);
+const shownRoles = computed(() => {
+    const words = query.value.toLowerCase().split(/\s+/).filter(Boolean);
+    return (pickedTeam.value?.roles || []).filter((role) => {
+        const hay = `${role.name} ${role.department} ${role.summary}`.toLowerCase();
+        return words.every((word) => hay.includes(word));
+    });
+});
+const needsKey = computed(() => aiAvailability.state === AI_STATE.UNCONFIGURED);
+
+const openPacks = () => {
+    const picked = pickedTeam.value;
+    emit("close");
+    router?.push({ name: "AiTeamPacks", query: picked ? { blueprint: picked.blueprint, team: picked.team } : {} });
+};
 
 const NO_BUILDER = Object.freeze({
     [AI_STATE.OFF_INSTANCE]: "AgentCatalogue.builder_off",
@@ -158,6 +220,7 @@ onMounted(async () => {
     await nextTick();
     (builderOpen.value ? describeField.value : searchField.value)?.focus();
     loadSkills().catch(() => []);
+    fetchTeamPacks().then((data) => { packs.value = data?.packs || []; }).catch(() => { packs.value = []; });
 });
 </script>
 
@@ -183,6 +246,10 @@ onMounted(async () => {
 .ac-card__line { display: flex; align-items: center; gap: 4px; margin: 0; color: var(--ink-2); }
 .ac-card__blocked { margin: 0; color: var(--warn-ink); }
 .ac-card__foot { margin-top: auto; padding-top: 4px; display: flex; }
+.ac-card__tools summary { cursor: pointer; color: var(--ink-2); }
+.ac-card__tools .ac-card__skills { margin-top: 6px; }
+.ac-team { display: flex; flex-direction: column; gap: 4px; max-width: 320px; }
+.ac-team__key { margin: 0; color: var(--ink-2); }
 @media (max-width: 480px) {
     .ac-grid { grid-template-columns: 1fr; }
     .ac-builder__row .ah-btn { margin-left: 0; width: 100%; }

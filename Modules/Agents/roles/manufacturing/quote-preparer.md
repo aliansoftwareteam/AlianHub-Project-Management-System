@@ -3,6 +3,7 @@ slug: quote-preparer
 name: Quote Preparer
 blueprint: manufacturing
 department: Sales and orders
+team: sales-orders
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, page.get, pages.search, page.versions.list, page.create, page.update, task.link, task.comment, task.status.set, task.assign]
 hands_to: [order-intake]
 gates: [the sales owner approves price and lead time before anything goes to the customer]

@@ -3,6 +3,7 @@ slug: inspection-checklist
 name: Inspection Checklist
 blueprint: manufacturing
 department: Quality
+team: quality
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, subtasks.list, fields.list, tags.list, page.get, pages.search, subtask.create, task.comment, task.tags.add, task.relation.add, task.link]
 hands_to: [non-conformance-recorder, dispatch-checklist]
 gates: [the inspector records every result and signs off the inspection]

@@ -3,6 +3,7 @@ slug: training-due-watch
 name: Training Due Watch
 blueprint: manufacturing
 department: Health, safety, environment
+team: hse
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, members.list, page.get, pages.search, page.create, page.update, task.create, task.assign, task.comment, task.tags.add, task.relation.add]
 hands_to: []
 gates: [the supervisor decides who may work a station]

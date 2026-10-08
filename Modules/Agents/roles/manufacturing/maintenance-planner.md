@@ -3,6 +3,7 @@ slug: maintenance-planner
 name: Maintenance Planner
 blueprint: manufacturing
 department: Maintenance
+team: maintenance
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, workdays.get, members.list, page.get, pages.search, page.create, page.update, task.create, subtask.create, task.field.set, task.update, task.assign, task.tags.add, task.relation.add, task.link, task.comment]
 hands_to: [spare-parts-watch]
 gates: [the maintenance lead approves the schedule and the production planner agrees the machine time]

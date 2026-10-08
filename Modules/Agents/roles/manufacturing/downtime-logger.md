@@ -3,6 +3,7 @@ slug: downtime-logger
 name: Downtime Logger
 blueprint: manufacturing
 department: Production
+team: production
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, page.create, page.update, task.create, task.field.set, task.tags.add, task.relation.add, task.comment, task.link]
 hands_to: [breakdown-triage]
 gates: [the shift supervisor confirms each stop record]

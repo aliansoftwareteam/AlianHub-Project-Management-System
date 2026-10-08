@@ -3,7 +3,7 @@ const path = require('path');
 const logger = require('../../Config/loggerConfig');
 
 const ROOT = path.join(__dirname, 'roles');
-const KEYS = ['slug', 'name', 'blueprint', 'department', 'tools', 'hands_to', 'gates'];
+const KEYS = ['slug', 'name', 'blueprint', 'department', 'team', 'tools', 'hands_to', 'gates'];
 const LISTS = ['tools', 'hands_to', 'gates'];
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -32,7 +32,7 @@ const parse = (text, rel) => {
     if (missing.length) fail(`the frontmatter lacks ${missing.join(', ')}`);
     const notLists = LISTS.filter((key) => !Array.isArray(meta[key]));
     if (notLists.length) fail(`${notLists.join(', ')} must be a [list]`);
-    if (!SLUG.test(meta.slug) || !SLUG.test(meta.blueprint)) fail('the slug and the blueprint must be lower-case words joined by hyphens');
+    if (![meta.slug, meta.blueprint, meta.team].every((value) => SLUG.test(value))) fail('the slug, the blueprint and the team must be lower-case words joined by hyphens');
     if (rel !== undefined && rel !== path.join(meta.blueprint, `${meta.slug}.md`)) fail(`it must live at ${path.join(meta.blueprint, `${meta.slug}.md`)}`);
     const body = match[2].trim();
     if (!body) fail('the playbook text is empty');
@@ -41,6 +41,7 @@ const parse = (text, rel) => {
         name: meta.name,
         blueprint: meta.blueprint,
         department: meta.department,
+        team: meta.team,
         tools: meta.tools,
         handsTo: meta.hands_to,
         gates: meta.gates,
