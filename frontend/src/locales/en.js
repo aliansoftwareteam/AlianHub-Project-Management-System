@@ -2411,7 +2411,8 @@ export default {
     },
     AgentActions: {
         folder_create: "Make a folder",
-        list_sprint_set: "Give a list start and end dates",
+        tag_create: "Add a tag to a project",
+        list_sprint_set:"Give a list start and end dates",
         task_comment: "Add a comment",
         task_status_set: "Change the status",
         task_link: "Attach a link",
