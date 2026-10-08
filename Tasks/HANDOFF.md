@@ -1,21 +1,20 @@
 # Handoff: where to start next session
 
-Updated 2026-10-06 09:00 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
+Updated 2026-10-08 13:00 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
 
 ## State
 
-- **Two tasks are in hand.**
-  - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent that comes with AlianHub is the person's own Claude or ChatGPT over MCP (decision 30). New agent slots go here.
-  - Task 046, "great next to ClickUp" (`Tasks/active/046-better-than-clickup/`, tracker AP-441): no new parity features; fixes, proof and the held PRs remain.
-  - In each folder, `progress.md` has every slice with its PR and build, the decisions and what waits for the owner.
-- **`beta` is at build 815** (`14.36.0-beta.815`, #1556). This docs PR becomes the next build.
-- **Live on localhost: build 815.** Nothing is merged and not built. No migration after 073. The local server stops when the Mac sleeps: start it with the "alianhub-api" launch entry (`npm run nodemon`, Node 20) and check `/health`.
-- **Hand-checked:** builds 782, 792 to 802, 803 to 806 (eleventh sweep), and by the coordinator 809 (Group by "Who is working"), 810 (the Inbox) and 812 (the task panel's tabs, the story point scale dialog and the export card in dark, measured in the page). The notes are in `Tasks/active/046-better-than-clickup/hand-check-2026-10-01.md`, a working note that is not committed. **Not hand-checked:** the rest of batch 26 (the list is under "Next steps"), and nothing that needs a connected AI (the MCP flags are off locally).
-- `docs/API.md` and `docs/api/openapi.json` are in sync with build 812 once this docs PR merges.
-- **Usage:** the week stood at 71% at 23:00 with the reset on 3 October at 17:30 IST. Full slots take about 5% of the week per hour. Nothing is running.
-- **Task 047:** every slice that does not need the owner is merged. The next step is the owner's: the MCP flags on, a Claude connected with the manage grant.
+- **Three tasks are in hand.**
+  - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent is the person's own Claude or ChatGPT over MCP (decision 30). **The first measured run is done: 15 of 15 pass** (13 on the first try, jobs 8 and 19 after #1568), in `ai-1-run-1-results.md`.
+  - Task 048, "Team agent packs" (`Tasks/active/048-team-agent-packs/`): role agents per team, workflows between them, one dispatcher, company blueprints. Part 1 (44 playbooks, IT company and Manufacturing) is #1572, waiting for the owner to read it. Step 2 (each role as an MCP prompt and a downloadable skill, behind a flag) is with an agent.
+  - Task 046, "great next to ClickUp": no new parity features; fixes, proof and the held PRs remain.
+- **`beta` is at build 819** (#1569). This docs PR becomes the next build.
+- **Live on localhost: build 819.** Nothing is merged and not built. Start the server only with the "alianhub-api" launch entry: it now unsets the `ANTHROPIC_MODEL` that Claude Code passes down (it had made the server use "opusplan").
+- **The owner's local `.env`, changed at the owner's request on 2026-10-08:** the MCP flags (`MCP_OAUTH=both`, issuer localhost:4000, `MCP_TOOLS_DATA/MANAGE/WORK=on`, `MCP_OAUTH_DCR=on`), and the AI provider switched to Anthropic: `LLM_PROVIDER="anthropic"`, `ANTHROPIC_MODEL="claude-sonnet-5-5"`, its price $2/$10 per million in `LLM_PRICING`. The key is in the admin field only; the `.env` key line stays empty. A backup of the old `.env` is in the private handoff folder.
+- **The owner's Claude Code is connected** as `alianhub-oauth` (user scope, OAuth, Manage tasks, Write docs, Read chat). Measured runs: `claude -p "<sentence>" --allowedTools "mcp__alianhub-oauth" --max-turns 40 --output-format json`, from `~`, with the browser pane on the job's start screen.
+- `docs/API.md` and `docs/api/openapi.json` are in sync with build 819.
 
-## Merged since the last handoff (builds 773 to 812)
+## Merged since the last handoff (builds 773 to 819)
 
 | Build | PR | What it carried |
 |---|---|---|
@@ -47,6 +46,12 @@ Updated 2026-10-06 09:00 IST. Read this first, then `Tasks/index.md` and the two
 | 810 | #1547, twenty-fourth batch | #1521: a thing read by its id answers only to a person who can open it; batch reads for the Inbox, the timesheet, workload and workflow runs; migration 072 |
 | 811 | #1548 | The docs PR for builds 807 to 810 |
 | 812 | #1550, twenty-sixth batch | S-2 locked parts and leftover rows (#1536); T-2 "@" your own AI in chat (#1537, migration 073); one approval for benchmark jobs 7 and 13 (#1546); work after a change under no bystander's limits (#1535, #1549); the eleventh sweep's fixes (#1538, #1541, #1545); legacy classes 2 (#1531); the benchmark sheet (#1530); three guide chapters (#1532) |
+| 813 | #1551 | The docs PR for builds 811 and 812 |
+| 814, 815 | #1553, #1556 | Batches 27 and 28: guide chapters, web helper specs, colours and legacy classes; a plan approved part by part; agent web writes named as MCP writes |
+| 816 | #1557 | The docs PR for builds 813 to 815 |
+| 817 | #1561, twenty-ninth batch | Replies in a thread, doc versions, a timesheet week, uploads over MCP |
+| 818 | #1566 | An approved subtask is made, and an approval that made nothing says so (AI-1 defect 1) |
+| 819 | #1569, thirtieth batch | The AI-1 fixes (#1568: grouped list by a saved view, dependent dates move with one undo, batch step names, formulas filled at once, approvals inside the token's projects) and live Inbox and Docs with the app named by its host (#1567) |
 
 Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choices they made are in 047's `progress.md`, under "Choices to review".
 
@@ -54,10 +59,10 @@ Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choice
 
 | PR | What | State |
 |---|---|---|
-| `chore/integrate-batch-27` (no PR yet) | #1539 four guide chapters, #1543 specs for 25 web helpers, #1542 colours 7, #1540 legacy classes 3 | Merged on a branch from batch 26; it needs `beta` merged in and its checks run. **Held** until its screens are seen: both style PRs met the sweep's dark-mode fixes in seven dialog files (the sweep's versions were kept), and legacy classes 3 rewrites 40 files blind |
+| #1572, thirty-first batch | Task 048 part 1: 22 IT company and 22 Manufacturing role playbooks (#1570, #1571) and the convention test `tests/conventions/role-playbooks.test.js` | Reviewed and fixed; **held for the owner to read** each set before it merges |
 | #1306 | The installable app shell | **Held.** It merges alone, after its own rebuild and the 14 checks in `.claude/test-cases/PWA.md` |
 | #1364 | A cloud run's API reference catch-up | Replaced. Close it |
-| This PR | Task docs, the beta log, the API reference, this handoff | Not a draft, docs only |
+| This PR | Task docs (047 results, 048 plan), the beta log, this handoff | Not a draft, docs only |
 
 ## The combined-PR method
 
@@ -86,7 +91,8 @@ Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choice
 ## Waiting for the owner
 
 The full lists are "Needs the owner" in 047's `progress.md` and "Open decisions for the owner" in 046's. The ones that block work or were raised on 2026-10-02:
-1. **The MCP flags and a connected Claude.** Turn on `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` in their own local `.env`, restart, and connect their Claude with the manage grant. AI-4a, AI-4e, the first AI-1 run and the hand check of every MCP slice wait for it. Advice given: batch 23 is merged, so it can be done now; #1521 (batch 24) tightens reads further and is not needed for a first run.
+1. **Read the 048 playbooks** in #1572 (IT company, then Manufacturing) and say what to change.
+1a. **Revoke the two `sk-ant-usr-` secrets** pasted in chat on 2026-10-08; they were never used or stored.
 2. **Whether a live instance exists** that needs today's fixes deployed and its logs looked at. Deploying is the owner's.
 3. **How many agents to run.** The owner's standing number is eight local and twelve cloud. At that pace the week's limit does not last to its reset, so the coordinator held to the critical path from 22:20 on 2 October. Ask again after the reset.
 3a. **A rule woken by a narrowed agent token's change** (#1535): its steps are held to the token's projects. One function, `judgedAfter` in `event/writerLimits.js`, switches that to the rule maker's full rights if the owner prefers.
@@ -103,12 +109,11 @@ Access findings and their state are in `~/.claude/projects/-Users-mevil-Alian-Hu
 
 ## Next steps, in order
 
-1. A full hand check of build 812, light and dark, 1280 and 390: Burndown and the four import dialogs; an empty folder; Custom Field Manager; archived lists with counts; one toast on Move and Convert; My Settings > Time format on chat, History, the audit log and the Inbox; a plan card with a locked part and with a leftover row; "@" in chat (it offers nothing without a connected AI); the status chips in Everything; the AI nav count.
-2. Batch 27: merge `beta` in, run the checks (the scripts print unhandled errors now), build it and look at the 40 files of legacy classes 3 before its pull request.
-3. One agent for the four small bugs the helper specs found (they are listed in 047's `progress.md`).
-4. The slice left open: agent changes over the web routes named and counted as MCP changes are.
-5. 047, without the owner: Home's "Waiting on you" card and the Approvals page approve a plan part by part; the benchmark gaps with no slice.
-6. When the owner has switched the flags on: AI-4a, AI-4e, then the first AI-1 run. The benchmark sheet marks 10 jobs "should pass" and 5 "should pass with approval".
+1. When the owner has read #1572: merge it, then the 048 step 2 PR (role prompts and skills for the connected AI) after its own review; use one role from the owner's Claude on the local build.
+2. AI-1's leftovers (in `ai-1-run-1-results.md`): fields with the same name, a new view not shown until a reload, same-day start after a blocker. One agent.
+3. 048 next steps by `task.md`: the catalogue Team filter and the one-click pack, then the dispatcher in suggest mode. The tool gaps the playbooks found (no tag creation, search without tag, priority or field filters, two-state status tool) come first, since the packs depend on them.
+4. AI-1 measured again (three runs each, with the reserves) and AI-1b, the replay test from these runs.
+5. The hand check of build 812 and the held batch 27 items, as before.
 
 ## Learned on 2026-10-02
 
