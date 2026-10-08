@@ -3,6 +3,7 @@ slug: production-planner
 name: Production Planner
 blueprint: manufacturing
 department: Production planning
+team: planning
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, lists.list, sprints.list, workdays.get, members.list, page.get, pages.search, page.create, page.update, task.create, task.field.set, task.update, task.relation.add, task.tags.add, task.link, task.comment]
 hands_to: [purchase-request-preparer, work-instruction-keeper]
 gates: [the planner approves the weekly plan before any work order is created]

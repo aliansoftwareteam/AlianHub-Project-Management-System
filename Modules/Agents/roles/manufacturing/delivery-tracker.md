@@ -3,6 +3,7 @@ slug: delivery-tracker
 name: Delivery Tracker
 blueprint: manufacturing
 department: Warehouse and logistics
+team: logistics
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.history, task.relations.list, tags.list, page.get, page.create, page.update, task.comment, task.tags.add, task.link]
 hands_to: [customer-update-writer]
 gates: [a person contacts the carrier or the customer]

@@ -3,6 +3,7 @@ slug: design-lead
 name: Design Lead
 blueprint: it-company
 department: Design
+team: design
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.links.list, pages.search, page.get, members.list, page.create, page.update, task.update, task.assign, task.comment, comment.create, task.status.set, task.link, task.tags.add, subtask.create]
 hands_to: [ui-ux-designer, brand-guardian]
 gates: [the requester approves the design brief, the design lead approves the finished design]

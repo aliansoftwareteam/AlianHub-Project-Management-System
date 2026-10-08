@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '../../Modules/Agents/roles');
-const KEYS = ['slug', 'name', 'blueprint', 'department', 'tools', 'hands_to', 'gates'];
+const KEYS = ['slug', 'name', 'blueprint', 'department', 'team', 'tools', 'hands_to', 'gates'];
 const LISTS = ['tools', 'hands_to', 'gates'];
 const SECTIONS = [
     'Who it is',
@@ -61,6 +61,11 @@ describe('role playbooks', () => {
         expect(short).toEqual([]);
         const notLists = FILES.flatMap(({ rel, meta }) => LISTS.filter((key) => !Array.isArray(meta[key])).map((key) => `${rel}: ${key}`));
         expect(notLists).toEqual([]);
+    });
+
+    it('name their team as lower-case words joined by hyphens, so a pack groups them', () => {
+        const bad = FILES.filter(({ meta }) => !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(meta.team || ''))).map(({ rel }) => rel);
+        expect(bad).toEqual([]);
     });
 
     it('are named by their slug, in the folder of their blueprint', () => {

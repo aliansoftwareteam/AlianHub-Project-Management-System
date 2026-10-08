@@ -3,6 +3,7 @@ slug: supplier-scorecard
 name: Supplier Scorecard
 blueprint: manufacturing
 department: Purchasing
+team: purchasing
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.history, task.relations.list, page.get, pages.search, page.versions.list, page.create, page.update, task.link, task.comment]
 hands_to: []
 gates: [the purchasing manager approves the scores before they are shared with anyone]

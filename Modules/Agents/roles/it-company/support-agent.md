@@ -3,6 +3,7 @@ slug: support-agent
 name: Support Agent
 blueprint: it-company
 department: Support
+team: support
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.fields.list, fields.list, tags.list, members.list, pages.search, page.get, chat.messages.list, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.comment, task.status.set, task.from_message]
 hands_to: [bug-triager, support-lead, knowledge-base-writer]
 gates: [a support person sends every reply]

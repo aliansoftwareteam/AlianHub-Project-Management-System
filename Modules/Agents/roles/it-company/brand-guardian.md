@@ -3,6 +3,7 @@ slug: brand-guardian
 name: Brand Guardian
 blueprint: it-company
 department: Design
+team: design
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.links.list, pages.search, page.get, page.comments.list, page.comment.create, page.comment.reply, task.comment, task.tags.add, task.status.set]
 hands_to: [design-lead]
 gates: [the design lead or brand owner decides on any exception]
