@@ -20,7 +20,7 @@ const NOT_OPEN_TO_THIS_PERSON = [403, 404];
 const hidden = () => typeof document !== "undefined" && document.hidden === true;
 
 // The socket and the company are passed in: the shell that provides them cannot inject them.
-export function useLiveProjects(socket, companyId) {
+export function useLiveProjects(socket, companyId, openProjectId = () => "") {
     const store = useStore();
 
     let bound = null;
@@ -96,6 +96,17 @@ export function useLiveProjects(socket, companyId) {
         bound = null;
     }
 
+    /* The shell drops its socket while the tab is hidden and connects a new one when it is seen again, so what was
+     * said in between never arrives: the open project is read again instead. */
+    function catchUp() {
+        const id = String(openProjectId() || "");
+        if (!id || !held(id) || waiting.has(id)) return;
+        if (!waiting.size) firstAt = Date.now();
+        waiting.set(id, "changed");
+        schedule();
+    }
+
+    let everBound = false;
     function bind() {
         const live = unref(socket);
         if (live === bound) return;
@@ -103,6 +114,8 @@ export function useLiveProjects(socket, companyId) {
         if (!live?.on) return;
         bound = live;
         live.on(PROJECT_CHANGED_EVENT, onChanged);
+        if (everBound) catchUp();
+        everBound = true;
     }
 
     watch(() => unref(socket), bind, { immediate: true });

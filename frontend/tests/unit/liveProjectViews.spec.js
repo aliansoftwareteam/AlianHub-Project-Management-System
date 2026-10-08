@@ -15,23 +15,25 @@ import { GATHER_MS, PROJECT_CHANGED_EVENT, useLiveProjects, useStoredProjectView
 import { splitProjectViews } from '@/views/Projects/composables/projectViewBar';
 
 const PAGE = fs.readFileSync(path.resolve(__dirname, '../../src/views/Projects/Projects.vue'), 'utf8');
+const APP = fs.readFileSync(path.resolve(__dirname, '../../src/App.vue'), 'utf8');
 const COMPANY = 'c1';
 const LIST = { _id: '6f00000000000000000000a1', id: '6f00000000000000000000a1', keyName: 'ProjectListView', name: 'List', title: 'List', viewStatus: true };
 const BY_STAGE = { ...LIST, _id: '6f00000000000000000000a2', id: '6f00000000000000000000a2', title: 'By Stage', sourceViewId: LIST._id };
 const project = (views) => ({ _id: 'p1', id: 'p1', ProjectName: 'Alpha', statusType: 'active', AssigneeUserId: [], sprintsObj: {}, sprintsfolders: {}, ProjectRequiredComponent: views });
 
 let handlers;
+let socket;
 let store;
 let page;
 let wrapper;
 
 const mountPage = () => {
     handlers = {};
-    const socket = ref({ on: (event, handler) => { handlers[event] = handler; }, off: () => {} });
+    socket = ref({ on: (event, handler) => { handlers[event] = handler; }, off: () => {} });
     store = createStore({ modules: { projectData: { namespaced: true, state: () => ({ allProjects: { data: [project([LIST])] }, sprints: {}, folders: {} }), getters: projectData.getters, mutations } } });
     const Host = defineComponent({
         setup() {
-            useLiveProjects(socket, computed(() => COMPANY));
+            useLiveProjects(socket, computed(() => COMPANY), () => 'p1');
             page = ref({ ...project([LIST]) });
             useStoredProjectViews(page);
             return () => h('div', splitProjectViews(page.value.ProjectRequiredComponent).views.map((view) => h('span', { class: 'tab' }, view.title)));
@@ -68,6 +70,29 @@ describe('a view added elsewhere', () => {
         store.state.projectData.allProjects.data[0].ProjectName = 'Alpha, renamed';
         await flushPromises();
         expect(page.value).toBe(before);
+    });
+
+    it('shows when it was added while the tab was hidden and its socket dropped', async () => {
+        socket.value = null;
+        await flushPromises();
+        apiRequest.mockResolvedValue({ data: project([LIST, BY_STAGE]) });
+        socket.value = { on: (event, handler) => { handlers[event] = handler; }, off: () => {} };
+        await vi.advanceTimersByTimeAsync(GATHER_MS);
+        await flushPromises();
+        expect(tabs()).toEqual(['List', 'By Stage']);
+    });
+
+    it('costs no read when the first socket connects', async () => {
+        wrapper.unmount();
+        apiRequest.mockReset();
+        mountPage();
+        await vi.advanceTimersByTimeAsync(GATHER_MS);
+        expect(apiRequest).not.toHaveBeenCalled();
+    });
+
+    it('is followed by the shell, which drops its socket on a hidden tab and names the open project', () => {
+        expect(APP).toMatch(/document\.hidden[\s\S]*?emit\('disconnectNameSpace'/);
+        expect(APP).toMatch(/useLiveProjects\(socket, companyId, \(\) => route\.params\?\.id\)/);
     });
 
     it('is wired into the project page', () => {
