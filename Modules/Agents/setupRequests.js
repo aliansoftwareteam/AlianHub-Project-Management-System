@@ -174,6 +174,28 @@ const SERVER_FAULT = 500;
 const heldField = (definition) => ({ name: definition.fieldTitle || '', type: definition.fieldType || '', fieldId: idOf(definition._id) });
 const fieldNamed = (fields, name) => (name ? fields.find((field) => sameName(field.name, name)) : undefined);
 
+/* What an agent needs to tell fields of one name apart when it asks the person which one they mean. */
+const fieldChoice = (definition) => {
+    const { optionsOf: optionRows, optionLabel } = require('../CustomField/helpers/fieldValueInput');
+    return { fieldId: idOf(definition._id), name: definition.fieldTitle || '', type: definition.fieldType || '', options: optionRows(definition).map(optionLabel) };
+};
+
+/* The held field a value names, by its id or its name. Of several fields with that name, the one value fits is
+ * taken only when it fits one alone; otherwise `choices` lists them all, so the agent asks rather than guesses. */
+const fieldForValue = (held, entry) => {
+    const byId = isId(entry.field) && held.find((field) => idOf(field._id).toLowerCase() === lower(entry.field));
+    if (byId) return { definition: byId };
+    const named = held.filter((field) => sameName(field.fieldTitle, entry.field));
+    if (named.length < 2) return { definition: named[0] };
+    const { storedValueOf } = require('../CustomField/helpers/fieldValueInput');
+    const fitting = named.filter((field) => !storedValueOf(field, entry.value).error);
+    return fitting.length === 1 ? { definition: fitting[0] } : { choices: named.map(fieldChoice) };
+};
+
+const choicesText = (name, choices) => `${choices.length} fields of this project are named "${name}": `
+    + choices.map((choice) => `${choice.fieldId} (${choice.type}${choice.options.length ? `: ${choice.options.join(', ')}` : ''})`).join('; ')
+    + '. Ask the person which one they mean and give its fieldId as field.';
+
 const saveField = async ({ companyId, who, projectId, draft, source }) => {
     const unreadable = computed.sourceProblem(draft, source);
     if (unreadable) return { name: draft.name, type: draft.type, made: false, error: unreadable };
@@ -240,8 +262,10 @@ const valuesMisfit = async ({ companyId, uid, projectId, definitions, values, ta
     const drafts = draftsOf(definitions);
     for (const [at, entry] of valuesOf(values).entries()) {
         if (!taskIds.includes(entry.taskId)) return `values[${at}]: ${NO_TASK}`;
+        const found = fieldForValue(held, entry);
+        if (found.choices) return `values[${at}]: ${choicesText(entry.field, found.choices)}`;
         const draft = drafts.find((named) => sameName(named.name, entry.field));
-        const definition = held.find((field) => sameName(field.fieldTitle, entry.field)) || (draft && definitionOf(draft, { projectId, uid }));
+        const definition = found.definition || (draft && definitionOf(draft, { projectId, uid }));
         if (!definition) return `values[${at}] names "${entry.field}", which is not a field of this call or of the project`;
         const read = storedValueOf(definition, entry.value);
         if (read.error) return `values[${at}] (${definition.fieldTitle}) ${read.error}`;
@@ -254,7 +278,8 @@ const valuesMisfit = async ({ companyId, uid, projectId, definitions, values, ta
 const setValue = async ({ companyId, actor, depth, approvedBy, projectId, held, entry }) => {
     const permissions = require('./permissions');
     const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
-    const definition = held.find((field) => sameName(field.fieldTitle, entry.field));
+    const { definition, choices } = fieldForValue(held, entry);
+    if (choices) throw refuse(choicesText(entry.field, choices));
     if (!definition) throw refuse(`This project has no field called "${entry.field}". Check fields.list.`);
     const task = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS, data: [{ _id: tools.oid(entry.taskId), ProjectID: { $in: idForms(projectId) }, deletedStatusKey: { $ne: 1 } }, { _id: 1 }],
@@ -515,6 +540,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
+    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
     FIELD_TYPES, CREATE_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };
