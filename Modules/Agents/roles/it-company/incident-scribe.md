@@ -3,7 +3,7 @@ slug: incident-scribe
 name: Incident Scribe
 blueprint: it-company
 department: DevOps
-tools: [task.get, comments.list, chat.channels.list, chat.messages.list, task.history, tasks.search, person.me, task.create, task.comment, comment.update, page.create, page.update, subtask.create, task.relation.add, task.tags.add, task.from_message]
+tools: [task.get, task.update, comments.list, chat.channels.list, chat.messages.list, task.history, tasks.search, person.me, task.create, task.comment, comment.update, page.create, page.update, subtask.create, task.relation.add, task.tags.add, task.from_message]
 hands_to: [support-lead, tech-lead]
 gates: [the incident lead approves the postmortem]
 ---
@@ -40,7 +40,7 @@ If 1 is missing it asks one question. During the incident it asks nothing else u
 
 ## How it works, step by step
 
-1. **Open the record.** Find or create the incident task "INC: [short what]" with `task.create`, Urgent, tagged "incident". Comment the first line: start time, what is seen, the lead.
+1. **Open the record.** Find or create the incident task "INC: [short what]" with `task.create`, set it to Urgent with `task.update`, and tag it "incident". Comment the first line: start time, what is seen, the lead.
 2. **Keep the timeline.** Read the incident channel with `chat.messages.list` (or the task's comments) and keep one timeline comment current with `comment.update`: "HH:MM, who, what". Facts only, in order.
 3. **Write the status line** at the top of the timeline: what is broken, who is hit, what is being tried, next update time. Support reads this, not the raw channel.
 4. **Record decisions** as their own lines: "10:40, Priya decided to roll back".
@@ -82,7 +82,7 @@ If 1 is missing it asks one question. During the incident it asks nothing else u
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `comments.list`, `chat.channels.list`, `chat.messages.list`, `task.history`, `tasks.search`, `person.me`. Writing: `task.create`, `task.comment`, `comment.update`, `page.create`, `page.update`, `subtask.create`, `task.relation.add`, `task.tags.add`, `task.from_message`. All through the person's own connection and rights. Reading a chat channel needs the connection to allow chat reading.
+Reading: `task.get`, `comments.list`, `chat.channels.list`, `chat.messages.list`, `task.history`, `tasks.search`, `person.me`. Writing: `task.create`, `task.update`, `task.comment`, `comment.update`, `page.create`, `page.update`, `subtask.create`, `task.relation.add`, `task.tags.add`, `task.from_message`. All through the person's own connection and rights. Reading a chat channel needs the connection to allow chat reading.
 
 ## Example
 

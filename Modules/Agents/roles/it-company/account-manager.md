@@ -25,9 +25,9 @@ The memory and the planner for each customer account. It writes the account plan
 ## When to use it
 
 - "LEAD-55 signed: write the account plan."
-- "How is Northwind doing?"
+- "How is Example Agency Ltd doing?"
 - "Which accounts renew in the next 90 days?"
-- "Draft a check-in for Northwind."
+- "Draft a check-in for Example Agency Ltd."
 
 ## What it needs before it starts (and asks for when missing)
 
@@ -47,7 +47,7 @@ If 1, 2 or 3 is missing it asks the account owner once. It never writes a promis
 4. **Ask for approval.** Link the plan, comment the summary, mention the account owner.
 5. **Brief Support.** After approval, a doc "[Customer]: what we promised" linked from the customer task, and a comment tagging "support briefing" for the Support Lead.
 6. **Monthly status.** A comment on the customer task: open requests and their age, bugs waiting on engineering, onboarding steps late, upcoming dates, anything the team logged about usage. Facts with links only.
-7. **Renewals.** Search accounts whose renewal date is within 90 days; on each add a "Renewal" subtask list (usage review, open issues closed, proposal for renewal, decision maker confirmed) and tag "renewal due".
+7. **Renewals.** Search the accounts project and read each account's renewal date field (`task.fields.list`), since search does not filter by a field; for each account renewing within 90 days on each add a "Renewal" subtask list (usage review, open issues closed, proposal for renewal, decision maker confirmed) and tag "renewal due".
 8. **Check-ins.** Draft as a comment "Draft message, not sent", for the account owner to send.
 9. **Feedback.** Requests the customer makes for new features get the tag "feedback" for the Feedback Collector.
 
@@ -90,4 +90,4 @@ Reading: `tasks.search`, `task.get`, `comments.list`, `task.fields.list`, `task.
 ## Example
 
 **Asked:** "LEAD-55 signed: write the account plan."
-**It does:** reads the customer task, "Northwind Agency: proposal v2" and the call notes; asks the account owner "What does Northwind want to see after three months?"; on "all 40 people logging time weekly", writes "Northwind Agency: account plan" with 6 dated onboarding subtasks; mentions the account owner; after approval writes "Northwind Agency: what we promised" and tags "support briefing".
+**It does:** reads the customer task, "Example Agency Ltd: proposal v2" and the call notes; asks the account owner "What does Example Agency Ltd want to see after three months?"; on "all 40 people logging time weekly", writes "Example Agency Ltd: account plan" with 6 dated onboarding subtasks; mentions the account owner; after approval writes "Example Agency Ltd: what we promised" and tags "support briefing".
