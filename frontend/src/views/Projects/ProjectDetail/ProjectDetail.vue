@@ -47,6 +47,7 @@
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
                 :projectId="String(projectData._id)"
                 :canEdit="checkPermission('project.project_details',projectData.isGlobalPermission) === true"
+                :choices="dispatcherChoices"
             />
             <AssignmentRulesCard
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
@@ -168,6 +169,14 @@
             .filter((person) => person.name)
             .sort((a, b) => a.name.localeCompare(b.name));
     });
+    const choicesOf = (list, value, label) => (Array.isArray(list) ? list : []).filter(Boolean)
+        .map((item) => ({ value: item[value], label: item[label] || '' })).filter((item) => item.value !== undefined && item.value !== null && item.label);
+    const dispatcherChoices = computed(() => ({
+        type: choicesOf(projectData.value?.taskTypeCounts, 'key', 'name'),
+        tag: choicesOf(projectData.value?.tagsArray, 'uid', 'name'),
+        status: choicesOf(projectData.value?.taskStatusData, 'key', 'name'),
+        priority: choicesOf(getters["settings/companyPriority"], 'value', 'name'),
+    }));
     const currentCompany = computed(() => getters["settings/selectedCompany"])
     const clientWidth = inject("$clientWidth");
     const emit = defineEmits(["openSeeAllProject","rightSideBarEmit","description"])

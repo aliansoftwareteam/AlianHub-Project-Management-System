@@ -470,7 +470,7 @@ describe('dispatcher: a lead decides', () => {
             const decision = await routeTask(task);
             // eslint-disable-next-line no-await-in-loop
             const res = await act('route', task, decision, { body: { role: REVIEWER } });
-            expect(res.body.data.decision).toMatchObject({ state: 'routed', chosenRole: REVIEWER });
+            expect(res.body.data.decision).toMatchObject({ state: 'routed', chosenRole: REVIEWER, resolvedBy: EDITOR, roleName: 'Code Reviewer' });
             offers.push(res.body.data.offer);
         }
         expect(offers.slice(0, 2)).toEqual([null, null]);

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 
-const { apiRequest, echo, toast } = vi.hoisted(() => ({
+const { apiRequest, echo, toast, socket } = vi.hoisted(() => ({
     apiRequest: vi.fn(),
+    socket: { handlers: {}, on(event, fn) { this.handlers[event] = fn; }, off(event) { delete this.handlers[event]; } },
     echo: (key, params) => (params ? `${key} ${JSON.stringify(params)}` : key),
     toast: { success: vi.fn(), error: vi.fn() }
 }));
@@ -10,6 +11,8 @@ const { apiRequest, echo, toast } = vi.hoisted(() => ({
 vi.mock('@/services', () => ({ apiRequest }));
 vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: echo }) }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
+vi.mock('vuex', () => ({ useStore: () => ({ getters: { 'settings/getSocketInstance': socket } }) }));
+vi.mock('@/composable', () => ({ useGetterFunctions: () => ({ getUser: (id) => ({ 'u-lead': { Employee_Name: 'Lena' } }[id]) }) }));
 
 import TaskRoleSuggestion from '@/components/organisms/TaskDetailOverlay/TaskRoleSuggestion.vue';
 
@@ -72,6 +75,19 @@ describe('TaskRoleSuggestion', () => {
         await wrapper.find('[data-test="role-offer-add"]').trigger('click');
         await flushPromises();
         expect(apiRequest).toHaveBeenCalledWith('post', `${BASE}/project/p1/rules`, { role: REVIEWER.key, when: offer.when });
+    });
+
+    it('says which lead routed the task when a lead overrode the dispatcher', async () => {
+        const wrapper = await mountChip({ found: decision({ state: 'routed', chosenRole: REVIEWER.key, roleName: REVIEWER.name, resolvedBy: 'u-lead' }) });
+        expect(chip(wrapper).text()).toContain('Dispatcher.routed_by {"role":"Code Reviewer","person":"Lena"}');
+    });
+
+    it('reads the decision again when the dispatcher announces a change', async () => {
+        const wrapper = await mountChip();
+        apiRequest.mockImplementation(() => ok({ on: true, decision: decision({ state: 'accepted' }), roles: [] }));
+        socket.handlers.dispatcherChanged({ kind: 'dispatchDecisions' });
+        await flushPromises();
+        expect(chip(wrapper).text()).toContain('Dispatcher.routed_to');
     });
 
     it('shows nothing while the dispatcher is off, and no buttons to someone who cannot decide', async () => {

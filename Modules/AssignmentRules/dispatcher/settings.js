@@ -138,6 +138,6 @@ const matches = (when, task) => {
     return named.length > 0 && named.every(([key, values]) => CONDITIONS[key](values, task));
 };
 
-const roleChoices = () => playbooks.all().map((role) => ({ key: roleKey(role), name: role.name, department: role.department }));
+const roleChoices = () => playbooks.all().map((role) => ({ key: roleKey(role), name: role.name, blueprint: role.blueprint, department: role.department }));
 
 module.exports = { MODES, THRESHOLD, MAX_RULES, DEFAULTS, roleKey, roleOf, roleName, view, settingsOf, load, validate, save, addRule, matches, roleChoices };

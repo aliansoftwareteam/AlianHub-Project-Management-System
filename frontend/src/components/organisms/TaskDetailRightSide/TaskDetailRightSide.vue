@@ -64,7 +64,7 @@
             <TaskRoleSuggestion
                 v-if="task?._id && checkPermission('task.task_assignee',project?.isGlobalPermission) !== null"
                 :task="task"
-                :canDecide="checkPermission('task.task_assignee',project?.isGlobalPermission) === true"
+                :canDecide="checkPermission('project.project_details',project?.isGlobalPermission) === true"
             />
             <div class="d-flex task-detail-right-side-label">
                 <div class="task-detail-field-name">{{$t('Comment.created_by')}}</div>

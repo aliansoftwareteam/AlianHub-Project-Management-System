@@ -20,7 +20,7 @@
                 </template>
             </span>
         </div>
-        <div v-if="offer" class="trs__offer" data-test="role-offer">
+        <div v-if="offer && canDecide" class="trs__offer" data-test="role-offer">
             <span>{{ $t('Dispatcher.offer_rule', { role: offer.role.name, times: offer.times }) }}</span>
             <button type="button" class="trs__btn" data-test="role-offer-add" :disabled="busy" @click="addOffer">{{ $t('Dispatcher.offer_add') }}</button>
         </div>
@@ -31,7 +31,8 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
-import { actOnRouting, addRoutingRule, fetchTaskRouting } from "@/utils/dispatcher";
+import { useGetterFunctions } from "@/composable";
+import { actOnRouting, addRoutingRule, fetchTaskRouting, useDispatcherChanges } from "@/utils/dispatcher";
 import { refusalText } from "@/utils/assignmentRules";
 
 defineOptions({ name: "TaskRoleSuggestion" });
@@ -45,6 +46,7 @@ const WAITING = ["suggested", "needs_routing"];
 
 const { t } = useI18n();
 const $toast = useToast();
+const { getUser } = useGetterFunctions();
 
 const decision = ref(null);
 const roles = ref([]);
@@ -60,6 +62,7 @@ const headline = computed(() => {
     if (!d) return "";
     if (d.state === "suggested") return t("Dispatcher.suggests", { role: d.roleName });
     if (d.state === "needs_routing") return t("Dispatcher.needs_routing");
+    if (d.state === "routed") return t("Dispatcher.routed_by", { role: d.roleName, person: getUser(d.resolvedBy)?.Employee_Name || t("Dispatcher.someone") });
     return t("Dispatcher.routed_to", { role: d.roleName });
 });
 const reason = computed(() => {
@@ -88,6 +91,8 @@ watch(() => props.task?._id, (taskId) => {
     picked.value = "";
     load(taskId);
 }, { immediate: true });
+
+useDispatcherChanges(() => { if (!busy.value) load(props.task?._id); });
 
 async function act(action, body) {
     const d = decision.value;

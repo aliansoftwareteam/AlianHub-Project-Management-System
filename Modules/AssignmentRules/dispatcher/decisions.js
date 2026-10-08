@@ -14,7 +14,7 @@ const { isClosedTask } = require('../../Tasks/helpers/taskSignals');
 const OFFER_AFTER = 3;
 const LISTED = 50;
 const SHOWN = Object.freeze(['suggested', 'needs_routing', 'applied', 'accepted', 'routed']);
-const PUBLIC_FIELDS = ['taskId', 'projectId', 'state', 'mode', 'role', 'source', 'ruleIndex', 'confidence', 'agentId', 'chosenRole', 'createdAt'];
+const PUBLIC_FIELDS = ['taskId', 'projectId', 'state', 'mode', 'role', 'source', 'ruleIndex', 'confidence', 'agentId', 'chosenRole', 'resolvedBy', 'createdAt'];
 
 const roleView = (key) => (key ? { key, name: settingsOf.roleName(key) } : null);
 
