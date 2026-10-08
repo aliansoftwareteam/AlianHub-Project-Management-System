@@ -36,6 +36,7 @@ const view = (row) => (row ? {
     revision: Number(row.revision) || 1,
     updatedBy: row.updatedBy ? String(row.updatedBy) : '',
     updatedAt: row.updatedAt || null,
+    dispatcher: row.dispatcher || null,
 } : null);
 
 const readRow = async (companyId, projectId) => plain(await MongoDbCrudOpration(companyId, {

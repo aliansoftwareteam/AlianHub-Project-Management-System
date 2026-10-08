@@ -1,4 +1,5 @@
 const controller = require('./controller');
+const dispatcher = require('./dispatcher/controller');
 const logger = require('../../Config/loggerConfig');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { READ, DETAILS, requireProjectAccess, projectIdsFrom } = require('../../Config/projectAccess');
@@ -22,5 +23,14 @@ exports.init = (app) => {
     app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/accept', byPerson('accept'), assignsTask, controller.actOnDecision('accept'));
     app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/dismiss', byPerson('dismiss'), assignsTask, controller.actOnDecision('dismiss'));
     app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo', byPerson('undo'), assignsTask, controller.actOnDecision('undo'));
+
+    app.get('/api/v2/assignment-rules/dispatcher/project/:projectId', readsProject, dispatcher.getSettings);
+    app.put('/api/v2/assignment-rules/dispatcher/project/:projectId', dispatcher.whenOn, agentsRefused('project.settings'), editsRules, dispatcher.saveSettings);
+    app.post('/api/v2/assignment-rules/dispatcher/project/:projectId/rules', dispatcher.whenOn, agentsRefused('project.settings'), editsRules, dispatcher.addRule);
+    app.get('/api/v2/assignment-rules/dispatcher/project/:projectId/needs-routing', readsProject, dispatcher.getNeedsRouting);
+    app.get('/api/v2/assignment-rules/dispatcher/task/:taskId', readsTask, dispatcher.getTaskDecision);
+    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/accept', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.accept'), assignsTask, dispatcher.actOnDecision('accept'));
+    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/dismiss', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.dismiss'), assignsTask, dispatcher.actOnDecision('dismiss'));
+    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/route', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.route'), assignsTask, dispatcher.actOnDecision('route'));
     logger.info('AssignmentRules routes initialised');
 };

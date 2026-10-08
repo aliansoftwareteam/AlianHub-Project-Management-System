@@ -102,6 +102,9 @@ const EVENTS = Object.freeze({
     'workflow.run_agent': 'A workflow ran an agent',
     'workflow.set_priority': 'A workflow changed the priority',
     'workflow.set_status': 'A workflow changed the status',
+    'dispatcher.routed': 'The dispatcher routed a task',
+    'dispatcher.settings_changed': 'Changed the dispatcher of a project',
+    'dispatcher.rule_added': 'Added a routing rule',
 });
 
 /* `meta.action` of an agent's row, for what the agent registry (Modules/Agents/registry.js) does not hold:
@@ -203,6 +206,9 @@ const ACTIONS = Object.freeze({
     'assignment.suggestion.accept': 'Accept a suggested assignee',
     'assignment.suggestion.dismiss': 'Dismiss a suggested assignee',
     'assignment.suggestion.undo': 'Undo a suggested assignee',
+    'dispatcher.suggestion.accept': 'Accept a suggested role',
+    'dispatcher.suggestion.dismiss': 'Dismiss a suggested role',
+    'dispatcher.suggestion.route': 'Send a task to a role',
     'timesheet.review': 'Review a timesheet',
     'pto.decide': 'Approve or turn down time off',
     'integration.connect': 'Connect an integration',

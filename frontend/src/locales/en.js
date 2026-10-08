@@ -8931,7 +8931,10 @@ export default {
         workflow_notify: "A workflow sent a notification",
         workflow_run_agent: "A workflow ran an agent",
         workflow_set_priority: "A workflow changed the priority",
-        workflow_set_status: "A workflow changed the status"
+        workflow_set_status: "A workflow changed the status",
+        dispatcher_routed: "The dispatcher routed a task",
+        dispatcher_settings_changed: "Changed the dispatcher of a project",
+        dispatcher_rule_added: "Added a routing rule"
     },
     AuditActions: {
         model_call: "Ask the AI model",
@@ -9030,6 +9033,9 @@ export default {
         assignment_suggestion_accept: "Accept a suggested assignee",
         assignment_suggestion_dismiss: "Dismiss a suggested assignee",
         assignment_suggestion_undo: "Undo a suggested assignee",
+        dispatcher_suggestion_accept: "Accept a suggested role",
+        dispatcher_suggestion_dismiss: "Dismiss a suggested role",
+        dispatcher_suggestion_route: "Send a task to a role",
         timesheet_review: "Review a timesheet",
         pto_decide: "Approve or turn down time off",
         integration_connect: "Connect an integration",
