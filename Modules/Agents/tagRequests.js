@@ -25,7 +25,6 @@ const lower = (value) => String(value).trim().toLowerCase();
 
 const nameOf = (value) => setup().lineOf(value, NAME_MAX + 1);
 
-/* '' for a tag that can be asked for; otherwise what is wrong with the request. */
 const tagProblem = (given) => {
     const asked = given && typeof given === 'object' ? given : {};
     const name = nameOf(asked.name);
@@ -45,8 +44,14 @@ const tagsOf = (project) => require('./workRequests').tagsOf(project);
 const tagByName = (project, name) => tagsOf(project).find((tag) => lower(tag.tagName || '') === lower(name)) || null;
 const alreadyThere = (tag) => `The project already has the tag "${tag.tagName}" (${tag.uid}). Put it on a task with task.tags.add.`;
 
+const DUPLICATE = 409;
+
 const tagWrite = async ({ companyId, who, projectId, items, operation }, fallback) => {
     const answer = await setup().answerOf('projectTags', { companyId, who, body: { id: projectId, items, operation } });
+    if (answer.code === DUPLICATE) {
+        const held = tagByName(await storedProject(companyId, projectId), items.tagName);
+        throw refuse(held ? alreadyThere(held) : setup().reasonOf(answer, fallback));
+    }
     if (answer.code !== 200 || !answer.body || answer.body.status !== true) throw refuse(setup().reasonOf(answer, fallback));
 };
 
@@ -80,8 +85,14 @@ const withdrawTag = async ({ companyId, who, projectId, tagId }) => {
     const inProject = idOf(project._id);
     const tag = tagsOf(project).find((entry) => String(entry.uid) === idOf(tagId));
     if (!tag) return { projectId: inProject, removed: false };
-    if (await carried(companyId, inProject, tag.uid)) throw refuse(`The tag "${tag.tagName}" was kept: a task carries it now. Take it off those tasks first, or remove the tag in AlianHub.`);
+    const kept = refuse(`The tag "${tag.tagName}" was kept: a task carries it now. Take it off those tasks first, or remove the tag in AlianHub.`);
+    if (await carried(companyId, inProject, tag.uid)) throw kept;
     await tagWrite({ companyId, who, projectId: inProject, items: { id: String(tag.uid) }, operation: 'delete' }, 'The tag was not removed. Try again, or tell the person.');
+    // A task may take the tag between the check and the removal; it is put back as it was.
+    if (await carried(companyId, inProject, tag.uid)) {
+        await tagWrite({ companyId, who, projectId: inProject, items: { ...tag }, operation: 'push' }, 'The tag was removed while a task carried it, and could not be put back. Tell the person.');
+        throw kept;
+    }
     await announce(companyId, inProject, 'remove');
     return { projectId: inProject, removed: true, name: tag.tagName || '' };
 };

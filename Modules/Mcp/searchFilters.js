@@ -47,6 +47,16 @@ const SEARCH_INPUT = Object.freeze({
 
 const opens = (vis, uid) => (project) => vis.allowsProject(project._id) && !isSomeoneElsesPersonalList(project, uid);
 
+/* The live projects among `candidates` (every project when null) that the person can open, as a find clause, so a
+ * cap on the find never drops one of them in favour of a project they cannot open. */
+const openProjects = (ctx, vis, candidates) => {
+    const named = candidates === null ? (Array.isArray(vis.projectIds) ? vis.projectIds.map(String) : null) : candidates.map(String);
+    const kept = named === null ? null : named.filter((id) => isId(id) && vis.allowsProject(id));
+    const excluded = (vis.excludedProjectIds || []).map(String).filter(isId);
+    const ids = kept === null ? (excluded.length ? { _id: { $nin: excluded.map((id) => oid(id)) } } : {}) : { _id: { $in: kept.map((id) => oid(id)) } };
+    return { ...ids, deletedStatusKey: { $nin: [1] }, $or: [{ isPersonal: { $ne: true } }, { personalOwner: String(ctx.userId) }] };
+};
+
 const tagClause = async (ctx, vis, args) => {
     const wanted = str(args.tag, TAG_MAX).trim();
     if (!wanted) return { error: 'tag needs a tag id or name.' };
@@ -54,7 +64,7 @@ const tagClause = async (ctx, vis, args) => {
     const projects = await MongoDbCrudOpration(ctx.companyId, {
         type: SCHEMA_TYPE.PROJECTS,
         data: [
-            { ...(isId(args.projectId) ? { _id: oid(String(args.projectId)) } : {}), deletedStatusKey: { $nin: [1] }, tagsArray: { $elemMatch: named } },
+            { ...openProjects(ctx, vis, isId(args.projectId) ? [String(args.projectId)] : null), tagsArray: { $elemMatch: named } },
             { tagsArray: 1, isPersonal: 1, personalOwner: 1 },
             { limit: PROJECTS_MAX },
         ],
@@ -79,7 +89,11 @@ const visibleField = async (ctx, vis, fieldId) => {
         data: [{ _id: oid(String(fieldId)) }, { fieldTitle: 1, fieldType: 1, fieldOptions: 1, type: 1, global: 1, projectId: 1, isDelete: 1 }],
     }, 'findOne');
     if (!definition || definition.isDelete === false || definition.type !== 'task') return null;
-    return definition.global === true || [].concat(definition.projectId || []).some((id) => vis.allowsProject(id)) ? definition : null;
+    if (definition.global === true) return definition;
+    const project = await MongoDbCrudOpration(ctx.companyId, {
+        type: SCHEMA_TYPE.PROJECTS, data: [openProjects(ctx, vis, [].concat(definition.projectId || [])), { isPersonal: 1, personalOwner: 1 }],
+    }, 'findOne');
+    return project && opens(vis, ctx.userId)(project) ? definition : null;
 };
 
 const dayStart = (day, zone) => (DAY.test(String(day)) ? DateTime.fromISO(String(day), { zone }).startOf('day') : null);
