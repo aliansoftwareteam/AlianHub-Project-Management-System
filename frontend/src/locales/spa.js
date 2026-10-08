@@ -8765,7 +8765,10 @@ export default {
         "workflow_notify": "A workflow sent a notification",
         "workflow_run_agent": "A workflow ran an agent",
         "workflow_set_priority": "A workflow changed the priority",
-        "workflow_set_status": "A workflow changed the status"
+        "workflow_set_status": "A workflow changed the status",
+        "dispatcher_routed": "The dispatcher routed a task",
+        "dispatcher_settings_changed": "Changed the dispatcher of a project",
+        "dispatcher_rule_added": "Added a routing rule"
     },
     "AuditActions": {
         "model_call": "Ask the AI model",
@@ -8864,6 +8867,9 @@ export default {
         "assignment_suggestion_accept": "Accept a suggested assignee",
         "assignment_suggestion_dismiss": "Dismiss a suggested assignee",
         "assignment_suggestion_undo": "Undo a suggested assignee",
+        "dispatcher_suggestion_accept": "Accept a suggested role",
+        "dispatcher_suggestion_dismiss": "Dismiss a suggested role",
+        "dispatcher_suggestion_route": "Send a task to a role",
         "timesheet_review": "Review a timesheet",
         "pto_decide": "Approve or turn down time off",
         "integration_connect": "Connect an integration",
@@ -13054,6 +13060,28 @@ export default {
         "settings_hint": "Templates saved from tasks, for one project or the whole workspace. Save a new one from a task's menu.",
         "settings_empty": "No task templates yet.",
         "summary": "{checklist} checklist items, {subtasks} subtasks"
+    },
+    "Dispatcher": {
+        "title": "Dispatcher",
+        "lead": "Sends each new or changed task to the agent role that should take it, by this project's routing rules.",
+        "mode_label": "Mode",
+        "mode_off": "Off",
+        "mode_suggest": "Suggest a role",
+        "mode_apply": "Send to the role's queue",
+        "counts": "{roles} roles on, {rules} routing rules",
+        "suggests": "Dispatcher suggests {role}",
+        "needs_routing": "Needs routing",
+        "routed_to": "Routed to {role} by the dispatcher",
+        "by_rule": "rule {n}",
+        "by_model": "AI guess, {confidence}% sure",
+        "accept": "Accept",
+        "dismiss": "Dismiss",
+        "pick_role": "Choose a role",
+        "send": "Send",
+        "offer_rule": "You sent this task type to {role} {times} times. Always send it there?",
+        "offer_add": "Add rule",
+        "offer_added": "Routing rule added.",
+        "failed": "Could not update the routing. Please try again."
     },
     "AssignmentRules": {
         "title": "Assignment rules",

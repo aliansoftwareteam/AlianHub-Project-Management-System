@@ -61,6 +61,11 @@
                 :task="task"
                 :canAssign="checkPermission('task.task_assignee',project?.isGlobalPermission) === true"
             />
+            <TaskRoleSuggestion
+                v-if="task?._id && checkPermission('task.task_assignee',project?.isGlobalPermission) !== null"
+                :task="task"
+                :canDecide="checkPermission('task.task_assignee',project?.isGlobalPermission) === true"
+            />
             <div class="d-flex task-detail-right-side-label">
                 <div class="task-detail-field-name">{{$t('Comment.created_by')}}</div>
                 <Skelaton v-if="!task?.Task_Leader && isMainSpinner" style="height: 30px;" class="w-30px border-radius-50-per"/>
@@ -297,6 +302,7 @@ import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vu
 import { useEscapeLayer } from '@/composable/useEscapeLayer';
 import TaskRepeatControl from '@/components/organisms/TaskDetailOverlay/TaskRepeatControl.vue';
 import TaskAssignmentSuggestion from '@/components/organisms/TaskDetailOverlay/TaskAssignmentSuggestion.vue';
+import TaskRoleSuggestion from '@/components/organisms/TaskDetailOverlay/TaskRoleSuggestion.vue';
 import { canUseAi } from "@/composable/aiAvailability";
 
 const aiEstimateIcon = require("@/assets/images/svg/ai_image.svg");
