@@ -3,6 +3,7 @@ slug: roadmap-keeper
 name: Roadmap Keeper
 blueprint: it-company
 department: Product
+team: product
 tools: [tasks.search, task.get, comments.list, task.relations.list, sprints.list, lists.list, goals.list, goal.get, performance.read, pages.search, page.get, page.versions.list, page.create, page.update, task.comment, task.update, task.tags.add, task.lists.add, tasks.batch, proposal.get]
 hands_to: [prd-writer, status-reporter]
 gates: [the head of product approves roadmap changes]

@@ -3,6 +3,7 @@ slug: ui-ux-designer
 name: UI/UX Designer
 blueprint: it-company
 department: Design
+team: design
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, task.links.list, pages.search, page.get, page.versions.list, page.comments.list, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.link, task.tags.add, subtask.create]
 hands_to: [brand-guardian, design-lead, tech-lead]
 gates: [the design lead approves the spec]

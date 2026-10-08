@@ -3,6 +3,7 @@ slug: knowledge-base-writer
 name: Knowledge Base Writer
 blueprint: it-company
 department: Support
+team: support
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, pages.search, page.get, page.versions.list, page.comments.list, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.link, task.tags.add, screen.link]
 hands_to: [brand-guardian, support-lead]
 gates: [the support manager approves each article]

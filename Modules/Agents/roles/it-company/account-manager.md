@@ -3,6 +3,7 @@ slug: account-manager
 name: Account Manager
 blueprint: it-company
 department: Sales
+team: sales
 tools: [tasks.search, task.get, comments.list, task.fields.list, task.relations.list, project.get, pages.search, page.get, page.create, page.update, task.create, subtask.create, task.update, task.field.set, task.assign, task.relation.add, task.tags.add, task.comment, task.link, workdays.get]
 hands_to: [support-lead, feedback-collector]
 gates: [the account owner approves the account plan, a person sends every customer message]

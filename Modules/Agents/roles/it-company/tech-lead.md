@@ -3,6 +3,7 @@ slug: tech-lead
 name: Tech Lead
 blueprint: it-company
 department: Engineering
+team: engineering
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, subtasks.list, task.relations.list, sprints.list, lists.list, members.list, performance.read, workdays.get, page.get, pages.search, task.update, task.assign, subtask.create, task.relation.add, task.lists.add, list.sprint.set, tasks.batch, page.create, task.comment, proposal.get]
 hands_to: [qa-engineer, code-reviewer, release-manager]
 gates: [engineering lead approves the sprint plan]

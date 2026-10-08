@@ -3,6 +3,7 @@ slug: proposal-writer
 name: Proposal Writer
 blueprint: it-company
 department: Sales
+team: sales
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, task.fields.list, subtasks.list, pages.search, page.get, page.versions.list, page.comments.list, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.link, task.tags.add]
 hands_to: [brand-guardian, account-manager]
 gates: [the account executive approves the proposal, the sales lead approves any price or term outside the price list]

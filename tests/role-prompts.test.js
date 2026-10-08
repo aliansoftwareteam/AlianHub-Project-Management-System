@@ -23,7 +23,7 @@ const manager = () => personal(['read', 'write'], ['tasks:manage', 'docs:manage'
 const roleNames = (ctx) => prompts.list(ctx).map((prompt) => prompt.name).filter((name) => name.startsWith('work_as_'));
 
 const PLAYBOOK = (meta) => `---\n${meta}\n---\n\n# Role\n\n## Who it is\n\nA tester. It checks things.\n`;
-const GOOD_META = 'slug: tester\nname: Tester\nblueprint: demo\ndepartment: QA\ntools: [task.get]\nhands_to: []\ngates: []';
+const GOOD_META = 'slug: tester\nname: Tester\nblueprint: demo\ndepartment: QA\nteam: qa\ntools: [task.get]\nhands_to: []\ngates: []';
 
 describe('the role playbook loader', () => {
     it('reads every playbook once, with its frontmatter and its text', () => {
@@ -31,7 +31,7 @@ describe('the role playbook loader', () => {
         expect(roles.length).toBeGreaterThanOrEqual(44);
         expect(rolePlaybooks.all()).toBe(roles);
         const triager = rolePlaybooks.find('it-company', 'bug-triager');
-        expect(triager).toMatchObject({ name: 'Bug Triager', department: 'Engineering', handsTo: ['tech-lead'] });
+        expect(triager).toMatchObject({ name: 'Bug Triager', department: 'Engineering', team: 'engineering', handsTo: ['tech-lead'] });
         expect(triager.tools).toEqual(expect.arrayContaining(['tasks.search', 'task.get']));
         expect(triager.body).toMatch(/^# Bug Triager/);
         expect(triager.body).not.toMatch(/^---/m);
@@ -46,7 +46,7 @@ describe('the role playbook loader', () => {
 
     it('names the file and the fault when a playbook is broken', () => {
         expect(() => rolePlaybooks.parse('# no frontmatter', 'demo/x.md')).toThrow('Role playbook demo/x.md: it does not open with a --- frontmatter block');
-        expect(() => rolePlaybooks.parse(PLAYBOOK('slug: tester\nname: Tester'), 'demo/tester.md')).toThrow('the frontmatter lacks blueprint, department, tools, hands_to, gates');
+        expect(() => rolePlaybooks.parse(PLAYBOOK('slug: tester\nname: Tester'), 'demo/tester.md')).toThrow('the frontmatter lacks blueprint, department, team, tools, hands_to, gates');
         expect(() => rolePlaybooks.parse(PLAYBOOK(GOOD_META.replace('tools: [task.get]', 'tools: task.get')), 'demo/tester.md')).toThrow('tools must be a [list]');
         expect(() => rolePlaybooks.parse(PLAYBOOK(GOOD_META), 'demo/other.md')).toThrow('it must live at demo/tester.md');
         expect(() => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\nnot a key`), 'demo/tester.md')).toThrow('cannot read the frontmatter line "not a key"');

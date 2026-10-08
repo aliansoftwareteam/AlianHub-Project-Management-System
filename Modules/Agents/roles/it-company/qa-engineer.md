@@ -3,6 +3,7 @@ slug: qa-engineer
 name: QA Engineer
 blueprint: it-company
 department: QA
+team: engineering
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, subtasks.list, task.links.list, page.get, docs.read, pages.search, page.create, subtask.create, task.create, task.relation.add, task.comment, comment.create, task.tags.add, task.status.set, task.link]
 hands_to: [bug-triager, release-manager]
 gates: [the QA lead approves the test plan]
