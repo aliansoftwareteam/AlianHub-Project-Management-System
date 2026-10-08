@@ -253,6 +253,19 @@ const sprintRef = async (companyId, sprint) => {
     };
 };
 
+/* A subtask lives in its parent's list. The stored row holds the list's ids as ObjectIds (the task schema's
+ * setter), and the route's preparation takes a list only as the plain ids a client sends. */
+const placementUnder = (parent) => {
+    const list = parent.sprintArray || {};
+    const sprintId = idOf(parent.sprintId || list.id);
+    const folderId = idOf(list.folderId || parent.folderObjId);
+    return {
+        sprintId,
+        sprintArray: { id: sprintId, name: list.name || '', ...(folderId ? { folderId, folderName: list.folderName || '' } : {}) },
+        ...(folderId ? { folderObjId: folderId } : {}),
+    };
+};
+
 const destinationOf = async ({ companyId, actor, uid, params }) => {
     const { canReadProject } = require('../../Config/projectAccess');
     const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
@@ -447,8 +460,7 @@ const executors = {
         const title = EDITS.TaskName.clean(params.title);
         const project = await storedProject(companyId, parent.ProjectID);
         const set = await createFieldsOf({ companyId, actor, who, project, fields: params.fields });
-        const placement = { sprintId: idOf(parent.sprintId), sprintArray: parent.sprintArray || {} };
-        const made = await createThroughRoute({ companyId, who, project, placement, parent, title, set });
+        const made = await createThroughRoute({ companyId, who, project, placement: placementUnder(parent), parent, title, set });
         return { result: { subtaskId: made.taskId, key: made.key, title }, undo: { kind: 'subtask', subtaskId: made.taskId, parentTaskId: idOf(parent._id) }, entityId: params.taskId };
     },
 
