@@ -4,6 +4,8 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const registry = require('../Agents/registry');
 const { oid } = require('../Automations/engine/tools');
 const work = require('../Agents/workRequests');
+const projectTags = require('../Agents/tagRequests');
+const searchFilters = require('./searchFilters');
 const { opensList } = require('../Tasks/helpers/taskExtraLists');
 const { TASK_ACCESS_FIELDS } = require('./visibility');
 const { GRANT, DOCS_GRANT } = require('./manageFlag');
@@ -19,7 +21,8 @@ const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 
 // Everyday work on what a person can already open: tags, links between tasks, lists, the lists a task is added to and doc comments.
-// A read needs the read scope and a write the write scope, with no grant. Each write names its target so
+// A read needs the read scope and a write the write scope; a write that changes what a whole project chooses from (a
+// new tag) needs the manage grant, as the setup tools' requests are filed under it. Each write names its target so
 // tools.call checks it against the caller's filter first, then runs as a registry action whose executor is
 // the web route's own handler (Modules/Agents/workRequests.js).
 
@@ -94,7 +97,10 @@ const LIVE = Object.freeze({ $in: [0, null] });
 
 const OTHER_LIST = Object.freeze({ ...ID, description: 'The other list (see lists.list)' });
 const LIST_PROJECT = Object.freeze({ ...ID, description: 'The project that list is in' });
-const SEARCH_INPUT = Object.freeze({ sprintId: { type: 'string', description: 'Only the tasks of this list: the ones that live in it and the ones added to it' } });
+const SEARCH_INPUT = Object.freeze({
+    sprintId: { type: 'string', description: 'Only the tasks of this list: the ones that live in it and the ones added to it' },
+    ...searchFilters.SEARCH_INPUT,
+});
 
 /* What tasks.search adds for one list: the tasks that live in it and, for a caller who can open the list, the
  * tasks added to it. It goes beside the caller's own clause, so a task is still read by its home alone. */
@@ -105,6 +111,14 @@ const listRows = async (ctx, vis, sprintId) => {
     const list = await findOne(ctx, SCHEMA_TYPE.SPRINTS, { _id: oid(String(sprintId)) }, { projectId: 1 });
     const open = Boolean(list) && vis.allowsProject(list.projectId) && vis.allowsSprint(list._id) && await opensList(ctx.companyId, ctx.userId, String(sprintId));
     return { filter: open ? { $or: [home, { extraLists: { $elemMatch: { sprintId: { $in: ids } } } }] } : home };
+};
+
+/* A name the project already has is answered with that tag before anything is filed. A project the caller cannot
+ * open is left to the target check, which answers it as missing. */
+const tagToFile = async (ctx, args, vis) => {
+    const project = await loadProject(ctx, vis, args.projectId);
+    const held = project ? projectTags.tagByName(project, projectTags.nameOf(args.name)) : null;
+    return held ? { answer: { ok: false, error: projectTags.alreadyThere(held), tagId: String(held.uid) } } : { args };
 };
 
 const TOOLS = [
@@ -218,6 +232,25 @@ const TOOLS = [
         description: 'Takes a tag off a task at once, by tag id or by name.',
         input: input({ taskId: ID, tag: TAG, ...REASON }, ['taskId', 'tag']),
         params: (args) => ({ taskId: str(args.taskId, 40), tag: str(args.tag, TAG_MAX) }),
+    },
+    {
+        name: 'tag.create',
+        action: 'tag.create',
+        visibility: 'filtered',
+        strict: true,
+        grant: GRANT,
+        target: (args) => ({ projectId: str(args.projectId, 40) }),
+        description: 'Adds a new tag to one project, by name, with a colour if you name one. A tag shows on every task of the project, so this waits for the person to approve it in AlianHub and nothing is added before then. '
+            + 'A name the project already has is not added twice: the answer gives that tag instead, so check tags.list first. Once it is approved, put it on tasks with task.tags.add. Undo removes it while no task carries it.',
+        input: input({
+            projectId: ID,
+            name: { type: 'string', minLength: 1, maxLength: projectTags.NAME_MAX },
+            color: { type: 'string', pattern: '^#[0-9a-fA-F]{6}$', description: 'Written #RRGGBB. Left out, one is picked.' },
+            ...REASON,
+        }, ['projectId', 'name']),
+        check: (args) => projectTags.tagProblem(args),
+        prepare: tagToFile,
+        params: (args) => ({ projectId: str(args.projectId, 40), name: projectTags.nameOf(args.name), ...(args.color === undefined ? {} : { color: String(args.color).toUpperCase() }) }),
     },
     {
         name: 'task.relation.add',
@@ -347,7 +380,7 @@ const SCOPES = Object.freeze({
     ...goalTools.READ_SCOPES,
     ...queueTools.READ_SCOPES,
     ...automationTools.READ_SCOPES,
-    ...Object.fromEntries(TOOLS.filter((tool) => !tool.run).map((tool) => [tool.name, 'tasks:write'])),
+    ...Object.fromEntries(TOOLS.filter((tool) => !tool.run).map((tool) => [tool.name, tool.grant || 'tasks:write'])),
     ...timesheetTools.SCOPES,
 });
 
