@@ -47,7 +47,7 @@ const findingYourWay = (has) => {
         taskReads.length && `- ${joined(taskReads)}.`,
         projectReads.length && `- For one project, ${joined(projectReads)}.`,
         docReads.length && `- ${joined(docReads)}.`,
-        has('screen.link') && '- When the person asks where something is or how to see it, answer in one line and add the link from `screen.link`.',
+        has('screen.link') && '- When the person asks where something is or how to see it, grouped or filtered too, answer in one line and add the link from `screen.link`.',
         has('person.place') && '- When the person names no place, or says "here", `person.place` shows what they last had open. When it is old or empty, ask where they mean.',
     ].filter(Boolean);
 };

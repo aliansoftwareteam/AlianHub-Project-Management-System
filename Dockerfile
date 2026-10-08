@@ -50,6 +50,8 @@ COPY Modules/CustomField/fieldTypes /app/Modules/CustomField/fieldTypes
 COPY Modules/Automations/templates.js /app/Modules/Automations/templates.js
 COPY Modules/Company/helpers/workingDays.js /app/Modules/Company/helpers/workingDays.js
 COPY Modules/Tasks/helpers/taskTreeRules.js /app/Modules/Tasks/helpers/taskTreeRules.js
+COPY Modules/Tasks/helpers/ganttShift.js /app/Modules/Tasks/helpers/ganttShift.js
+COPY Modules/Tasks/helpers/workingCalendar.js /app/Modules/Tasks/helpers/workingCalendar.js
 COPY Modules/Tasks/helpers/taskExtraListsRules.js /app/Modules/Tasks/helpers/taskExtraListsRules.js
 COPY Modules/Tasks/helpers/descriptionBlock.js /app/Modules/Tasks/helpers/descriptionBlock.js
 COPY Modules/Tasks/helpers/richTextAllowlist.js /app/Modules/Tasks/helpers/richTextAllowlist.js

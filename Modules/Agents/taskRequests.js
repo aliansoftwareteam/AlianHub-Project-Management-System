@@ -431,6 +431,34 @@ const createThroughRoute = async ({ companyId, who, project, placement, parent, 
     return { taskId: idOf(created.id), key: await keyOnceAssigned(companyId, created.id), title };
 };
 
+/* The edits a task.edit names that change something, each cleaned as it is stored. */
+const editsOf = (task, params, zone) => {
+    const given = params.fields && typeof params.fields === 'object' ? params.fields : {};
+    const names = Object.keys(given);
+    const unknown = names.filter((name) => !Object.hasOwn(EDITS, name));
+    if (unknown.length) throw refuse(`${unknown.join(', ')} cannot be changed with this tool.`);
+    if (!names.length) throw refuse('Name at least one detail to change.');
+    const wanted = names.map((name) => ({ name, value: EDITS[name].clean(given[name], zone) }));
+    const start = wanted.find((change) => change.name === 'startDate');
+    const due = wanted.find((change) => change.name === 'DueDate');
+    if (start && due && due.value && new Date(start.value) > new Date(due.value)) throw refuse('The start date is after the due date. Check both dates.');
+    return wanted.filter(({ name, value }) => !EDITS[name].same(task, value));
+};
+
+const waitingPlan = ({ companyId, actor, uid, task, changes, zone, approved, applying }) => {
+    const dated = Object.fromEntries(changes.filter(({ name }) => name === 'startDate' || name === 'DueDate').map(({ name, value }) => [name, value]));
+    return Object.keys(dated).length ? require('./waitingTasks').plan({ companyId, actor, uid, task, to: dated, zone, approved, applying }) : null;
+};
+
+/* The waiting tasks a task.edit waiting for approval would move once approved, for its card; nothing is counted or written. */
+const plannedMoves = async ({ companyId, actor, params }) => {
+    const uid = personOf(actor);
+    const task = await liveTask(companyId, params.taskId);
+    const zone = await zoneOf(uid);
+    const waiting = await waitingPlan({ companyId, actor, uid, task, changes: editsOf(task, params, zone), zone, approved: true, applying: false });
+    return waiting ? waiting.answer.moved : [];
+};
+
 const executors = {
     async 'task.status.change'({ companyId, actor, params, depth }) {
         const who = whoOf(actor, depth);
@@ -464,29 +492,39 @@ const executors = {
         return { result: { subtaskId: made.taskId, key: made.key, title }, undo: { kind: 'subtask', subtaskId: made.taskId, parentTaskId: idOf(parent._id) }, entityId: params.taskId };
     },
 
-    async 'task.edit'({ companyId, actor, params, depth }) {
+    async 'task.edit'({ companyId, actor, params, depth, approvedBy }) {
         const who = whoOf(actor, depth);
         const { uid } = who;
         const task = await liveTask(companyId, params.taskId);
-        const given = params.fields && typeof params.fields === 'object' ? params.fields : {};
-        const names = Object.keys(given);
-        const unknown = names.filter((name) => !Object.hasOwn(EDITS, name));
-        if (unknown.length) throw refuse(`${unknown.join(', ')} cannot be changed with this tool.`);
-        if (!names.length) throw refuse('Name at least one detail to change.');
         const zone = await zoneOf(uid);
-        const wanted = names.map((name) => ({ name, value: EDITS[name].clean(given[name], zone) }));
-        const start = wanted.find((change) => change.name === 'startDate');
-        const due = wanted.find((change) => change.name === 'DueDate');
-        if (start && due && due.value && new Date(start.value) > new Date(due.value)) throw refuse('The start date is after the due date. Check both dates.');
-
-        const changes = wanted.filter(({ name, value }) => !EDITS[name].same(task, value));
+        const changes = editsOf(task, params, zone);
+        const waiting = await waitingPlan({ companyId, actor, uid, task, changes, zone, approved: Boolean(approvedBy), applying: true });
         const previous = {};
-        for (const { name, value } of changes) {
-            await EDITS[name].write({ companyId, who, task, value, zone, note: String(params.note || '').slice(0, 500) });
-            Object.assign(previous, EDITS[name].previous(task));
+        try {
+            for (const { name, value } of changes) {
+                await EDITS[name].write({ companyId, who, task, value, zone, note: String(params.note || '').slice(0, 500) });
+                Object.assign(previous, EDITS[name].previous(task));
+            }
+        } catch (error) {
+            if (Object.keys(previous).length) await require('./undo').inverses.update(companyId, { taskId: idOf(task._id), previous }, actor).catch(() => null);
+            throw error;
+        }
+        let shifted = waiting && waiting.rows.length ? waiting.before : [];
+        let answer = waiting ? waiting.answer : null;
+        if (shifted.length) {
+            try {
+                await asRoute(companyId, who, 'bulkUpdateDates', { companyId: String(companyId), dates: waiting.rows, userData: {} });
+            } catch (error) {
+                answer = { ...answer, moved: [], notMoved: answer.moved.map((entry) => ({ taskId: entry.taskId, title: entry.title })), error: `The waiting tasks were not moved: ${error.message}` };
+                shifted = [];
+            }
         }
         const changed = changes.map((change) => change.name);
-        return { result: { changed }, undo: changed.length ? { kind: 'update', taskId: idOf(task._id), previous } : null, entityId: task._id, entityName: task.TaskName };
+        return {
+            result: { changed, ...(answer ? { waitingTasks: answer } : {}) },
+            undo: changed.length ? { kind: 'update', taskId: idOf(task._id), previous, ...(shifted.length ? { shifted } : {}) } : null,
+            entityId: task._id, entityName: task.TaskName,
+        };
     },
 
     async 'task.assignees.set'({ companyId, actor, params, depth }) {
@@ -576,4 +614,4 @@ const executors = {
     },
 };
 
-module.exports = { executors, setArchived, setStatus, whoOf, zoneOf, asRoute, liveTask, storedProject, assignable, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };
+module.exports = { executors, plannedMoves, setArchived, setStatus, whoOf, zoneOf, asRoute, liveTask, storedProject, assignable, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };

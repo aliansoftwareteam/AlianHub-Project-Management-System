@@ -5,7 +5,7 @@
  * and the ids this task blocks. Cycles are tolerated — a relation pair that loops
  * would otherwise hang the topological walk. */
 
-const { workingDaySet, workingDaysBetween } = require('./workingCalendar');
+const { workingDaySet, workingDaysBetween } = require('../../../../../Modules/Tasks/helpers/workingCalendar');
 
 const DAY_MS = 86400000;
 

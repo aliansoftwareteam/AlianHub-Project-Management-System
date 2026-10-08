@@ -469,6 +469,25 @@ const setFieldNames = async (companyId, changes, tasks) => {
     }));
 };
 
+const PENDING = 'pending';
+
+/* The tasks waiting on a task whose dates a pending change moves, as approving it would move them: worked out as the
+ * person behind the token, inside the token's projects, and named only where this viewer can open them. */
+const waitingMovesOf = async (companyId, uid, proposal) => {
+    if (proposal.status !== PENDING || proposal.source !== SOURCE_MCP) return [];
+    const dated = changesOf(proposal).filter((change) => EDITS.includes(change.action) && ['DueDate', 'startDate'].some((field) => Object.hasOwn(objectOf(paramsOf(change).fields), field)));
+    if (!dated.length) return [];
+    const actor = { kind: 'agent', userId: idOf(proposal.requestedBy), tokenId: idOf(proposal.tokenId) || null, ...(proposal.oauthClientId ? { clientId: idOf(proposal.oauthClientId) } : {}), viaAccount: 'personal' };
+    const planned = async () => (await Promise.all(dated.map((change) => require('./taskRequests').plannedMoves({ companyId, actor, params: paramsOf(change) }).catch(() => [])))).flat();
+    const moves = await require('../../Config/tokenNarrowing').runNarrowed({ userId: actor.userId, projectIds: listOf(proposal.tokenProjectIds) }, planned);
+    if (!moves.length) return [];
+    const seen = new Set(await readableTaskIds(companyId, uid, moves.map((move) => move.taskId)));
+    return moves.filter((move) => seen.has(move.taskId)).flatMap((move) => [
+        { kind: 'batchItem', task: move.title, what: 'start', value: move.startDate },
+        { kind: 'batchItem', task: move.title, what: 'due', value: move.dueDate },
+    ]);
+};
+
 /* For each batch among the proposals, by proposal id: its one card. A task is named, and can be opened from the
  * card, only when the viewer can read it; the rest are a count. `others` counts every task past the first few, and
  * `rest` holds those of them the viewer can read. A person, a place and a field are named as the viewer may see
@@ -491,6 +510,7 @@ const forBatches = async (companyId, uid, proposals, { bareChanges = false } = {
         userIds: all.flatMap((change) => [...listOf(paramsOf(change).userIds), ...(change.action === FIELD_SET ? peopleIn(paramsOf(change).value) : [])]).map(idOf).filter(Boolean),
     });
     const context = { named, tasks, fieldNames: await setFieldNames(companyId, all, tasks), replyAuthors: await replyAuthorsFor(companyId, uid, all) };
+    const waiting = new Map(await Promise.all(batches.map(async (proposal) => [String(proposal._id), await waitingMovesOf(companyId, uid, proposal)])));
     return new Map(batches.map((proposal) => {
         const changes = changesOf(proposal);
         const ids = taskIdsOf(changes);
@@ -502,7 +522,7 @@ const forBatches = async (companyId, uid, proposals, { bareChanges = false } = {
             kind: 'batch',
             tasks: ids.length,
             changes: changes.length,
-            lines: [...summary, ids.length > 0 && { kind: 'batchTasks', tasks: shown, others: ids.length - shown.length, ...(rest.length ? { rest } : {}) }, ...spelledOut].filter(Boolean),
+            lines: [...summary, ids.length > 0 && { kind: 'batchTasks', tasks: shown, others: ids.length - shown.length, ...(rest.length ? { rest } : {}) }, ...spelledOut, ...waiting.get(String(proposal._id))].filter(Boolean),
         }];
     }));
 };

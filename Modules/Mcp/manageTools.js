@@ -280,7 +280,8 @@ const TOOLS = [
         batch: true,
         target: () => ({}),
         description: `Runs several change tools in one call, in order: up to ${BATCH_AT_ONCE_MAX} when every step is on the same task, and up to ${BATCH_MAX} when the steps name more than one task. When every step is on the same task, each is applied on its own and reports its own result, so one refusal does not stop or undo the others, and a person can undo the ones that applied together. When the steps name more than one task, nothing runs yet: the changes wait in AlianHub as one proposal that a person approves or declines whole. A link counts both of its tasks, and each new task, subtask or doc counts as a task of its own. Keep such a batch inside one project. `
-            + 'When one request changes many tasks, or changes several things on each of them, put every change in one batch, so the person approves once: do not split it into smaller batches.',
+            + 'When one request changes many tasks, or changes several things on each of them, put every change in one batch, so the person approves once: do not split it into smaller batches. '
+            + 'Name each step\'s tool by its AlianHub name with dots, such as task.update; the name your tool list shows, such as task_update, is taken too.',
         tooLarge: batchTooLarge,
         input: input({
             operations: {
@@ -339,7 +340,9 @@ const TOOLS = [
         grant: GRANT,
         strict: true,
         target: taskTarget,
-        description: 'Changes a task\'s title, description, priority, due date, start date or estimate at once, and the person can undo it. One call may change several; a detail you leave out is not touched.',
+        description: 'Changes a task\'s title, description, priority, due date, start date or estimate at once, and the person can undo it. One call may change several; a detail you leave out is not touched. '
+            + 'When a new due date ends the task later and other tasks wait on it (it blocks them), they move later by the same working days, as the Gantt moves them, in this one change and one undo: '
+            + 'waitingTasks.moved lists them, and waitingTasks.startTooEarly lists any the person may not reschedule, which now start before this task ends. Do not move the moved ones again.',
         input: input({
             taskId: ID,
             title: { type: 'string', minLength: 1, maxLength: TITLE_MAX },

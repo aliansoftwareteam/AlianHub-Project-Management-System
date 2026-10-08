@@ -307,6 +307,7 @@ import { holdInView, refreshLimit, rowInView, stitchRows } from './refreshInPlac
 import { loadInboxDensity, saveInboxDensity } from './inboxDensity';
 import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
 import ApprovalQueue from './ApprovalQueue.vue';
+import { AGENTS_CHANGED_EVENT, PROPOSAL_CHANGE } from '@/views/Ai/agentFeed';
 
 defineOptions({ name: 'InboxPage' });
 
@@ -519,6 +520,25 @@ watch(liveCounts, (next) => {
     clearTimeout(liveTimer);
     liveTimer = setTimeout(() => { if (!busy.value) refresh(); }, 400);
 }, { immediate: true });
+
+/* A proposal filed or decided moves no counter of the person's, and it changes the approval rows as well as the counts. */
+let proposalTimer = null;
+const onAgentsChanged = (change) => {
+    if (change?.kind !== PROPOSAL_CHANGE) return;
+    clearTimeout(proposalTimer);
+    const readWhenFree = () => {
+        if (busy.value) proposalTimer = setTimeout(readWhenFree, 400);
+        else reload({ quiet: true });
+    };
+    proposalTimer = setTimeout(readWhenFree, 400);
+};
+let agentSocket = null;
+const listenToAgents = (socket) => {
+    agentSocket?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
+    agentSocket = socket && typeof socket.on === 'function' ? socket : null;
+    agentSocket?.on(AGENTS_CHANGED_EVENT, onAgentsChanged);
+};
+watch(() => getters['settings/getSocketInstance'], listenToAgents, { immediate: true });
 
 const syncQuery = () => router.replace({ query: { ...route.query, tab: tab.value, kind: kind.value } }).catch(() => {});
 const switchTab = (next) => {
@@ -981,6 +1001,8 @@ onUnmounted(() => {
     document.removeEventListener('keydown', onDocumentKey);
     stopOnTaskClosed();
     clearTimeout(liveTimer);
+    clearTimeout(proposalTimer);
+    listenToAgents(null);
     clearTimeout(undoTimer);
     snoozeWake.clear();
 });
