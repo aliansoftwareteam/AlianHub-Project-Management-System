@@ -130,3 +130,19 @@ export function useStoredProjectPart(projectId, field, shown, follow) {
         if (part && Object.keys(shown).some((key) => part[key] !== undefined && part[key] !== shown[key])) follow();
     });
 }
+
+/* The project page keeps its own copy of the open project, so a view added elsewhere, by a person or by an
+ * agent's approved proposal, reaches its tabs only when that copy takes the stored project's views. */
+export function useStoredProjectViews(projectData) {
+    const store = useStore();
+    const storedViews = () => {
+        const id = String(projectData.value?._id || "");
+        const project = id ? (store?.getters["projectData/allProjects"]?.data || []).find((item) => String(item._id) === id) : null;
+        return Array.isArray(project?.ProjectRequiredComponent) ? project.ProjectRequiredComponent : null;
+    };
+    watch(() => JSON.stringify(storedViews()), () => {
+        const views = storedViews();
+        if (!views || JSON.stringify(views) === JSON.stringify(projectData.value?.ProjectRequiredComponent || null)) return;
+        projectData.value = { ...projectData.value, ProjectRequiredComponent: JSON.parse(JSON.stringify(views)) };
+    });
+}

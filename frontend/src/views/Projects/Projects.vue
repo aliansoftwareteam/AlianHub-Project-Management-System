@@ -528,6 +528,7 @@ import { useProjectLifecycle } from './composables/useProjectLifecycle';
 import { useProjectAvatar } from './composables/useProjectAvatar';
 import { useProjectSearch } from './composables/useProjectSearch';
 import { useProjectTree } from './composables/useProjectTree';
+import { useStoredProjectViews } from './liveProjects';
 import { splitProjectViews } from './composables/projectViewBar';
 import { useSavedViews } from './composables/useSavedViews';
 import { viewKeyOf } from './composables/savedViewSettings';
@@ -722,6 +723,7 @@ const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData
 const projectSearch = useProjectSearch(projectData, showArchived, { buildFilterQuery });
 const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, searchFailed, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy, agentWorking, setAgentWorking } = projectSearch;
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
+useStoredProjectViews(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));
 const renameValue = ref('');
