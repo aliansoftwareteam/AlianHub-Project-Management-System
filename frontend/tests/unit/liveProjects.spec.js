@@ -307,7 +307,7 @@ describe('the socket', () => {
     });
 
     it('is bound by the shell, which hands over the socket and the company', () => {
-        expect(APP).toMatch(/useLiveProjects\(socket, companyId\)/);
+        expect(APP).toMatch(/useLiveProjects\(socket, companyId, /);
     });
 });
 
