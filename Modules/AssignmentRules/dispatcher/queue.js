@@ -30,9 +30,11 @@ const standing = async (companyId, task) => {
     return { role: (open && open.facts && open.facts.role) || '', left: rows.some((row) => Boolean(row.leftQueue)) };
 };
 
-/* The least loaded in-product agent that plays the role, counted by the role items it already has; null when none plays it. */
-const leastLoaded = async (companyId, role) => {
-    const agents = await find(companyId, SCHEMA_TYPE.AGENTS, [{ role, paused: { $ne: true }, deletedStatusKey: { $ne: 1 } }, { name: 1 }]);
+/* The least loaded in-product agent that plays the role and may work in the project, counted by the role items it
+ * already has; null when none does. An agent with no projects named may work in any. */
+const leastLoaded = async (companyId, role, projectId) => {
+    const agents = (await find(companyId, SCHEMA_TYPE.AGENTS, [{ role, paused: { $ne: true }, deletedStatusKey: { $ne: 1 } }, { name: 1, projectIds: 1 }]))
+        .filter((agent) => !(agent.projectIds || []).length || agent.projectIds.map(String).includes(String(projectId)));
     if (!agents.length) return null;
     const { HANDED_OVER, STATUS } = require('../../Agents/manager/findings');
     const loads = await Promise.all(agents.map(async (agent) => Number(await MongoDbCrudOpration(companyId, {

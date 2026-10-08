@@ -285,6 +285,27 @@ describe('dispatcher: the gate', () => {
         expect(task.AssigneeUserId).toEqual([]);
     });
 
+    it('never picks an agent of the role that is limited to other projects', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await saveSettings(project, { mode: 'apply' });
+        mockDb.seed(SCHEMA_TYPE.AGENTS, { name: 'Elsewhere', role: TRIAGER, projectIds: [oid()] });
+        const here = mockDb.seed(SCHEMA_TYPE.AGENTS, { name: 'Here', role: TRIAGER, projectIds: [String(project._id)] });
+        mockDb.seed(SCHEMA_TYPE.PROJECT_FINDINGS, { projectId: String(project._id), key: 'handed_over:x', rule: 'handed_over', status: 'open', taskIds: [], facts: { agentId: String(here._id) } });
+        expect(await routeTask(seedTask(project))).toMatchObject({ agentId: String(here._id) });
+    });
+
+    it('lets an agent play a known role only', async () => {
+        const { roleOf } = require('../Modules/Agents/agentRole');
+        expect(roleOf(TRIAGER)).toBe(TRIAGER);
+        expect(roleOf('')).toBe('');
+        expect(() => roleOf('it-company/nobody')).toThrow(/no role/);
+        expect(() => roleOf('a/b/c')).toThrow(/no role/);
+        const { createAgentRecord } = require('../Modules/Agents/agentRecord');
+        await expect(createAgentRecord(C, { name: 'Bad', role: 'it-company/nobody' }, { ownerId: OWNER })).rejects.toThrow(/no role/);
+        expect(store(SCHEMA_TYPE.AGENTS)).toHaveLength(0);
+    });
+
     it('takes a model guess only at or above the threshold, without calling a model itself', async () => {
         seedRules(GRANTS);
         const project = seedProject();

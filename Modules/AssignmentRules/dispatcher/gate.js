@@ -114,7 +114,7 @@ async function route({ companyId, taskId, trigger = 'create' }) {
     if (seen) return skip('decided');
 
     const { pick, skipped } = await findRole(companyId, task, settings);
-    const agent = pick ? await queue.leastLoaded(companyId, pick.role) : null;
+    const agent = pick ? await queue.leastLoaded(companyId, pick.role, task.ProjectID) : null;
     let state = 'needs_routing';
     if (pick) state = settings.mode === 'apply' ? 'applied' : 'suggested';
     const decision = await claim(companyId, {

@@ -152,7 +152,7 @@ async function route(companyId, actor, taskId, decisionId, role) {
     if (!gate.WAITING.includes(decision.state)) throw new RuleError('This suggestion has already been handled.', 409);
     if (decision.state === 'suggested' && role === decision.role) return accept(companyId, actor, taskId, decisionId);
     const settings = await assertCanRoute(companyId, task, role);
-    const agent = await queue.leastLoaded(companyId, role);
+    const agent = await queue.leastLoaded(companyId, role, task.ProjectID);
     const done = await queueAs(companyId, actor, task, decision, 'routed', role, agent ? agent.id : null);
     audit.decided(companyId, actor, 'route', task, { from: decision.role, to: role, agentId: agent ? agent.id : null, decisionId: String(decision._id) });
     return { decision: publicView(done), offer: await offerFor(companyId, settings, decision, role) };
