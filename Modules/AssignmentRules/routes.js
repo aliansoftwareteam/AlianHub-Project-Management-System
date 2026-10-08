@@ -27,12 +27,12 @@ exports.init = (app) => {
     app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo', byPerson('undo'), assignsTask, controller.actOnDecision('undo'));
 
     app.get('/api/v2/assignment-rules/dispatcher/project/:projectId', readsProject, dispatcher.getSettings);
-    app.put('/api/v2/assignment-rules/dispatcher/project/:projectId', dispatcher.whenOn, agentsRefused('project.settings'), editsRules, dispatcher.saveSettings);
-    app.post('/api/v2/assignment-rules/dispatcher/project/:projectId/rules', dispatcher.whenOn, agentsRefused('project.settings'), editsRules, dispatcher.addRule);
+    app.put('/api/v2/assignment-rules/dispatcher/project/:projectId', agentsRefused('project.settings'), dispatcher.whenOn, editsRules, dispatcher.saveSettings);
+    app.post('/api/v2/assignment-rules/dispatcher/project/:projectId/rules', agentsRefused('project.settings'), dispatcher.whenOn, editsRules, dispatcher.addRule);
     app.get('/api/v2/assignment-rules/dispatcher/project/:projectId/needs-routing', readsProject, dispatcher.getNeedsRouting);
     app.get('/api/v2/assignment-rules/dispatcher/task/:taskId', readsTask, dispatcher.getTaskDecision);
-    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/accept', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.accept'), leadsTaskProject, dispatcher.actOnDecision('accept'));
-    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/dismiss', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.dismiss'), leadsTaskProject, dispatcher.actOnDecision('dismiss'));
-    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/route', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.route'), leadsTaskProject, dispatcher.actOnDecision('route'));
+    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/accept', decidedByPerson('dispatcher.suggestion.accept'), dispatcher.whenOn, leadsTaskProject, dispatcher.actOnDecision('accept'));
+    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/dismiss', decidedByPerson('dispatcher.suggestion.dismiss'), dispatcher.whenOn, leadsTaskProject, dispatcher.actOnDecision('dismiss'));
+    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/route', decidedByPerson('dispatcher.suggestion.route'), dispatcher.whenOn, leadsTaskProject, dispatcher.actOnDecision('route'));
     logger.info('AssignmentRules routes initialised');
 };
