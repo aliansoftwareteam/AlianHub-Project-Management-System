@@ -8,9 +8,9 @@ const { recordFieldCreated, recordFieldRenamed } = require("./helpers/customFiel
 const { withFieldDefaults } = require("./helpers/fieldDefaults");
 const { PROJECTS_CHANGED, PROJECTS_CHANGED_TEXT, linkPlan, applyLinks, announceFields } = require("./helpers/fieldProjects");
 
-const ROLLUP_KEYS = ['fieldType', 'rollupFunction', 'rollupSourceFieldId'];
-const rollupChanged = (previous, update) => ROLLUP_KEYS.some((key) => key in update && String(update[key] ?? '') !== String(previous[key] ?? ''));
-const logFill = (error) => logger.error(`rollup fill: ${(error && error.message) || error}`);
+const COMPUTED_KEYS = ['fieldType', 'rollupFunction', 'rollupSourceFieldId', 'formulaExpression'];
+const computedChanged = (previous, update) => COMPUTED_KEYS.some((key) => key in update && String(update[key] ?? '') !== String(previous[key] ?? ''));
+const logFill = (error) => logger.error(`computed field fill: ${(error && error.message) || error}`);
 
 exports.insertCustomField = async (req, res) => {
     try {
@@ -28,7 +28,7 @@ exports.insertCustomField = async (req, res) => {
         }
 
         const response = await this.insertCustomFieldPromise(updateObject, type, companyId);
-        await this.fillRollup(companyId, response).catch(logFill);
+        await this.fillComputed(companyId, response).catch(logFill);
         recordFieldCreated({ companyId, field: response, actorId: req.uid })
             .catch((error) => logger.error(`custom field created history: ${error && error.message}`));
 
@@ -135,9 +135,9 @@ exports.updateCustomField = async (req, res) => {
         const response = await MongoDbCrudOpration(companyId, query, type);
         if (previous) await applyLinks(companyId, previous, links);
         announceFields(companyId, 'update');
-        if (previous && (rollupChanged(previous, updateObject) || links.add.length || links.clears)) {
+        if (previous && (computedChanged(previous, updateObject) || links.add.length || links.clears)) {
             const current = await MongoDbCrudOpration(companyId, { type: dbCollections.CUSTOM_FIELDS, data: [filter] }, 'findOne');
-            await this.fillRollup(companyId, current).catch(logFill);
+            await this.fillComputed(companyId, current).catch(logFill);
         }
         removeCache(`aiFieldAutoRefill:${companyId}`);
         if (previous) {
@@ -416,18 +416,23 @@ const storeComputed = async ({ companyId, tasks, rows, everyDefinition, bySprint
 };
 
 const ROLLUP_FILL_LIMIT = 500;
+const FILL_BATCH = 200;
 exports.ROLLUP_FILL_LIMIT = ROLLUP_FILL_LIMIT;
 
 const hasValue = { $exists: true, $nin: ["", null] };
 
+const fieldProjectsFilter = (field) => {
+    if (field.global === true) return {};
+    const projectIds = [].concat(field.projectId || []).map(String).filter(isObjectIdString);
+    return projectIds.length ? { ProjectID: { $in: projectIds.map((id) => new mongoose.Types.ObjectId(id)) } } : null;
+};
+
 /* A rollup made or changed after its source values were entered has nothing stored, and a task shows a dash until
  * one of its subtasks is saved again. The tasks above a subtask that holds a source value are computed here, from at
  * most ROLLUP_FILL_LIMIT such subtasks; past that the rest fill in as their subtasks change. */
-exports.fillRollup = async (companyId, field) => {
-    if (!companyId || !field || field.fieldType !== "rollup") return 0;
-    const projectIds = field.global === true ? null : [].concat(field.projectId || []).map(String).filter(isObjectIdString);
-    if (projectIds && !projectIds.length) return 0;
-    const inProjects = projectIds ? { ProjectID: { $in: projectIds.map((id) => new mongoose.Types.ObjectId(id)) } } : {};
+const fillRollup = async (companyId, field) => {
+    const inProjects = fieldProjectsFilter(field);
+    if (!inProjects) return 0;
     const sourceId = isObjectIdString(String(field.rollupSourceFieldId || "")) ? String(field.rollupSourceFieldId) : "";
 
     const holders = await MongoDbCrudOpration(companyId, {
@@ -444,6 +449,30 @@ exports.fillRollup = async (companyId, field) => {
     const tasks = await liveTasks(companyId, { ...inProjects, _id: { $in: above.map((id) => new mongoose.Types.ObjectId(id)) } });
     const { out } = await storeComputed({ companyId, tasks, rows: await rowsBelow(companyId, tasks), everyDefinition: await loadDefinitions(companyId, null) });
     return Object.keys(out).length;
+};
+
+/* A formula made or changed after the values it reads were entered: at most ROLLUP_FILL_LIMIT tasks of its projects
+ * are worked out at once, a batch at a time, with every rollup above them; the rest fill in as they change. */
+const fillFormula = async (companyId, field) => {
+    const inProjects = fieldProjectsFilter(field);
+    if (!inProjects) return 0;
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TASKS,
+        data: [{ ...inProjects, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }, { _id: 1 }, { limit: ROLLUP_FILL_LIMIT, lean: true }]
+    }, "find") || [];
+    const ids = rows.map((row) => String(row._id));
+    let filled = 0;
+    for (let at = 0; at < ids.length; at += FILL_BATCH) {
+        // eslint-disable-next-line no-await-in-loop
+        filled += await exports.refreshComputed(companyId, ids.slice(at, at + FILL_BATCH));
+    }
+    return filled;
+};
+
+exports.fillComputed = async (companyId, field) => {
+    if (!companyId || !field) return 0;
+    if (field.fieldType === "rollup") return fillRollup(companyId, field);
+    return field.fieldType === "formula" ? fillFormula(companyId, field) : 0;
 };
 
 /* POST /api/v2/custom-fields/compute
