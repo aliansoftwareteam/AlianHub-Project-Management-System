@@ -480,13 +480,21 @@ const executors = {
         if (start && due && due.value && new Date(start.value) > new Date(due.value)) throw refuse('The start date is after the due date. Check both dates.');
 
         const changes = wanted.filter(({ name, value }) => !EDITS[name].same(task, value));
+        const dated = Object.fromEntries(changes.filter(({ name }) => name === 'startDate' || name === 'DueDate').map(({ name, value }) => [name, value]));
+        const waiting = Object.keys(dated).length ? await require('./waitingTasks').plan({ companyId, actor, uid, task, to: dated, zone }) : null;
         const previous = {};
         for (const { name, value } of changes) {
             await EDITS[name].write({ companyId, who, task, value, zone, note: String(params.note || '').slice(0, 500) });
             Object.assign(previous, EDITS[name].previous(task));
         }
+        const shifted = waiting && waiting.rows.length ? waiting.before : [];
+        if (shifted.length) await asRoute(companyId, who, 'bulkUpdateDates', { companyId: String(companyId), dates: waiting.rows, userData: {} });
         const changed = changes.map((change) => change.name);
-        return { result: { changed }, undo: changed.length ? { kind: 'update', taskId: idOf(task._id), previous } : null, entityId: task._id, entityName: task.TaskName };
+        return {
+            result: { changed, ...(waiting ? { waitingTasks: waiting.answer } : {}) },
+            undo: changed.length ? { kind: 'update', taskId: idOf(task._id), previous, ...(shifted.length ? { shifted } : {}) } : null,
+            entityId: task._id, entityName: task.TaskName,
+        };
     },
 
     async 'task.assignees.set'({ companyId, actor, params, depth }) {

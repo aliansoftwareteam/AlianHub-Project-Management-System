@@ -74,8 +74,19 @@ const takesView = (screen) => screen === 'project' || screen === 'list';
 
 const askedOf = (args) => SHOWN.filter((key) => (key === 'mine' ? args.mine === true : args[key] !== undefined));
 
-const shownProblem = (args) => {
-    const asked = askedOf(args);
+const groupKey = (value) => String(value).trim().toLowerCase().replace(/\s+/g, '_');
+/* A grouping named the way the person says it ("Stage", "Priority") rather than by key or id is looked up when the link is made. */
+const namesAField = (value) => value !== undefined && !isId(value) && !Object.hasOwn(setup.GROUPS, groupKey(value));
+
+const checkedGroup = (args) => {
+    if (args.groupBy === undefined || isId(args.groupBy)) return args;
+    const { groupBy, ...rest } = args;
+    return namesAField(groupBy) ? rest : { ...rest, groupBy: groupKey(groupBy) };
+};
+
+const shownProblem = (given) => {
+    const args = checkedGroup(given);
+    const asked = askedOf(given);
     if (!asked.length) return '';
     const screen = String(args.screen);
     if (screen === 'everything') return asked.every((key) => key === 'mine') ? '' : 'a link to the everything screen carries only mine; its grouping and filters are picked on the page';
@@ -85,16 +96,54 @@ const shownProblem = (args) => {
 };
 
 const notSaved = (kind) => `No saved view of this project shows its ${kind} view that way, and a link carries no grouping or filter of its own, so this one opens the ${kind} view as it is.`
-    + (registry.has(SAVED_VIEW) ? ` ${SAVED_VIEW} adds a saved view that does, once the person approves it.` : '');
+    + (registry.has(SAVED_VIEW)
+        ? ' Do not list the tasks in the chat in its place: offer to save this view, and when the person agrees send view.create with saveView.arguments. It waits for their approval once; then the link opens on it.'
+        : '');
+
+const fieldsNamed = async (ctx, project, name) => {
+    const { isTaskFieldOf } = require('../CustomField/helpers/fieldValueInput');
+    const rows = await MongoDbCrudOpration(ctx.companyId, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [{ type: 'task', isDelete: { $ne: false } }, { fieldTitle: 1, fieldType: 1, type: 1, isDelete: 1, global: 1, projectId: 1 }] }, 'find') || [];
+    const wanted = String(name).trim().toLowerCase();
+    return rows.filter((row) => isTaskFieldOf(row, project._id) && String(row.fieldTitle || '').trim().toLowerCase() === wanted);
+};
+
+/* The grouping asked for, as a key or a field id, with the words a view's name uses for it; or why there is none. */
+const groupingOf = async (ctx, project, value) => {
+    if (value === undefined) return { label: '' };
+    if (isId(value)) {
+        const field = await findOne(ctx, SCHEMA_TYPE.CUSTOM_FIELDS, { _id: oid(String(value)) }, { fieldTitle: 1 });
+        return { groupBy: String(value), label: (field && field.fieldTitle) || '' };
+    }
+    if (!namesAField(value)) return { groupBy: groupKey(value), label: groupKey(value).replace(/_/g, ' ') };
+    const found = await fieldsNamed(ctx, project, value);
+    if (!found.length) return { problem: { error: `This project has no field named "${value}". Look its fields up with fields.list, or group by ${Object.keys(setup.GROUPS).join(', ')}.` } };
+    if (found.length > 1) {
+        return { problem: {
+            error: `More than one field of this project is named "${value}". Ask the person which one they mean, or pick by type, and give its fieldId as groupBy.`,
+            fields: found.map((row) => ({ fieldId: String(row._id), name: row.fieldTitle, type: row.fieldType })),
+        } };
+    }
+    return { groupBy: String(found[0]._id), label: found[0].fieldTitle };
+};
+
+const savingIt = (project, kind, args, label) => ({
+    tool: SAVED_VIEW,
+    arguments: {
+        projectId: String(project._id), name: label ? `By ${label}` : 'Filtered', kind,
+        ...Object.fromEntries(SHOWN.filter((key) => args[key] !== undefined && (key !== 'mine' || args.mine === true)).map((key) => [key, args[key]])),
+    },
+});
 
 /* A project or a list asked for grouped, filtered or on the person's own tasks: the saved view that shows it, or the plain view and why. */
-const asShown = async (ctx, place, args) => {
+const asShown = async (ctx, place, given) => {
+    const grouping = await groupingOf(ctx, place.project, given.groupBy);
+    if (grouping.problem) return grouping;
+    const args = grouping.groupBy === undefined ? given : { ...given, groupBy: grouping.groupBy };
     const kind = args.view === undefined ? 'list' : String(args.view);
     const path = onView(place.path, kind);
     const saved = await setup.savedViewShowing(ctx.companyId, place.project, kind, args);
-    return saved
-        ? { path: `${path}&view=${setup.viewIdOf(saved)}`, view: kind, savedView: saved.title || '' }
-        : { path, view: kind, note: notSaved(kind) };
+    if (saved) return { path: `${path}&view=${setup.viewIdOf(saved)}`, view: kind, savedView: saved.title || '' };
+    return { path, view: kind, note: notSaved(kind), ...(registry.has(SAVED_VIEW) ? { saveView: savingIt(place.project, kind, args, grouping.label) } : {}) };
 };
 
 const placeOf = async (ctx, args, vis) => {
@@ -119,6 +168,7 @@ const TOOLS = [
             + 'home (the person\'s own tasks for today), everything (all tasks across projects), projects, inbox, planner, docs, goals. '
             + 'A project or a list can open on one view: list, board, calendar, gantt, table, workload (who has how much work this week), dashboard or activity. '
             + 'If you ask for a grouping, a filter or mine, it opens on the saved view that already shows it that way, named in savedView; if there is none, you get the plain link with a note. The everything screen takes mine. '
+            + 'When the person asks to see a list grouped or filtered ("show me this list grouped by Stage"), use this with the list they have open, not a table of its tasks; groupBy takes a field\'s name as the person says it. '
             + 'It answers only for something the person can open; for anything else it says the place was not found.',
         input: {
             type: 'object',
@@ -130,6 +180,7 @@ const TOOLS = [
                 pageId: { ...ID_ARG, description: 'The id of a doc' },
                 view: { type: 'string', enum: Object.keys(VIEWS), description: 'For a project or a list' },
                 ...Object.fromEntries(SHOWN.map((key) => [key, LOOK[key]])),
+                groupBy: { type: 'string', maxLength: 80, description: `One of ${Object.keys(setup.GROUPS).join(', ')}, or a custom field by its name or id` },
                 mine: { type: 'boolean', description: 'Only the person\'s own tasks' },
             },
             required: ['screen'],
@@ -143,6 +194,7 @@ const TOOLS = [
             if (!base) return { ...NO_ADDRESS };
             const place = await placeOf(ctx, args, vis);
             if (!place) return { ...NOT_FOUND };
+            if (place.problem) return place.problem;
             const { path, ...rest } = place;
             return { url: `${base}/#/${encodeURIComponent(String(ctx.companyId))}${path}`, screen: String(args.screen), ...rest };
         },

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { DEFAULT_WORKING_DAYS, checkWorkingDays, workingDaysFor, weekendDaysFor, countsEveryDay } = require('../Modules/Company/helpers/workingDays');
-const { shiftDependants } = require('../frontend/src/views/Projects/composables/ganttShift');
+const { shiftDependants } = require('../Modules/Tasks/helpers/ganttShift');
 const R = require('../Modules/Pto/helpers/ptoRules');
 
 const MON_TO_FRI = [1, 2, 3, 4, 5];

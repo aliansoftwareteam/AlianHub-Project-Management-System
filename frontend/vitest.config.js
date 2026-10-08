@@ -36,6 +36,7 @@ export default defineConfig({
             '@fieldTypes': path.resolve(__dirname, '../Modules/CustomField/fieldTypes'),
             '@automationTemplates': path.resolve(__dirname, '../Modules/Automations/templates.js'),
             '@workingDays': path.resolve(__dirname, '../Modules/Company/helpers/workingDays.js'),
+            '@ganttShift': path.resolve(__dirname, '../Modules/Tasks/helpers/ganttShift.js'),
             '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js'),
             '@taskExtraListsRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskExtraListsRules.js'),
             '@descriptionBlock': path.resolve(__dirname, '../Modules/Tasks/helpers/descriptionBlock.js'),

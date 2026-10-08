@@ -208,6 +208,19 @@ describe('the number is there to read', () => {
         expect(total).toEqual({ fieldId: idOfField('Cost total'), title: 'Cost total', type: 'rollup', value: 350, computed: true, computedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) });
     });
 
+    it('a formula just made holds its number on the tasks that already hold what it reads', async () => {
+        await approve(await filed(as(INSIDER), [{ name: 'Double cost', type: 'formula', expression: '{Cost} * 2' }]));
+        expect(valueOn(SUB_1, 'Double cost')).toBe(200);
+        expect(valueOn(SUB_2, 'Double cost')).toBe(500);
+    });
+
+    it('a rollup made after its subtask holds the value shows it on the parent at once', async () => {
+        stored(SCHEMA_TYPE.TASKS, SUB_1).customField = { [COST]: { fieldValue: 50 } };
+        stored(SCHEMA_TYPE.TASKS, SUB_2).deletedStatusKey = 1;
+        await approve(await filed(as(INSIDER), [COST_TOTAL]));
+        expect(valueOn(T_OPEN, 'Cost total')).toBe(50);
+    });
+
     it('a value set with task.field.set moves the rollup above it', async () => {
         await approve(await filed(as(INSIDER), [COST_TOTAL]));
         expect(await rpc(as(OWNER), 'task.field.set', { taskId: SUB_1, fieldId: COST, value: 50 })).toMatchObject({ ok: true });

@@ -127,6 +127,32 @@ describe('a rollup field that is created', () => {
     });
 });
 
+describe('a formula field that is created', () => {
+    const formula = (extra = {}) => ({ fieldTitle: 'Double cost', fieldType: 'formula', global: false, projectId: [PROJECT], formulaExpression: '{Cost} * 2', ...extra });
+
+    it('is worked out at once on the tasks of its project that hold what it reads', async () => {
+        const res = await create(formula());
+        expect(res.statusCode).toBe(200);
+        const field = res.body._id;
+        expect(stored(CHILD, field)).toBe(20);
+        expect(stored(GRANDCHILD, field)).toBe(10);
+        expect(stored(SECOND_CHILD, field)).toBe(2);
+        expect(stored(ELSEWHERE_CHILD, field)).toBeUndefined();
+    });
+
+    it('reads a bounded number of tasks of its own company', async () => {
+        await create(formula());
+        expect(mockDb.calls.every((call) => call.companyId === CID)).toBe(true);
+        expect(taskCalls()[0].data[2]).toMatchObject({ limit: ROLLUP_FILL_LIMIT });
+    });
+
+    it('is worked out again when its expression changes', async () => {
+        const field = (await create(formula())).body._id;
+        expect((await change(field, { formulaExpression: '{Cost} + 1' })).statusCode).toBe(200);
+        expect(stored(CHILD, field)).toBe(11);
+    });
+});
+
 describe('a field that is not a rollup', () => {
     it('reads no task when it is created', async () => {
         expect((await create({ fieldTitle: 'Budget', fieldType: 'number', global: false, projectId: [PROJECT] })).statusCode).toBe(200);
