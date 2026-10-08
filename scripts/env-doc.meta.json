@@ -781,6 +781,11 @@
     "description": "MCP tools v2: \"on\" puts human names and a ref next to the ids in tool results (only names the caller may see), pages every list tool with an opaque cursor (default 25, at most 100 per page), annotates every tool with readOnlyHint, destructiveHint, idempotentHint and openWorldHint from its action rating, and turns a destructive call (an irreversible or workspace-scope write) into a proposal a person approves in the Inbox instead of acting. Default \"off\" keeps the tool list and result shapes as they were.",
     "default": "off"
   },
+  "MCP_ROLE_PROMPTS": {
+    "group": "ai",
+    "description": "Role playbooks for a connected AI: \"on\" offers each role playbook in Modules/Agents/roles as a ready-made MCP prompt (work_as_<role>, with an optional request), listed only to a connection that may run every tool the role's playbook names, and lets a signed-in member of a workspace download a role as a Claude skill (a zip holding <name>/SKILL.md) from /api/v2/agents/roles/<blueprint>/<role>/skill. A prompt and a skill are fixed text: they give the AI no tool and no right it did not have. Default \"off\" leaves the MCP prompt list as it was and refuses the download.",
+    "default": "off"
+  },
   "MEASUREMENTID": {
     "group": "integrations",
     "description": "Firebase analytics measurement id."

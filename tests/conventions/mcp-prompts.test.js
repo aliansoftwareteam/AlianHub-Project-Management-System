@@ -2,7 +2,7 @@
  * connection reading it is offered. A name the connection cannot call sends the agent to a tool that answers
  * "unknown", so every mix of settings and connections is read here. Tool names are written in backticks. */
 describe('the MCP instructions and prompts name only tools the connection is offered', () => {
-    const FLAGS = ['MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2', 'AGENT_PERFORMANCE_READ', 'EXTERNAL_AGENT_SESSIONS'];
+    const FLAGS = ['MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2', 'AGENT_PERFORMANCE_READ', 'EXTERNAL_AGENT_SESSIONS', 'MCP_ROLE_PROMPTS'];
     const saved = Object.fromEntries(FLAGS.map((flag) => [flag, process.env[flag]]));
     const set = (on) => FLAGS.forEach((flag) => { if (on.includes(flag)) process.env[flag] = 'on'; else delete process.env[flag]; });
 
@@ -137,6 +137,58 @@ describe('the MCP instructions and prompts name only tools the connection is off
         expect(writing).toEqual(['set_up_my_project']);
         ['personal, only reads', 'personal, manage grants but only reads', 'app, only reads', 'personal, kept to three reads'].forEach((who) => {
             expect(prompts.list(CALLERS[who]()).map((prompt) => prompt.name).filter((name) => writing.includes(name))).toEqual([]);
+        });
+    });
+
+    /* The role prompts carry whole playbooks, so they are read under the two ends of the tool mixes, not all of them. */
+    describe('with MCP_ROLE_PROMPTS on', () => {
+        const ROLE_MIXES = [['MCP_ROLE_PROMPTS'], ['MCP_ROLE_PROMPTS', 'MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2', 'AGENT_PERFORMANCE_READ']];
+        const isRole = (name) => name.startsWith('work_as_');
+
+        const everyRoleText = (visit) => ROLE_MIXES.forEach((mix) => {
+            set(mix);
+            Object.entries(CALLERS).forEach(([who, caller]) => {
+                const ctx = caller();
+                prompts.list(ctx).filter((prompt) => isRole(prompt.name)).forEach((prompt) => [undefined, { request: 'the open bugs' }].forEach((args) => visit({
+                    where: `the prompt ${prompt.name}${args ? ' with arguments' : ''}, for ${who}, with ${mix.join(' + ')}`,
+                    ctx,
+                    text: prompts.get(ctx, prompt.name, args).messages.map((message) => message.content.text).join('\n'),
+                })));
+            });
+        });
+
+        it('offers some roles to a connection that manages both (the scan works)', () => {
+            set(ROLE_MIXES[1]);
+            expect(prompts.list(CALLERS['personal, manages both']()).filter((prompt) => isRole(prompt.name)).length).toBeGreaterThan(20);
+        });
+
+        /* A playbook also puts tag names and labels in backticks; only a dotted name can be a tool. */
+        it('names only tools the connection may run, each in backticks', () => {
+            const all = tools.registered().map((tool) => tool.name);
+            const bareName = new RegExp(`(^|[^\\w.])(${all.map(escaped).join('|')})($|[^\\w])`, 'g');
+            const wrong = [];
+            everyRoleText(({ where, ctx, text }) => {
+                const usable = new Set(tools.usable(ctx).map((tool) => tool.name));
+                named(text).filter((name) => /^[a-z_]+(\.[a-z_]+)+$/.test(name) && !usable.has(name)).forEach((name) => wrong.push(`${name} in ${where}`));
+                [...outsideBackticks(text).matchAll(bareName)].forEach((match) => wrong.push(`bare ${match[2]} in ${where}`));
+            });
+            expect(wrong).toEqual([]);
+        });
+
+        it('offers a role only when the connection may run every tool its playbook names', () => {
+            const short = [];
+            ROLE_MIXES.forEach((mix) => {
+                set(mix);
+                Object.entries(CALLERS).forEach(([who, caller]) => {
+                    const ctx = caller();
+                    const usable = new Set(tools.usable(ctx).map((tool) => tool.name));
+                    const listed = new Set(prompts.list(ctx).map((prompt) => prompt.name));
+                    prompts.rolePrompts().forEach((prompt) => {
+                        if (listed.has(prompt.name) !== prompt.needs.every((name) => usable.has(name))) short.push(`${prompt.name} for ${who}, with ${mix.join(' + ')}`);
+                    });
+                });
+            });
+            expect(short).toEqual([]);
         });
     });
 });
