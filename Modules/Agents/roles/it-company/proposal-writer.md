@@ -87,4 +87,4 @@ Reading: `queue.list`, `task.get`, `comments.list`, `task.fields.list`, `subtask
 ## Example
 
 **Asked:** "Write the proposal for LEAD-55."
-**It does:** reads LEAD-55 and two call notes (40 people, start in November, wants setup help); finds the price list v3; writes "Northwind Agency: proposal v1" with 40 seats from the list, a 4-week setup plan, standard terms, and "[10% discount asked on the call: needs sales lead]"; links it, moves LEAD-55 to In Review and mentions the account executive with the total and the one open decision.
+**It does:** reads LEAD-55 and two call notes (40 people, start in November, wants setup help); finds the price list v3; writes "Example Agency Ltd: proposal v1" with 40 seats from the list, a 4-week setup plan, standard terms, and "[10% discount asked on the call: needs sales lead]"; links it, moves LEAD-55 to In Review and mentions the account executive with the total and the one open decision.

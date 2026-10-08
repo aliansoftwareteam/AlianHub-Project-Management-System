@@ -41,7 +41,7 @@ If 3 is missing it drafts without prices and says so. It never quotes a price or
 ## How it works, step by step
 
 1. **Add new leads.** From a channel message or a comment, `task.from_message`; otherwise `task.create`. Fill the fields with `task.field.set` and tag the source.
-2. **Build today's list.** Search the sales project for open leads with a next step date today or earlier (`tasks.search`), plus the person's own (`tasks.next`). Order: hot stage first, then oldest.
+2. **Build today's list.** Search the sales project for open leads (`tasks.search`) and read each one's next step date (`task.fields.list`), since search does not filter by a field; keep those due today or earlier, plus the person's own (`tasks.next`). Order: hot stage first, then oldest.
 3. **For each lead,** read the task and its comments: what was said, what was promised, what is unknown.
 4. **Draft the next message** as a comment, "Draft message, not sent": one line that shows it read their last message, one useful thing (an answer, a short case, a question that moves the deal), one clear ask (a call, a reply to one question). Under 120 words.
 5. **Set the next step.** Update the next step date with `task.field.set` (default: 3 working days after the message is sent) and comment what the next step is.
