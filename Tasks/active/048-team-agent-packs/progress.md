@@ -7,7 +7,7 @@ Confirmed by the owner on 2026-10-08: "go with your recommendations". Decisions 
 **Part 1: role skills (playbooks)**
 - [x] IT company roles, written to the example's depth: 22 roles, #1570, with the convention test tests/conventions/role-playbooks.test.js
 - [x] Manufacturing roles, written to the example's depth: 22 roles, #1571
-- [ ] The owner reviews each set
+- [ ] The owner reviews each set (#1572, reviewed and fixed, held for the owner)
 
 **Part 2: team packs** · **Part 3: the dispatcher** · **Part 4: workflows** · **Part 5: the company view** · **Part 6: blueprints**: not started.
 
@@ -16,3 +16,7 @@ Confirmed by the owner on 2026-10-08: "go with your recommendations". Decisions 
 ### 2026-10-08
 - Plan written and confirmed. Part 1 started: two agents write the IT company and Manufacturing playbooks.
 - Both sets done as draft PRs (#1570 IT company, #1571 Manufacturing). Combined in batch 31 for one review and the convention test. Gaps both found: no tool reads a pull request or the running app; task.status.set has two states only; tasks.search cannot filter by tag, priority or field; no MCP tool creates a tag (the Manufacturing handoffs use about 20 tags, so the blueprint setup must create them); queue items carry no role yet (part 3).
+- Step 2, roles for the connected AI: #1574, 44 prompts `work_as_<slug>` offered only to a connection that holds every tool a role names, and each role as a downloadable Claude skill, behind `MCP_ROLE_PROMPTS` (off). Reviewed and fixed; waits on #1572.
+- The tool gaps: `tag.create` and `tasks.search` by tag, priority and field merged in build 821 (#1576). The two-state `task.status.set` without the grant is the deliberate never-Done rule and stays.
+- Part 3, the dispatcher in suggest mode: started on top of #1574.
+
