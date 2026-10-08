@@ -20,7 +20,7 @@ const NOT_OPEN_TO_THIS_PERSON = [403, 404];
 const hidden = () => typeof document !== "undefined" && document.hidden === true;
 
 // The socket and the company are passed in: the shell that provides them cannot inject them.
-export function useLiveProjects(socket, companyId) {
+export function useLiveProjects(socket, companyId, openProjectId = () => "") {
     const store = useStore();
 
     let bound = null;
@@ -96,6 +96,17 @@ export function useLiveProjects(socket, companyId) {
         bound = null;
     }
 
+    /* The shell drops its socket while the tab is hidden and connects a new one when it is seen again, so what was
+     * said in between never arrives: the open project is read again instead. */
+    function catchUp() {
+        const id = String(openProjectId() || "");
+        if (!id || !held(id) || waiting.has(id)) return;
+        if (!waiting.size) firstAt = Date.now();
+        waiting.set(id, "changed");
+        schedule();
+    }
+
+    let everBound = false;
     function bind() {
         const live = unref(socket);
         if (live === bound) return;
@@ -103,6 +114,8 @@ export function useLiveProjects(socket, companyId) {
         if (!live?.on) return;
         bound = live;
         live.on(PROJECT_CHANGED_EVENT, onChanged);
+        if (everBound) catchUp();
+        everBound = true;
     }
 
     watch(() => unref(socket), bind, { immediate: true });
@@ -128,5 +141,21 @@ export function useStoredProjectPart(projectId, field, shown, follow) {
     watch(() => JSON.stringify(Object.keys(shown).map((key) => stored()?.[key])), () => {
         const part = stored();
         if (part && Object.keys(shown).some((key) => part[key] !== undefined && part[key] !== shown[key])) follow();
+    });
+}
+
+/* The project page keeps its own copy of the open project, so a view added elsewhere, by a person or by an
+ * agent's approved proposal, reaches its tabs only when that copy takes the stored project's views. */
+export function useStoredProjectViews(projectData) {
+    const store = useStore();
+    const storedViews = () => {
+        const id = String(projectData.value?._id || "");
+        const project = id ? (store?.getters["projectData/allProjects"]?.data || []).find((item) => String(item._id) === id) : null;
+        return Array.isArray(project?.ProjectRequiredComponent) ? project.ProjectRequiredComponent : null;
+    };
+    watch(() => JSON.stringify(storedViews()), () => {
+        const views = storedViews();
+        if (!views || JSON.stringify(views) === JSON.stringify(projectData.value?.ProjectRequiredComponent || null)) return;
+        projectData.value = { ...projectData.value, ProjectRequiredComponent: JSON.parse(JSON.stringify(views)) };
     });
 }

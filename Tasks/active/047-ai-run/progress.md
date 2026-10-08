@@ -36,7 +36,7 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 
 **Step 1: the road in**
 - [x] Each group of registry entries in its own file, so slices stop colliding (#1383, inside build 762)
-- [ ] AI-4a A real Claude connected over OAuth with the manage grant (needs the owner)
+- [x] AI-4a A real Claude connected over OAuth with the manage grant: the owner's Claude Code, approved in Settings, Agent clients, on 2026-10-08
 - [x] AI-4b The agent's name in task history ("Claude, for Priya"), and the loop guard on the newer path (#1387, inside build 762)
 - [x] AI-4d Token default, expiry notice and renew (#1386, inside build 762)
 
@@ -56,7 +56,7 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] A copy of a project by proposal: `project.duplicate` (#1467, inside build 788)
 
 **Step 3: measure**
-- [ ] AI-1 First measured run over MCP (needs the owner: flags on locally, a connection with the manage grant)
+- [x] AI-1 First measured run over MCP: 13 of 15 on builds 815 to 817; jobs 8 and 19 fixed in #1568 and passing on build 819, so 15 of 15 (`ai-1-run-1-results.md`)
 - [ ] AI-4e The dogfood list repeated on the local build (needs the owner)
 
 **Step 4: the front door and the simple outside**

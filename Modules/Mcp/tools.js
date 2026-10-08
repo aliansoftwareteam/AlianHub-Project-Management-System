@@ -29,6 +29,7 @@ const workTools = require('./workTools');
 const workFlag = require('./workFlag');
 const argsSchema = require('./argsSchema');
 const { taskRow, planRow } = require('./taskRows');
+const { searchFilters } = require('./searchFilters');
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
@@ -108,6 +109,11 @@ const TOOLS = [
                 filter.$and = [...(filter.$and || []), more.filter];
             }
             if (inList) filter.$and = [...(filter.$and || []), inList.filter];
+            if (workFlag.enabled()) {
+                const narrowed = await searchFilters(ctx, vis, args);
+                if (narrowed.error) return { error: narrowed.error };
+                if (narrowed.clauses.length) filter.$and = [...(filter.$and || []), ...narrowed.clauses];
+            }
             const row = planning ? planRow : taskRow;
             if (v2.enabled()) return taskPage(ctx, 'tasks.search', args, filter, { updatedAt: -1, _id: -1 }, row);
             const rows = await MongoDbCrudOpration(ctx.companyId, {
@@ -267,8 +273,9 @@ const FLAGGED_TOOLS = [
     },
 ];
 
-const SEARCH_BY_LIST = 'Finds tasks the person can open, by text, status, project or list. A list answers the tasks that live in it and the tasks added to it. Changes nothing.';
+const SEARCH_BY_LIST = 'Finds tasks the person can open, by text, status, project, list, tag, priority or a custom field\'s value. A list answers the tasks that live in it and the tasks added to it. Changes nothing.';
 const SEARCH_FOR_PLANNING = 'Finds tasks the person can open, by text, status, project, list, assignee or due date. Each task shows its assignees, dates, estimate, subtask count and the tasks above it. Changes nothing.';
+const SEARCH_FOR_PLANNING_BY_LIST = 'Finds tasks the person can open, by text, status, project, list, assignee, due date, tag, priority or a custom field\'s value. Each task shows its assignees, dates, estimate, subtask count and the tasks above it. Changes nothing.';
 
 const offered = () => [...TOOLS, ...FLAGGED_TOOLS.filter((t) => registry.has(t.action)), ...dataTools.offered(), ...screenTools.offered(), ...intentTools.offered(), ...contextTools.offered(), ...manageTools.offered(), ...workTools.offered(), ...sessionTools.offered()];
 
@@ -287,7 +294,8 @@ const formFor = (ctx, tool) => {
     const byList = workFlag.enabled();
     if (!planning && !byList) return tool;
     const more = { ...(planning ? manageTools.SEARCH_INPUT : {}), ...(byList ? workTools.SEARCH_INPUT : {}) };
-    return { ...tool, description: planning ? SEARCH_FOR_PLANNING : SEARCH_BY_LIST, input: { ...tool.input, properties: { ...tool.input.properties, ...more } } };
+    const description = planning ? (byList ? SEARCH_FOR_PLANNING_BY_LIST : SEARCH_FOR_PLANNING) : SEARCH_BY_LIST;
+    return { ...tool, description, input: { ...tool.input, properties: { ...tool.input.properties, ...more } } };
 };
 
 const toolsFor = (ctx) => offered().filter((tool) => holdsGrantFor(ctx, tool)).map((tool) => formFor(ctx, tool));

@@ -2411,6 +2411,7 @@ export default {
     },
     AgentActions: {
         folder_create: "Make a folder",
+        tag_create: "Add a tag to a project",
         list_sprint_set: "Give a list start and end dates",
         task_comment: "Add a comment",
         task_status_set: "Change the status",
@@ -9588,6 +9589,8 @@ export default {
         copy_dates_kept: "Kept as they are in the project",
         new_folder: "New folder",
         wants_folder: "create the folder “{title}”",
+        new_tag: "New tag",
+        wants_tag: "add the tag “{title}” to the project",
         line_inside: "Inside",
         line_subfolder: "Subfolder",
         line_moved_lists: "Lists moved in",

@@ -188,6 +188,55 @@ describe('a value that cannot be set is refused before anybody is asked', () => 
     });
 });
 
+describe('fields that share a name are told apart, not guessed', () => {
+    const STAGE = '6f0000000000000000000e01';
+    const TWIN = '6f0000000000000000000e02';
+    const stage = (twinType) => {
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: STAGE, fieldTitle: 'Stage', fieldType: 'dropdown', fieldOptions: [{ id: 'o1', label: 'Design' }, { id: 'o2', label: 'Build' }], type: 'task', isDelete: true, global: false, projectId: [P_OPEN] });
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: TWIN, fieldTitle: 'Stage', fieldType: twinType, type: 'task', isDelete: true, global: true });
+    };
+    const args = (field, value) => ({ projectId: P_OPEN, fields: [{ name: 'Cost', type: 'number' }], values: [{ taskId: T_OPEN, field, value }] });
+
+    it('a value both would take is refused with each field, its type and its options, so the person is asked', async () => {
+        stage('text');
+        const out = await rpc(as(OWNER), TOOL, args('Stage', 'Design'));
+        expect(out.pending).toBeUndefined();
+        expect(out.error).toMatch(/2 fields of this project are named "Stage"/);
+        expect(out.error).toContain(`${STAGE} (dropdown: Design, Build)`);
+        expect(out.error).toContain(`${TWIN} (text)`);
+        expect(waiting()).toHaveLength(0);
+    });
+
+    it('the one field the value fits is taken, and a fieldId picks one outright', async () => {
+        stage('number');
+        const out = await approve(await filed(as(OWNER), args('Stage', 'Design')));
+        expect(valuesOf(out)).toEqual([[T_OPEN, 'Stage', true, '']]);
+        expect(stored(SCHEMA_TYPE.TASKS, T_OPEN).customField[STAGE].fieldValue).toEqual(['o1']);
+        const byId = await approve(await filed(as(OWNER), args(TWIN, 5)));
+        expect(valuesOf(byId)).toEqual([[T_OPEN, 'Stage', true, '']]);
+        expect(stored(SCHEMA_TYPE.TASKS, T_OPEN).customField[TWIN].fieldValue).toBe('5');
+    });
+
+    it('a value only a text field takes is not put there while a typed field shares the name', async () => {
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: STAGE, fieldTitle: 'Size', fieldType: 'number', type: 'task', isDelete: true, global: false, projectId: [P_OPEN] });
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: TWIN, fieldTitle: 'Size', fieldType: 'text', type: 'task', isDelete: true, global: true });
+        const out = await rpc(as(OWNER), TOOL, args('Size', 'abc'));
+        expect(out.pending).toBeUndefined();
+        expect(out.error).toMatch(/2 fields of this project are named "Size"/);
+        expect(out.error).toContain(`${STAGE} (number)`);
+        expect(waiting()).toHaveLength(0);
+    });
+
+    it('a twin that appears after filing stops that value at approval and lists both', async () => {
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: STAGE, fieldTitle: 'Stage', fieldType: 'text', type: 'task', isDelete: true, global: false, projectId: [P_OPEN] });
+        const id = await filed(as(OWNER), args('Stage', 'Design'));
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: TWIN, fieldTitle: 'Stage', fieldType: 'textarea', type: 'task', isDelete: true, global: true });
+        const [[, , set, error]] = valuesOf(await approve(id));
+        expect(set).toBe(false);
+        expect(error).toMatch(/2 fields of this project are named "Stage"/);
+    });
+});
+
 describe('approving sets a value only where both people may', () => {
     const args = { projectId: P_OPEN, fields: [{ name: 'Note', type: 'text' }], values: [{ taskId: T_OPEN, field: 'Note', value: 'ok' }] };
 

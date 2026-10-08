@@ -486,9 +486,11 @@ const variantOf = (name) => (manageFlag.enabled() && Object.hasOwn(VARIANTS, nam
 
 const offered = () => TOOLS.filter((t) => registry.has(t.action));
 
-/* The grant an action needs: only the actions these tools alone reach, not the ones a variant shares with its plain tool. */
+/* The grant an action needs: only the actions these tools alone reach, not the ones a variant shares with its plain
+ * tool, and the actions of the work tools that name a grant. */
 const grantOfAction = (action) => {
-    const tool = [...TOOLS, ...Object.values(VARIANTS)].find((t) => t.action === String(action) && manageFlag.ACTIONS.includes(t.action));
+    const tool = [...TOOLS, ...Object.values(VARIANTS)].find((t) => t.action === String(action) && manageFlag.ACTIONS.includes(t.action))
+        || require('./workTools').TOOLS.find((t) => t.action === String(action) && t.grant);
     return tool && tool.grant ? tool.grant : null;
 };
 
