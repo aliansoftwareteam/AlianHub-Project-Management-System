@@ -217,6 +217,16 @@ describe('fields that share a name are told apart, not guessed', () => {
         expect(stored(SCHEMA_TYPE.TASKS, T_OPEN).customField[TWIN].fieldValue).toBe('5');
     });
 
+    it('a value only a text field takes is not put there while a typed field shares the name', async () => {
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: STAGE, fieldTitle: 'Size', fieldType: 'number', type: 'task', isDelete: true, global: false, projectId: [P_OPEN] });
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: TWIN, fieldTitle: 'Size', fieldType: 'text', type: 'task', isDelete: true, global: true });
+        const out = await rpc(as(OWNER), TOOL, args('Size', 'abc'));
+        expect(out.pending).toBeUndefined();
+        expect(out.error).toMatch(/2 fields of this project are named "Size"/);
+        expect(out.error).toContain(`${STAGE} (number)`);
+        expect(waiting()).toHaveLength(0);
+    });
+
     it('a twin that appears after filing stops that value at approval and lists both', async () => {
         mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: STAGE, fieldTitle: 'Stage', fieldType: 'text', type: 'task', isDelete: true, global: false, projectId: [P_OPEN] });
         const id = await filed(as(OWNER), args('Stage', 'Design'));
