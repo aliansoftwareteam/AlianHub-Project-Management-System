@@ -218,6 +218,18 @@ describe('the step at the end of sign-up', () => {
         expect(replace).toHaveBeenCalledWith({ name: 'Home', params: { cid: 'company-1' } });
     });
 
+    it('offers the team set-up only while the dispatcher is on', async () => {
+        const off = await openPage({}, { welcome: true });
+        expect(find(off, 'connect-ai-blueprint').exists()).toBe(false);
+        off.unmount();
+        route.name = CONNECT_AI_WELCOME_ROUTE;
+        route.meta = { welcome: true, hideHeader: true };
+        apiRequest.mockImplementation((type, url) => answer(String(url).endsWith('/team-packs') ? { on: true, packs: [], companyBlueprints: [] } : STATUS));
+        const on = mount(ConnectYourAi, { global: { components: { RouterLink: LinkStub } } });
+        await flushPromises();
+        expect(find(on, 'connect-ai-blueprint').exists()).toBe(true);
+    });
+
     it('offers Skip for now whatever this install has switched on', async () => {
         const wrapper = await openPage({ apps: false, tokens: false, address: '' }, { welcome: true });
         expect(find(wrapper, 'connect-ai-skip').exists()).toBe(true);

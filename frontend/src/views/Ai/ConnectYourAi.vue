@@ -92,7 +92,7 @@
                     <router-link class="cya__inline-link" :to="serverKeyPage">{{ $t('ConnectAi.server_key_link') }}</router-link>
                 </p>
 
-                <p v-if="welcome" class="cya__note">
+                <p v-if="welcome && dispatcherOn" class="cya__note">
                     <router-link class="cya__inline-link" :to="inWorkspace(BLUEPRINT_WELCOME_ROUTE)" data-test="connect-ai-blueprint">{{ $t('CompanyBlueprint.welcome_link') }}</router-link>
                 </p>
 
@@ -118,6 +118,7 @@ import { aiConnection as connection, aiConnectionKnownFor, watchAiConnection } f
 import { saveOnboarding } from "@/composable/onboardingState";
 import { formatWhen } from "@/views/OAuth/oauthShared";
 import { BLUEPRINT_WELCOME_ROUTE } from "@/router/ai/connect";
+import { fetchTeamPacks } from "@/utils/dispatcher";
 
 defineOptions({ name: "ConnectYourAi" });
 
@@ -159,7 +160,11 @@ const skip = () => {
 };
 
 let stopWatching = () => {};
-onMounted(() => { stopWatching = watchAiConnection(() => unref(companyId)); });
+const dispatcherOn = ref(false);
+onMounted(() => {
+    stopWatching = watchAiConnection(() => unref(companyId));
+    if (welcome.value) fetchTeamPacks().then((data) => { dispatcherOn.value = data?.on === true; }).catch(() => {});
+});
 onBeforeUnmount(() => stopWatching());
 </script>
 
