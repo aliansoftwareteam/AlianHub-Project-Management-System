@@ -125,3 +125,26 @@ describe('company view page', () => {
         expect(apiRequest).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('shared company view state', () => {
+    it('reads the org chart again, and drops the last one, after a switch of company', async () => {
+        localStorage.setItem('selectedCompany', 'company-a');
+        apiRequest.mockResolvedValue({ data: { status: true, data: ORG } });
+        const { orgChart, loadOrgChart } = useCompanyView();
+        await loadOrgChart();
+        await loadOrgChart();
+        expect(apiRequest).toHaveBeenCalledTimes(1);
+        expect(orgChart.value).toEqual(ORG);
+
+        localStorage.setItem('selectedCompany', 'company-b');
+        let settle;
+        apiRequest.mockReturnValueOnce(new Promise((resolve) => { settle = resolve; }));
+        const pending = loadOrgChart();
+        expect(apiRequest).toHaveBeenCalledTimes(2);
+        expect(orgChart.value).toBeNull();
+        settle({ data: { status: true, data: { on: false, blueprints: [] } } });
+        await pending;
+        expect(orgChart.value).toEqual({ on: false, blueprints: [] });
+        localStorage.removeItem('selectedCompany');
+    });
+});
