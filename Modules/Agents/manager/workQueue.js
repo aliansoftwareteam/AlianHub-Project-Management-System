@@ -294,12 +294,32 @@ const byClaimTime = (a, b) => new Date(a.row.claim.at) - new Date(b.row.claim.at
 
 /* The marks on a list of tasks: each task an agent holds that the person can open, with who holds it and since
  * when. One read of the claims serves any number of rows, and no total is sent beside the list. */
-const heldTasks = async (companyId, uid, now = new Date()) => {
+const heldInManaged = async (companyId, now) => {
     const projects = await projectsOn(companyId);
     if (!projects.length) return [];
-    const rows = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
+    return find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
         { ...waitingAboutTasks, projectId: { $in: idForms(projects.map((project) => String(project._id))) }, 'claim.until': { $gt: now } }, {}, { limit: ROWS_READ },
     ]);
+};
+
+const heldForRoles = async (companyId, now) => {
+    if (await accounts.connectedPaused(companyId)) return [];
+    const rows = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
+        { ...waiting, rule: HANDED_OVER, 'facts.role': ROUTED_TO_A_ROLE, 'claim.until': { $gt: now } }, {}, { limit: ROWS_READ },
+    ]);
+    const ids = [...new Set(rows.map((row) => String(row.projectId)))];
+    const kept = new Set((ids.length ? await projectsIn(companyId, ids, NOT_PAUSED) : []).map((project) => String(project._id)));
+    return rows.filter((row) => kept.has(String(row.projectId)));
+};
+
+const heldTasks = async (companyId, uid, now = new Date()) => {
+    const seen = new Set();
+    const rows = (await Promise.all([heldInManaged(companyId, now), heldForRoles(companyId, now)])).flat().filter((row) => {
+        if (seen.has(String(row._id))) return false;
+        seen.add(String(row._id));
+        return true;
+    });
+    if (!rows.length) return [];
     const held = await stillHolding(companyId, await readableBy(companyId, uid, rows.filter((row) => liveClaim(row, now))));
     const first = new Map();
     held.sort(byClaimTime).forEach(({ row }) => { if (!first.has(String(row.taskId))) first.set(String(row.taskId), row); });
@@ -315,6 +335,12 @@ const openTask = async (companyId, uid, taskId) => {
 const aboutTaskRows = (companyId, task) => find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
     { ...waiting, projectId: { $in: idForms([String(task.ProjectID)]) }, taskId: String(task._id) },
 ]);
+
+/* With the manager off, a task's line shows only what a lead routed to a role, unless agents are paused. */
+const roleRowsAbout = async (companyId, task) => {
+    if (await accounts.connectedPaused(companyId) || !(await projectsIn(companyId, [String(task.ProjectID)], NOT_PAUSED)).length) return [];
+    return (await aboutTaskRows(companyId, task)).filter(routedToRole);
+};
 
 const NOTHING = Object.freeze({ on: false, canHandOver: false, items: [] });
 
@@ -332,11 +358,14 @@ const standing = async (companyId, row, now) => {
 };
 
 /* The line a task shows: the items about it that an agent holds or a person handed over. A task the person
- * cannot open, a missing one and one in a project whose manager is off all answer alike. */
+ * cannot open, a missing one and one in a project whose manager is off with nothing routed to a role all answer alike. */
 const aboutTask = async (companyId, uid, taskId, now = new Date()) => {
     const task = await openTask(companyId, uid, taskId);
-    if (!task || !(await projectsOn(companyId, [String(task.ProjectID)])).length) return { ...NOTHING, items: [] };
-    const about = await Promise.all((await readableBy(companyId, uid, await aboutTaskRows(companyId, task))).map(async ({ row }) => ({ row, ...(await standing(companyId, row, now)) })));
+    if (!task) return { ...NOTHING, items: [] };
+    const managed = (await projectsOn(companyId, [String(task.ProjectID)])).length > 0;
+    const rows = managed ? await aboutTaskRows(companyId, task) : await roleRowsAbout(companyId, task);
+    if (!managed && !rows.length) return { ...NOTHING, items: [] };
+    const about = await Promise.all((await readableBy(companyId, uid, rows)).map(async ({ row }) => ({ row, ...(await standing(companyId, row, now)) })));
     const readable = about.filter((item) => item.stands);
     const items = (await Promise.all(readable.map(async ({ row, to }) => {
         const claim = await heldBy(companyId, row, now);
@@ -344,7 +373,7 @@ const aboutTask = async (companyId, uid, taskId, now = new Date()) => {
         return { id: String(row._id), rule: row.rule, claim: shown(claim), ...(to ? { to } : {}), canTakeBack: Boolean(await mayTakeBack(companyId, uid, row, claim)) };
     }))).filter(Boolean);
     const handed = readable.some(({ row }) => row.rule === HANDED_OVER);
-    return { on: true, canHandOver: !handed && !isClosedTask(task) && await holds(companyId, uid, OFFER_NEEDS[HANDED_OVER], task.ProjectID), items };
+    return { on: true, canHandOver: managed && !handed && !isClosedTask(task) && await holds(companyId, uid, OFFER_NEEDS[HANDED_OVER], task.ProjectID), items };
 };
 
 /* With `to`, the task goes to one person's AI, and only their own: the answer is the same for someone else's AI, for a person

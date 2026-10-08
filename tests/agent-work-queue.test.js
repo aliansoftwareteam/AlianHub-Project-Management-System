@@ -609,6 +609,25 @@ describe('a task a lead routed to a role through the dispatcher', () => {
         expect(await queue(agent(OWNER), { role: TRIAGER })).toEqual([]);
     });
 
+    it('marks the task as held on its line and in lists with the manager off, to those who can open it, until agents are paused', async () => {
+        const itemId = await routed(OTHER, { TaskKey: 'HID-BUG', sprintId: S_SECRET, sprintArray: { id: S_SECRET, name: 'Secret' } });
+        const taskId = rowOf(itemId).taskId;
+        expect((await taskLine(OTHER, taskId)).body.data).toMatchObject({ on: true, canHandOver: false, items: [{ id: itemId, rule: HANDED_OVER, claim: null }] });
+        await claim(agent(OTHER), itemId);
+        expect((await taskLine(OTHER, taskId)).body.data.items).toMatchObject([{ id: itemId, claim: { name: expect.any(String) } }]);
+        expect(await workQueue.heldTasks(CID, OTHER)).toMatchObject([{ taskId, projectId: P_OPEN }]);
+        expect(await workQueue.heldTasks(CID, MEMBER)).toEqual([]);
+        expect((await taskLine(MEMBER, taskId)).body.data).toMatchObject({ on: false, items: [] });
+        project(P_OPEN).agentLimits = { paused: true };
+        expect(await workQueue.heldTasks(CID, OTHER)).toEqual([]);
+        expect((await taskLine(OTHER, taskId)).body.data).toMatchObject({ on: false, items: [] });
+    });
+
+    it('leaves the line of a task nobody routed empty with the manager off', async () => {
+        const plainTask = task({ TaskKey: 'OPN-PLAIN' });
+        expect((await taskLine(OWNER, plainTask._id)).body.data).toMatchObject({ on: false, canHandOver: false, items: [] });
+    });
+
     it('stays out of reach of a person who cannot open the task, and of a paused project', async () => {
         const itemId = await routed(OTHER, { TaskKey: 'HID-BUG', sprintId: S_SECRET, sprintArray: { id: S_SECRET, name: 'Secret' } });
         expect(await queue(agent(MEMBER), { role: TRIAGER })).toEqual([]);
