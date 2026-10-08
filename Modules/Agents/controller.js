@@ -662,6 +662,15 @@ exports.createProposal = async (req, res) => {
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
+/* An approval stays approved when part of it was not made (proposals.approve keeps `notMade`); its answer names what. */
+const approvalText = (out) => {
+    const notMade = (out && out.proposal && Array.isArray(out.proposal.notMade)) ? out.proposal.notMade : [];
+    if (!notMade.length) return 'Done.';
+    const lines = notMade.map((entry) => [entry.name, entry.error].filter(Boolean).join(': ')).join(' ');
+    const madeAny = Array.isArray(out.applied) && out.applied.some((change) => change && change.ok);
+    return `${madeAny ? 'Approved, but part of it was not made.' : 'Approved, but nothing was made.'} ${lines}`;
+};
+
 /* `heldTo`, when given, is asked of the caller and the proposal before the decision is taken; it answers a refusal or null. */
 const decide = (action, fn, heldTo = null) => async (req, res) => {
     try {
@@ -678,7 +687,7 @@ const decide = (action, fn, heldTo = null) => async (req, res) => {
         if (held) return fail(res, held.error, held.status, refusalOf(held));
         const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, parts: req.body && req.body.parts, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
-        return res.send({ status: true, statusText: 'Done.', data: out });
+        return res.send({ status: true, statusText: action === 'proposal.approve' ? approvalText(out) : 'Done.', data: out });
     } catch (e) { logger.error(`proposal decision: ${e.message}`); return fail(res, e.message, 500); }
 };
 
