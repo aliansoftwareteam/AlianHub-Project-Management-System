@@ -243,6 +243,19 @@ describe('a link that opens it grouped, filtered or on the person\'s own tasks',
         expect(none.error).toMatch(/no field named "colour"/);
     });
 
+    it('takes a field id only of a field of this project, and offers a view to save only to a caller that can file one', async () => {
+        process.env.MCP_TOOLS_WORK = 'on';
+        const other = '6f0000000000000000000f13';
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: other, fieldTitle: 'Region', fieldType: 'dropdown', type: 'task', isDelete: true, global: false, projectId: [P_PRIVATE] });
+        const out = await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: other });
+        expect(out.url).toBeUndefined();
+        expect(out.error).toMatch(/no field with the id/);
+        const reading = await link(readOnly(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'assignee' });
+        expect(reading.url).toBe(`${AT}/project/${P_OPEN}/p?tab=ProjectListView`);
+        expect(reading.saveView).toBeUndefined();
+        expect(reading.note).not.toMatch(/view\.create/);
+    });
+
     it('answers a project the person cannot open as before, and writes nothing', async () => {
         const before = everythingStored();
         expect(await link(ctx(OUTSIDER), { screen: 'project', projectId: P_PRIVATE, groupBy: 'priority' })).toEqual(NOT_FOUND);
