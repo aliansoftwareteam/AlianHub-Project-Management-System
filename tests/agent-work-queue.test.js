@@ -576,6 +576,50 @@ describe('what people see, and taking an item back', () => {
     });
 });
 
+describe('a task a lead routed to a role through the dispatcher', () => {
+    const TRIAGER = 'it-company/bug-triager';
+    const routed = async (uid, over = {}) => {
+        const routedTask = task({ TaskKey: 'OPN-BUG', ...over });
+        mockDb.seed(SCHEMA_TYPE.ASSIGNMENT_RULES, { projectId: P_OPEN, dispatcher: { mode: 'suggest', roles: [TRIAGER], rules: [{ role: TRIAGER, when: { taskTypeKeys: [2] } }] } });
+        const decision = mockDb.seed(SCHEMA_TYPE.DISPATCH_DECISIONS, {
+            taskId: String(routedTask._id), projectId: P_OPEN, state: 'suggested', mode: 'suggest', role: TRIAGER, source: 'rule', ruleIndex: 0, agentId: null, createdAt: new Date(),
+        });
+        await require('../Modules/AssignmentRules/dispatcher/decisions').accept(CID, { id: uid }, String(routedTask._id), String(decision._id));
+        return String(stored().find((row) => row.taskId === String(routedTask._id))._id);
+    };
+
+    beforeEach(() => { process.env.DISPATCHER = 'on'; });
+    afterEach(() => { delete process.env.DISPATCHER; });
+
+    it('is in that role\'s queue with the manager off, can be claimed and released, and finished it leaves', async () => {
+        const itemId = await routed(OWNER);
+        expect(project(P_OPEN).agentManager).toBeUndefined();
+        expect(rowOf(itemId)).toMatchObject({ rule: HANDED_OVER, status: 'open', facts: { role: TRIAGER, agentId: '' } });
+        expect(await queue(agent(OWNER), { role: TRIAGER })).toMatchObject([{ itemId, kind: HANDED_OVER, key: 'OPN-BUG', role: TRIAGER, handedOverBy: OWNER }]);
+        expect(await queue(agent(OWNER))).toMatchObject([{ itemId }]);
+        expect(await queue(agent(OWNER), { role: 'it-company/code-reviewer' })).toEqual([]);
+        expect(await claim(agent(OWNER), itemId)).toMatchObject({ ok: true });
+        expect(rowOf(itemId).claim).toMatchObject({ userId: OWNER });
+        expect(await queue(agent(OWNER, TOKEN_2), { role: TRIAGER })).toEqual([]);
+        expect(await release(agent(OWNER), itemId)).toMatchObject({ ok: true });
+        expect(rowOf(itemId).claim).toBeUndefined();
+        await claim(agent(OWNER), itemId);
+        expect(await release(agent(OWNER), itemId, true)).toMatchObject({ ok: true });
+        expect(rowOf(itemId)).toMatchObject({ status: 'closed', leftQueue: { why: 'finished' } });
+        expect(await queue(agent(OWNER), { role: TRIAGER })).toEqual([]);
+    });
+
+    it('stays out of reach of a person who cannot open the task, and of a paused project', async () => {
+        const itemId = await routed(OTHER, { TaskKey: 'HID-BUG', sprintId: S_SECRET, sprintArray: { id: S_SECRET, name: 'Secret' } });
+        expect(await queue(agent(MEMBER), { role: TRIAGER })).toEqual([]);
+        expect(await claim(agent(MEMBER), itemId)).toMatchObject({ error: workQueue.REFUSAL.NO_ITEM });
+        expect(rowOf(itemId).claim).toBeUndefined();
+        expect(await queue(agent(OTHER), { role: TRIAGER })).toMatchObject([{ itemId }]);
+        project(P_OPEN).agentLimits = { paused: true };
+        expect(await queue(agent(OTHER), { role: TRIAGER })).toEqual([]);
+    });
+});
+
 describe('the stored fields', () => {
     it('are declared, so a strict schema keeps them', () => {
         expect(Object.keys(projectFindingsSchema.paths)).toEqual(expect.arrayContaining(['claim', 'leftQueue']));

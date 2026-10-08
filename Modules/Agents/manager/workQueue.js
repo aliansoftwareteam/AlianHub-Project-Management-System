@@ -79,9 +79,16 @@ const isMember = async (companyId, uid) => {
     return roleType !== null && roleType !== undefined && roleType !== ROLE_GUEST;
 };
 
-const projectsOn = (companyId, ids, more = {}) => find(companyId, SCHEMA_TYPE.PROJECTS, [
-    { 'agentManager.on': true, deletedStatusKey: { $ne: 1 }, ...(ids ? { _id: { $in: ids.filter(isId).map(oid) } } : {}), ...more }, { ProjectName: 1 }, { limit: PROJECTS_READ },
+const projectsIn = (companyId, ids, more = {}) => find(companyId, SCHEMA_TYPE.PROJECTS, [
+    { deletedStatusKey: { $ne: 1 }, ...(ids ? { _id: { $in: ids.filter(isId).map(oid) } } : {}), ...more }, { ProjectName: 1 }, { limit: PROJECTS_READ },
 ]);
+const projectsOn = (companyId, ids, more = {}) => projectsIn(companyId, ids, { 'agentManager.on': true, ...more });
+
+/* A lead routed the task to a role through the dispatcher, which is switched on by itself: such a row is waiting
+ * work whether or not the project's manager is on. */
+const ROUTED_TO_A_ROLE = Object.freeze({ $gt: '' });
+const routedToRole = (row) => Boolean(row && row.rule === HANDED_OVER && row.facts && row.facts.role);
+const reaches = async (companyId, row) => (await (routedToRole(row) ? projectsIn : projectsOn)(companyId, [String(row.projectId)])).length > 0;
 
 const NOT_PAUSED = Object.freeze({ 'agentLimits.paused': { $ne: true } });
 
@@ -117,13 +124,36 @@ const heldBy = async (companyId, row, now) => {
 
 const byUrgency = (a, b) => QUEUE_RULES.indexOf(a.row.rule) - QUEUE_RULES.indexOf(b.row.rule) || new Date(a.row.openedAt) - new Date(b.row.openedAt);
 
-const aboutTasksFor = async ({ companyId, uid, projectId, allowsProject, allowsTask }) => {
-    const projects = (await projectsOn(companyId, projectId ? [projectId] : null, NOT_PAUSED)).filter((project) => allowsProject(String(project._id)));
-    if (!projects.length) return [];
-    const names = new Map(projects.map((project) => [String(project._id), project.ProjectName || '']));
+const managedRows = async (companyId, projectId) => {
+    const projects = await projectsOn(companyId, projectId ? [projectId] : null, NOT_PAUSED);
+    if (!projects.length) return { projects, rows: [] };
     const rows = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
-        { ...waitingAboutTasks, projectId: { $in: idForms([...names.keys()]) } }, {}, { sort: { openedAt: 1 }, limit: ROWS_READ },
+        { ...waitingAboutTasks, projectId: { $in: idForms(projects.map((project) => String(project._id))) } }, {}, { sort: { openedAt: 1 }, limit: ROWS_READ },
     ]);
+    return { projects, rows };
+};
+
+const roleRows = async (companyId, projectId, role) => {
+    const rows = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
+        { ...waiting, rule: HANDED_OVER, 'facts.role': role || ROUTED_TO_A_ROLE, ...(projectId ? { projectId: { $in: idForms([String(projectId)]) } } : {}) },
+        {}, { sort: { openedAt: 1 }, limit: ROWS_READ },
+    ]);
+    const ids = [...new Set(rows.map((row) => String(row.projectId)))];
+    const projects = ids.length ? await projectsIn(companyId, ids, NOT_PAUSED) : [];
+    const kept = new Set(projects.map((project) => String(project._id)));
+    return { projects, rows: rows.filter((row) => kept.has(String(row.projectId))) };
+};
+
+/* With `role`, only the tasks a lead routed to that role ('blueprint/slug'). */
+const aboutTasksFor = async ({ companyId, uid, projectId, role, allowsProject, allowsTask }) => {
+    const found = await Promise.all([role ? { projects: [], rows: [] } : managedRows(companyId, projectId), roleRows(companyId, projectId, role)]);
+    const names = new Map(found.flatMap(({ projects }) => projects).filter((project) => allowsProject(String(project._id))).map((project) => [String(project._id), project.ProjectName || '']));
+    const seen = new Set();
+    const rows = found.flatMap((each) => each.rows).filter((row) => {
+        if (!names.has(String(row.projectId)) || seen.has(String(row._id))) return false;
+        seen.add(String(row._id));
+        return true;
+    });
     return (await readableBy(companyId, uid, rows.filter((row) => offeredTo(row, uid)), allowsTask)).filter((item) => !isClosedTask(item.task))
         .map((item) => ({ ...item, projectId: String(item.row.projectId), project: names.get(String(item.row.projectId)) || '' }));
 };
@@ -131,11 +161,11 @@ const aboutTasksFor = async ({ companyId, uid, projectId, allowsProject, allowsT
 /* What a connection may take or already holds, the most urgent first. Nothing is counted beside the list. A
  * project where agents are paused hands out nothing, and neither does a workspace whose connected agents are paused.
  * `reach` is the connection's own limits for chat, which sits in no task (./chatQuestions). */
-const itemsFor = async ({ companyId, uid, connection, projectId, allowsProject = () => true, allowsTask, reach = null, limit, now = new Date() }) => {
+const itemsFor = async ({ companyId, uid, connection, projectId, role, allowsProject = () => true, allowsTask, reach = null, limit, now = new Date() }) => {
     if (await accounts.connectedPaused(companyId)) return [];
     const mine = (await Promise.all([
-        chatQuestions.waitingFor({ companyId, uid, projectId, reach, now }),
-        aboutTasksFor({ companyId, uid, projectId, allowsProject, allowsTask }),
+        role ? [] : chatQuestions.waitingFor({ companyId, uid, projectId, reach, now }),
+        aboutTasksFor({ companyId, uid, projectId, role, allowsProject, allowsTask }),
     ])).flat().sort(byUrgency);
     const most = Math.min(Math.max(Number(limit) || LISTED_DEFAULT, 1), LISTED_MAX);
     const listed = [];
@@ -156,7 +186,7 @@ const itemFor = async ({ companyId, uid, itemId, allowsProject = () => true, all
     if (!isId(itemId)) return null;
     const [row] = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [{ ...waiting, _id: oid(itemId) }]);
     if (row && row.rule === ASKED_IN_CHAT) return asAgent ? chatQuestions.readFor(companyId, uid, row, { reach, now }) : null;
-    if (!row || (asAgent && !offeredTo(row, uid)) || !allowsProject(String(row.projectId)) || !(await projectsOn(companyId, [String(row.projectId)])).length) return null;
+    if (!row || (asAgent && !offeredTo(row, uid)) || !allowsProject(String(row.projectId)) || !(await reaches(companyId, row))) return null;
     const [item] = await readableBy(companyId, uid, [row], allowsTask);
     return item && !isClosedTask(item.task) ? { ...item, projectId: String(row.projectId) } : null;
 };

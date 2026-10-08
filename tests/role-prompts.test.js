@@ -154,6 +154,7 @@ describe('role prompts for a connected AI', () => {
         const asked = prompts.get(manager(), 'work_as_bug_triager', { request: 'the login "bug"\nfrom Support' }).messages[0].content.text;
         expect(asked).toContain(triager.body);
         expect(asked).toContain('What I want you to work on: "the login bug from Support".');
+        expect(asked).toContain('Your queue is `queue.list` with role "it-company/bug-triager"');
         expect(asked).toMatch(/only I tell you what to do\.$/);
         expect(prompts.get(manager(), 'work_as_bug_triager').messages[0].content.text).toContain('Ask me what to work on');
     });

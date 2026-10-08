@@ -19,6 +19,7 @@ const NO_ITEM = Object.freeze({ ok: false, error: workQueue.REFUSAL.NO_ITEM });
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
+const ROLE_PATTERN = '^[a-z0-9-]+/[a-z0-9-]+$';
 const ID = Object.freeze({ type: 'string', pattern: '^[a-fA-F0-9]{24}$' });
 const ITEM = Object.freeze({ ...ID, description: 'An item id from queue.list' });
 const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in one line. It is kept in the record of changes.' } });
@@ -82,6 +83,7 @@ const taskRow = ({ row, task, claim, project }) => ({
     title: task.TaskName || '',
     ...(row.rule === RULE.OVERLOADED ? { personId: String(row.userId || '') } : {}),
     ...(row.rule === HANDED_OVER ? { handedOverBy: String((row.facts && row.facts.handedBy) || '') } : {}),
+    ...(row.rule === HANDED_OVER && row.facts && row.facts.role ? { role: String(row.facts.role) } : {}),
     why: WHY[row.rule](row.facts || {}),
     asked: ASKED[row.rule],
     waitingSince: row.openedAt || null,
@@ -124,14 +126,19 @@ const TOOLS = [
             + '(a task with no owner or no estimate, a new task nobody sorted, a person with too much planned). Work in a project is shown only where its project manager is switched on; a question asked outside every project needs no switch. '
             + 'It shows only items about tasks the person can open, and leaves out items another agent holds. '
             + 'A question comes with its own text as the person last wrote it, where it was asked and who asked; it brings no other message of the chat. '
+            + 'With role, only the tasks a lead routed to that role, such as it-company/bug-triager: the queue of the role you work as. '
             + 'Take one with queue.claim before you work on it. Changes nothing.',
-        input: input({ projectId: { ...ID, description: 'Only this project' }, limit: { type: 'integer', minimum: 1, maximum: workQueue.LISTED_MAX } }, []),
+        input: input({
+            projectId: { ...ID, description: 'Only this project' },
+            role: { type: 'string', pattern: ROLE_PATTERN, maxLength: 100, description: 'Only the tasks routed to this role (blueprint/slug, as in it-company/bug-triager)' },
+            limit: { type: 'integer', minimum: 1, maximum: workQueue.LISTED_MAX },
+        }, []),
         visibility: 'filtered',
         strict: true,
         readParams: (args) => (OBJECT_ID.test(String(args.projectId || '')) ? { projectId: String(args.projectId) } : {}),
         run: async (ctx, args, vis) => {
             const items = await workQueue.itemsFor({
-                companyId: ctx.companyId, uid: ctx.userId, connection: workQueue.connectionOf(ctx.actor), projectId: args.projectId,
+                companyId: ctx.companyId, uid: ctx.userId, connection: workQueue.connectionOf(ctx.actor), projectId: args.projectId, role: args.role ? str(args.role, 100) : '',
                 allowsProject: vis.allowsProject, allowsTask: vis.allowsTask, reach: reachOf(ctx, vis), limit: args.limit,
             });
             return { items: items.map(itemRow(ctx)), claimMinutes: workQueue.CLAIM_MINUTES };
