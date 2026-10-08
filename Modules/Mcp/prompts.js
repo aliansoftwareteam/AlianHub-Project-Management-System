@@ -220,6 +220,7 @@ const rolePrompt = (role) => Object.freeze({
         `Work as the ${role.name} of the ${role.department} team in AlianHub, following the playbook below.`,
         request ? `What I want you to work on: "${request}".` : 'Ask me what to work on, unless I have just told you.',
         'Ask me for anything the playbook needs that you do not have before you start, and show me what you will change before you change it.',
+        ...(has('queue.list') ? [`Your queue is \`queue.list\` with role "${role.blueprint}/${role.slug}": the tasks a lead routed to the ${role.name}.`] : []),
         role.body,
         CONTENT_RULE,
     ],

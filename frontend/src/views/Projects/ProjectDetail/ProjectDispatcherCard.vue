@@ -1,7 +1,9 @@
 <template>
-    <section v-if="settings" class="pdc" data-test="project-dispatcher" :aria-labelledby="ids.heading">
-        <h5 :id="ids.heading" class="pdc__title">{{ $t('Dispatcher.title') }}</h5>
-        <p class="pdc__hint">{{ $t('Dispatcher.lead') }}</p>
+    <section v-if="settings" class="ah-card pdc" data-test="project-dispatcher" :aria-labelledby="ids.heading">
+        <div class="pdc__head">
+            <h5 :id="ids.heading" class="pdc__title">{{ $t('Dispatcher.title') }}</h5>
+            <p class="ah-small pdc__lead">{{ $t('Dispatcher.lead') }}</p>
+        </div>
         <div class="pdc__row">
             <label class="pdc__label" :for="ids.mode">{{ $t('Dispatcher.mode_label') }}</label>
             <select :id="ids.mode" v-model="mode" class="pdc__select" data-test="dispatcher-mode" :disabled="!canEdit || busy" @change="saveMode">
@@ -78,7 +80,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
-    CONDITION_KINDS, actOnRouting, fetchDispatcher, fetchNeedsRouting, ruleToRow, rowIsComplete, rowToRule, saveDispatcher, useDispatcherChanges
+    CONDITION_KINDS, actOnRouting, blueprintName, fetchDispatcher, fetchNeedsRouting, ruleToRow, rowIsComplete, rowToRule, saveDispatcher, useDispatcherChanges
 } from "@/utils/dispatcher";
 import { refusalText } from "@/utils/assignmentRules";
 
@@ -93,7 +95,7 @@ const props = defineProps({
 
 const MODES = ["off", "suggest", "apply"];
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const uid = `pdc-${Math.random().toString(36).slice(2, 8)}`;
 const ids = { heading: `${uid}-heading`, mode: `${uid}-mode` };
 
@@ -109,11 +111,10 @@ const error = ref("");
 let nextRowId = 0;
 
 const withId = (row) => ({ ...row, id: (nextRowId += 1) });
-const labelOf = (blueprint) => blueprint.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 const roleGroups = computed(() => {
     const groups = new Map();
     allRoles.value.forEach((role) => groups.set(role.blueprint, [...(groups.get(role.blueprint) || []), role]));
-    return [...groups].map(([blueprint, roles]) => ({ blueprint, label: labelOf(blueprint), roles, on: roles.filter((role) => draftRoles.value.includes(role.key)).length }));
+    return [...groups].map(([blueprint, roles]) => ({ blueprint, label: blueprintName(t, te, blueprint), roles, on: roles.filter((role) => draftRoles.value.includes(role.key)).length }));
 });
 const enabledRoles = computed(() => allRoles.value.filter((role) => draftRoles.value.includes(role.key)));
 const savedRoles = computed(() => allRoles.value.filter((role) => (settings.value?.roles || []).includes(role.key)));
@@ -207,8 +208,10 @@ async function route(item) {
 </script>
 
 <style scoped>
-.pdc { margin-top: 20px; color: var(--ink); font-family: var(--font-ui); max-width: 100%; }
-.pdc__title { margin: 0 0 4px; font-weight: 600; }
+.pdc { display: flex; flex-direction: column; margin: 20px 0 0; padding: 14px 16px; max-width: 720px; box-sizing: border-box; color: var(--ink); font-family: var(--font-ui); }
+.pdc__head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.pdc__title { margin: 0; font: 600 14px/1.3 var(--font-ui); color: var(--ink); }
+.pdc__lead { margin: 0; }
 .pdc__subtitle { margin: 12px 0 6px; font-weight: 600; font-size: var(--fs-md, 12.5px); }
 .pdc__hint { margin: 0 0 8px; color: var(--ink-2); font-size: var(--fs-sm, 12px); }
 .pdc__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }

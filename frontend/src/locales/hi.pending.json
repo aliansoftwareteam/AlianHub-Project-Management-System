@@ -3873,6 +3873,7 @@
     "Description.cancel": "Cancel",
     "Description.save": "Save",
     "Dispatcher.accept": "Accept",
+    "Dispatcher.accepted_by": "{role} · accepted by {person}",
     "Dispatcher.by_model": "AI guess, {confidence}% sure",
     "Dispatcher.by_rule": "rule {n}",
     "Dispatcher.condition_field": "Field equals",
