@@ -109,6 +109,18 @@ describe('promote and rollback', () => {
         expect(agentRow().autonomy).toBe(1);
     });
 
+    it('carries the role an agent plays through a new version, and refuses an unknown one', async () => {
+        await revisions.liveFor(C, baseAgent());
+        const r = await call(ctrl.createRevision, { body: { state: 'candidate', role: 'it-company/bug-triager' } });
+        expect(r.body.data.snapshot).toMatchObject({ role: 'it-company/bug-triager' });
+        expect(agentRow().role).toBeUndefined();
+        await call(ctrl.promoteRevision, { params: { id: AGENT_ID, n: String(r.body.data.n) } });
+        expect(agentRow().role).toBe('it-company/bug-triager');
+        const later = await call(ctrl.createRevision, { body: { state: 'candidate', autonomy: 2 } });
+        expect(later.body.data.snapshot).toMatchObject({ role: 'it-company/bug-triager', autonomy: 2 });
+        expect((await call(ctrl.createRevision, { body: { state: 'candidate', role: 'it-company/nobody' } })).code).toBe(400);
+    });
+
     it('promote is a pointer move with an audit row and never rewrites an old revision', async () => {
         const candidate = await seedHistory();
         const before = JSON.stringify(rows().map(({ n, snapshot, createdAt, createdBy, source }) => ({ n, snapshot, createdAt, createdBy, source })));
