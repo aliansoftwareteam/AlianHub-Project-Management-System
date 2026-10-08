@@ -80,7 +80,7 @@ const VALUE = Object.freeze({
     additionalProperties: false,
     properties: {
         taskId: ID,
-        field: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX, description: 'The name of a field of this call, or of one the project already has' },
+        field: { type: 'string', minLength: 1, maxLength: RAW_TEXT_MAX, description: 'The name of a field of this call, or the name or fieldId of one the project already has. Where several fields share the name, give the fieldId' },
         value: { description: 'The value in the field\'s type, as task.field.set takes it' },
     },
     required: ['taskId', 'field', 'value'],

@@ -168,7 +168,7 @@ describe('a link that opens it grouped, filtered or on the person\'s own tasks',
             view(V_PRIORITY, 'ProjectListView', 'By priority', { groupBy: 2, sort: { field: 'DueDate', dir: 1 } }),
             view(V_MINE_WEEK, 'ProjectKanban', 'Mine this week', { me: true, filters: [dueThisWeek] }),
         ];
-        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: F_STAGE, fieldTitle: 'Stage', fieldType: 'dropdown', type: 'task', isDelete: true, global: false, projectId: [P_OPEN] });
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: F_STAGE, fieldTitle: 'Stage', fieldType: 'dropdown', fieldOptions: [{ id: 'o1', label: 'Design' }, { id: 'o2', label: 'Build' }], type: 'task', isDelete: true, global: false, projectId: [P_OPEN] });
     });
 
     it('the everything screen opens on the person\'s own tasks', async () => {
@@ -237,7 +237,7 @@ describe('a link that opens it grouped, filtered or on the person\'s own tasks',
         const out = await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'Stage' });
         expect(out.url).toBeUndefined();
         expect(out.error).toMatch(/more than one field[\s\S]*Stage/i);
-        expect(out.fields).toEqual([{ fieldId: F_STAGE, name: 'Stage', type: 'dropdown' }, { fieldId: twin, name: 'Stage', type: 'text' }]);
+        expect(out.fields).toEqual([{ fieldId: F_STAGE, name: 'Stage', type: 'dropdown', options: ['Design', 'Build'] }, { fieldId: twin, name: 'Stage', type: 'text', options: [] }]);
         const none = await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'colour' });
         expect(none.url).toBeUndefined();
         expect(none.error).toMatch(/no field named "colour"/);
