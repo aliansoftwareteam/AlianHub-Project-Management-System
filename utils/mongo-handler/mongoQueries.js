@@ -118,6 +118,7 @@ const {
     aiAlertsSchema,
     agentProposalsSchema,
     agentStandingApprovalsSchema,
+    rolePlaybookOverridesSchema,
     agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,
@@ -390,6 +391,8 @@ exports.checkType = (type) => {
             return agentStandingApprovalsSchema
         case SCHEMA_TYPE.AGENT_SKILLS:
             return agentSkillsSchema
+        case SCHEMA_TYPE.ROLE_PLAYBOOK_OVERRIDES:
+            return rolePlaybookOverridesSchema
         case SCHEMA_TYPE.CALLS:
             return callsSchema
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
@@ -700,6 +703,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AGENT_STANDING_APPROVALS}`
         case SCHEMA_TYPE.AGENT_SKILLS:
                 return `${dbCollections.AGENT_SKILLS}`
+        case SCHEMA_TYPE.ROLE_PLAYBOOK_OVERRIDES:
+                return `${dbCollections.ROLE_PLAYBOOK_OVERRIDES}`
         case SCHEMA_TYPE.CALLS:
                 return `${dbCollections.CALLS}`
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:

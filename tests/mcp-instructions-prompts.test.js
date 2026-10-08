@@ -268,7 +268,7 @@ describe('the ready-made prompts', () => {
 });
 
 describe('neither reads the workspace', () => {
-    it.each(EVERY_MIX)('no workspace data and no database read for %s', async (label, mix, caller) => {
+    it.each(EVERY_MIX)('no workspace data and no database read but the workspace\'s edited role playbooks for %s', async (label, mix, caller) => {
         flags(...mix);
         const reads = jest.spyOn(mockDb, 'crud');
         const who = caller();
@@ -278,7 +278,7 @@ describe('neither reads the workspace', () => {
             texts.push((await promptText(who, prompt.name)).text);
             texts.push((await promptText(who, prompt.name, { project: 'Website relaunch', period: 'this week' })).text);
         }
-        expect(reads).not.toHaveBeenCalled();
+        expect(reads.mock.calls.filter(([, query]) => query.type !== 'role_playbook_overrides')).toEqual([]);
         reads.mockRestore();
         const all = texts.join('\n');
         ['Olive Owner', 'Gus Guest', 'Open task', 'Private list', 'List of the private project', CID, OWNER, P_OPEN, T_OPEN].forEach((stored) => expect(all).not.toContain(stored));
