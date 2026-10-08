@@ -25,6 +25,8 @@ const roleOf = (key) => {
     return rest === undefined && blueprint && slug ? playbooks.find(blueprint, slug) : null;
 };
 const roleName = (key) => (roleOf(key) || {}).name || '';
+const WHO_MAX = 300;
+const roleWho = (companyId, key) => playbooks.whoFor(companyId, key, WHO_MAX);
 
 const textOf = (value) => String(value === undefined || value === null ? '' : value).trim().slice(0, MAX_TEXT);
 
@@ -140,4 +142,4 @@ const matches = (when, task) => {
 
 const roleChoices = () => playbooks.all().map((role) => ({ key: roleKey(role), name: role.name, blueprint: role.blueprint, department: role.department }));
 
-module.exports = { MODES, THRESHOLD, MAX_RULES, DEFAULTS, roleKey, roleOf, roleName, view, settingsOf, load, validate, save, addRule, matches, roleChoices };
+module.exports = { MODES, THRESHOLD, MAX_RULES, DEFAULTS, roleKey, roleOf, roleName, roleWho, view, settingsOf, load, validate, save, addRule, matches, roleChoices };

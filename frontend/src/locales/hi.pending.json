@@ -3924,6 +3924,7 @@
     "Dispatcher.mode_label": "Mode",
     "Dispatcher.mode_off": "Off",
     "Dispatcher.mode_suggest": "Suggest a role",
+    "Dispatcher.model_reason": "Model's reason:",
     "Dispatcher.needs_routing": "Needs routing",
     "Dispatcher.needs_routing_empty": "Nothing is waiting for a role.",
     "Dispatcher.offer_add": "Add rule",

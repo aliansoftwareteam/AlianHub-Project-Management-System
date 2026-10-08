@@ -13466,6 +13466,7 @@ export default {
         needs_routing_empty: "Nothing is waiting for a role.",
         by_rule: "rule {n}",
         by_model: "AI guess, {confidence}% sure",
+        model_reason: "Model's reason:",
         accept: "Accept",
         dismiss: "Dismiss",
         pick_role: "Choose a role",
