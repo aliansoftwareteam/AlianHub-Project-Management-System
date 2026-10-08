@@ -1198,6 +1198,8 @@ const schema = {
         skills: { type: Array, default: [], required: false },
         // Subset of Modules/Agents/registry.js keys this agent may use. Empty = every registry action.
         allowedActions: { type: Array, default: [], required: false },
+        // The role it plays ('blueprint/slug' of Modules/Agents/roles), so the dispatcher can give a role's task to the least loaded of its agents.
+        role: { type: String, required: false },
         projectIds: { type: Array, default: [], required: false },
         // 0 suggest everything · 1 act on low risk · 2 act on medium, propose the rest · 3 also on a schedule
         autonomy: { type: Number, default: 0, required: false },
@@ -2318,6 +2320,9 @@ const schema = {
         revision: { type: Number, required: false, default: 1 },
         updatedBy: { type: String, required: false },
         updatedAt: { type: Date, required: false },
+        // The dispatcher (Modules/AssignmentRules/dispatcher): { mode: off | suggest | apply, threshold, modelGuess, roles: ['blueprint/slug'],
+        // rules: [{ role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
+        dispatcher: { type: Object, required: false },
     },
     // One decision per task revision: what the rules chose, why, and what became of it. `inputHash` covers the task text
     // and the rule revision, so the same task is never decided twice for the same input.
@@ -2335,6 +2340,29 @@ const schema = {
         model: { type: String, required: false, default: '' },
         rulesRevision: { type: Number, required: false, default: 0 },
         rulesBy: { type: String, required: false, default: '' },
+        resolvedBy: { type: String, required: false, default: '' },
+        resolvedAt: { type: Date, required: false },
+        createdAt: { type: Date, required: false },
+        updatedAt: { type: Date, required: false },
+    },
+    // Which role the dispatcher routed a task to, why, and what a lead made of it (Modules/AssignmentRules/dispatcher).
+    // state: suggested | needs_routing | applied | accepted | dismissed | routed | superseded. `inputHash` covers the task fields the rules read
+    // and the dispatcher revision, so a task is routed once per input.
+    dispatchDecisions: {
+        taskId: { type: String, required: true },
+        projectId: { type: String, required: true },
+        inputHash: { type: String, required: true },
+        trigger: { type: String, required: false, default: 'create' },
+        state: { type: String, required: true },
+        mode: { type: String, required: false, default: 'suggest' },
+        role: { type: String, required: false, default: null },
+        source: { type: String, required: false, default: null },
+        ruleIndex: { type: Number, required: false, default: null },
+        confidence: { type: Number, required: false, default: null },
+        agentId: { type: String, required: false, default: null },
+        skipped: { type: Array, required: false, default: [] },
+        taskTypeKey: { type: Number, required: false, default: null },
+        chosenRole: { type: String, required: false, default: null },
         resolvedBy: { type: String, required: false, default: '' },
         resolvedAt: { type: Date, required: false },
         createdAt: { type: Date, required: false },

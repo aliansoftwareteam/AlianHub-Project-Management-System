@@ -148,6 +148,7 @@ const {
     aiEvalRunsSchema,
     assignmentRulesSchema,
     assignmentDecisionsSchema,
+    dispatchDecisionsSchema,
     aiProfilesSchema,
     secretsSchema,
     oauthClientsSchema,
@@ -447,6 +448,8 @@ exports.checkType = (type) => {
             return assignmentRulesSchema
         case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
             return assignmentDecisionsSchema
+        case SCHEMA_TYPE.DISPATCH_DECISIONS:
+            return dispatchDecisionsSchema
         case SCHEMA_TYPE.AI_PROFILES:
             return aiProfilesSchema
         case SCHEMA_TYPE.SECRETS:
@@ -755,6 +758,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.ASSIGNMENT_RULES}`
         case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
                 return `${dbCollections.ASSIGNMENT_DECISIONS}`
+        case SCHEMA_TYPE.DISPATCH_DECISIONS:
+                return `${dbCollections.DISPATCH_DECISIONS}`
         case SCHEMA_TYPE.AI_PROFILES:
                 return `${dbCollections.AI_PROFILES}`
         case SCHEMA_TYPE.SECRETS:
