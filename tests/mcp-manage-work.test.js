@@ -417,14 +417,42 @@ describe('comments', () => {
     it('tells the members a comment names in the editor\'s markup, for a token created to manage tasks only', async () => {
         const body = `Ready for you @[Priya Other](${OTHER}) and @[Otto Outsider](${OUTSIDER})`;
         const told = await rpc(ctx(OWNER), 'task.comment', { taskId: fx.top._id, body });
-        expect(told.result.mentioned).toEqual([{ userId: OTHER, name: 'Priya Other' }]);
+        expect(told.result).toMatchObject({ mentioned: [{ userId: OTHER, name: 'Priya Other' }], notNotified: [], notFound: [OUTSIDER] });
         expect(comment(told.result.commentId)).toMatchObject({ mentionIds: [OTHER], message: body, actorType: 'agent' });
         expect(rows(SCHEMA_TYPE.MENTIONS)).toEqual([expect.objectContaining({ comment_id: told.result.commentId, mentionIds: [OTHER], taskId: fx.top._id, userId: OWNER })]);
+    });
 
-        const quiet = await rpc(olderToken(OWNER), 'task.comment', { taskId: fx.top._id, body });
-        expect(quiet.result.mentioned).toBeUndefined();
-        expect(comment(quiet.result.commentId).mentionIds).toBeUndefined();
-        expect(rows(SCHEMA_TYPE.MENTIONS)).toHaveLength(1);
+    const PRIYA = { userId: OTHER, name: 'Priya Other' };
+    const byName = '@Priya Other please add the steps to reproduce.';
+    const replyTo = async () => (await rpc(ctx(OWNER), 'task.comment', { taskId: fx.top._id, body: 'Thread start' })).result.commentId;
+    const told = (result) => result.result || (result.items && result.items[0].result);
+    const withData = async (post) => {
+        process.env.MCP_TOOLS_DATA = 'on';
+        try { return await post(); } finally { delete process.env.MCP_TOOLS_DATA; }
+    };
+
+    it.each([
+        ['task.comment, as a token created to manage tasks', () => rpc(ctx(OWNER), 'task.comment', { taskId: fx.top._id, body: byName })],
+        ['comment.create, as a token created to manage tasks', () => withData(() => rpc(ctx(OWNER), 'comment.create', { taskId: fx.top._id, text: byName }))],
+        ['task.comment, as an older token', () => rpc(olderToken(OWNER), 'task.comment', { taskId: fx.top._id, body: byName })],
+        ['comment.create, as an older token', () => withData(() => rpc(olderToken(OWNER), 'comment.create', { taskId: fx.top._id, text: byName }))],
+        ['task.comment, over OAuth', () => rpc(oauth(OWNER), 'task.comment', { taskId: fx.top._id, body: byName })],
+        ['a reply in a thread', async () => rpc(ctx(OWNER), 'task.comment', { taskId: fx.top._id, body: byName, replyTo: await replyTo() })],
+        ['a step of tasks.batch', () => rpc(ctx(OWNER), 'tasks.batch', { operations: [{ tool: 'task.comment', arguments: { taskId: fx.top._id, body: byName } }] })],
+    ])('%s tells the person named and lists who was told', async (path, post) => {
+        const out = told(await post());
+        expect(out).toMatchObject({ mentioned: [PRIYA], notNotified: [], notFound: [] });
+        expect(comment(out.commentId)).toMatchObject({ mentionIds: [OTHER], message: `@[Priya Other](${OTHER}) please add the steps to reproduce.` });
+        expect(rows(SCHEMA_TYPE.MENTIONS).filter((row) => row.comment_id === out.commentId)).toHaveLength(1);
+    });
+
+    it.each([
+        ['by name', '@Adam Admin please add the steps to reproduce.'],
+        ['by member id', `@[Adam Admin](${ADMIN}) please add the steps to reproduce.`],
+    ])('a comment that names the person it is written for, %s, says that no one was told', async (form, body) => {
+        const { result } = await rpc(ctx(ADMIN), 'task.comment', { taskId: fx.top._id, body });
+        expect(result).toMatchObject({ mentioned: [], notNotified: [{ userId: ADMIN, name: 'Adam Admin', reason: expect.stringMatching(/is you/) }], notFound: [] });
+        expect(rows(SCHEMA_TYPE.MENTIONS)).toHaveLength(0);
     });
 });
 

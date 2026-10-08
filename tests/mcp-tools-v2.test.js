@@ -286,7 +286,7 @@ describe('destructive calls open a proposal', () => {
         expect(proposals.create).toHaveBeenCalledTimes(1);
         const saved = mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS][0];
         expect(saved).toMatchObject({ source: 'mcp', requestedBy: USER, tokenId: TOKEN, tokenProjectIds: [PROJECT], taskId: t._id, status: 'pending' });
-        expect(saved.changes).toEqual([expect.objectContaining({ action: 'task.comment', params: { taskId: t._id, body: 'drop it' } })]);
+        expect(saved.changes).toEqual([expect.objectContaining({ action: 'task.comment', params: { taskId: t._id, body: 'drop it', notifyMentions: true } })]);
         expect(out).toEqual({ ok: false, pending: true, approval: 'pending', proposalRef: `proposal:${saved._id}`, proposalId: String(saved._id), message: expect.stringMatching(/approv/i) });
     });
 

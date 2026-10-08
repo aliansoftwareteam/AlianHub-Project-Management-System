@@ -59,7 +59,7 @@ describe('a mention in an agent task comment reaches the person', () => {
         const { result } = await comment(body);
 
         expect(result.mentioned).toEqual([{ userId: LOCAL_PM, name: 'Local PM' }]);
-        expect(result.notNotified).toBeUndefined();
+        expect(result.notNotified).toEqual([]);
         expect(stored().message).toBe(`Please check @[Local PM](${LOCAL_PM}).`);
         expect(stored().mentionIds).toEqual([LOCAL_PM]);
         expect(deliverMentions).toHaveBeenCalledWith(CID, expect.objectContaining({ _id: stored()._id }), [LOCAL_PM]);
@@ -85,12 +85,26 @@ describe('a mention in an agent task comment reaches the person', () => {
         const { result } = await comment('See [docs](https://example.com) or write to pm@example.com');
 
         expect(result.mentioned).toEqual([]);
-        expect(result.notFound).toBeUndefined();
+        expect(result.notFound).toEqual([]);
         expect(stored().message).toBe('See [docs](https://example.com) or write to pm@example.com');
     });
 
-    it.each(['task.comment', 'comment.create'])('the %s description names every form the parser accepts and what the answer lists', (name) => {
-        const { description } = manageTools.VARIANTS[name];
-        ['@[Their Name](their member id)', '@Their Name', 'members.list', 'mentioned', 'notNotified', 'notFound'].forEach((part) => expect(description).toContain(part));
+    it.each(['@Local PM, steps please', `@[Local PM](${LOCAL_PM}), steps please`])('naming the person the comment is written for (%s) says no one was told', async (body) => {
+        const pm = { ...ownersClaude, userId: LOCAL_PM };
+        const { result } = await actions.perform({ companyId: CID, actor: pm, action: 'task.comment', params: { taskId: TASK_ID, body, notifyMentions: true } });
+
+        expect(result).toEqual(expect.objectContaining({ mentioned: [], notNotified: [{ userId: LOCAL_PM, name: 'Local PM', reason: expect.stringMatching(/is you/) }], notFound: [] }));
+        expect(deliverMentions).not.toHaveBeenCalled();
+    });
+
+    const plainTools = [...require('../Modules/Mcp/tools').TOOLS, ...require('../Modules/Mcp/dataTools').TOOLS];
+    it.each([
+        ['task.comment', plainTools.find((t) => t.name === 'task.comment')],
+        ['task.comment, managing', manageTools.VARIANTS['task.comment']],
+        ['comment.create, managing', manageTools.VARIANTS['comment.create']],
+        ['comment.create', plainTools.find((t) => t.name === 'comment.create')],
+    ])('the %s tool notifies and its description names every form the parser accepts and what the answer lists', (name, tool) => {
+        ['@[Their Name](their member id)', '@Their Name', 'members.list', 'mentioned', 'notNotified', 'notFound'].forEach((part) => expect(tool.description).toContain(part));
+        expect(tool.params({ taskId: TASK_ID, body: 'x', text: 'x' })).toMatchObject({ notifyMentions: true });
     });
 });
