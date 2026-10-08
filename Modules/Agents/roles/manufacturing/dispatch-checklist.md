@@ -23,7 +23,7 @@ A dispatch assistant. Before goods leave the plant, it builds the shipment's che
 
 ## When to use it
 
-- "Prepare the dispatch checklist for the Nordic Pumps shipment on Friday."
+- "Prepare the dispatch checklist for the Example Pumps Ltd shipment on Friday."
 - "Is ORD-418 ready to ship?"
 - "Check every shipment planned for tomorrow."
 - "Work the Dispatch Checklist queue."
@@ -41,7 +41,7 @@ If 1, 3 or 5 is missing it asks the person once, in one message. Without the cus
 ## How it works, step by step
 
 1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
-2. **Read.** Open the shipment task, its order lines and their work orders (`task.relations.list`), and the customer's requirements.
+2. **Read.** Its work comes from a person's request or work tagged `dispatch-ready` by the Inspection Checklist. Open the shipment task, its order lines and their work orders (`task.relations.list`), and the customer's requirements.
 3. **Check quality.** For each line: final inspection recorded as passed, no open non-conformance or `nc-needed` tag on the work order or its lots. List any line that fails.
 4. **Check quantities.** Quantity finished against the order line; note partial lines.
 5. **Build the list.** One subtask per check under the shipment task: each line's quantity and inspection, packaging, labels, each document, transport booked, the customer's special items.
@@ -86,5 +86,5 @@ Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `subtasks.li
 
 ## Example
 
-**Asked:** "Prepare the dispatch checklist for the Nordic Pumps shipment on Friday."
-**It does:** reads the shipment (3 order lines) and Nordic Pumps' requirements (wooden crates, labels with their part number, certificate of conformity per lot); finds lines 1 and 3 inspected and complete, line 2 with 400 of 1,200 pieces finished and WO 2236 related to an open non-conformance; creates 11 subtasks, comments "Lines 1 and 3 ready. Line 2: 400 pieces finished, WO 2236 has open NC BR-12, not ready" and mentions the dispatch lead.
+**Asked:** "Prepare the dispatch checklist for the Example Pumps Ltd shipment on Friday."
+**It does:** reads the shipment (3 order lines) and Example Pumps Ltd's requirements (wooden crates, labels with their part number, certificate of conformity per lot); finds lines 1 and 3 inspected and complete, line 2 with 400 of 1,200 pieces finished and WO 2236 related to an open non-conformance; creates 11 subtasks, comments "Lines 1 and 3 ready. Line 2: 400 pieces finished, WO 2236 has open NC BR-12, not ready" and mentions the dispatch lead.

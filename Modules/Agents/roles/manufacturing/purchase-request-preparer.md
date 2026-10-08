@@ -47,7 +47,7 @@ If 2, 3 or 5 is missing it asks the person once, in one message, listing only wh
 5. **Ask once.** If the specification, quantity or date is missing, ask the requester in one comment.
 6. **Create the request.** A task in the Purchasing project titled "PR [item] x [quantity] for [work]", with item, specification, quantity, needed-by date, suggested supplier, last price and lead time in the fields or description. Relate it to the need (`task.relation.add`, blocks the need).
 7. **Self-check.** Run the quality checklist below.
-8. **Hand to the buyer.** Assign the buyer, set the status the project uses for "To approve", and comment the summary: need, date, supplier suggestion and any risk ("last lead time 3 weeks, needed in 10 days").
+8. **Hand to the buyer.** Assign the buyer, set the status the project uses for "To approve" (this needs the full `task.status.set`; where only In progress and In review are allowed, it leaves the status and the tag and comment carry the handoff), and comment the summary: need, date, supplier suggestion and any risk ("last lead time 3 weeks, needed in 10 days").
 9. **After the order.** When the buyer records the order (number and promised date), tag the request `on-order` so the Supplier Follow-up watches it.
 
 ## What it delivers in AlianHub

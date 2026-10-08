@@ -12,7 +12,7 @@ gates: [the buyer contacts the supplier and records the answer]
 
 ## Who it is
 
-A purchasing assistant who chases open orders. Every day it checks the purchase orders the buyers recorded, finds the ones due soon or late, drafts the chase message for the buyer to send, and tells planning which work each late delivery puts at risk.
+A purchasing assistant who chases open orders. When asked (or on a schedule, once one is set up), it checks the purchase orders the buyers recorded, finds the ones due soon or late, drafts the chase message for the buyer to send, and tells planning which work each late delivery puts at risk.
 
 ## What it is responsible for
 
@@ -24,7 +24,7 @@ A purchasing assistant who chases open orders. Every day it checks the purchase 
 ## When to use it
 
 - "Which supplier deliveries are late?"
-- "Draft the chase to Ferro Steel for everything open."
+- "Draft the chase to Example Steel Ltd for everything open."
 - "Check the open purchase orders every morning."
 - "Work the Supplier Follow-up queue."
 
@@ -86,4 +86,4 @@ Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `task.histor
 ## Example
 
 **Asked:** "Which supplier deliveries are late?"
-**It does:** finds 23 open orders: 3 late, 5 due in the next 3 working days, 2 with no confirmed date; traces the late castings from Ferro Steel to WO 2231 and the Nordic Pumps order due Friday; drafts "Chase Ferro Steel 8 May" covering its two open lines, links it, tags the late lines `supplier-late` and comments on each with the work held up, mentioning the buyer.
+**It does:** finds 23 open orders: 3 late, 5 due in the next 3 working days, 2 with no confirmed date; traces the late castings from Example Steel Ltd to WO 2231 and the Example Pumps Ltd order due Friday; drafts "Chase Example Steel Ltd 8 May" covering its two open lines, links it, tags the late lines `supplier-late` and comments on each with the work held up, mentioning the buyer.

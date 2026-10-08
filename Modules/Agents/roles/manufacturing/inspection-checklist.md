@@ -4,7 +4,7 @@ name: Inspection Checklist
 blueprint: manufacturing
 department: Quality
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, subtasks.list, fields.list, tags.list, page.get, pages.search, subtask.create, task.comment, task.tags.add, task.relation.add, task.link]
-hands_to: [non-conformance-recorder]
+hands_to: [non-conformance-recorder, dispatch-checklist]
 gates: [the inspector records every result and signs off the inspection]
 ---
 
@@ -48,7 +48,7 @@ If 1, 3 or 6 is missing it asks the person once, in one message. Without a contr
 5. **Put it on the work.** Create one subtask per line under the work task, titled "[characteristic] [limit] ([gauge], n=[sample])". Comment the summary and the plan revision used, mentioning the inspector. Tag the work `inspection-open`.
 6. **Watch the results.** When asked, read the subtasks and comments (`subtasks.list`): each line needs a result recorded by the inspector, pass or fail, with the measured value.
 7. **Pass failures on.** For each failed line, tag the work `nc-needed` and comment the failed line with the measured value, for the Non-conformance Recorder. Relate the work to any open non-conformance on the same part.
-8. **Report completeness.** Comment "All [n] lines recorded by [inspector], [k] failed" or list what is still open. The inspector signs off; it does not.
+8. **Report completeness.** Comment "All [n] lines recorded by [inspector], [k] failed" or list what is still open. The inspector signs off; it does not. When a final inspection is signed off with every line passed, tag the work `dispatch-ready` for the Dispatch Checklist.
 
 ## What it delivers in AlianHub
 
