@@ -20,6 +20,7 @@ const listSetup = require('./listSetupPreview');
 const projectCopy = require('./projectDuplicatePreview');
 const dashboards = require('./dashboardRequests');
 const timesheetWeek = require('./timesheetWeek');
+const projectTags = require('./tagRequests');
 
 // What a waiting change will make, as the lines its card shows (frontend IntentPreview). It is built for one viewer:
 // a project, list, parent task, person or custom field is named only when that viewer may see it, and everything
@@ -270,7 +271,7 @@ const projectPreview = async (change, context, filed) => {
     };
 };
 
-const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview, ...listSetup.BUILDERS, ...projectCopy.BUILDERS, [dashboards.ACTION]: dashboards.preview, [timesheetWeek.SUBMIT]: timesheetWeek.preview });
+const SETUPS = Object.freeze({ 'fields.create': fieldsPreview, 'view.create': viewPreview, [PLAN]: planPreview, [projects.ACTION]: projectPreview, [automation.ACTION]: automation.preview, ...listSetup.BUILDERS, ...projectCopy.BUILDERS, [dashboards.ACTION]: dashboards.preview, [timesheetWeek.SUBMIT]: timesheetWeek.preview, ...projectTags.BUILDERS });
 const BUILDERS = Object.freeze({ ...Object.fromEntries(Object.keys(CREATES).map((action) => [action, createPreview])), ...SETUPS });
 const builderOf = (change) => (change && Object.hasOwn(BUILDERS, change.action) ? BUILDERS[change.action] : null);
 const isSetup = (change) => Boolean(change) && Object.hasOwn(SETUPS, change.action);

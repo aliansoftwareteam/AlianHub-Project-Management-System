@@ -397,6 +397,9 @@ const PROPOSED_ON_THE_WEB = {
     'folder.create': {
         'adding a folder': ['POST /api/v1/folder', { projectId: P_OPEN, name: 'Design' }],
     },
+    'tag.create': {
+        'adding a tag to a project': ['POST /api/v1/project/tags', { id: P_OPEN, operation: 'push', items: { uid: 'tag-2', tagName: 'Design' } }, {}, 'project.tags.edit'],
+    },
     'list.sprint.set': {
         'making a list a sprint': ['POST /api/v2/sprints/scrum', { projectId: P_OPEN, sprintId: L_OPEN }, {}, 'sprint.scrum'],
     },

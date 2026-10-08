@@ -57,6 +57,7 @@ const ROUTES = Object.freeze({
     fieldCompute: { routes: () => require('../CustomField/routes'), method: 'post', path: '/api/v2/custom-fields/compute' },
     viewCreate: { routes: () => require('../Project/routes'), method: 'post', path: '/api/v1/project/:id/views' },
     projectUpdate: { routes: () => require('../Project/routes'), method: 'put', path: '/api/v1/project/:id' },
+    projectTags: { routes: () => require('../Project/routes'), method: 'post', path: '/api/v1/project/tags' },
     projectCreate: { routes: () => require('../createProject/routes'), method: 'post', path: '/api/v1/createproject' },
     statusInsert: { routes: () => require('../settings/templates/routes'), method: 'put', path: '/api/v1/setting/taskStatus' },
     folderCreate: { routes: () => require('../Sprints/routes'), method: 'post', path: '/api/v1/folder' },
