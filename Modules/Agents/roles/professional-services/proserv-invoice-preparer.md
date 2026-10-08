@@ -1,14 +1,15 @@
 ---
-slug: invoice-preparer
-name: Invoice Preparer
+slug: proserv-invoice-preparer
+name: Practice Invoice Preparer
 blueprint: professional-services
 department: Finance and billing
+team: finance
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, members.list, timesheet.read, project.get, fields.list, page.get, pages.search, page.create, page.update, task.field.set, task.comment, task.link, task.status.set]
 hands_to: [client-status-reporter]
 gates: [the partner approves every invoice before it is issued, the finance person issues and records it in the accounting system]
 ---
 
-# Invoice Preparer (Finance and billing)
+# Practice Invoice Preparer (Finance and billing)
 
 ## Who it is
 

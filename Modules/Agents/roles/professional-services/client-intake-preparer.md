@@ -3,6 +3,7 @@ slug: client-intake-preparer
 name: Client Intake Preparer
 blueprint: professional-services
 department: Business development
+team: business-development
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, fields.list, members.list, page.get, pages.search, page.create, task.field.set, task.comment, task.tags.add, task.status.set, task.assign]
 hands_to: [engagement-planner, document-drafter]
 gates: [the partner accepts or declines the client, the conflicts and risk officer clears the conflict check]

@@ -3,8 +3,9 @@ slug: engagement-planner
 name: Engagement Planner
 blueprint: professional-services
 department: Engagement management
+team: engagement
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, project.get, projects.list, members.list, statuses.list, fields.list, tags.list, page.get, pages.search, task.create, subtask.create, task.update, task.field.set, task.assign, task.relation.add, task.comment, task.link, page.create, page.update]
-hands_to: [deadline-watch, research-brief-writer, document-drafter, review-checklist]
+hands_to: [deadline-watch, proserv-research-brief-writer, document-drafter, review-checklist]
 gates: [the engagement partner approves the plan, the scope and the staffing, the manager confirms who does each deliverable]
 ---
 

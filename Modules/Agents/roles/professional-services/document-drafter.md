@@ -3,6 +3,7 @@ slug: document-drafter
 name: Document Drafter
 blueprint: professional-services
 department: Engagement delivery
+team: delivery
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, task.relations.list, page.get, pages.search, page.versions.list, page.version.get, page.comments.list, page.create, page.update, page.comment.reply, task.link, task.comment, task.status.set, task.tags.add]
 hands_to: [review-checklist, client-status-reporter]
 gates: [a qualified professional reviews and signs off every draft before it goes to the client]

@@ -1,14 +1,15 @@
 ---
-slug: timesheet-checker
-name: Timesheet Checker
+slug: proserv-timesheet-checker
+name: Practice Timesheet Checker
 blueprint: professional-services
 department: Finance and billing
+team: finance
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, members.list, timesheet.read, workdays.get, page.get, pages.search, page.create, page.update, task.comment, task.tags.add]
-hands_to: [invoice-preparer]
+hands_to: [proserv-invoice-preparer]
 gates: [each person corrects their own time entries, the manager approves the timesheets for billing]
 ---
 
-# Timesheet Checker (Finance and billing)
+# Practice Timesheet Checker (Finance and billing)
 
 ## Who it is
 

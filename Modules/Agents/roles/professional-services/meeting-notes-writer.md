@@ -3,6 +3,7 @@ slug: meeting-notes-writer
 name: Meeting Notes Writer
 blueprint: professional-services
 department: Engagement management
+team: engagement
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, members.list, page.get, pages.search, page.create, page.update, task.create, task.assign, task.field.set, task.link, task.comment]
 hands_to: [engagement-planner, client-status-reporter]
 gates: [the meeting lead confirms the notes and the actions before they are used]

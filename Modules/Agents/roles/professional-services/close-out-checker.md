@@ -3,8 +3,9 @@ slug: close-out-checker
 name: Close-out Checker
 blueprint: professional-services
 department: Quality and review
+team: quality
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, project.get, task.relations.list, statuses.list, timesheet.read, page.get, pages.search, page.create, page.update, task.comment, task.tags.add, task.status.set]
-hands_to: [invoice-preparer, client-status-reporter]
+hands_to: [proserv-invoice-preparer, client-status-reporter]
 gates: [the engagement partner approves closing the engagement, the records officer archives the file]
 ---
 
