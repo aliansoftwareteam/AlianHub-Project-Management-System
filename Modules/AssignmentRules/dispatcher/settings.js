@@ -3,6 +3,8 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { removeCache } = require('../../../utils/commonFunctions');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const playbooks = require('../../Agents/rolePlaybooks');
+/* Loaded for its side effect: it plugs the workspace's edited playbook text into playbooks.whoFor. */
+require('../../Agents/rolePlaybookOverrides');
 const { RuleError, cacheKey, loadRules, plain } = require('../rules');
 
 // A project's dispatcher settings live on its assignment rules row, so one rule set says who and which role takes a task.

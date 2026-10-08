@@ -624,6 +624,19 @@ describe('dispatcher: the model guess', () => {
         expect(decision.reason.startsWith('<img src=x onerror=alert(1)> evil')).toBe(true);
     });
 
+    it('reads a role\'s who-it-is line from the workspace\'s saved playbook text without anything else loading the editor first', async () => {
+        const project = await guessing();
+        await mockDb.crud(C, {
+            type: SCHEMA_TYPE.ROLE_PLAYBOOK_OVERRIDES,
+            data: [[{ key: TRIAGER, body: '## Who it is\n\nThe edited triager this workspace saved.\n\n## How it works\n\n1. Triage.', updatedBy: OWNER }]],
+        }, 'insertMany');
+        adapter.chat.mockResolvedValue(answer({ role: TRIAGER, confidence: 95, reason: 'fits' }));
+        await routeTask(seedTask(project, { TaskName: 'edited' }));
+        const sent = adapter.chat.mock.calls.at(-1)[0].messages.map((m) => m.content).join('\n');
+        expect(sent).toContain('who it is: The edited triager this workspace saved.');
+        expect(Object.keys(require.cache).some((file) => file.endsWith('rolePlaybookOverrides.js'))).toBe(true);
+    });
+
     it('gives the model each role\'s who-it-is line as the workspace reads it, falling back to the built-in text', async () => {
         const playbooks = require('../Modules/Agents/rolePlaybooks');
         const project = await guessing();
