@@ -3,6 +3,7 @@ slug: material-order-preparer
 name: Material Order Preparer
 blueprint: construction
 department: Procurement
+team: procurement
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.relations.list, page.get, pages.search, queue.claim, queue.release, task.comment, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.status.set]
 hands_to: [subcontractor-follow-up, site-daily-report-writer]
 gates: [the procurement lead approves every purchase before it is placed]

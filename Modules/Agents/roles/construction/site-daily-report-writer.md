@@ -3,8 +3,9 @@ slug: site-daily-report-writer
 name: Site Daily Report Writer
 blueprint: construction
 department: Site operations
+team: site
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, chat.channels.list, chat.messages.list, timesheet.read, queue.claim, queue.release, task.comment, task.create, task.update, task.field.set, task.tags.add, task.relation.add, page.create, task.from_message]
-hands_to: [rfi-tracker, snag-list-keeper, project-planner]
+hands_to: [rfi-tracker, snag-list-keeper, construction-project-planner]
 gates: [the site manager reviews and signs the daily report]
 ---
 

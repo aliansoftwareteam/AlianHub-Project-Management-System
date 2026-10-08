@@ -3,8 +3,9 @@ slug: tender-document-checker
 name: Tender Document Checker
 blueprint: construction
 department: Tendering
+team: commercial
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, page.get, pages.search, task.fields.list, queue.claim, queue.release, task.comment, task.create, task.update, task.field.set, task.tags.add, task.status.set]
-hands_to: [project-planner]
+hands_to: [construction-project-planner]
 gates: [the estimator or bid manager signs off the tender before it is submitted]
 ---
 

@@ -3,8 +3,9 @@ slug: subcontractor-follow-up
 name: Subcontractor Follow-up
 blueprint: construction
 department: Procurement and site
+team: procurement
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.relations.list, task.history, queue.claim, queue.release, task.comment, task.create, task.update, task.assign, task.field.set, task.tags.add, task.status.set]
-hands_to: [project-planner, site-daily-report-writer]
+hands_to: [construction-project-planner, site-daily-report-writer]
 gates: [the site manager confirms any change to a subcontractor's start date]
 ---
 

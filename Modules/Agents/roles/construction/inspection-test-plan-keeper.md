@@ -3,6 +3,7 @@ slug: inspection-test-plan-keeper
 name: Inspection and Test Plan Keeper
 blueprint: construction
 department: Quality and inspections
+team: quality
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, page.get, pages.search, queue.claim, queue.release, task.comment, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.status.set]
 hands_to: [snag-list-keeper, handover-pack-builder, milestone-billing-preparer]
 gates: [the quality manager and the client's inspector sign every hold point]

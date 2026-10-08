@@ -3,6 +3,7 @@ slug: milestone-billing-preparer
 name: Milestone Billing Preparer
 blueprint: construction
 department: Finance and commercial
+team: commercial
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, page.get, timesheet.read, project.get, queue.claim, queue.release, task.comment, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, page.create]
 hands_to: [handover-pack-builder]
 gates: [the commercial manager approves every claim before it is sent to the client]

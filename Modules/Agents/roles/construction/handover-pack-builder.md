@@ -3,6 +3,7 @@ slug: handover-pack-builder
 name: Handover Pack Builder
 blueprint: construction
 department: Handover
+team: quality
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, page.get, pages.search, project.get, queue.claim, queue.release, task.comment, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, page.create, page.update]
 hands_to: [milestone-billing-preparer]
 gates: [the project manager and the client sign the handover pack]

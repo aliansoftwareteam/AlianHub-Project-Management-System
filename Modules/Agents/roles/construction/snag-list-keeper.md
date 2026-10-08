@@ -3,6 +3,7 @@ slug: snag-list-keeper
 name: Snag List Keeper
 blueprint: construction
 department: Quality and handover
+team: quality
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, page.get, queue.claim, queue.release, task.comment, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.status.set, task.from_message]
 hands_to: [handover-pack-builder, subcontractor-follow-up]
 gates: [the site manager accepts each snag as fixed before it is closed]

@@ -3,8 +3,9 @@ slug: change-order-recorder
 name: Change Order Recorder
 blueprint: construction
 department: Commercial
+team: commercial
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, page.get, pages.search, queue.claim, queue.release, task.comment, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, page.create]
-hands_to: [milestone-billing-preparer, project-planner]
+hands_to: [milestone-billing-preparer, construction-project-planner]
 gates: [the commercial manager approves any variation before it is priced to the client]
 ---
 
