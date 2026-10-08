@@ -186,6 +186,22 @@ describe('tuning a role playbook for a workspace', () => {
         expect((await overrides.findFor(C2, BLUEPRINT, SLUG)).body).toBe(BUILT_IN);
     });
 
+    it('reads a text saved on another instance within 60 seconds, since only this process\'s cache is cleared', async () => {
+        const start = Date.now();
+        const clock = jest.spyOn(Date, 'now').mockReturnValue(start);
+        try {
+            expect((await overrides.findFor(C1, BLUEPRINT, SLUG)).body).toBe(BUILT_IN);
+            store.set(`${C1}|${BLUEPRINT}/${SLUG}`, { key: `${BLUEPRINT}/${SLUG}`, body: EDITED });
+            clock.mockReturnValue(start + 59 * 1000);
+            expect((await overrides.findFor(C1, BLUEPRINT, SLUG)).body).toBe(BUILT_IN);
+            clock.mockReturnValue(start + 61 * 1000);
+            expect((await overrides.findFor(C1, BLUEPRINT, SLUG)).body).toBe(EDITED);
+        } finally {
+            clock.mockRestore();
+        }
+        expect(overrides.CACHE_SECONDS).toBeLessThanOrEqual(60);
+    });
+
     it('reads as the built-in text when the store cannot be read', async () => {
         MongoDbCrudOpration.mockRejectedValue(new Error('down'));
         expect((await overrides.findFor(C1, BLUEPRINT, SLUG)).body).toBe(BUILT_IN);

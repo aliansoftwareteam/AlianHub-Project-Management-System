@@ -6,7 +6,9 @@ const { removeCache } = require('../../utils/commonFunctions');
 const rolePlaybooks = require('./rolePlaybooks');
 
 const BODY_MAX = 30000;
-const CACHE_SECONDS = 3600;
+/* removeCache clears this process only and nothing carries it to other instances, so another instance may read
+ * a text up to this long after it was saved or restored. */
+const CACHE_SECONDS = 60;
 const cacheKeyOf = (companyId) => `rolePlaybookOverrides:${companyId}`;
 
 const keyOf = (blueprint, slug) => `${blueprint}/${slug}`;
@@ -74,4 +76,4 @@ const restore = async (companyId, blueprint, slug) => {
     return { role: built, from, to: built.body };
 };
 
-module.exports = { BODY_MAX, keyOf, forCompany, apply, applyAll, findFor, save, restore, clear };
+module.exports = { BODY_MAX, CACHE_SECONDS, keyOf, forCompany, apply, applyAll, findFor, save, restore, clear };
