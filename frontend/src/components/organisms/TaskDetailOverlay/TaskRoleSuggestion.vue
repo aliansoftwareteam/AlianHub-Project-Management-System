@@ -62,7 +62,9 @@ const headline = computed(() => {
     if (!d) return "";
     if (d.state === "suggested") return t("Dispatcher.suggests", { role: d.roleName });
     if (d.state === "needs_routing") return t("Dispatcher.needs_routing");
-    if (d.state === "routed") return t("Dispatcher.routed_by", { role: d.roleName, person: getUser(d.resolvedBy)?.Employee_Name || t("Dispatcher.someone") });
+    const person = () => getUser(d.resolvedBy)?.Employee_Name || t("Dispatcher.someone");
+    if (d.state === "routed") return t("Dispatcher.routed_by", { role: d.roleName, person: person() });
+    if (d.state === "accepted" && d.resolvedBy) return t("Dispatcher.accepted_by", { role: d.roleName, person: person() });
     return t("Dispatcher.routed_to", { role: d.roleName });
 });
 const reason = computed(() => {
@@ -143,7 +145,7 @@ async function addOffer() {
 .trs__chip--done, .trs__offer { background: var(--surface-2); border: 1px solid var(--border); }
 .trs__text { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
 .trs__reason { color: var(--ink-2); margin-left: 4px; }
-.trs__reason::before { content: "\2014\00a0"; }
+.trs__reason::before { content: "\00b7\00a0"; }
 .trs__actions { display: inline-flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .trs__select {
     height: 26px;
