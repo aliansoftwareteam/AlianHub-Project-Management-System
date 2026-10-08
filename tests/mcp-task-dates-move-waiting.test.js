@@ -109,6 +109,17 @@ describe('moving a blocker later', () => {
         expect(out.result.waitingTasks.startTooEarly).toEqual([]);
     });
 
+    it('starts a waiting task where the Gantt drag puts it: at its blocker\'s due instant, the end of the blocker\'s bar', async () => {
+        const { shiftDependants } = require('../Modules/Tasks/helpers/ganttShift');
+        const rows = [design, build, ship].map((task) => ({ id: String(task._id), startDate: stored(task._id).startDate, DueDate: stored(task._id).DueDate }));
+        const links = [{ source: String(design._id), target: String(build._id) }, { source: String(build._id), target: String(ship._id) }];
+        const gantt = shiftDependants(rows, links, String(design._id), { startDate: at('13'), DueDate: at('14') }, { workingDays: [1, 2, 3, 4, 5] });
+        const out = await move(design, '2026-10-13', '2026-10-14');
+        expect(out.result.waitingTasks.moved.map((row) => [row.startDate, row.dueDate]))
+            .toEqual(gantt.shifts.map((shift) => [shift.to.startDate.toISOString(), shift.to.DueDate.toISOString()]));
+        expect(stored(build._id).startDate).toEqual(stored(design._id).DueDate);
+    });
+
     it('steps over the weekend', async () => {
         await move(design, '2026-10-15', '2026-10-16');
         expect(datesOf(build)).toEqual(['2026-10-16', '2026-10-17']);

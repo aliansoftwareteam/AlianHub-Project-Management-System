@@ -102,7 +102,7 @@ const notSaved = (kind, offer) => `No saved view of this project shows its ${kin
 
 const fieldsNamed = async (ctx, project, name) => {
     const { isTaskFieldOf } = require('../CustomField/helpers/fieldValueInput');
-    const rows = await MongoDbCrudOpration(ctx.companyId, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [{ type: 'task', isDelete: { $ne: false } }, { fieldTitle: 1, fieldType: 1, type: 1, isDelete: 1, global: 1, projectId: 1 }] }, 'find') || [];
+    const rows = await MongoDbCrudOpration(ctx.companyId, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [{ type: 'task', isDelete: { $ne: false } }, { fieldTitle: 1, fieldType: 1, fieldOptions: 1, type: 1, isDelete: 1, global: 1, projectId: 1 }] }, 'find') || [];
     const wanted = String(name).trim().toLowerCase();
     return rows.filter((row) => isTaskFieldOf(row, project._id) && String(row.fieldTitle || '').trim().toLowerCase() === wanted);
 };
@@ -122,7 +122,7 @@ const groupingOf = async (ctx, project, value) => {
     if (found.length > 1) {
         return { problem: {
             error: `More than one field of this project is named "${value}". Ask the person which one they mean, or pick by type, and give its fieldId as groupBy.`,
-            fields: found.map((row) => ({ fieldId: String(row._id), name: row.fieldTitle, type: row.fieldType })),
+            fields: found.map(setup.fieldChoice),
         } };
     }
     return { groupBy: String(found[0]._id), label: found[0].fieldTitle };

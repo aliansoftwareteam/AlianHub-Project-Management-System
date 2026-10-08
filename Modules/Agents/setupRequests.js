@@ -57,6 +57,7 @@ const ROUTES = Object.freeze({
     fieldCompute: { routes: () => require('../CustomField/routes'), method: 'post', path: '/api/v2/custom-fields/compute' },
     viewCreate: { routes: () => require('../Project/routes'), method: 'post', path: '/api/v1/project/:id/views' },
     projectUpdate: { routes: () => require('../Project/routes'), method: 'put', path: '/api/v1/project/:id' },
+    projectTags: { routes: () => require('../Project/routes'), method: 'post', path: '/api/v1/project/tags' },
     projectCreate: { routes: () => require('../createProject/routes'), method: 'post', path: '/api/v1/createproject' },
     statusInsert: { routes: () => require('../settings/templates/routes'), method: 'put', path: '/api/v1/setting/taskStatus' },
     folderCreate: { routes: () => require('../Sprints/routes'), method: 'post', path: '/api/v1/folder' },
@@ -174,6 +175,32 @@ const SERVER_FAULT = 500;
 const heldField = (definition) => ({ name: definition.fieldTitle || '', type: definition.fieldType || '', fieldId: idOf(definition._id) });
 const fieldNamed = (fields, name) => (name ? fields.find((field) => sameName(field.name, name)) : undefined);
 
+/* What an agent needs to tell fields of one name apart when it asks the person which one they mean. */
+const fieldChoice = (definition) => {
+    const { optionsOf: optionRows, optionLabel } = require('../CustomField/helpers/fieldValueInput');
+    return { fieldId: idOf(definition._id), name: definition.fieldTitle || '', type: definition.fieldType || '', options: optionRows(definition).map(optionLabel) };
+};
+
+/* Field types whose check turns a value away, so a value that fits one of them alone says which field was meant.
+ * Text takes anything, so a value that fits only a text field says nothing about the typed fields beside it. */
+const TELLING_TYPES = Object.freeze(['dropdown', 'number', 'money', 'date', 'checkbox', 'email']);
+
+/* The held field a value names, by its id or its name. Of several fields with that name, one is taken only when the
+ * value fits it alone and its type could have turned the value away; otherwise `choices` lists them all, so the agent asks. */
+const fieldForValue = (held, entry) => {
+    const byId = isId(entry.field) && held.find((field) => idOf(field._id).toLowerCase() === lower(entry.field));
+    if (byId) return { definition: byId };
+    const named = held.filter((field) => sameName(field.fieldTitle, entry.field));
+    if (named.length < 2) return { definition: named[0] };
+    const { storedValueOf } = require('../CustomField/helpers/fieldValueInput');
+    const fitting = named.filter((field) => !storedValueOf(field, entry.value).error);
+    return fitting.length === 1 && TELLING_TYPES.includes(fitting[0].fieldType) ? { definition: fitting[0] } : { choices: named.map(fieldChoice) };
+};
+
+const choicesText = (name, choices) => `${choices.length} fields of this project are named "${name}": `
+    + choices.map((choice) => `${choice.fieldId} (${choice.type}${choice.options.length ? `: ${choice.options.join(', ')}` : ''})`).join('; ')
+    + '. Ask the person which one they mean and give its fieldId as field.';
+
 const saveField = async ({ companyId, who, projectId, draft, source }) => {
     const unreadable = computed.sourceProblem(draft, source);
     if (unreadable) return { name: draft.name, type: draft.type, made: false, error: unreadable };
@@ -240,8 +267,10 @@ const valuesMisfit = async ({ companyId, uid, projectId, definitions, values, ta
     const drafts = draftsOf(definitions);
     for (const [at, entry] of valuesOf(values).entries()) {
         if (!taskIds.includes(entry.taskId)) return `values[${at}]: ${NO_TASK}`;
+        const found = fieldForValue(held, entry);
+        if (found.choices) return `values[${at}]: ${choicesText(entry.field, found.choices)}`;
         const draft = drafts.find((named) => sameName(named.name, entry.field));
-        const definition = held.find((field) => sameName(field.fieldTitle, entry.field)) || (draft && definitionOf(draft, { projectId, uid }));
+        const definition = found.definition || (draft && definitionOf(draft, { projectId, uid }));
         if (!definition) return `values[${at}] names "${entry.field}", which is not a field of this call or of the project`;
         const read = storedValueOf(definition, entry.value);
         if (read.error) return `values[${at}] (${definition.fieldTitle}) ${read.error}`;
@@ -254,7 +283,8 @@ const valuesMisfit = async ({ companyId, uid, projectId, definitions, values, ta
 const setValue = async ({ companyId, actor, depth, approvedBy, projectId, held, entry }) => {
     const permissions = require('./permissions');
     const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
-    const definition = held.find((field) => sameName(field.fieldTitle, entry.field));
+    const { definition, choices } = fieldForValue(held, entry);
+    if (choices) throw refuse(choicesText(entry.field, choices));
     if (!definition) throw refuse(`This project has no field called "${entry.field}". Check fields.list.`);
     const task = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS, data: [{ _id: tools.oid(entry.taskId), ProjectID: { $in: idForms(projectId) }, deletedStatusKey: { $ne: 1 } }, { _id: 1 }],
@@ -515,6 +545,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
+    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
     FIELD_TYPES, CREATE_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };

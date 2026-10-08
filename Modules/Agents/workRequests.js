@@ -354,6 +354,7 @@ const executors = {
     ...require('./projectCreate').executors,
     ...require('./projectDuplicate').executors,
     ...require('./listSetup').executors,
+    ...require('./tagRequests').executors,
     ...require('./automationRequests').executors,
     ...require('./dashboardRequests').executors,
     ...require('./timesheetWeek').executors,

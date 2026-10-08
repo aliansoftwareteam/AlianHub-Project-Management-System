@@ -265,6 +265,7 @@ const HEADINGS = Object.freeze({
     sprint: SPRINT_HEADING,
     dashboardCard: DASHBOARD_HEADING,
     timesheetWeek: TIMESHEET_HEADING,
+    tag: { kind: 'IntentPreview.new_tag', wants: 'IntentPreview.wants_tag' },
 });
 
 const isBatch = (preview) => Boolean(preview) && preview.kind === 'batch';

@@ -42,8 +42,8 @@ const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGE
 const LIST_KINDS = Object.freeze(['list', 'listName', 'listFolder', 'listSprint']);
 /* A goal belongs to no project: whoever can edit the goal may undo a change to it. */
 const GOAL_KINDS = Object.freeze(['goalValue', 'goalSource']);
-/* A field, a view, a whole setup, a folder, or the project or the copy of one an agent asked for is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
-const SETUP_KINDS = Object.freeze(['fields', 'view', 'setup', 'project', 'projectCopy', 'folder']);
+/* A field, a view, a whole setup, a folder, a project tag, or the project or the copy of one an agent asked for is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
+const SETUP_KINDS = Object.freeze(['fields', 'view', 'setup', 'project', 'projectCopy', 'folder', 'projectTag']);
 /* A rule is taken back by the Automations page's own delete, which asks whether the person undoing may. */
 const AUTOMATION_KIND = 'automation';
 /* A dashboard belongs to no project either, and its owner alone takes a card of it back. */
@@ -260,6 +260,7 @@ const inverses = {
     ...require('./projectCreate').inverses,
     ...require('./projectDuplicate').inverses,
     ...require('./listSetup').inverses,
+    ...require('./tagRequests').inverses,
     ...require('./automationRequests').inverses,
     ...require('./dashboardRequests').inverses,
 };
