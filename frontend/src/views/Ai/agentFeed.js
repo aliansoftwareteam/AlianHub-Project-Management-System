@@ -11,6 +11,7 @@ import { noteConnectedPaused } from "./useAccounts";
  * timers, which no agent event announces. */
 export const AGENTS_CHANGED_EVENT = "agentsChanged";
 export const POLICY_CHANGE = "policy";
+export const PROPOSAL_CHANGE = "proposal";
 // Sent to one person about their own connected agent's change (./agentChangeNotice); nothing this feed shows moves with it.
 export const APPLIED_CHANGE = "change";
 const LIVE_POLL_MS = 30000;
