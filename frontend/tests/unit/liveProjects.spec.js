@@ -307,7 +307,47 @@ describe('the socket', () => {
     });
 
     it('is bound by the shell, which hands over the socket and the company', () => {
-        expect(APP).toMatch(/useLiveProjects\(socket, companyId, /);
+        expect(APP).toMatch(/useLiveProjects\(socket, companyId\)/);
+    });
+});
+
+describe('a socket dropped while the tab was hidden and connected again', () => {
+    const LIST_READ = '/api/v1/project';
+    const reconnect = async () => {
+        socketRef.value = null;
+        await flushPromises();
+        socket = fakeSocket();
+        socketRef.value = socket;
+        await flushPromises();
+    };
+
+    it('costs nothing when the first socket connects', async () => {
+        mountHost();
+        await gathered(GATHER_MAX_MS);
+        expect(reads()).toEqual([]);
+    });
+
+    it('reads the sidebar\'s project list once and catches every project up, not one read a project', async () => {
+        mountHost({ data: [alpha(), { ...row({ _id: 'p2', ProjectName: 'Beta' }), id: 'p2' }, { ...row({ _id: 'p3', ProjectName: 'Gamma' }), id: 'p3' }], privateSnap: null, publicSnap: null });
+        server.project = [row({ ProjectName: 'Alpha, renamed' }), row({ _id: 'p2', ProjectName: 'Beta, renamed' }), row({ _id: 'p4', ProjectName: 'Delta' }), row({ _id: 'p5', deletedStatusKey: 1 })];
+        await reconnect();
+        await gathered(GATHER_MAX_MS);
+        expect(reads()).toEqual([LIST_READ]);
+        expect(stored('p1')).toMatchObject({ ProjectName: 'Alpha, renamed', sprintsObj: list, sprintsfolders: folders, isExpanded: true });
+        expect(stored('p2').ProjectName).toBe('Beta, renamed');
+        expect(stored('p4').ProjectName).toBe('Delta');
+        expect(stored('p3')).toBeUndefined();
+        expect(stored('p5')).toBeUndefined();
+        expect(socket.bound()).toBe(true);
+    });
+
+    it('keeps what the store holds when the list cannot be read', async () => {
+        mountHost();
+        server.project = 500;
+        await reconnect();
+        await gathered(GATHER_MAX_MS);
+        expect(reads()).toEqual([LIST_READ]);
+        expect(stored('p1').ProjectName).toBe('Alpha');
     });
 });
 
