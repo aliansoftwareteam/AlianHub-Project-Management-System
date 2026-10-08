@@ -53,3 +53,9 @@ export const rowToRule = (row) => {
 
 export const rowIsComplete = (row) => Boolean(row.role && String(row.value).trim() && (row.kind !== "field" || String(row.fieldId).trim())
     && (!NUMBER_KINDS.includes(row.kind) || Number.isFinite(Number(row.value))));
+
+/* settings/companyPriority holds the company's task_priorities settings: [{ name, value, image, statusImage, isDeleted }],
+ * and a task stores the `value` in Task_Priority. */
+export const priorityChoices = (list) => (Array.isArray(list) ? list : [])
+    .filter((priority) => priority && priority.isDeleted !== true && priority.value && priority.name)
+    .map((priority) => ({ value: priority.value, label: priority.name }));

@@ -126,6 +126,7 @@
     import ProjectManagerCard from './ProjectManagerCard.vue';
     import AssignmentRulesCard from './AssignmentRulesCard.vue';
     import ProjectDispatcherCard from './ProjectDispatcherCard.vue';
+    import { priorityChoices } from '@/utils/dispatcher';
     import Attachments from '@/components/atom/Attachments/Attachments.vue';
     import FixMilestone from '@/components/organisms/FixMilestone/FixMilestone.vue';
     import HourlyMilestone from '@/components/organisms/HourlyMilestone/HourlyMilestone.vue';
@@ -175,7 +176,7 @@
         type: choicesOf(projectData.value?.taskTypeCounts, 'key', 'name'),
         tag: choicesOf(projectData.value?.tagsArray, 'uid', 'name'),
         status: choicesOf(projectData.value?.taskStatusData, 'key', 'name'),
-        priority: choicesOf(getters["settings/companyPriority"], 'value', 'name'),
+        priority: priorityChoices(getters["settings/companyPriority"]),
     }));
     const currentCompany = computed(() => getters["settings/selectedCompany"])
     const clientWidth = inject("$clientWidth");

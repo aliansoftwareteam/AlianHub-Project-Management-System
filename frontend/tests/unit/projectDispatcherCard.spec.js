@@ -12,6 +12,7 @@ vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), us
 vi.mock('vuex', () => ({ useStore: () => ({ getters: { 'settings/getSocketInstance': socket } }) }));
 
 import ProjectDispatcherCard from '@/views/Projects/ProjectDetail/ProjectDispatcherCard.vue';
+import { priorityChoices } from '@/utils/dispatcher';
 
 const BASE = '/api/v2/assignment-rules/dispatcher';
 const TRIAGER = { key: 'it-company/bug-triager', name: 'Bug Triager', blueprint: 'it-company' };
@@ -24,6 +25,13 @@ const SETTINGS = {
 const NEED = { decision: { _id: 'd9', state: 'needs_routing' }, task: { _id: 't9', TaskName: 'Odd one', TaskKey: 'LCH-9' } };
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
 
+/* As the server seeds task_priorities (utils/data.js) and the settings store keeps them. */
+const COMPANY_PRIORITIES = [
+    { name: 'High', value: 'HIGH', image: '', statusImage: '', isDeleted: false },
+    { name: 'Low', value: 'LOW', image: '', statusImage: '', isDeleted: false },
+    { name: 'Old', value: 'OLD', image: '', statusImage: '', isDeleted: true },
+];
+
 const mountCard = async ({ canEdit = true, settings = SETTINGS } = {}) => {
     apiRequest.mockImplementation((type, url, body) => {
         if (type === 'get' && url.endsWith('/needs-routing')) return ok({ on: true, items: [NEED] });
@@ -32,7 +40,7 @@ const mountCard = async ({ canEdit = true, settings = SETTINGS } = {}) => {
         return ok({ decision: { ...NEED.decision, state: 'routed' }, offer: null });
     });
     const wrapper = mount(ProjectDispatcherCard, {
-        props: { projectId: 'p1', canEdit, choices: { type: [{ value: 2, label: 'Bug' }, { value: 3, label: 'Feature' }] } },
+        props: { projectId: 'p1', canEdit, choices: { type: [{ value: 2, label: 'Bug' }, { value: 3, label: 'Feature' }], priority: priorityChoices(COMPANY_PRIORITIES) } },
         global: { mocks: { $t: echo } },
     });
     await flushPromises();
@@ -71,6 +79,21 @@ describe('ProjectDispatcherCard', () => {
             { role: TRIAGER.key, when: { taskTypeKeys: [2] } },
             { role: REVIEWER.key, when: { taskTypeKeys: [3] } },
         ]);
+    });
+
+    it('offers the company priorities that are not deleted, and saves the value a task stores', async () => {
+        expect(priorityChoices(COMPANY_PRIORITIES)).toEqual([{ value: 'HIGH', label: 'High' }, { value: 'LOW', label: 'Low' }]);
+        const wrapper = await mountCard();
+        await wrapper.find('[data-test="dispatcher-rule-add"]').trigger('click');
+        const added = wrapper.findAll('[data-test="dispatcher-rule"]')[2];
+        await added.findAll('select')[0].setValue('priority');
+        const values = added.findAll('select')[1];
+        expect(values.findAll('option').map((option) => option.text())).toEqual(['Dispatcher.rule_value', 'High', 'Low']);
+        await values.setValue('LOW');
+        await added.findAll('select')[2].setValue(REVIEWER.key);
+        await wrapper.find('[data-test="dispatcher-save"]').trigger('click');
+        await flushPromises();
+        expect(putBody().rules[2]).toEqual({ role: REVIEWER.key, when: { priorities: ['LOW'] } });
     });
 
     it('saves a mode change with the saved roles and rules', async () => {
