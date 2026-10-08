@@ -1,4 +1,4 @@
-import { CONNECT_AI_ROUTE, CONNECT_AI_WELCOME_PATH, CONNECT_AI_WELCOME_ROUTE } from './connect';
+import { BLUEPRINT_WELCOME_PATH, BLUEPRINT_WELCOME_ROUTE, CONNECT_AI_ROUTE, CONNECT_AI_WELCOME_PATH, CONNECT_AI_WELCOME_ROUTE } from './connect';
 
 export default [
     { path: '/:cid/ai', redirect: { name: 'AiAsk' } },
@@ -106,6 +106,12 @@ export default [
         name: CONNECT_AI_WELCOME_ROUTE,
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/ConnectYourAi.vue'),
         meta: { title: 'Connect your AI', requiresAuth: true, hideHeader: true, welcome: true }
+    },
+    {
+        path: BLUEPRINT_WELCOME_PATH,
+        name: BLUEPRINT_WELCOME_ROUTE,
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/BlueprintWelcome.vue'),
+        meta: { title: 'Set up your teams', requiresAuth: true, hideHeader: true, welcome: true }
     },
     {
         path: '/:cid/ai/runs/:runId',
