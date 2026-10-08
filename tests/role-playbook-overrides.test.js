@@ -133,13 +133,16 @@ describe('tuning a role playbook for a workspace', () => {
         expect(store.size).toBe(0);
     });
 
-    it('refuses a member, a guest and a stranger, and saves nothing', async () => {
+    it('refuses a member, a guest and a stranger, saves nothing, and shows someone outside the members no role', async () => {
         getRoleType.mockResolvedValue(ROLE_MEMBER);
         expect((await put(EDITED)).code).toBe(403);
         expect((await restore()).code).toBe(403);
         getRoleType.mockResolvedValue(null);
         expect((await put(EDITED)).code).toBe(403);
         expect((await put(EDITED, { aud: C2 })).code).toBe(403);
+        const outside = await list();
+        expect(outside.code).toBe(200);
+        expect(outside.body.data).toEqual({ on: false, roles: [] });
         expect(store.size).toBe(0);
         expect(agentAudit.recordRolePlaybookChange).not.toHaveBeenCalled();
         expect(socketEmitter.emit).not.toHaveBeenCalled();

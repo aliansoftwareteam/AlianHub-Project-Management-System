@@ -39,10 +39,13 @@ const guarded = async (req, res) => {
 
 const listRoles = async (req, res) => {
     try {
-        if (!rolesFlag.enabled()) return res.json({ status: true, statusText: 'Role playbooks are off on this server.', data: { on: false, roles: [] } });
+        const hidden = { on: false, roles: [] };
+        if (!rolesFlag.enabled()) return res.json({ status: true, statusText: 'Role playbooks are off on this server.', data: hidden });
         const at = await guarded(req, res);
         if (!at) return undefined;
-        if (!at.caller.human || !(at.caller.member || at.caller.privileged)) return fail(res, 403, 'Only a member of this workspace can read the roles.');
+        if (!at.caller.human) return fail(res, 403, 'Only a member of this workspace can read the roles.');
+        /* The AI settings page loads for everyone, so a person outside the members is told there is nothing to show, not refused. */
+        if (!(at.caller.member || at.caller.privileged)) return res.json({ status: true, statusText: 'Only a member of this workspace can read the roles.', data: hidden });
         return res.json({ status: true, statusText: 'Roles fetched.', data: { on: true, ...(await answerFor(at.companyId, !req.apiToken && canManageAgents(at.caller))) } });
     } catch (e) {
         if (e instanceof TenantError) return fail(res, e.statusCode, e.message);
