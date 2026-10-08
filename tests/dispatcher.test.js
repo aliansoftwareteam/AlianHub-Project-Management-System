@@ -603,4 +603,24 @@ describe('dispatcher: the model guess', () => {
         budget.mockRestore();
         expect(guess.TIMEOUT_MS).toBeGreaterThan(0);
     });
+
+    it('lands a model guess as a suggestion in apply mode, however sure it says it is, while a rule still applies', async () => {
+        const project = await guessing({ mode: 'apply', threshold: 50 });
+        adapter.chat.mockResolvedValue(answer({ role: TRIAGER, confidence: 100, reason: 'certain' }));
+        expect(await routeTask(seedTask(project, { TaskName: 'model pick' }))).toMatchObject({ state: 'suggested', source: 'model', role: TRIAGER });
+        expect(queueRows()).toHaveLength(0);
+        await saveSettings(project, { mode: 'apply', modelGuess: true });
+        expect(await routeTask(seedTask(project, { TaskName: 'rule pick' }))).toMatchObject({ state: 'applied', source: 'rule', role: TRIAGER });
+        expect(queueRows()).toHaveLength(1);
+    });
+
+    it('keeps the model\'s reason as one plain line of at most 200 characters', async () => {
+        const project = await guessing();
+        const raw = `<img src=x onerror=alert(1)>\u202eevil\u0007 ${'long '.repeat(80)}`;
+        adapter.chat.mockResolvedValue(answer({ role: TRIAGER, confidence: 95, reason: raw }));
+        const decision = await routeTask(seedTask(project));
+        expect(decision.reason.length).toBeLessThanOrEqual(200);
+        expect(decision.reason).not.toMatch(/[\p{Cc}\u202e]/u);
+        expect(decision.reason.startsWith('<img src=x onerror=alert(1)> evil')).toBe(true);
+    });
 });

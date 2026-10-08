@@ -117,7 +117,8 @@ async function route({ companyId, taskId, trigger = 'create' }) {
     const { pick, skipped } = await findRole(companyId, task, settings);
     const agent = pick ? await queue.leastLoaded(companyId, pick.role, task.ProjectID) : null;
     let state = 'needs_routing';
-    if (pick) state = settings.mode === 'apply' ? 'applied' : 'suggested';
+    /* The model rates its own confidence, and the task text it reads can talk that up, so only a rule ever applies by itself. */
+    if (pick) state = settings.mode === 'apply' && pick.source === 'rule' ? 'applied' : 'suggested';
     const decision = await claim(companyId, {
         taskId: String(task._id), projectId: String(task.ProjectID), inputHash, trigger, state, mode: settings.mode,
         role: pick ? pick.role : null, source: pick ? pick.source : null,

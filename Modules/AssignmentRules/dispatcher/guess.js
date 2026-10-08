@@ -16,6 +16,14 @@ const use = (fn, { timeout = TIMEOUT_MS } = {}) => {
 };
 
 const TIMED_OUT = Symbol('timed out');
+const REASON_CAP = 200;
+const UNSEEN = /[\p{Cc}\p{Cf}]/gu;
+
+/* The model's reason is written by the model from task text anyone may have typed: one plain line, shown only as text. */
+const untrustedLine = (value) => {
+    const text = String(value === undefined || value === null ? '' : value).replace(UNSEEN, ' ').replace(/\s+/g, ' ').trim();
+    return text.length > REASON_CAP ? `${text.slice(0, REASON_CAP - 1)}…` : text;
+};
 
 const within = async (work, ms) => {
     let timer;
@@ -40,7 +48,7 @@ const guess = async ({ companyId, task, roles }) => {
     if (answer && answer.failed) return { failed: String(answer.failed) };
     if (!answer || !roles.some((role) => role.key === answer.role)) return null;
     const confidence = Math.max(0, Math.min(100, Number(answer.confidence) || 0));
-    return { role: answer.role, confidence, reason: String(answer.reason || '') };
+    return { role: answer.role, confidence, reason: untrustedLine(answer.reason) };
 };
 
-module.exports = { TIMEOUT_MS, use, guess };
+module.exports = { TIMEOUT_MS, REASON_CAP, use, guess, untrustedLine };
