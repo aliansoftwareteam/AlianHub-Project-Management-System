@@ -13086,7 +13086,31 @@ export default {
         "quality": "Quality",
         "maintenance": "Maintenance",
         "logistics": "Logistics",
-        "hse": "Health and safety"
+        "hse": "Health and safety",
+        "client_services": "Client services",
+        "creative": "Creative",
+        "delivery": "Delivery",
+        "finance": "Finance",
+        "strategy": "Strategy",
+        "catalogue": "Catalogue",
+        "operations": "Operations",
+        "marketing": "Marketing",
+        "business_development": "Business development",
+        "engagement": "Engagement",
+        "compliance": "Compliance",
+        "commercial": "Commercial",
+        "procurement": "Procurement",
+        "site": "Site",
+        "admissions": "Admissions",
+        "teaching": "Teaching",
+        "pastoral": "Pastoral care",
+        "curriculum": "Curriculum",
+        "staffing": "Staffing",
+        "school_life": "School life",
+        "assessment": "Assessment",
+        "communications": "Communications",
+        "timetable": "Timetable and rooms",
+        "front_office": "Front office"
     },
     "TeamPacks": {
         "nav": "Team packs",
@@ -13167,7 +13191,12 @@ export default {
     },
     "Blueprints": {
         "it_company": "IT company",
-        "manufacturing": "Manufacturing"
+        "manufacturing": "Manufacturing",
+        "agency": "Agency",
+        "ecommerce": "Ecommerce",
+        "professional_services": "Professional services",
+        "education": "Education",
+        "construction": "Construction"
     },
     "AssignmentRules": {
         "title": "Assignment rules",
