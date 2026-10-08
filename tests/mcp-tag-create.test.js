@@ -227,6 +227,28 @@ describe('approving adds the tag through the project tag route', () => {
     });
 });
 
+describe('two requests for one name', () => {
+    it('lets the tag route add a name only while the project does not have it, in any case', async () => {
+        const web = world.asPerson(world.routeTable(require('../Modules/Project/routes').init));
+        const before = projectsNow();
+        const out = await web('POST /api/v1/project/tags', INSIDER, { body: { id: P_OPEN, operation: 'push', items: { uid: 'tag_x', tagName: ' BUG ', tagColor: '#000000' } } });
+        expect(out).toMatchObject({ code: 409, body: { status: false } });
+        expect(projectsNow()).toBe(before);
+        expect((await web('POST /api/v1/project/tags', INSIDER, { body: { id: P_OPEN, operation: 'push', items: { uid: 'tag_y', tagName: 'Fresh', tagColor: '#000000' } } })).code).toBe(200);
+        expect(tagNamed(P_OPEN, 'Fresh')).toBeDefined();
+    });
+
+    it('adds one tag when two approvals of the same name run at once, and answers the other as already there', async () => {
+        const first = await filed(as(INSIDER), { projectId: P_OPEN, name: 'Twice' });
+        const second = await filed(as(OUTSIDER), { projectId: P_OPEN, name: 'twice' });
+        const outs = await Promise.all([approve(first), approve(second)]);
+        expect(tagsOf(P_OPEN).filter((tag) => tag.tagName.toLowerCase() === 'twice')).toHaveLength(1);
+        const failed = outs.map((out) => out.applied[0]).filter((entry) => !entry.ok);
+        expect(failed).toHaveLength(1);
+        expect(failed[0].error).toMatch(/already has the tag "Twice"/i);
+    });
+});
+
 describe('undo', () => {
     it('removes the tag while no task carries it', async () => {
         const id = await filed(as(INSIDER), { projectId: P_OPEN, name: 'Short lived' });
@@ -250,6 +272,25 @@ describe('undo', () => {
         stored(SCHEMA_TYPE.TASKS, T_OPEN).tagsArray = [];
         expect(await undoAuditRow(CID, audits(TOOL, 'applied')[0], human(OWNER))).toMatchObject({ ok: true, result: { removed: true } });
         expect(tagNamed(P_OPEN, 'In use')).toBeUndefined();
+    });
+
+    it('puts the tag back when a task takes it while it is being removed', async () => {
+        const id = await filed(as(INSIDER), { projectId: P_OPEN, name: 'Raced' });
+        await approve(id);
+        const made = { ...tagNamed(P_OPEN, 'Raced') };
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (companyId, q, method) => {
+            const out = await real(companyId, q, method);
+            const update = q.data && q.data[1];
+            if (q.type === SCHEMA_TYPE.PROJECTS && method === 'findOneAndUpdate' && update && update.$pull && update.$pull.tagsArray) stored(SCHEMA_TYPE.TASKS, T_OPEN).tagsArray = [made.uid];
+            return out;
+        });
+        try {
+            expect((await undo(id)).results[0]).toMatchObject({ ok: false, reason: expect.stringMatching(/"Raced" was kept: a task carries it now/) });
+        } finally {
+            mockDb.crud.mockImplementation(real);
+        }
+        expect(tagNamed(P_OPEN, 'Raced')).toEqual(made);
     });
 });
 

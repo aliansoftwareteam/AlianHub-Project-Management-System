@@ -38,7 +38,7 @@ const world = require('./fixtures/mcpWorkWorld');
 const tools = require('../Modules/Mcp/tools');
 const server = require('../Modules/Mcp/server');
 
-const { OWNER, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, T_OPEN, T_SECRET, T_PRIVATE, T_OPEN_2, T_TWIN, FLAGS, ctx, narrowed } = world;
+const { OWNER, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, T_OPEN_2, T_TWIN, FLAGS, ctx, narrowed } = world;
 const { seed, stored, rows, rpcThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 
@@ -50,6 +50,7 @@ const F_CLIENT = '6f0000000000000000000f15';
 const F_PEOPLE = '6f0000000000000000000f16';
 const F_HIDDEN = '6f0000000000000000000f17';
 const F_OFF = '6f0000000000000000000f18';
+const F_MINE = '6f0000000000000000000f19';
 
 const search = async (caller, args) => rpc(caller, 'tasks.search', args);
 const idsOf = (out) => (out.tasks || []).map((task) => task.taskId).sort();
@@ -135,6 +136,15 @@ describe('tag', () => {
         expect(idsOf(await search(ctx(INSIDER), { tag: 'Secret' }))).toEqual([T_PRIVATE]);
     });
 
+    it('finds a tag the person can open however many projects they cannot open share its name', async () => {
+        const projects = mockDb.store[SCHEMA_TYPE.PROJECTS];
+        for (let i = 0; i < 520; i += 1) {
+            mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: `6e${i.toString(16).padStart(22, '0')}`, ProjectName: `Someone's ${i}`, isPersonal: true, personalOwner: GUEST, deletedStatusKey: 0, tagsArray: [{ uid: `tag_p${i}`, tagName: 'Bug' }] });
+        }
+        projects.push(projects.splice(projects.findIndex((row) => String(row._id) === P_OPEN), 1)[0]);
+        expect(idsOf(await search(ctx(OWNER), { tag: 'Bug' }))).toEqual([T_OPEN, T_SECRET].sort());
+    });
+
     it('narrows to one project with projectId', async () => {
         expect(idsOf(await search(ctx(INSIDER), { tag: 'Secret', projectId: P_OPEN }))).toEqual([]);
         expect((await search(ctx(INSIDER), { tag: 'Secret', projectId: P_OPEN })).error).toMatch(/No tag/);
@@ -204,6 +214,19 @@ describe('a custom field', () => {
         expect(await search(ctx(GUEST), { field: { fieldId: F_HIDDEN, equals: 9 } })).toEqual(missing);
         expect(await search(ctx(OWNER), { field: { fieldId: F_OFF, equals: 1 } })).toEqual(missing);
         expect(idsOf(await search(ctx(INSIDER), { field: { fieldId: F_HIDDEN, equals: 9 } }))).toEqual([T_PRIVATE]);
+    });
+
+    it('answers a field of someone else\'s personal list or of a trashed project as a missing one, and names none of its options', async () => {
+        field(F_MINE, 'Mine', 'dropdown', { projectId: [P_PERSONAL], fieldOptions: [{ id: 1, label: 'Hush' }] });
+        valueOn(T_PERSONAL, F_MINE, ['1']);
+        const missing = { error: 'That custom field was not found in the projects the person can open. Check the field id.' };
+        for (const uid of [OWNER, OUTSIDER]) {
+            expect(await search(ctx(uid), { field: { fieldId: F_MINE, equals: 'nope' } })).toEqual(missing);
+        }
+        expect(await search(ctx(INSIDER), { field: { fieldId: F_MINE, equals: 'nope' } })).toEqual({ error: 'Mine has no option nope. Its options: Hush.' });
+        expect(idsOf(await search(ctx(INSIDER), { field: { fieldId: F_MINE, equals: 'hush' } }))).toEqual([T_PERSONAL]);
+        stored(SCHEMA_TYPE.PROJECTS, P_PRIVATE).deletedStatusKey = 1;
+        expect(await search(ctx(INSIDER), { field: { fieldId: F_HIDDEN, equals: 9 } })).toEqual(missing);
     });
 
     it('never answers a task the person cannot open', async () => {

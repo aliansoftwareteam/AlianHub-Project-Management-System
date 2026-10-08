@@ -2412,7 +2412,7 @@ export default {
     AgentActions: {
         folder_create: "Make a folder",
         tag_create: "Add a tag to a project",
-        list_sprint_set:"Give a list start and end dates",
+        list_sprint_set: "Give a list start and end dates",
         task_comment: "Add a comment",
         task_status_set: "Change the status",
         task_link: "Attach a link",
