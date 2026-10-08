@@ -6,8 +6,10 @@ import en from '@/locales/en';
 
 const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
 const route = { query: {} };
+const composable = vi.hoisted(() => ({ useCustomComposable: () => ({ checkPermission: () => composable.details }), details: true }));
 
 vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('@/composable', () => ({ useCustomComposable: composable.useCustomComposable }));
 vi.mock('@/locales/main', () => ({ i18n: { global: { t: (key) => key } } }));
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('@/components/organisms/Shell/ShellIcon.vue', () => ({ default: { name: 'ShellIcon', render: () => null } }));
@@ -20,13 +22,15 @@ import { applyAiAvailability, resetAiAvailability, AI_STATE } from '@/composable
 const i18n = createI18n({ legacy: false, locale: 'en', messages: { en }, missingWarn: false, fallbackWarn: false });
 const t = i18n.global.t;
 
-const PROJECTS = [{ _id: 'p1', ProjectName: 'Mobile app' }, { _id: 'p2', ProjectName: 'Website' }];
+const TWO = [{ _id: 'p1', ProjectName: 'Mobile app' }, { _id: 'p2', ProjectName: 'Website' }];
 const store = createStore({
     modules: {
-        settings: { namespaced: true, getters: { companyUserDetail: () => ({ roleType: 1 }) } },
-        projectData: { namespaced: true, getters: { projects: () => ({ data: PROJECTS }) } }
+        settings: { namespaced: true, state: () => ({ roleType: 1 }), getters: { companyUserDetail: (state) => ({ roleType: state.roleType }) } },
+        projectData: { namespaced: true, state: () => ({ list: TWO }), getters: { projects: (state) => ({ data: state.list }) } }
     }
 });
+const access = store.state.settings;
+const projectState = store.state.projectData;
 
 const TRIAGER = { key: 'it-company/bug-triager', slug: 'bug-triager', name: 'Bug Triager', department: 'Engineering', summary: 'Sorts new bugs.', tools: ['task.get', 'task.comment'] };
 const REVIEWER = { key: 'it-company/code-reviewer', slug: 'code-reviewer', name: 'Code Reviewer', department: 'Engineering', summary: 'Reviews pull requests.', tools: ['task.get'] };
@@ -58,6 +62,9 @@ beforeEach(() => {
     apiRequest.mockReset();
     applied = null;
     route.query = {};
+    access.roleType = 1;
+    composable.details = true;
+    projectState.list = TWO;
     serve();
     resetAiAvailability();
     applyAiAvailability({ state: AI_STATE.ON });
@@ -129,5 +136,30 @@ describe('Team packs', () => {
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
         await flushPromises();
         expect(wrapper.find('[data-test="tp-error"]').text()).toBe('refused');
+    });
+
+    it('offers a member only the projects they may change, and says why the others are shut', async () => {
+        access.roleType = 3;
+        projectState.list = [...TWO, { _id: 'p3', ProjectName: 'Own roles', isGlobalPermission: false }];
+        const wrapper = await mountWith(AiTeamPacks);
+        const rows = wrapper.findAll('[data-test="tp-project"]');
+        expect(rows.map((row) => row.attributes('data-why') || '')).toEqual(['', '', 'own_roles']);
+        expect(rows[2].find('input').attributes('disabled')).toBeDefined();
+        expect(rows[2].text()).toContain('This project has its own roles');
+
+        composable.details = false;
+        const shut = await mountWith(AiTeamPacks);
+        expect(shut.findAll('[data-test="tp-project"]').map((row) => row.attributes('data-why'))).toEqual(['no_permission', 'no_permission', 'own_roles']);
+    });
+
+    it('stops at 50 projects', async () => {
+        projectState.list = Array.from({ length: 52 }, (_, i) => ({ _id: `p${i}`, ProjectName: `Project ${i}` }));
+        route.query = { team: 'design' };
+        const wrapper = await mountWith(AiTeamPacks);
+        const inputs = wrapper.findAll('[data-test="tp-project"] input');
+        for (const input of inputs.slice(0, 50)) await input.setValue(true);
+        expect(inputs[50].attributes('disabled')).toBeDefined();
+        expect(inputs[0].attributes('disabled')).toBeUndefined();
+        expect(wrapper.find('[data-test="tp-projects-hint"]').text()).toBe('You can pick up to 50 projects at a time.');
     });
 });

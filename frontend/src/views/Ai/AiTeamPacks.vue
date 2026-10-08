@@ -37,12 +37,26 @@
                                 <legend class="ah-field__label">{{ $t('TeamPacks.projects_label') }}</legend>
                                 <p v-if="!projects.length" class="ah-small">{{ $t('TeamPacks.no_projects') }}</p>
                                 <div class="tp-projects">
-                                    <label v-for="project in projects" :key="project._id" class="tp-row" data-test="tp-project">
-                                        <input v-model="projectIds" class="ah-check" type="checkbox" :value="String(project._id)" />
-                                        <span class="tp-row__name">{{ project.ProjectName }}</span>
+                                    <label
+                                        v-for="project in projects"
+                                        :key="project._id"
+                                        class="tp-row"
+                                        :class="{ 'tp-row--off': project.why }"
+                                        data-test="tp-project"
+                                        :data-why="project.why || null"
+                                    >
+                                        <input
+                                            v-model="projectIds"
+                                            class="ah-check"
+                                            type="checkbox"
+                                            :value="project.id"
+                                            :disabled="Boolean(project.why) || (atCap && !projectIds.includes(project.id))"
+                                        />
+                                        <span class="tp-row__name">{{ project.name }}</span>
+                                        <span v-if="project.why" class="ah-small tp-row__roles">{{ $t(`TeamPacks.why_${project.why}`) }}</span>
                                     </label>
                                 </div>
-                                <span class="ah-field__hint">{{ $t('TeamPacks.projects_hint') }}</span>
+                                <span class="ah-field__hint" data-test="tp-projects-hint">{{ atCap ? $t('TeamPacks.projects_cap', { n: MAX_PROJECTS }) : $t('TeamPacks.projects_hint') }}</span>
                             </fieldset>
 
                             <div class="tp-actions">
@@ -87,15 +101,20 @@ import AiSidebar from "./AiSidebar.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { aiAvailability, AI_STATE } from "@/composable/aiAvailability";
 import { refusalText } from "@/utils/assignmentRules";
+import { useCustomComposable } from "@/composable";
+import { isOwnerOrAdmin } from "@/utils/roles";
 import { applyTeamPack, blueprintName, fetchTeamPacks, teamName, undoTeamPack } from "@/utils/dispatcher";
 
 defineOptions({ name: "AiTeamPacks" });
 
 const OFF = 409;
+const MAX_PROJECTS = 50;
+const DETAILS = "project.project_details";
 
 const { t, te } = useI18n();
 const route = useRoute();
 const { getters } = useStore();
+const { checkPermission } = useCustomComposable();
 
 const loading = ref(true);
 const loadError = ref("");
@@ -110,11 +129,21 @@ const result = ref(null);
 const undone = ref(false);
 
 const needsKey = computed(() => aiAvailability.state === AI_STATE.UNCONFIGURED);
-const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey && p.isPersonal !== true));
+/* The server checks every project again; this only keeps out of reach what it would refuse. A project with its own
+ * roles is judged by rules this page does not hold, so only an owner or admin is offered it here. */
+const whyNot = (project) => {
+    if (isOwnerOrAdmin(getters["settings/companyUserDetail"]?.roleType)) return "";
+    if (project.isGlobalPermission === false) return "own_roles";
+    return checkPermission(DETAILS, true) === true ? "" : "no_permission";
+};
+const projects = computed(() => (getters["projectData/projects"]?.data || [])
+    .filter((p) => !p.deletedStatusKey && p.isPersonal !== true)
+    .map((p) => ({ id: String(p._id), name: p.ProjectName, why: whyNot(p) })));
+const atCap = computed(() => projectIds.value.length >= MAX_PROJECTS);
 const teamsOfPack = computed(() => (packs.value.find((pack) => pack.blueprint === blueprint.value) || { teams: [] }).teams);
 const roleCount = computed(() => teamsOfPack.value.filter((team) => teams.value.includes(team.team)).reduce((sum, team) => sum + team.roles.length, 0));
 const addedCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.added || []).length, 0));
-const projectName = (id) => (projects.value.find((p) => String(p._id) === String(id)) || {}).ProjectName || id;
+const projectName = (id) => (projects.value.find((p) => p.id === String(id)) || {}).name || id;
 
 const resultHead = computed(() => {
     if (undone.value) return t("TeamPacks.undone");
@@ -192,6 +221,7 @@ onMounted(load);
 .tp-set { margin: 0; padding: 0; border: 0; }
 .tp-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; cursor: pointer; color: var(--ink); }
 .tp-row__name { font-weight: 600; }
+.tp-row--off { cursor: default; color: var(--ink-2); }
 .tp-row__roles { flex-basis: 100%; padding-left: 24px; color: var(--ink-2); }
 .tp-projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
 .tp-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
