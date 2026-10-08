@@ -9,6 +9,7 @@ const ACTIONS = Object.freeze([
     'task.lists.list', 'task.lists.add', 'task.lists.remove',
     'fields.create', 'view.create', 'project.setup', 'project.create', 'project.duplicate', 'folder.create', 'list.sprint.set',
     'automation.catalogue', 'automation.create',
+    'timesheet.week', 'timesheet.week.submit',
 ]);
 
 const enabled = () => ['on', 'true', '1'].includes(String(process.env.MCP_TOOLS_WORK || 'off').trim().toLowerCase());

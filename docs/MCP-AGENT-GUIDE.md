@@ -98,7 +98,7 @@ Taking it back works at each level and takes effect on the app's next call: an o
 |---|---|---|---|
 | `performance.read` | `time:read` | Reads. Logged time, estimate against actual, velocity and cumulative flow | Up to 5 projects, a range of at most 120 days; needs `from` and `to` |
 
-### Data tools, `MCP_TOOLS_DATA` (18 tools)
+### Data tools, `MCP_TOOLS_DATA` (20 tools)
 
 | Tool | Permission | What it does | Limits |
 |---|---|---|---|
@@ -109,8 +109,10 @@ Taking it back works at each level and takes effect on the app's next call: an o
 | `comments.list` | `tasks:read` | Reads. A task's comments, newest first | Needs `taskId` |
 | `pages.search` | `docs:read` | Reads. Docs you can open, by title | `query`, `projectId`, `limit` |
 | `page.get` | `docs:read` | Reads. One doc with its full text | Text up to 40000 characters |
+| `page.versions.list` | `docs:read` | Reads. A doc's saved versions, newest first, with who saved each and when. A version kept while the doc was private is listed for its author alone | Needs `pageId`; `limit` |
+| `page.version.get` | `docs:read` | Reads. One saved version of a doc with its full text. Putting a version back is the person's to do in AlianHub | Needs `pageId`, `versionId`; text up to 40000 characters |
 | `timesheet.read` | `time:read` | Reads. Time entries, yours by default; another person's only where the timesheet screens show them to you | `userId`, `from`, `to`, `projectId`, `limit` |
-| `comment.create` | `tasks:write` | At once. A comment on a task, stored as plain text | Needs `taskId`, `text` |
+| `comment.create` | `tasks:write` | At once. A comment on a task, stored as plain text; with `replyTo`, a reply in the thread of that comment on the same task | Needs `taskId`, `text` |
 | `timelog.create` | `time:write` | At once. A finished time entry of your own. A day in an approved timesheet period is refused | Needs `taskId`, `minutes` |
 | `screen.link` | `projects:read` | Reads. The web address of a place in AlianHub | See "Show me" below |
 | `person.place` | `projects:read` | Reads. The project, list or task the person last opened | No arguments; "fresh" for 60 minutes |
@@ -146,7 +148,7 @@ These need the `tasks:manage` permission, except `page.create` and `page.update`
 
 The grant also gives fuller forms of tools in the first group, which are the same names with more arguments: `tasks.search`, `task.get`, `task.create`, `subtask.create`, `task.comment`, `comment.create` and `task.status.set`.
 
-### Work tools, `MCP_TOOLS_WORK` (32 tools)
+### Work tools, `MCP_TOOLS_WORK` (34 tools)
 
 None of these needs a grant. A read takes the read scope and a write takes the write scope.
 
@@ -184,6 +186,8 @@ None of these needs a grant. A read takes the read scope and a write takes the w
 | `project.create` | `tasks:write` | Waits, always. A new project, with or without a plan | Name 3 to 100 characters, description up to 2000 |
 | `automation.create` | `tasks:write` | Waits, always, for an owner or admin. One automation rule for one project | Six step kinds; see "Automations" |
 | `dashboard.card.add` | `tasks:write` | Waits, always, for the dashboard's owner. One card on a dashboard they own, or on a new private one | Eight kinds of card; see "Dashboards" |
+| `timesheet.week` | `time:read` | Reads. Where your own timesheet week stands: not submitted, submitted, approved, sent back or reopened | `weekOf` (any day of the week) |
+| `timesheet.week.submit` | `time:write` | Waits, always, for you alone. Sends your own week for approval, as the Submit week button does. No tool approves, sends back or reopens a week | `weekOf`, `note` up to 500 characters; not for a connection kept to some projects |
 
 ### Delegated sessions, `EXTERNAL_AGENT_SESSIONS` (3 tools)
 

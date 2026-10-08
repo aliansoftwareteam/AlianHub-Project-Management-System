@@ -13,6 +13,7 @@ const goalTools = require('./goalTools');
 const setupTools = require('./setupTools');
 const automationTools = require('./automationTools');
 const dashboardTools = require('./dashboardTools');
+const timesheetTools = require('./timesheetTools');
 const queueTools = require('./queueTools');
 const v2 = require('./v2Flag');
 const cursor = require('./cursor');
@@ -332,6 +333,7 @@ const TOOLS = [
     ...setupTools.TOOLS,
     ...automationTools.TOOLS,
     ...dashboardTools.TOOLS,
+    ...timesheetTools.TOOLS,
     ...queueTools.TOOLS,
 ];
 
@@ -346,6 +348,7 @@ const SCOPES = Object.freeze({
     ...queueTools.READ_SCOPES,
     ...automationTools.READ_SCOPES,
     ...Object.fromEntries(TOOLS.filter((tool) => !tool.run).map((tool) => [tool.name, 'tasks:write'])),
+    ...timesheetTools.SCOPES,
 });
 
 const offered = () => TOOLS.filter((tool) => registry.has(tool.action));

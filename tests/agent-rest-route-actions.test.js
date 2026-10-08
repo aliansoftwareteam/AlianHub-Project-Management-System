@@ -438,6 +438,9 @@ const PROPOSED_ON_THE_WEB = {
         'adding a card to the home dashboard': ['POST /api/v1/dashboard', { op: 'add', card: { key: 'DueSoonCard' } }, {}, 'dashboard.manage'],
         'adding a card to a dashboard': ['PUT /api/v1/dashboards/:id/cards', { cards: [{ key: 'DueSoonCard' }] }, { id: TEMPLATE }, 'dashboard.manage'],
     },
+    'timesheet.week.submit': {
+        'sending the timesheet week of the person for approval': ['POST /api/v2/timesheet-approval/submit', { periodStart: '2026-09-28', periodEnd: '2026-10-04' }, {}, 'timesheet.submit'],
+    },
     'automation.create': {
         'adding an automation': ['POST /api/v2/automations', rule],
         'changing an automation': ['PUT /api/v2/automations/:id', rule, { id: RULE }, 'automation.update'],
