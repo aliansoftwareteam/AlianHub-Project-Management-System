@@ -265,6 +265,8 @@ const REFUSED_BY_THEIR_OWN_RULE = [
     'PUT /api/v2/agents/project-limits/:projectId',
     'DELETE /api/v2/agents/standing-approvals/:projectId/:id',
     'PUT /api/v2/agents/project-manager/:projectId',
+    'PUT /api/v2/agents/roles/:blueprint/:slug/playbook',
+    'DELETE /api/v2/agents/roles/:blueprint/:slug/playbook',
     'POST /api/v2/agents/work-queue/task/:taskId/hand-over',
     'POST /api/v2/agents/work-queue/:itemId/take-back',
 ];

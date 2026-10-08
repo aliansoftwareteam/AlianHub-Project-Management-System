@@ -1535,6 +1535,11 @@ const schema = {
         notMade: { type: Array, default: undefined, required: false },
     },
     // "Always do this": one kind of change, by one connection, in one project — managed by Modules/Agents/standingApprovals.js.
+    rolePlaybookOverrides: {
+        key: { type: String, required: true },
+        body: { type: String, required: true },
+        updatedBy: { type: String, required: true },
+    },
     agentStandingApprovals: {
         projectId: { type: String, required: true },
         action: { type: String, required: true },
@@ -2359,6 +2364,7 @@ const schema = {
         source: { type: String, required: false, default: null },
         ruleIndex: { type: Number, required: false, default: null },
         confidence: { type: Number, required: false, default: null },
+        reason: { type: String, required: false, default: null },
         agentId: { type: String, required: false, default: null },
         skipped: { type: Array, required: false, default: [] },
         taskTypeKey: { type: Number, required: false, default: null },

@@ -3,6 +3,8 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { removeCache } = require('../../../utils/commonFunctions');
 const socketEmitter = require('../../../event/socketEventEmitter');
 const playbooks = require('../../Agents/rolePlaybooks');
+/* Loaded for its side effect: it plugs the workspace's edited playbook text into playbooks.whoFor. */
+require('../../Agents/rolePlaybookOverrides');
 const { RuleError, cacheKey, loadRules, plain } = require('../rules');
 
 // A project's dispatcher settings live on its assignment rules row, so one rule set says who and which role takes a task.
@@ -25,6 +27,8 @@ const roleOf = (key) => {
     return rest === undefined && blueprint && slug ? playbooks.find(blueprint, slug) : null;
 };
 const roleName = (key) => (roleOf(key) || {}).name || '';
+const WHO_MAX = 300;
+const roleWho = (companyId, key) => playbooks.whoFor(companyId, key, WHO_MAX);
 
 const textOf = (value) => String(value === undefined || value === null ? '' : value).trim().slice(0, MAX_TEXT);
 
@@ -140,4 +144,4 @@ const matches = (when, task) => {
 
 const roleChoices = () => playbooks.all().map((role) => ({ key: roleKey(role), name: role.name, blueprint: role.blueprint, department: role.department }));
 
-module.exports = { MODES, THRESHOLD, MAX_RULES, DEFAULTS, roleKey, roleOf, roleName, view, settingsOf, load, validate, save, addRule, matches, roleChoices };
+module.exports = { MODES, THRESHOLD, MAX_RULES, DEFAULTS, roleKey, roleOf, roleName, roleWho, view, settingsOf, load, validate, save, addRule, matches, roleChoices };

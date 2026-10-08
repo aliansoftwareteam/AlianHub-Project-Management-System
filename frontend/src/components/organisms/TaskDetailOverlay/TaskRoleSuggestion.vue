@@ -4,6 +4,7 @@
             <span class="trs__text">
                 <strong>{{ headline }}</strong>
                 <span v-if="reason" class="trs__reason">{{ reason }}</span>
+                <span v-if="modelReason" class="trs__model-reason" data-test="model-reason"><span class="trs__label">{{ $t('Dispatcher.model_reason') }}</span> {{ modelReason }}</span>
             </span>
             <span v-if="canDecide && waiting" class="trs__actions">
                 <template v-if="decision.state === 'suggested'">
@@ -73,6 +74,11 @@ const reason = computed(() => {
     if (d.source === "rule") return t("Dispatcher.by_rule", { n: Number(d.ruleIndex) + 1 });
     if (d.source === "model") return t("Dispatcher.by_model", { confidence: d.confidence });
     return "";
+});
+
+const modelReason = computed(() => {
+    const d = decision.value;
+    return d && d.source === "model" && d.state !== "routed" ? String(d.reason || "").slice(0, 200) : "";
 });
 
 async function load(taskId) {
@@ -146,6 +152,8 @@ async function addOffer() {
 .trs__text { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
 .trs__reason { color: var(--ink-2); margin-left: 4px; }
 .trs__reason::before { content: "\00b7\00a0"; }
+.trs__model-reason { display: block; color: var(--ink-2); white-space: normal; }
+.trs__label { font-weight: 600; }
 .trs__actions { display: inline-flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .trs__select {
     height: 26px;

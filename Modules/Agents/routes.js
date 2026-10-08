@@ -11,6 +11,7 @@ const projectManagerCtrl = require('./manager/controller');
 const standingApprovalsCtrl = require('./standingApprovalsController');
 const changeNoticeCtrl = require('./changeNoticeController');
 const roleSkillCtrl = require('./roleSkillController');
+const rolePlaybookCtrl = require('./rolePlaybookController');
 const { agentPerimeter } = require('./guard');
 const { setByPerson } = require('./personDecides');
 
@@ -46,6 +47,9 @@ exports.init = (app) => {
     app.get('/api/v2/agents/alerts', metricsCtrl.getAlerts);
     app.post('/api/v2/agents/alerts/evaluate', metricsCtrl.evaluateAlerts);
 
+    app.get('/api/v2/agents/roles', rolePlaybookCtrl.listRoles);
+    app.put('/api/v2/agents/roles/:blueprint/:slug/playbook', rolePlaybookCtrl.putRolePlaybook);
+    app.delete('/api/v2/agents/roles/:blueprint/:slug/playbook', rolePlaybookCtrl.deleteRolePlaybook);
     app.get('/api/v2/agents/roles/:blueprint/:slug/skill', roleSkillCtrl.downloadRoleSkill);
 
     app.get('/api/v2/agents/skills/catalogues', skillsCtrl.getCatalogues);

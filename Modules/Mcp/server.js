@@ -11,6 +11,7 @@ const dataFlag = require('./dataFlag');
 const writerLimits = require('../../event/writerLimits');
 const instructions = require('./instructions');
 const prompts = require('./prompts');
+const rolePlaybookOverrides = require('../Agents/rolePlaybookOverrides');
 const oauthAuth = require('./oauthAuth');
 const mcpOAuth = require('../../Config/mcpOAuth');
 const { TOKEN_PREFIX } = require('../ApiTokens/helpers/apiTokenRules');
@@ -216,10 +217,10 @@ const handleRpc = async (ctx, message) => {
             return rpcResult(id, { resources: [] });
 
         case 'prompts/list':
-            return rpcResult(id, { prompts: prompts.list(ctx) });
+            return rpcResult(id, { prompts: prompts.list(ctx, await rolePlaybookOverrides.forCompany(ctx.companyId)) });
 
         case 'prompts/get': {
-            const prompt = prompts.get(ctx, params.name, params.arguments);
+            const prompt = prompts.get(ctx, params.name, params.arguments, await rolePlaybookOverrides.forCompany(ctx.companyId));
             return prompt ? rpcResult(id, prompt) : rpcError(id, -32602, `Unknown prompt "${String(params.name === undefined ? '' : params.name).slice(0, 100)}"`);
         }
 

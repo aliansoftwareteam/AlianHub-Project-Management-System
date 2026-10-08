@@ -43,6 +43,17 @@ describe('TaskRoleSuggestion', () => {
         expect(wrapper.find('[data-test="role-dismiss"]').exists()).toBe(true);
     });
 
+    it('shows the model\'s reason as plain text under its label, never as markup', async () => {
+        const reason = '<img src=x onerror="window.pwned=1"> a crash report';
+        const wrapper = await mountChip({ found: decision({ source: 'model', ruleIndex: null, confidence: 90, reason }) });
+        const shown = wrapper.find('[data-test="model-reason"]');
+        expect(shown.text()).toBe(`Dispatcher.model_reason ${reason}`);
+        expect(shown.find('img').exists()).toBe(false);
+        expect(chip(wrapper).text()).toContain('Dispatcher.by_model {"confidence":90}');
+        const ruled = await mountChip();
+        expect(ruled.find('[data-test="model-reason"]').exists()).toBe(false);
+    });
+
     it('accepts through the dispatcher endpoint and then shows where the task went', async () => {
         const wrapper = await mountChip({ answer: { decision: decision({ state: 'accepted', resolvedBy: 'u-lead' }), offer: null } });
         await wrapper.find('[data-test="role-accept"]').trigger('click');
