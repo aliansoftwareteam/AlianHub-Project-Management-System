@@ -294,31 +294,22 @@ const byClaimTime = (a, b) => new Date(a.row.claim.at) - new Date(b.row.claim.at
 
 /* The marks on a list of tasks: each task an agent holds that the person can open, with who holds it and since
  * when. One read of the claims serves any number of rows, and no total is sent beside the list. */
-const heldInManaged = async (companyId, now) => {
-    const projects = await projectsOn(companyId);
-    if (!projects.length) return [];
-    return find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
-        { ...waitingAboutTasks, projectId: { $in: idForms(projects.map((project) => String(project._id))) }, 'claim.until': { $gt: now } }, {}, { limit: ROWS_READ },
-    ]);
-};
-
-const heldForRoles = async (companyId, now) => {
-    if (await accounts.connectedPaused(companyId)) return [];
-    const rows = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
-        { ...waiting, rule: HANDED_OVER, 'facts.role': ROUTED_TO_A_ROLE, 'claim.until': { $gt: now } }, {}, { limit: ROWS_READ },
-    ]);
-    const ids = [...new Set(rows.map((row) => String(row.projectId)))];
-    const kept = new Set((ids.length ? await projectsIn(companyId, ids, NOT_PAUSED) : []).map((project) => String(project._id)));
-    return rows.filter((row) => kept.has(String(row.projectId)));
-};
-
+/* One read of the claims: those in projects whose manager is on, and those on tasks a lead routed to a role,
+ * which count while neither their project nor the workspace has paused agents. */
 const heldTasks = async (companyId, uid, now = new Date()) => {
-    const seen = new Set();
-    const rows = (await Promise.all([heldInManaged(companyId, now), heldForRoles(companyId, now)])).flat().filter((row) => {
-        if (seen.has(String(row._id))) return false;
-        seen.add(String(row._id));
-        return true;
-    });
+    const [managed, rolesPaused] = await Promise.all([projectsOn(companyId), accounts.connectedPaused(companyId)]);
+    const reached = [
+        ...(managed.length ? [{ projectId: { $in: idForms(managed.map((project) => String(project._id))) } }] : []),
+        ...(rolesPaused ? [] : [{ rule: HANDED_OVER, 'facts.role': ROUTED_TO_A_ROLE }]),
+    ];
+    if (!reached.length) return [];
+    const found = await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [
+        { ...waitingAboutTasks, 'claim.until': { $gt: now }, $or: reached }, {}, { limit: ROWS_READ },
+    ]);
+    const onManaged = new Set(managed.map((project) => String(project._id)));
+    const roleProjects = [...new Set(found.filter((row) => !onManaged.has(String(row.projectId))).map((row) => String(row.projectId)))];
+    const unpaused = new Set((roleProjects.length ? await projectsIn(companyId, roleProjects, NOT_PAUSED) : []).map((project) => String(project._id)));
+    const rows = found.filter((row) => onManaged.has(String(row.projectId)) || (routedToRole(row) && unpaused.has(String(row.projectId))));
     if (!rows.length) return [];
     const held = await stillHolding(companyId, await readableBy(companyId, uid, rows.filter((row) => liveClaim(row, now))));
     const first = new Map();
