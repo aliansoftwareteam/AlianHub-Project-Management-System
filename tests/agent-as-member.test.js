@@ -164,9 +164,19 @@ describe('who is shown a person\'s connected AI', () => {
         expect(await seenBy(MEMBER)).toEqual([]);
         process.env.MCP_OAUTH = 'on';
         process.env.MCP_OAUTH_ISSUER = 'https://hub.example.com';
-        expect(await seenBy(MEMBER)).toEqual(['ChatGPT, for Priya Other']);
+        expect(await seenBy(MEMBER)).toEqual(['ChatGPT (app · chat.example.com), for Priya Other']);
         app.revokedAt = new Date();
         expect(await seenBy(MEMBER)).toEqual([]);
+    });
+
+    it('shows an app named like a member, or like Claude Code from another host, as an app with its host', async () => {
+        const app = grant(OTHER);
+        const approval = mockDb.seed(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS, { companyId: CID, clientId: app.clientId, clientName: 'Mia Member', status: 'approved' });
+        process.env.MCP_OAUTH = 'on';
+        process.env.MCP_OAUTH_ISSUER = 'https://hub.example.com';
+        expect(await seenBy(MEMBER)).toEqual(['Mia Member (app · chat.example.com), for Priya Other']);
+        approval.clientName = 'Claude Code';
+        expect(await seenBy(MEMBER)).toEqual(['Claude Code (app · chat.example.com), for Priya Other']);
     });
 
     it('is one entry a person, named after the connection that worked last', async () => {

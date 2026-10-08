@@ -157,7 +157,7 @@ describe('audit attribution under AUDIT_CHAIN', () => {
         expect(resultOf(res)).toMatchObject({ ok: true });
 
         const actionRow = auditRows().find((row) => row.action === agentAudit.ACTION_DONE);
-        expect(actionRow).toMatchObject({ actorId: client.clientId, actorName: 'S10S4 Coder for Priya' });
+        expect(actionRow).toMatchObject({ actorId: client.clientId, actorName: 'S10S4 Coder (app · 127.0.0.1) for Priya' });
         expect(actionRow.meta).toMatchObject({
             actorType: 'agent', viaAccount: 'external', clientId: client.clientId, grantId: grant.grantId, delegatedBy: USER, onBehalfOf: USER, tokenId: null,
             tainted: true, taintSources: [expect.objectContaining({ kind: 'client', ref: client.clientId })],
@@ -169,7 +169,7 @@ describe('audit attribution under AUDIT_CHAIN', () => {
         expect(await chain.verifyChain(C)).toMatchObject({ state: 'verified', brokenAt: null });
 
         const [, { context }] = mockOutbound.find(([what]) => what === 'addComment');
-        expect(context).toMatchObject({ viaAccount: 'external', userId: USER, ruleName: 'S10S4 Coder for Priya' });
+        expect(context).toMatchObject({ viaAccount: 'external', userId: USER, ruleName: 'S10S4 Coder (app · 127.0.0.1) for Priya' });
     });
 });
 
@@ -372,18 +372,28 @@ describe('the manage tools for an OAuth client', () => {
         expect(await decide()).toMatchObject({ status: 403, error: expect.stringMatching(/revoked/) });
     });
 
-    it('names the filed proposal and the audit row by the name the workspace approved the client under', async () => {
+    it('names the filed proposal and the audit row by the approved name, with the client\'s host and the app mark', async () => {
         process.env.MCP_TOOLS_MANAGE = 'on';
         process.env.AGENT_TAINT_ROUTING = 'on';
         const { raw } = await mint(MANAGING, [...ALL_SCOPES, 'tasks:manage'], { clientName: 'Claude Code' });
         await post(raw, call('task.archive', { taskId: TASK, reason: 'no longer needed' }));
         const [filed] = proposalRows();
-        expect(filed.agentName).toBe('Claude Code');
+        expect(filed.agentName).toBe('Claude Code (app · 127.0.0.1)');
         expect(require('../event/socketEventEmitter').emit).toHaveBeenCalledWith('update', expect.objectContaining({
             module: 'agent', companyId: C, data: { kind: 'proposal', proposal: expect.objectContaining({ _id: filed._id, projectId: PROJECT }) },
         }));
         await post(raw, call('task.comment', { taskId: TASK, body: 'Found the cause.' }));
-        expect(auditRows().find((row) => row.action === agentAudit.ACTION_DONE)).toMatchObject({ actorName: 'Claude Code for Priya' });
+        expect(auditRows().find((row) => row.action === agentAudit.ACTION_DONE)).toMatchObject({ actorName: 'Claude Code (app · 127.0.0.1) for Priya' });
+    });
+
+    it('shows a client named like a member as an app with its host, on the proposal and the audit row', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        const { raw } = await mint(MANAGING, [...ALL_SCOPES, 'tasks:manage'], { clientName: 'Priya' });
+        await post(raw, call('task.archive', { taskId: TASK, reason: 'no longer needed' }));
+        expect(proposalRows()[0].agentName).toBe('Priya (app · 127.0.0.1)');
+        await post(raw, call('task.comment', { taskId: TASK, body: 'Hi.' }));
+        expect(auditRows().find((row) => row.action === agentAudit.ACTION_DONE)).toMatchObject({ actorName: 'Priya (app · 127.0.0.1) for Priya' });
     });
 
     it('refuses the same routed write to a client without the scope, as before, and files nothing', async () => {
