@@ -89,12 +89,19 @@ describe('a mention in an agent task comment reaches the person', () => {
         expect(stored().message).toBe('See [docs](https://example.com) or write to pm@example.com');
     });
 
-    it.each(['@Local PM, steps please', `@[Local PM](${LOCAL_PM}), steps please`])('naming the person the comment is written for (%s) says no one was told', async (body) => {
+    it.each(['@Local PM, steps please', `@[Local PM](${LOCAL_PM}), steps please`])('naming the person the comment is written for (%s) says they were not told', async (body) => {
         const pm = { ...ownersClaude, userId: LOCAL_PM };
         const { result } = await actions.perform({ companyId: CID, actor: pm, action: 'task.comment', params: { taskId: TASK_ID, body, notifyMentions: true } });
 
         expect(result).toEqual(expect.objectContaining({ mentioned: [], notNotified: [{ userId: LOCAL_PM, name: 'Local PM', reason: expect.stringMatching(/is you/) }], notFound: [] }));
         expect(deliverMentions).not.toHaveBeenCalled();
+    });
+
+    it('naming yourself beside someone else tells them and says only that you were not notified', async () => {
+        const { result } = await comment(`@${OWNER} and @[Local PM](${LOCAL_PM}), steps please`);
+
+        expect(result.mentioned).toEqual([{ userId: LOCAL_PM, name: 'Local PM' }]);
+        expect(result.notNotified).toEqual([{ userId: OWNER, name: expect.any(String), reason: 'is you, the person this comment is written for, so you were not notified' }]);
     });
 
     const plainTools = [...require('../Modules/Mcp/tools').TOOLS, ...require('../Modules/Mcp/dataTools').TOOLS];

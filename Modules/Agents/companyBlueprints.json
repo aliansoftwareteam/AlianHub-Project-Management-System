@@ -1,0 +1,291 @@
+{
+  "industries": [
+    {
+      "id": "it-company",
+      "roles": [
+        { "slug": "bug-triager" },
+        { "slug": "support-agent" },
+        { "slug": "tech-lead" },
+        { "slug": "qa-engineer" },
+        { "slug": "code-reviewer" },
+        { "slug": "release-manager" },
+        { "slug": "support-lead" },
+        { "slug": "sales-development-rep" },
+        { "slug": "ui-ux-designer" },
+        { "slug": "design-lead" },
+        { "slug": "design-qa-reviewer" },
+        { "slug": "brand-guardian" },
+        { "slug": "prd-writer" },
+        { "slug": "feedback-collector" },
+        { "slug": "roadmap-keeper" },
+        { "slug": "documentation-writer" },
+        { "slug": "incident-scribe" },
+        { "slug": "knowledge-base-writer" },
+        { "slug": "account-manager" },
+        { "slug": "proposal-writer" },
+        { "slug": "status-reporter" },
+        { "slug": "risk-watch" },
+        { "name": "Regression Watch", "team": "engineering", "notWritten": true },
+        { "name": "Change Checklist", "team": "engineering", "notWritten": true },
+        { "name": "Project Planner", "team": "delivery", "notWritten": true },
+        { "name": "Client Status Reporter", "team": "delivery", "notWritten": true },
+        { "name": "Timesheet Checker", "team": "delivery", "notWritten": true },
+        { "name": "Invoice Preparer", "team": "finance", "notWritten": true },
+        { "name": "Onboarding Coordinator", "team": "people", "notWritten": true }
+      ],
+      "sizes": {
+        "small": {
+          "people": [5, 25],
+          "roles": 10,
+          "seats": [10, 15]
+        },
+        "medium": {
+          "people": [25, 150],
+          "roles": 25,
+          "seats": [33, 50]
+        },
+        "large": {
+          "people": [150, 1000],
+          "roles": 29,
+          "seats": [70, 145]
+        }
+      }
+    },
+    {
+      "id": "manufacturing",
+      "roles": [
+        { "slug": "order-intake" },
+        { "slug": "non-conformance-recorder" },
+        { "slug": "maintenance-planner" },
+        { "slug": "production-planner" },
+        { "slug": "shift-handover-writer" },
+        { "slug": "breakdown-triage" },
+        { "slug": "supplier-follow-up" },
+        { "slug": "purchase-request-preparer" },
+        { "slug": "quote-preparer" },
+        { "slug": "customer-update-writer" },
+        { "slug": "schedule-change-watch" },
+        { "slug": "work-instruction-keeper" },
+        { "slug": "downtime-logger" },
+        { "slug": "inspection-checklist" },
+        { "slug": "corrective-action-tracker" },
+        { "slug": "spare-parts-watch" },
+        { "slug": "dispatch-checklist" },
+        { "slug": "delivery-tracker" },
+        { "slug": "supplier-scorecard" },
+        { "slug": "safety-incident-reporter" },
+        { "slug": "training-due-watch" },
+        { "slug": "change-request-writer" },
+        { "name": "Audit Checklist", "team": "hse", "notWritten": true },
+        { "name": "Stock Alert", "team": "logistics", "notWritten": true },
+        { "name": "Drawing Revision Tracker", "team": "engineering", "notWritten": true },
+        { "name": "Invoice Preparer", "team": "finance", "notWritten": true },
+        { "name": "Shift Roster Checker", "team": "people", "notWritten": true },
+        { "name": "Training Records", "team": "people", "notWritten": true }
+      ],
+      "sizes": {
+        "small": {
+          "people": [5, 25],
+          "roles": 10,
+          "seats": [10, 15]
+        },
+        "medium": {
+          "people": [25, 150],
+          "roles": 25,
+          "seats": [33, 50]
+        },
+        "large": {
+          "people": [150, 1000],
+          "roles": 28,
+          "seats": [68, 140]
+        }
+      }
+    },
+    {
+      "id": "agency",
+      "roles": [
+        { "slug": "content-writer" },
+        { "slug": "social-media-manager" },
+        { "slug": "agency-account-manager" },
+        { "slug": "campaign-manager" },
+        { "slug": "seo-specialist" },
+        { "slug": "agency-design-lead" },
+        { "slug": "agency-brand-guardian" },
+        { "slug": "agency-proposal-writer" },
+        { "slug": "research-brief-writer" },
+        { "slug": "project-planner" },
+        { "slug": "client-approval-tracker" },
+        { "slug": "marketing-analyst" },
+        { "slug": "timesheet-checker" },
+        { "slug": "invoice-preparer" }
+      ],
+      "sizes": {
+        "small": {
+          "people": [5, 25],
+          "roles": 10,
+          "seats": [10, 15]
+        },
+        "medium": {
+          "people": [25, 150],
+          "roles": 14,
+          "seats": [19, 28]
+        },
+        "large": {
+          "people": [150, 1000],
+          "roles": 14,
+          "seats": [34, 70]
+        }
+      }
+    },
+    {
+      "id": "ecommerce",
+      "roles": [
+        { "slug": "customer-service-agent" },
+        { "slug": "product-listing-writer" },
+        { "slug": "catalogue-checker" },
+        { "slug": "order-issue-triage" },
+        { "slug": "returns-coordinator" },
+        { "slug": "promotion-planner" },
+        { "slug": "store-content-writer" },
+        { "slug": "store-social-media-manager" },
+        { "slug": "stock-alert" },
+        { "slug": "supplier-chase" },
+        { "slug": "weekly-sales-reporter" }
+      ],
+      "sizes": {
+        "small": {
+          "people": [5, 25],
+          "roles": 10,
+          "seats": [10, 15]
+        },
+        "medium": {
+          "people": [25, 150],
+          "roles": 11,
+          "seats": [15, 22]
+        },
+        "large": {
+          "people": [150, 1000],
+          "roles": 11,
+          "seats": [27, 55]
+        }
+      }
+    },
+    {
+      "id": "construction",
+      "roles": [
+        { "slug": "construction-project-planner" },
+        { "slug": "site-daily-report-writer" },
+        { "slug": "safety-checklist" },
+        { "slug": "rfi-tracker" },
+        { "slug": "snag-list-keeper" },
+        { "slug": "subcontractor-follow-up" },
+        { "slug": "tender-document-checker" },
+        { "slug": "milestone-billing-preparer" },
+        { "slug": "handover-pack-builder" }
+      ],
+      "sizes": {
+        "small": {
+          "people": [5, 25],
+          "roles": 9,
+          "seats": [9, 14]
+        },
+        "medium": {
+          "people": [25, 150],
+          "roles": 9,
+          "seats": [12, 18]
+        },
+        "large": {
+          "people": [150, 1000],
+          "roles": 9,
+          "seats": [22, 45]
+        }
+      }
+    },
+    {
+      "id": "professional-services",
+      "roles": [
+        { "slug": "engagement-planner" },
+        { "slug": "document-drafter" },
+        { "slug": "deadline-watch" },
+        { "slug": "review-checklist" },
+        { "slug": "client-status-reporter" },
+        { "slug": "proserv-research-brief-writer" },
+        { "slug": "proserv-timesheet-checker" },
+        { "slug": "proserv-invoice-preparer" }
+      ],
+      "sizes": {
+        "small": {
+          "people": [5, 25],
+          "roles": 8,
+          "seats": [8, 12]
+        },
+        "medium": {
+          "people": [25, 150],
+          "roles": 8,
+          "seats": [11, 16]
+        },
+        "large": {
+          "people": [150, 1000],
+          "roles": 8,
+          "seats": [20, 40]
+        }
+      }
+    },
+    {
+      "id": "education",
+      "roles": [
+        { "slug": "course-planner" },
+        { "slug": "student-query-triage" },
+        { "slug": "lesson-material-drafter" },
+        { "slug": "assignment-feedback-drafter" },
+        { "slug": "attendance-watch" },
+        { "slug": "schedule-keeper" },
+        { "slug": "parent-update-writer" }
+      ],
+      "sizes": {
+        "small": {
+          "people": [5, 25],
+          "roles": 7,
+          "seats": [7, 11]
+        },
+        "medium": {
+          "people": [25, 150],
+          "roles": 7,
+          "seats": [10, 14]
+        },
+        "large": {
+          "people": [150, 1000],
+          "roles": 7,
+          "seats": [17, 35]
+        }
+      }
+    },
+    {
+      "id": "clinic",
+      "roles": [
+        { "slug": "appointment-follow-up-list" },
+        { "slug": "clinic-supplies-stock-alert" },
+        { "slug": "staff-roster-checker" },
+        { "slug": "clinic-compliance-checklist-keeper" },
+        { "slug": "clinic-patient-feedback-summary" }
+      ],
+      "sizes": {
+        "small": {
+          "people": [5, 25],
+          "roles": 5,
+          "seats": [5, 8]
+        },
+        "medium": {
+          "people": [25, 150],
+          "roles": 5,
+          "seats": [7, 10]
+        },
+        "large": {
+          "people": [150, 1000],
+          "roles": 5,
+          "seats": [12, 25]
+        }
+      }
+    }
+  ]
+}

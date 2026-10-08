@@ -155,7 +155,7 @@ const startsNamedAgents = (companyId, actor, { taskId, body, depth, approvedBy }
 });
 
 const NOT_TOLD = Object.freeze({
-    self: 'is you, the person this comment is written for, so no one was notified',
+    self: 'is you, the person this comment is written for, so you were not notified',
     noAccess: 'cannot open this task, so was not notified',
 });
 

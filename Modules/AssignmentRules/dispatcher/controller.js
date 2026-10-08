@@ -6,6 +6,7 @@ const settings = require('./settings');
 const decisions = require('./decisions');
 const audit = require('./audit');
 const packs = require('./packs');
+const companyBlueprints = require('../../Agents/companyBlueprints');
 const company = require('./company');
 
 const companyOf = (req) => String(req.headers['companyid'] || '');
@@ -32,7 +33,7 @@ exports.whenOnForPacks = (req, res, next) => (flag.enabled() ? next() : refuse(r
 
 exports.getPacks = (req, res) => {
     try {
-        return res.json({ status: true, statusText: 'Team packs', data: { on: flag.enabled(), packs: packs.packs() } });
+        return res.json({ status: true, statusText: 'Team packs', data: { on: flag.enabled(), packs: packs.packs(), companyBlueprints: companyBlueprints.view() } });
     } catch (error) {
         return fail(res, 'read packs')(error);
     }

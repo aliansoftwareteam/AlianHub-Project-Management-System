@@ -68,6 +68,12 @@ beforeEach(() => {
 });
 
 describe('org chart panel', () => {
+    it('names a team by its label, not its slug', () => {
+        const slugged = { ...ORG, blueprints: [{ ...ORG.blueprints[0], teams: [{ ...ORG.blueprints[0].teams[0], team: 'sales-orders' }] }] };
+        const wrapper = mount(CompanyOrgChart, { props: { data: slugged }, global });
+        expect(wrapper.find('[data-team="sales-orders"] .cv-team__name').text()).toBe('Sales and orders');
+    });
+
     it('shows blueprints, teams, roles, their agents and who supervises them', () => {
         const wrapper = mount(CompanyOrgChart, { props: { data: ORG }, global });
         const triager = wrapper.find('[data-role="it-company/bug-triager"]');

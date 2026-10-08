@@ -98,6 +98,12 @@ describe('the catalogue Team filter', () => {
 });
 
 describe('Team packs', () => {
+    it('reads the team packs once and hands them to the blueprint picker', async () => {
+        const wrapper = await mountWith(AiTeamPacks);
+        expect(wrapper.find('[data-test="blueprint-picker"]').exists()).toBe(true);
+        expect(apiRequest.mock.calls.filter(([type, url]) => type === 'get' && url.endsWith('/team-packs'))).toHaveLength(1);
+    });
+
     it('turns the picked teams on in the picked projects, says where the dispatcher is off, and undoes it', async () => {
         route.query = { blueprint: 'it-company', team: 'engineering' };
         const wrapper = await mountWith(AiTeamPacks);
