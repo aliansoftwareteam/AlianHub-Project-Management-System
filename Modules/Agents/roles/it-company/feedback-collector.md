@@ -3,6 +3,7 @@ slug: feedback-collector
 name: Feedback Collector
 blueprint: it-company
 department: Product
+team: product
 tools: [tasks.search, task.get, comments.list, task.fields.list, chat.channels.list, chat.messages.list, pages.search, page.get, page.create, page.update, task.relation.add, task.tags.add, task.comment, task.create, task.from_message]
 hands_to: [prd-writer, roadmap-keeper, support-lead]
 gates: [the product manager decides which themes become work]

@@ -3,6 +3,7 @@ slug: status-reporter
 name: Status Reporter
 blueprint: it-company
 department: Leadership
+team: product
 tools: [person.me, projects.list, project.get, tasks.search, task.get, comments.list, sprints.list, performance.read, goals.list, goal.get, timesheet.read, pages.search, page.get, page.create, page.update, task.comment, screen.link]
 hands_to: [risk-watch]
 gates: [the CEO or CTO approves the digest before it is shared]

@@ -3,6 +3,7 @@ slug: supplier-follow-up
 name: Supplier Follow-up
 blueprint: manufacturing
 department: Purchasing
+team: purchasing
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.history, task.relations.list, tags.list, page.get, page.create, page.update, task.link, task.comment, task.tags.add]
 hands_to: [schedule-change-watch]
 gates: [the buyer contacts the supplier and records the answer]

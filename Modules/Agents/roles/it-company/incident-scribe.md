@@ -3,6 +3,7 @@ slug: incident-scribe
 name: Incident Scribe
 blueprint: it-company
 department: DevOps
+team: engineering
 tools: [task.get, task.update, comments.list, chat.channels.list, chat.messages.list, task.history, tasks.search, person.me, task.create, task.comment, comment.update, page.create, page.update, subtask.create, task.relation.add, task.tags.add, task.from_message]
 hands_to: [support-lead, tech-lead]
 gates: [the incident lead approves the postmortem]

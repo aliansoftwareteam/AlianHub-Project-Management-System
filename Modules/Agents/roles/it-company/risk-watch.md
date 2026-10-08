@@ -3,6 +3,7 @@ slug: risk-watch
 name: Risk Watch
 blueprint: it-company
 department: Leadership
+team: product
 tools: [projects.list, tasks.search, task.get, comments.list, task.history, task.relations.list, sprints.list, performance.read, members.list, goals.list, goal.get, workdays.get, pages.search, page.get, page.create, page.update, task.comment, task.tags.add]
 hands_to: [status-reporter]
 gates: [a leader accepts each risk and names an owner]
