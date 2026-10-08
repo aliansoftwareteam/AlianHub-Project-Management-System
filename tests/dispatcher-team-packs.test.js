@@ -270,7 +270,7 @@ describe('team packs', () => {
         const project = seedProject();
         const ids = [String(project._id)];
         expect((await call('POST', PACKS, { body: { blueprint: 'bakery', teams: ['engineering'], projectIds: ids } })).statusCode).toBe(400);
-        expect((await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['finance'], projectIds: ids } })).statusCode).toBe(400);
+        expect((await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['no-such-team'], projectIds: ids } })).statusCode).toBe(400);
         expect((await call('POST', PACKS, { body: { blueprint: 'it-company', teams: [], projectIds: ids } })).statusCode).toBe(400);
         expect((await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering'], projectIds: ['nope'] } })).statusCode).toBe(400);
         expect(dispatcherOf(project)).toBeUndefined();
