@@ -1,5 +1,7 @@
 const grants = require('./grants');
 const store = require('./store');
+const tokenHash = require('./tokenHash');
+const { appLabel, hostOfClient } = require('./clientLabel');
 const workspaces = require('./workspaces');
 const logger = require('../../Config/loggerConfig');
 
@@ -20,10 +22,12 @@ const clientNames = async (rows) => {
     const byId = new Map();
     const approvalRows = await store.approvals.namesFor(rows.map((row) => ({ companyId: row.companyId, clientId: row.clientId })));
     for (const row of approvalRows) if (row.clientName) byId.set(`${row.companyId}|${row.clientId}`, row.clientName);
-    const missing = [...new Set(rows.filter((row) => !byId.has(`${row.companyId}|${row.clientId}`)).map((row) => row.clientId))];
-    const found = await Promise.all(missing.map((clientId) => store.clients.find(clientId).catch(() => null)));
-    const fromRows = new Map(found.filter(Boolean).map((client) => [client.clientId, client.name]));
-    return (row) => byId.get(`${row.companyId}|${row.clientId}`) || fromRows.get(row.clientId) || row.clientId;
+    const registered = [...new Set(rows.map((row) => String(row.clientId)).filter((clientId) => tokenHash.CLIENT_ID.test(clientId)))];
+    const found = await Promise.all(registered.map((clientId) => store.clients.find(clientId).catch(() => null)));
+    const clientRows = new Map(found.filter(Boolean).map((client) => [client.clientId, client]));
+    const nameOf = (row) => byId.get(`${row.companyId}|${row.clientId}`) || (clientRows.get(row.clientId) || {}).name || row.clientId;
+    nameOf.labelOf = (row) => appLabel(nameOf(row), hostOfClient(row.clientId, clientRows.get(row.clientId)));
+    return nameOf;
 };
 
 exports.clientNames = clientNames;
