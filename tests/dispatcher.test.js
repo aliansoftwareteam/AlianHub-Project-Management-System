@@ -498,3 +498,77 @@ describe('dispatcher: a lead decides', () => {
         expect(queueRows()).toHaveLength(0);
     });
 });
+
+describe('dispatcher: the model guess', () => {
+    const answer = (content) => ({ content: JSON.stringify(content), inputTokens: 300, outputTokens: 40, totalTokens: 340, model: 'gpt-4.1' });
+    const { modelGuesser } = require('../Modules/AssignmentRules/dispatcher/modelGuesser');
+
+    const guessing = async (over = {}) => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await saveSettings(project, { modelGuess: true, rules: [], threshold: 80, ...over });
+        guess.use(modelGuesser);
+        return project;
+    };
+
+    it('routes to the role the model names at or above the threshold, sends only the allowed task data and role lines, and books the cost', async () => {
+        const project = await guessing();
+        adapter.chat.mockResolvedValue(answer({ role: TRIAGER, confidence: 91, reason: 'a crash report' }));
+        const decision = await routeTask(seedTask(project));
+        expect(decision).toMatchObject({ state: 'suggested', role: TRIAGER, source: 'model', confidence: 91, reason: 'a crash report' });
+        expect(adapter.chat).toHaveBeenCalledTimes(1);
+        const request = adapter.chat.mock.calls[0][0];
+        expect(request.spend).toMatchObject({ feature: 'assignment_rules', companyId: C });
+        const prompt = request.messages.map((m) => m.content).join('\n');
+        expect(prompt).toContain('Login button overflows on Safari');
+        expect(prompt).toContain(TRIAGER);
+        expect(prompt).toContain(REVIEWER);
+        expect(prompt).toMatch(/who it is: \S/);
+        expect(store(SCHEMA_TYPE.AI_USAGE)).toEqual([expect.objectContaining({ companyId: C, feature: 'assignment_rules', model: 'gpt-4.1', billedToWorkspace: true })]);
+    });
+
+    it('asks a person when the confidence is below the threshold', async () => {
+        const project = await guessing();
+        adapter.chat.mockResolvedValue(answer({ role: TRIAGER, confidence: 79, reason: 'maybe' }));
+        expect(await routeTask(seedTask(project))).toMatchObject({ state: 'needs_routing', role: null });
+    });
+
+    it('ignores a role the project has not switched on, an invented role and an unreadable answer', async () => {
+        const project = await guessing();
+        for (const reply of [answer({ role: 'it-company/brand-guardian', confidence: 99 }), answer({ role: 'made/up', confidence: 99 }), { content: 'not json', model: 'gpt-4.1' }]) {
+            adapter.chat.mockResolvedValue(reply);
+            expect(await routeTask(seedTask(project, { TaskName: `T${Math.random()}` }))).toMatchObject({ state: 'needs_routing' });
+        }
+    });
+
+    it('does not ask the model when the project has the guess off', async () => {
+        const project = await guessing({ modelGuess: false });
+        expect(await routeTask(seedTask(project))).toMatchObject({ state: 'needs_routing' });
+        expect(adapter.chat).not.toHaveBeenCalled();
+    });
+
+    it('does not ask the model without a configured provider, with an unpriced model, with AI off or over the budget', async () => {
+        const project = await guessing();
+        adapter.chat.mockResolvedValue(answer({ role: TRIAGER, confidence: 99 }));
+
+        adapter.isConfigured = false;
+        expect(await routeTask(seedTask(project, { TaskName: 'no provider' }))).toMatchObject({ state: 'needs_routing' });
+        adapter.isConfigured = true;
+
+        const usage = require('../Modules/AICore/usage');
+        const unpriced = jest.spyOn(usage, 'checkConfiguredModelPriced').mockReturnValue({ ok: false, reason: 'no price', model: 'x' });
+        expect(await routeTask(seedTask(project, { TaskName: 'unpriced' }))).toMatchObject({ state: 'needs_routing' });
+        unpriced.mockRestore();
+
+        const aiSwitch = require('../Modules/AICore/aiSwitch');
+        const off = jest.spyOn(aiSwitch, 'allowed').mockResolvedValue(false);
+        expect(await routeTask(seedTask(project, { TaskName: 'ai off' }))).toMatchObject({ state: 'needs_routing' });
+        off.mockRestore();
+
+        const budget = jest.spyOn(require('../Modules/Agents/budget'), 'check').mockResolvedValue({ ok: false, reason: 'over' });
+        expect(await routeTask(seedTask(project, { TaskName: 'over budget' }))).toMatchObject({ state: 'needs_routing' });
+        budget.mockRestore();
+
+        expect(adapter.chat).not.toHaveBeenCalled();
+    });
+});

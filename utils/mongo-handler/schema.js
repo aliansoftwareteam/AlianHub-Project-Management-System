@@ -2359,6 +2359,7 @@ const schema = {
         source: { type: String, required: false, default: null },
         ruleIndex: { type: Number, required: false, default: null },
         confidence: { type: Number, required: false, default: null },
+        reason: { type: String, required: false, default: null },
         agentId: { type: String, required: false, default: null },
         skipped: { type: Array, required: false, default: [] },
         taskTypeKey: { type: Number, required: false, default: null },

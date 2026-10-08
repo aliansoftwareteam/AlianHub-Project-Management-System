@@ -85,11 +85,11 @@ async function findRole(companyId, task, settings) {
         }
     }
     if (settings.modelGuess) {
-        const roles = settings.roles.filter((key) => !roleProblem(settings, key)).map((key) => ({ key, name: rulesOf.roleName(key) }));
+        const roles = settings.roles.filter((key) => !roleProblem(settings, key)).map((key) => ({ key, name: rulesOf.roleName(key), who: rulesOf.roleWho(key) }));
         const project = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(task.ProjectID) }, { tagsArray: 1 }] }, 'findOne');
         const input = { title: task.TaskName || '', type: task.TaskType || '', tags: tagNames(task, plain(project) || {}), description: task.rawDescription || '' };
         const guessed = await guess.guess({ companyId, task: input, roles });
-        if (guessed && guessed.confidence >= settings.threshold) return { pick: { role: guessed.role, source: 'model', confidence: guessed.confidence }, skipped };
+        if (guessed && guessed.confidence >= settings.threshold) return { pick: { role: guessed.role, source: 'model', confidence: guessed.confidence, reason: guessed.reason }, skipped };
     }
     return { pick: null, skipped };
 }
@@ -122,13 +122,14 @@ async function route({ companyId, taskId, trigger = 'create' }) {
         role: pick ? pick.role : null, source: pick ? pick.source : null,
         ruleIndex: pick && pick.source === 'rule' ? pick.ruleIndex : null,
         confidence: pick && pick.source === 'model' ? pick.confidence : null,
+        reason: pick && pick.source === 'model' ? pick.reason : null,
         agentId: agent ? agent.id : null, skipped,
         taskTypeKey: Number.isFinite(Number(task.TaskTypeKey)) && task.TaskTypeKey !== null ? Number(task.TaskTypeKey) : null,
     });
     if (!decision) return skip('decided');
     if (state === 'applied') await queue.put(companyId, task, { role: pick.role, agentId: decision.agentId, by: 'dispatcher' });
     audit.routed(companyId, task, {
-        state, mode: settings.mode, trigger, role: decision.role, source: decision.source, ruleIndex: decision.ruleIndex, confidence: decision.confidence, agentId: decision.agentId, skipped,
+        state, mode: settings.mode, trigger, role: decision.role, source: decision.source, ruleIndex: decision.ruleIndex, confidence: decision.confidence, reason: decision.reason, agentId: decision.agentId, skipped,
     });
     announce(companyId, decision);
     return decision;
