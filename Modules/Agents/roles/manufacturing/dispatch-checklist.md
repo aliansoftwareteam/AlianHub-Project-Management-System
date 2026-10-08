@@ -3,6 +3,7 @@ slug: dispatch-checklist
 name: Dispatch Checklist
 blueprint: manufacturing
 department: Warehouse and logistics
+team: logistics
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, subtasks.list, fields.list, tags.list, task.relations.list, page.get, pages.search, page.create, subtask.create, task.comment, task.tags.add, task.relation.add, task.link]
 hands_to: [delivery-tracker]
 gates: [the dispatch lead checks the list and releases the shipment]

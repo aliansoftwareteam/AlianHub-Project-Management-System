@@ -417,7 +417,7 @@ describe('comments', () => {
     it('tells the members a comment names in the editor\'s markup, for a token created to manage tasks only', async () => {
         const body = `Ready for you @[Priya Other](${OTHER}) and @[Otto Outsider](${OUTSIDER})`;
         const told = await rpc(ctx(OWNER), 'task.comment', { taskId: fx.top._id, body });
-        expect(told.result.mentioned).toEqual([OTHER]);
+        expect(told.result.mentioned).toEqual([{ userId: OTHER, name: 'Priya Other' }]);
         expect(comment(told.result.commentId)).toMatchObject({ mentionIds: [OTHER], message: body, actorType: 'agent' });
         expect(rows(SCHEMA_TYPE.MENTIONS)).toEqual([expect.objectContaining({ comment_id: told.result.commentId, mentionIds: [OTHER], taskId: fx.top._id, userId: OWNER })]);
 

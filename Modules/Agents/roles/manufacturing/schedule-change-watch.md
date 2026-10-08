@@ -3,6 +3,7 @@ slug: schedule-change-watch
 name: Schedule Change Watch
 blueprint: manufacturing
 department: Production planning
+team: planning
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.history, task.relations.list, tags.list, page.get, pages.search, task.comment, task.tags.add, task.relation.add]
 hands_to: [production-planner, customer-update-writer]
 gates: [the planner decides every change to the approved plan]

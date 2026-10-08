@@ -3,6 +3,7 @@ slug: customer-update-writer
 name: Customer Update Writer
 blueprint: manufacturing
 department: Sales and orders
+team: sales-orders
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.history, task.relations.list, page.get, pages.search, page.create, page.update, task.link, task.comment, task.assign]
 hands_to: []
 gates: [a person in customer service reads and sends every customer message]

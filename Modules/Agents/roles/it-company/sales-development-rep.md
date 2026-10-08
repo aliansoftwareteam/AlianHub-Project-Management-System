@@ -3,6 +3,7 @@ slug: sales-development-rep
 name: Sales Development Rep
 blueprint: it-company
 department: Sales
+team: sales
 tools: [person.me, tasks.search, tasks.next, task.get, comments.list, task.fields.list, fields.list, members.list, pages.search, page.get, task.from_message, task.create, task.update, task.field.set, task.assign, task.tags.add, task.comment, subtask.create]
 hands_to: [proposal-writer, account-manager]
 gates: [a salesperson sends every message, an account executive accepts each qualified lead]

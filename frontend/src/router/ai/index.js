@@ -42,6 +42,12 @@ export default [
         meta: { title: 'Route tasks to agents', requiresAuth: true }
     },
     {
+        path: '/:cid/ai/team-packs',
+        name: 'AiTeamPacks',
+        component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiTeamPacks.vue'),
+        meta: { title: 'Team packs', requiresAuth: true }
+    },
+    {
         path: '/:cid/ai/ask',
         name: 'AiAsk',
         component: () => import(/* webpackChunkName: "ai" */ '@/views/Ai/AskPage.vue'),
