@@ -18,6 +18,30 @@ export const fetchTaskRouting = (taskId) => apiRequest("get", `${BASE}/task/${ta
 
 export const actOnRouting = (taskId, decisionId, action, body = {}) => apiRequest("post", `${BASE}/task/${taskId}/decisions/${decisionId}/${action}`, body).then(dataOf);
 
+/* A blueprint's display name; one the locales do not know yet shows as its slug. */
+export const blueprintName = (t, te, blueprint) => {
+    const key = `Blueprints.${String(blueprint || "").replace(/-/g, "_")}`;
+    return te(key) ? t(key) : String(blueprint || "");
+};
+
+export const teamName = (t, te, team) => {
+    const key = `Teams.${String(team || "").replace(/-/g, "_")}`;
+    return te(key) ? t(key) : String(team || "");
+};
+
+export const fetchTeamPacks = () => apiRequest("get", `${BASE}/team-packs`, undefined).then(dataOf);
+
+export const applyTeamPack = (body) => apiRequest("post", `${BASE}/team-packs`, body).then(dataOf);
+
+/* Turns off only what `applied` (the answer of applyTeamPack) turned on. */
+export const undoTeamPack = (applied) => apiRequest("post", `${BASE}/team-packs`, {
+    undo: true,
+    blueprint: applied.blueprint,
+    teams: applied.teams,
+    projectIds: applied.projects.map((project) => project.projectId),
+    roles: Object.fromEntries(applied.projects.map((project) => [project.projectId, project.added]))
+}).then(dataOf);
+
 export const DISPATCHER_CHANGED_EVENT = "dispatcherChanged";
 
 /* Calls `onChange` whenever the dispatcher's decisions or settings change in the company; the socket is replaced on reconnect. */
