@@ -1,6 +1,6 @@
 # Handoff: where to start next session
 
-Updated 2026-10-08 15:00 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
+Updated 2026-10-08 16:15 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
 
 ## State
 
@@ -8,13 +8,13 @@ Updated 2026-10-08 15:00 IST. Read this first, then `Tasks/index.md` and the two
   - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent is the person's own Claude or ChatGPT over MCP (decision 30). **The first measured run is done: 15 of 15 pass** (13 on the first try, jobs 8 and 19 after #1568), in `ai-1-run-1-results.md`.
   - Task 048, "Team agent packs" (`Tasks/active/048-team-agent-packs/`): role agents per team, workflows between them, one dispatcher, company blueprints. Part 1 (44 playbooks, IT company and Manufacturing) is #1572, waiting for the owner to read it. Step 2 (each role as an MCP prompt and a downloadable skill, behind `MCP_ROLE_PROMPTS`) is #1574, reviewed, waiting on #1572. Part 3, the dispatcher in suggest mode, is with an agent on top of #1574.
   - Task 046, "great next to ClickUp": no new parity features; fixes, proof and the held PRs remain.
-- **`beta` is at build 822** (#1578). This docs PR becomes the next build.
-- **Live on localhost: build 822.** Nothing is merged and not built. Start the server only with the "alianhub-api" launch entry: it now unsets the `ANTHROPIC_MODEL` that Claude Code passes down (it had made the server use "opusplan").
+- **`beta` is at build 825** (#1582). This docs PR becomes the next build.
+- **Live on localhost: build 825**, with `DISPATCHER=on` and `MCP_ROLE_PROMPTS=on` in the owner's `.env` (approved by the owner). Nothing is merged and not built. Start the server only with the "alianhub-api" launch entry: it now unsets the `ANTHROPIC_MODEL` that Claude Code passes down (it had made the server use "opusplan").
 - **The owner's local `.env`, changed at the owner's request on 2026-10-08:** the MCP flags (`MCP_OAUTH=both`, issuer localhost:4000, `MCP_TOOLS_DATA/MANAGE/WORK=on`, `MCP_OAUTH_DCR=on`), and the AI provider switched to Anthropic: `LLM_PROVIDER="anthropic"`, `ANTHROPIC_MODEL="claude-sonnet-5-5"`, its price $2/$10 per million in `LLM_PRICING`. The key is in the admin field only; the `.env` key line stays empty. A backup of the old `.env` is in the private handoff folder.
 - **The owner's Claude Code is connected** as `alianhub-oauth` (user scope, OAuth, Manage tasks, Write docs, Read chat). Measured runs: `claude -p "<sentence>" --allowedTools "mcp__alianhub-oauth" --max-turns 40 --output-format json`, from `~`, with the browser pane on the job's start screen.
-- `docs/API.md` and `docs/api/openapi.json` are in sync with build 822.
+- `docs/API.md` and `docs/api/openapi.json` are in sync with build 825.
 
-## Merged since the last handoff (builds 773 to 822)
+## Merged since the last handoff (builds 773 to 825)
 
 | Build | PR | What it carried |
 |---|---|---|
@@ -55,6 +55,9 @@ Updated 2026-10-08 15:00 IST. Read this first, then `Tasks/index.md` and the two
 | 820 | #1573 | The docs PR for builds 816 to 819, the AI-1 results and the 048 plan |
 | 821 | #1577, thirty-second batch | Same-named fields asked (#1575); `tag.create` and search by tag, priority and field (#1576) |
 | 822 | #1578 | A view approved elsewhere shows in the open project when its tab is seen again |
+| 823 | #1579 | The docs PR for builds 820 to 822 |
+| 824 | #1580 | A paused project says so; the sidebar catches up after a hidden tab |
+| 825 | #1582, thirty-third batch | 048: 44 role playbooks (#1572), role prompts and skills behind `MCP_ROLE_PROMPTS` (#1574), the dispatcher in suggest mode behind `DISPATCHER` (#1581) |
 
 Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choices they made are in 047's `progress.md`, under "Choices to review".
 
@@ -65,7 +68,6 @@ Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choice
 | #1572, thirty-first batch | Task 048 part 1: 22 IT company and 22 Manufacturing role playbooks (#1570, #1571) and the convention test `tests/conventions/role-playbooks.test.js` | Reviewed and fixed; **held for the owner to read** each set before it merges |
 | #1306 | The installable app shell | **Held.** It merges alone, after its own rebuild and the 14 checks in `.claude/test-cases/PWA.md` |
 | #1364 | A cloud run's API reference catch-up | Replaced. Close it |
-| #1574 | 048 step 2: role prompts and skills for the connected AI | Reviewed and fixed; merges after #1572 |
 | This PR | The beta log for builds 820 to 822, 047 and 048 progress, this handoff | Not a draft, docs only |
 
 ## The combined-PR method
