@@ -79,6 +79,7 @@ const seedProject = (doc = {}) => mockDb.seed(SCHEMA_TYPE.PROJECTS, {
 });
 
 const dispatcherOf = (project) => (mockDb.store[SCHEMA_TYPE.ASSIGNMENT_RULES] || []).find((row) => String(row.projectId) === String(project._id))?.dispatcher;
+const store = (type) => mockDb.store[type] || [];
 const audited = () => recordAudit.mock.calls.map(([companyId, entry]) => ({ companyId, ...entry })).filter((entry) => entry.action.startsWith('dispatcher.pack_'));
 const applyPack = (projects, { uid = EDITOR, teams = ['engineering'], extra } = {}) => call('POST', PACKS, {
     uid, extra, body: { blueprint: 'it-company', teams, projectIds: projects.map((project) => String(project._id)) },
@@ -174,7 +175,7 @@ describe('team packs', () => {
         seedRules(GRANTS);
         const mine = seedProject();
         const other = seedProject({ AssigneeUserId: [OWNER] });
-        const res = await call('POST', PACKS, { body: { undo: true, projectIds: [String(mine._id)], roles: { [String(other._id)]: [TRIAGER] } } });
+        const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: [String(mine._id)], roles: { [String(other._id)]: [TRIAGER] } } });
         expect(res.statusCode).toBe(400);
     });
 
@@ -189,6 +190,52 @@ describe('team packs', () => {
         const admin = await applyPack([open, closed], { uid: OWNER });
         expect(admin.statusCode).toBe(200);
         expect(dispatcherOf(closed).roles).toEqual(engineering);
+    });
+
+    it('writes no project when one project\'s new settings would not save, and names that project', async () => {
+        seedRules(GRANTS);
+        const good = seedProject();
+        const broken = seedProject();
+        mockDb.seed(SCHEMA_TYPE.ASSIGNMENT_RULES, { projectId: String(broken._id), entries: [], dispatcher: { mode: 'suggest', roles: [], rules: [{ role: 'it-company/nobody', when: { tags: ['x'] } }] } });
+        recordAudit.mockClear();
+        const res = await applyPack([good, broken]);
+        expect(res.statusCode).toBe(400);
+        expect(res.body.statusText).toContain(`Project ${broken._id}`);
+        expect(dispatcherOf(good)).toBeUndefined();
+        expect(dispatcherOf(broken).roles).toEqual([]);
+        expect(audited()).toEqual([]);
+    });
+
+    it('undoes only roles of the named pack, and refuses a pack that does not exist', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await call('PUT', SETTINGS, { params: { projectId: String(project._id) }, body: { mode: 'suggest', threshold: 80, roles: [DESIGN_LEAD, TRIAGER], rules: [] } });
+        recordAudit.mockClear();
+        const id = String(project._id);
+        const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['design'], projectIds: [id], roles: { [id]: [DESIGN_LEAD, TRIAGER] } } });
+        expect(res.body.data.projects).toEqual([{ projectId: id, removed: [DESIGN_LEAD], mode: 'suggest' }]);
+        expect(dispatcherOf(project).roles).toEqual([TRIAGER]);
+        expect(audited()).toEqual([expect.objectContaining({ action: 'dispatcher.pack_undone', entityId: 'it-company', meta: expect.objectContaining({ blueprint: 'it-company', teams: ['design'] }) })]);
+
+        recordAudit.mockClear();
+        const unknown = await call('POST', PACKS, { body: { undo: true, blueprint: 'made-up', teams: ['design'], projectIds: [id], roles: { [id]: [TRIAGER] } } });
+        expect(unknown.statusCode).toBe(400);
+        expect(dispatcherOf(project).roles).toEqual([TRIAGER]);
+        expect(audited()).toEqual([]);
+    });
+
+    it('cleans the project list before the permission check: at most 50, no repeats, lower-case', async () => {
+        seedRules(GRANTS);
+        const many = Array.from({ length: 51 }, () => oid());
+        const tooMany = await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering'], projectIds: many } });
+        expect(tooMany.statusCode).toBe(400);
+
+        const project = seedProject();
+        const id = String(project._id);
+        const res = await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering'], projectIds: [id.toUpperCase(), id] } });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.data.projects.map((one) => one.projectId)).toEqual([id]);
+        expect(store(SCHEMA_TYPE.ASSIGNMENT_RULES).map((row) => row.projectId)).toEqual([id]);
     });
 
     it('refuses a member whose role may not change project details', async () => {

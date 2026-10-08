@@ -20,9 +20,25 @@ const packs = () => {
 };
 
 const projectIdsOf = (body) => {
-    const ids = Array.isArray(body && body.projectIds) ? body.projectIds.map(String) : [];
-    if (!ids.length || ids.length > MAX_PROJECTS || !ids.every((id) => OBJECT_ID.test(id))) throw new RuleError(`projectIds must list from 1 to ${MAX_PROJECTS} projects.`);
-    return [...new Set(ids)];
+    const given = Array.isArray(body && body.projectIds) ? body.projectIds : [];
+    const ids = [...new Set(given.map((id) => String(id).trim().toLowerCase()))];
+    if (!ids.length || given.length > MAX_PROJECTS || !ids.every((id) => OBJECT_ID.test(id))) throw new RuleError(`projectIds must list from 1 to ${MAX_PROJECTS} projects.`);
+    return ids;
+};
+
+/* Runs before the per-project permission check, so the check sees the same short, clean list the handler uses. */
+const normaliseProjectIds = (req, res, next) => {
+    try {
+        const body = req.body || {};
+        body.projectIds = projectIdsOf(body);
+        if (body.roles && typeof body.roles === 'object' && !Array.isArray(body.roles)) {
+            body.roles = Object.fromEntries(Object.entries(body.roles).map(([id, roles]) => [String(id).trim().toLowerCase(), roles]));
+        }
+        req.body = body;
+        return next();
+    } catch (error) {
+        return res.status(error.statusCode || 400).json({ status: false, statusText: error.message, message: error.message });
+    }
 };
 
 const rolesOfPack = (body) => {
@@ -35,40 +51,52 @@ const rolesOfPack = (body) => {
     return { blueprint: pack.blueprint, teams: asked, roles: pack.teams.filter((one) => asked.includes(one.team)).flatMap((one) => one.roles.map((role) => role.key)) };
 };
 
-const saveRoles = (companyId, projectId, current, roles, actorId) => settings.save(companyId, projectId, {
-    mode: current.mode, threshold: current.threshold, modelGuess: current.modelGuess, rules: current.rules, roles,
-}, actorId);
+const bodyWith = (current, roles) => ({ mode: current.mode, threshold: current.threshold, modelGuess: current.modelGuess, rules: current.rules, roles });
+
+/* Every project's new settings are checked before any is written, so a pack lands in all of its projects or in none. */
+async function writeAll(companyId, plans, actorId) {
+    plans.filter((plan) => plan.body).forEach((plan) => {
+        try {
+            settings.validate(plan.body);
+        } catch (error) {
+            throw new RuleError(`Project ${plan.projectId}: ${error.message}`, error.statusCode || 400);
+        }
+    });
+    for (const plan of plans.filter((one) => one.body)) await settings.save(companyId, plan.projectId, plan.body, actorId);
+}
 
 /* Turns the pack's roles on and nothing else: the mode stays as the project has it, so a project whose dispatcher is
  * off routes nothing until a person switches it on. A project that already has every role is left unwritten. */
 async function apply(companyId, body, actorId) {
     const projectIds = projectIdsOf(body);
     const pack = rolesOfPack(body);
-    const projects = [];
+    const plans = [];
     for (const projectId of projectIds) {
         const current = await settings.load(companyId, projectId);
         const kept = current.roles.filter((key) => settings.roleOf(key));
         const added = pack.roles.filter((key) => !kept.includes(key));
-        if (added.length) await saveRoles(companyId, projectId, current, [...kept, ...added], actorId);
-        projects.push({ projectId, added, mode: current.mode });
+        plans.push({ projectId, added, mode: current.mode, body: added.length ? bodyWith(current, [...kept, ...added]) : null });
     }
-    return { blueprint: pack.blueprint, teams: pack.teams, projects };
+    await writeAll(companyId, plans, actorId);
+    return { blueprint: pack.blueprint, teams: pack.teams, projects: plans.map(({ projectId, added, mode }) => ({ projectId, added, mode })) };
 }
 
-/* Turns off only the roles a pack turned on, as its answer listed them. */
+/* Turns off the roles a pack turned on, as its answer listed them, and never a role outside that pack. */
 async function undo(companyId, body, actorId) {
     const projectIds = projectIdsOf(body);
+    const pack = rolesOfPack(body);
     const given = body.roles && typeof body.roles === 'object' && !Array.isArray(body.roles) ? body.roles : {};
     if (Object.keys(given).some((id) => !projectIds.includes(id))) throw new RuleError('roles may name only the projects in projectIds.');
-    const projects = [];
+    const plans = [];
     for (const projectId of projectIds) {
-        const asked = Array.isArray(given[projectId]) ? given[projectId].map(String) : [];
+        const asked = (Array.isArray(given[projectId]) ? given[projectId].map(String) : []).filter((key) => pack.roles.includes(key));
         const current = await settings.load(companyId, projectId);
         const removed = current.roles.filter((key) => asked.includes(key));
-        if (removed.length) await saveRoles(companyId, projectId, current, current.roles.filter((key) => !removed.includes(key) && settings.roleOf(key)), actorId);
-        projects.push({ projectId, removed, mode: current.mode });
+        const body = removed.length ? bodyWith(current, current.roles.filter((key) => !removed.includes(key) && settings.roleOf(key))) : null;
+        plans.push({ projectId, removed, mode: current.mode, body });
     }
-    return { projects };
+    await writeAll(companyId, plans, actorId);
+    return { blueprint: pack.blueprint, teams: pack.teams, projects: plans.map(({ projectId, removed, mode }) => ({ projectId, removed, mode })) };
 }
 
-module.exports = { MAX_PROJECTS, packs, apply, undo };
+module.exports = { MAX_PROJECTS, packs, normaliseProjectIds, apply, undo };

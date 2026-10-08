@@ -28,7 +28,7 @@ exports.init = (app) => {
     app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo', byPerson('undo'), assignsTask, controller.actOnDecision('undo'));
 
     app.get('/api/v2/assignment-rules/dispatcher/team-packs', dispatcher.getPacks);
-    app.post('/api/v2/assignment-rules/dispatcher/team-packs', agentsRefused('project.settings'), dispatcher.whenOnForPacks, editsEveryProject, dispatcher.applyPack);
+    app.post('/api/v2/assignment-rules/dispatcher/team-packs', agentsRefused('project.settings'), dispatcher.whenOnForPacks, dispatcher.normaliseProjectIds, editsEveryProject, dispatcher.applyPack);
     app.get('/api/v2/assignment-rules/dispatcher/project/:projectId', readsProject, dispatcher.getSettings);
     app.put('/api/v2/assignment-rules/dispatcher/project/:projectId', agentsRefused('project.settings'), dispatcher.whenOn, editsRules, dispatcher.saveSettings);
     app.post('/api/v2/assignment-rules/dispatcher/project/:projectId/rules', agentsRefused('project.settings'), dispatcher.whenOn, editsRules, dispatcher.addRule);

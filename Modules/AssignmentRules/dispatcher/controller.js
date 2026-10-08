@@ -37,6 +37,8 @@ exports.getPacks = (req, res) => {
     }
 };
 
+exports.normaliseProjectIds = packs.normaliseProjectIds;
+
 exports.applyPack = async (req, res) => {
     try {
         const actor = await signedIn(req, res);
@@ -48,8 +50,8 @@ exports.applyPack = async (req, res) => {
         const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length);
         if (changed.length) {
             audit.packChanged(companyId, actor, undone, {
-                blueprint: undone ? String(body.blueprint || '') : result.blueprint,
-                teams: undone ? (Array.isArray(body.teams) ? body.teams.map(String) : []) : result.teams,
+                blueprint: result.blueprint,
+                teams: result.teams,
                 projects: changed.map((project) => ({ projectId: project.projectId, roles: undone ? project.removed : project.added })),
             });
         }
