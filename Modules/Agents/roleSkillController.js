@@ -7,11 +7,10 @@ const roleSkill = require('./roleSkill');
 
 const fail = (res, message, code) => res.status(code).send({ status: false, statusText: message, message });
 
-/* GET /api/v2/agents/roles/:blueprint/:slug/skill — one role playbook as a Claude skill zip. */
 exports.downloadRoleSkill = async (req, res) => {
     try {
-        const companyId = tenantOf(req);
         if (!rolesFlag.enabled()) return fail(res, 'Role skills are not available on this server.', 404);
+        const companyId = tenantOf(req);
         const caller = await callerOf(req, companyId);
         if (!caller.human || !(caller.member || caller.privileged)) return fail(res, 'Only a member of this workspace can download a role.', 403);
         const role = rolePlaybooks.find(req.params.blueprint, req.params.slug);

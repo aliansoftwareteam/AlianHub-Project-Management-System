@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const logger = require('../../Config/loggerConfig');
 
 const ROOT = path.join(__dirname, 'roles');
 const KEYS = ['slug', 'name', 'blueprint', 'department', 'tools', 'hands_to', 'gates'];
@@ -47,14 +48,21 @@ const parse = (text, rel) => {
     };
 };
 
-const readAll = (root = ROOT) => {
-    const roles = filesUnder(root).sort().map((file) => parse(fs.readFileSync(file, 'utf8'), path.relative(root, file)));
+/* A broken playbook is left out and reported, so one bad file never takes the other roles or the prompt list down. */
+const readAll = (root = ROOT, report = (message) => logger.error(message)) => {
     const seen = new Map();
-    roles.forEach((role) => {
-        if (seen.has(role.slug)) throw new PlaybookError(`Role playbook ${role.blueprint}/${role.slug}.md: the slug "${role.slug}" is also used by ${seen.get(role.slug)}/${role.slug}.md`);
-        seen.set(role.slug, role.blueprint);
+    const roles = filesUnder(root).sort().flatMap((file) => {
+        try {
+            const role = parse(fs.readFileSync(file, 'utf8'), path.relative(root, file));
+            if (seen.has(role.slug)) throw new PlaybookError(`Role playbook ${role.blueprint}/${role.slug}.md: the slug "${role.slug}" is also used by ${seen.get(role.slug)}/${role.slug}.md`);
+            seen.set(role.slug, role.blueprint);
+            return [Object.freeze(role)];
+        } catch (error) {
+            report(error instanceof PlaybookError ? error.message : `Role playbook ${path.relative(root, file)}: ${error.message}`);
+            return [];
+        }
     });
-    return Object.freeze(roles.map((role) => Object.freeze(role)));
+    return Object.freeze(roles);
 };
 
 let cached = null;
@@ -65,7 +73,6 @@ const all = () => {
 
 const find = (blueprint, slug) => all().find((role) => role.blueprint === String(blueprint) && role.slug === String(slug)) || null;
 
-/* The whole sentences of the "Who it is" paragraph that fit in `max` characters. */
 const summary = (role, max) => {
     const who = ((role.body.split(/^## Who it is\s*$/m)[1] || '').split(/^## /m)[0].trim().split(/\n\s*\n/)[0] || '').replace(/\s+/g, ' ').trim();
     const sentences = who.match(/[^.!?]+[.!?]+(?=\s|$)/g) || [who];

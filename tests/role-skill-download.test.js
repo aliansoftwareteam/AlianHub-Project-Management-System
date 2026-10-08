@@ -76,6 +76,7 @@ describe('downloading a role as a Claude skill', () => {
         const r = await download();
         expect(r.code).toBe(404);
         expect(r.body.status).toBe(false);
+        expect((await download({ headers: {}, aud: undefined })).code).toBe(404);
     });
 
     it('answers 404 for a role that does not exist', async () => {

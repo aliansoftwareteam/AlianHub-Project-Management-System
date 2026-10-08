@@ -1,3 +1,5 @@
+jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
+
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -51,17 +53,60 @@ describe('the role playbook loader', () => {
         expect(rolePlaybooks.parse(PLAYBOOK(GOOD_META), 'demo/tester.md')).toMatchObject({ slug: 'tester', tools: ['task.get'], gates: [] });
     });
 
-    it('refuses two roles with one slug, since the slug names the prompt', () => {
+    const folderOf = (files) => {
         const root = fs.mkdtempSync(path.join(os.tmpdir(), 'roles-'));
+        Object.entries(files).forEach(([rel, text]) => {
+            fs.mkdirSync(path.join(root, path.dirname(rel)), { recursive: true });
+            fs.writeFileSync(path.join(root, rel), text);
+        });
+        return root;
+    };
+
+    it('leaves out a broken playbook and reports it once, keeping the others', () => {
+        const root = folderOf({ 'demo/tester.md': PLAYBOOK(GOOD_META), 'demo/broken.md': '# no frontmatter' });
         try {
-            ['demo', 'other'].forEach((blueprint) => {
-                fs.mkdirSync(path.join(root, blueprint));
-                fs.writeFileSync(path.join(root, blueprint, 'tester.md'), PLAYBOOK(GOOD_META.replace('blueprint: demo', `blueprint: ${blueprint}`)));
-            });
-            expect(() => rolePlaybooks.readAll(root)).toThrow('the slug "tester" is also used by demo/tester.md');
+            const report = jest.fn();
+            expect(rolePlaybooks.readAll(root, report).map((role) => role.slug)).toEqual(['tester']);
+            expect(report.mock.calls).toEqual([['Role playbook demo/broken.md: it does not open with a --- frontmatter block']]);
         } finally {
             fs.rmSync(root, { recursive: true, force: true });
         }
+    });
+
+    it('keeps the first of two roles with one slug, since the slug names the prompt', () => {
+        const root = folderOf({
+            'demo/tester.md': PLAYBOOK(GOOD_META),
+            'other/tester.md': PLAYBOOK(GOOD_META.replace('blueprint: demo', 'blueprint: other')),
+        });
+        try {
+            const report = jest.fn();
+            expect(rolePlaybooks.readAll(root, report).map((role) => role.blueprint)).toEqual(['demo']);
+            expect(report.mock.calls).toEqual([['Role playbook other/tester.md: the slug "tester" is also used by demo/tester.md']]);
+        } finally {
+            fs.rmSync(root, { recursive: true, force: true });
+        }
+    });
+});
+
+describe('a broken playbook in the shipped folder', () => {
+    it('drops only that role from the prompt list, logs it once and reads the folder once', () => {
+        set(['MCP_ROLE_PROMPTS', ...EVERYTHING]);
+        jest.isolateModules(() => {
+            const realFs = jest.requireActual('fs');
+            const readFileSync = jest.fn((file, ...rest) => (String(file).endsWith(path.join('it-company', 'bug-triager.md')) ? '# broken' : realFs.readFileSync(file, ...rest)));
+            jest.doMock('fs', () => ({ ...realFs, readFileSync }));
+            const logger = require('../Config/loggerConfig');
+            const freshPrompts = require('../Modules/Mcp/prompts');
+            const names = () => freshPrompts.list(manager()).map((prompt) => prompt.name);
+            const first = names();
+            const reads = readFileSync.mock.calls.filter(([file]) => String(file).endsWith('.md')).length;
+            expect(names()).toEqual(first);
+            expect(readFileSync.mock.calls.filter(([file]) => String(file).endsWith('.md')).length).toBe(reads);
+            expect(first).toEqual(expect.arrayContaining([...freshPrompts.PROMPTS.map((prompt) => prompt.name), 'work_as_tech_lead']));
+            expect(first).not.toContain('work_as_bug_triager');
+            expect(logger.error.mock.calls.filter(([message]) => /bug-triager\.md/.test(message))).toEqual([['Role playbook it-company/bug-triager.md: it does not open with a --- frontmatter block']]);
+            jest.dontMock('fs');
+        });
     });
 });
 
@@ -89,6 +134,14 @@ describe('role prompts for a connected AI', () => {
         expect(roleNames(personal(['read']))).toEqual([]);
         set(['MCP_ROLE_PROMPTS']);
         expect(roleNames(manager())).toEqual([]);
+    });
+
+    it('answers null for a role prompt the connection is not offered', () => {
+        set(['MCP_ROLE_PROMPTS', ...EVERYTHING]);
+        expect(roleNames(manager())).not.toContain('work_as_feedback_collector');
+        expect(prompts.get(manager(), 'work_as_feedback_collector', { request: 'this week' })).toBeNull();
+        expect(prompts.get(personal(['read']), 'work_as_bug_triager', {})).toBeNull();
+        expect(prompts.get(manager(), 'work_as_bug_triager', {})).not.toBeNull();
     });
 
     it('carries the playbook and what the person asked for', () => {
