@@ -11,13 +11,14 @@ const guess = require('./guess');
 const queue = require('./queue');
 const audit = require('./audit');
 const { tagNames } = require('../engine');
+const { isClosedTask } = require('../../Tasks/helpers/taskSignals');
 
 const LOG_PREFIX = '[dispatcher]';
 const DUPLICATE_KEY = 11000;
 const WATCHED_FIELDS = Object.freeze(['TaskName', 'rawDescription', 'TaskType', 'TaskTypeKey', 'tagsArray', 'Task_Priority', 'statusKey', 'status', 'sprintId', 'customField']);
 const TASK_FIELDS = {
     TaskName: 1, TaskKey: 1, rawDescription: 1, TaskType: 1, TaskTypeKey: 1, tagsArray: 1, Task_Priority: 1, statusKey: 1,
-    sprintId: 1, customField: 1, ProjectID: 1, deletedStatusKey: 1, mainChat: 1,
+    sprintId: 1, customField: 1, ProjectID: 1, deletedStatusKey: 1, mainChat: 1, statusType: 1, status: 1,
 };
 /* Decisions a lead has not acted on yet; a newer decision for the same task replaces them. */
 const WAITING = Object.freeze(['suggested', 'needs_routing']);
@@ -104,7 +105,10 @@ async function route({ companyId, taskId, trigger = 'create' }) {
     const settings = await rulesOf.load(companyId, task.ProjectID);
     if (settings.mode === 'off') return skip('off');
     if (await queue.paused(companyId, task.ProjectID)) return skip('paused');
-    if (await queue.queuedRole(companyId, task)) return skip('queued');
+    if (isClosedTask(task)) return skip('closed');
+    const inQueue = await queue.standing(companyId, task);
+    if (inQueue.role) return skip('queued');
+    if (inQueue.left) return skip('left_queue');
     const inputHash = hashOf(task, settings.revision);
     const seen = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.DISPATCH_DECISIONS, data: [{ taskId: String(task._id), inputHash }, { _id: 1 }] }, 'findOne');
     if (seen) return skip('decided');

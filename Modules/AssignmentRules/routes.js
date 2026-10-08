@@ -12,6 +12,8 @@ const readsProject = requireProjectAccess({ mode: READ, projectIds: ofProject })
 const editsRules = requireProjectAccess({ projectIds: ofProject, permissions: () => [DETAILS] });
 const readsTask = requireProjectAccess({ mode: READ, projectIds: ofTask });
 const assignsTask = requireProjectAccess({ projectIds: ofTask, permissions: () => ['task.task_assignee'] });
+/* A lead, for the dispatcher, is whoever may change the project's details. */
+const leadsTaskProject = requireProjectAccess({ projectIds: ofTask, permissions: () => [DETAILS] });
 const byPerson = (action) => decidedByPerson(`assignment.suggestion.${action}`);
 const { agentsRefused } = require('../Agents/guard');
 
@@ -29,8 +31,8 @@ exports.init = (app) => {
     app.post('/api/v2/assignment-rules/dispatcher/project/:projectId/rules', dispatcher.whenOn, agentsRefused('project.settings'), editsRules, dispatcher.addRule);
     app.get('/api/v2/assignment-rules/dispatcher/project/:projectId/needs-routing', readsProject, dispatcher.getNeedsRouting);
     app.get('/api/v2/assignment-rules/dispatcher/task/:taskId', readsTask, dispatcher.getTaskDecision);
-    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/accept', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.accept'), assignsTask, dispatcher.actOnDecision('accept'));
-    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/dismiss', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.dismiss'), assignsTask, dispatcher.actOnDecision('dismiss'));
-    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/route', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.route'), assignsTask, dispatcher.actOnDecision('route'));
+    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/accept', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.accept'), leadsTaskProject, dispatcher.actOnDecision('accept'));
+    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/dismiss', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.dismiss'), leadsTaskProject, dispatcher.actOnDecision('dismiss'));
+    app.post('/api/v2/assignment-rules/dispatcher/task/:taskId/decisions/:decisionId/route', dispatcher.whenOn, decidedByPerson('dispatcher.suggestion.route'), leadsTaskProject, dispatcher.actOnDecision('route'));
     logger.info('AssignmentRules routes initialised');
 };

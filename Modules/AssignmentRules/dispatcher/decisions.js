@@ -8,6 +8,7 @@ const settingsOf = require('./settings');
 const gate = require('./gate');
 const queue = require('./queue');
 const audit = require('./audit');
+const { isClosedTask } = require('../../Tasks/helpers/taskSignals');
 
 /* The same lead choice this many times for one task type, and the dispatcher offers it as a rule. */
 const OFFER_AFTER = 3;
@@ -71,6 +72,7 @@ async function loadForAction(companyId, uid, taskId, decisionId) {
     }, 'findOne'));
     if (!decision) throw new RuleError('Suggestion not found.', 404);
     if (String(decision.projectId) !== String(task.ProjectID)) throw new RuleError('This task has moved to another project since the suggestion was made.', 409);
+    if ((await settingsOf.load(companyId, task.ProjectID)).mode === 'off') throw new RuleError('The dispatcher is off in this project, so its suggestions can no longer be acted on.', 409);
     return { task, decision };
 }
 
@@ -90,20 +92,25 @@ async function transition(companyId, decision, to, actorId, more = {}) {
 
 async function assertCanRoute(companyId, task, role) {
     const settings = await settingsOf.load(companyId, task.ProjectID);
+    if (isClosedTask(task)) throw new RuleError('This task is done, so it is not routed to an agent.', 409);
     if (gate.roleProblem(settings, role)) throw new RuleError('That role is not on for this project.', 409);
     if (await queue.paused(companyId, task.ProjectID)) throw new RuleError('Agents are paused in this project.', 409);
     return settings;
 }
 
-const restore = (companyId, decision) => MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.DISPATCH_DECISIONS,
-    data: [{ _id: decision._id }, { $set: { state: decision.state, resolvedBy: '', chosenRole: decision.chosenRole || null, updatedAt: new Date() } }],
-}, 'updateOne');
+/* A queue write that failed after the claim gives the decision back to the leads, waiting as it was. */
+async function restore(companyId, decision) {
+    await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.DISPATCH_DECISIONS,
+        data: [{ _id: decision._id }, { $set: { state: decision.state, resolvedBy: '', chosenRole: decision.chosenRole || null, agentId: decision.agentId || null, updatedAt: new Date() }, $unset: { resolvedAt: '' } }],
+    }, 'updateOne');
+    gate.announce(companyId, decision);
+}
 
 async function queueAs(companyId, actor, task, decision, to, role, agentId) {
     const done = await transition(companyId, decision, to, actor.id, to === 'routed' ? { chosenRole: role, agentId } : {});
     try {
-        await queue.put(companyId, task, { role, agentId, by: actor.id });
+        await queue.put(companyId, task, { role, agentId, by: actor.id, byPerson: true });
     } catch (error) {
         await restore(companyId, decision);
         throw error;

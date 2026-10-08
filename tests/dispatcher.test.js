@@ -298,6 +298,33 @@ describe('dispatcher: the gate', () => {
         expect(adapter.chat).not.toHaveBeenCalled();
     });
 
+    it('never routes a task that is done or closed', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await saveSettings(project, { mode: 'apply' });
+        expect(await routeTask(seedTask(project, { statusType: 'close' }))).toEqual({ skipped: 'closed' });
+        expect(await routeTask(seedTask(project, { statusType: 'done' }))).toEqual({ skipped: 'closed' });
+        expect(decisions()).toHaveLength(0);
+        expect(queueRows()).toHaveLength(0);
+    });
+
+    it('does not put back a task an agent finished, withdrew or a person took back; a lead can', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await saveSettings(project, { mode: 'apply' });
+        const task = seedTask(project);
+        const row = mockDb.seed(SCHEMA_TYPE.PROJECT_FINDINGS, {
+            projectId: String(project._id), key: `handed_over:${task._id}`, rule: 'handed_over', status: 'closed', taskId: String(task._id), taskIds: [String(task._id)],
+            facts: { role: TRIAGER }, leftQueue: { why: 'finished', at: new Date() },
+        });
+        expect(await routeTask(task)).toEqual({ skipped: 'left_queue' });
+        const queue = require('../Modules/AssignmentRules/dispatcher/queue');
+        expect(await queue.put(C, task, { role: TRIAGER, by: 'dispatcher' })).toBe(false);
+        expect(row.status).toBe('closed');
+        expect(await queue.put(C, task, { role: TRIAGER, by: EDITOR, byPerson: true })).toBe(true);
+        expect(queueRows()[0]).toMatchObject({ status: 'open', facts: expect.objectContaining({ role: TRIAGER, handedBy: EDITOR }) });
+    });
+
     it('does nothing with the flag off', async () => {
         seedRules(GRANTS);
         const project = seedProject();
@@ -357,14 +384,50 @@ describe('dispatcher: a lead decides', () => {
         expect(audited('dispatcher.suggestion.dismiss')).toEqual([expect.objectContaining({ actorId: EDITOR, entityId: String(task._id) })]);
     });
 
-    it('refuses someone who may not change assignees', async () => {
-        seedRules({ ...GRANTS, 'task.task_assignee': false });
+    it('leaves accept, dismiss and route to leads, who may change the project details', async () => {
+        seedRules({ ...GRANTS, 'project.project_details': false });
         const project = seedProject();
-        await saveSettings(project);
+        await saveSettings(project, {}, OWNER);
         const task = seedTask(project);
         const decision = await routeTask(task);
-        expect((await act('accept', task, decision, { uid: VIEWER })).statusCode).toBe(403);
+        for (const action of ['accept', 'dismiss', 'route']) {
+            // eslint-disable-next-line no-await-in-loop
+            expect((await act(action, task, decision, { body: { role: REVIEWER } })).statusCode).toBe(403);
+        }
         expect(decisions()[0].state).toBe('suggested');
+        expect(queueRows()).toHaveLength(0);
+        expect((await act('accept', task, decision, { uid: OWNER })).statusCode).toBe(200);
+    });
+
+    it('refuses to act on an old suggestion once the project turns the dispatcher off, and says why', async () => {
+        const { project, task, decision } = await suggested();
+        await saveSettings(project, { mode: 'off' });
+        for (const action of ['accept', 'dismiss', 'route']) {
+            // eslint-disable-next-line no-await-in-loop
+            const res = await act(action, task, decision, { body: { role: REVIEWER } });
+            expect(res.statusCode).toBe(409);
+            expect(res.body.statusText).toMatch(/dispatcher is off/);
+        }
+        expect(queueRows()).toHaveLength(0);
+    });
+
+    it('gives the decision back to the leads when the queue write fails', async () => {
+        const queue = require('../Modules/AssignmentRules/dispatcher/queue');
+        const { task, decision } = await suggested();
+        const spy = jest.spyOn(queue, 'put').mockRejectedValueOnce(new Error('queue down'));
+        expect((await act('accept', task, decision)).statusCode).toBe(500);
+        spy.mockRestore();
+        expect(decisions()[0].state).toBe('suggested');
+        expect(decisions()[0].resolvedAt).toBeUndefined();
+        expect(decisions()[0].resolvedBy).toBe('');
+        expect((await act('accept', task, decision)).statusCode).toBe(200);
+    });
+
+    it('will not route a task that is done', async () => {
+        const { task, decision } = await suggested();
+        store(SCHEMA_TYPE.TASKS).find((row) => String(row._id) === String(task._id)).statusType = 'close';
+        const res = await act('accept', task, decision);
+        expect(res.statusCode).toBe(409);
         expect(queueRows()).toHaveLength(0);
     });
 

@@ -21,10 +21,13 @@ const queueRows = (companyId, task) => {
     return find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [{ projectId: { $in: idForms([String(task.ProjectID)]) }, key: `${HANDED_OVER}:${task._id}` }]);
 };
 
-const queuedRole = async (companyId, task) => {
+/* Where the task stands in the queue: `role` while an open row holds it, `left` once a row was finished, withdrawn
+ * or taken back, which only a person may undo by routing it again. */
+const standing = async (companyId, task) => {
     const { STATUS } = require('../../Agents/manager/findings');
-    const open = (await queueRows(companyId, task)).find((row) => row.status === STATUS.OPEN && !row.leftQueue);
-    return (open && open.facts && open.facts.role) || '';
+    const rows = await queueRows(companyId, task);
+    const open = rows.find((row) => row.status === STATUS.OPEN && !row.leftQueue);
+    return { role: (open && open.facts && open.facts.role) || '', left: rows.some((row) => Boolean(row.leftQueue)) };
 };
 
 /* The least loaded in-product agent that plays the role, counted by the role items it already has; null when none plays it. */
@@ -40,22 +43,24 @@ const leastLoaded = async (companyId, role) => {
     return { id: String(agents[best]._id), name: agents[best].name || '' };
 };
 
-async function put(companyId, task, { role, agentId, by }) {
+async function put(companyId, task, { role, agentId, by, byPerson = false }) {
     const { HANDED_OVER, STATUS, open } = require('../../Agents/manager/findings');
     const facts = { taskKey: task.TaskKey || '', taskName: task.TaskName || '', handedBy: String(by), role, agentId: agentId || '' };
     const rows = await queueRows(companyId, task);
-    const standing = rows.find((row) => row.status === STATUS.OPEN);
+    if (!byPerson && rows.some((row) => row.leftQueue)) return false;
+    const held = rows.find((row) => row.status === STATUS.OPEN);
     const now = new Date();
-    if (standing) {
+    if (held) {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECT_FINDINGS,
-            data: [{ _id: new mongoose.Types.ObjectId(String(standing._id)) }, { $set: { 'facts.role': role, 'facts.agentId': agentId || '' }, $unset: { leftQueue: '' } }],
+            data: [{ _id: new mongoose.Types.ObjectId(String(held._id)) }, { $set: { 'facts.role': role, 'facts.agentId': agentId || '' }, $unset: { leftQueue: '' } }],
         }, 'updateOne');
     } else {
         const closed = rows.find((row) => row.status === STATUS.CLOSED) || null;
         await open(companyId, String(task.ProjectID), { key: `${HANDED_OVER}:${task._id}`, rule: HANDED_OVER, taskId: String(task._id), taskIds: [String(task._id)], facts }, now, closed);
     }
     require('../../Agents/manager/workQueue').announce(companyId);
+    return true;
 }
 
-module.exports = { paused, queuedRole, leastLoaded, put };
+module.exports = { paused, standing, leastLoaded, put };
