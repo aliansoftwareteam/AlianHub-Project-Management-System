@@ -451,14 +451,14 @@ const fillRollup = async (companyId, field) => {
     return Object.keys(out).length;
 };
 
-/* A formula made or changed after the values it reads were entered: at most ROLLUP_FILL_LIMIT tasks of its projects
- * are worked out at once, a batch at a time, with every rollup above them; the rest fill in as they change. */
+/* A formula made or changed after the values it reads were entered: the newest ROLLUP_FILL_LIMIT live tasks of its
+ * projects are worked out at once, a batch at a time, with every rollup above them; the rest fill in as they change. */
 const fillFormula = async (companyId, field) => {
     const inProjects = fieldProjectsFilter(field);
     if (!inProjects) return 0;
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ ...inProjects, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }, { _id: 1 }, { limit: ROLLUP_FILL_LIMIT, lean: true }]
+        data: [{ ...inProjects, deletedStatusKey: { $nin: [1, 2, 3] }, mainChat: { $ne: true } }, { _id: 1 }, { sort: { _id: -1 }, limit: ROLLUP_FILL_LIMIT, lean: true }]
     }, "find") || [];
     const ids = rows.map((row) => String(row._id));
     let filled = 0;

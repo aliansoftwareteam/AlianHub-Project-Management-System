@@ -95,8 +95,8 @@ const shownProblem = (given) => {
     return setup.lookProblem(args);
 };
 
-const notSaved = (kind) => `No saved view of this project shows its ${kind} view that way, and a link carries no grouping or filter of its own, so this one opens the ${kind} view as it is.`
-    + (registry.has(SAVED_VIEW)
+const notSaved = (kind, offer) => `No saved view of this project shows its ${kind} view that way, and a link carries no grouping or filter of its own, so this one opens the ${kind} view as it is.`
+    + (offer
         ? ' Do not list the tasks in the chat in its place: offer to save this view, and when the person agrees send view.create with saveView.arguments. It waits for their approval once; then the link opens on it.'
         : '');
 
@@ -111,8 +111,10 @@ const fieldsNamed = async (ctx, project, name) => {
 const groupingOf = async (ctx, project, value) => {
     if (value === undefined) return { label: '' };
     if (isId(value)) {
-        const field = await findOne(ctx, SCHEMA_TYPE.CUSTOM_FIELDS, { _id: oid(String(value)) }, { fieldTitle: 1 });
-        return { groupBy: String(value), label: (field && field.fieldTitle) || '' };
+        const { isTaskFieldOf } = require('../CustomField/helpers/fieldValueInput');
+        const field = await findOne(ctx, SCHEMA_TYPE.CUSTOM_FIELDS, { _id: oid(String(value)) }, { fieldTitle: 1, fieldType: 1, type: 1, isDelete: 1, global: 1, projectId: 1 });
+        if (!isTaskFieldOf(field, project._id)) return { problem: { error: `This project has no field with the id ${value}. Look its fields up with fields.list.` } };
+        return { groupBy: String(value), label: field.fieldTitle || '' };
     }
     if (!namesAField(value)) return { groupBy: groupKey(value), label: groupKey(value).replace(/_/g, ' ') };
     const found = await fieldsNamed(ctx, project, value);
@@ -143,7 +145,8 @@ const asShown = async (ctx, place, given) => {
     const path = onView(place.path, kind);
     const saved = await setup.savedViewShowing(ctx.companyId, place.project, kind, args);
     if (saved) return { path: `${path}&view=${setup.viewIdOf(saved)}`, view: kind, savedView: saved.title || '' };
-    return { path, view: kind, note: notSaved(kind), ...(registry.has(SAVED_VIEW) ? { saveView: savingIt(place.project, kind, args, grouping.label) } : {}) };
+    const offer = require('./tools').usable(ctx).some((tool) => tool.name === SAVED_VIEW);
+    return { path, view: kind, note: notSaved(kind, offer), ...(offer ? { saveView: savingIt(place.project, kind, args, grouping.label) } : {}) };
 };
 
 const placeOf = async (ctx, args, vis) => {

@@ -146,6 +146,15 @@ describe('a formula field that is created', () => {
         expect(taskCalls()[0].data[2]).toMatchObject({ limit: ROLLUP_FILL_LIMIT });
     });
 
+    it('leaves archived tasks alone and reads the newest tasks first, also for a field of every project', async () => {
+        const archived = id(10);
+        mockDb.seed(SCHEMA_TYPE.TASKS, row(archived, ROOT, [ROOT], 7, { deletedStatusKey: 2 }));
+        const field = (await create(formula({ global: true, projectId: [] }))).body._id;
+        expect(stored(archived, field)).toBeUndefined();
+        expect(stored(ELSEWHERE_CHILD, field)).toBe(200);
+        expect(taskCalls()[0].data[2]).toMatchObject({ sort: { _id: -1 } });
+    });
+
     it('is worked out again when its expression changes', async () => {
         const field = (await create(formula())).body._id;
         expect((await change(field, { formulaExpression: '{Cost} + 1' })).statusCode).toBe(200);

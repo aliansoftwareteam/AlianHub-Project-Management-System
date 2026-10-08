@@ -105,11 +105,20 @@ const inverses = {
         Object.entries(u.previous || {}).forEach(([k, v]) => { if (v === null) unset[k] = 1; else set[k] = v; });
         await setTask(companyId, u.taskId, set, Object.keys(unset).length ? unset : undefined);
         const shifted = Array.isArray(u.shifted) ? u.shifted : [];
+        const movedBack = [];
+        const leftAlone = [];
         for (const row of shifted) {
             if (!actor || !(await taskReadable(companyId, actor.userId, row.taskId))) continue;
+            const now = await findRow(companyId, SCHEMA_TYPE.TASKS, row.taskId, { startDate: 1, DueDate: 1 });
+            if (!now || !sameInstant(now.startDate, row.movedStart) || !sameInstant(now.DueDate, row.movedDue)) { leftAlone.push(row.taskId); continue; }
             await setTask(companyId, row.taskId, { startDate: row.startDate, DueDate: row.DueDate });
+            movedBack.push(row.taskId);
         }
-        return { taskId: u.taskId, restored: Object.keys(u.previous || {}), ...(shifted.length ? { movedBack: shifted.map((row) => row.taskId) } : {}) };
+        return {
+            taskId: u.taskId, restored: Object.keys(u.previous || {}),
+            ...(movedBack.length ? { movedBack } : {}),
+            ...(leftAlone.length ? { leftAlone, note: 'Some waiting tasks were changed again since, so their dates were left as they are now.' } : {}),
+        };
     },
     async sprint(companyId, u) {
         const before = await findRow(companyId, SCHEMA_TYPE.TASKS, u.taskId, { ProjectID: 1, sprintId: 1 });
@@ -281,6 +290,8 @@ const projectIdOfRow = async (companyId, row, run) => {
     }
     return '';
 };
+
+const sameInstant = (a, b) => Boolean(a) && Boolean(b) && new Date(a).getTime() === new Date(b).getTime();
 
 const findRow = (companyId, type, id, fields) => (oid(id)
     ? MongoDbCrudOpration(companyId, { type, data: [{ _id: oid(id) }, fields] }, 'findOne')

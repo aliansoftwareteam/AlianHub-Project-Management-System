@@ -146,6 +146,12 @@ const mcpFields = ({ source, requestedBy, tokenId, tokenProjectIds, allowedActio
     : {});
 
 /* Who an approved MCP proposal runs as: the person behind the token, or the outside client acting for the person who granted it. */
+/* An MCP proposal is applied inside the projects its token was held to, so what the change reaches beyond its own
+ * target (the tasks waiting on a task whose dates move) stays inside them too. */
+const underTokenOf = (p, step) => (p.source === SOURCE_MCP && Array.isArray(p.tokenProjectIds) && p.tokenProjectIds.length
+    ? require('../../Config/tokenNarrowing').runNarrowed({ userId: p.requestedBy, projectIds: p.tokenProjectIds }, step)
+    : step());
+
 const mcpActor = async (p) => (p.oauthGrantId
     ? { ...(await externalClientActor({ userId: p.requestedBy, clientId: p.oauthClientId, clientName: p.agentName, grantId: p.oauthGrantId })), source: SOURCE_MCP }
     : { kind: 'agent', userId: p.requestedBy, agentId: null, agentName: p.agentName, runId: null, viaAccount: 'personal', tokenId: p.tokenId || null, source: SOURCE_MCP });
@@ -371,7 +377,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     for (const c of changes) {
         try {
             // eslint-disable-next-line no-await-in-loop
-            const out = await actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, ...(marker ? { taint: marker } : {}) });
+            const out = await underTokenOf(p, () => actions.perform({ companyId, actor: agentActor, action: c.action, params: { ...c.params, __proposal: true }, reason: `approved proposal ${id} by ${decider.userId}`, ip, allowedActions: agent.allowedActions, depth, approved: true, approvedBy: decider.userId, ...(marker ? { taint: marker } : {}) }));
             if (out.auditId) auditIds.push(out.auditId, ...partAudits(out.result));
             applied.push({ action: c.action, ok: true, result: out.result });
         } catch (e) {

@@ -45,11 +45,15 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/mcpManageWorld');
 const mongoHelper = require('../Modules/Tasks/helpers/mongo_helper');
 const undo = require('../Modules/Agents/undo');
+const proposals = require('../Modules/Agents/proposals');
+const intentPreview = require('../Modules/Agents/intentPreview');
+const waitingTasks = require('../Modules/Agents/waitingTasks');
+const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
 const server = require('../Modules/Mcp/server');
 
 mongoHelper.getTotalSprintCount = async () => true;
 
-const { CID, OWNER, MEMBER, TOKEN, P_OPEN, P_PRIVATE, S_OPEN, S_PRIVATE, ctx, settle } = world;
+const { CID, OWNER, MEMBER, TOKEN, P_OPEN, P_PRIVATE, P_DEST, S_OPEN, S_PRIVATE, S_DEST, ctx, settle } = world;
 const { seed, stored, audits, rpcThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const DAY = 24 * 60 * 60 * 1000;
@@ -70,7 +74,7 @@ const link = (blocker, waiting) => {
     stored(blocker._id).relations.push(blocks(waiting._id));
     stored(waiting._id).relations.push(blockedBy(blocker._id));
 };
-const move = (task, startDate, dueDate, uid = OWNER) => rpc(ctx(uid), 'task.update', { taskId: String(task._id), startDate, dueDate, reason: 'Design slips' });
+const move = (task, startDate, dueDate, uid = OWNER, over = {}) => rpc(ctx(uid, over), 'task.update', { taskId: String(task._id), startDate, dueDate, reason: 'Design slips' });
 
 let fx;
 let design;
@@ -88,7 +92,7 @@ beforeEach(() => {
     link(design, build);
     link(build, ship);
 });
-afterEach(settle);
+afterEach(async () => { await settle(); jest.restoreAllMocks(); waitingTasks.limits.chainMax = 500; });
 afterAll(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2'].forEach((key) => { delete process.env[key]; }); });
 
 describe('moving a blocker later', () => {
@@ -148,5 +152,125 @@ describe('what the agent is told', () => {
     it('task.update says that moving a task later moves the tasks waiting on it', async () => {
         const listed = (await server.handleRpc(ctx(OWNER), { jsonrpc: '2.0', id: 1, method: 'tools/list' })).result.tools.find((tool) => tool.name === 'task.update');
         expect(listed.description).toMatch(/wait on it[\s\S]*working days/);
+    });
+});
+
+describe('each waiting task is held to what a change of its own would be', () => {
+    const project = (id) => mockDb.store[SCHEMA_TYPE.PROJECTS].find((row) => String(row._id) === id);
+    let elsewhere;
+    let second;
+
+    beforeEach(() => {
+        elsewhere = named('Elsewhere', P_DEST, S_DEST, '12', '13');
+        second = named('Elsewhere too', P_DEST, S_DEST, '12', '13');
+        link(design, elsewhere);
+        link(design, second);
+    });
+
+    const stays = (out, task, why) => {
+        expect(datesOf(task)).toEqual(['2026-10-12', '2026-10-13']);
+        expect(out.result.waitingTasks.startTooEarly).toEqual(expect.arrayContaining([expect.objectContaining({ taskId: String(task._id), title: task.TaskName, why: expect.stringMatching(why) })]));
+    };
+
+    it('stays put and is named in a project where agents are paused', async () => {
+        project(P_DEST).agentLimits = { paused: true };
+        const out = await move(design, '2026-10-13', '2026-10-14');
+        expect(datesOf(build)).toEqual(['2026-10-14', '2026-10-15']);
+        stays(out, elsewhere, /paused/);
+        stays(out, second, /paused/);
+    });
+
+    it('stays put and is named in a project where a connected agent asks before every change', async () => {
+        project(P_DEST).agentPolicy = { connected: 'propose_all' };
+        const out = await move(design, '2026-10-13', '2026-10-14');
+        expect(datesOf(build)).toEqual(['2026-10-14', '2026-10-15']);
+        stays(out, elsewhere, /ask a person/);
+    });
+
+    it('stays put and is named past the count of tasks an agent may change at once in its project', async () => {
+        project(P_DEST).agentLimits = { directTasks: 1 };
+        const out = await move(design, '2026-10-13', '2026-10-14');
+        const movedThere = [elsewhere, second].filter((task) => datesOf(task)[0] === '2026-10-14');
+        expect(movedThere).toHaveLength(1);
+        const left = [elsewhere, second].find((task) => !movedThere.includes(task));
+        stays(out, left, /already changed 1 task/);
+    });
+
+    it('stays outside the projects the token is held to', async () => {
+        mockDb.store[SCHEMA_TYPE.API_TOKENS][0].projectIds = [P_OPEN];
+        const out = await move(design, '2026-10-13', '2026-10-14', OWNER, { projectIds: [P_OPEN] });
+        expect(out).toMatchObject({ ok: true });
+        expect(datesOf(build)).toEqual(['2026-10-14', '2026-10-15']);
+        expect(datesOf(elsewhere)).toEqual(['2026-10-12', '2026-10-13']);
+        expect(JSON.stringify(out)).not.toContain(String(elsewhere._id));
+    });
+});
+
+describe('a date change that waits for approval', () => {
+    const human = (userId) => ({ kind: 'human', userId });
+    let elsewhere;
+
+    beforeEach(() => {
+        elsewhere = named('Elsewhere', P_DEST, S_DEST, '12', '13');
+        link(design, elsewhere);
+        mockDb.store[SCHEMA_TYPE.PROJECTS].find((row) => String(row._id) === P_OPEN).agentPolicy = { connected: 'propose_all' };
+        mockDb.store[SCHEMA_TYPE.API_TOKENS][0].projectIds = [P_OPEN];
+    });
+
+    it('shows the waiting tasks it will move on its card, and on approval moves none outside the token\'s projects', async () => {
+        const filed = await move(design, '2026-10-13', '2026-10-14', OWNER, { projectIds: [P_OPEN] });
+        expect(filed).toMatchObject({ pending: true });
+        expect(datesOf(build)).toEqual(['2026-10-12', '2026-10-13']);
+        const row = mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS].find((entry) => String(entry._id) === filed.proposalId);
+        const card = (await intentPreview.forBatches(CID, OWNER, [{ ...row, id: String(row._id) }], { bareChanges: true })).get(String(row._id));
+        expect(card.lines).toEqual(expect.arrayContaining([
+            { kind: 'batchItem', task: 'Build', what: 'start', value: '2026-10-14T00:00:00.000Z' },
+            { kind: 'batchItem', task: 'Ship', what: 'due', value: '2026-10-16T00:00:00.000Z' },
+        ]));
+        expect(JSON.stringify(card)).not.toMatch(/Elsewhere/);
+
+        const approved = await proposals.approve(CID, filed.proposalId, { decider: human(OWNER), isPrivileged: true, ip: '' });
+        await settle();
+        expect(approved.error).toBeUndefined();
+        expect(datesOf(design)).toEqual(['2026-10-13', '2026-10-14']);
+        expect(datesOf(build)).toEqual(['2026-10-14', '2026-10-15']);
+        expect(datesOf(ship)).toEqual(['2026-10-15', '2026-10-16']);
+        expect(datesOf(elsewhere)).toEqual(['2026-10-12', '2026-10-13']);
+    });
+});
+
+describe('a long chain', () => {
+    it('says the chain was cut at its cap, and how many waiting tasks were read', async () => {
+        waitingTasks.limits.chainMax = 2;
+        const out = await move(design, '2026-10-13', '2026-10-14');
+        expect(out.result.waitingTasks).toMatchObject({ truncated: true, considered: 1 });
+        expect(datesOf(ship)).toEqual(['2026-10-14', '2026-10-15']);
+    });
+});
+
+describe('when moving the waiting tasks fails', () => {
+    it('keeps the change to the task itself undoable and says the waiting tasks did not move', async () => {
+        jest.spyOn(taskMongo, 'bulkUpdateDates').mockRejectedValue(new Error('write failed'));
+        const out = await move(design, '2026-10-13', '2026-10-14');
+        expect(out).toMatchObject({ ok: true, undoable: true });
+        expect(out.result.waitingTasks).toMatchObject({ moved: [], error: expect.stringMatching(/not moved/) });
+        expect(datesOf(build)).toEqual(['2026-10-12', '2026-10-13']);
+        const [row] = audits('task.edit', 'applied');
+        expect(row.meta.undo.shifted).toBeUndefined();
+        expect(await undo.undoAuditRow(CID, row, { kind: 'human', userId: OWNER }, '')).toMatchObject({ ok: true });
+        expect(datesOf(design)).toEqual(['2026-10-08', '2026-10-09']);
+    });
+});
+
+describe('undo', () => {
+    it('leaves a waiting task a person moved since, says so, and names only what it put back', async () => {
+        await move(design, '2026-10-13', '2026-10-14');
+        stored(ship._id).startDate = at('20');
+        stored(ship._id).DueDate = at('21');
+        const [row] = audits('task.edit', 'applied');
+        const out = await undo.undoAuditRow(CID, row, { kind: 'human', userId: OWNER }, '');
+        expect(out.result).toMatchObject({ movedBack: [String(build._id)], leftAlone: [String(ship._id)] });
+        expect(datesOf(build)).toEqual(['2026-10-12', '2026-10-13']);
+        expect(datesOf(ship)).toEqual(['2026-10-20', '2026-10-21']);
     });
 });
