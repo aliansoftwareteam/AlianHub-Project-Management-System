@@ -571,4 +571,36 @@ describe('dispatcher: the model guess', () => {
 
         expect(adapter.chat).not.toHaveBeenCalled();
     });
+
+    it('sends the task to Needs routing with the reason when the AI switch or the budget check throws', async () => {
+        const project = await guessing();
+        adapter.chat.mockResolvedValue(answer({ role: TRIAGER, confidence: 99 }));
+        const aiSwitch = require('../Modules/AICore/aiSwitch');
+        const broken = jest.spyOn(aiSwitch, 'allowed').mockRejectedValue(new Error('settings unreadable'));
+        expect(await routeTask(seedTask(project, { TaskName: 'switch throws' }))).toMatchObject({
+            state: 'needs_routing', role: null, skipped: [{ source: 'model', why: 'ai_check_failed' }],
+        });
+        broken.mockRestore();
+        const budget = jest.spyOn(require('../Modules/Agents/budget'), 'check').mockImplementation(() => { throw new Error('usage unreadable'); });
+        expect(await routeTask(seedTask(project, { TaskName: 'budget throws' }))).toMatchObject({
+            state: 'needs_routing', role: null, skipped: [{ source: 'model', why: 'budget_check_failed' }],
+        });
+        budget.mockRestore();
+        expect(adapter.chat).not.toHaveBeenCalled();
+    });
+
+    it('sends the task to Needs routing with the reason when the model call throws or the guess takes too long', async () => {
+        const project = await guessing();
+        adapter.chat.mockRejectedValue(new Error('provider down'));
+        expect(await routeTask(seedTask(project, { TaskName: 'model throws' }))).toMatchObject({
+            state: 'needs_routing', skipped: [{ source: 'model', why: 'model_failed' }],
+        });
+        guess.use(modelGuesser, { timeout: 20 });
+        const budget = jest.spyOn(require('../Modules/Agents/budget'), 'check').mockReturnValue(new Promise(() => {}));
+        expect(await routeTask(seedTask(project, { TaskName: 'budget hangs' }))).toMatchObject({
+            state: 'needs_routing', role: null, skipped: [{ source: 'model', why: 'model_timeout' }],
+        });
+        budget.mockRestore();
+        expect(guess.TIMEOUT_MS).toBeGreaterThan(0);
+    });
 });

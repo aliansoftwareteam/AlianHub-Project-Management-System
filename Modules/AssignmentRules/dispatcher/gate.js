@@ -89,7 +89,8 @@ async function findRole(companyId, task, settings) {
         const project = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(task.ProjectID) }, { tagsArray: 1 }] }, 'findOne');
         const input = { title: task.TaskName || '', type: task.TaskType || '', tags: tagNames(task, plain(project) || {}), description: task.rawDescription || '' };
         const guessed = await guess.guess({ companyId, task: input, roles });
-        if (guessed && guessed.confidence >= settings.threshold) return { pick: { role: guessed.role, source: 'model', confidence: guessed.confidence, reason: guessed.reason }, skipped };
+        if (guessed && guessed.failed) skipped.push({ source: 'model', why: guessed.failed });
+        else if (guessed && guessed.confidence >= settings.threshold) return { pick: { role: guessed.role, source: 'model', confidence: guessed.confidence, reason: guessed.reason }, skipped };
     }
     return { pick: null, skipped };
 }
