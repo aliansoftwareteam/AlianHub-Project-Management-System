@@ -26,7 +26,7 @@ const roleOf = (key) => {
 };
 const roleName = (key) => (roleOf(key) || {}).name || '';
 const WHO_MAX = 300;
-const roleWho = (key) => { const role = roleOf(key); return role ? playbooks.summary(role, WHO_MAX) : ''; };
+const roleWho = (companyId, key) => playbooks.whoFor(companyId, key, WHO_MAX);
 
 const textOf = (value) => String(value === undefined || value === null ? '' : value).trim().slice(0, MAX_TEXT);
 

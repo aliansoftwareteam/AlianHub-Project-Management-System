@@ -85,7 +85,8 @@ async function findRole(companyId, task, settings) {
         }
     }
     if (settings.modelGuess) {
-        const roles = settings.roles.filter((key) => !roleProblem(settings, key)).map((key) => ({ key, name: rulesOf.roleName(key), who: rulesOf.roleWho(key) }));
+        const roles = await Promise.all(settings.roles.filter((key) => !roleProblem(settings, key))
+            .map(async (key) => ({ key, name: rulesOf.roleName(key), who: await rulesOf.roleWho(companyId, key) })));
         const project = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(task.ProjectID) }, { tagsArray: 1 }] }, 'findOne');
         const input = { title: task.TaskName || '', type: task.TaskType || '', tags: tagNames(task, plain(project) || {}), description: task.rawDescription || '' };
         const guessed = await guess.guess({ companyId, task: input, roles });

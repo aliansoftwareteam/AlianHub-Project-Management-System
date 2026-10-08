@@ -86,4 +86,16 @@ const summary = (role, max) => {
     return kept || who.slice(0, max).trim();
 };
 
-module.exports = { PlaybookError, parse, readAll, all, find, summary };
+/* A workspace may edit a role's text, and ./rolePlaybookOverrides plugs that in here, so 'who it is' is read per company. */
+let bodyFor = async () => null;
+const useOverrides = (fn) => { bodyFor = typeof fn === 'function' ? fn : async () => null; };
+
+const whoFor = async (companyId, key, max = 300) => {
+    const [blueprint, slug, rest] = String(key || '').split('/');
+    const role = rest === undefined && blueprint && slug ? find(blueprint, slug) : null;
+    if (!role) return '';
+    const body = await Promise.resolve().then(() => bodyFor(companyId, role)).catch(() => null);
+    return summary(body ? { ...role, body } : role, max);
+};
+
+module.exports = { PlaybookError, parse, readAll, all, find, summary, useOverrides, whoFor };

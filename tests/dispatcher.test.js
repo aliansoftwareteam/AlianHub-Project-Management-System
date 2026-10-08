@@ -623,4 +623,24 @@ describe('dispatcher: the model guess', () => {
         expect(decision.reason).not.toMatch(/[\p{Cc}\u202e]/u);
         expect(decision.reason.startsWith('<img src=x onerror=alert(1)> evil')).toBe(true);
     });
+
+    it('gives the model each role\'s who-it-is line as the workspace reads it, falling back to the built-in text', async () => {
+        const playbooks = require('../Modules/Agents/rolePlaybooks');
+        const project = await guessing();
+        adapter.chat.mockResolvedValue(answer({ role: TRIAGER, confidence: 95, reason: 'fits' }));
+        const promptSent = () => adapter.chat.mock.calls.at(-1)[0].messages.map((m) => m.content).join('\n');
+        await routeTask(seedTask(project, { TaskName: 'built in' }));
+        const [blueprint, slug] = TRIAGER.split('/');
+        expect(promptSent()).toContain(playbooks.summary(playbooks.find(blueprint, slug), 300));
+        playbooks.useOverrides(async (companyId, role) => (companyId === C && role.slug === slug ? '## Who it is\n\nThe tuned triager of this workspace.' : null));
+        try {
+            await routeTask(seedTask(project, { TaskName: 'tuned' }));
+            expect(promptSent()).toContain('who it is: The tuned triager of this workspace.');
+            expect(await playbooks.whoFor('another-company', TRIAGER)).toBe(playbooks.summary(playbooks.find(blueprint, slug), 300));
+            playbooks.useOverrides(async () => { throw new Error('store down'); });
+            expect(await playbooks.whoFor(C, TRIAGER)).toBe(playbooks.summary(playbooks.find(blueprint, slug), 300));
+        } finally {
+            playbooks.useOverrides(null);
+        }
+    });
 });
