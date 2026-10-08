@@ -180,8 +180,12 @@ const fieldChoice = (definition) => {
     return { fieldId: idOf(definition._id), name: definition.fieldTitle || '', type: definition.fieldType || '', options: optionRows(definition).map(optionLabel) };
 };
 
-/* The held field a value names, by its id or its name. Of several fields with that name, the one value fits is
- * taken only when it fits one alone; otherwise `choices` lists them all, so the agent asks rather than guesses. */
+/* Field types whose check turns a value away, so a value that fits one of them alone says which field was meant.
+ * Text takes anything, so a value that fits only a text field says nothing about the typed fields beside it. */
+const TELLING_TYPES = Object.freeze(['dropdown', 'number', 'money', 'date', 'checkbox', 'email']);
+
+/* The held field a value names, by its id or its name. Of several fields with that name, one is taken only when the
+ * value fits it alone and its type could have turned the value away; otherwise `choices` lists them all, so the agent asks. */
 const fieldForValue = (held, entry) => {
     const byId = isId(entry.field) && held.find((field) => idOf(field._id).toLowerCase() === lower(entry.field));
     if (byId) return { definition: byId };
@@ -189,7 +193,7 @@ const fieldForValue = (held, entry) => {
     if (named.length < 2) return { definition: named[0] };
     const { storedValueOf } = require('../CustomField/helpers/fieldValueInput');
     const fitting = named.filter((field) => !storedValueOf(field, entry.value).error);
-    return fitting.length === 1 ? { definition: fitting[0] } : { choices: named.map(fieldChoice) };
+    return fitting.length === 1 && TELLING_TYPES.includes(fitting[0].fieldType) ? { definition: fitting[0] } : { choices: named.map(fieldChoice) };
 };
 
 const choicesText = (name, choices) => `${choices.length} fields of this project are named "${name}": `
