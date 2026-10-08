@@ -70,9 +70,9 @@ afterAll(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete pr
 const challengeOf = (verifier) => crypto.createHash('sha256').update(verifier).digest('base64url');
 
 /* `approved` names the scopes of the workspace's approval; left out, the fixture's approval stands as it is. */
-const mint = async (scopes, approved) => {
+const mint = async (scopes, approved, approvedAs = {}) => {
     const { client } = await clients.register({ kind: 'dynamic', name: 'S10S4 Coder', redirectUris: [REDIRECT], tokenEndpointAuthMethod: 'none' });
-    approveInWorkspace(mockDb, C, client.clientId, approved ? { scopes: approved } : {});
+    approveInWorkspace(mockDb, C, client.clientId, { ...(approved ? { scopes: approved } : {}), ...approvedAs });
     const verifier = crypto.randomBytes(32).toString('base64url');
     const { code, grant } = await grants.issueCode({ client, companyId: C, userId: USER, scopes, redirectUri: REDIRECT, codeChallenge: challengeOf(verifier) });
     const issued = await grants.exchangeCode({ client, code, codeVerifier: verifier, redirectUri: REDIRECT, resource: RESOURCE });
@@ -370,6 +370,20 @@ describe('the manage tools for an OAuth client', () => {
         expect(await decide()).toMatchObject({ status: 403, error: expect.stringMatching(/no longer holds the grant/) });
         await grants.revokeOwnGrant(USER, grant.grantId);
         expect(await decide()).toMatchObject({ status: 403, error: expect.stringMatching(/revoked/) });
+    });
+
+    it('names the filed proposal and the audit row by the name the workspace approved the client under', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        const { raw } = await mint(MANAGING, [...ALL_SCOPES, 'tasks:manage'], { clientName: 'Claude Code' });
+        await post(raw, call('task.archive', { taskId: TASK, reason: 'no longer needed' }));
+        const [filed] = proposalRows();
+        expect(filed.agentName).toBe('Claude Code');
+        expect(require('../event/socketEventEmitter').emit).toHaveBeenCalledWith('update', expect.objectContaining({
+            module: 'agent', companyId: C, data: { kind: 'proposal', proposal: expect.objectContaining({ _id: filed._id, projectId: PROJECT }) },
+        }));
+        await post(raw, call('task.comment', { taskId: TASK, body: 'Found the cause.' }));
+        expect(auditRows().find((row) => row.action === agentAudit.ACTION_DONE)).toMatchObject({ actorName: 'Claude Code for Priya' });
     });
 
     it('refuses the same routed write to a client without the scope, as before, and files nothing', async () => {

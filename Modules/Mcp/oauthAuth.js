@@ -26,6 +26,14 @@ const clientStanding = async (clientId) => {
     return { ok: true, name: row.name || String(clientId) };
 };
 
+/* The name the workspace approved the client under, which a metadata document client takes from its own
+ * client_name, as the Members page names it; the registered name or the publisher's host otherwise. */
+const nameInWorkspace = async (companyId, clientId, fallback) => {
+    const rows = await store.approvals.namesFor([{ companyId, clientId }]).catch(() => []);
+    const approved = (rows || []).find((row) => row && row.clientName);
+    return approved ? String(approved.clientName) : fallback;
+};
+
 const refuseApproval = (clientId, why) => {
     logger.error(`mcp oauth: refusing client ${clientId}, its workspace approval could not be checked: ${why}`);
     return false;
@@ -110,7 +118,7 @@ const authenticate = async (req, raw, { namedCompanies = [], now = new Date() } 
     return {
         companyId: String(token.companyId),
         userId,
-        actor: await externalClientActor({ userId, clientId: token.clientId, clientName: client.name, grantId: token.grantId }),
+        actor: await externalClientActor({ userId, clientId: token.clientId, clientName: await nameInWorkspace(String(token.companyId), token.clientId, client.name), grantId: token.grantId }),
         token: { oauth: true, scopes },
         oauth: { clientId: token.clientId, grantId: token.grantId, scopes },
         canWrite: scopes.some((scope) => mcpOAuth.WRITE_SCOPES.includes(scope)),
@@ -120,4 +128,4 @@ const authenticate = async (req, raw, { namedCompanies = [], now = new Date() } 
     };
 };
 
-module.exports = { isAccessToken, looksLikeOAuthSecret, authenticate, clientStanding, clientApprovedInWorkspace, standingOfGrant };
+module.exports = { isAccessToken, looksLikeOAuthSecret, authenticate, clientStanding, nameInWorkspace, clientApprovedInWorkspace, standingOfGrant };
