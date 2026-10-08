@@ -278,6 +278,14 @@ Each is reversible. The PR is named so the choice can be found.
 - On Home, a plan opens inside its row, not in a dialog; a plan locked for the reader shows no Approve on the Approvals page (#1554).
 - A field of every project is left alone when a project is copied (#1552).
 
+### Choices to review, builds 816 to 822
+
+- A due date given without a time is stored as the start of that day, so the list shows a blocker and the task waiting on it on the same day while the Gantt shows them a day apart. Kept: changing it means changing how due dates are stored. (#1575)
+- Among fields with the same name, a value picks one only when it fits a single field whose type can reject values (dropdown, number, money, date, checkbox, email); otherwise the agent is given the list and asks. (#1575)
+- Approving `tag.create` checks again that the connection still holds the manage grant, like the other management actions. (#1576)
+- Adding a tag whose name the project already has, in any case, is refused (409) on the web route as well as over MCP. (#1576)
+- A tab that was hidden reads its open project again when its live connection comes back; other projects in the sidebar do not catch up yet. (#1578)
+
 ## Last step
 
 Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 IST: the docs PR #1551, the twenty-seventh batch (#1553: colours batch 7, legacy classes batch 3, four guide chapters, 25 helper specs and the four bugs they found) and the twenty-eighth (#1556: agent changes over the web named and counted; plan parts on Home and Approvals). The local server answers build 815. Every slice of task 047 that does not need the owner is merged; what is left needs a connected AI, a new account or the owner's time. This docs PR ticks the lines above and regenerates the beta log.
@@ -344,3 +352,10 @@ Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 I
 - 07:28 on 3 October: the twenty-seventh batch merged (#1553, build 814). Its colour and class changes were measured in the page, light and dark, on nine screens against the numbers taken on build 813 that morning: nothing new below the contrast line.
 - The twenty-eighth batch (#1556, build 815) merged on 2026-10-04 at 11:09 after a review that found no hole. Its local full run could not be used: the machine was short of memory and every test timed out, so CI was the test run.
 - The local server had stopped overnight three times (2 to 3, 3 to 4, 4 to 6 October) and was restarted each morning.
+
+### 2026-10-08
+- The owner connected their Claude Code over OAuth with Manage tasks (AI-4a). The first measured run, AI-1: 13 of 15, then 15 of 15 after #1568 (build 819).
+- Build 821 (#1577): same-named fields are asked, `tag.create`, search by tag, priority and field. Hand-checked through the owner's Claude: a tag proposed, approved, put on a task and found by tag search; a duplicate in another case refused; priority and date search right.
+- The live view tab did not appear on the real build although its spec passed: a hidden tab drops its socket. Fixed in #1578 (build 822). Not seen by eye: the coordinator's browser pane is always hidden.
+- The local server's AI provider switched to Anthropic Sonnet 5.5 at the owner's request; the key is in the admin field.
+
