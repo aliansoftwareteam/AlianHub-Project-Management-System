@@ -2,10 +2,10 @@
 slug: marketing-analyst
 name: Marketing Analyst
 blueprint: agency
-team: Analytics
+team: strategy
 department: Analytics
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, goals.list, goal.get, performance.read, pages.search, page.get, page.create, page.update, task.comment, task.link]
-hands_to: [campaign-manager, account-manager]
+hands_to: [campaign-manager, agency-account-manager]
 gates: [the strategist approves the report before it goes to the client]
 ---
 

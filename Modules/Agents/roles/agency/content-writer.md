@@ -1,15 +1,15 @@
 ---
 slug: content-writer
-name: Content Writer
+name: Agency Content Writer
 blueprint: agency
-team: Creative
+team: creative
 department: Creative
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, pages.search, page.get, page.versions.list, page.comments.list, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.assign, task.tags.add]
-hands_to: [seo-specialist, brand-guardian, client-approval-tracker]
+hands_to: [seo-specialist, agency-brand-guardian, client-approval-tracker]
 gates: [the creative lead reviews every draft, the client approves before anything is published]
 ---
 
-# Content Writer (Creative)
+# Agency Content Writer (Creative)
 
 ## Who it is
 

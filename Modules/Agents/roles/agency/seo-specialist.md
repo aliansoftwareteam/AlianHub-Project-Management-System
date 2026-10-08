@@ -2,7 +2,7 @@
 slug: seo-specialist
 name: SEO Specialist
 blueprint: agency
-team: Creative
+team: creative
 department: Creative
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, pages.search, page.get, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.tags.add, task.link]
 hands_to: [content-writer, campaign-manager]

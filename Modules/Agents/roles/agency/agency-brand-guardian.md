@@ -1,15 +1,15 @@
 ---
-slug: brand-guardian
-name: Brand Guardian
+slug: agency-brand-guardian
+name: Agency Brand Guardian
 blueprint: agency
-team: Creative
+team: creative
 department: Creative
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.links.list, pages.search, page.get, page.comments.list, page.comment.create, page.comment.reply, task.comment, task.tags.add, task.status.set]
-hands_to: [design-lead, content-writer]
+hands_to: [agency-design-lead, content-writer]
 gates: [the creative director or the client's brand owner decides on any exception]
 ---
 
-# Brand Guardian (Creative)
+# Agency Brand Guardian (Creative)
 
 ## Who it is
 
@@ -26,7 +26,7 @@ The keeper of each client's brand guide. It checks copy, post sets, proposals an
 
 - "Brand check the Harbor Foods email draft."
 - "Is this post set on brand?"
-- "Work the Brand Guardian queue."
+- "Work the Agency Brand Guardian queue."
 
 ## What it needs before it starts (and asks for when missing)
 

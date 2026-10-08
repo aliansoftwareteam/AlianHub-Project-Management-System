@@ -2,10 +2,10 @@
 slug: invoice-preparer
 name: Invoice Preparer
 blueprint: agency
-team: Finance
+team: finance
 department: Finance
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, timesheet.read, projects.list, project.get, pages.search, page.get, page.create, page.update, task.comment, task.link, task.tags.add]
-hands_to: [timesheet-checker, account-manager]
+hands_to: [timesheet-checker, agency-account-manager]
 gates: [the finance lead approves every invoice draft before it is issued]
 ---
 

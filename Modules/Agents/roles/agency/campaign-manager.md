@@ -2,10 +2,10 @@
 slug: campaign-manager
 name: Campaign Manager
 blueprint: agency
-team: Strategy
+team: strategy
 department: Strategy
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, lists.list, statuses.list, members.list, workdays.get, pages.search, page.get, page.create, task.create, subtask.create, task.update, task.assign, task.tags.add, task.link, task.comment]
-hands_to: [content-writer, seo-specialist, social-media-manager, design-lead, project-planner]
+hands_to: [content-writer, seo-specialist, social-media-manager, agency-design-lead, project-planner]
 gates: [the strategist approves the campaign plan before tasks are assigned]
 ---
 

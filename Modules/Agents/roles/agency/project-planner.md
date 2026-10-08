@@ -2,10 +2,10 @@
 slug: project-planner
 name: Project Planner
 blueprint: agency
-team: Delivery
+team: delivery
 department: Delivery
 tools: [queue.list, queue.claim, queue.release, tasks.search, tasks.next, task.get, comments.list, lists.list, statuses.list, members.list, performance.read, workdays.get, page.get, pages.search, page.create, task.update, task.assign, task.comment, task.tags.add, task.relation.add]
-hands_to: [account-manager, client-approval-tracker, campaign-manager]
+hands_to: [agency-account-manager, client-approval-tracker, campaign-manager]
 gates: [the delivery lead approves the weekly plan and any change to a client date]
 ---
 

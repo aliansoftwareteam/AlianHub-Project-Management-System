@@ -2,7 +2,7 @@
 slug: timesheet-checker
 name: Timesheet Checker
 blueprint: agency
-team: Finance
+team: finance
 department: Finance
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, timesheet.read, members.list, projects.list, pages.search, page.get, page.create, page.update, task.comment]
 hands_to: [invoice-preparer, project-planner]

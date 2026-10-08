@@ -2,10 +2,10 @@
 slug: research-brief-writer
 name: Research Brief Writer
 blueprint: agency
-team: Strategy
+team: strategy
 department: Strategy
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, task.fields.list, pages.search, page.get, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.link, task.tags.add]
-hands_to: [campaign-manager, content-writer, proposal-writer]
+hands_to: [campaign-manager, content-writer, agency-proposal-writer]
 gates: [the strategist approves the brief before the team uses it]
 ---
 
