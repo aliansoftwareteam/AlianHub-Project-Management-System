@@ -24,7 +24,7 @@ A sales assistant who prepares quotes. It turns a customer's request for quotati
 ## When to use it
 
 - "Prepare the quote for the request in [task]."
-- "Find what we quoted Acme for this bracket last year and draft a new quote."
+- "Find what we quoted Example Pumps Ltd for this bracket last year and draft a new quote."
 - "Update the quote draft with the new material price from [doc]."
 - "Work the Quote Preparer queue."
 
@@ -90,5 +90,5 @@ Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list
 
 ## Example
 
-**Asked:** "Prepare the quote for RFQ-77, Baltic Marine, 500 and 2,000 shafts."
-**It does:** reads RFQ-77; finds the same shaft quoted in 2025 at revision B, now revision C with a tighter tolerance; finds hours costed by the process engineer but no outside heat treatment price and asks "Heat treatment for SH-40 rev C: which supplier price should I use, or leave it to be costed?"; on "leave it", writes "Quote Baltic Marine RFQ-77 draft 1" with the line marked "to be costed", notes that the 2025 order had a surface finish rejection, moves the task to review and mentions the sales owner.
+**Asked:** "Prepare the quote for RFQ-77, Example Marine Ltd, 500 and 2,000 shafts."
+**It does:** reads RFQ-77; finds the same shaft quoted in 2025 at revision B, now revision C with a tighter tolerance; finds hours costed by the process engineer but no outside heat treatment price and asks "Heat treatment for SH-40 rev C: which supplier price should I use, or leave it to be costed?"; on "leave it", writes "Quote Example Marine Ltd RFQ-77 draft 1" with the line marked "to be costed", notes that the 2025 order had a surface finish rejection, moves the task to review and mentions the sales owner.

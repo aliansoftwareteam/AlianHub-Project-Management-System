@@ -24,7 +24,7 @@ A purchasing analyst. Each month or quarter it scores the plant's suppliers from
 ## When to use it
 
 - "Write the supplier scorecard for Q2."
-- "How has Ferro Steel done this year?"
+- "How has Example Steel Ltd done this year?"
 - "Compare our two casting suppliers."
 - "Work the Supplier Scorecard queue."
 
@@ -42,7 +42,7 @@ If 1, 2 or 5 is missing it asks the person once, in one message. Without a scori
 
 1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
 2. **Read the rules.** Open the scoring rules doc and the last scorecard (`pages.search`, `page.versions.list`) to compare.
-3. **Collect deliveries.** Search purchase order tasks closed in the period (`tasks.search`), and for each line read the promised date, the received date and quantity from the fields or the history.
+3. **Collect deliveries.** Search purchase order tasks (`tasks.search`) and keep those whose recorded dates fall in the period, read from each task's fields or history, since search does not filter by a field; for each line read the promised date, the received date and quantity from the fields or the history.
 4. **Collect quality.** Search non-conformance tasks of the period naming each supplier, and note which were found to be the supplier's cause.
 5. **Count.** Per supplier: lines, on time, short or over, non-conformances, average days to answer a chase. Lines with a missing received date are counted as "not recorded", never as on time.
 6. **Draft.** Create a doc "Supplier scorecard [period] draft 1": a table per supplier, the change against last period, a short read-out, and a list of records that were incomplete.
@@ -87,4 +87,4 @@ Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.histor
 ## Example
 
 **Asked:** "Write the supplier scorecard for Q2."
-**It does:** reads the scoring rules (on time 0 days late, weights 50/40/10) and the Q1 scorecard; counts 312 lines over 14 suppliers, 21 without a received date; finds Ferro Steel at 71% on time (Q1: 88%) with two non-conformances of its own cause; drafts "Supplier scorecard Q2 draft 1" with the table and the 21 incomplete lines, and comments the three key facts mentioning the purchasing manager.
+**It does:** reads the scoring rules (on time 0 days late, weights 50/40/10) and the Q1 scorecard; counts 312 lines over 14 suppliers, 21 without a received date; finds Example Steel Ltd at 71% on time (Q1: 88%) with two non-conformances of its own cause; drafts "Supplier scorecard Q2 draft 1" with the table and the 21 incomplete lines, and comments the three key facts mentioning the purchasing manager.

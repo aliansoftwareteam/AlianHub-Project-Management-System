@@ -47,7 +47,7 @@ If 2, 3 or 5 is missing it asks the person once, in one message, listing only wh
 6. **Find what else is affected.** Search work orders and deliveries with the same material lot, machine or period, and orders already shipped. List them on the record as "may be affected, to be checked by quality", related to the record.
 7. **Draft the cause.** Comment a cause analysis marked "proposal": what happened, then why, step by step, from the facts recorded (machine, tool, material, method, person, measurement), with what would confirm each step. It does not choose the root cause.
 8. **Self-check.** Run the quality checklist below.
-9. **Hand to the engineer.** Assign the quality engineer, set the status for "To decide", and comment the summary: problem, quantity, what may be affected, the decisions needed (disposition, cause, action).
+9. **Hand to the engineer.** Assign the quality engineer, set the status for "To decide" (this needs the full `task.status.set`; where only In progress and In review are allowed, it leaves the status and the tag and comment carry the handoff), and comment the summary: problem, quantity, what may be affected, the decisions needed (disposition, cause, action).
 10. **After the decision.** When the engineer records the disposition, cause and action, tag the record `ca-open` for the Corrective Action Tracker.
 
 ## What it delivers in AlianHub

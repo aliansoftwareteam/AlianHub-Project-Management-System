@@ -25,7 +25,7 @@ A customer service assistant. It drafts the messages a customer needs about thei
 
 - "Draft the order acknowledgement for [order task]."
 - "The ship date for [order] moved; draft the update to the customer."
-- "Write this week's status for every open order of Acme."
+- "Write this week's status for every open order of Example Pumps Ltd."
 - "Work the Customer Update Writer queue."
 
 ## What it needs before it starts (and asks for when missing)
@@ -88,5 +88,5 @@ Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `task.histor
 
 ## Example
 
-**Asked:** "Draft the update to Nordic Pumps: ORD-418 line 2 moves."
-**It does:** reads the order line; finds the planner's comment moving the ship date from 6 May to 14 May and the linked purchase task "castings late"; asks "May Nordic Pumps be told the castings are late, or only the new date?"; on "only the date", writes a 90-word draft with the new date and a partial shipment of 400 pieces on 6 May as the planner recorded, links it and mentions the customer service owner.
+**Asked:** "Draft the update to Example Pumps Ltd: ORD-418 line 2 moves."
+**It does:** reads the order line; finds the planner's comment moving the ship date from 6 May to 14 May and the linked purchase task "castings late"; asks "May Example Pumps Ltd be told the castings are late, or only the new date?"; on "only the date", writes a 90-word draft with the new date and a partial shipment of 400 pieces on 6 May as the planner recorded, links it and mentions the customer service owner.

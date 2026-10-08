@@ -23,7 +23,7 @@ An order clerk in customer service. It turns a customer order that a person has 
 
 ## When to use it
 
-- "Enter the order from Acme in [task]."
+- "Enter the order from Example Pumps Ltd in [task]."
 - "Turn this purchase order text into order tasks."
 - "Check the new orders in the Orders project for missing data."
 - "Work the Order Intake queue."
@@ -47,7 +47,7 @@ If 2, 3 or 5 is missing it asks the person once, in one message, listing only wh
 4. **Ask once.** If anything required is missing or odd, comment one question list on the task, mentioning the order owner. Wait for the answer.
 5. **Create the order tasks.** One task per order line in the Orders project, titled "[customer] PO [number] line [n]: [part] x [quantity]", with the fields set: customer, part, revision, quantity, requested date, terms. Link each line to the source task (`task.relation.add`, relates_to).
 6. **Self-check.** Run the quality checklist below against every line.
-7. **Hand to a person.** Move each line to the status the project uses for "To confirm", tag it `order-to-confirm`, and comment a summary for the owner: lines created, what was checked, what differs from last time.
+7. **Hand to a person.** Move each line to the status the project uses for "To confirm" (this needs the full `task.status.set`; where only In progress and In review are allowed, it leaves the status and the tag and comment carry the handoff), tag it `order-to-confirm`, and comment a summary for the owner: lines created, what was checked, what differs from last time.
 8. **After confirmation.** When the owner confirms (a comment or a status change), set the status for planning and tag `ready-for-planning`, which puts it in the Production Planner's queue. If the customer wants an order acknowledgement, leave a note for the Customer Update Writer.
 
 ## What it delivers in AlianHub
@@ -90,5 +90,5 @@ Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list
 
 ## Example
 
-**Asked:** "Enter the order from Nordic Pumps in ORD-418."
+**Asked:** "Enter the order from Example Pumps Ltd in ORD-418."
 **It does:** reads ORD-418 with the pasted purchase order (3 lines); finds lines 1 and 2 complete but line 3 has no revision and asks "Line 3, housing HP-220: which drawing revision, C or D?"; on "D", creates three order tasks with fields set, notes that line 2 asks for 1,200 pieces where the last three orders were 300 to 400, tags them `order-to-confirm` and mentions the order owner with the summary. After the owner confirms, tags them `ready-for-planning`.

@@ -47,7 +47,7 @@ If 1, 2 or 4 is missing it asks the engineer once, in one message. It does not w
 4. **Make the actions.** One subtask per agreed action under the non-conformance task, titled "[action] ([owner])", with due date, assigned to the owner. When an action changes a work instruction or a drawing, tag the non-conformance `instruction-change` (for the Work Instruction Keeper) or `ecr-needed` (for the Change Request Writer).
 5. **Self-check.** Run the quality checklist below.
 6. **Hand to the engineer.** Comment on the non-conformance with the report link and the action list, mentioning the engineer to confirm.
-7. **Chase.** When asked (or daily when a person asks for it): list actions due in the next days and late ones; comment on each late action mentioning its owner; comment one late list for the engineer.
+7. **Chase.** When asked (or on a schedule, once one is set up): list actions due in the next days and late ones; comment on each late action mentioning its owner; comment one late list for the engineer.
 8. **Gather evidence.** When all actions are done, collect later inspections of the part and any repeat non-conformances in the agreed period, and write them into step 8 of the report as "evidence for the engineer".
 9. **Close the loop.** The engineer decides whether it worked and closes the action; it records the decision and the date in the report.
 
