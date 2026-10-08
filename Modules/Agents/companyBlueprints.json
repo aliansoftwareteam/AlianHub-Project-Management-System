@@ -25,13 +25,13 @@
         { "slug": "proposal-writer" },
         { "slug": "status-reporter" },
         { "slug": "risk-watch" },
-        { "name": "Regression Watch", "team": "engineering" },
-        { "name": "Change Checklist", "team": "engineering" },
-        { "name": "Project Planner", "team": "delivery" },
-        { "name": "Client Status Reporter", "team": "delivery" },
-        { "name": "Timesheet Checker", "team": "delivery" },
-        { "name": "Invoice Preparer", "team": "finance" },
-        { "name": "Onboarding Coordinator", "team": "people" }
+        { "name": "Regression Watch", "team": "engineering", "notWritten": true },
+        { "name": "Change Checklist", "team": "engineering", "notWritten": true },
+        { "name": "Project Planner", "team": "delivery", "notWritten": true },
+        { "name": "Client Status Reporter", "team": "delivery", "notWritten": true },
+        { "name": "Timesheet Checker", "team": "delivery", "notWritten": true },
+        { "name": "Invoice Preparer", "team": "finance", "notWritten": true },
+        { "name": "Onboarding Coordinator", "team": "people", "notWritten": true }
       ],
       "sizes": {
         "small": {
@@ -76,12 +76,12 @@
         { "slug": "safety-incident-reporter" },
         { "slug": "training-due-watch" },
         { "slug": "change-request-writer" },
-        { "name": "Audit Checklist", "team": "hse" },
-        { "name": "Stock Alert", "team": "logistics" },
-        { "name": "Drawing Revision Tracker", "team": "engineering" },
-        { "name": "Invoice Preparer", "team": "finance" },
-        { "name": "Shift Roster Checker", "team": "people" },
-        { "name": "Training Records", "team": "people" }
+        { "name": "Audit Checklist", "team": "hse", "notWritten": true },
+        { "name": "Stock Alert", "team": "logistics", "notWritten": true },
+        { "name": "Drawing Revision Tracker", "team": "engineering", "notWritten": true },
+        { "name": "Invoice Preparer", "team": "finance", "notWritten": true },
+        { "name": "Shift Roster Checker", "team": "people", "notWritten": true },
+        { "name": "Training Records", "team": "people", "notWritten": true }
       ],
       "sizes": {
         "small": {
@@ -104,20 +104,20 @@
     {
       "id": "agency",
       "roles": [
-        { "name": "Content Writer", "team": "creative" },
-        { "name": "Social Media Manager", "team": "creative" },
-        { "slug": "account-manager" },
-        { "name": "Campaign Manager", "team": "strategy" },
-        { "name": "SEO Specialist", "team": "creative" },
-        { "slug": "design-lead" },
-        { "slug": "brand-guardian" },
-        { "slug": "proposal-writer" },
-        { "name": "Research Brief Writer", "team": "strategy" },
-        { "name": "Project Planner", "team": "delivery" },
-        { "name": "Client Approval Tracker", "team": "delivery" },
-        { "name": "Marketing Analyst", "team": "analytics" },
-        { "name": "Timesheet Checker", "team": "finance" },
-        { "name": "Invoice Preparer", "team": "finance" }
+        { "slug": "content-writer" },
+        { "slug": "social-media-manager" },
+        { "slug": "agency-account-manager" },
+        { "slug": "campaign-manager" },
+        { "slug": "seo-specialist" },
+        { "slug": "agency-design-lead" },
+        { "slug": "agency-brand-guardian" },
+        { "slug": "agency-proposal-writer" },
+        { "slug": "research-brief-writer" },
+        { "slug": "project-planner" },
+        { "slug": "client-approval-tracker" },
+        { "slug": "marketing-analyst" },
+        { "slug": "timesheet-checker" },
+        { "slug": "invoice-preparer" }
       ],
       "sizes": {
         "small": {
@@ -140,17 +140,17 @@
     {
       "id": "ecommerce",
       "roles": [
-        { "name": "Customer Service Agent", "team": "support" },
-        { "name": "Product Listing Writer", "team": "catalogue" },
-        { "name": "Catalogue Checker", "team": "catalogue" },
-        { "name": "Order Issue Triage", "team": "support" },
-        { "name": "Returns Coordinator", "team": "support" },
-        { "name": "Promotion Planner", "team": "marketing" },
-        { "name": "Content Writer", "team": "marketing" },
-        { "name": "Social Media Manager", "team": "marketing" },
-        { "name": "Stock Alert", "team": "logistics" },
-        { "name": "Supplier Follow-up", "team": "purchasing" },
-        { "name": "Weekly Sales Reporter", "team": "leadership" }
+        { "slug": "customer-service-agent" },
+        { "slug": "product-listing-writer" },
+        { "slug": "catalogue-checker" },
+        { "slug": "order-issue-triage" },
+        { "slug": "returns-coordinator" },
+        { "slug": "promotion-planner" },
+        { "slug": "store-content-writer" },
+        { "slug": "store-social-media-manager" },
+        { "slug": "stock-alert" },
+        { "slug": "supplier-chase" },
+        { "slug": "weekly-sales-reporter" }
       ],
       "sizes": {
         "small": {
@@ -173,15 +173,15 @@
     {
       "id": "construction",
       "roles": [
-        { "name": "Project Planner", "team": "planning" },
-        { "name": "Site Daily Report Writer", "team": "site" },
-        { "name": "Safety Checklist", "team": "hse" },
-        { "name": "RFI Tracker", "team": "planning" },
-        { "name": "Snag List Keeper", "team": "site" },
-        { "name": "Subcontractor Follow-up", "team": "purchasing" },
-        { "name": "Tender Document Checker", "team": "sales" },
-        { "name": "Milestone Billing Preparer", "team": "finance" },
-        { "name": "Handover Pack Builder", "team": "site" }
+        { "slug": "construction-project-planner" },
+        { "slug": "site-daily-report-writer" },
+        { "slug": "safety-checklist" },
+        { "slug": "rfi-tracker" },
+        { "slug": "snag-list-keeper" },
+        { "slug": "subcontractor-follow-up" },
+        { "slug": "tender-document-checker" },
+        { "slug": "milestone-billing-preparer" },
+        { "slug": "handover-pack-builder" }
       ],
       "sizes": {
         "small": {
@@ -204,14 +204,14 @@
     {
       "id": "professional-services",
       "roles": [
-        { "name": "Engagement Planner", "team": "delivery" },
-        { "name": "Document Drafter", "team": "delivery" },
-        { "name": "Deadline Watch", "team": "delivery" },
-        { "name": "Review Checklist", "team": "quality" },
-        { "name": "Client Status Reporter", "team": "delivery" },
-        { "name": "Research Brief Writer", "team": "delivery" },
-        { "name": "Timesheet Checker", "team": "finance" },
-        { "name": "Invoice Preparer", "team": "finance" }
+        { "slug": "engagement-planner" },
+        { "slug": "document-drafter" },
+        { "slug": "deadline-watch" },
+        { "slug": "review-checklist" },
+        { "slug": "client-status-reporter" },
+        { "slug": "proserv-research-brief-writer" },
+        { "slug": "proserv-timesheet-checker" },
+        { "slug": "proserv-invoice-preparer" }
       ],
       "sizes": {
         "small": {
@@ -234,13 +234,13 @@
     {
       "id": "education",
       "roles": [
-        { "name": "Course Planner", "team": "teaching" },
-        { "name": "Student Query Triage", "team": "support" },
-        { "name": "Lesson Material Drafter", "team": "teaching" },
-        { "name": "Assignment Feedback Drafter", "team": "teaching" },
-        { "name": "Attendance Watch", "team": "administration" },
-        { "name": "Schedule Keeper", "team": "administration" },
-        { "name": "Parent Update Writer", "team": "administration" }
+        { "slug": "course-planner" },
+        { "slug": "student-query-triage" },
+        { "slug": "lesson-material-drafter" },
+        { "slug": "assignment-feedback-drafter" },
+        { "slug": "attendance-watch" },
+        { "slug": "schedule-keeper" },
+        { "slug": "parent-update-writer" }
       ],
       "sizes": {
         "small": {
@@ -261,13 +261,13 @@
       }
     },
     {
-      "id": "clinic-admin",
+      "id": "clinic",
       "roles": [
-        { "name": "Appointment Follow-up List", "team": "administration" },
-        { "name": "Supplies Stock Alert", "team": "administration" },
-        { "name": "Staff Roster Checker", "team": "administration" },
-        { "name": "Compliance Checklist", "team": "administration" },
-        { "name": "Patient Feedback Summary", "team": "administration" }
+        { "slug": "appointment-follow-up-list" },
+        { "slug": "clinic-supplies-stock-alert" },
+        { "slug": "staff-roster-checker" },
+        { "slug": "clinic-compliance-checklist-keeper" },
+        { "slug": "clinic-patient-feedback-summary" }
       ],
       "sizes": {
         "small": {
