@@ -1,6 +1,6 @@
 # Handoff: where to start next session
 
-Updated 2026-10-08 16:15 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
+Updated 2026-10-08 20:35 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
 
 ## State
 
@@ -8,13 +8,13 @@ Updated 2026-10-08 16:15 IST. Read this first, then `Tasks/index.md` and the two
   - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent is the person's own Claude or ChatGPT over MCP (decision 30). **The first measured run is done: 15 of 15 pass** (13 on the first try, jobs 8 and 19 after #1568), in `ai-1-run-1-results.md`.
   - Task 048, "Team agent packs" (`Tasks/active/048-team-agent-packs/`): role agents per team, workflows between them, one dispatcher, company blueprints. Part 1 (44 playbooks, IT company and Manufacturing) is #1572, waiting for the owner to read it. Step 2 (each role as an MCP prompt and a downloadable skill, behind `MCP_ROLE_PROMPTS`) is #1574, reviewed, waiting on #1572. Part 3, the dispatcher in suggest mode, is with an agent on top of #1574.
   - Task 046, "great next to ClickUp": no new parity features; fixes, proof and the held PRs remain.
-- **`beta` is at build 825** (#1582). This docs PR becomes the next build.
-- **Live on localhost: build 825**, with `DISPATCHER=on` and `MCP_ROLE_PROMPTS=on` in the owner's `.env` (approved by the owner). Nothing is merged and not built. Start the server only with the "alianhub-api" launch entry: it now unsets the `ANTHROPIC_MODEL` that Claude Code passes down (it had made the server use "opusplan").
+- **`beta` is at build 833** (#1601). This docs PR becomes the next build.
+- **Live on localhost: build 833**, with `DISPATCHER=on` and `MCP_ROLE_PROMPTS=on` in the owner's `.env` (approved by the owner). Nothing is merged and not built. Start the server only with the "alianhub-api" launch entry: it now unsets the `ANTHROPIC_MODEL` that Claude Code passes down (it had made the server use "opusplan").
 - **The owner's local `.env`, changed at the owner's request on 2026-10-08:** the MCP flags (`MCP_OAUTH=both`, issuer localhost:4000, `MCP_TOOLS_DATA/MANAGE/WORK=on`, `MCP_OAUTH_DCR=on`), and the AI provider switched to Anthropic: `LLM_PROVIDER="anthropic"`, `ANTHROPIC_MODEL="claude-sonnet-5-5"`, its price $2/$10 per million in `LLM_PRICING`. The key is in the admin field only; the `.env` key line stays empty. A backup of the old `.env` is in the private handoff folder.
 - **The owner's Claude Code is connected** as `alianhub-oauth` (user scope, OAuth, Manage tasks, Write docs, Read chat). Measured runs: `claude -p "<sentence>" --allowedTools "mcp__alianhub-oauth" --max-turns 40 --output-format json`, from `~`, with the browser pane on the job's start screen.
-- `docs/API.md` and `docs/api/openapi.json` are in sync with build 825.
+- `docs/API.md` and `docs/api/openapi.json` are in sync with build 833.
 
-## Merged since the last handoff (builds 773 to 825)
+## Merged since the last handoff (builds 773 to 833)
 
 | Build | PR | What it carried |
 |---|---|---|
@@ -58,8 +58,19 @@ Updated 2026-10-08 16:15 IST. Read this first, then `Tasks/index.md` and the two
 | 823 | #1579 | The docs PR for builds 820 to 822 |
 | 824 | #1580 | A paused project says so; the sidebar catches up after a hidden tab |
 | 825 | #1582, thirty-third batch | 048: 44 role playbooks (#1572), role prompts and skills behind `MCP_ROLE_PROMPTS` (#1574), the dispatcher in suggest mode behind `DISPATCHER` (#1581) |
+| 826 | #1583 | The docs PR for builds 823 to 825 |
+| 827 | #1584 | Dispatcher hand-check fixes: the card framed, IT company named, the accepter shown, a role sees its queue |
+| 828 | #1585 | Team packs: the catalogue Team filter and one-click packs, undoable |
+| 829, 831 | #1589, #1596 | A mention in an agent's comment reaches the person, on every comment tool |
+| 830 | #1598, thirty-fourth batch | Playbooks for e-commerce, agency, professional services, education and construction; the team packs guide |
+| 832 | #1599, thirty-fifth batch | The company view, tuning a role playbook per workspace, the dispatcher's model guess |
+| 833 | #1601, thirty-sixth batch | Clinic playbooks and the company blueprint picker |
 
 Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choices they made are in 047's `progress.md`, under "Choices to review".
+
+## Work from AlianHub
+
+Since 2026-10-08 the owner gives work as tasks in project AlianHub Platform (AP), list "Claude coordinator" (read-me AP-477). Check it with `handoff/scripts/coord-check.sh` at the start of every session and on the 30-minute `/loop`; post decisions as "Decision taken:" comments there.
 
 ## Open
 
@@ -117,7 +128,7 @@ Access findings and their state are in `~/.claude/projects/-Users-mevil-Alian-Hu
 
 1. When the owner has read #1572: merge it, then the 048 step 2 PR (role prompts and skills for the connected AI) after its own review; use one role from the owner's Claude on the local build.
 2. Ask the owner to see the live view tab by eye (#1578): the coordinator's browser pane is always hidden, so it cannot.
-3. 048: review and batch the dispatcher (suggest mode) PR after #1572 and #1574 merge; then the catalogue Team filter and the one-click pack.
+3. 048: parts 1 to 3, 5 and 6 are built. Left: part 4 as workflow-engine steps; a measured run per pack; the owner's read of the playbooks; the three unlisted e-commerce roles and the 13 "not written yet" roles.
 4. AI-1 measured again (three runs each, with the reserves) and AI-1b, the replay test from these runs.
 5. The hand check of build 812 and the held batch 27 items, as before.
 
