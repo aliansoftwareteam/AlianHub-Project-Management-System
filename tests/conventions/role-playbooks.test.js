@@ -1,0 +1,113 @@
+/* A role playbook is the one text a role agent works from, as a prompt for a connected AI and as an in-product
+ * skill. It may name only MCP tools that exist, carries every section of the model playbook, and hands work only
+ * to roles written beside it. */
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.join(__dirname, '../../Modules/Agents/roles');
+const KEYS = ['slug', 'name', 'blueprint', 'department', 'tools', 'hands_to', 'gates'];
+const LISTS = ['tools', 'hands_to', 'gates'];
+const SECTIONS = [
+    'Who it is',
+    'What it is responsible for',
+    'When to use it',
+    'What it needs before it starts (and asks for when missing)',
+    'How it works, step by step',
+    'What it delivers in AlianHub',
+    'Quality checklist',
+    'When it hands over to a person',
+    'What it never does',
+    'AlianHub tools it uses',
+    'Example',
+];
+
+const playbooks = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return playbooks(full);
+    return entry.name.endsWith('.md') ? [full] : [];
+});
+
+const parse = (file) => {
+    const text = fs.readFileSync(file, 'utf8');
+    const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!match) return { text, meta: null, body: text };
+    const meta = {};
+    match[1].split('\n').filter((line) => line.trim()).forEach((line) => {
+        const [, key, value] = line.match(/^([a-z_]+):\s*(.*)$/) || [];
+        if (!key) return;
+        const list = value.match(/^\[(.*)\]$/);
+        meta[key] = list ? list[1].split(',').map((item) => item.trim()).filter(Boolean) : value.trim();
+    });
+    return { text, meta, body: match[2] };
+};
+
+const FILES = playbooks(ROOT).map((file) => ({ file, rel: path.relative(ROOT, file), ...parse(file) }));
+const toolName = /^[a-z_]+(\.[a-z_]+)+$/;
+
+describe('role playbooks', () => {
+    let registered;
+
+    beforeAll(() => {
+        registered = new Set(require('../../Modules/Mcp/tools').registered().map((tool) => tool.name));
+    });
+
+    it('finds the playbooks and the tool list (the scan works)', () => {
+        expect(FILES.length).toBeGreaterThan(0);
+        expect(registered.has('task.get')).toBe(true);
+    });
+
+    it('open with frontmatter holding every key', () => {
+        const short = FILES.flatMap(({ rel, meta }) => (meta ? KEYS.filter((key) => meta[key] === undefined || meta[key] === '').map((key) => `${rel}: ${key}`) : [`${rel}: no frontmatter`]));
+        expect(short).toEqual([]);
+        const notLists = FILES.flatMap(({ rel, meta }) => LISTS.filter((key) => !Array.isArray(meta[key])).map((key) => `${rel}: ${key}`));
+        expect(notLists).toEqual([]);
+    });
+
+    it('are named by their slug, in the folder of their blueprint', () => {
+        const wrong = FILES.filter(({ rel, meta }) => rel !== path.join(meta.blueprint, `${meta.slug}.md`)).map(({ rel }) => rel);
+        expect(wrong).toEqual([]);
+    });
+
+    it('carry every section of the model playbook, in its order', () => {
+        const missing = FILES.flatMap(({ rel, body }) => {
+            const headings = [...body.matchAll(/^## (.+)$/gm)].map((m) => m[1].trim());
+            const at = SECTIONS.map((section) => headings.findIndex((heading) => heading === section || heading.startsWith(`${section} (`)));
+            const absent = SECTIONS.filter((section, i) => at[i] < 0).map((section) => `${rel}: ${section}`);
+            const ordered = at.every((index, i) => i === 0 || index > at[i - 1]);
+            return absent.length || ordered ? absent : [`${rel}: sections out of order`];
+        });
+        expect(missing).toEqual([]);
+    });
+
+    it('list only MCP tools that exist', () => {
+        const unknown = FILES.flatMap(({ rel, meta }) => meta.tools.filter((name) => !registered.has(name)).map((name) => `${rel}: ${name}`));
+        expect(unknown).toEqual([]);
+    });
+
+    it('name in the text only tools that exist, and only tools the frontmatter lists', () => {
+        const stray = FILES.flatMap(({ rel, meta, body }) => [...body.matchAll(/`([^`]+)`/g)]
+            .map((m) => m[1])
+            .filter((name) => toolName.test(name))
+            .filter((name) => !registered.has(name) || !meta.tools.includes(name))
+            .map((name) => `${rel}: ${name}`));
+        expect(stray).toEqual([]);
+    });
+
+    it('show every listed tool in the tools section', () => {
+        const unnamed = FILES.flatMap(({ rel, meta, body }) => {
+            const section = (body.split(/^## AlianHub tools it uses$/m)[1] || '').split(/^## /m)[0];
+            return meta.tools.filter((name) => !section.includes(`\`${name}\``)).map((name) => `${rel}: ${name}`);
+        });
+        expect(unnamed).toEqual([]);
+    });
+
+    it('hand work only to roles written in the same blueprint', () => {
+        const slugs = new Set(FILES.map(({ meta }) => `${meta.blueprint}/${meta.slug}`));
+        const dangling = FILES.flatMap(({ rel, meta }) => meta.hands_to.filter((slug) => !slugs.has(`${meta.blueprint}/${slug}`)).map((slug) => `${rel}: ${slug}`));
+        expect(dangling).toEqual([]);
+    });
+
+    it('use plain punctuation: no em dash', () => {
+        expect(FILES.filter(({ text }) => text.includes('—')).map(({ rel }) => rel)).toEqual([]);
+    });
+});
