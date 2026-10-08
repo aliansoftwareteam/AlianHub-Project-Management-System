@@ -25,13 +25,13 @@
         { "slug": "proposal-writer" },
         { "slug": "status-reporter" },
         { "slug": "risk-watch" },
-        { "name": "Regression Watch", "team": "engineering", "notWritten": true },
-        { "name": "Change Checklist", "team": "engineering", "notWritten": true },
-        { "name": "Project Planner", "team": "delivery", "notWritten": true },
-        { "name": "Client Status Reporter", "team": "delivery", "notWritten": true },
-        { "name": "Timesheet Checker", "team": "delivery", "notWritten": true },
-        { "name": "Invoice Preparer", "team": "finance", "notWritten": true },
-        { "name": "Onboarding Coordinator", "team": "people", "notWritten": true }
+        { "slug": "regression-watch" },
+        { "slug": "change-checklist" },
+        { "slug": "it-project-planner" },
+        { "slug": "it-client-status-reporter" },
+        { "slug": "it-timesheet-checker" },
+        { "slug": "it-invoice-preparer" },
+        { "slug": "onboarding-coordinator" }
       ],
       "sizes": {
         "small": {
@@ -76,12 +76,12 @@
         { "slug": "safety-incident-reporter" },
         { "slug": "training-due-watch" },
         { "slug": "change-request-writer" },
-        { "name": "Audit Checklist", "team": "hse", "notWritten": true },
-        { "name": "Stock Alert", "team": "logistics", "notWritten": true },
-        { "name": "Drawing Revision Tracker", "team": "engineering", "notWritten": true },
-        { "name": "Invoice Preparer", "team": "finance", "notWritten": true },
-        { "name": "Shift Roster Checker", "team": "people", "notWritten": true },
-        { "name": "Training Records", "team": "people", "notWritten": true }
+        { "slug": "audit-checklist" },
+        { "slug": "plant-stock-alert" },
+        { "slug": "drawing-revision-tracker" },
+        { "slug": "plant-invoice-preparer" },
+        { "slug": "shift-roster-checker" },
+        { "slug": "training-records" }
       ],
       "sizes": {
         "small": {
@@ -150,7 +150,10 @@
         { "slug": "store-social-media-manager" },
         { "slug": "stock-alert" },
         { "slug": "supplier-chase" },
-        { "slug": "weekly-sales-reporter" }
+        { "slug": "weekly-sales-reporter" },
+        { "slug": "customer-service-lead" },
+        { "slug": "reconciliation-checker" },
+        { "slug": "store-brand-guardian" }
       ],
       "sizes": {
         "small": {
@@ -160,13 +163,13 @@
         },
         "medium": {
           "people": [25, 150],
-          "roles": 11,
-          "seats": [15, 22]
+          "roles": 14,
+          "seats": [19, 28]
         },
         "large": {
           "people": [150, 1000],
-          "roles": 11,
-          "seats": [27, 55]
+          "roles": 14,
+          "seats": [34, 70]
         }
       }
     },
