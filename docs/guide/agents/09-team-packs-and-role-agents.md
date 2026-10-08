@@ -2,36 +2,56 @@
 
 A role playbook is a written job description for an AI. It says who the AI is in a team, what it looks after, what it needs before it starts, what it hands over, and what it never does. It is plain text. It gives no new power: your AI still acts as you, with your rights.
 
-AlianHub ships 44 playbooks in two team packs. A person who runs your server can switch the features on or off. See "Who switches what on" at the end.
+AlianHub ships playbooks for several company blueprints, for example an IT company and a manufacturer. Each playbook names its team, such as engineering or quality. The full, current set lives in [Modules/Agents/roles](../../../Modules/Agents/roles), one folder per blueprint. A person who runs your server can switch the features on or off. See "Who switches what on" at the end.
 
-## The 44 roles
+## Roles, grouped by team
 
-### IT company (22)
+A team groups the roles that work together. The tables below show, for example, how two blueprints are grouped. The set grows, so read the folder above for the roles your server has.
+
+### For example, an IT company
 
 | Team | Roles |
 |---|---|
-| Engineering | Bug Triager, Code Reviewer, Documentation Writer, Release Manager, Tech Lead |
+| Engineering | Bug Triager, Code Reviewer, Documentation Writer, Incident Scribe, QA Engineer, Release Manager, Tech Lead |
 | Design | Brand Guardian, Design Lead, Design QA Reviewer, UI/UX Designer |
-| Product | Feedback Collector, PRD Writer, Roadmap Keeper |
+| Product | Feedback Collector, PRD Writer, Risk Watch, Roadmap Keeper, Status Reporter |
 | Sales | Account Manager, Proposal Writer, Sales Development Rep |
 | Support | Knowledge Base Writer, Support Agent, Support Lead |
-| QA | QA Engineer |
-| DevOps | Incident Scribe |
-| Leadership | Risk Watch, Status Reporter |
 
-### Manufacturing (22)
+### For example, a manufacturer
 
 | Team | Roles |
 |---|---|
 | Production | Downtime Logger, Shift Handover Writer, Work Instruction Keeper |
-| Production planning | Production Planner, Schedule Change Watch |
+| Planning | Production Planner, Schedule Change Watch |
 | Maintenance | Breakdown Triage, Maintenance Planner, Spare Parts Watch |
 | Quality | Corrective Action Tracker, Inspection Checklist, Non-conformance Recorder |
 | Sales and orders | Customer Update Writer, Order Intake, Quote Preparer |
 | Purchasing | Purchase Request Preparer, Supplier Follow-up, Supplier Scorecard |
-| Warehouse and logistics | Delivery Tracker, Dispatch Checklist |
-| Health, safety, environment | Safety Incident Reporter, Training Due Watch |
+| Logistics | Delivery Tracker, Dispatch Checklist |
+| Health and safety | Safety Incident Reporter, Training Due Watch |
 | Engineering | Change Request Writer |
+
+A team is not the same as a department. Several departments can share one team: in the IT company, the QA and DevOps roles sit in Engineering, and the Leadership roles sit in Product.
+
+## Team packs
+
+Team packs, and the grouping by team above, arrive with pull request #1585. Until it is merged, the app does not group roles by team.
+
+### Turn on a team pack with one click
+
+Open **AI**, then **Team packs**. Pick a company blueprint, tick one or more teams, tick the projects to turn them on in (up to 50 at a time), then choose **Turn on**.
+
+- The pack turns the team's roles on in each project's dispatcher, and nothing else. Each project keeps its dispatcher mode. A project whose dispatcher is off routes nothing until someone switches it on in the project's settings.
+- You can pick a project only if you are a workspace admin or may change that project's details. A project you cannot pick says why.
+- Every project is checked first, so the pack is turned on in all the projects you picked or in none.
+- Afterwards, **Undo** turns off the roles that pack turned on, and no other role.
+- Turning a pack on, and undoing it, are written to the audit log.
+- If the dispatcher is switched off on the server, the page says so and cannot turn a pack on.
+
+### Browse roles by team in the catalogue
+
+The agent catalogue has a **Team** filter. Choose a blueprint and a team, for example "IT company · Engineering", to see that team's roles. Each card shows the role, its department, a short summary and the tools it uses, and the search box narrows the list. **Turn on as a team pack** opens the Team packs page. Leave the filter on "Any team" to see the templates as before.
 
 ## What is in a playbook
 
@@ -106,11 +126,11 @@ When a rule names several conditions, all must hold. When a condition lists seve
 
 ### AI guess
 
-If no rule matches, the dispatcher can ask a model to guess, but only if all of these are true: the project's model guess is on, a model is set up on the server, and the guess is at least as sure as the project's confidence level (50 to 100, default 80). It sees only the task's title, type, tags and description, and the names of the roles that are on. On a server where nothing is plugged in, no guess is made.
+The settings have a model guess switch and a confidence level, but the guess does not run yet: no guesser ships with AlianHub. Turning the switch on changes nothing today.
 
 ### Needs routing
 
-If no rule matches and there is no sure guess, the task waits in the project's **Needs routing** list. Nobody is chosen for it. A lead opens the task and picks a role.
+If no rule matches, the task waits in the project's **Needs routing** list. Nobody is chosen for it. A lead opens the task and picks a role.
 
 ### Who is a lead
 
