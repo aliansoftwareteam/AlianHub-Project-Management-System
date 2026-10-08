@@ -82,7 +82,7 @@ If the machine or start time is missing it asks the person once, in one message.
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.link`, `page.create`, `page.update`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.link`, `page.create`, `page.update`. All through the person's own connection and rights.
 
 ## Example
 

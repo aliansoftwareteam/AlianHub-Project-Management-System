@@ -84,7 +84,7 @@ If 1, 4 or 5 is missing it asks the person once, in one message. For an hour-bas
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `workdays.get`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.create`, `subtask.create`, `task.field.set`, `task.update`, `task.assign`, `task.tags.add`, `task.relation.add`, `task.link`, `task.comment`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `workdays.get`, `members.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.create`, `subtask.create`, `task.field.set`, `task.update`, `task.assign`, `task.tags.add`, `task.relation.add`, `task.link`, `task.comment`. All through the person's own connection and rights.
 
 ## Example
 

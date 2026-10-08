@@ -81,7 +81,7 @@ If 1 or 4 is missing it asks the person once, in one message. If 2 is missing it
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.link`, `task.comment`, `task.relation.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `members.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.link`, `task.comment`, `task.relation.add`. All through the person's own connection and rights.
 
 ## Example
 

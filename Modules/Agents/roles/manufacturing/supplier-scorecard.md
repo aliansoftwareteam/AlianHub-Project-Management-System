@@ -82,7 +82,7 @@ If 1, 2 or 5 is missing it asks the person once, in one message. Without a scori
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `task.relations.list`, `page.get`, `pages.search`, `page.versions.list`. Writing: `page.create`, `page.update`, `task.link`, `task.comment`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `task.relations.list`, `page.get`, `pages.search`, `page.versions.list`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.link`, `task.comment`. All through the person's own connection and rights.
 
 ## Example
 

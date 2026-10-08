@@ -82,7 +82,7 @@ If 1 or 2 is missing it asks the person once, in one message. A person with no r
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.create`, `task.assign`, `task.comment`, `task.tags.add`, `task.relation.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.create`, `task.assign`, `task.comment`, `task.tags.add`, `task.relation.add`. All through the person's own connection and rights.
 
 ## Example
 
