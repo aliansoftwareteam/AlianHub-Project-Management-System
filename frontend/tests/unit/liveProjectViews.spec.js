@@ -80,6 +80,7 @@ describe('a view added elsewhere', () => {
         await vi.advanceTimersByTimeAsync(GATHER_MS);
         await flushPromises();
         expect(tabs()).toEqual(['List', 'By Stage']);
+        expect(apiRequest.mock.calls.map(([, url]) => url)).toEqual(['/api/v1/project']);
     });
 
     it('costs no read when the first socket connects', async () => {
