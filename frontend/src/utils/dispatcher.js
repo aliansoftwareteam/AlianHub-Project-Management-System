@@ -18,6 +18,12 @@ export const fetchTaskRouting = (taskId) => apiRequest("get", `${BASE}/task/${ta
 
 export const actOnRouting = (taskId, decisionId, action, body = {}) => apiRequest("post", `${BASE}/task/${taskId}/decisions/${decisionId}/${action}`, body).then(dataOf);
 
+/* A blueprint's display name; one the locales do not know yet shows as its slug. */
+export const blueprintName = (t, te, blueprint) => {
+    const key = `Blueprints.${String(blueprint || "").replace(/-/g, "_")}`;
+    return te(key) ? t(key) : String(blueprint || "");
+};
+
 export const DISPATCHER_CHANGED_EVENT = "dispatcherChanged";
 
 /* Calls `onChange` whenever the dispatcher's decisions or settings change in the company; the socket is replaced on reconnect. */
