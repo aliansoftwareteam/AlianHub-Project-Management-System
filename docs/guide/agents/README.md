@@ -16,6 +16,7 @@ Some changes happen at once, and you can undo them. Some wait for you to approve
 6. [What your AI can see](06-what-it-sees.md)
 7. [The audit log](07-audit-log.md)
 8. [Ten things to say](08-things-to-say.md)
+9. [Team packs and role agents](09-team-packs-and-role-agents.md)
 
 ## Good to know
 
