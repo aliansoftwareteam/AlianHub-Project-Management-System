@@ -60,7 +60,7 @@ import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import IntentPreview from "@/components/molecules/IntentPreview/IntentPreview.vue";
 import { hasParts } from "@/components/molecules/IntentPreview/planPicks";
 import { usePlanChoices } from "@/components/molecules/IntentPreview/planChoices";
-import { laterLine } from "@/views/Inbox/approvalQueue";
+import { laterLine, unappliedOf } from "@/views/Inbox/approvalQueue";
 import { changeLabel } from "@/views/Ai/agentActionLabels";
 import { aiOff } from "@/composable/aiAvailability";
 import { fetchPendingProposals, sendProposalDecision } from "@/composable/agentProposals";
@@ -126,17 +126,20 @@ async function approve(item) {
     busy.value = true;
     try {
         let later = "";
+        let unapplied = [];
         if (item.kind === "proposal") {
             const res = await sendProposalDecision(item.id, "approve", item.plan ? plans.bodyFor(item.id, item.plan) : {});
             if (!res?.data?.status) throw new Error(res?.data?.statusText || t("Inbox.action_failed"));
             showProjects(store, madeProjectIds(res.data.data));
             later = laterLine(t, res.data.data);
+            unapplied = unappliedOf(res.data.data);
             plans.forget(item.id);
         } else {
             await workflow.decide(item.source, "approved");
         }
         drop(item);
-        $toast.success(t("Home.waiting_approved"), { position: "top-right" });
+        if (unapplied.length) $toast.error(t("Ai.applied_with_failures", { n: unapplied.length, error: unapplied[0].error }), { position: "top-right" });
+        else $toast.success(t("Home.waiting_approved"), { position: "top-right" });
         if (later) {
             $toast.info(later, { position: "top-right" });
             await load().catch(() => {});

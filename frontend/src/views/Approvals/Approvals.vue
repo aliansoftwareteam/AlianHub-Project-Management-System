@@ -177,7 +177,7 @@ import ProposalWhyDialog from './ProposalWhyDialog.vue';
 import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
 import { hasParts } from '@/components/molecules/IntentPreview/planPicks';
 import { usePlanChoices } from '@/components/molecules/IntentPreview/planChoices';
-import { laterLine } from '@/views/Inbox/approvalQueue';
+import { laterLine, unappliedOf } from '@/views/Inbox/approvalQueue';
 import { proposalTitle } from '@/views/Ai/plainLabels';
 import { changeLabel } from '@/views/Ai/agentActionLabels';
 
@@ -346,17 +346,19 @@ const decide = async (card, action, reason) => {
         agentProposals.value = agentProposals.value.filter((r) => r.id !== card.row.id);
         const later = laterLine(t, body.data);
         if (later) await loadProposals();
-        return later;
+        const unapplied = unappliedOf(body.data);
+        return { later, failed: unapplied.length ? t('Ai.applied_with_failures', { n: unapplied.length, error: unapplied[0].error }) : '' };
     }
-    return '';
+    return {};
 };
 const approve = async (card) => {
     if (busy.value) return;
     busy.value = card.key;
     error.value = '';
     try {
-        const later = await decide(card, 'approve');
-        flash([t('Time.approved_ok'), later].filter(Boolean).join(' '), later ? 6000 : 3000);
+        const { later = '', failed = '' } = await decide(card, 'approve');
+        if (failed) error.value = [failed, later].filter(Boolean).join(' ');
+        else flash([t('Time.approved_ok'), later].filter(Boolean).join(' '), later ? 6000 : 3000);
     } catch (e) {
         error.value = t('Time.action_failed');
     } finally {
