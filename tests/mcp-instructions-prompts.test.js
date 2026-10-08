@@ -268,9 +268,15 @@ describe('the ready-made prompts', () => {
 });
 
 describe('neither reads the workspace', () => {
-    it.each(EVERY_MIX)('no workspace data and no database read but the workspace\'s edited role playbooks for %s', async (label, mix, caller) => {
+    it.each(EVERY_MIX)('no workspace data, and no database read but one of the edited role playbooks cached up to 60 s, for %s', async (label, mix, caller) => {
         flags(...mix);
+        const { myCache } = require('../Config/config');
+        const cached = new Map();
+        const { get, set } = myCache;
+        myCache.get = (key) => cached.get(key);
+        myCache.set = (key, value, ttl) => { expect(ttl).toBeLessThanOrEqual(60); cached.set(key, value); return true; };
         const reads = jest.spyOn(mockDb, 'crud');
+        reads.mockClear();
         const who = caller();
         const texts = [await told(who)];
         for (const prompt of await promptList(who)) {
@@ -278,8 +284,11 @@ describe('neither reads the workspace', () => {
             texts.push((await promptText(who, prompt.name)).text);
             texts.push((await promptText(who, prompt.name, { project: 'Website relaunch', period: 'this week' })).text);
         }
-        expect(reads.mock.calls.filter(([, query]) => query.type !== 'role_playbook_overrides')).toEqual([]);
+        const [overrideReads, others] = [true, false].map((wanted) => reads.mock.calls.filter(([, query]) => (query.type === 'role_playbook_overrides') === wanted));
+        expect(others).toEqual([]);
+        expect(overrideReads.length).toBeLessThanOrEqual(1);
         reads.mockRestore();
+        Object.assign(myCache, { get, set });
         const all = texts.join('\n');
         ['Olive Owner', 'Gus Guest', 'Open task', 'Private list', 'List of the private project', CID, OWNER, P_OPEN, T_OPEN].forEach((stored) => expect(all).not.toContain(stored));
     });
