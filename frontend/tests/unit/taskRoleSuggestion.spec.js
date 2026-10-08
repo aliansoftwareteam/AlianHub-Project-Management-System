@@ -44,11 +44,12 @@ describe('TaskRoleSuggestion', () => {
     });
 
     it('accepts through the dispatcher endpoint and then shows where the task went', async () => {
-        const wrapper = await mountChip({ answer: { decision: decision({ state: 'accepted' }), offer: null } });
+        const wrapper = await mountChip({ answer: { decision: decision({ state: 'accepted', resolvedBy: 'u-lead' }), offer: null } });
         await wrapper.find('[data-test="role-accept"]').trigger('click');
         await flushPromises();
         expect(apiRequest).toHaveBeenCalledWith('post', `${BASE}/task/t1/decisions/d1/accept`, {});
-        expect(chip(wrapper).text()).toContain('Dispatcher.routed_to {"role":"Bug Triager"}');
+        expect(chip(wrapper).text()).toContain('Dispatcher.accepted_by {"role":"Bug Triager","person":"Lena"}');
+        expect(chip(wrapper).text()).toContain('Dispatcher.by_rule {"n":1}');
         expect(wrapper.find('[data-test="role-accept"]').exists()).toBe(false);
     });
 

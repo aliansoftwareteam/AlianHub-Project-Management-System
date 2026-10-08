@@ -13364,6 +13364,7 @@ export default {
         needs_routing: "Needs routing",
         routed_to: "Routed to {role} by the dispatcher",
         routed_by: "Routed to {role} by {person}",
+        accepted_by: "{role} · accepted by {person}",
         someone: "someone",
         roles_title: "Roles on in this project",
         roles_group: "{blueprint} ({on} of {total} on)",
@@ -13396,6 +13397,10 @@ export default {
         offer_add: "Add rule",
         offer_added: "Routing rule added.",
         failed: "Could not update the routing. Please try again.",
+    },
+    Blueprints: {
+        it_company: "IT company",
+        manufacturing: "Manufacturing",
     },
     AssignmentRules: {
         title: "Assignment rules",

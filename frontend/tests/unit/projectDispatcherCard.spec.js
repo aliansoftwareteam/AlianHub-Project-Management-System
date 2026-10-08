@@ -8,7 +8,7 @@ const { apiRequest, echo, socket } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/services', () => ({ apiRequest }));
-vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: echo }) }));
+vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: echo, te: (key) => key === 'Blueprints.it_company' }) }));
 vi.mock('vuex', () => ({ useStore: () => ({ getters: { 'settings/getSocketInstance': socket } }) }));
 
 import ProjectDispatcherCard from '@/views/Projects/ProjectDetail/ProjectDispatcherCard.vue';
@@ -54,7 +54,11 @@ describe('ProjectDispatcherCard', () => {
 
     it('groups the roles by blueprint and saves the roles switched on', async () => {
         const wrapper = await mountCard();
-        expect(wrapper.findAll('[data-test="dispatcher-role-group"]')).toHaveLength(2);
+        const groups = wrapper.findAll('[data-test="dispatcher-role-group"]');
+        expect(groups).toHaveLength(2);
+        expect(groups[0].find('summary').text()).toContain('"blueprint":"Blueprints.it_company"');
+        expect(groups[1].find('summary').text()).toContain('"blueprint":"manufacturing"');
+        expect(wrapper.find('[data-test="project-dispatcher"]').classes()).toContain('ah-card');
         await wrapper.find(`[data-test="dispatcher-role-${PLANNER.key}"]`).setValue(true);
         await wrapper.find('[data-test="dispatcher-save"]').trigger('click');
         await flushPromises();
