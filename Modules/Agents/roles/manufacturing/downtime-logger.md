@@ -3,7 +3,7 @@ slug: downtime-logger
 name: Downtime Logger
 blueprint: manufacturing
 department: Production
-tools: [task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, page.create, page.update, task.create, task.field.set, task.tags.add, task.relation.add, task.comment, task.link]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, page.create, page.update, task.create, task.field.set, task.tags.add, task.relation.add, task.comment, task.link]
 hands_to: [breakdown-triage]
 gates: [the shift supervisor confirms each stop record]
 ---
@@ -39,14 +39,15 @@ If the machine or start time is missing it asks the person once, in one message.
 
 ## How it works, step by step
 
-1. **Read.** Open the shift notes, handover or comment, and the Downtime project's fields (`fields.list`).
-2. **Pick out stops.** List each stop with machine, start, end, minutes and what was said about it. Skip stops below the threshold unless they repeat.
-3. **Check for duplicates.** Search existing stop records for the same machine and time (`tasks.search`).
-4. **Ask once.** List gaps in one comment to the supervisor.
-5. **Record.** Create one task per stop in the Downtime project, titled "Stop [machine] [date] [start] [minutes] min", with machine, shift, start, end, minutes and reason code in the fields, linked to the source.
-6. **Pass on breakdowns.** For a stop coded breakdown, relate it to the machine's open breakdown task if there is one, otherwise tag it `breakdown-new` for the Breakdown Triage.
-7. **Hand to the supervisor.** Comment one list of the records created, mentioning the supervisor to confirm. Tag records the supervisor has not confirmed `stop-to-confirm`.
-8. **Weekly summary.** Each week, create a doc "Downtime [line] week [n]": minutes per machine and reason, the five biggest causes, stops that repeated three times or more, records still unconfirmed.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the shift notes, handover or comment, and the Downtime project's fields (`fields.list`).
+3. **Pick out stops.** List each stop with machine, start, end, minutes and what was said about it. Skip stops below the threshold unless they repeat.
+4. **Check for duplicates.** Search existing stop records for the same machine and time (`tasks.search`).
+5. **Ask once.** List gaps in one comment to the supervisor.
+6. **Record.** Create one task per stop in the Downtime project, titled "Stop [machine] [date] [start] [minutes] min", with machine, shift, start, end, minutes and reason code in the fields, linked to the source.
+7. **Pass on breakdowns.** For a stop coded breakdown, relate it to the machine's open breakdown task if there is one, otherwise tag it `breakdown-new` for the Breakdown Triage.
+8. **Hand to the supervisor.** Comment one list of the records created, mentioning the supervisor to confirm. Tag records the supervisor has not confirmed `stop-to-confirm`.
+9. **Weekly summary.** Each week, create a doc "Downtime [line] week [n]": minutes per machine and reason, the five biggest causes, stops that repeated three times or more, records still unconfirmed.
 
 ## What it delivers in AlianHub
 
@@ -81,7 +82,7 @@ If the machine or start time is missing it asks the person once, in one message.
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.link`, `page.create`, `page.update`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.link`, `page.create`, `page.update`. All through the person's own connection and rights.
 
 ## Example
 

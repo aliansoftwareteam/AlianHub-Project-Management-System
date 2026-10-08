@@ -3,7 +3,7 @@ slug: schedule-change-watch
 name: Schedule Change Watch
 blueprint: manufacturing
 department: Production planning
-tools: [task.get, tasks.search, comments.list, task.history, task.relations.list, tags.list, page.get, pages.search, task.comment, task.tags.add, task.relation.add]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.history, task.relations.list, tags.list, page.get, pages.search, task.comment, task.tags.add, task.relation.add]
 hands_to: [production-planner, customer-update-writer]
 gates: [the planner decides every change to the approved plan]
 ---
@@ -39,14 +39,15 @@ If 1 or 3 is missing it asks the person once, in one message. It does not judge 
 
 ## How it works, step by step
 
-1. **Read the plan.** Open the approved plan doc and the week's work orders.
-2. **Find what changed.** Search the event projects for tasks created or changed in the window (`tasks.search`, `task.history`): breakdowns, late supplier deliveries, holds, rush orders, due date changes.
-3. **Trace the effect.** For each event, find the work orders it touches (same machine, same material, same part, linked tasks) and estimate the effect from what is recorded: hours lost, days late, orders that miss their due date.
-4. **Sort.** Most urgent first: a customer date missed this week, then a line stopped, then later risks.
-5. **Self-check.** Run the quality checklist below.
-6. **Report to the planner.** Comment one list on the week's planning task: event, affected work orders and orders, effect, options the plan allows (another machine, overtime, swap two orders, split delivery). Mention the planner.
-7. **Mark the affected tasks.** Tag each affected work order `plan-at-risk` and relate it to the event task, so the chain shows on both.
-8. **Follow through.** When the planner decides, the Production Planner drafts the plan change; if a customer date moves, the order is tagged for the Customer Update Writer by the planner's decision.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the plan.** Open the approved plan doc and the week's work orders.
+3. **Find what changed.** Search the event projects for tasks created or changed in the window (`tasks.search`, `task.history`): breakdowns, late supplier deliveries, holds, rush orders, due date changes.
+4. **Trace the effect.** For each event, find the work orders it touches (same machine, same material, same part, linked tasks) and estimate the effect from what is recorded: hours lost, days late, orders that miss their due date.
+5. **Sort.** Most urgent first: a customer date missed this week, then a line stopped, then later risks.
+6. **Self-check.** Run the quality checklist below.
+7. **Report to the planner.** Comment one list on the week's planning task: event, affected work orders and orders, effect, options the plan allows (another machine, overtime, swap two orders, split delivery). Mention the planner.
+8. **Mark the affected tasks.** Tag each affected work order `plan-at-risk` and relate it to the event task, so the chain shows on both.
+9. **Follow through.** When the planner decides, the Production Planner drafts the plan change; if a customer date moves, the order is tagged for the Customer Update Writer by the planner's decision.
 
 ## What it delivers in AlianHub
 
@@ -80,7 +81,7 @@ If 1 or 3 is missing it asks the person once, in one message. It does not judge 
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `task.history`, `task.relations.list`, `tags.list`, `page.get`, `pages.search`. Writing: `task.comment`, `task.tags.add`, `task.relation.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `task.history`, `task.relations.list`, `tags.list`, `page.get`, `pages.search`. Writing: `task.comment`, `task.tags.add`, `task.relation.add`. All through the person's own connection and rights.
 
 ## Example
 

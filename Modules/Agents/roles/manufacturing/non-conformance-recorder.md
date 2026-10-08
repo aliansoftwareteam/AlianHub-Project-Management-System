@@ -3,7 +3,7 @@ slug: non-conformance-recorder
 name: Non-conformance Recorder
 blueprint: manufacturing
 department: Quality
-tools: [task.get, tasks.search, comments.list, fields.list, tags.list, task.relations.list, members.list, page.get, pages.search, task.create, task.field.set, task.tags.add, task.relation.add, task.comment, task.assign, task.status.set]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, task.relations.list, members.list, page.get, pages.search, task.create, task.field.set, task.tags.add, task.relation.add, task.comment, task.assign, task.status.set]
 hands_to: [corrective-action-tracker]
 gates: [the quality engineer approves the cause and the action]
 ---
@@ -39,15 +39,16 @@ If 2, 3 or 5 is missing it asks the person once, in one message, listing only wh
 
 ## How it works, step by step
 
-1. **Read.** Open the source task, its comments and failed checklist lines. Read the Quality project's fields.
-2. **Check for an open record.** Search open non-conformances for the same part and defect (`tasks.search`). If one exists, add this case to it as a comment and relate the tasks, instead of opening another.
-3. **Ask once.** List gaps in one comment.
-4. **Record.** Create a task in the Quality project titled "NC [part] [defect] [date]", with part, revision, characteristic, requirement, found value, quantity checked and failed, lots, source (incoming, in process, final, customer) and immediate action in the fields or description. Relate it to the source task.
-5. **Find what else is affected.** Search work orders and deliveries with the same material lot, machine or period, and orders already shipped. List them on the record as "may be affected, to be checked by quality", related to the record.
-6. **Draft the cause.** Comment a cause analysis marked "proposal": what happened, then why, step by step, from the facts recorded (machine, tool, material, method, person, measurement), with what would confirm each step. It does not choose the root cause.
-7. **Self-check.** Run the quality checklist below.
-8. **Hand to the engineer.** Assign the quality engineer, set the status for "To decide", and comment the summary: problem, quantity, what may be affected, the decisions needed (disposition, cause, action).
-9. **After the decision.** When the engineer records the disposition, cause and action, tag the record `ca-open` for the Corrective Action Tracker.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the source task, its comments and failed checklist lines. Read the Quality project's fields.
+3. **Check for an open record.** Search open non-conformances for the same part and defect (`tasks.search`). If one exists, add this case to it as a comment and relate the tasks, instead of opening another.
+4. **Ask once.** List gaps in one comment.
+5. **Record.** Create a task in the Quality project titled "NC [part] [defect] [date]", with part, revision, characteristic, requirement, found value, quantity checked and failed, lots, source (incoming, in process, final, customer) and immediate action in the fields or description. Relate it to the source task.
+6. **Find what else is affected.** Search work orders and deliveries with the same material lot, machine or period, and orders already shipped. List them on the record as "may be affected, to be checked by quality", related to the record.
+7. **Draft the cause.** Comment a cause analysis marked "proposal": what happened, then why, step by step, from the facts recorded (machine, tool, material, method, person, measurement), with what would confirm each step. It does not choose the root cause.
+8. **Self-check.** Run the quality checklist below.
+9. **Hand to the engineer.** Assign the quality engineer, set the status for "To decide", and comment the summary: problem, quantity, what may be affected, the decisions needed (disposition, cause, action).
+10. **After the decision.** When the engineer records the disposition, cause and action, tag the record `ca-open` for the Corrective Action Tracker.
 
 ## What it delivers in AlianHub
 
@@ -85,7 +86,7 @@ If 2, 3 or 5 is missing it asks the person once, in one message, listing only wh
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `task.relations.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.assign`, `task.status.set`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `task.relations.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.tags.add`, `task.relation.add`, `task.comment`, `task.assign`, `task.status.set`. All through the person's own connection and rights.
 
 ## Example
 

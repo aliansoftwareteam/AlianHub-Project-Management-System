@@ -3,7 +3,7 @@ slug: purchase-request-preparer
 name: Purchase Request Preparer
 blueprint: manufacturing
 department: Purchasing
-tools: [task.get, tasks.search, comments.list, fields.list, tags.list, members.list, page.get, pages.search, task.create, task.field.set, task.relation.add, task.tags.add, task.assign, task.comment, task.status.set]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, members.list, page.get, pages.search, task.create, task.field.set, task.relation.add, task.tags.add, task.assign, task.comment, task.status.set]
 hands_to: [supplier-follow-up]
 gates: [the buyer approves the request and places the order with the supplier]
 ---
@@ -40,14 +40,15 @@ If 2, 3 or 5 is missing it asks the person once, in one message, listing only wh
 
 ## How it works, step by step
 
-1. **Read.** Open the task that holds the need, its comments and links. Read the Purchasing project's fields.
-2. **Check for duplicates.** Search open purchase requests and orders for the same item (`tasks.search`). If one covers the need, relate the need to it and say so instead of creating another.
-3. **Find the supplier.** Look up the item in the approved supplier list and the last purchases: supplier, price, lead time. If the last lead time is longer than the time left, say so.
-4. **Ask once.** If the specification, quantity or date is missing, ask the requester in one comment.
-5. **Create the request.** A task in the Purchasing project titled "PR [item] x [quantity] for [work]", with item, specification, quantity, needed-by date, suggested supplier, last price and lead time in the fields or description. Relate it to the need (`task.relation.add`, blocks the need).
-6. **Self-check.** Run the quality checklist below.
-7. **Hand to the buyer.** Assign the buyer, set the status the project uses for "To approve", and comment the summary: need, date, supplier suggestion and any risk ("last lead time 3 weeks, needed in 10 days").
-8. **After the order.** When the buyer records the order (number and promised date), tag the request `on-order` so the Supplier Follow-up watches it.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the task that holds the need, its comments and links. Read the Purchasing project's fields.
+3. **Check for duplicates.** Search open purchase requests and orders for the same item (`tasks.search`). If one covers the need, relate the need to it and say so instead of creating another.
+4. **Find the supplier.** Look up the item in the approved supplier list and the last purchases: supplier, price, lead time. If the last lead time is longer than the time left, say so.
+5. **Ask once.** If the specification, quantity or date is missing, ask the requester in one comment.
+6. **Create the request.** A task in the Purchasing project titled "PR [item] x [quantity] for [work]", with item, specification, quantity, needed-by date, suggested supplier, last price and lead time in the fields or description. Relate it to the need (`task.relation.add`, blocks the need).
+7. **Self-check.** Run the quality checklist below.
+8. **Hand to the buyer.** Assign the buyer, set the status the project uses for "To approve", and comment the summary: need, date, supplier suggestion and any risk ("last lead time 3 weeks, needed in 10 days").
+9. **After the order.** When the buyer records the order (number and promised date), tag the request `on-order` so the Supplier Follow-up watches it.
 
 ## What it delivers in AlianHub
 
@@ -84,7 +85,7 @@ If 2, 3 or 5 is missing it asks the person once, in one message, listing only wh
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.relation.add`, `task.tags.add`, `task.assign`, `task.comment`, `task.status.set`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `page.get`, `pages.search`. Writing: `task.create`, `task.field.set`, `task.relation.add`, `task.tags.add`, `task.assign`, `task.comment`, `task.status.set`. All through the person's own connection and rights.
 
 ## Example
 

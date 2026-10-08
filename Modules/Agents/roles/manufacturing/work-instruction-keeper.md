@@ -3,7 +3,7 @@ slug: work-instruction-keeper
 name: Work Instruction Keeper
 blueprint: manufacturing
 department: Production
-tools: [task.get, tasks.search, comments.list, task.relations.list, page.get, pages.search, page.versions.list, page.version.get, page.create, page.update, page.comments.list, page.comment.create, page.comment.reply, task.link, task.comment, task.tags.add, task.assign]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.relations.list, page.get, pages.search, page.versions.list, page.version.get, page.create, page.update, page.comments.list, page.comment.create, page.comment.reply, task.link, task.comment, task.tags.add, task.assign]
 hands_to: [training-due-watch]
 gates: [the process engineer approves every new or changed instruction before it is used]
 ---
@@ -40,14 +40,15 @@ If 1, 2 or 5 is missing it asks the person once, in one message. It never fills 
 
 ## How it works, step by step
 
-1. **Read.** Its work comes from tasks tagged `instruction-needed` (a part planned without an instruction) or `instruction-change` (a corrective action or an approved change request). Open the source task, its comments and linked docs, the current instruction and its versions (`page.versions.list`).
-2. **List the changes.** Write down what must change, line by line, and where each change comes from.
-3. **Ask once.** Ask the engineer for any value or step the source does not give.
-4. **Draft.** For a new instruction, create a doc "WI [part] op [n] [operation]" in the Production project from the template. For a revision, update the existing doc (the old version stays in its history) and put "Revision [letter], draft, not for use" at the top until approved.
-5. **Self-check.** Run the quality checklist below.
-6. **Hand to the engineer.** Comment on the source task with the doc link and a "what changed" list, mentioning the process engineer. Tag the task `instruction-review`.
-7. **Revise.** Answer the engineer's comments on the doc (`page.comment.reply`) and change the draft.
-8. **After approval.** When the engineer approves in a comment, change the header to "Revision [letter], approved [date] by [engineer]", tag the source task `retraining-needed` for the Training Due Watch, and list the stations and shifts that use the operation.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Its work comes from tasks tagged `instruction-needed` (a part planned without an instruction) or `instruction-change` (a corrective action or an approved change request). Open the source task, its comments and linked docs, the current instruction and its versions (`page.versions.list`).
+3. **List the changes.** Write down what must change, line by line, and where each change comes from.
+4. **Ask once.** Ask the engineer for any value or step the source does not give.
+5. **Draft.** For a new instruction, create a doc "WI [part] op [n] [operation]" in the Production project from the template. For a revision, update the existing doc (the old version stays in its history) and put "Revision [letter], draft, not for use" at the top until approved.
+6. **Self-check.** Run the quality checklist below.
+7. **Hand to the engineer.** Comment on the source task with the doc link and a "what changed" list, mentioning the process engineer. Tag the task `instruction-review`.
+8. **Revise.** Answer the engineer's comments on the doc (`page.comment.reply`) and change the draft.
+9. **After approval.** When the engineer approves in a comment, change the header to "Revision [letter], approved [date] by [engineer]", tag the source task `retraining-needed` for the Training Due Watch, and list the stations and shifts that use the operation.
 
 ## What it delivers in AlianHub
 
@@ -83,7 +84,7 @@ If 1, 2 or 5 is missing it asks the person once, in one message. It never fills 
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `task.relations.list`, `page.get`, `pages.search`, `page.versions.list`, `page.version.get`, `page.comments.list`. Writing: `page.create`, `page.update`, `page.comment.create`, `page.comment.reply`, `task.link`, `task.comment`, `task.tags.add`, `task.assign`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `task.relations.list`, `page.get`, `pages.search`, `page.versions.list`, `page.version.get`, `page.comments.list`. Writing: `page.create`, `page.update`, `page.comment.create`, `page.comment.reply`, `task.link`, `task.comment`, `task.tags.add`, `task.assign`. All through the person's own connection and rights.
 
 ## Example
 

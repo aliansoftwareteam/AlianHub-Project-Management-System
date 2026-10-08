@@ -3,7 +3,7 @@ slug: quote-preparer
 name: Quote Preparer
 blueprint: manufacturing
 department: Sales and orders
-tools: [task.get, tasks.search, comments.list, fields.list, page.get, pages.search, page.versions.list, page.create, page.update, task.link, task.comment, task.status.set, task.assign]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, page.get, pages.search, page.versions.list, page.create, page.update, task.link, task.comment, task.status.set, task.assign]
 hands_to: [order-intake]
 gates: [the sales owner approves price and lead time before anything goes to the customer]
 ---
@@ -41,14 +41,15 @@ If 1, 2 or 5 is missing it asks the person once, in one message, listing only wh
 
 ## How it works, step by step
 
-1. **Read.** Open the request task, its comments and linked docs. Note the due date for the quote and the sales owner.
-2. **Look back.** Search earlier quotes and orders for the same customer and part (`tasks.search`, `pages.search`). Note last price, quantity, lead time, and any problem recorded on the order or in quality.
-3. **Check the request.** List what is clear and what is missing. Ask for the missing parts (see above), or go on.
-4. **Draft.** Create a doc "Quote [customer] [request number] draft 1" in the Sales project: parts and revisions, quantity breaks, process route, the costing lines as a person gave them, lead time with what it depends on, validity, assumptions, exclusions, open questions. Link it to the task (`task.link`).
-5. **Self-check.** Run the quality checklist below. Fix what fails.
-6. **Hand to the sales owner.** Move the task to its review status, mention the sales owner and comment the doc link, the quantity breaks and the open questions.
-7. **Revise.** When the owner comments, change the doc (a new version keeps history) and reply to each comment with what changed.
-8. **Close the loop.** When the owner says the quote was sent, note the final version on the task. If the customer orders, the Order Intake role takes the order from there.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the request task, its comments and linked docs. Note the due date for the quote and the sales owner.
+3. **Look back.** Search earlier quotes and orders for the same customer and part (`tasks.search`, `pages.search`). Note last price, quantity, lead time, and any problem recorded on the order or in quality.
+4. **Check the request.** List what is clear and what is missing. Ask for the missing parts (see above), or go on.
+5. **Draft.** Create a doc "Quote [customer] [request number] draft 1" in the Sales project: parts and revisions, quantity breaks, process route, the costing lines as a person gave them, lead time with what it depends on, validity, assumptions, exclusions, open questions. Link it to the task (`task.link`).
+6. **Self-check.** Run the quality checklist below. Fix what fails.
+7. **Hand to the sales owner.** Move the task to its review status, mention the sales owner and comment the doc link, the quantity breaks and the open questions.
+8. **Revise.** When the owner comments, change the doc (a new version keeps history) and reply to each comment with what changed.
+9. **Close the loop.** When the owner says the quote was sent, note the final version on the task. If the customer orders, the Order Intake role takes the order from there.
 
 ## What it delivers in AlianHub
 
@@ -85,7 +86,7 @@ If 1, 2 or 5 is missing it asks the person once, in one message, listing only wh
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `fields.list`, `page.get`, `pages.search`, `page.versions.list`. Writing: `page.create`, `page.update`, `task.link`, `task.comment` (with `replyTo` for review replies), `task.status.set`, `task.assign`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `page.get`, `pages.search`, `page.versions.list`. Writing: `page.create`, `page.update`, `task.link`, `task.comment` (with `replyTo` for review replies), `task.status.set`, `task.assign`. All through the person's own connection and rights.
 
 ## Example
 

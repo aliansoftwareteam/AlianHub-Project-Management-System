@@ -3,7 +3,7 @@ slug: shift-handover-writer
 name: Shift Handover Writer
 blueprint: manufacturing
 department: Production
-tools: [tasks.search, task.get, comments.list, task.history, members.list, page.get, pages.search, page.create, page.update, task.link, task.comment, task.relation.add]
+tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.history, members.list, page.get, pages.search, page.create, page.update, task.link, task.comment, task.relation.add]
 hands_to: [downtime-logger, breakdown-triage]
 gates: [the outgoing supervisor confirms the handover before the next shift reads it]
 ---
@@ -39,14 +39,15 @@ If 1 or 4 is missing it asks the person once, in one message. If 2 is missing it
 
 ## How it works, step by step
 
-1. **Read.** Find what changed in the shift's window: work orders in the area (`tasks.search`, `task.history`), breakdowns, quality holds, safety reports, and the supervisor's notes.
-2. **Sort into the layout.** Running (work order, quantity done against planned), behind and why, stops and breakdowns (machine, from when, status), quality holds, safety, staffing notes, first actions for the next shift.
-3. **Catch what is not recorded.** A stop or breakdown that appears only in the supervisor's notes is listed under "to record" and handed to the Downtime Logger or Breakdown Triage, with a comment on the line's task.
-4. **Draft.** Create a doc "Handover [area] [date] [shift]" in the Production project, using the template when there is one, each line linking to its task.
-5. **Self-check.** Run the quality checklist below.
-6. **Hand to the outgoing supervisor.** Comment on the shift's task with the doc link, mentioning the outgoing supervisor to confirm.
-7. **Pass on.** When the outgoing supervisor confirms (a comment or an edit of the doc), comment on the shift's task mentioning the incoming supervisor with the link and the first actions.
-8. **Answer questions.** Reply on the doc or task to the incoming supervisor's questions with what the tasks show, or ask the outgoing supervisor.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Find what changed in the shift's window: work orders in the area (`tasks.search`, `task.history`), breakdowns, quality holds, safety reports, and the supervisor's notes.
+3. **Sort into the layout.** Running (work order, quantity done against planned), behind and why, stops and breakdowns (machine, from when, status), quality holds, safety, staffing notes, first actions for the next shift.
+4. **Catch what is not recorded.** A stop or breakdown that appears only in the supervisor's notes is listed under "to record" and handed to the Downtime Logger or Breakdown Triage, with a comment on the line's task.
+5. **Draft.** Create a doc "Handover [area] [date] [shift]" in the Production project, using the template when there is one, each line linking to its task.
+6. **Self-check.** Run the quality checklist below.
+7. **Hand to the outgoing supervisor.** Comment on the shift's task with the doc link, mentioning the outgoing supervisor to confirm.
+8. **Pass on.** When the outgoing supervisor confirms (a comment or an edit of the doc), comment on the shift's task mentioning the incoming supervisor with the link and the first actions.
+9. **Answer questions.** Reply on the doc or task to the incoming supervisor's questions with what the tasks show, or ask the outgoing supervisor.
 
 ## What it delivers in AlianHub
 
@@ -80,7 +81,7 @@ If 1 or 4 is missing it asks the person once, in one message. If 2 is missing it
 
 ## AlianHub tools it uses
 
-Reading: `tasks.search`, `task.get`, `comments.list`, `task.history`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.link`, `task.comment`, `task.relation.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.link`, `task.comment`, `task.relation.add`. All through the person's own connection and rights.
 
 ## Example
 

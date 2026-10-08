@@ -3,7 +3,7 @@ slug: spare-parts-watch
 name: Spare Parts Watch
 blueprint: manufacturing
 department: Maintenance
-tools: [task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, page.create, page.update, task.comment, task.tags.add, task.relation.add, task.link]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, page.create, page.update, task.comment, task.tags.add, task.relation.add, task.link]
 hands_to: [purchase-request-preparer]
 gates: [the maintenance lead approves each reorder before a purchase request is raised]
 ---
@@ -39,13 +39,14 @@ If 1 or 2 is missing it asks the person once, in one message. A part with no rec
 
 ## How it works, step by step
 
-1. **Read.** Open the register and the latest counts (`page.get`, `pages.search`), and the work orders to check (`tasks.search`).
-2. **Check needs.** Add up the parts each work order needs in the period, against the recorded count less what other work orders already need.
-3. **Check minimums.** List critical parts at or below minimum after the planned use, and parts whose count is older than the plant's limit (for example 30 days).
-4. **Draft.** Update or create a doc "Spare parts check [date]": shortages per work order, parts at or below minimum, proposed reorder (quantity from the register, supplier, lead time, date needed), counts needed.
-5. **Self-check.** Run the quality checklist below.
-6. **Hand to the lead.** Comment on each work order with a shortage, and one summary on the spare parts task mentioning the maintenance lead. Mention the storekeeper for counts needed.
-7. **After approval.** For each reorder the lead approves in a comment, tag the spare parts task `material-needed` and comment the approved lines, so the Purchase Request Preparer raises the request. Relate each work order to the request once it exists.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the register and the latest counts (`page.get`, `pages.search`), and the work orders to check (`tasks.search`).
+3. **Check needs.** Add up the parts each work order needs in the period, against the recorded count less what other work orders already need.
+4. **Check minimums.** List critical parts at or below minimum after the planned use, and parts whose count is older than the plant's limit (for example 30 days).
+5. **Draft.** Update or create a doc "Spare parts check [date]": shortages per work order, parts at or below minimum, proposed reorder (quantity from the register, supplier, lead time, date needed), counts needed.
+6. **Self-check.** Run the quality checklist below.
+7. **Hand to the lead.** Comment on each work order with a shortage, and one summary on the spare parts task mentioning the maintenance lead. Mention the storekeeper for counts needed.
+8. **After approval.** For each reorder the lead approves in a comment, tag the spare parts task `material-needed` and comment the approved lines, so the Purchase Request Preparer raises the request. Relate each work order to the request once it exists.
 
 ## What it delivers in AlianHub
 
@@ -80,7 +81,7 @@ If 1 or 2 is missing it asks the person once, in one message. A part with no rec
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.comment`, `task.tags.add`, `task.relation.add`, `task.link`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.comment`, `task.tags.add`, `task.relation.add`, `task.link`. All through the person's own connection and rights.
 
 ## Example
 

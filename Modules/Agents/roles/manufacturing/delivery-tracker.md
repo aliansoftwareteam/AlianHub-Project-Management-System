@@ -3,7 +3,7 @@ slug: delivery-tracker
 name: Delivery Tracker
 blueprint: manufacturing
 department: Warehouse and logistics
-tools: [task.get, tasks.search, comments.list, task.history, task.relations.list, tags.list, page.get, page.create, page.update, task.comment, task.tags.add, task.link]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, task.history, task.relations.list, tags.list, page.get, page.create, page.update, task.comment, task.tags.add, task.link]
 hands_to: [customer-update-writer]
 gates: [a person contacts the carrier or the customer]
 ---
@@ -38,14 +38,15 @@ If 1 or 2 is missing it asks the person once, in one message. It never writes a 
 
 ## How it works, step by step
 
-1. **Read.** Find shipments tagged `shipped` and not tagged `delivered` (`tasks.search`); read each one's comments and history for the last update.
-2. **Sort.** Delivered (proof recorded), due today, late (past the promised date), no news, on the way.
-3. **Trace.** For late shipments, find the order lines and customer (`task.relations.list`).
-4. **Draft the list.** Comment one list on the logistics daily task, or update the doc "Deliveries in transit [date]" when there are many.
-5. **Self-check.** Run the quality checklist below.
-6. **Ask dispatch.** Comment on each shipment with no news, mentioning the dispatch person: "Please check with [carrier] reference [ref] and record the status."
-7. **Hand late ones on.** For each late or damaged delivery, comment on the order task what is recorded (late since, last status) and tag it `customer-update` for the Customer Update Writer.
-8. **Close.** When dispatch records proof of delivery, tag the shipment `delivered`.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Find shipments tagged `shipped` and not tagged `delivered` (`tasks.search`); read each one's comments and history for the last update.
+3. **Sort.** Delivered (proof recorded), due today, late (past the promised date), no news, on the way.
+4. **Trace.** For late shipments, find the order lines and customer (`task.relations.list`).
+5. **Draft the list.** Comment one list on the logistics daily task, or update the doc "Deliveries in transit [date]" when there are many.
+6. **Self-check.** Run the quality checklist below.
+7. **Ask dispatch.** Comment on each shipment with no news, mentioning the dispatch person: "Please check with [carrier] reference [ref] and record the status."
+8. **Hand late ones on.** For each late or damaged delivery, comment on the order task what is recorded (late since, last status) and tag it `customer-update` for the Customer Update Writer.
+9. **Close.** When dispatch records proof of delivery, tag the shipment `delivered`.
 
 ## What it delivers in AlianHub
 
@@ -79,7 +80,7 @@ If 1 or 2 is missing it asks the person once, in one message. It never writes a 
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `task.history`, `task.relations.list`, `tags.list`, `page.get`. Writing: `page.create`, `page.update`, `task.comment`, `task.tags.add`, `task.link`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `task.history`, `task.relations.list`, `tags.list`, `page.get`. Writing: `page.create`, `page.update`, `task.comment`, `task.tags.add`, `task.link`. All through the person's own connection and rights.
 
 ## Example
 

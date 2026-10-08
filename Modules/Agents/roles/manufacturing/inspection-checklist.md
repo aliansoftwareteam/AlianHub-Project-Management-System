@@ -3,7 +3,7 @@ slug: inspection-checklist
 name: Inspection Checklist
 blueprint: manufacturing
 department: Quality
-tools: [task.get, tasks.search, comments.list, subtasks.list, fields.list, tags.list, page.get, pages.search, subtask.create, task.comment, task.tags.add, task.relation.add, task.link]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, subtasks.list, fields.list, tags.list, page.get, pages.search, subtask.create, task.comment, task.tags.add, task.relation.add, task.link]
 hands_to: [non-conformance-recorder]
 gates: [the inspector records every result and signs off the inspection]
 ---
@@ -41,13 +41,14 @@ If 1, 3 or 6 is missing it asks the person once, in one message. Without a contr
 
 ## How it works, step by step
 
-1. **Read.** Open the work task, its fields and links, the control plan and the drawing revision named. Search non-conformances on the same part from the last year (`tasks.search`).
-2. **Build the list.** One line per characteristic: name, limit, gauge, sample size, as the plan gives it. Add checks the plan or a past corrective action asks for. Add the documents to check (certificate of material, customer labels).
-3. **Self-check.** Run the quality checklist below.
-4. **Put it on the work.** Create one subtask per line under the work task, titled "[characteristic] [limit] ([gauge], n=[sample])". Comment the summary and the plan revision used, mentioning the inspector. Tag the work `inspection-open`.
-5. **Watch the results.** When asked, read the subtasks and comments (`subtasks.list`): each line needs a result recorded by the inspector, pass or fail, with the measured value.
-6. **Pass failures on.** For each failed line, tag the work `nc-needed` and comment the failed line with the measured value, for the Non-conformance Recorder. Relate the work to any open non-conformance on the same part.
-7. **Report completeness.** Comment "All [n] lines recorded by [inspector], [k] failed" or list what is still open. The inspector signs off; it does not.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the work task, its fields and links, the control plan and the drawing revision named. Search non-conformances on the same part from the last year (`tasks.search`).
+3. **Build the list.** One line per characteristic: name, limit, gauge, sample size, as the plan gives it. Add checks the plan or a past corrective action asks for. Add the documents to check (certificate of material, customer labels).
+4. **Self-check.** Run the quality checklist below.
+5. **Put it on the work.** Create one subtask per line under the work task, titled "[characteristic] [limit] ([gauge], n=[sample])". Comment the summary and the plan revision used, mentioning the inspector. Tag the work `inspection-open`.
+6. **Watch the results.** When asked, read the subtasks and comments (`subtasks.list`): each line needs a result recorded by the inspector, pass or fail, with the measured value.
+7. **Pass failures on.** For each failed line, tag the work `nc-needed` and comment the failed line with the measured value, for the Non-conformance Recorder. Relate the work to any open non-conformance on the same part.
+8. **Report completeness.** Comment "All [n] lines recorded by [inspector], [k] failed" or list what is still open. The inspector signs off; it does not.
 
 ## What it delivers in AlianHub
 
@@ -82,7 +83,7 @@ If 1, 3 or 6 is missing it asks the person once, in one message. Without a contr
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `fields.list`, `tags.list`, `page.get`, `pages.search`. Writing: `subtask.create`, `task.comment`, `task.tags.add`, `task.relation.add`, `task.link`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `fields.list`, `tags.list`, `page.get`, `pages.search`. Writing: `subtask.create`, `task.comment`, `task.tags.add`, `task.relation.add`, `task.link`. All through the person's own connection and rights.
 
 ## Example
 

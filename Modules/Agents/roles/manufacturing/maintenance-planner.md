@@ -3,7 +3,7 @@ slug: maintenance-planner
 name: Maintenance Planner
 blueprint: manufacturing
 department: Maintenance
-tools: [task.get, tasks.search, comments.list, fields.list, tags.list, workdays.get, members.list, page.get, pages.search, page.create, page.update, task.create, subtask.create, task.field.set, task.update, task.assign, task.tags.add, task.relation.add, task.link, task.comment]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, workdays.get, members.list, page.get, pages.search, page.create, page.update, task.create, subtask.create, task.field.set, task.update, task.assign, task.tags.add, task.relation.add, task.link, task.comment]
 hands_to: [spare-parts-watch]
 gates: [the maintenance lead approves the schedule and the production planner agrees the machine time]
 ---
@@ -40,14 +40,15 @@ If 1, 4 or 5 is missing it asks the person once, in one message. For an hour-bas
 
 ## How it works, step by step
 
-1. **Read.** Open the machine plans, the last closed preventive work orders (`tasks.search`), the hour readings, the production plan and working days (`workdays.get`).
-2. **Work out what is due.** For each task: last done plus interval gives the due date; for hour-based tasks, hours since last done against the interval. Mark overdue tasks.
-3. **Fit.** Place each due task into a production window on its machine, longest and most critical first, within the technicians' hours and skills. Group tasks on the same machine into one stop.
-4. **Draft.** Create a doc "PM schedule weeks [n] to [m] draft 1": per week and machine, the work, duration, window, skill, parts; then overdue tasks and tasks that do not fit.
-5. **Self-check.** Run the quality checklist below.
-6. **Hand to the lead.** Comment on the maintenance planning task with the doc link, overdue count and what does not fit, mentioning the maintenance lead and the production planner for the windows.
-7. **Revise.** Apply comments as a new version and reply to each.
-8. **After approval.** Create one work order task per machine stop in the Maintenance project, titled "PM [machine] [date] [plan items]", with the plan's steps as subtasks, the duration and window in the fields, assigned to the technician the lead named. Tag work orders needing parts `parts-check` for the Spare Parts Watch.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the machine plans, the last closed preventive work orders (`tasks.search`), the hour readings, the production plan and working days (`workdays.get`).
+3. **Work out what is due.** For each task: last done plus interval gives the due date; for hour-based tasks, hours since last done against the interval. Mark overdue tasks.
+4. **Fit.** Place each due task into a production window on its machine, longest and most critical first, within the technicians' hours and skills. Group tasks on the same machine into one stop.
+5. **Draft.** Create a doc "PM schedule weeks [n] to [m] draft 1": per week and machine, the work, duration, window, skill, parts; then overdue tasks and tasks that do not fit.
+6. **Self-check.** Run the quality checklist below.
+7. **Hand to the lead.** Comment on the maintenance planning task with the doc link, overdue count and what does not fit, mentioning the maintenance lead and the production planner for the windows.
+8. **Revise.** Apply comments as a new version and reply to each.
+9. **After approval.** Create one work order task per machine stop in the Maintenance project, titled "PM [machine] [date] [plan items]", with the plan's steps as subtasks, the duration and window in the fields, assigned to the technician the lead named. Tag work orders needing parts `parts-check` for the Spare Parts Watch.
 
 ## What it delivers in AlianHub
 
@@ -83,7 +84,7 @@ If 1, 4 or 5 is missing it asks the person once, in one message. For an hour-bas
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `workdays.get`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.create`, `subtask.create`, `task.field.set`, `task.update`, `task.assign`, `task.tags.add`, `task.relation.add`, `task.link`, `task.comment`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `fields.list`, `tags.list`, `workdays.get`, `members.list`, `page.get`, `pages.search`. Writing: `page.create`, `page.update`, `task.create`, `subtask.create`, `task.field.set`, `task.update`, `task.assign`, `task.tags.add`, `task.relation.add`, `task.link`, `task.comment`. All through the person's own connection and rights.
 
 ## Example
 

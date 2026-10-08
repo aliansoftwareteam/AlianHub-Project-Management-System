@@ -3,7 +3,7 @@ slug: dispatch-checklist
 name: Dispatch Checklist
 blueprint: manufacturing
 department: Warehouse and logistics
-tools: [task.get, tasks.search, comments.list, subtasks.list, fields.list, tags.list, task.relations.list, page.get, pages.search, page.create, subtask.create, task.comment, task.tags.add, task.relation.add, task.link]
+tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, subtasks.list, fields.list, tags.list, task.relations.list, page.get, pages.search, page.create, subtask.create, task.comment, task.tags.add, task.relation.add, task.link]
 hands_to: [delivery-tracker]
 gates: [the dispatch lead checks the list and releases the shipment]
 ---
@@ -40,14 +40,15 @@ If 1, 3 or 5 is missing it asks the person once, in one message. Without the cus
 
 ## How it works, step by step
 
-1. **Read.** Open the shipment task, its order lines and their work orders (`task.relations.list`), and the customer's requirements.
-2. **Check quality.** For each line: final inspection recorded as passed, no open non-conformance or `nc-needed` tag on the work order or its lots. List any line that fails.
-3. **Check quantities.** Quantity finished against the order line; note partial lines.
-4. **Build the list.** One subtask per check under the shipment task: each line's quantity and inspection, packaging, labels, each document, transport booked, the customer's special items.
-5. **Self-check.** Run the quality checklist below.
-6. **Hand to the dispatch team.** Comment the summary: ready lines, lines not ready and why, documents still missing. Mention the dispatch lead. Tag the shipment `dispatch-open`.
-7. **Watch the ticks.** When asked, read the subtasks and comment what is still open.
-8. **After release.** When the dispatch lead records the release and the carrier's reference, tag the shipment `shipped` for the Delivery Tracker.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the shipment task, its order lines and their work orders (`task.relations.list`), and the customer's requirements.
+3. **Check quality.** For each line: final inspection recorded as passed, no open non-conformance or `nc-needed` tag on the work order or its lots. List any line that fails.
+4. **Check quantities.** Quantity finished against the order line; note partial lines.
+5. **Build the list.** One subtask per check under the shipment task: each line's quantity and inspection, packaging, labels, each document, transport booked, the customer's special items.
+6. **Self-check.** Run the quality checklist below.
+7. **Hand to the dispatch team.** Comment the summary: ready lines, lines not ready and why, documents still missing. Mention the dispatch lead. Tag the shipment `dispatch-open`.
+8. **Watch the ticks.** When asked, read the subtasks and comment what is still open.
+9. **After release.** When the dispatch lead records the release and the carrier's reference, tag the shipment `shipped` for the Delivery Tracker.
 
 ## What it delivers in AlianHub
 
@@ -81,7 +82,7 @@ If 1, 3 or 5 is missing it asks the person once, in one message. Without the cus
 
 ## AlianHub tools it uses
 
-Reading: `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `fields.list`, `tags.list`, `task.relations.list`, `page.get`, `pages.search`. Writing: `subtask.create`, `page.create`, `task.comment`, `task.tags.add`, `task.relation.add`, `task.link`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `tasks.search`, `comments.list`, `subtasks.list`, `fields.list`, `tags.list`, `task.relations.list`, `page.get`, `pages.search`. Writing: `subtask.create`, `page.create`, `task.comment`, `task.tags.add`, `task.relation.add`, `task.link`. All through the person's own connection and rights.
 
 ## Example
 
