@@ -20,6 +20,7 @@ const { annotationsFor, isDestructive } = require('./annotations');
 const { propose, proposeBatch, afterManyTasks, fileable, outsideMayFile, declinedNotes } = require('./propose');
 const sessionTools = require('./sessionTools');
 const dataTools = require('./dataTools');
+const { MENTIONS } = require('./commentReply');
 const screenTools = require('./screenTools');
 const intentTools = require('./intentTools');
 const contextTools = require('./contextTools');
@@ -146,9 +147,9 @@ const TOOLS = [
         action: 'task.comment',
         visibility: 'filtered',
         target: taskTarget,
-        description: 'Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link.',
+        description: `Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link. ${MENTIONS}`,
         input: { type: 'object', properties: { taskId: { type: 'string' }, body: { type: 'string' } }, required: ['taskId', 'body'] },
-        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.body, 20000) }),
+        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.body, 20000), notifyMentions: true }),
     },
     {
         name: 'task.status.set',

@@ -154,19 +154,20 @@ const startsNamedAgents = (companyId, actor, { taskId, body, depth, approvedBy }
     ...(isAgent(actor) && !approvedBy ? { postedBy: actor, asked: true } : {}),
 });
 
-/* A person the comment names who cannot open the task is not told, and the answer says so. */
+const NOT_TOLD = Object.freeze({
+    self: 'is you, the person this comment is written for, so no one was notified',
+    noAccess: 'cannot open this task, so was not notified',
+});
+
+/* A person the comment names who is not told is listed with the reason, the commenter's own name included. */
 const mentionAnswer = (marked, notifiedIds, authorId) => {
     const notified = new Set(notifiedIds.map(String));
     const nameOf = new Map(marked.people.map((p) => [p.userId, p.name]));
     const row = (userId) => ({ userId, name: nameOf.get(userId) || '' });
     const notNotified = marked.named.map((p) => p.userId)
-        .filter((userId) => !notified.has(userId) && userId !== String(authorId || ''))
-        .map((userId) => ({ ...row(userId), reason: 'cannot open this task, so was not notified' }));
-    return {
-        mentioned: [...notified].map(row),
-        ...(notNotified.length ? { notNotified } : {}),
-        ...(marked.notFound.length ? { notFound: marked.notFound } : {}),
-    };
+        .filter((userId) => !notified.has(userId))
+        .map((userId) => ({ ...row(userId), reason: userId === String(authorId || '') ? NOT_TOLD.self : NOT_TOLD.noAccess }));
+    return { mentioned: [...notified].map(row), notNotified, notFound: marked.notFound };
 };
 
 const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action, written) => {

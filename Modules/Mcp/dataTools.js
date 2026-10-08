@@ -10,7 +10,7 @@ const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
 const { PAGE_TEXT_MAX, pageText } = require('./pageText');
-const { REPLY_TO, replyParams } = require('./commentReply');
+const { MENTIONS, REPLY_TO, replyParams } = require('./commentReply');
 const pageVersions = require('../Pages/helpers/pageVersions');
 const versionRules = require('../Pages/helpers/pageVersionRules');
 const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
@@ -360,9 +360,9 @@ const TOOLS = [
         action: 'comment.create',
         visibility: 'filtered',
         target: (args) => ({ taskId: str(args.taskId, 40) }),
-        description: `Adds a comment to a task the person can open, at once, and the person can undo it. The text is saved as plain text. ${REPLY_TO}`,
+        description: `Adds a comment to a task the person can open, at once, and the person can undo it. The text is saved as plain text. ${MENTIONS} ${REPLY_TO}`,
         input: { type: 'object', properties: { taskId: { type: 'string' }, text: { type: 'string' }, replyTo: { type: 'string' } }, required: ['taskId', 'text'] },
-        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000), ...replyParams(args) }),
+        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000), notifyMentions: true, ...replyParams(args) }),
     },
     {
         name: 'timelog.create',

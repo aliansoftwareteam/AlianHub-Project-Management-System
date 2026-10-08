@@ -12,7 +12,7 @@ const { TASK_ACCESS_FIELDS } = require('./visibility');
 const manageFlag = require('./manageFlag');
 const { listOf, loadProject, NO_PROJECT, NO_TASK } = require('./dataTools');
 const { planRow } = require('./taskRows');
-const { REPLY_TO, REPLY_INPUT, replyParams } = require('./commentReply');
+const { MENTIONS, REPLY_TO, REPLY_INPUT, replyParams } = require('./commentReply');
 const { PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, LINK_KINDS, LINKS_MAX } = require('../Agents/taskRequests');
 const pageRequests = require('../Agents/pageRequests');
 const v2 = require('./v2Flag');
@@ -76,7 +76,6 @@ const CREATE_OPTIONS = Object.freeze({
     },
 });
 
-const MENTIONS = 'To mention a member so they are notified, write @[Their Name](their member id) with the id from members.list, or @Their Name exactly as members.list shows it; @[All](everyone) reaches everyone who can open the task. Only people who can open the task are notified: the answer lists them in mentioned, a named person who cannot open it in notNotified, and a name that matched no one in notFound.';
 
 /* The activity log stores each entry as a line of markup with dates as DATE_<milliseconds>. */
 const plainEntry = (message) => String(message || '')
