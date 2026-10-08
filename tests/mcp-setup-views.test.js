@@ -155,6 +155,18 @@ describe('a view is never added before a person has seen it', () => {
         await expect(actions.perform({ companyId: CID, actor, action: TOOL, params: { ...params, __proposal: true } })).rejects.toThrow(/waits for a person's approval/);
         expect(viewsOf(P_OPEN)).toHaveLength(2);
     });
+
+    it('is refused as a pause in a project where agents are paused, for every action that always waits, and files nothing', async () => {
+        project(P_OPEN).agentLimits = { paused: true };
+        const paused = /^agents are paused in this project/;
+        expect(await rpc(as(INSIDER), TOOL, { projectId: P_OPEN, name: 'Paused' })).toMatchObject({ refused: true, reason: expect.stringMatching(paused) });
+        const actor = as(INSIDER).actor;
+        for (const { key } of registry.ACTIONS.filter((entry) => entry.proposeOnly && entry.write && registry.has(entry.key))) {
+            await expect(actions.perform({ companyId: CID, actor, action: key, params: { projectId: P_OPEN } })).rejects.toThrow(paused);
+        }
+        expect(viewsOf(P_OPEN)).toHaveLength(2);
+        expect(waiting()).toHaveLength(0);
+    });
 });
 
 describe('who may ask for a view', () => {

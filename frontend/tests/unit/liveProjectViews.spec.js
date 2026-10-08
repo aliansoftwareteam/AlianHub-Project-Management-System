@@ -33,7 +33,7 @@ const mountPage = () => {
     store = createStore({ modules: { projectData: { namespaced: true, state: () => ({ allProjects: { data: [project([LIST])] }, sprints: {}, folders: {} }), getters: projectData.getters, mutations } } });
     const Host = defineComponent({
         setup() {
-            useLiveProjects(socket, computed(() => COMPANY), () => 'p1');
+            useLiveProjects(socket, computed(() => COMPANY));
             page = ref({ ...project([LIST]) });
             useStoredProjectViews(page);
             return () => h('div', splitProjectViews(page.value.ProjectRequiredComponent).views.map((view) => h('span', { class: 'tab' }, view.title)));
@@ -75,11 +75,12 @@ describe('a view added elsewhere', () => {
     it('shows when it was added while the tab was hidden and its socket dropped', async () => {
         socket.value = null;
         await flushPromises();
-        apiRequest.mockResolvedValue({ data: project([LIST, BY_STAGE]) });
+        apiRequest.mockResolvedValue({ data: [project([LIST, BY_STAGE])] });
         socket.value = { on: (event, handler) => { handlers[event] = handler; }, off: () => {} };
         await vi.advanceTimersByTimeAsync(GATHER_MS);
         await flushPromises();
         expect(tabs()).toEqual(['List', 'By Stage']);
+        expect(apiRequest.mock.calls.map(([, url]) => url)).toEqual(['/api/v1/project']);
     });
 
     it('costs no read when the first socket connects', async () => {
@@ -90,9 +91,9 @@ describe('a view added elsewhere', () => {
         expect(apiRequest).not.toHaveBeenCalled();
     });
 
-    it('is followed by the shell, which drops its socket on a hidden tab and names the open project', () => {
+    it('is followed by the shell, which drops its socket on a hidden tab', () => {
         expect(APP).toMatch(/document\.hidden[\s\S]*?emit\('disconnectNameSpace'/);
-        expect(APP).toMatch(/useLiveProjects\(socket, companyId, \(\) => route\.params\?\.id\)/);
+        expect(APP).toMatch(/useLiveProjects\(socket, companyId\)/);
     });
 
     it('is wired into the project page', () => {

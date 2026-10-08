@@ -714,7 +714,7 @@ provide("$mainTour", mainTour);
 provide("$socket",socket);
 useFieldDefinitionsSync(socket);
 useAgentChangeNotice(socket, companyId);
-useLiveProjects(socket, companyId, () => route.params?.id);
+useLiveProjects(socket, companyId);
 useLiveLists(socket, companyId);
 
 </script>

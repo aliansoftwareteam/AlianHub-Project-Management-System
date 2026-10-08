@@ -527,6 +527,13 @@ const liveStep = async (companyId, actor, { action, params, ip, taint }) => {
     if (!live.ok) throw await refusal(companyId, actor, { action, params, reason: live.reason, ip, taint });
 };
 
+/* A change that could only be proposed, in a project where agents are paused, could not be proposed either: the pause is the answer. */
+const pauseOverProposal = async (companyId, actor, { action, params, approved, check }) => {
+    if (check.code !== 'propose_only') return check.reason;
+    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved });
+    return rule.paused ? rule.reason : check.reason;
+};
+
 /* Run one action for an actor. Refusals are audited and thrown as RefusedError.
  * This is the one place every agent's change passes, so "changed since you read it" (./taskReads) is asked here,
  * last, with nothing written yet.
@@ -539,7 +546,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     await liveStep(companyId, actor, { action, params, ip, taint });
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip, taint });
     const check = registry.evaluate(action, params, { allowedActions });
-    if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip, taint });
+    if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: await pauseOverProposal(companyId, actor, { action, params, approved, check }), ip, taint });
     const closed = await personRefusal(companyId, actor, action, params);
     if (closed) throw await refusal(companyId, actor, { action, params, reason: closed, ip, taint });
     const rule = await projectPolicy.ask({ companyId, actor, action, params, approved, taint, standing: true, applying: true });

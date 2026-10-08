@@ -20,7 +20,7 @@ const NOT_OPEN_TO_THIS_PERSON = [403, 404];
 const hidden = () => typeof document !== "undefined" && document.hidden === true;
 
 // The socket and the company are passed in: the shell that provides them cannot inject them.
-export function useLiveProjects(socket, companyId, openProjectId = () => "") {
+export function useLiveProjects(socket, companyId) {
     const store = useStore();
 
     let bound = null;
@@ -97,13 +97,23 @@ export function useLiveProjects(socket, companyId, openProjectId = () => "") {
     }
 
     /* The shell drops its socket while the tab is hidden and connects a new one when it is seen again, so what was
-     * said in between never arrives: the open project is read again instead. */
-    function catchUp() {
-        const id = String(openProjectId() || "");
-        if (!id || !held(id) || waiting.has(id)) return;
-        if (!waiting.size) firstAt = Date.now();
-        waiting.set(id, "changed");
-        schedule();
+     * said in between never arrives: the project list the sidebar is filled from is read once instead. */
+    async function catchUp() {
+        const askedIn = company();
+        lastReadAt = Date.now();
+        let listed;
+        try {
+            listed = (await apiRequest("get", env.PROJECT, undefined, undefined, { background: true }))?.data;
+        } catch (e) {
+            return;
+        }
+        if (askedIn !== company() || !Array.isArray(listed)) return;
+        const live = listed.filter((project) => project?._id && project.deletedStatusKey !== TRASHED);
+        const listedIds = new Set(live.map((project) => String(project._id)));
+        (store.getters["projectData/allProjects"]?.data || [])
+            .filter((project) => !listedIds.has(String(project._id)))
+            .forEach((project) => drop(String(project._id)));
+        live.forEach(keep);
     }
 
     let everBound = false;

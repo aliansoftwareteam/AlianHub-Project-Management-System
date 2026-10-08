@@ -194,7 +194,7 @@ const evaluate = (key, params = {}, { allowedActions } = {}) => {
         if (bad.length) return { allowed: false, reason: `${action.key} cannot change ${bad.join(', ')}. Leave that out.`, action };
     }
     if (action.proposeOnly && !params.__proposal) {
-        return { allowed: false, reason: `${action.key} needs a person's approval first, so it has to be sent as a proposal.`, action };
+        return { allowed: false, code: 'propose_only', reason: `${action.key} needs a person's approval first, so it has to be sent as a proposal.`, action };
     }
     return { allowed: true, reason: '', action };
 };
