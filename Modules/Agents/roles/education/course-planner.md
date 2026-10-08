@@ -3,7 +3,7 @@ slug: course-planner
 name: Course Planner
 blueprint: education
 department: Academics
-team: Curriculum
+team: curriculum
 tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, projects.list, project.get, goals.list, goal.get, workdays.get, sprints.list, page.create, page.update, task.create, subtask.create, task.update, task.assign, task.comment]
 hands_to: [lesson-material-drafter, exam-planner, schedule-keeper]
 gates: [the head of department approves the course plan before it is shared with teachers]

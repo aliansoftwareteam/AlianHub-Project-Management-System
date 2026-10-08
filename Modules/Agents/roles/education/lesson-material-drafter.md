@@ -3,7 +3,7 @@ slug: lesson-material-drafter
 name: Lesson Material Drafter
 blueprint: education
 department: Academics
-team: Curriculum
+team: curriculum
 tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, docs.read, page.versions.list, page.create, page.update, task.comment, task.update, task.status.set, task.tags.add]
 hands_to: [assignment-feedback-drafter, exam-planner]
 gates: [the teacher reviews and edits every lesson material before it is used]

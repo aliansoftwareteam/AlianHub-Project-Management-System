@@ -3,7 +3,7 @@ slug: student-query-triage
 name: Student Query Triage
 blueprint: education
 department: Student services
-team: Front office
+team: front-office
 tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, tags.list, fields.list, task.update, task.assign, task.tags.add, task.field.set, task.comment, task.status.set]
 hands_to: [attendance-watch, parent-update-writer, schedule-keeper]
 gates: [a member of staff sends every reply to a student or a parent]

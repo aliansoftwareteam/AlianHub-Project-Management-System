@@ -3,7 +3,7 @@ slug: schedule-keeper
 name: Schedule Keeper
 blueprint: education
 department: Operations
-team: Timetable and rooms
+team: timetable
 tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, projects.list, workdays.get, sprints.list, page.create, page.update, task.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [cover-planner, event-planner]
 gates: [the timetabler approves every change to the timetable or to a room booking]

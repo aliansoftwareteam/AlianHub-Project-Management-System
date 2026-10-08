@@ -3,7 +3,7 @@ slug: cover-planner
 name: Cover Planner
 blueprint: education
 department: Operations
-team: Staffing
+team: staffing
 tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, timesheet.read, page.create, page.update, task.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [schedule-keeper]
 gates: [the deputy head approves every cover assignment before staff are told]

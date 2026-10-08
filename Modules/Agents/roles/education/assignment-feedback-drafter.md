@@ -3,7 +3,7 @@ slug: assignment-feedback-drafter
 name: Assignment Feedback Drafter
 blueprint: education
 department: Academics
-team: Teaching
+team: teaching
 tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, comment.create, page.create, page.update, task.comment, task.update, task.status.set, task.tags.add]
 hands_to: [parent-update-writer]
 gates: [the teacher edits and releases every piece of feedback and decides every grade]

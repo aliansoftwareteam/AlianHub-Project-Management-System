@@ -3,7 +3,7 @@ slug: event-planner
 name: Event Planner
 blueprint: education
 department: Operations
-team: School life
+team: school-life
 tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, page.create, page.update, task.create, subtask.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [parent-update-writer, schedule-keeper]
 gates: [the event lead approves the plan and the budget before anything is booked or announced]

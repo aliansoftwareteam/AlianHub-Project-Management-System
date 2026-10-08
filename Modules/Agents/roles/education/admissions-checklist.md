@@ -3,7 +3,7 @@ slug: admissions-checklist
 name: Admissions Checklist
 blueprint: education
 department: Admissions
-team: Admissions
+team: admissions
 tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, tags.list, fields.list, task.create, subtask.create, task.update, task.assign, task.field.set, task.tags.add, task.comment, task.status.set, page.create]
 hands_to: [student-query-triage, schedule-keeper]
 gates: [the admissions officer decides every offer and every refusal]

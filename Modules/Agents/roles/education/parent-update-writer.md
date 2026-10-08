@@ -3,7 +3,7 @@ slug: parent-update-writer
 name: Parent Update Writer
 blueprint: education
 department: Student services
-team: Communications
+team: communications
 tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, screen.link, page.create, page.update, task.create, task.update, task.comment, task.status.set]
 hands_to: [schedule-keeper]
 gates: [a member of staff reviews and sends every message to parents]
