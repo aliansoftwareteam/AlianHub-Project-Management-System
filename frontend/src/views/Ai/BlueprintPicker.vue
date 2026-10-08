@@ -97,6 +97,7 @@ import { applyStarterRoles, blueprintName, COMPANY_SIZES, fetchTeamPacks, teamNa
 
 defineOptions({ name: "BlueprintPicker" });
 
+const props = defineProps({ teamPacks: { type: Object, default: null } });
 const emit = defineEmits(["loaded"]);
 
 const OFF = 409;
@@ -155,7 +156,7 @@ async function load() {
     loading.value = true;
     loadError.value = "";
     try {
-        const data = await fetchTeamPacks();
+        const data = props.teamPacks || await fetchTeamPacks();
         industries.value = data?.companyBlueprints || [];
         dispatcherOn.value = Boolean(data?.on);
         industryId.value = industries.value[0]?.id || "";

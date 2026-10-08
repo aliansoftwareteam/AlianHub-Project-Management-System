@@ -29,7 +29,7 @@ const size = (roles, packs, people = [5, 25], seats = [6, 9]) => ({ people, seat
 const IT_PACKS = [{ blueprint: 'it-company', teams: ['engineering', 'support'], roles: IT_ROLES.slice(0, 3).map((one) => one.key) }];
 const BLUEPRINTS = [
     { id: 'it-company', sizes: { small: size(IT_ROLES, IT_PACKS), medium: size(IT_ROLES, IT_PACKS, [25, 150], [20, 40]), large: size(IT_ROLES, IT_PACKS, [150, 1000], [60, 200]) } },
-    { id: 'clinic-admin', sizes: { small: size(CLINIC_ROLES, []), medium: size(CLINIC_ROLES, []), large: size(CLINIC_ROLES, []) } }
+    { id: 'clinic', sizes: { small: size(CLINIC_ROLES, []), medium: size(CLINIC_ROLES, []), large: size(CLINIC_ROLES, []) } }
 ];
 
 const TWO = [{ _id: 'p1', ProjectName: 'Mobile app' }, { _id: 'p2', ProjectName: 'Website' }];
@@ -111,11 +111,19 @@ describe('the company blueprint picker', () => {
 
     it('turns nothing on for an industry whose first roles are not written, and says so', async () => {
         const wrapper = await mountWith(BlueprintPicker);
-        await wrapper.find('[data-test="bp-industry"]').setValue('clinic-admin');
+        await wrapper.find('[data-test="bp-industry"]').setValue('clinic');
         await wrapper.findAll('[data-test="bp-project"] input')[0].setValue(true);
         expect(wrapper.find('[data-test="bp-none-written"]').exists()).toBe(true);
         expect(wrapper.find('[data-test="bp-apply"]').attributes('disabled')).toBeDefined();
         expect(apiRequest).not.toHaveBeenCalledWith('post', expect.anything(), expect.anything());
+    });
+
+    it('uses the team packs it is handed instead of asking again', async () => {
+        const wrapper = mount(BlueprintPicker, { props: { teamPacks: { on: true, packs: [], companyBlueprints: BLUEPRINTS } }, global: { plugins: [store, i18n], mocks: { $t: t } } });
+        mounted.push(wrapper);
+        await flushPromises();
+        expect(apiRequest).not.toHaveBeenCalled();
+        expect(wrapper.find('[data-test="bp-seats"]').text()).toBe('About 4 roles and 6 to 9 seats');
     });
 
     it('is closed with a note while the dispatcher is off', async () => {

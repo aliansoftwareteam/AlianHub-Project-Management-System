@@ -15,7 +15,7 @@
                     <p v-if="!dispatcherOn" class="ah-small tp-note" data-test="tp-off" role="status">{{ $t('TeamPacks.dispatcher_off') }}</p>
                     <p v-if="needsKey" class="ah-small tp-note" data-test="tp-needs-key">{{ $t('AgentCatalogue.role_needs_key') }}</p>
 
-                    <BlueprintPicker />
+                    <BlueprintPicker :team-packs="teamPacks" />
 
                     <section class="ah-card tp-card">
                         <div class="ah-card__body tp-form">
@@ -122,6 +122,7 @@ const { checkPermission } = useCustomComposable();
 const loading = ref(true);
 const loadError = ref("");
 const packs = ref([]);
+const teamPacks = ref(null);
 const dispatcherOn = ref(false);
 const blueprint = ref("");
 const teams = ref([]);
@@ -171,6 +172,7 @@ async function load() {
     loadError.value = "";
     try {
         const data = await fetchTeamPacks();
+        teamPacks.value = data || null;
         packs.value = data?.packs || [];
         dispatcherOn.value = Boolean(data?.on);
         const asked = String(route?.query?.blueprint || "");
