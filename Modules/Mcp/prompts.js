@@ -1,6 +1,7 @@
 const tools = require('./tools');
 const rolesFlag = require('./rolesFlag');
 const rolePlaybooks = require('../Agents/rolePlaybooks');
+const playbookOverrides = require('../Agents/rolePlaybookOverrides');
 
 /* The ready-made prompts a person picks in their AI app. Fixed text shipped with the server: a prompt holds
  * no workspace data, takes what the person typed as its arguments, and tells the agent which tools to call.
@@ -227,12 +228,13 @@ const rolePrompt = (role) => Object.freeze({
 });
 
 let rolePromptsCache = null;
-const rolePrompts = () => {
+const rolePrompts = (edited) => {
+    if (edited && edited.size) return rolePlaybooks.all().map((role) => rolePrompt(playbookOverrides.apply(role, edited)));
     if (!rolePromptsCache) rolePromptsCache = Object.freeze(rolePlaybooks.all().map(rolePrompt));
     return rolePromptsCache;
 };
 
-const available = () => (rolesFlag.enabled() ? [...PROMPTS, ...rolePrompts()] : PROMPTS);
+const available = (edited) => (rolesFlag.enabled() ? [...PROMPTS, ...rolePrompts(edited)] : PROMPTS);
 
 const usableBy = (ctx) => {
     const offered = tools.usable(ctx);
@@ -240,12 +242,12 @@ const usableBy = (ctx) => {
     return { has: (name) => names.has(name), changes: offered.some((tool) => tool.write) };
 };
 
-const offeredTo = (ctx) => {
+const offeredTo = (ctx, edited) => {
     const { has } = usableBy(ctx);
-    return available().filter((prompt) => prompt.needs.every(has));
+    return available(edited).filter((prompt) => prompt.needs.every(has));
 };
 
-const list = (ctx) => offeredTo(ctx).map((prompt) => ({
+const list = (ctx, edited) => offeredTo(ctx, edited).map((prompt) => ({
     name: prompt.name,
     title: prompt.title,
     description: prompt.description,
@@ -253,8 +255,8 @@ const list = (ctx) => offeredTo(ctx).map((prompt) => ({
 }));
 
 /* null for a prompt that does not exist and for one this connection is not offered, so the two answer alike. */
-const get = (ctx, name, given = {}) => {
-    const prompt = offeredTo(ctx).find((offered) => offered.name === String(name));
+const get = (ctx, name, given = {}, edited = null) => {
+    const prompt = offeredTo(ctx, edited).find((offered) => offered.name === String(name));
     if (!prompt) return null;
     const { has, changes } = usableBy(ctx);
     const typed = given && typeof given === 'object' ? given : {};
