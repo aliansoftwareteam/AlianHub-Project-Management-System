@@ -5,6 +5,7 @@ const flag = require('./flag');
 const settings = require('./settings');
 const decisions = require('./decisions');
 const audit = require('./audit');
+const packs = require('./packs');
 
 const companyOf = (req) => String(req.headers['companyid'] || '');
 
@@ -24,6 +25,39 @@ const signedIn = async (req, res) => {
 
 /* Off, the routes that change something answer as if they did not exist. */
 exports.whenOn = (req, res, next) => (flag.enabled() ? next() : refuse(res, 404, 'Not found.'));
+
+/* The packs route answers why it cannot act rather than pretending it is not there. */
+exports.whenOnForPacks = (req, res, next) => (flag.enabled() ? next() : refuse(res, 409, 'The dispatcher is off on this server.'));
+
+exports.getPacks = (req, res) => {
+    try {
+        return res.json({ status: true, statusText: 'Team packs', data: { on: flag.enabled(), packs: packs.packs() } });
+    } catch (error) {
+        return fail(res, 'read packs')(error);
+    }
+};
+
+exports.applyPack = async (req, res) => {
+    try {
+        const actor = await signedIn(req, res);
+        if (!actor) return undefined;
+        const companyId = companyOf(req);
+        const body = req.body || {};
+        const undone = body.undo === true;
+        const result = undone ? await packs.undo(companyId, body, actor.id) : await packs.apply(companyId, body, actor.id);
+        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length);
+        if (changed.length) {
+            audit.packChanged(companyId, actor, undone, {
+                blueprint: undone ? String(body.blueprint || '') : result.blueprint,
+                teams: undone ? (Array.isArray(body.teams) ? body.teams.map(String) : []) : result.teams,
+                projects: changed.map((project) => ({ projectId: project.projectId, roles: undone ? project.removed : project.added })),
+            });
+        }
+        return res.json({ status: true, statusText: undone ? 'Team pack undone' : 'Team pack applied', data: result });
+    } catch (error) {
+        return fail(res, 'apply pack')(error);
+    }
+};
 
 exports.getSettings = async (req, res) => {
     try {

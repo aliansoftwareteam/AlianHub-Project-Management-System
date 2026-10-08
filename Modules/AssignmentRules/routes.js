@@ -10,6 +10,7 @@ const ofTask = projectIdsFrom({ records: [[SCHEMA_TYPE.TASKS, (req) => req.param
 
 const readsProject = requireProjectAccess({ mode: READ, projectIds: ofProject });
 const editsRules = requireProjectAccess({ projectIds: ofProject, permissions: () => [DETAILS] });
+const editsEveryProject = requireProjectAccess({ projectIds: (req) => (req.body && req.body.projectIds) || [], permissions: () => [DETAILS] });
 const readsTask = requireProjectAccess({ mode: READ, projectIds: ofTask });
 const assignsTask = requireProjectAccess({ projectIds: ofTask, permissions: () => ['task.task_assignee'] });
 /* A lead, for the dispatcher, is whoever may change the project's details. */
@@ -26,6 +27,8 @@ exports.init = (app) => {
     app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/dismiss', byPerson('dismiss'), assignsTask, controller.actOnDecision('dismiss'));
     app.post('/api/v2/assignment-rules/task/:taskId/decisions/:decisionId/undo', byPerson('undo'), assignsTask, controller.actOnDecision('undo'));
 
+    app.get('/api/v2/assignment-rules/dispatcher/team-packs', dispatcher.getPacks);
+    app.post('/api/v2/assignment-rules/dispatcher/team-packs', agentsRefused('project.settings'), dispatcher.whenOnForPacks, editsEveryProject, dispatcher.applyPack);
     app.get('/api/v2/assignment-rules/dispatcher/project/:projectId', readsProject, dispatcher.getSettings);
     app.put('/api/v2/assignment-rules/dispatcher/project/:projectId', agentsRefused('project.settings'), dispatcher.whenOn, editsRules, dispatcher.saveSettings);
     app.post('/api/v2/assignment-rules/dispatcher/project/:projectId/rules', agentsRefused('project.settings'), dispatcher.whenOn, editsRules, dispatcher.addRule);

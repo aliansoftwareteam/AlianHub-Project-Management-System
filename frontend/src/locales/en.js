@@ -8935,7 +8935,9 @@ export default {
         workflow_set_status: "A workflow changed the status",
         dispatcher_routed: "The dispatcher routed a task",
         dispatcher_settings_changed: "Changed the dispatcher of a project",
-        dispatcher_rule_added: "Added a routing rule"
+        dispatcher_rule_added: "Added a routing rule",
+        dispatcher_pack_applied: "Turned on a team pack",
+        dispatcher_pack_undone: "Undid a team pack"
     },
     AuditActions: {
         model_call: "Ask the AI model",
