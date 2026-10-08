@@ -152,6 +152,7 @@ const dbCollections = {
     AI_EVAL_RUNS: "ai_eval_runs",
     ASSIGNMENT_RULES: "assignment_rules",
     ASSIGNMENT_DECISIONS: "assignment_decisions",
+    DISPATCH_DECISIONS: "dispatch_decisions",
     AI_PROFILES: "ai_profiles",
 }
 

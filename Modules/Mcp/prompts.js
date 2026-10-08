@@ -1,4 +1,6 @@
 const tools = require('./tools');
+const rolesFlag = require('./rolesFlag');
+const rolePlaybooks = require('../Agents/rolePlaybooks');
 
 /* The ready-made prompts a person picks in their AI app. Fixed text shipped with the server: a prompt holds
  * no workspace data, takes what the person typed as its arguments, and tells the agent which tools to call.
@@ -202,6 +204,35 @@ const PROMPTS = Object.freeze([
     },
 ]);
 
+const ROLE_REQUEST = { name: 'request', description: 'What to work on: a task, a project or a request in your own words. Leave it empty and you are asked.', required: false };
+
+const rolePromptName = (role) => `work_as_${role.slug.replace(/-/g, '_')}`;
+
+/* A role's prompt carries its playbook, which names only the tools in `needs`; the role is offered only to a
+ * connection that may run all of them. */
+const rolePrompt = (role) => Object.freeze({
+    name: rolePromptName(role),
+    title: `Work as the ${role.name}`,
+    description: `${role.department}: ${rolePlaybooks.summary(role, 300)}`,
+    arguments: [ROLE_REQUEST],
+    needs: role.tools,
+    text: (has, { request }) => [
+        `Work as the ${role.name} of the ${role.department} team in AlianHub, following the playbook below.`,
+        request ? `What I want you to work on: "${request}".` : 'Ask me what to work on, unless I have just told you.',
+        'Ask me for anything the playbook needs that you do not have before you start, and show me what you will change before you change it.',
+        role.body,
+        CONTENT_RULE,
+    ],
+});
+
+let rolePromptsCache = null;
+const rolePrompts = () => {
+    if (!rolePromptsCache) rolePromptsCache = Object.freeze(rolePlaybooks.all().map(rolePrompt));
+    return rolePromptsCache;
+};
+
+const available = () => (rolesFlag.enabled() ? [...PROMPTS, ...rolePrompts()] : PROMPTS);
+
 const usableBy = (ctx) => {
     const offered = tools.usable(ctx);
     const names = new Set(offered.map((tool) => tool.name));
@@ -210,7 +241,7 @@ const usableBy = (ctx) => {
 
 const offeredTo = (ctx) => {
     const { has } = usableBy(ctx);
-    return PROMPTS.filter((prompt) => prompt.needs.every(has));
+    return available().filter((prompt) => prompt.needs.every(has));
 };
 
 const list = (ctx) => offeredTo(ctx).map((prompt) => ({
@@ -233,4 +264,4 @@ const get = (ctx, name, given = {}) => {
     };
 };
 
-module.exports = { PROMPTS, ARGUMENT_MAX, list, get };
+module.exports = { PROMPTS, ARGUMENT_MAX, list, get, rolePrompts, rolePromptName };

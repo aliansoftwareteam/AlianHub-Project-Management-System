@@ -428,6 +428,9 @@ const assignmentDecisionsSchema = new Schema(schema.assignmentDecisions, {strict
 assignmentDecisionsSchema.index({ taskId: 1, inputHash: 1 }, { unique: true, name: 'task_revision' });
 assignmentDecisionsSchema.index({ taskId: 1, createdAt: -1 });
 assignmentDecisionsSchema.index({ createdAt: -1 });
+const dispatchDecisionsSchema = new Schema(schema.dispatchDecisions, {strict: true, timestamps: false});
+dispatchDecisionsSchema.index({ taskId: 1, inputHash: 1 }, { unique: true, name: 'task_revision' });
+dispatchDecisionsSchema.index({ projectId: 1, state: 1, createdAt: -1 });
 const aiProfilesSchema = new Schema(schema.aiProfiles, {strict: true, timestamps: true});
 aiProfilesSchema.index({ ownerId: 1 }, { unique: true, name: 'owner_id' });
 
@@ -630,6 +633,7 @@ module.exports = {
     aiEvalRunsSchema,
     assignmentRulesSchema,
     assignmentDecisionsSchema,
+    dispatchDecisionsSchema,
     aiProfilesSchema,
     secretsSchema,
     oauthClientsSchema,

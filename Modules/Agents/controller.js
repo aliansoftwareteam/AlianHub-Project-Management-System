@@ -130,6 +130,7 @@ const agentPatchFields = (body) => {
     if (body.schedule !== undefined && typeof body.schedule === 'object') set.schedule = body.schedule;
     if (body.rateLimitPerDay !== undefined) set.rateLimitPerDay = Math.max(0, Number(body.rateLimitPerDay) || 0);
     if (body.confidenceFloor !== undefined) set.confidenceFloor = confidence.floorToStore(body.confidenceFloor);
+    if (body.role !== undefined) set.role = require('./agentRole').roleOf(body.role);
     return set;
 };
 
