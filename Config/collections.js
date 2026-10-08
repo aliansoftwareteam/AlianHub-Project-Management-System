@@ -116,6 +116,7 @@ const dbCollections = {
     AGENT_PROPOSALS: "agent_proposals",
     AGENT_STANDING_APPROVALS: "agent_standing_approvals",
     AGENT_SKILLS: "agent_skills",
+    ROLE_PLAYBOOK_OVERRIDES: "role_playbook_overrides",
     CALLS: "calls",
     INTEGRATION_CONNECTIONS: "integration_connections",
     CLOUD_STORAGE_CONNECTIONS: "cloud_storage_connections",
