@@ -3,7 +3,7 @@ slug: weekly-sales-reporter
 name: Weekly Sales Reporter
 blueprint: ecommerce
 department: Reporting
-team: Operations
+team: operations
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, goals.list, goal.get, timesheet.read, task.history, pages.search, page.get, page.create, page.update, task.comment, task.tags.add]
 hands_to: [promotion-planner, stock-alert]
 gates: [the shop manager reviews the report before it is shared]

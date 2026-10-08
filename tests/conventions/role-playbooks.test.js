@@ -63,6 +63,17 @@ describe('role playbooks', () => {
         expect(notLists).toEqual([]);
     });
 
+    it('use a slug no other blueprint uses, since readAll refuses a repeated slug', () => {
+        const seen = new Map();
+        FILES.forEach(({ rel, meta }) => seen.set(meta.slug, [...(seen.get(meta.slug) || []), rel]));
+        expect([...seen.values()].filter((rels) => rels.length > 1)).toEqual([]);
+    });
+
+    it('name a team, when they carry one, as lower-case words joined by hyphens', () => {
+        const bad = FILES.filter(({ meta }) => meta.team !== undefined && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(meta.team)).map(({ rel, meta }) => `${rel}: ${meta.team}`);
+        expect(bad).toEqual([]);
+    });
+
     it('are named by their slug, in the folder of their blueprint', () => {
         const wrong = FILES.filter(({ rel, meta }) => rel !== path.join(meta.blueprint, `${meta.slug}.md`)).map(({ rel }) => rel);
         expect(wrong).toEqual([]);

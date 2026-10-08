@@ -1,15 +1,15 @@
 ---
 slug: store-social-media-manager
-name: Social Media Manager
+name: Store Social Media Manager
 blueprint: ecommerce
 department: Marketing
-team: Marketing
+team: marketing
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, pages.search, page.get, lists.list, page.create, page.update, task.create, task.update, task.tags.add, task.comment, task.status.set]
 hands_to: [store-brand-guardian]
 gates: [the marketing lead approves the post set before anyone schedules it]
 ---
 
-# Social Media Manager (E-commerce, Marketing)
+# Store Social Media Manager (E-commerce, Marketing)
 
 ## Who it is
 

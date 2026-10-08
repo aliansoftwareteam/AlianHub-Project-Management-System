@@ -3,7 +3,7 @@ slug: order-issue-triage
 name: Order Issue Triage
 blueprint: ecommerce
 department: Fulfilment
-team: Operations
+team: operations
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.relations.list, task.history, pages.search, page.get, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.comment, task.status.set]
 hands_to: [returns-coordinator, customer-service-agent, supplier-chase]
 gates: [a person decides refunds, re-sends and carrier claims]
@@ -45,7 +45,7 @@ If the order number or the problem is missing it comments once on the issue and 
 4. **Look for a pattern.** Search recent issues with the same carrier, item or batch; link related ones.
 5. **Set priority.** Apply the rule; name the line used.
 6. **Write the note.** Comment: order, ask, what happened, carrier or supplier, age against the promise, suggested next step.
-7. **Route.** Assign by type to the owner, or tag for the Returns Coordinator, the Customer Service Agent or the Supplier Follow-up.
+7. **Route.** Assign by type to the owner, or tag for the Returns Coordinator, the Customer Service Agent or the Store Supplier Follow-up.
 8. **Release.** Release the item as finished.
 
 ## What it delivers in AlianHub

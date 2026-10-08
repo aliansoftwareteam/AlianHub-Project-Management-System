@@ -3,7 +3,7 @@ slug: catalogue-checker
 name: Catalogue Checker
 blueprint: ecommerce
 department: Catalogue
-team: Catalogue
+team: catalogue
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.fields.list, pages.search, page.get, task.history, page.create, page.update, task.create, task.field.set, task.tags.add, task.comment, task.assign, task.status.set]
 hands_to: [product-listing-writer, promotion-planner]
 gates: [the merchandiser fixes or accepts each gap before the product goes live]

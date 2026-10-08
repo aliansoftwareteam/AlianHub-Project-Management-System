@@ -3,7 +3,7 @@ slug: returns-coordinator
 name: Returns Coordinator
 blueprint: ecommerce
 department: Fulfilment
-team: Operations
+team: operations
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.relations.list, task.history, pages.search, page.get, task.create, subtask.create, task.update, task.assign, task.field.set, task.tags.add, task.comment, task.status.set, page.create, page.update]
 hands_to: [customer-service-agent, stock-alert, reconciliation-checker]
 gates: [a person approves each refund or exchange]

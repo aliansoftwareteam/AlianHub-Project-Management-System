@@ -3,7 +3,7 @@ slug: stock-alert
 name: Stock Alert
 blueprint: ecommerce
 department: Buying and stock
-team: Operations
+team: operations
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.fields.list, task.history, pages.search, page.get, task.create, task.update, task.assign, task.field.set, task.tags.add, task.comment, page.create, page.update]
 hands_to: [supplier-chase, promotion-planner]
 gates: [the buyer decides what to reorder and how much]
@@ -44,7 +44,7 @@ If a figure has no update date it says it is unknown how fresh it is, and does n
 3. **Flag.** One task per product at risk, named "[product]: low stock", with stock, weekly sales, cover in days, supplier and lead time.
 4. **Reorder list.** Write a doc "Reorder list, [date]" grouped by supplier, for the buyer.
 5. **Dead stock.** List products with no sales in the period, as a separate section.
-6. **Hand on.** Tag "supplier chase" when an open order is late, for the Supplier Follow-up.
+6. **Hand on.** Tag "supplier chase" when an open order is late, for the Store Supplier Follow-up.
 
 ## What it delivers in AlianHub
 

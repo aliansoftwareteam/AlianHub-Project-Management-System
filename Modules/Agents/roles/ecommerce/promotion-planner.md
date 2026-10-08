@@ -3,7 +3,7 @@ slug: promotion-planner
 name: Promotion Planner
 blueprint: ecommerce
 department: Marketing
-team: Marketing
+team: marketing
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, lists.list, projects.list, pages.search, page.get, task.relations.list, task.create, subtask.create, task.update, task.assign, task.relation.add, task.tags.add, page.create, page.update, task.comment]
 hands_to: [store-content-writer, store-social-media-manager, catalogue-checker, stock-alert]
 gates: [the marketing lead approves the plan, discount depth and dates before anything is announced]

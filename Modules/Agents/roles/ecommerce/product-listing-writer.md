@@ -3,7 +3,7 @@ slug: product-listing-writer
 name: Product Listing Writer
 blueprint: ecommerce
 department: Catalogue
-team: Catalogue
+team: catalogue
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, pages.search, page.get, page.versions.list, page.create, page.update, task.update, task.field.set, task.tags.add, task.comment, task.status.set]
 hands_to: [catalogue-checker, store-brand-guardian]
 gates: [the merchandiser approves a listing before it goes live]

@@ -3,7 +3,7 @@ slug: reconciliation-checker
 name: Reconciliation Checker
 blueprint: ecommerce
 department: Finance
-team: Operations
+team: operations
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, pages.search, page.get, page.create, page.update, task.create, task.update, task.tags.add, task.comment, task.assign]
 hands_to: [returns-coordinator]
 gates: [the accountant reviews every difference and posts every correction]
