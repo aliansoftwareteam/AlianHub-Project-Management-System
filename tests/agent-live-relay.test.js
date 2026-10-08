@@ -2,6 +2,11 @@ const mockCrud = jest.fn();
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockCrud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
+const mockSees = jest.fn(async () => true);
+jest.mock('../Modules/Agents/access', () => ({
+    personOf: async (companyId, userId) => ({ actor: { kind: 'human', userId: String(userId) }, human: true }),
+    canSeeProposal: (...a) => mockSees(...a),
+}));
 
 const socketEmitter = require('../event/socketEventEmitter');
 const helper = require('../socket/helper');
@@ -62,7 +67,7 @@ describe('the live agents signal', () => {
     });
 
     it('tells of a proposal, a pause and a deleted agent', async () => {
-        await relay(change({ kind: 'proposal', proposal: { _id: 'p1' } }));
+        await relay(change({ kind: 'proposal', proposal: { _id: 'p1', projectId: PROJECT } }));
         await relay(change({ kind: 'agent', pausedAll: true }));
         await relay(change({ kind: 'agent', agentId: 'a1', deleted: true }));
         await relay(change({ kind: 'agent', agent: { _id: 'a1', paused: true } }));
@@ -84,6 +89,46 @@ describe('the live agents signal', () => {
         await relay(change({ kind: 'run' }));
         await relay({ type: 'update', module: 'agent', data: { kind: 'proposal' } });
         expect(mine).not.toHaveBeenCalled();
+    });
+});
+
+describe('a proposal filed or decided', () => {
+    const APPROVER = '6f0000000000000000000a21';
+    const OUTSIDER = '6f0000000000000000000a22';
+    const PROPOSAL = { _id: '6f0000000000000000000e21', projectId: PROJECT, source: 'mcp', requestedBy: APPROVER };
+
+    const seat = (socketId, uid) => {
+        const emit = jest.fn();
+        const roomName = `selected_companies_${C}**${socketId}`;
+        const socket = { id: socketId, rooms: new Set([roomName]), identity: { companyId: C, uid } };
+        helper.upsertRoom({ roomName, socketId, socket, namespace: { to: jest.fn(() => ({ emit })) } });
+        return emit;
+    };
+
+    let approver;
+    let outsider;
+    beforeEach(() => {
+        mockCrud.mockResolvedValue({ roleType: 3 });
+        mockSees.mockReset();
+        mockSees.mockImplementation(async (companyId, caller) => caller.actor.userId === APPROVER);
+        approver = seat('q1', APPROVER);
+        outsider = seat('q2', OUTSIDER);
+    });
+    afterEach(() => ['q1', 'q2'].forEach((id) => helper.removeRoom(`selected_companies_${C}**${id}`)));
+
+    it('reaches only the people who may read it, asking about the proposal that was filed, and carries nothing of it', async () => {
+        await relay(change({ kind: 'proposal', proposal: PROPOSAL }));
+        expect(approver).toHaveBeenCalledWith(EVENT, { kind: 'proposal' });
+        expect(outsider).not.toHaveBeenCalled();
+        expect(mockSees).toHaveBeenCalledWith(C, expect.objectContaining({ actor: expect.objectContaining({ userId: APPROVER }) }), PROPOSAL);
+    });
+
+    it('reaches nobody when the check cannot be read, or when no proposal is named', async () => {
+        mockSees.mockRejectedValue(new Error('down'));
+        await relay(change({ kind: 'proposal', proposal: PROPOSAL }));
+        await relay(change({ kind: 'proposal' }));
+        expect(approver).not.toHaveBeenCalled();
+        expect(outsider).not.toHaveBeenCalled();
     });
 });
 

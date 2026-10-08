@@ -42,7 +42,7 @@ const clientStanding = async (companyId, clientId) => {
     const standing = await oauthAuth.clientStanding(clientId);
     if (!standing.ok) return { ok: false, name: '' };
     if (!(await oauthAuth.clientApprovedInWorkspace(companyId, clientId))) return { ok: false, name: standing.name };
-    return standing;
+    return { ...standing, name: await oauthAuth.nameInWorkspace(String(companyId), clientId, standing.name) };
 };
 
 module.exports = { liveGrantFor, grantStanding, approvalRow, privateSprintsOptIn, clientStanding };
