@@ -165,6 +165,7 @@ None of these needs a grant. A read takes the read scope and a write takes the w
 | `queue.list` | `tasks:read` | Reads. Work waiting for an agent: questions its person asked it in chat, and work in projects whose project manager is switched on (a question asked in a project's channel needs that switch too) | At most 25 items; `projectId` optional |
 | `task.tags.add` | `tasks:write` | At once. Puts a project tag on a task | Tag by id or name |
 | `task.tags.remove` | `tasks:write` | At once. Takes a tag off | |
+| `tag.create` | `tasks:manage` | Waits for a person. Adds a new tag to a project | One name the project does not have yet; undo removes it while no task carries it |
 | `task.relation.add` | `tasks:write` | At once. Links two tasks: `blocks`, `blocked_by`, `duplicates`, `duplicated_by`, `relates_to` | One link per pair |
 | `task.relation.remove` | `tasks:write` | At once. Removes the link on both tasks | |
 | `task.lists.add` | `tasks:write` | At once. Adds a top-level task to another list | Not a Scrum sprint, backlog or personal list; at most 10 lists per task |
@@ -271,6 +272,12 @@ With `MCP_TOOLS_WORK` on, `tasks.search` takes `sprintId` for every token: the t
 
 ```json
 { "name": "tasks.search", "arguments": { "sprintId": "<list id>" } }
+```
+
+With `MCP_TOOLS_WORK` on, it also takes `tag` (a tag id or name), `priority` (`URGENT`, `HIGH`, `MEDIUM` or `LOW`) and `field`: `{ "fieldId", "equals" }` for a dropdown option (label or id), a checkbox (true or false), a number or text (any case), and `before` or `after` instead for a date field. Days are written `YYYY-MM-DD` and read in the person's time zone. A tag or a field is looked up only in projects you can open, and the answer keeps its shape.
+
+```json
+{ "name": "tasks.search", "arguments": { "tag": "Bug", "priority": "HIGH", "field": { "fieldId": "<field id>", "before": "2026-11-01" } } }
 ```
 
 `task.get`: one task as a brief, with its goal, acceptance criteria, checklist, relations, links and what the comments settled. With `tasks:manage` it also carries the assignees, the subtask count, the tasks above it and each link's id.
@@ -433,6 +440,8 @@ These need `MCP_TOOLS_WORK` and the write scope, and no grant. Each asks the per
 ```json
 { "name": "task.tags.add", "arguments": { "taskId": "<task id>", "tag": "Bug", "reason": "Triage" } }
 ```
+
+`tag.create`: ask for a new tag on a project. It needs the `tasks:manage` grant and always waits for a person, because the project's tags show on every task. Arguments: `projectId`, `name` (at most 50 characters), `color` (`#RRGGBB`, optional) and `reason`. A name the project already has, in any case, is answered with that tag's id and nothing is filed. Once approved, put it on tasks with `task.tags.add`. Undo removes it while no task carries it, and otherwise says why it was kept.
 
 `task.relation.add`: link a task to another task you can open. Arguments: `taskId`, `relatedTaskId`, `type` (`blocks`, `blocked_by`, `duplicates`, `duplicated_by` or `relates_to`, read from the first task), and `reason`. The other task shows the matching link. Two tasks hold one link; to change its type, remove it and add it again.
 
