@@ -130,7 +130,7 @@ const findRunningTimer = (companyId, taskId, userId) => MongoDbCrudOpration(comp
 
 /* The people a comment names are told the way the comment route tells them.
  * A delivery that fails is logged: the comment is already written. */
-const announceMentions = async (companyId, commentId, mentionIds) => {
+const announceMentions = async (companyId, commentId, mentionIds = []) => {
     if (!mentionIds.length) return [];
     try {
         const { deliverMentions } = require('../Comments/helpers/commentNotifications');
@@ -178,7 +178,7 @@ const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action
         data: [{ _id: oid(r.commentId) }, { $set: { userId: String(actor.userId || a.actorId), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null } }],
     }, 'updateOne').catch(() => {});
     if (!actor.runId) await startsNamedAgents(companyId, actor, { taskId: params.taskId, body, depth, approvedBy });
-    const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId, r.mentionIds) : null;
+    const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId, r.mentionIds || []) : null;
     if (reply) await commentReplies.announceReply(companyId, r.commentId, reply.comment, mentioned);
     return {
         result: { commentId: r.commentId, ...(reply ? { threadOf: reply.rootId } : {}), ...(mentioned ? mentionAnswer(marked, mentioned, actor.userId) : {}) },
