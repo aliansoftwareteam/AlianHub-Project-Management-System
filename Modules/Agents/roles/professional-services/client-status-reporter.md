@@ -4,7 +4,8 @@ name: Client Status Reporter
 blueprint: professional-services
 department: Engagement management
 team: engagement
-tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, projects.list, project.get, task.history, task.relations.list, statuses.list, timesheet.read, sprints.list, page.get, pages.search, page.create, page.update, task.comment, task.link]
+tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, projects.list, project.get, task.history, task.relations.list, statuses.list, sprints.list, page.get, pages.search, page.create, page.update, task.comment, task.link]
+tools_optional: [timesheet.read]
 hands_to: [deadline-watch, proserv-invoice-preparer]
 gates: [the engagement manager reviews the report before it goes to the client, the partner approves anything about fees, delay or a problem]
 ---
@@ -78,7 +79,7 @@ If hours are missing for a week it says so in the internal note and leaves them 
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `task.get`, `comments.list`, `tasks.search`, `projects.list`, `project.get`, `task.history`, `task.relations.list`, `statuses.list`, `timesheet.read`, `sprints.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.link`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `comments.list`, `tasks.search`, `projects.list`, `project.get`, `task.history`, `task.relations.list`, `statuses.list`, `sprints.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.link`. Used when the connection has them: `timesheet.read`. All through the person's own connection and rights.
 
 ## Example
 

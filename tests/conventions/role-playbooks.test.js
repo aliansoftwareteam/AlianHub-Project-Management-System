@@ -42,6 +42,8 @@ const parse = (file) => {
 };
 
 const FILES = playbooks(ROOT).map((file) => ({ file, rel: path.relative(ROOT, file), ...parse(file) }));
+const allTools = (meta) => [...meta.tools, ...(Array.isArray(meta.tools_optional) ? meta.tools_optional : [])];
+const QUEUE = ['queue.list', 'queue.claim', 'queue.release'];
 const toolName = /^[a-z_]+(\.[a-z_]+)+$/;
 
 describe('role playbooks', () => {
@@ -61,6 +63,13 @@ describe('role playbooks', () => {
         expect(short).toEqual([]);
         const notLists = FILES.flatMap(({ rel, meta }) => LISTS.filter((key) => !Array.isArray(meta[key])).map((key) => `${rel}: ${key}`));
         expect(notLists).toEqual([]);
+        const badOptional = FILES.filter(({ meta }) => meta.tools_optional !== undefined && !Array.isArray(meta.tools_optional)).map(({ rel }) => rel);
+        expect(badOptional).toEqual([]);
+    });
+
+    it('keep a tool either required or optional, not both', () => {
+        const both = FILES.flatMap(({ rel, meta }) => (meta.tools_optional || []).filter((name) => meta.tools.includes(name)).map((name) => `${rel}: ${name}`));
+        expect(both).toEqual([]);
     });
 
     it('use a slug no other blueprint uses, since readAll refuses a repeated slug', () => {
@@ -91,7 +100,7 @@ describe('role playbooks', () => {
     });
 
     it('list only MCP tools that exist', () => {
-        const unknown = FILES.flatMap(({ rel, meta }) => meta.tools.filter((name) => !registered.has(name)).map((name) => `${rel}: ${name}`));
+        const unknown = FILES.flatMap(({ rel, meta }) => allTools(meta).filter((name) => !registered.has(name)).map((name) => `${rel}: ${name}`));
         expect(unknown).toEqual([]);
     });
 
@@ -99,7 +108,7 @@ describe('role playbooks', () => {
         const stray = FILES.flatMap(({ rel, meta, body }) => [...body.matchAll(/`([^`]+)`/g)]
             .map((m) => m[1])
             .filter((name) => toolName.test(name))
-            .filter((name) => !registered.has(name) || !meta.tools.includes(name))
+            .filter((name) => !registered.has(name) || !allTools(meta).includes(name))
             .map((name) => `${rel}: ${name}`));
         expect(stray).toEqual([]);
     });
@@ -107,9 +116,22 @@ describe('role playbooks', () => {
     it('show every listed tool in the tools section', () => {
         const unnamed = FILES.flatMap(({ rel, meta, body }) => {
             const section = (body.split(/^## AlianHub tools it uses$/m)[1] || '').split(/^## /m)[0];
-            return meta.tools.filter((name) => !section.includes(`\`${name}\``)).map((name) => `${rel}: ${name}`);
+            return allTools(meta).filter((name) => !section.includes(`\`${name}\``)).map((name) => `${rel}: ${name}`);
         });
         expect(unnamed).toEqual([]);
+    });
+
+    it('take routed work from their queue, unless the frontmatter says routed: false', () => {
+        const routed = FILES.filter(({ meta }) => meta.routed !== 'false');
+        expect(routed.length).toBeGreaterThan(0);
+        expect(FILES.filter(({ meta }) => ![undefined, 'true', 'false'].includes(meta.routed)).map(({ rel }) => rel)).toEqual([]);
+        const short = routed.flatMap(({ rel, meta }) => QUEUE.filter((name) => !meta.tools.includes(name)).map((name) => `${rel}: ${name}`));
+        expect(short).toEqual([]);
+        const firstStep = routed.filter(({ body }) => {
+            const section = (body.split(/^## How it works, step by step$/m)[1] || '').split(/^## /m)[0];
+            return !/^1\. \*\*Take the work/.test(section.trim());
+        }).map(({ rel }) => rel);
+        expect(firstStep).toEqual([]);
     });
 
     it('hand work only to roles written in the same blueprint', () => {

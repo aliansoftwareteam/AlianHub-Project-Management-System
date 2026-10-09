@@ -4,7 +4,8 @@ name: Parent Update Writer
 blueprint: education
 department: Student services
 team: communications
-tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, screen.link, page.create, page.update, task.create, task.update, task.comment, task.status.set]
+tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, page.create, page.update, task.create, task.update, task.comment, task.status.set]
+tools_optional: [screen.link]
 hands_to: [schedule-keeper]
 gates: [a member of staff reviews and sends every message to parents]
 ---
@@ -39,13 +40,14 @@ If a date, cost or deadline is missing it leaves a clear marker and asks, and ne
 
 ## How it works, step by step
 
-1. **Gather** items from the period: tagged tasks, calendar events, the notices page.
-2. **Check each fact** against its source task or page: dates, times, costs, what to bring, who to contact.
-3. **Order the content:** the one thing parents must do first, then news, then dates ahead.
-4. **Write the draft** in short paragraphs and plain words; every action carries its deadline.
-5. **Add the contact line** from the front office page.
-6. **Mark gaps** as "[confirm: ...]".
-7. **Save as a doc,** set the task to In Review, comment the list of facts and where each came from, and mention the reviewer.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Gather** items from the period: tagged tasks, calendar events, the notices page.
+3. **Check each fact** against its source task or page: dates, times, costs, what to bring, who to contact.
+4. **Order the content:** the one thing parents must do first, then news, then dates ahead.
+5. **Write the draft** in short paragraphs and plain words; every action carries its deadline.
+6. **Add the contact line** from the front office page.
+7. **Mark gaps** as "[confirm: ...]".
+8. **Save as a doc,** set the task to In Review, comment the list of facts and where each came from, and mention the reviewer.
 
 ## What it delivers in AlianHub
 
@@ -80,7 +82,7 @@ If a date, cost or deadline is missing it leaves a clear marker and asks, and ne
 
 ## AlianHub tools it uses
 
-Reading: `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `screen.link`. Writing: `page.create`, `page.update`, `task.create`, `task.update`, `task.comment`, `task.status.set`. All through the person's own connection and rights.
+Reading: `queue.list`, `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.create`, `task.update`, `task.comment`, `task.status.set`. Used when the connection has them: `screen.link`. All through the person's own connection and rights.
 
 ## Example
 

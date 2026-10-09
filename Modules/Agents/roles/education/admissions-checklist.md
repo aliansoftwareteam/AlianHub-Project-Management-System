@@ -39,7 +39,7 @@ If the steps doc is missing it proposes the usual stages and asks for confirmati
 
 ## How it works, step by step
 
-1. **Claim a new application** from the queue.
+1. **Take the work.** Claim a new application from `queue.list` with `queue.claim`, and give it back with `queue.release` once its checklist is handed over.
 2. **Create the checklist** as subtasks from the steps doc, with due dates from the intake deadlines.
 3. **Record each item** as received or missing; never paste a document's content.
 4. **Find the late ones:** open items past their date.

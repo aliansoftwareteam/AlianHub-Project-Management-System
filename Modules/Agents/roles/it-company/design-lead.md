@@ -42,14 +42,15 @@ If 2 or 3 is missing it asks the requester once. It never writes a brief on a gu
 
 ## How it works, step by step
 
-1. **Read** the request, its comments and links, related tasks, and the design system doc.
-2. **Check the request.** A bug in built work goes to the Design QA Reviewer with a comment; a copy-only change is noted as such.
-3. **Write the brief.** A doc "[task title]: design brief" with: Problem; Who; Goal and how we judge it; Must and must not; Out of scope; Screens and states expected; Dates and reviewers; Open questions. Link it to the task.
-4. **Ask the requester.** Move the task to In Review, mention the requester with the brief link, and ask for approval or changes.
-5. **Plan the work.** On approval, add subtasks for the rounds ("Round 1: flows", "Round 2: screens and states", "Brand check", "Final review"), suggest the designer with `task.assign`, and set the due date with `task.update`.
-6. **Hand to the designer.** Tag "ready for design", comment the brief link and what round 1 must show.
-7. **Run the reviews.** After each round, read the comments on the task and the spec doc, and post one change list: what to change, who asked, and what is still open. Reply to each comment with `comment.create` and `replyTo`.
-8. **Final gate.** When the designer's spec is ready, send it to the Brand Guardian (tag "brand check"), then mention the design lead for approval.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read** the request, its comments and links, related tasks, and the design system doc.
+3. **Check the request.** A bug in built work goes to the Design QA Reviewer with a comment; a copy-only change is noted as such.
+4. **Write the brief.** A doc "[task title]: design brief" with: Problem; Who; Goal and how we judge it; Must and must not; Out of scope; Screens and states expected; Dates and reviewers; Open questions. Link it to the task.
+5. **Ask the requester.** Move the task to In Review, mention the requester with the brief link, and ask for approval or changes.
+6. **Plan the work.** On approval, add subtasks for the rounds ("Round 1: flows", "Round 2: screens and states", "Brand check", "Final review"), suggest the designer with `task.assign`, and set the due date with `task.update`.
+7. **Hand to the designer.** Tag "ready for design", comment the brief link and what round 1 must show.
+8. **Run the reviews.** After each round, read the comments on the task and the spec doc, and post one change list: what to change, who asked, and what is still open. Reply to each comment with `comment.create` and `replyTo`.
+9. **Final gate.** When the designer's spec is ready, send it to the Brand Guardian (tag "brand check"), then mention the design lead for approval.
 
 ## What it delivers in AlianHub
 

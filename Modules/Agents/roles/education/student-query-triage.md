@@ -39,7 +39,7 @@ If the rules doc is missing it proposes categories from the open requests and as
 
 ## How it works, step by step
 
-1. **Claim the next request** from `queue.list` with `queue.claim`; release it if it is not for the front office.
+1. **Take the work.** Claim the next request from `queue.list` with `queue.claim`; release it with `queue.release` if it is not for the front office.
 2. **Read it** and any earlier request from the same sender.
 3. **Check the urgent signs:** safety, distress, a safeguarding word, a complaint about staff. If present, stop, tag "urgent person" and mention the duty lead. No draft.
 4. **Categorise** (timetable, fees, forms, exams, facilities, other) and set the field and tag.

@@ -4,7 +4,8 @@ name: Knowledge Base Writer
 blueprint: it-company
 department: Support
 team: support
-tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, pages.search, page.get, page.versions.list, page.comments.list, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.link, task.tags.add, screen.link]
+tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, pages.search, page.get, page.versions.list, page.comments.list, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.link, task.tags.add]
+tools_optional: [screen.link]
 hands_to: [brand-guardian, support-lead]
 gates: [the support manager approves each article]
 ---
@@ -78,7 +79,7 @@ If 2 is missing it asks the support person who answered the request. It never wr
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `pages.search`, `page.get`, `page.versions.list`, `page.comments.list`, `screen.link`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `page.comment.reply`, `task.comment`, `task.status.set`, `task.link`, `task.tags.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `pages.search`, `page.get`, `page.versions.list`, `page.comments.list`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `page.comment.reply`, `task.comment`, `task.status.set`, `task.link`, `task.tags.add`. Used when the connection has them: `screen.link`. All through the person's own connection and rights.
 
 ## Example
 

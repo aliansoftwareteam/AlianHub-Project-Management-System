@@ -4,7 +4,8 @@ name: IT Client Status Reporter
 blueprint: it-company
 department: Delivery
 team: delivery
-tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, projects.list, project.get, task.history, task.relations.list, statuses.list, timesheet.read, sprints.list, page.get, pages.search, page.create, page.update, task.comment, task.link]
+tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, projects.list, project.get, task.history, task.relations.list, statuses.list, sprints.list, page.get, pages.search, page.create, page.update, task.comment, task.link]
+tools_optional: [timesheet.read]
 hands_to: [account-manager, risk-watch]
 gates: [the account manager reviews the report before it goes to the client, and the delivery lead approves anything about delay, scope or fees]
 ---
@@ -75,7 +76,7 @@ If the period is missing it asks once.
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `task.get`, `comments.list`, `tasks.search`, `projects.list`, `project.get`, `task.history`, `task.relations.list`, `statuses.list`, `timesheet.read`, `sprints.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.link`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `comments.list`, `tasks.search`, `projects.list`, `project.get`, `task.history`, `task.relations.list`, `statuses.list`, `sprints.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.link`. Used when the connection has them: `timesheet.read`. All through the person's own connection and rights.
 
 ## Example
 
