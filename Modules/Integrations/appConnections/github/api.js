@@ -18,7 +18,7 @@ const rateLimited = (res) => res.status === 429
 const refusal = (res) => {
     if (res.status === 401) return new Error('GitHub refused the token (401). Connect GitHub again with a new token.');
     if (res.status === 404) return new Error('GitHub cannot find the repository, or the token cannot read it (404).');
-    if (rateLimited(res)) return Object.assign(new Error('GitHub rate limit reached; trying again later.'), { retry: { after: header(res, 'retry-after'), reset: header(res, 'x-ratelimit-reset') } });
+    if (rateLimited(res)) return Object.assign(new Error('GitHub rate limit reached; trying again later.'), { rateLimited: true, retry: { after: header(res, 'retry-after'), reset: header(res, 'x-ratelimit-reset') } });
     if (res.status === 403) return new Error('GitHub refused access to the repository (403).');
     return new Error(`GitHub answered ${res.status}.`);
 };
@@ -72,4 +72,42 @@ async function accountOf({ token, companyId, get = defaultGet }) {
     return { id: String((body && body.id) || ''), login: String((body && body.login) || '') };
 }
 
-module.exports = { listPulls, listRepos, canReadRepo, accountOf, defaultGet, PAGE_SIZE, MAX_PAGES, REPO_PAGES };
+const PULL_FILES_PER_PAGE = 50;
+const CHECK_RUNS_MAX = 100;
+
+const readJson = async (url, { token, companyId, get, missing }) => {
+    const res = await get(url, { token, companyId });
+    if (res.status === 404 && missing) throw Object.assign(new Error(missing), { notFound: true });
+    return parsed(res);
+};
+
+async function readPull({ repo, number, token, companyId, get = defaultGet }) {
+    const pull = await readJson(`https://api.github.com/repos/${repo}/pulls/${number}`, {
+        token, companyId, get, missing: 'GitHub cannot find that pull request, or the token cannot read it (404).',
+    });
+    if (!pull || typeof pull !== 'object' || Array.isArray(pull)) throw new Error('GitHub sent an unexpected reply.');
+    return pull;
+}
+
+async function pullFiles({ repo, number, page = 1, token, companyId, get = defaultGet }) {
+    const url = `https://api.github.com/repos/${repo}/pulls/${number}/files?per_page=${PULL_FILES_PER_PAGE}&page=${page}`;
+    const rows = await readJson(url, { token, companyId, get });
+    if (!Array.isArray(rows)) throw new Error('GitHub sent an unexpected reply.');
+    return rows;
+}
+
+/* Check runs (GitHub Actions and apps) and commit statuses (older CI services) both report on a commit. */
+async function commitChecks({ repo, sha, token, companyId, get = defaultGet }) {
+    const runs = await readJson(`https://api.github.com/repos/${repo}/commits/${sha}/check-runs?per_page=${CHECK_RUNS_MAX}`, { token, companyId, get });
+    const status = await readJson(`https://api.github.com/repos/${repo}/commits/${sha}/status?per_page=${CHECK_RUNS_MAX}`, { token, companyId, get });
+    return {
+        runs: Array.isArray(runs && runs.check_runs) ? runs.check_runs : [],
+        totalRuns: Number(runs && runs.total_count) || 0,
+        statuses: Array.isArray(status && status.statuses) ? status.statuses : [],
+    };
+}
+
+module.exports = {
+    listPulls, listRepos, canReadRepo, accountOf, readPull, pullFiles, commitChecks, defaultGet,
+    PAGE_SIZE, MAX_PAGES, REPO_PAGES, PULL_FILES_PER_PAGE, CHECK_RUNS_MAX,
+};

@@ -2482,6 +2482,7 @@ export default {
         "chat_channels_list": "List chat channels",
         "chat_messages_list": "Read chat messages",
         "proposal_get": "Check on a proposal",
+        "pull_request_get": "Read a GitHub pull request",
         "person_place": "Check where the person is working",
         "queue_list": "List the work queue",
         "screen_link": "Get a link to a screen"

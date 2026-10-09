@@ -323,6 +323,7 @@
     "AgentActions.project_setup": "Set up a project",
     "AgentActions.projects_list": "List projects",
     "AgentActions.proposal_get": "Check on a proposal",
+    "AgentActions.pull_request_get": "Read a GitHub pull request",
     "AgentActions.queue_claim": "Take an item from the work queue",
     "AgentActions.queue_list": "List the work queue",
     "AgentActions.queue_release": "Give back an item from the work queue",
