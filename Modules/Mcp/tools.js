@@ -373,20 +373,32 @@ const admitWrite = (ctx, tool, args) => {
 
 /* A write taken to the point where it either runs or is filed: its params, the project's answer and why it is held,
  * or the answer its preparation already gave. It throws what a call of the tool throws until then, and changes nothing. */
+const assertTarget = async (ctx, tool, vis, target, params) => {
+    try {
+        await visibility.assertWritable(ctx.companyId, vis, target);
+    } catch (error) {
+        if (!error.notVisible) throw error;
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: error.message, ip: ctx.ip, taint: ctx.taint });
+    }
+};
+
+const reachesCompanyWide = (tool, args) => {
+    try {
+        return Boolean(tool.target(args).companyWide);
+    } catch (error) {
+        return false;
+    }
+};
+
 const readied = async (ctx, tool, args) => {
     const filtered = tool.visibility === 'filtered';
     const vis = filtered ? await visibility.forCaller(ctx) : undefined;
+    // A connection kept to some projects is refused a workspace-wide write before preparing it, whose answer would tell it what the person may do.
+    if (filtered && tool.prepare && reachesCompanyWide(tool, args)) await assertTarget(ctx, tool, vis, { companyWide: true }, {});
     const prepared = tool.prepare ? await prepare(ctx, tool, args, vis) : { args };
     if (prepared.answer) return { answer: prepared.answer };
     const params = tool.params(prepared.args);
-    if (filtered) {
-        try {
-            await visibility.assertWritable(ctx.companyId, vis, tool.target(prepared.args));
-        } catch (error) {
-            if (!error.notVisible) throw error;
-            throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: error.message, ip: ctx.ip, taint: ctx.taint });
-        }
-    }
+    if (filtered) await assertTarget(ctx, tool, vis, tool.target(prepared.args), params);
     const tainted = heldForApproval(ctx, tool.action);
     // An outside client that holds the tool's manage grant files what is held for a person; without the grant the call is refused, as before.
     if (tainted && !outsideMayFile(ctx, tool)) {

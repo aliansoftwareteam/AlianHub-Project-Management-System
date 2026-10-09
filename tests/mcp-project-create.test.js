@@ -218,6 +218,13 @@ describe('who may ask for a project', () => {
         expect(waiting()).toHaveLength(0);
     });
 
+    it('gives a token kept to some projects the same answer whether or not the person may create a project', async () => {
+        setRule('project_create', false, [3]);
+        const kept = { ...as(OUTSIDER), projectIds: narrowed(OUTSIDER, [P_OPEN]).projectIds };
+        expect(await rpc(kept, TOOL, { name: NAME })).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible: .*limited to some projects/) });
+        expect(waiting()).toHaveLength(0);
+    });
+
     it('holds the name and each part to its limit and says what is wrong', async () => {
         const bad = async (args) => (await rpc(as(OWNER), TOOL, args)).rpcError;
         expect(await bad({})).toMatchObject({ code: -32602 });
