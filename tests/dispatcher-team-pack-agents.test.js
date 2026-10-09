@@ -152,18 +152,59 @@ describe('team packs make one agent per role', () => {
         });
     });
 
-    it('never duplicates an agent for the same role and projects, and makes a new one for other projects', async () => {
+    it('reuses the role\'s agent whose projects overlap, widening it to the new ones, and makes one only for projects no agent reaches', async () => {
         seedRules(GRANTS);
         const one = seedProject();
         const two = seedProject();
-        await applyPack([one]);
+        const three = seedProject();
+        const first = await applyPack([one]);
         const again = await applyPack([one]);
-        expect(again.body.data.agents.made).toEqual([]);
+        expect(again.body.data.agents).toMatchObject({ made: [], widened: [] });
         expect(again.body.data.agents.kept).toHaveLength(engineering.length);
+        const wider = await applyPack([one, two]);
+        expect(wider.body.data.agents.made).toEqual([]);
+        expect(wider.body.data.agents.widened.map((a) => a.agentId).sort()).toEqual(first.body.data.agents.made.map((a) => a.agentId).sort());
+        expect(wider.body.data.agents.widened[0].projectIds).toEqual(ids(two));
         expect(live()).toHaveLength(engineering.length);
-        const other = await applyPack([one, two]);
-        expect(other.body.data.agents.made).toHaveLength(engineering.length);
+        expect(live().find((agent) => agent.role === TRIAGER).projectIds.map(String)).toEqual([String(one._id), String(two._id)]);
+        expect(audited().pop().meta.agents.widened).toHaveLength(engineering.length);
+        const apart = await applyPack([three]);
+        expect(apart.body.data.agents.made).toHaveLength(engineering.length);
         expect(live()).toHaveLength(engineering.length * 2);
+    });
+
+    it('finds the overlapping agent however many agents play the role', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        for (let i = 0; i < 600; i += 1) mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: oid(), name: `Elsewhere ${i}`, role: TRIAGER, projectIds: [oid()], deletedStatusKey: 0, createdAt: new Date(1000 + i) });
+        const mine = oid();
+        mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: mine, name: 'Mine', role: TRIAGER, projectIds: ids(project), deletedStatusKey: 0, createdAt: new Date(5000) });
+        const res = await applyPack([project]);
+        expect(res.body.data.agents.made.map((a) => a.roleKey)).not.toContain(TRIAGER);
+        expect(res.body.data.agents.kept).toEqual([expect.objectContaining({ roleKey: TRIAGER, agentId: mine })]);
+    });
+
+    it('lets one of two packs applied at once through and turns the other away, so no role gets two agents', async () => {
+        mockDb.unique(SCHEMA_TYPE.AGENT_WORK_MARKS, ['scope', 'key']);
+        seedRules(GRANTS);
+        const project = seedProject();
+        const [a, b] = await Promise.all([applyPack([project]), applyPack([project])]);
+        expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);
+        expect([a, b].find((res) => res.statusCode === 409).body.message).toContain('Another team pack is being applied');
+        expect(live()).toHaveLength(engineering.length);
+        expect((await applyPack([project])).statusCode).toBe(200);
+        expect(live()).toHaveLength(engineering.length);
+    });
+
+    it('waits for a pack change that holds the lock, and takes over one whose lease ran out', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        const mark = mockDb.seed(SCHEMA_TYPE.AGENT_WORK_MARKS, { scope: 'team-pack', key: 'apply', by: 'someone', rev: 1, until: new Date(Date.now() + 60000) });
+        expect((await applyPack([project])).statusCode).toBe(409);
+        expect(live()).toHaveLength(0);
+        mark.until = new Date(Date.now() - 1000);
+        expect((await applyPack([project])).statusCode).toBe(200);
+        expect(live()).toHaveLength(engineering.length);
     });
 
     it('leaves agents out when asked, and a person\'s own agent for the role counts as the one', async () => {
@@ -171,7 +212,7 @@ describe('team packs make one agent per role', () => {
         const project = seedProject();
         mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: oid(), name: 'Mine', role: TRIAGER, projectIds: ids(project), deletedStatusKey: 0, ownerId: OWNER });
         const res = await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), createAgents: false } });
-        expect(res.body.data.agents).toEqual({ made: [], kept: [] });
+        expect(res.body.data.agents).toEqual({ made: [], kept: [], widened: [] });
         expect(live()).toHaveLength(1);
         const on = await applyPack([project]);
         expect(on.body.data.agents.kept.map((a) => a.roleKey)).toEqual([TRIAGER]);
@@ -222,7 +263,7 @@ describe('team packs make one agent per role', () => {
         const one = seedProject();
         const two = seedProject();
         const first = await applyPack([one]);
-        const wide = await applyPack([one, two]);
+        const wide = await applyPack([two]);
         const handed = first.body.data.agents.made[0].agentId;
         mockDb.seed(SCHEMA_TYPE.PROJECT_FINDINGS, { rule: 'handed_over', status: 'open', facts: { agentId: handed } });
         const res = await call('POST', PACKS, {
@@ -250,7 +291,7 @@ describe('team packs make one agent per role', () => {
         expect(store(SCHEMA_TYPE.ASSIGNMENT_RULES)).toHaveLength(0);
         const quiet = await applyPack([project], { uid: EDITOR });
         expect(quiet.statusCode).toBe(200);
-        expect(quiet.body.data.agents).toEqual({ made: [], kept: [] });
+        expect(quiet.body.data.agents).toEqual({ made: [], kept: [], widened: [] });
         expect(agentsOf()).toHaveLength(0);
         const made = await applyPack([project]);
         const undo = await call('POST', PACKS, { uid: EDITOR, body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), roles: {}, agents: made.body.data.agents.made.map((a) => a.agentId) } });

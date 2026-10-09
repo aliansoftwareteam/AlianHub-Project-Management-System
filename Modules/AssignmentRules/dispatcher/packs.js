@@ -7,6 +7,7 @@ const logger = require('../../../Config/loggerConfig');
 const { RuleError } = require('../rules');
 const settings = require('./settings');
 const packAgents = require('./packAgents');
+const { withPackLock } = require('./packLock');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const MAX_PROJECTS = 50;
@@ -216,7 +217,7 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
             ...(proposed.failed ? { tagsFailed: true } : {}),
         });
     }
-    const agents = createAgents ? await packAgents.create(companyId, pack.roles, projectIds, actorId) : { made: [], kept: [] };
+    const agents = createAgents ? await packAgents.create(companyId, pack.roles, projectIds, actorId) : { made: [], kept: [], widened: [] };
     return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 
@@ -268,4 +269,8 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 
-module.exports = { MAX_PROJECTS, packs, normaliseProjectIds, apply, undo };
+module.exports = {
+    MAX_PROJECTS, packs, normaliseProjectIds,
+    apply: (companyId, ...rest) => withPackLock(companyId, () => apply(companyId, ...rest)),
+    undo: (companyId, ...rest) => withPackLock(companyId, () => undo(companyId, ...rest)),
+};

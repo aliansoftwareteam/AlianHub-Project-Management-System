@@ -11,7 +11,6 @@ const registry = require('../../Agents/registry');
 const knowledgeMemory = require('../../Knowledge/memory/publish');
 const settings = require('./settings');
 
-const AGENT_ROWS = 500;
 const SKILL_PROMPT_MAX = 19000;
 const REPLY_MAX = 1500;
 const SKILL_ACTIONS = Object.freeze(['task.get', 'task.comment']);
@@ -22,7 +21,6 @@ const SMALL_WORDS = Object.freeze({ it: 'IT' });
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
 const find = async (companyId, type, data) => ((await MongoDbCrudOpration(companyId, { type, data }, 'find')) || []).map(plain);
 const madeBy = (blueprint) => `team-pack:${blueprint}`;
-const sameIds = (a, b) => a.length === b.length && a.every((id) => b.includes(id));
 const idsOf = (agent) => [...new Set((agent.projectIds || []).map(String))];
 
 const blueprintLabel = (blueprint) => String(blueprint).split('-')
@@ -59,18 +57,26 @@ async function ensureSkill(companyId, role, actorId) {
 /* The playbook names MCP tools; the ones the registry does not know as agent actions are left out by allowedActionsToStore. */
 const actionsOf = (role) => registry.allowedActionsToStore([...new Set([...SKILL_ACTIONS, ...role.tools, ...role.toolsOptional])]);
 
-const sameRole = (agent, roleKey, projectIds) => agent.role === roleKey && sameIds(idsOf(agent), projectIds);
+/* An agent with no projects named may work in any, so it already covers every project. */
+const overlaps = (agent, projectIds) => !idsOf(agent).length || idsOf(agent).some((id) => projectIds.includes(id));
 
-/* One agent per role for exactly these projects. A role that already has an agent for the same projects is left as it
- * is, whoever made that agent. A new agent starts paused and with no mention trigger, so neither a mention nor routed
- * work reaches it until a person switches it on. */
+/* One agent per role across these projects. A role that already has an agent whose projects overlap them, whoever made
+ * it, is reused and widened to the projects it lacks rather than doubled. A new agent starts paused and with no mention
+ * trigger, so neither a mention nor routed work reaches it until a person switches it on. */
 async function create(companyId, roleKeys, projectIds, actorId) {
-    const existing = await find(companyId, SCHEMA_TYPE.AGENTS, [{ role: { $in: roleKeys }, deletedStatusKey: { $ne: 1 } }, { role: 1, projectIds: 1, name: 1 }, { limit: AGENT_ROWS }]);
+    const existing = await find(companyId, SCHEMA_TYPE.AGENTS, [{ role: { $in: roleKeys }, deletedStatusKey: { $ne: 1 } }, { role: 1, projectIds: 1, name: 1 }, { sort: { createdAt: 1, _id: 1 } }]);
     const made = [];
     const kept = [];
+    const widened = [];
     for (const key of roleKeys) {
-        const have = existing.find((agent) => sameRole(agent, key, projectIds));
+        const have = existing.find((agent) => agent.role === key && overlaps(agent, projectIds));
         if (have) {
+            const missing = idsOf(have).length ? projectIds.filter((id) => !idsOf(have).includes(id)) : [];
+            if (missing.length) {
+                await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: have._id }, { $addToSet: { projectIds: { $each: missing } } }] }, 'updateOne');
+                runs.emitAgent(companyId, { agentId: String(have._id) });
+                widened.push({ roleKey: key, agentId: String(have._id), name: have.name || '', projectIds: missing });
+            }
             kept.push({ roleKey: key, agentId: String(have._id), name: have.name || '' });
             continue;
         }
@@ -80,7 +86,7 @@ async function create(companyId, roleKeys, projectIds, actorId) {
             name: agentName(role),
             description: roleSkill.skillDescription(role),
             role: key,
-            projectIds,
+            projectIds: [...projectIds],
             skills: [{ key: skill, name: role.name, enabled: true }],
             allowedActions: actionsOf(role),
             autonomy: AUTONOMY,
@@ -91,7 +97,7 @@ async function create(companyId, roleKeys, projectIds, actorId) {
         }, { ownerId: actorId });
         made.push({ roleKey: key, agentId: String(saved._id), name: saved.name });
     }
-    return { made, kept };
+    return { made, kept, widened };
 }
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
