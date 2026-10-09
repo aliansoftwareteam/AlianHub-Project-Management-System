@@ -13,6 +13,7 @@ describe('every registered MCP tool maps to one scope', () => {
     const savedData = process.env.MCP_TOOLS_DATA;
     const savedManage = process.env.MCP_TOOLS_MANAGE;
     const savedWork = process.env.MCP_TOOLS_WORK;
+    const savedApps = process.env.APP_CONNECTIONS;
     const restore = (key, value) => { if (value === undefined) delete process.env[key]; else process.env[key] = value; };
 
     beforeAll(() => {
@@ -21,12 +22,13 @@ describe('every registered MCP tool maps to one scope', () => {
         process.env.MCP_TOOLS_DATA = 'on';
         process.env.MCP_TOOLS_MANAGE = 'on';
         process.env.MCP_TOOLS_WORK = 'on';
+        process.env.APP_CONNECTIONS = 'on';
         tools = require('../../Modules/Mcp/tools');
         registry = require('../../Modules/Agents/registry');
         sessionTools = require('../../Modules/Mcp/sessionTools');
         ({ TOOL_SCOPES, scopeForTool } = require('../../Modules/Mcp/scopes'));
     });
-    afterAll(() => { restore('AGENT_PERFORMANCE_READ', saved); restore('EXTERNAL_AGENT_SESSIONS', savedSessions); restore('MCP_TOOLS_DATA', savedData); restore('MCP_TOOLS_MANAGE', savedManage); restore('MCP_TOOLS_WORK', savedWork); });
+    afterAll(() => { restore('AGENT_PERFORMANCE_READ', saved); restore('EXTERNAL_AGENT_SESSIONS', savedSessions); restore('MCP_TOOLS_DATA', savedData); restore('MCP_TOOLS_MANAGE', savedManage); restore('MCP_TOOLS_WORK', savedWork); restore('APP_CONNECTIONS', savedApps); });
 
     it('sees the flagged tools too (the scan works)', () => {
         expect(tools.names()).toContain('performance.read');

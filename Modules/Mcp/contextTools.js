@@ -20,6 +20,7 @@ const { loadProject, NO_PROJECT, NO_TASK } = require('./dataTools');
 const { SOURCE } = require('./propose');
 const { turnBackIfKeptAway, askThePerson } = require('./readGate');
 const chatTools = require('./chatTools');
+const pullRequestTools = require('./pullRequestTools');
 const names = require('./names');
 
 // What a connected agent needs to know before it acts on one sentence: who "me" is, which days count, what a
@@ -242,6 +243,7 @@ const TOOLS = [
         },
     },
     ...chatTools.TOOLS,
+    ...pullRequestTools.TOOLS,
 ];
 
 const offered = () => TOOLS.filter((tool) => registry.has(tool.action));

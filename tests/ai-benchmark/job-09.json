@@ -1,0 +1,47 @@
+{
+    "job": 9,
+    "title": "Filter and save a view",
+    "sentence": "Show my tasks due this week and save it as a view called \"[AI bench] Mine this week\".",
+    "start": "The list",
+    "passed": "AI-1 run 1, 2026-10-08, builds 815 to 817: pass with one approval, 6 steps",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "calls": [
+        {
+            "tool": "person.place",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "person.me",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "view.create",
+            "arguments": {
+                "projectId": "$project",
+                "name": "[AI bench] Mine this week",
+                "kind": "list",
+                "mine": true,
+                "due": "this_week",
+                "reason": "My tasks due this week"
+            },
+            "answer": "pending"
+        }
+    ],
+    "preview": {
+        "kind": "view",
+        "title": "[AI bench] Mine this week",
+        "lines": [
+            {
+                "kind": "mine"
+            },
+            {
+                "kind": "dueFilter",
+                "when": "this_week"
+            }
+        ]
+    },
+    "approve": true,
+    "undo": true
+}
