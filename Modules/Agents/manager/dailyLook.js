@@ -10,6 +10,7 @@ const proposals = require('../proposals');
 const rules = require('./rules');
 const findings = require('./findings');
 const workQueue = require('./workQueue');
+const { SYSTEM_ACTIONS, propose } = require('./filing');
 
 // The look a project gets once on each of its working days: read a bounded slice of its open work, let the rules
 // say what needs attention, and file what is new. Nothing is changed here; a ready change waits as a proposal.
@@ -19,8 +20,6 @@ const CAPS = Object.freeze({ TASKS_READ: 500, FILED_PER_DAY: 10 });
 const DATED_SHARE = 300;
 const PLANS_READ = 2000;
 const COMPANY_CONCURRENCY = 5;
-const SYSTEM_AGENT_ID = 'project-manager';
-const SYSTEM_ACTIONS = Object.freeze(['task.comment', 'task.update']);
 const WITHDRAWN = 'no_longer_needed';
 const LOG_PREFIX = '[project-look]';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -78,17 +77,6 @@ const afterDecision = (row, decision) => {
     if (row.status !== STATUS.OPEN || !decision || decision.decidedBy === proposals.SYSTEM_DECIDER) return row.status;
     if (REFUSED_BY_A_PERSON.includes(decision.status)) return STATUS.DECLINED;
     return ANSWERED.includes(decision.status) ? STATUS.HANDLED : row.status;
-};
-
-const propose = async (companyId, project, row, finding) => {
-    const { action, params, label, what, why } = finding.fix;
-    const proposal = await proposals.create(companyId, {
-        agent: { _id: SYSTEM_AGENT_ID, name: `System for ${project.ProjectName || 'this project'}` },
-        taskId: params.taskId, projectId: String(project._id), what, why, changes: [{ action, params, label }],
-        source: proposals.SOURCE_SYSTEM, allowedActions: SYSTEM_ACTIONS,
-        finding: { id: String(row._id), rule: finding.rule, facts: finding.facts, projectName: project.ProjectName || '' },
-    });
-    await findings.attach(companyId, row, proposal._id);
 };
 
 const reconcile = async (companyId, project, found, now) => {

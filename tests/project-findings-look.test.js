@@ -127,7 +127,7 @@ describe('the daily look', () => {
         const cases = oneOfEach();
         switchOn();
         expect(await dailyLook.runForCompany(CID, WEDNESDAY)).toMatchObject({ looked: 1, filed: 7 });
-        expect(open().map((row) => row.rule).sort()).toEqual(Object.values(RULE).sort());
+        expect(open().map((row) => row.rule).sort()).toEqual(Object.values(RULE).filter((rule) => rule !== RULE.TRIAGE).sort());
         const about = (rule) => ofRule(open(), rule)[0];
         expect(about(RULE.SLIPPING)).toMatchObject({ taskId: String(cases.late._id), facts: { taskKey: cases.late.TaskKey, daysLate: 3 } });
         expect(about(RULE.BLOCKED)).toMatchObject({ taskId: String(cases.waiting._id), facts: { blockerKey: cases.quietBlocker.TaskKey, quietDays: 4 } });

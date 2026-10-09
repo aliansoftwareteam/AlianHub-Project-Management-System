@@ -3709,6 +3709,21 @@ const schema = {
             type: String,
             required: false
         },
+        // The day (YYYY-MM-DD) of the last triage: the mark a server takes before it asks the model.
+        agentManagerTriagedOn: {
+            type: String,
+            required: false
+        },
+        // The creation time up to which the manager's model has triaged new tasks (Modules/Agents/managerTriage.js).
+        agentManagerTriagedAt: {
+            type: Date,
+            required: false
+        },
+        // Ids of tasks created at exactly agentManagerTriagedAt that were already triaged.
+        agentManagerTriagedIds: {
+            type: [String],
+            required: false
+        },
         ProjectType: {
             type: String,
             required: true
