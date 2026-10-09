@@ -4,7 +4,8 @@ name: Roadmap Keeper
 blueprint: it-company
 department: Product
 team: product
-tools: [tasks.search, task.get, comments.list, task.relations.list, sprints.list, lists.list, goals.list, goal.get, performance.read, pages.search, page.get, page.versions.list, page.create, page.update, task.comment, task.update, task.tags.add, task.lists.add, tasks.batch, proposal.get]
+tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.relations.list, sprints.list, lists.list, pages.search, page.get, page.versions.list, page.create, page.update, task.comment, task.update, task.tags.add, task.lists.add, tasks.batch, proposal.get]
+tools_optional: [goals.list, goal.get, performance.read]
 hands_to: [prd-writer, status-reporter]
 gates: [the head of product approves roadmap changes]
 ---
@@ -41,13 +42,14 @@ If 1 is missing it offers to make the doc from the roadmap list. It never sets a
 
 ## How it works, step by step
 
-1. **Read** the roadmap doc, the roadmap list, the goals (`goals.list`, `goal.get`).
-2. **Measure each item.** Follow its links to the engineering tasks; count open and closed, read `performance.read` for the list doing it. Note the planned date.
-3. **Find slips.** An item whose date passed, or whose work has not started a sprint before its date, or whose tasks grew by more than a third.
-4. **Find gaps.** A Now item with no PRD, an item with no goal, a candidate tagged "roadmap candidate" not yet placed.
-5. **Propose.** A comment on the roadmap task: each slip with the numbers and a suggested new date or swap; each gap with what is needed; each candidate with where it could go. Changes to items (dates, order, the list they sit in) go in one `tasks.batch` for the head of product to approve.
-6. **Update the doc** after approval: now, next, later, each with goal, PRD link, progress (closed of total), date and a one-line status. Keep the old version in history.
-7. **Hand on.** Tag Now items with no PRD "needs PRD" for the PRD Writer. Tell the Status Reporter what changed with a comment on the roadmap task.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read** the roadmap doc, the roadmap list, the goals (`goals.list`, `goal.get`).
+3. **Measure each item.** Follow its links to the engineering tasks; count open and closed, read `performance.read` for the list doing it. Note the planned date.
+4. **Find slips.** An item whose date passed, or whose work has not started a sprint before its date, or whose tasks grew by more than a third.
+5. **Find gaps.** A Now item with no PRD, an item with no goal, a candidate tagged "roadmap candidate" not yet placed.
+6. **Propose.** A comment on the roadmap task: each slip with the numbers and a suggested new date or swap; each gap with what is needed; each candidate with where it could go. Changes to items (dates, order, the list they sit in) go in one `tasks.batch` for the head of product to approve.
+7. **Update the doc** after approval: now, next, later, each with goal, PRD link, progress (closed of total), date and a one-line status. Keep the old version in history.
+8. **Hand on.** Tag Now items with no PRD "needs PRD" for the PRD Writer. Tell the Status Reporter what changed with a comment on the roadmap task.
 
 ## What it delivers in AlianHub
 
@@ -80,7 +82,7 @@ If 1 is missing it offers to make the doc from the roadmap list. It never sets a
 
 ## AlianHub tools it uses
 
-Reading: `tasks.search`, `task.get`, `comments.list`, `task.relations.list`, `sprints.list`, `lists.list`, `goals.list`, `goal.get`, `performance.read`, `pages.search`, `page.get`, `page.versions.list`, `proposal.get`. Writing: `page.create`, `page.update`, `task.comment`, `task.update`, `task.tags.add`, `task.lists.add`, `tasks.batch`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.relations.list`, `sprints.list`, `lists.list`, `pages.search`, `page.get`, `page.versions.list`, `proposal.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.update`, `task.tags.add`, `task.lists.add`, `tasks.batch`. Used when the connection has them: `goals.list`, `goal.get`, `performance.read`. All through the person's own connection and rights.
 
 ## Example
 

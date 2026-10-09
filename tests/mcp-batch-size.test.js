@@ -153,6 +153,14 @@ describe('a batch that does not wait as one proposal', () => {
         expect(audits('tasks.batch')[0].meta.undo.auditIds).toHaveLength(BATCH_AT_ONCE_MAX);
     });
 
+    it('refuses a connection kept away from the batch before any of its changes runs', async () => {
+        const out = await batch(ctx(OWNER, { allowedActions: ['task.update'] }), onOne(2));
+
+        expect(out).toMatchObject({ refused: true, reason: expect.stringMatching(/is not switched on for this connection/) });
+        untouched();
+        expect(audits('task.update')).toHaveLength(0);
+    });
+
     it('refuses twenty-six changes to one task in plain words, before anything is read, and runs none of them', async () => {
         const out = await batch(ctx(OWNER), onOne(BATCH_AT_ONCE_MAX + 1));
 

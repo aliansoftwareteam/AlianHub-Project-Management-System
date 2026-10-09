@@ -109,9 +109,13 @@ const allow = (run, steps, step, now = new Date()) => {
         return refusal(LOOP_DEPTH_EXCEEDED, `step ${step.stepId} is ${depth} levels of re-entry deep, and the guard stops at ${MAX_DEPTH}`);
     }
 
+    // A step that waits across claims counts its deadline from when it began, so what it still wants shrinks with the run.
+    const begun = step && step.handedAt ? now.getTime() - new Date(step.handedAt).getTime() : 0;
+    const stillWantedMs = positive(config.deadlineMs) === null ? null : positive(config.deadlineMs - Math.max(0, begun));
+
     if (left.ms !== null) {
         if (left.ms <= 0) return refusal(DEADLINE_EXCEEDED, `the run's deadline passed ${seconds(-left.ms)} ago, so step ${step.stepId} was not started`);
-        const wanted = positive(config.deadlineMs);
+        const wanted = stillWantedMs;
         if (wanted !== null && wanted > left.ms) {
             return refusal(DEADLINE_EXCEEDED, `step ${step.stepId} asks for ${seconds(wanted)} and the run has ${seconds(left.ms)} left, so it was not started`);
         }
@@ -127,7 +131,7 @@ const allow = (run, steps, step, now = new Date()) => {
 
     // What the hop is handed: what it asked for when that is less than remains,
     // and the whole remainder when it named nothing of its own.
-    const wantedMs = positive(config.deadlineMs);
+    const wantedMs = stillWantedMs;
     const wantedUsd = positive(config.budgetUsd);
     return {
         ok: true,

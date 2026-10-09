@@ -65,7 +65,7 @@ const tokenOf = (uid) => TOKEN.replace(/.$/, String(PEOPLE.indexOf(uid) + 1));
 /* Each person's own token, so approval finds the token the proposal was filed with. */
 const as = (uid, over = {}) => {
     const base = ctx(uid, over);
-    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid) } };
+    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid), grants: ['tasks:manage'] } };
 };
 const human = (userId) => ({ kind: 'human', userId });
 const approve = (id) => proposals.approve(CID, id, { decider: human(OWNER), isPrivileged: true, ip: '' });
@@ -95,7 +95,7 @@ beforeEach(() => {
     const parent = rows(SCHEMA_TYPE.RULES).find((rule) => rule.isParent && rule.key === 'project');
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'project_custom_field', name: 'project_custom_field', isParent: false, parentId: String(parent._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
     PEOPLE.forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, {
-        _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
+        _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], grants: ['tasks:manage'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
     }));
     jest.spyOn(memory, 'rememberApprovedChanges').mockResolvedValue([]);
     jest.spyOn(memory, 'rememberDeclined').mockResolvedValue(null);

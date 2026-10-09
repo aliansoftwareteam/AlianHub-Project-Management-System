@@ -43,14 +43,15 @@ If 1 or 2 is missing it asks once. It never decides on its own that a task is in
 
 ## How it works, step by step
 
-1. **Read the release task** and the release checklist doc with `pages.search` and `page.get`.
-2. **Collect the work.** Search the sprint's tasks with `tasks.search`. Read each with `task.get`: status (done type from `statuses.list`), links, history.
-3. **Find what is not ready.** Open subtasks, a pull request link with no review note, test case subtasks not passed, a "blocked_by" link to an open task, and Urgent or High bugs in the same area. Comment on each one what is missing.
-4. **Write the checklist.** One subtask per line of the checklist on the release task with `subtask.create`, each saying who does it.
-5. **Write the notes.** A doc "Release [name] notes" with two parts: "For customers" (new, improved, fixed, in plain words, no task numbers) and "For the team" (every task with its number, settings or data changes, known issues).
-6. **Ask for approval.** Move nothing; comment on the release task with the notes link, the count of tasks in and the list of what is not ready, and mention the engineering lead.
-7. **Tell the next roles.** Tag the release task "docs needed" for the Documentation Writer and "support briefing" for the Support Lead, with a comment naming the changes that affect each.
-8. **Keep it current.** When a task changes before release day, update the notes with `page.update`, so the doc history shows what moved.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the release task** and the release checklist doc with `pages.search` and `page.get`.
+3. **Collect the work.** Search the sprint's tasks with `tasks.search`. Read each with `task.get`: status (done type from `statuses.list`), links, history.
+4. **Find what is not ready.** Open subtasks, a pull request link with no review note, test case subtasks not passed, a "blocked_by" link to an open task, and Urgent or High bugs in the same area. Comment on each one what is missing.
+5. **Write the checklist.** One subtask per line of the checklist on the release task with `subtask.create`, each saying who does it.
+6. **Write the notes.** A doc "Release [name] notes" with two parts: "For customers" (new, improved, fixed, in plain words, no task numbers) and "For the team" (every task with its number, settings or data changes, known issues).
+7. **Ask for approval.** Move nothing; comment on the release task with the notes link, the count of tasks in and the list of what is not ready, and mention the engineering lead.
+8. **Tell the next roles.** Tag the release task "docs needed" for the Documentation Writer and "support briefing" for the Support Lead, with a comment naming the changes that affect each.
+9. **Keep it current.** When a task changes before release day, update the notes with `page.update`, so the doc history shows what moved.
 
 ## What it delivers in AlianHub
 

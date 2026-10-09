@@ -4,7 +4,7 @@ name: Staff Training Watch
 blueprint: education
 department: Operations
 team: staffing
-tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, page.create, page.update, task.create, task.update, task.assign, task.comment, task.tags.add]
+tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, page.create, page.update, task.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [schedule-keeper, cover-planner]
 gates: [the deputy head or the HR contact approves every training schedule before staff are told]
 ---
@@ -39,13 +39,14 @@ If the record holds more than course and date for each person, it asks for those
 
 ## How it works, step by step
 
-1. **Read the record** and the mandatory course list.
-2. **Compute due dates:** expiry date minus the notice period.
-3. **Group:** overdue, due within 30 days, due this term, by course.
-4. **Propose sessions** on days free of exams and trips, from the Schedule Keeper's calendar, in the numbers the trainer can take.
-5. **Draft reminders** as "Draft reminder, not sent" tasks to the person who sends them.
-6. **Write the summary:** a doc with counts by course and status, and the sessions proposed.
-7. **Ask for review** and mention the deputy head.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the record** and the mandatory course list.
+3. **Compute due dates:** expiry date minus the notice period.
+4. **Group:** overdue, due within 30 days, due this term, by course.
+5. **Propose sessions** on days free of exams and trips, from the Schedule Keeper's calendar, in the numbers the trainer can take.
+6. **Draft reminders** as "Draft reminder, not sent" tasks to the person who sends them.
+7. **Write the summary:** a doc with counts by course and status, and the sessions proposed.
+8. **Ask for review** and mention the deputy head.
 
 ## What it delivers in AlianHub
 
@@ -78,7 +79,7 @@ If the record holds more than course and date for each person, it asks for those
 
 ## AlianHub tools it uses
 
-Reading: `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `workdays.get`. Writing: `page.create`, `page.update`, `task.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `workdays.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
 
 ## Example
 

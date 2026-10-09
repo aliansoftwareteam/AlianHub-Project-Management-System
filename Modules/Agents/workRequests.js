@@ -21,6 +21,7 @@ const TRASHED = 1;
 const LIST_CREATE = 'project.project_sprint_create';
 const LIST_RENAME = 'project.project_sprint_name_edit';
 const LIST_MOVE = Object.freeze([LIST_RENAME, 'project.sprint_type_change', LIST_CREATE]);
+const LIST_DELETE = 'project.sprint_delete';
 const TASK_NOT_FOUND = 'Task not found';
 const LIST_NOT_FOUND = 'That list was not found in that project. Check lists.list or ask the person which list they mean.';
 
@@ -185,10 +186,11 @@ const moveList = async ({ companyId, who, projectId, sprintId, folderId }) => {
     return { ...at, previous: from, folderId: idOf(moved.folderId) };
 };
 
-/* Taking back a list an agent created moves it to the trash, and only while nothing has been put in it. */
+/* Taking back a list an agent created moves it to the trash, and only while nothing has been put in it, for someone the list route would let delete it. */
 const withdrawList = async ({ companyId, who, projectId, sprintId }) => {
     const project = await storedProject(companyId, projectId);
     const list = await openList(companyId, who.uid, project._id, sprintId);
+    await mayWriteLists(companyId, who.uid, idOf(project._id), [LIST_DELETE]);
     const at = { project, list, projectId: idOf(project._id), sprintId: idOf(list._id) };
     const held = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS, data: [{ sprintId: { $in: idForms(at.sprintId) }, deletedStatusKey: { $ne: TRASHED } }, { _id: 1 }],

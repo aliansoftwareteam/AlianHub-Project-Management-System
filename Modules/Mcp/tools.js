@@ -31,6 +31,7 @@ const workFlag = require('./workFlag');
 const argsSchema = require('./argsSchema');
 const { taskRow, planRow } = require('./taskRows');
 const { searchFilters } = require('./searchFilters');
+const { clientMessage } = require('./clientError');
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
@@ -373,20 +374,32 @@ const admitWrite = (ctx, tool, args) => {
 
 /* A write taken to the point where it either runs or is filed: its params, the project's answer and why it is held,
  * or the answer its preparation already gave. It throws what a call of the tool throws until then, and changes nothing. */
+const assertTarget = async (ctx, tool, vis, target, params) => {
+    try {
+        await visibility.assertWritable(ctx.companyId, vis, target);
+    } catch (error) {
+        if (!error.notVisible) throw error;
+        throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: error.message, ip: ctx.ip, taint: ctx.taint });
+    }
+};
+
+const reachesCompanyWide = (tool, args) => {
+    try {
+        return Boolean(tool.target(args).companyWide);
+    } catch (error) {
+        return false;
+    }
+};
+
 const readied = async (ctx, tool, args) => {
     const filtered = tool.visibility === 'filtered';
     const vis = filtered ? await visibility.forCaller(ctx) : undefined;
+    // A connection kept to some projects is refused a workspace-wide write before preparing it, whose answer would tell it what the person may do.
+    if (filtered && tool.prepare && reachesCompanyWide(tool, args)) await assertTarget(ctx, tool, vis, { companyWide: true }, {});
     const prepared = tool.prepare ? await prepare(ctx, tool, args, vis) : { args };
     if (prepared.answer) return { answer: prepared.answer };
     const params = tool.params(prepared.args);
-    if (filtered) {
-        try {
-            await visibility.assertWritable(ctx.companyId, vis, tool.target(prepared.args));
-        } catch (error) {
-            if (!error.notVisible) throw error;
-            throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params, reason: error.message, ip: ctx.ip, taint: ctx.taint });
-        }
-    }
+    if (filtered) await assertTarget(ctx, tool, vis, tool.target(prepared.args), params);
     const tainted = heldForApproval(ctx, tool.action);
     // An outside client that holds the tool's manage grant files what is held for a person; without the grant the call is refused, as before.
     if (tainted && !outsideMayFile(ctx, tool)) {
@@ -455,7 +468,7 @@ const batchTool = (ctx, operation) => {
 
 const outcomeOf = (error) => (error instanceof actions.RefusedError
     ? { ok: false, refused: true, reason: error.message, auditId: error.auditId || null }
-    : { ok: false, error: error.message });
+    : { ok: false, error: clientMessage(error, 'batch operation') });
 
 /* One operation of a batch: a write tool this caller has, run exactly as a call of its own, with its outcome instead of a throw. */
 const batchItem = async (ctx, operation) => {
@@ -553,8 +566,11 @@ const canonicalStep = (ctx, given) => {
     return match ? match.name : name;
 };
 
-/* A batch of one operation is that operation's own call, which waits or runs by the rule for a single change. */
-function runBatch(ctx, tool, asked) {
+/* A batch of one operation is that operation's own call, which waits or runs by the rule for a single change.
+ * A connection kept away from the batch itself is refused before any operation runs. */
+async function runBatch(ctx, tool, asked) {
+    const may = registry.evaluate(tool.action, { __proposal: true }, { allowedActions: ctx.allowedActions });
+    if (!may.allowed) throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params: {}, reason: may.reason, ip: ctx.ip, taint: ctx.taint });
     const args = { ...asked, operations: asked.operations.map((operation) => ({ ...operation, tool: canonicalStep(ctx, operation.tool) })) };
     const given = args.operations.length;
     if (given > 1 && tasksNamed(ctx, args.operations) > 1) return fileBatch(ctx, tool, args);

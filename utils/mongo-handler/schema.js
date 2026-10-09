@@ -1671,6 +1671,8 @@ const schema = {
          * and these say why, so a pending row is readable as blocked rather
          * than as failed-and-retrying. */
         waitingSince: { type: Date, required: false },
+        // When a role_handoff step put its task in the role's queue; the step's deadline counts from here.
+        handedAt: { type: Date, required: false },
         waitUntil: { type: Date, required: false },
         waitReason: { type: String, required: false },
         approvalId: { type: String, required: false },

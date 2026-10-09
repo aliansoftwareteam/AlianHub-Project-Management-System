@@ -20,6 +20,10 @@ const personal = (scopes, grants) => ({
 });
 const EVERYTHING = ['MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2', 'AGENT_PERFORMANCE_READ'];
 const manager = () => personal(['read', 'write'], ['tasks:manage', 'docs:manage']);
+const usableNames = (ctx) => tools.usable(ctx).map((tool) => tool.name);
+const usableWrites = (ctx) => tools.usable(ctx).filter((tool) => tool.write).map((tool) => tool.name);
+const without = (ctx, names) => ({ ...ctx, allowedActions: usableNames(ctx).filter((name) => !names.includes(name)) });
+const REPORTING = ['performance.read', 'timesheet.read', 'goals.list', 'goal.get', 'screen.link'];
 const roleNames = (ctx) => prompts.list(ctx).map((prompt) => prompt.name).filter((name) => name.startsWith('work_as_'));
 
 const PLAYBOOK = (meta) => `---\n${meta}\n---\n\n# Role\n\n## Who it is\n\nA tester. It checks things.\n`;
@@ -50,7 +54,9 @@ describe('the role playbook loader', () => {
         expect(() => rolePlaybooks.parse(PLAYBOOK(GOOD_META.replace('tools: [task.get]', 'tools: task.get')), 'demo/tester.md')).toThrow('tools must be a [list]');
         expect(() => rolePlaybooks.parse(PLAYBOOK(GOOD_META), 'demo/other.md')).toThrow('it must live at demo/tester.md');
         expect(() => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\nnot a key`), 'demo/tester.md')).toThrow('cannot read the frontmatter line "not a key"');
-        expect(rolePlaybooks.parse(PLAYBOOK(GOOD_META), 'demo/tester.md')).toMatchObject({ slug: 'tester', tools: ['task.get'], gates: [] });
+        expect(rolePlaybooks.parse(PLAYBOOK(GOOD_META), 'demo/tester.md')).toMatchObject({ slug: 'tester', tools: ['task.get'], toolsOptional: [], routed: true, gates: [] });
+        expect(() => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\ntools_optional: goal.get`), 'demo/tester.md')).toThrow('tools_optional must be a [list]');
+        expect(rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\ntools_optional: [goal.get]\nrouted: false`), 'demo/tester.md')).toMatchObject({ tools: ['task.get'], toolsOptional: ['goal.get'], routed: false });
     });
 
     const folderOf = (files) => {
@@ -118,15 +124,55 @@ describe('role prompts for a connected AI', () => {
         expect(prompts.list(manager()).map((prompt) => prompt.name)).toEqual(prompts.PROMPTS.map((prompt) => prompt.name));
     });
 
-    it('offers a role only when the connection may run every tool its playbook names', () => {
+    it('offers a role whose tools the connection only partly holds', () => {
         set(['MCP_ROLE_PROMPTS', ...EVERYTHING]);
-        const ctx = manager();
-        const usable = new Set(tools.usable(ctx).map((tool) => tool.name));
-        const expected = prompts.rolePrompts().filter((prompt) => prompt.needs.every((name) => usable.has(name))).map((prompt) => prompt.name);
-        expect(roleNames(ctx)).toEqual(expected);
-        expect(expected).toContain('work_as_bug_triager');
-        expect(expected).not.toContain('work_as_feedback_collector');
         expect(rolePlaybooks.find('it-company', 'feedback-collector').tools).toContain('chat.messages.list');
+        expect(usableNames(manager())).not.toContain('chat.messages.list');
+        expect(roleNames(manager())).toEqual(expect.arrayContaining(['work_as_bug_triager', 'work_as_feedback_collector']));
+    });
+
+    it('offers the Status Reporter without the reporting tools, and names what is missing at the top', () => {
+        set(['MCP_ROLE_PROMPTS', ...EVERYTHING]);
+        const ctx = without(manager(), [...REPORTING, 'pages.search', 'page.get', 'page.create', 'page.update']);
+        expect(roleNames(ctx)).toContain('work_as_status_reporter');
+        const [top, ...rest] = prompts.get(ctx, 'work_as_status_reporter', {}).messages[0].content.text.split('\n\n');
+        expect(top).toBe('This connection lacks tools the playbook needs: `pages.search`, `page.get`, `page.create`, `page.update`. '
+            + 'Skip the steps that need them, ask me for what they would have given you, and say in your answer what you left out. '
+            + 'It also lacks these extras: `performance.read`, `goals.list`, `goal.get`, `timesheet.read`, `screen.link`. Leave out what they add, and say so. '
+            + 'They are marked "(not on this connection)" below: do not call them.');
+        const body = rest.join('\n\n');
+        expect(body).toContain('Your queue is `queue.list` with role "it-company/status-reporter"');
+        expect(body).toContain('`performance.read` (not on this connection)');
+        expect(body).toContain('`page.create` (not on this connection)');
+        expect(body).not.toContain('`tasks.search` (not on this connection)');
+    });
+
+    it('adds no line about missing tools when the connection holds them all', () => {
+        set(['MCP_ROLE_PROMPTS', ...EVERYTHING]);
+        const text = prompts.get(manager(), 'work_as_bug_triager', {}).messages[0].content.text;
+        expect(text).toMatch(/^Work as the Bug Triager/);
+        expect(text).not.toContain('(not on this connection)');
+    });
+
+    it('hides a role when the connection holds none of the writes it delivers with, or under half of its required tools', () => {
+        set(['MCP_ROLE_PROMPTS', ...EVERYTHING]);
+        const reporter = rolePlaybooks.find('it-company', 'status-reporter');
+        const deliveries = reporter.tools.filter((name) => usableWrites(manager()).includes(name) && !name.startsWith('queue.'));
+        expect(deliveries).toEqual(expect.arrayContaining(['page.create', 'task.comment']));
+        expect(roleNames(without(manager(), deliveries))).not.toContain('work_as_status_reporter');
+        expect(roleNames(without(manager(), deliveries.slice(1)))).toContain('work_as_status_reporter');
+        const half = reporter.tools.filter((name) => !deliveries.includes(name)).slice(0, Math.floor(reporter.tools.length / 2) + 1);
+        expect(roleNames(without(manager(), half))).not.toContain('work_as_status_reporter');
+        expect(roleNames(without(manager(), half.slice(1)))).toContain('work_as_status_reporter');
+    });
+
+    it('lets missing optional tools never hide a role', () => {
+        set(['MCP_ROLE_PROMPTS', ...EVERYTHING]);
+        const ctx = without(manager(), REPORTING);
+        const usable = new Set(usableNames(ctx));
+        const hidden = prompts.rolePrompts().filter((prompt) => prompt.needs.every((name) => usable.has(name)) && !roleNames(ctx).includes(prompt.name));
+        expect(hidden.map((prompt) => prompt.name)).toEqual([]);
+        expect(rolePlaybooks.find('it-company', 'status-reporter').toolsOptional).toEqual(expect.arrayContaining(REPORTING));
     });
 
     it('offers fewer roles as the connection holds fewer tools', () => {
@@ -138,8 +184,9 @@ describe('role prompts for a connected AI', () => {
 
     it('answers null for a role prompt the connection is not offered', () => {
         set(['MCP_ROLE_PROMPTS', ...EVERYTHING]);
-        expect(roleNames(manager())).not.toContain('work_as_feedback_collector');
-        expect(prompts.get(manager(), 'work_as_feedback_collector', { request: 'this week' })).toBeNull();
+        const noDeliveries = without(manager(), rolePlaybooks.find('it-company', 'feedback-collector').tools.filter((name) => usableWrites(manager()).includes(name) && !name.startsWith('queue.')));
+        expect(roleNames(noDeliveries)).not.toContain('work_as_feedback_collector');
+        expect(prompts.get(noDeliveries, 'work_as_feedback_collector', { request: 'this week' })).toBeNull();
         expect(prompts.get(personal(['read']), 'work_as_bug_triager', {})).toBeNull();
         expect(prompts.get(manager(), 'work_as_bug_triager', {})).not.toBeNull();
     });

@@ -4,7 +4,8 @@ name: IT Project Planner
 blueprint: it-company
 department: Delivery
 team: delivery
-tools: [queue.list, queue.claim, queue.release, tasks.search, tasks.next, task.get, comments.list, lists.list, statuses.list, members.list, performance.read, workdays.get, page.get, pages.search, page.create, task.update, task.assign, task.comment, task.tags.add, task.relation.add]
+tools: [queue.list, queue.claim, queue.release, tasks.search, tasks.next, task.get, comments.list, lists.list, statuses.list, members.list, workdays.get, page.get, pages.search, page.create, task.update, task.assign, task.comment, task.tags.add, task.relation.add]
+tools_optional: [performance.read]
 hands_to: [it-client-status-reporter, account-manager, risk-watch]
 gates: [the delivery lead approves the weekly plan and any change to a client date]
 ---
@@ -75,7 +76,7 @@ If scope or deadline is missing it asks once, and does not plan on a guessed dat
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `tasks.search`, `tasks.next`, `task.get`, `comments.list`, `lists.list`, `statuses.list`, `members.list`, `performance.read`, `workdays.get`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`, `task.relation.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `tasks.next`, `task.get`, `comments.list`, `lists.list`, `statuses.list`, `members.list`, `workdays.get`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`, `task.relation.add`. Used when the connection has them: `performance.read`. All through the person's own connection and rights.
 
 ## Example
 

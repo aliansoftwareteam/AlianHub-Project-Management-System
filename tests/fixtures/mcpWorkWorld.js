@@ -15,7 +15,7 @@ const GRANT_ID = '0123456789abcdef0123456789abcdef';
 const ISSUER = 'https://hub.work.test';
 const TAGS = [{ uid: 'tag_bug', tagName: 'Bug', tagColor: '#ff0000' }, { uid: 'tag_api', tagName: 'API', tagColor: '#0000ff' }];
 const PRIVATE_TAGS = [{ uid: 'tag_secret', tagName: 'Secret', tagColor: '#00ff00' }];
-const PROJECT_KEYS = ['project_list', 'project_details', 'project_sprint_create', 'project_sprint_name_edit', 'sprint_type_change'];
+const PROJECT_KEYS = ['project_list', 'project_details', 'project_sprint_create', 'project_sprint_name_edit', 'sprint_type_change', 'sprint_delete'];
 const BEFORE = ['tasks.next', 'tasks.search', 'task.get', 'task.comment', 'task.status.set', 'task.link', 'task.create', 'subtask.create', 'timelog.start', 'timelog.stop', 'docs.read'];
 const FLAGS = ['MCP_TOOLS_WORK', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_DATA', 'MCP_TOOLS_V2', 'AGENT_TAINT_ROUTING', 'MCP_OAUTH', 'MCP_OAUTH_ISSUER'];
 
@@ -26,7 +26,8 @@ const ctx = (uid, over = {}) => ({
     ...over,
 });
 const narrowed = (uid, projectIds) => ctx(uid, { projectIds });
-const readOnly = (uid) => ctx(uid, { canWrite: false, token: { _id: TOKEN, userId: uid, scopes: ['read'], active: true } });
+const managing = (caller) => ({ ...caller, token: { ...caller.token, grants: ['tasks:manage'] } });
+const readOnly = (uid) => ctx(uid, { canWrite: false, token: { _id: TOKEN, userId: uid, scopes: ['read'], grants: ['tasks:manage'], active: true } });
 
 /* An outside client's call as the server builds it from a verified grant. */
 const outside = (uid, scopes) => ctx(uid, {
@@ -111,6 +112,6 @@ const create = (mockDb) => {
 
 module.exports = {
     ...access, TOKEN, MISSING, T_OPEN_2, T_TWIN, CLIENT, GRANT_ID, ISSUER, TAGS, PRIVATE_TAGS, BEFORE, FLAGS,
-    ctx, narrowed, readOnly, outside, routeTable, asPerson, create,
+    ctx, narrowed, managing, readOnly, outside, routeTable, asPerson, create,
     EVERYONE: [['an owner', OWNER], ['a member on the private work', INSIDER], ['a member outside it', access.OUTSIDER], ['a guest', GUEST]],
 };

@@ -4,7 +4,7 @@ name: Lesson Material Drafter
 blueprint: education
 department: Academics
 team: curriculum
-tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, docs.read, page.versions.list, page.create, page.update, task.comment, task.update, task.status.set, task.tags.add]
+tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, docs.read, page.versions.list, page.create, page.update, task.comment, task.update, task.status.set, task.tags.add]
 hands_to: [assignment-feedback-drafter, exam-planner]
 gates: [the teacher reviews and edits every lesson material before it is used]
 ---
@@ -39,13 +39,14 @@ If the outcomes are missing it asks for the unit task rather than guessing what 
 
 ## How it works, step by step
 
-1. **Read the unit** and the outcomes for the lesson.
-2. **Read the template** and a previous lesson by the same teacher for tone.
-3. **Draft the lesson** in the template: objective, starter (5 minutes), main activity, check for understanding, plenary, homework.
-4. **Draft the worksheet** with questions in rising difficulty and an answer key on a separate page.
-5. **Add variants** only when asked: support (scaffolds, sentence starters) and extension (open questions).
-6. **Mark what to verify.** Any fact, date or figure it is not certain of is marked "check" so the teacher confirms it.
-7. **Save and hand over.** Create the doc, set the task to In Review, comment what is in it and mention the teacher.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the unit** and the outcomes for the lesson.
+3. **Read the template** and a previous lesson by the same teacher for tone.
+4. **Draft the lesson** in the template: objective, starter (5 minutes), main activity, check for understanding, plenary, homework.
+5. **Draft the worksheet** with questions in rising difficulty and an answer key on a separate page.
+6. **Add variants** only when asked: support (scaffolds, sentence starters) and extension (open questions).
+7. **Mark what to verify.** Any fact, date or figure it is not certain of is marked "check" so the teacher confirms it.
+8. **Save and hand over.** Create the doc, set the task to In Review, comment what is in it and mention the teacher.
 
 ## What it delivers in AlianHub
 
@@ -78,7 +79,7 @@ If the outcomes are missing it asks for the unit task rather than guessing what 
 
 ## AlianHub tools it uses
 
-Reading: `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `docs.read`, `page.versions.list`. Writing: `page.create`, `page.update`, `task.comment`, `task.update`, `task.status.set`, `task.tags.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `docs.read`, `page.versions.list`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.update`, `task.status.set`, `task.tags.add`. All through the person's own connection and rights.
 
 ## Example
 
