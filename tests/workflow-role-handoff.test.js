@@ -26,6 +26,7 @@ const { isWaiting } = require('../Modules/Workflows/stepTypes/waiting');
 const findings = require('../Modules/Agents/manager/findings');
 const places = require('../Modules/Agents/manager/places');
 const engine = require('../Modules/Workflows/engine');
+const hop = require('../Modules/Workflows/hop');
 
 const CID = '6c0000000000000000000001';
 const OTHER_CID = '6c0000000000000000000002';
@@ -241,23 +242,62 @@ describe('the wait runs out', () => {
         withdrawn();
     });
 
-    it('ends before the run deadline, with room left to take the task back', async () => {
-        const runEnds = new Date(Date.now() + 10 * 60 * 1000);
+    const DAY = 24 * 60 * 60 * 1000;
+
+    it('a 7-day step on an 8-day run gets its own 7 days from the hand-over, and the hop guard lets it keep waiting', async () => {
+        await patchRun({ deadlineAt: new Date(Date.now() + 8 * DAY) });
+        await setStep({ config: { role: ROLE, deadlineMs: 7 * DAY } });
+        const waiting = await handedOver();
+        expect(Math.abs(waiting.until.getTime() - (Date.now() + 7 * DAY))).toBeLessThan(5000);
+
+        await setStep({ handedAt: new Date(Date.now() - 2 * DAY) });
+        await patchRun({ deadlineAt: new Date(Date.now() + 6 * DAY) });
+        const later = await workflowStore.getRun(CID, run._id);
+        expect(hop.allow(later, [], await stepRow()).ok).toBe(true);
+        const again = await settle(execute());
+        expect(Math.abs(again.error.until.getTime() - (Date.now() + 5 * DAY))).toBeLessThan(5000);
+    });
+
+    it('a tighter run deadline ends the step a minute before the run, with time to take the task back', async () => {
+        const runEnds = new Date(Date.now() + 3 * DAY);
         await patchRun({ deadlineAt: runEnds });
         const waiting = await handedOver();
-        expect(waiting.until.getTime()).toBeLessThanOrEqual(runEnds.getTime() - 60 * 1000);
+        expect(Math.abs(waiting.until.getTime() - (runEnds.getTime() - 60 * 1000))).toBeLessThan(5000);
         await patchRun({ deadlineAt: new Date(Date.now() + 30 * 1000) });
         const out = await settle(execute());
         expect(out.error.message).toMatch(/did not finish by/);
         withdrawn();
     });
+});
 
-    it('a step deadline longer than what the run has left ends before the hop guard would refuse it', async () => {
-        const runEnds = new Date(Date.now() + 60 * 60 * 1000);
-        await patchRun({ deadlineAt: runEnds });
-        await setStep({ config: { role: ROLE, deadlineMs: 20 * 60 * 1000 } });
-        const waiting = await handedOver();
-        expect(waiting.until.getTime()).toBeLessThanOrEqual(runEnds.getTime() - 20 * 60 * 1000);
+describe('a person retrying or resuming a failed hand-over', () => {
+    const failByTimeout = async () => {
+        await handedOver();
+        await setStep({ handedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) });
+        await settle(execute());
+        await setStep({ status: 'failed' });
+        withdrawn();
+    };
+
+    it.each([['retry', 'retryStep'], ['resume', 'resumeStep']])('%s hands the task over again from the start', async (_, write) => {
+        await failByTimeout();
+        const step = await workflowStore[write](CID, run._id, STEP, { by: OWNER });
+        expect(step.handedAt).toBeNull();
+        expect(step.waitingSince).toBeNull();
+        await setStep({ status: 'running' });
+        const again = await settle(execute());
+        expect(isWaiting(again.error)).toBe(true);
+        expect(again.error.wait.set.handedAt).toBeTruthy();
+        expect(queueRow()).toMatchObject({ status: findings.STATUS.OPEN, facts: { role: ROLE } });
+        expect(audited(roleHandoff.AUDIT.QUEUED)).toHaveLength(2);
+    });
+
+    it('resuming a claim a dead worker left keeps the hand-over it was waiting on', async () => {
+        await handedOver();
+        const handedAt = (await stepRow()).handedAt;
+        await setStep({ status: 'running' });
+        const step = await workflowStore.resumeStep(CID, run._id, STEP, { by: OWNER });
+        expect(step.handedAt).toEqual(handedAt);
     });
 });
 

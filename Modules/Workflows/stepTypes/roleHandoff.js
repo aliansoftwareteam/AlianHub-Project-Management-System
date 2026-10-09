@@ -107,13 +107,13 @@ const takeBack = async (companyId, { run, step, taskId, role, action = AUDIT.WIT
     return true;
 };
 
-/* The hop guard refuses a step once the run has less left than the step's own deadline asks for, and a refused
- * step never runs again to take the task back; so the step gives up first, with a couple of polls to spare. */
+const RUN_MARGIN_MS = 60 * 1000;
+
+/* The step's own deadline from the hand-over, cut short to a minute before the run's so there is time to withdraw. */
 const deadlineOf = (handedAt, config, run, now) => {
     const own = new Date(new Date(handedAt || now).getTime() + num(config.deadlineMs, flag.roleHandoffDeadlineMs()));
     if (!run.deadlineAt) return own;
-    const room = Math.max(2 * flag.roleHandoffPollMs(), Number(config.deadlineMs) > 0 ? Number(config.deadlineMs) : 0);
-    const runs = new Date(new Date(run.deadlineAt).getTime() - room);
+    const runs = new Date(new Date(run.deadlineAt).getTime() - RUN_MARGIN_MS);
     return runs < own ? runs : own;
 };
 

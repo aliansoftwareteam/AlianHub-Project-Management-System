@@ -303,13 +303,17 @@ const control = async (companyId, runId, stepId, { from, set, unset }) => call(c
 
 const CLEARED = Object.freeze({ workerId: null, claimedAt: null, leaseExpiresAt: null, nextAttemptAt: null, finishedAt: null });
 
+/* What one attempt left on the row to find again on its next claim. A step that ended took its effect back
+ * (a role hand-over withdraws its task), so a fresh attempt must start over rather than read the old one. */
+const ATTEMPT_STATE = Object.freeze({ handedAt: null, waitingSince: null, waitUntil: null, waitReason: null });
+
 const controlEntry = (action, by, reason) => ({ action, by: by ? String(by) : null, at: new Date(), reason: String(reason || '').slice(0, 500) });
 
 /* A fresh attempt budget: the person asking for a retry is saying the reason it
  * failed is gone, which is a different claim from "try the ladder again". */
 const retryStep = (companyId, runId, stepId, { by, reason } = {}) => control(companyId, runId, stepId, {
     from: ['failed', 'skipped'],
-    set: { ...CLEARED, status: 'pending', attempts: 0, error: null, failure: null, skippedBy: null, startedAt: null, control: controlEntry('retry', by, reason) },
+    set: { ...CLEARED, ...ATTEMPT_STATE, status: 'pending', attempts: 0, error: null, failure: null, skippedBy: null, startedAt: null, control: controlEntry('retry', by, reason) },
 });
 
 /* An operator skip carries who asked for it, and that is what lets the steps
@@ -323,10 +327,12 @@ const operatorSkipStep = (companyId, runId, stepId, { by, reason } = {}) => cont
 /* Resume keeps the attempts already spent: it is "carry on from here", not "start
  * again". A running step is included because a worker that died holding the claim
  * leaves one, and the bumped token is what makes taking it back safe. */
-const resumeStep = (companyId, runId, stepId, { by, reason } = {}) => control(companyId, runId, stepId, {
-    from: ['failed', 'running'],
-    set: { ...CLEARED, status: 'pending', error: null, control: controlEntry('resume', by, reason) },
-});
+const resumeStep = async (companyId, runId, stepId, { by, reason } = {}) => {
+    const set = { ...CLEARED, status: 'pending', error: null, control: controlEntry('resume', by, reason) };
+    // A dead worker's claim is still mid-attempt, so what that attempt left stands.
+    return (await control(companyId, runId, stepId, { from: ['failed'], set: { ...set, ...ATTEMPT_STATE } }))
+        || control(companyId, runId, stepId, { from: ['running'], set });
+};
 
 const recordCompensation = (companyId, runId, stepId, compensation) => call(companyId, STEPS, [
     { runId: String(runId), stepId: String(stepId) },
