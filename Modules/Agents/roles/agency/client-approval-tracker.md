@@ -7,6 +7,8 @@ department: Delivery
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.history, members.list, pages.search, page.get, page.create, page.update, task.update, task.tags.add, task.comment, task.status.set]
 hands_to: [agency-account-manager, project-planner]
 gates: [a person sends every reminder and approval request to the client]
+starter_rules: [tag:client-approval]
+tags: [client-approval]
 ---
 
 # Client Approval Tracker (Delivery)

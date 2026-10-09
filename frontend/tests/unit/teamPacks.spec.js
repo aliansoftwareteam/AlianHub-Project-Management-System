@@ -32,20 +32,24 @@ const store = createStore({
 const access = store.state.settings;
 const projectState = store.state.projectData;
 
-const TRIAGER = { key: 'it-company/bug-triager', slug: 'bug-triager', name: 'Bug Triager', department: 'Engineering', summary: 'Sorts new bugs.', tools: ['task.get', 'task.comment'] };
-const REVIEWER = { key: 'it-company/code-reviewer', slug: 'code-reviewer', name: 'Code Reviewer', department: 'Engineering', summary: 'Reviews pull requests.', tools: ['task.get'] };
+const TRIAGER = { key: 'it-company/bug-triager', slug: 'bug-triager', name: 'Bug Triager', department: 'Engineering', summary: 'Sorts new bugs.', tools: ['task.get', 'task.comment'], starterRules: [{ kind: 'type', value: 'Bug' }], tags: ['bug', 'needs-triage'] };
+const REVIEWER = { key: 'it-company/code-reviewer', slug: 'code-reviewer', name: 'Code Reviewer', department: 'Engineering', summary: 'Reviews pull requests.', tools: ['task.get'], starterRules: [], tags: ['Bug'] };
 const LEAD = { key: 'it-company/design-lead', slug: 'design-lead', name: 'Design Lead', department: 'Design', summary: 'Runs design reviews.', tools: ['task.get'] };
 const PACKS = [{ blueprint: 'it-company', teams: [{ team: 'engineering', roles: [TRIAGER, REVIEWER] }, { team: 'design', roles: [LEAD] }] }];
 
+const RULE = { role: 'it-company/bug-triager', when: { taskTypeKeys: [4] } };
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
 let applied;
 const serve = ({ on = true, refuse = null } = {}) => apiRequest.mockImplementation((type, url, body) => {
     if (url.endsWith('/team-packs') && type === 'get') return ok({ on, packs: PACKS });
     if (url.endsWith('/team-packs') && type === 'post') {
         if (refuse) return Promise.reject({ response: { status: refuse, data: { statusText: 'refused' } } });
-        if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: body.roles[projectId], mode: 'off' })) });
+        if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: [TRIAGER.key, REVIEWER.key], mode: 'off' })), agents: { removed: [], kept: [], narrowed: [] } });
         applied = body;
-        return ok({ blueprint: body.blueprint, teams: body.teams, projects: [{ projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest' }, { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off' }] });
+        return ok({ blueprint: body.blueprint, teams: body.teams, applyId: 'ap1', agents: { made: [], kept: [], widened: [] }, projects: [
+            { projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', rules: body.starterRules ? [RULE] : [], skippedRules: 0, tags: ['bug', 'needs-triage'], proposalId: 'prop1' },
+            { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off', rules: [], skippedRules: 1, rulesAwaitingTags: 2, tags: [], proposalId: null }
+        ] });
     }
     return ok([]);
 });
@@ -113,7 +117,7 @@ describe('Team packs', () => {
         for (const input of wrapper.findAll('[data-test="tp-project"] input')) await input.setValue(true);
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
         await flushPromises();
-        expect(applied).toEqual({ blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'] });
+        expect(applied).toEqual({ blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], starterRules: true, proposeTags: true, createAgents: true });
         const result = wrapper.find('[data-test="tp-result"]');
         expect(result.text()).toContain('Turned on 4 roles.');
         expect(result.text()).toContain('Mobile app: the dispatcher is in suggest mode.');
@@ -122,9 +126,70 @@ describe('Team packs', () => {
         await wrapper.find('[data-test="tp-undo"]').trigger('click');
         await flushPromises();
         const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);
-        expect(undo[2]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], roles: { p1: [TRIAGER.key, REVIEWER.key], p2: [TRIAGER.key, REVIEWER.key] } });
+        expect(undo[2]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], applyId: 'ap1' });
         expect(wrapper.find('[data-test="tp-result"]').text()).toContain('The pack\'s roles are off again.');
         expect(wrapper.find('[data-test="tp-undo"]').exists()).toBe(false);
+    });
+
+    it('offers the starter rules as a checkbox that is on, and sends what it says', async () => {
+        route.query = { blueprint: 'it-company', team: 'engineering' };
+        const wrapper = await mountWith(AiTeamPacks);
+        const box = wrapper.find('[data-test="tp-starter-rules"]');
+        expect(box.element.checked).toBe(true);
+        expect(wrapper.find('[data-test="tp-starter-rules-hint"]').text()).toContain('One starter rule');
+        expect(wrapper.find('[data-test="tp-tags-hint"]').text()).toContain('bug, needs-triage');
+        await box.setValue(false);
+        await wrapper.find('[data-test="tp-project"] input').setValue(true);
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        expect(applied).toMatchObject({ starterRules: false, proposeTags: true });
+        expect(wrapper.find('[data-test="tp-result"]').text()).not.toContain('routing rule');
+    });
+
+    it('tells what each project got: rules added, rules waiting and tags proposed for approval', async () => {
+        route.query = { blueprint: 'it-company', team: 'engineering' };
+        const wrapper = await mountWith(AiTeamPacks);
+        for (const input of wrapper.findAll('[data-test="tp-project"] input')) await input.setValue(true);
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        const lines = wrapper.findAll('[data-test="tp-result"] li').map((li) => li.text());
+        expect(lines[0]).toContain('Added one routing rule.');
+        expect(lines[0]).toContain('Proposed 2 tags for approval: bug, needs-triage.');
+        expect(lines[1]).toContain('One starter rule waits for a tag or task type this project lacks.');
+        expect(lines[1]).not.toContain('Proposed');
+        expect(lines[1]).toContain('2 starter rules wait for their tags to be approved; apply the pack again after the approval to add them.');
+        expect(lines[0]).not.toContain('to be approved');
+    });
+
+    it('offers the team\'s agents on by default, can leave them off, and sends the made agents back on undo', async () => {
+        route.query = { blueprint: 'it-company', team: 'engineering' };
+        const wrapper = await mountWith(AiTeamPacks);
+        const box = wrapper.find('[data-test="tp-create-agents"] input');
+        expect(box.element.checked).toBe(true);
+        expect(wrapper.find('[data-test="tp-create-agents"]').text()).toContain('Create the team\'s agents');
+        expect(wrapper.find('[data-test="tp-create-agents"]').text()).toContain('Each starts paused');
+        await box.setValue(false);
+        await wrapper.find('[data-test="tp-project"] input').setValue(true);
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        expect(applied.createAgents).toBe(false);
+
+        apiRequest.mockImplementation((type, url, body) => {
+            if (type === 'get') return ok({ on: true, packs: PACKS });
+            if (body.undo) return ok({ projects: [], agents: { removed: [{ agentId: 'g1', name: 'Bug Triager · IT company' }], kept: [{ agentId: 'g2', name: 'Code Reviewer · IT company', why: 'has_worked' }, { agentId: 'g3', name: 'QA Engineer · IT company', why: 'running' }] } });
+            return ok({ blueprint: 'it-company', teams: ['engineering'], applyId: 'ap2', projects: [{ projectId: 'p1', added: [TRIAGER.key], mode: 'off' }], agents: { made: [{ agentId: 'g1', roleKey: TRIAGER.key, name: 'Bug Triager · IT company' }, { agentId: 'g2', roleKey: REVIEWER.key, name: 'Code Reviewer · IT company' }], kept: [] } });
+        });
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="tp-agents"]').text()).toContain('Created 2 agents.');
+        expect(wrapper.find('[data-test="tp-agents-paused"]').text()).toContain('The new agents are paused.');
+        await wrapper.find('[data-test="tp-undo"]').trigger('click');
+        await flushPromises();
+        const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);
+        expect(undo[2].applyId).toBe('ap2');
+        expect(wrapper.find('[data-test="tp-agents"]').text()).toContain('2 agents stay.');
+        expect(wrapper.find('[data-test="tp-kept"]').text()).toContain('Code Reviewer · IT company stays: it has done work');
+        expect(wrapper.find('[data-test="tp-kept"]').text()).toContain('QA Engineer · IT company stays: it has runs in progress.');
     });
 
     it('says the dispatcher is off and keeps the button shut', async () => {
@@ -147,11 +212,18 @@ describe('Team packs', () => {
     it('offers a member only the projects they may change, and says why the others are shut', async () => {
         access.roleType = 3;
         projectState.list = [...TWO, { _id: 'p3', ProjectName: 'Own roles', isGlobalPermission: false }];
+        route.query = { team: 'design' };
         const wrapper = await mountWith(AiTeamPacks);
         const rows = wrapper.findAll('[data-test="tp-project"]');
         expect(rows.map((row) => row.attributes('data-why') || '')).toEqual(['', '', 'own_roles']);
         expect(rows[2].find('input').attributes('disabled')).toBeDefined();
         expect(rows[2].text()).toContain('This project has its own roles');
+
+        expect(wrapper.find('[data-test="tp-create-agents"]').exists()).toBe(false);
+        await rows[0].find('input').setValue(true);
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        expect(applied.createAgents).toBe(false);
 
         composable.details = false;
         const shut = await mountWith(AiTeamPacks);

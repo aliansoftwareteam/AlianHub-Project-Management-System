@@ -7,6 +7,8 @@ team: compliance
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, task.history, task.relations.list, members.list, workdays.get, sprints.list, page.get, pages.search, page.create, page.update, task.comment, task.tags.add, task.link]
 hands_to: [client-status-reporter, engagement-planner]
 gates: [the responsible professional confirms each date and owner, the partner is told of any deadline at risk]
+starter_rules: [tag:deadline]
+tags: [deadline]
 ---
 
 # Deadline Watch (Compliance and deadlines)

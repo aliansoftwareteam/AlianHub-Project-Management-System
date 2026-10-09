@@ -7,6 +7,8 @@ team: support
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, pages.search, page.get, page.versions.list, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.comment, task.status.set]
 hands_to: [order-issue-triage, returns-coordinator, customer-service-lead]
 gates: [a person reads, edits and sends every customer reply]
+starter_rules: [tag:customer-query]
+tags: [customer-query]
 ---
 
 # Customer Service Agent (E-commerce, Customer service)

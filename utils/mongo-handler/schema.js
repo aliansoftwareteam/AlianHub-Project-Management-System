@@ -1200,6 +1200,8 @@ const schema = {
         allowedActions: { type: Array, default: [], required: false },
         // The role it plays ('blueprint/slug' of Modules/Agents/roles), so the dispatcher can give a role's task to the least loaded of its agents.
         role: { type: String, required: false },
+        // 'team-pack:<blueprint>' on an agent a team pack made, so undoing the pack can find it again.
+        madeBy: { type: String, required: false },
         projectIds: { type: Array, default: [], required: false },
         // 0 suggest everything · 1 act on low risk · 2 act on medium, propose the rest · 3 also on a schedule
         autonomy: { type: Number, default: 0, required: false },
@@ -2336,8 +2338,11 @@ const schema = {
         updatedBy: { type: String, required: false },
         updatedAt: { type: Date, required: false },
         // The dispatcher (Modules/AssignmentRules/dispatcher): { mode: off | suggest | apply, threshold, modelGuess, roles: ['blueprint/slug'],
-        // rules: [{ role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
+        // rules: [{ id?, role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
         dispatcher: { type: Object, required: false },
+        // What each team pack applied here, so its undo takes back only that (Modules/AssignmentRules/dispatcher/packs.js):
+        // [{ applyId, blueprint, projectIds, roles, rules: [{ id, role, when }], proposalId, agents: { made, widened: [{ agentId, projectIds }] }, skills, by, at }]
+        teamPacks: { type: Array, default: undefined, required: false },
     },
     // One decision per task revision: what the rules chose, why, and what became of it. `inputHash` covers the task text
     // and the rule revision, so the same task is never decided twice for the same input.

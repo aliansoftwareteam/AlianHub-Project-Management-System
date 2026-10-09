@@ -105,6 +105,48 @@ describe('saving agent settings', () => {
     });
 });
 
+describe('the role picker', () => {
+    const withRoles = (extra = {}) => apiRequest.mockImplementation((type, url) => {
+        if (type === 'get' && url === '/api/v2/agents/roles') return ok({ on: true, roles: [{ blueprint: 'it-company', slug: 'bug-triager', name: 'Bug Triager', department: 'Engineering' }] });
+        if (type === 'get' && url === '/api/v2/agents') return ok([{ ...agent, ...extra }]);
+        if (type === 'get' && url === '/api/v2/agents/registry') return ok({ actions: [], never: [], autonomy: [{ level: 0 }, { level: 1 }, { level: 2 }] });
+        return type === 'get' ? ok([]) : ok({});
+    });
+
+    it('gives an agent a role and sends only the role', async () => {
+        withRoles();
+        const wrapper = await mountSettings();
+        await wrapper.find('[data-test="role-pick"]').setValue('it-company/bug-triager');
+        await wrapper.find('[data-test="save"]').trigger('click');
+        await flushPromises();
+        expect(puts()[0][2]).toEqual({ _id: 'a1', role: 'it-company/bug-triager' });
+    });
+
+    it('names each role with its department through the translations, with no inline style', async () => {
+        withRoles();
+        const wrapper = await mountSettings();
+        const option = wrapper.findAll('[data-test="role-pick"] option')[1];
+        expect(option.text()).toBe('Ai.role_option');
+        expect((await import('@/locales/en')).default.Ai.role_option).toBe('{name} · {department}');
+        expect(wrapper.find('[data-test="role"]').findAll('[style]')).toHaveLength(0);
+    });
+
+    it('clears the role with the empty choice', async () => {
+        withRoles({ role: 'it-company/bug-triager' });
+        const wrapper = await mountSettings();
+        expect(wrapper.find('[data-test="role-pick"]').element.value).toBe('it-company/bug-triager');
+        await wrapper.find('[data-test="role-pick"]').setValue('');
+        await wrapper.find('[data-test="save"]').trigger('click');
+        await flushPromises();
+        expect(puts()[0][2]).toEqual({ _id: 'a1', role: '' });
+    });
+
+    it('is not offered when the server has no roles', async () => {
+        const wrapper = await mountSettings();
+        expect(wrapper.find('[data-test="role"]').exists()).toBe(false);
+    });
+});
+
 describe('changedFields', () => {
     it('treats the display default of an unset field as unchanged', () => {
         const shown = formFromAgent({});
