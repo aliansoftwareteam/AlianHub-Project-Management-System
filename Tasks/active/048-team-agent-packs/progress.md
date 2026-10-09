@@ -30,3 +30,8 @@ Confirmed by the owner on 2026-10-08: "go with your recommendations". Decisions 
 - Choices taken (reversible): a model's guess is always a suggestion, even in apply mode; only rules apply by themselves. Role names are unique across blueprints (prefixed where they met: agency-, construction-, proserv-). An edited playbook changes only the text, never a role's tools, and reaches every server copy within 60 s. Older API tokens now notify the people they mention. Thirteen IT company and Manufacturing roles in the blueprints are marked "not written yet"; three written e-commerce roles are not yet in its blueprint.
 - Six cloud runs and five more did most of the writing (owner's ask on 2026-10-08 for more agents); every cloud PR had a local review before its batch.
 
+### 2026-10-09
+- Build 835 (#1603): the 13 roles the blueprints marked not written are written; e-commerce lists its three extra roles. Every role the blueprint picker suggests has a playbook.
+- Pack run 1, IT company Engineering, on the local build: see `pack-run-1-results.md`. The dispatcher, a lead's routing and three role runs worked end to end; each role stopped where a person decides. Found: packs bring no starter rules, playbooks expect tags the project lacks, no MCP tool reads a pull request, a chip separator. A cloud run adds starter rules, pack tags and the separator.
+- Part 4: a cloud run built role hand-overs as workflow steps and the ready-made team workflows (#1604); its review found a spin while paused and a task left in a role's queue when a run ends early; being fixed.
+
