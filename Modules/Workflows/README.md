@@ -144,12 +144,21 @@ sooner by its `recheck`:
 - the task leaves the queue another way (taken back, withdrawn, moved to another
   role): `outcome: released`; the steps after it are skipped, or run anyway with
   `onRelease: continue`;
-- the deadline passes (`deadlineMs`, seven days by default, never past the run's
-  own): the task is withdrawn from the role's queue and the step fails without a
-  retry;
+- the deadline passes (`deadlineMs`, seven days by default): the task is withdrawn
+  from the role's queue and the step fails without a retry. Under a run deadline
+  the step gives up at least a minute (or its own `deadlineMs`) before the run's,
+  since the hop guard would otherwise refuse the step before it could withdraw;
 - the role does not exist, is not on for the task's project, or the task is gone
-  or done: the step fails at once, naming the cause. While agents are paused it
-  waits instead of queueing.
+  or done: the step fails at once, naming the cause, and withdraws the task if it
+  had handed it over. A closed or deleted task wakes a waiting step. While agents
+  are paused it waits instead of queueing, looking again every 30 seconds;
+- the step ends any other way (refused by the hop guard, skipped by a person, its
+  executor gone after `DISPATCHER` was switched off, its run ended): the engine
+  calls the type's ending (`executors.onEnd`), which withdraws the task and writes
+  `workflow.role_handoff.withdrawn`.
+
+A finish counts only for the role this step handed to; a task moved to another
+role and finished there is `released` for this step.
 
 Queueing and every end of the wait write an audit row (`workflow.role_handoff.*`),
 announce on the agent socket and clear the task-list cache. A task sits in one
@@ -158,7 +167,8 @@ role's queue at a time, so a chain the design runs in parallel is a line here.
 `templates.js` holds the ready-made team workflows: marketing campaign launch,
 design request to handoff, engineering design to release, support to engineering
 (a customer bug), sales onboarding, and the three manufacturing ones. `GET
-/templates` lists them and `POST /templates/:key/install` saves one as an ordinary
+/templates` lists them (each `installable: false`, with the reason, while either
+switch is off) and `POST /templates/:key/install` saves one as an ordinary
 definition, disabled; a person enables it and starts a run on a task. Roles in the
 design but absent from `Modules/Agents/roles` are left out: Design Ops (design),
 Customer Success Manager (sales) and the wait for the launch date before the

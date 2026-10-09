@@ -2417,6 +2417,7 @@
     "AuditActions.workflow_role_handoff_queued": "A workflow put a task in a role's queue",
     "AuditActions.workflow_role_handoff_released": "A role gave back a task a workflow handed over",
     "AuditActions.workflow_role_handoff_timed_out": "A workflow took a task out of a role's queue after the wait ran out",
+    "AuditActions.workflow_role_handoff_withdrawn": "A workflow took a task back from a role when its step ended",
     "AuditActions.workflow_run_start": "Start a workflow",
     "AuditActions.workflow_step_compensate": "Undo a workflow step",
     "AuditActions.workflow_step_resume": "Resume a workflow step",

@@ -141,6 +141,7 @@ const ACTIONS = Object.freeze({
     'workflow.role_handoff.finished': 'A role finished a task a workflow handed over',
     'workflow.role_handoff.released': 'A role gave back a task a workflow handed over',
     'workflow.role_handoff.timed_out': 'A workflow took a task back from a role',
+    'workflow.role_handoff.withdrawn': 'A workflow took a task back from a role when its step ended',
     'workflow.definition.create': 'Create a workflow',
     'workflow.definition.update': 'Edit a workflow',
     'workflow.definition.enable': 'Turn a workflow on or off',

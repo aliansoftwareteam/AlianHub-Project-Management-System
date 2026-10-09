@@ -24,6 +24,8 @@ const stepTypes = require('../Modules/Workflows/stepTypes');
 const roleHandoff = require('../Modules/Workflows/stepTypes/roleHandoff');
 const { isWaiting } = require('../Modules/Workflows/stepTypes/waiting');
 const findings = require('../Modules/Agents/manager/findings');
+const places = require('../Modules/Agents/manager/places');
+const engine = require('../Modules/Workflows/engine');
 
 const CID = '6c0000000000000000000001';
 const OTHER_CID = '6c0000000000000000000002';
@@ -57,6 +59,9 @@ const stepRow = () => workflowStore.getStep(CID, run._id, STEP);
 const execute = async (context = {}) => roleHandoff.execute({ companyId: CID, run: await workflowStore.getRun(CID, run._id), step: await stepRow(), context });
 const settle = (promise) => promise.then((output) => ({ output }), (error) => ({ error }));
 const setStep = (set) => db().crud(CID, { type: SCHEMA_TYPE.WORKFLOW_STEP_RUNS, data: [{ runId: String(run._id), stepId: STEP }, { $set: set }] }, 'updateOne');
+const patchRun = (set) => db().crud(CID, { type: SCHEMA_TYPE.WORKFLOW_RUNS, data: [{ _id: run._id }, { $set: set }] }, 'updateOne');
+const setTask = (set) => db().crud(CID, { type: SCHEMA_TYPE.TASKS, data: [{ _id: TASK }, { $set: set }] }, 'updateOne');
+const withdrawn = () => expect(queueRow()).toMatchObject({ status: findings.STATUS.CLOSED, leftQueue: { why: findings.LEFT.WITHDRAWN } });
 const audited = (action) => recordAudit.mock.calls.filter(([, entry]) => entry.action === action);
 
 /* A step's first claim queues the task and hands the worker back, and what it noted on the row is there on the next claim. */
@@ -229,14 +234,30 @@ describe('the wait runs out', () => {
         expect(audited(roleHandoff.AUDIT.TIMED_OUT)).toHaveLength(1);
     });
 
-    it('uses the step own deadline, and never goes past the run deadline', async () => {
+    it('uses the step own deadline', async () => {
         await handedOver();
         await setStep({ config: { role: ROLE, deadlineMs: 60 * 1000 }, handedAt: new Date(Date.now() - 2 * 60 * 1000) });
         expect((await settle(execute())).error).toMatchObject({ deterministic: true });
-        seedRun();
-        await handedOver();
-        const out = await settle(execute({ deadlineAt: new Date(Date.now() - 1000) }));
-        expect(out.error).toMatchObject({ deterministic: true });
+        withdrawn();
+    });
+
+    it('ends before the run deadline, with room left to take the task back', async () => {
+        const runEnds = new Date(Date.now() + 10 * 60 * 1000);
+        await patchRun({ deadlineAt: runEnds });
+        const waiting = await handedOver();
+        expect(waiting.until.getTime()).toBeLessThanOrEqual(runEnds.getTime() - 60 * 1000);
+        await patchRun({ deadlineAt: new Date(Date.now() + 30 * 1000) });
+        const out = await settle(execute());
+        expect(out.error.message).toMatch(/did not finish by/);
+        withdrawn();
+    });
+
+    it('a step deadline longer than what the run has left ends before the hop guard would refuse it', async () => {
+        const runEnds = new Date(Date.now() + 60 * 60 * 1000);
+        await patchRun({ deadlineAt: runEnds });
+        await setStep({ config: { role: ROLE, deadlineMs: 20 * 60 * 1000 } });
+        const waiting = await handedOver();
+        expect(waiting.until.getTime()).toBeLessThanOrEqual(runEnds.getTime() - 20 * 60 * 1000);
     });
 });
 
@@ -272,6 +293,116 @@ describe('a role that cannot take it', () => {
         } finally {
             process.env.DISPATCHER = 'on';
         }
+        expect(rows()).toHaveLength(0);
+    });
+});
+
+describe('waiting while agents are paused', () => {
+    const pause = (paused) => db().crud(CID, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: PROJECT }, { $set: { agentLimits: { paused } } }] }, 'updateOne');
+
+    it('looks again every 30 seconds rather than at once, and is woken only once agents are back', async () => {
+        db().seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'P', agentLimits: { paused: true } });
+        const first = await settle(execute());
+        expect(first.error.retryAfterMs).toBe(30 * 1000);
+        expect(await first.error.recheck()).toBe(false);
+        await pause(false);
+        expect(await first.error.recheck()).toBe(true);
+    });
+
+    it('paused after the hand-over, the step keeps waiting and says so', async () => {
+        db().seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'P', agentLimits: { paused: false } });
+        await handedOver();
+        await pause(true);
+        const again = await settle(execute());
+        expect(again.error.wait.reason).toMatch(/switched on again; .* holds the task/);
+        expect(await again.error.recheck()).toBe(false);
+        expect(queueRow().status).toBe(findings.STATUS.OPEN);
+    });
+});
+
+describe('after the hand-over', () => {
+    it('a closed task wakes the step, which fails and takes the task back', async () => {
+        const waiting = await handedOver();
+        await setTask({ statusType: 'close' });
+        expect(await waiting.recheck()).toBe(true);
+        const out = await settle(execute());
+        expect(out.error).toMatchObject({ deterministic: true });
+        expect(out.error.message).toMatch(/was closed before/);
+        withdrawn();
+        expect(audited(roleHandoff.AUDIT.WITHDRAWN)[0][1]).toMatchObject({ meta: { reason: 'task_closed', role: ROLE } });
+    });
+
+    it('a deleted task wakes the step, which fails and takes the task back', async () => {
+        const waiting = await handedOver();
+        await setTask({ deletedStatusKey: 1 });
+        expect(await waiting.recheck()).toBe(true);
+        expect((await settle(execute())).error.message).toMatch(/was not found/);
+        withdrawn();
+        expect(audited(roleHandoff.AUDIT.WITHDRAWN)[0][1]).toMatchObject({ meta: { reason: 'task_gone' } });
+    });
+
+    it('a role switched off for the project fails the step with the reason and takes the task back', async () => {
+        await handedOver();
+        await setRoles([]);
+        const out = await settle(execute());
+        expect(out.error.message).toMatch(/was switched off for this task's project/);
+        withdrawn();
+        expect(audited(roleHandoff.AUDIT.WITHDRAWN)[0][1]).toMatchObject({ meta: { reason: 'role_off' } });
+    });
+
+    it('a finish by another role the task was moved to is a release for this step', async () => {
+        await handedOver();
+        roleFinishes();
+        db().crud(CID, { type: SCHEMA_TYPE.PROJECT_FINDINGS, data: [{ _id: queueRow()._id }, { $set: { 'facts.role': 'it-company/code-reviewer' } }] }, 'updateOne');
+        expect((await settle(execute())).output).toMatchObject({ outcome: 'released' });
+        expect(audited(roleHandoff.AUDIT.FINISHED)).toHaveLength(0);
+    });
+
+    it('taking it back frees the place an agent held on it', async () => {
+        const giveBack = jest.spyOn(places, 'giveBack');
+        await handedOver();
+        await setStep({ handedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) });
+        await settle(execute());
+        expect(giveBack).toHaveBeenCalledWith(CID, queueRow()._id);
+        giveBack.mockRestore();
+    });
+});
+
+describe('every other way the step ends takes the task back too', () => {
+    it('the hop guard refusing it once the run is out of time', async () => {
+        await handedOver();
+        await patchRun({ deadlineAt: new Date(Date.now() - 1000) });
+        const steps = await workflowStore.listSteps(CID, run._id);
+        const out = await engine.runStep(CID, await workflowStore.getRun(CID, run._id), steps.find((step) => step.stepId === STEP), { steps });
+        expect(out.outcome).toBe('blocked');
+        withdrawn();
+        expect(audited(roleHandoff.AUDIT.WITHDRAWN)).toHaveLength(1);
+    });
+
+    it('an executor that is gone, as when DISPATCHER is switched off and the server restarts', async () => {
+        await handedOver();
+        const ok = await engine.failUnclaimed(CID, run, await stepRow(), { workerId: 'w', error: 'no executor', code: 'unknown_step_type' });
+        expect(ok).toBe(true);
+        withdrawn();
+    });
+
+    it('a person skipping it, once only', async () => {
+        await handedOver();
+        expect(await executors.ended({ companyId: CID, run, step: await stepRow(), why: 'skipped by a person' })).toBe(true);
+        withdrawn();
+        expect(await executors.ended({ companyId: CID, run, step: await stepRow(), why: 'skipped by a person' })).toBe(false);
+        expect(audited(roleHandoff.AUDIT.WITHDRAWN)).toHaveLength(1);
+        expect(audited(roleHandoff.AUDIT.WITHDRAWN)[0][1]).toMatchObject({ entityId: TASK, entityName: 'Test the parser', meta: { reason: 'skipped by a person' } });
+    });
+
+    it('the run ending while the step still waits', async () => {
+        await handedOver();
+        await engine.finish(CID, run, await workflowStore.listSteps(CID, run._id), { code: 'deadline_exceeded', reason: 'out of time', stepId: NEXT });
+        withdrawn();
+    });
+
+    it('a step that never handed anything over leaves the queue alone', async () => {
+        expect(await executors.ended({ companyId: CID, run, step: await stepRow(), why: 'skipped' })).toBe(false);
         expect(rows()).toHaveLength(0);
     });
 });

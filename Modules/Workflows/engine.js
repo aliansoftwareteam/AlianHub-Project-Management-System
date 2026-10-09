@@ -100,6 +100,14 @@ const waitAlreadyOver = async (companyId, run, claimed, error) => {
     }
 };
 
+const stepEnded = async (companyId, run, step, why) => {
+    try {
+        await executors.ended({ companyId, run, step, why });
+    } catch (error) {
+        logger.error(`${LOG_PREFIX} ${run._id}/${step && step.stepId}: cleaning up after the step failed: ${error.message}`);
+    }
+};
+
 /* A failed step either comes back later or fails for good, whatever stage failed. */
 const settleFailure = async (companyId, run, claimed, claim, error) => {
     const decision = retry.decide(error, { attempt: Number(claimed.attempts) || 1, maxAttempts: Number(claimed.maxAttempts) || 3 });
@@ -107,6 +115,7 @@ const settleFailure = async (companyId, run, claimed, claim, error) => {
     const failure = { ...decision.failure, deterministic: decision.failure.deterministic };
     if (!decision.retry) {
         await store.failStep(companyId, claim, { error: message, failure });
+        await stepEnded(companyId, run, claimed, message);
         logger.error(`${LOG_PREFIX} ${run._id}/${claimed.stepId} failed (${decision.reason}): ${message}`);
         return { outcome: 'failed', reason: decision.reason };
     }
@@ -130,6 +139,7 @@ const failUnclaimed = async (companyId, run, pending, { workerId, error, code })
         error,
         failure: { type: 'deterministic', code, deterministic: true },
     });
+    await stepEnded(companyId, run, claimed, error);
     return true;
 };
 
@@ -257,16 +267,23 @@ const skipBlocked = async (companyId, runId, steps) => {
     }
 };
 
+/* A run that ends with a step still waiting leaves nobody to come back for that step. */
+const endUnfinished = (companyId, run, steps, why) => Promise.all(steps
+    .filter((step) => !store.STEP_TERMINAL.includes(step.status))
+    .map((step) => stepEnded(companyId, run, step, why)));
+
 const finish = async (companyId, run, steps, blocked = null) => {
     // A blocked run has a verdict of its own and it outranks whatever the step
     // rows add up to: the steps behind the refused hop are skipped, which would
     // otherwise read as an ordinary failure and hide the reason.
     if (blocked) {
         await store.blockRun(companyId, run._id, blocked);
+        await endUnfinished(companyId, run, steps, blocked.reason);
         return 'blocked';
     }
     const status = scheduler.runStatus(steps);
     if (!status) return null;
+    await endUnfinished(companyId, run, steps, `the run ended ${status}`);
     const failed = steps.find((step) => step.status === 'failed');
     await store.patchRun(companyId, run._id, {
         status,
@@ -338,4 +355,4 @@ const tickInner = async (companyId, runId, { enqueue = null, workerId = WORKER_I
 
 const tick = (companyId, runId, opts) => providerContext.run({ companyId }, () => tickInner(companyId, runId, opts));
 
-module.exports = { tick, runStep, finish, skipBlocked, failUnclaimed, WORKER_ID, CAPACITY_RETRY_MS, stepActor };
+module.exports = { tick, runStep, finish, skipBlocked, failUnclaimed, stepEnded, WORKER_ID, CAPACITY_RETRY_MS, stepActor };

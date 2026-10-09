@@ -8995,6 +8995,7 @@ export default {
         workflow_role_handoff_finished: "A role finished a task a workflow handed over",
         workflow_role_handoff_released: "A role gave back a task a workflow handed over",
         workflow_role_handoff_timed_out: "A workflow took a task back from a role",
+        workflow_role_handoff_withdrawn: "A workflow took a task back from a role when its step ended",
         workflow_definition_create: "Create a workflow",
         workflow_definition_update: "Edit a workflow",
         workflow_definition_enable: "Turn a workflow on or off",
