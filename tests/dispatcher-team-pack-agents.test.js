@@ -137,6 +137,20 @@ describe('team packs make one agent per role', () => {
         expect(store(SCHEMA_TYPE.AGENT_REVISIONS).length).toBeGreaterThanOrEqual(engineering.length);
     });
 
+    it('gives each agent its role\'s playbook tools, the queue tools among them, as far as the registry knows them', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await applyPack([project]);
+        const registry = require('../Modules/Agents/registry');
+        const triager = live().find((agent) => agent.role === TRIAGER);
+        expect(triager.allowedActions).toEqual(expect.arrayContaining(['queue.list', 'queue.claim', 'queue.release', 'task.get', 'task.comment', 'task.update']));
+        expect(triager.allowedActions).not.toContain('task.from_message');
+        live().forEach((agent) => {
+            expect(agent.allowedActions.length).toBeGreaterThan(2);
+            expect(agent.allowedActions.every((key) => registry.knows(key))).toBe(true);
+        });
+    });
+
     it('never duplicates an agent for the same role and projects, and makes a new one for other projects', async () => {
         seedRules(GRANTS);
         const one = seedProject();

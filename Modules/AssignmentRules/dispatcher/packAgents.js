@@ -7,6 +7,7 @@ const skillRecord = require('../../Agents/skillRecord');
 const overrides = require('../../Agents/rolePlaybookOverrides');
 const agentAudit = require('../../Agents/agentAudit');
 const runs = require('../../Agents/runs');
+const registry = require('../../Agents/registry');
 const knowledgeMemory = require('../../Knowledge/memory/publish');
 const settings = require('./settings');
 
@@ -54,6 +55,9 @@ async function ensureSkill(companyId, role, actorId) {
     return key;
 }
 
+/* The playbook names MCP tools; the ones the registry does not know as agent actions are left out by allowedActionsToStore. */
+const actionsOf = (role) => registry.allowedActionsToStore([...new Set([...SKILL_ACTIONS, ...role.tools, ...role.toolsOptional])]);
+
 const sameRole = (agent, roleKey, projectIds) => agent.role === roleKey && sameIds(idsOf(agent), projectIds);
 
 /* One agent per role for exactly these projects. A role that already has an agent for the same projects is left as it
@@ -77,7 +81,7 @@ async function create(companyId, roleKeys, projectIds, actorId) {
             role: key,
             projectIds,
             skills: [{ key: skill, name: role.name, enabled: true }],
-            allowedActions: [...SKILL_ACTIONS],
+            allowedActions: actionsOf(role),
             autonomy: AUTONOMY,
             trigger: 'mention',
             madeBy: madeBy(role.blueprint),
