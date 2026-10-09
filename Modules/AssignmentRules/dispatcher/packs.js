@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const playbooks = require('../../Agents/rolePlaybooks');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 const logger = require('../../../Config/loggerConfig');
 const { RuleError } = require('../rules');
 const settings = require('./settings');
@@ -122,7 +123,7 @@ const tagNamesFor = (roleKeys, project) => {
 
 const pendingTagNames = async (companyId, projectId) => {
     const rows = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ projectId, agentId: PACK_AGENT._id, status: 'pending' }, { changes: 1 }],
+        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ projectId: { $in: idForms([projectId]) }, agentId: PACK_AGENT._id, status: 'pending' }, { changes: 1 }],
     }, 'find');
     return new Set((rows || []).flatMap((row) => row.changes || []).filter((change) => change.action === TAG_ACTION).map((change) => lower((change.params || {}).name)));
 };
@@ -154,7 +155,7 @@ async function withdrawProposal(companyId, projectId, proposalId) {
     if (!OBJECT_ID.test(String(proposalId || ''))) return false;
     const proposals = require('../../Agents/proposals');
     const own = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: new mongoose.Types.ObjectId(proposalId), projectId, agentId: PACK_AGENT._id, status: proposals.STATUS.PENDING }, { _id: 1 }],
+        type: SCHEMA_TYPE.AGENT_PROPOSALS, data: [{ _id: new mongoose.Types.ObjectId(proposalId), projectId: { $in: idForms([projectId]) }, agentId: PACK_AGENT._id, status: proposals.STATUS.PENDING }, { _id: 1 }],
     }, 'findOne');
     if (!own) return false;
     return Boolean(await proposals.withdraw(companyId, proposalId, 'The team pack was undone.'));

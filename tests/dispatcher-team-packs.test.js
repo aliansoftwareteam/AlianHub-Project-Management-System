@@ -444,6 +444,23 @@ describe('team pack starter rules and tags', () => {
         expect(pending()).toEqual([]);
     });
 
+    it('finds the pack\'s tag approval by the project id as it is stored, an ObjectId, when it checks for one and withdraws it', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const id = String(project._id);
+        const applied = await withStarter([project], { proposeTags: true });
+        await withStarter([project], { proposeTags: true });
+        const [row] = applied.body.data.projects;
+        await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: [id], roles: { [id]: row.added }, rules: { [id]: row.rules }, proposals: { [id]: row.proposalId } } });
+        const reads = mockDb.calls.filter((c) => c.type === SCHEMA_TYPE.AGENT_PROPOSALS && ['find', 'findOne'].includes(c.method) && c.data[0].agentId === 'team-pack');
+        expect(reads.length).toBeGreaterThanOrEqual(2);
+        reads.forEach((c) => {
+            expect(c.data[0].projectId.$in.map(String)).toEqual([id, id]);
+            expect(c.data[0].projectId.$in.some((one) => one instanceof mongoose.Types.ObjectId)).toBe(true);
+        });
+    });
+
     it('withdraws a tag approval nobody has decided when the pack is undone', async () => {
         seedRules(GRANTS);
         process.env.MCP_TOOLS_WORK = 'on';
