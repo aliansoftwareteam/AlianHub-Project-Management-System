@@ -4,6 +4,7 @@ const mockDbFor = (id) => { mockDbs[id] = mockDbs[id] || require('./fixtures/fak
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (companyId, q, method) => mockDbFor(String(companyId)).crud(companyId, q, method) }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
+jest.mock('../Modules/Agents/access');
 
 process.env.WORKFLOW_ENGINE = 'on';
 process.env.DISPATCHER = 'on';
@@ -68,5 +69,41 @@ describe('the ready-made team workflows', () => {
         require('../Modules/Workflows/routes').init({ get: register('GET'), post: register('POST'), put: register('PUT'), patch: register('PATCH'), delete: register('DELETE') });
         expect(table['GET /api/v2/workflows/templates']).toBe(1);
         expect(table['POST /api/v2/workflows/templates/:key/install']).toBe(2);
+    });
+});
+
+describe('listing the templates', () => {
+    const verified = require('./fixtures/verifiedRequest');
+    const access = require('../Modules/Agents/access');
+    const controller = require('../Modules/Workflows/controller');
+    const call = async (handler, params = {}) => {
+        const res = { statusCode: 200, body: null };
+        res.status = (code) => { res.statusCode = code; return res; };
+        res.send = (body) => { res.body = body; return res; };
+        await handler(verified({ headers: { companyid: '6d0000000000000000000001' }, params, query: {}, body: {}, ip: '' }), res);
+        return res;
+    };
+
+    beforeEach(() => {
+        access.callerOf.mockResolvedValue({ actor: { userId: 'u1', kind: 'human' }, human: true, privileged: true });
+        access.canManageAgents.mockReturnValue(true);
+    });
+
+    it('with the dispatcher on, every template is installable', async () => {
+        const res = await call(controller.listTemplates);
+        expect(res.body.data).toHaveLength(EXPECTED.length);
+        expect(res.body.data.every((template) => template.installable === true && !template.notInstallableReason)).toBe(true);
+    });
+
+    it('with the dispatcher off, each says it cannot be installed and why, and install is refused', async () => {
+        process.env.DISPATCHER = 'off';
+        try {
+            const res = await call(controller.listTemplates);
+            expect(res.body.data.every((template) => template.installable === false && /DISPATCHER/.test(template.notInstallableReason))).toBe(true);
+            const install = await call(controller.installTemplate, { key: 'manufacturing-breakdown' });
+            expect(install.statusCode).toBe(409);
+        } finally {
+            process.env.DISPATCHER = 'on';
+        }
     });
 });
