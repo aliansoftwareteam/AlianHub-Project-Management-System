@@ -49,7 +49,9 @@ exports.applyPack = async (req, res) => {
         const companyId = companyOf(req);
         const body = req.body || {};
         const undone = body.undo === true;
-        const result = undone ? await packs.undo(companyId, body, actor) : await packs.apply(companyId, body, actor.id);
+        const agentAccess = require('../../Agents/access');
+        const managesAgents = agentAccess.canManageAgents(await agentAccess.callerOf(req, companyId));
+        const result = undone ? await packs.undo(companyId, body, actor, { managesAgents }) : await packs.apply(companyId, body, actor.id, { managesAgents });
         const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length));
         const agentsChanged = undone ? result.agents.removed : result.agents.made;
         if (agentsChanged.length) {

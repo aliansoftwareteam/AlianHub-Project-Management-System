@@ -47,7 +47,7 @@ const response = () => {
     return res;
 };
 
-const call = async (method, path, { uid = EDITOR, params = {}, body = {}, extra = {} } = {}) => {
+const call = async (method, path, { uid = OWNER, params = {}, body = {}, extra = {} } = {}) => {
     const handlers = routes()[`${method} ${path}`];
     if (!handlers) throw new Error(`no route ${method} ${path}`);
     const req = verified({ uid, method, originalUrl: path, params, body, query: {}, headers: { companyid: C }, ...extra });
@@ -80,7 +80,7 @@ const seedProject = (doc = {}) => mockDb.seed(SCHEMA_TYPE.PROJECTS, {
 
 const store = (type) => mockDb.store[type] || [];
 const audited = () => recordAudit.mock.calls.map(([companyId, entry]) => ({ companyId, ...entry })).filter((entry) => entry.action.startsWith('dispatcher.pack_'));
-const applyPack = (projects, { uid = EDITOR, teams = ['engineering'], extra } = {}) => call('POST', PACKS, {
+const applyPack = (projects, { uid = OWNER, teams = ['engineering'], extra } = {}) => call('POST', PACKS, {
     uid, extra, body: { blueprint: 'it-company', teams, projectIds: projects.map((project) => String(project._id)) },
 });
 
@@ -124,7 +124,7 @@ describe('team packs make one agent per role', () => {
         expect(live()).toHaveLength(engineering.length);
         const triager = live().find((agent) => agent.role === TRIAGER);
         expect(triager).toMatchObject({
-            name: 'Bug Triager · IT company', projectIds: [String(one._id), String(two._id)], paused: true, pausedReason: 'team_pack', autonomy: 1, ownerId: EDITOR, madeBy: 'team-pack:it-company', skills: [{ key: 'role.bug-triager', enabled: true }],
+            name: 'Bug Triager · IT company', projectIds: [String(one._id), String(two._id)], paused: true, pausedReason: 'team_pack', autonomy: 1, ownerId: OWNER, madeBy: 'team-pack:it-company', skills: [{ key: 'role.bug-triager', enabled: true }],
         });
         expect(triager.autonomy).toBeLessThan(3);
         expect(triager.trigger).toBeUndefined();
@@ -240,10 +240,28 @@ describe('team packs make one agent per role', () => {
         expect(live()).toHaveLength(0);
     });
 
+    it('lets only an owner or admin create or remove agents through a pack, and turns a member\'s roles on without them', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        const asked = await call('POST', PACKS, { uid: EDITOR, body: { blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), createAgents: true } });
+        expect(asked.statusCode).toBe(403);
+        expect(asked.body.message).toContain('Only an Owner or an Admin can create or remove agents');
+        expect(agentsOf()).toHaveLength(0);
+        expect(store(SCHEMA_TYPE.ASSIGNMENT_RULES)).toHaveLength(0);
+        const quiet = await applyPack([project], { uid: EDITOR });
+        expect(quiet.statusCode).toBe(200);
+        expect(quiet.body.data.agents).toEqual({ made: [], kept: [] });
+        expect(agentsOf()).toHaveLength(0);
+        const made = await applyPack([project]);
+        const undo = await call('POST', PACKS, { uid: EDITOR, body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), roles: {}, agents: made.body.data.agents.made.map((a) => a.agentId) } });
+        expect(undo.statusCode).toBe(403);
+        expect(live()).toHaveLength(engineering.length);
+    });
+
     it('creates nothing for a member without project details, or an agent', async () => {
         seedRules({});
         const project = seedProject();
-        expect((await applyPack([project])).statusCode).toBe(403);
+        expect((await applyPack([project], { uid: EDITOR })).statusCode).toBe(403);
         const token = { apiToken: { _id: oid(), kind: 'agent', userId: OWNER, name: 'Claude', scopes: ['read', 'write'] } };
         expect((await applyPack([project], { uid: OWNER, extra: token })).statusCode).toBe(403);
         expect(agentsOf()).toHaveLength(0);

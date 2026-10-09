@@ -14,6 +14,7 @@ const SUMMARY_MAX = 280;
 const PACK_AGENT = Object.freeze({ _id: 'team-pack', name: 'Team pack' });
 const TAG_ACTION = 'tag.create';
 const MAX_AGENTS = 200;
+const MANAGE_REFUSAL = 'Only an Owner or an Admin can create or remove agents. Leave the team\'s agents out to turn on its roles.';
 
 const packs = () => {
     const byBlueprint = new Map();
@@ -177,9 +178,11 @@ async function writeAll(companyId, plans, actorId) {
  * off routes nothing until a person switches it on. A project that already has every role is left unwritten.
  * With starterRules the roles' own routing rules join the project's, each once; with proposeTags the tags the roles
  * hand work on with are proposed, for a person to approve, once the settings are saved. */
-async function apply(companyId, body, actorId) {
+async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
     const projectIds = projectIdsOf(body);
     const pack = rolesOfPack(body);
+    const createAgents = body.createAgents === undefined ? managesAgents : body.createAgents !== false;
+    if (createAgents && !managesAgents) throw new RuleError(MANAGE_REFUSAL, 403);
     const plans = [];
     for (const projectId of projectIds) {
         const current = await settings.load(companyId, projectId);
@@ -213,7 +216,7 @@ async function apply(companyId, body, actorId) {
             ...(proposed.failed ? { tagsFailed: true } : {}),
         });
     }
-    const agents = body.createAgents === false ? { made: [], kept: [] } : await packAgents.create(companyId, pack.roles, projectIds, actorId);
+    const agents = createAgents ? await packAgents.create(companyId, pack.roles, projectIds, actorId) : { made: [], kept: [] };
     return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 
@@ -228,10 +231,12 @@ const agentIdsOf = (body) => {
 /* Takes back what a pack added, as its answer listed it: its roles, the rules it wrote, the tag approval it filed
  * while nobody has decided it, and the agents it made that have done no work. Never a role or a rule outside that
  * pack; a rule a person has since changed stays, and so does an agent that has worked. */
-async function undo(companyId, body, actor) {
+async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     const actorId = actor.id;
     const projectIds = projectIdsOf(body);
     const pack = rolesOfPack(body);
+    const agentIds = agentIdsOf(body);
+    if (agentIds.length && !managesAgents) throw new RuleError(MANAGE_REFUSAL, 403);
     const given = mapOf(body.roles);
     const givenRules = mapOf(body.rules);
     const givenProposals = mapOf(body.proposals);
@@ -259,7 +264,7 @@ async function undo(companyId, body, actor) {
         const withdrawn = await withdrawProposal(companyId, plan.projectId, givenProposals[plan.projectId]).catch(() => false);
         projects.push({ projectId: plan.projectId, removed: plan.removed, rules: plan.rules, mode: plan.mode, tagsWithdrawn: withdrawn });
     }
-    const agents = await packAgents.remove(companyId, pack.blueprint, agentIdsOf(body), projectIds, actor);
+    const agents = await packAgents.remove(companyId, pack.blueprint, agentIds, projectIds, actor);
     return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 

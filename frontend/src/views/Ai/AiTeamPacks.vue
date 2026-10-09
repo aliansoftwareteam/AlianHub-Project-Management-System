@@ -70,7 +70,7 @@
                             </div>
                             <p v-if="tagNames.length" class="ah-small tp-muted" data-test="tp-tags-hint">{{ $t('TeamPacks.tags_hint', { names: tagNames.join(', ') }) }}</p>
 
-                            <label class="tp-row" data-test="tp-create-agents">
+                            <label v-if="managesAgents" class="tp-row" data-test="tp-create-agents">
                                 <input v-model="createAgents" class="ah-check" type="checkbox" />
                                 <span class="tp-row__name">{{ $t('TeamPacks.create_agents') }}</span>
                                 <span class="ah-small tp-row__roles">{{ $t('TeamPacks.create_agents_paused_hint') }}</span>
@@ -155,6 +155,7 @@ const withStarterRules = ref(true);
 const undoneKept = ref([]);
 const createAgents = ref(true);
 
+const managesAgents = computed(() => isOwnerOrAdmin(getters["settings/companyUserDetail"]?.roleType));
 const needsKey = computed(() => aiAvailability.state === AI_STATE.UNCONFIGURED);
 /* The server checks every project again; this only keeps out of reach what it would refuse. A project with its own
  * roles is judged by rules this page does not hold, so only an owner or admin is offered it here. */
@@ -247,7 +248,7 @@ async function apply() {
             projectIds: projectIds.value,
             starterRules: withStarterRules.value && starterRuleCount.value > 0,
             proposeTags: tagNames.value.length > 0,
-            createAgents: createAgents.value
+            createAgents: managesAgents.value && createAgents.value
         });
         undone.value = false;
         undoneKept.value = [];

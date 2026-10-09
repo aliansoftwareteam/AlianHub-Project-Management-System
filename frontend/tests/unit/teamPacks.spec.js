@@ -209,11 +209,18 @@ describe('Team packs', () => {
     it('offers a member only the projects they may change, and says why the others are shut', async () => {
         access.roleType = 3;
         projectState.list = [...TWO, { _id: 'p3', ProjectName: 'Own roles', isGlobalPermission: false }];
+        route.query = { team: 'design' };
         const wrapper = await mountWith(AiTeamPacks);
         const rows = wrapper.findAll('[data-test="tp-project"]');
         expect(rows.map((row) => row.attributes('data-why') || '')).toEqual(['', '', 'own_roles']);
         expect(rows[2].find('input').attributes('disabled')).toBeDefined();
         expect(rows[2].text()).toContain('This project has its own roles');
+
+        expect(wrapper.find('[data-test="tp-create-agents"]').exists()).toBe(false);
+        await rows[0].find('input').setValue(true);
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        expect(applied.createAgents).toBe(false);
 
         composable.details = false;
         const shut = await mountWith(AiTeamPacks);
