@@ -10,9 +10,18 @@ Confirmed by the owner on 2026-10-08: "go with your recommendations". Decisions 
 - [ ] The owner reviews each set (merged in build 825 before the owner's read; changes come as a small docs PR)
 
 **Part 5: the company view**
-- [ ] Org chart and flow board in AI > Company view behind `DISPATCHER` (draft PR feat/company-view; read-only, two reads)
+- [x] The company view in AI > Company view behind `DISPATCHER` (#1599, build 832)
+- [ ] The flow board
 
-**Part 2: team packs** · **Part 4: workflows** · **Part 6: blueprints**: not started.
+**Part 2: team packs**
+- [x] Packs with the catalogue Team filter, undoable (#1585, build 828)
+- [x] Starter rules and tag proposals, one agent per role, all-or-nothing apply (#1606, #1612 in #1616, build 845)
+
+**Part 4: workflows**
+- [x] Role hand-overs as workflow steps and the ready-made team workflows (#1604, build 837)
+
+**Part 6: blueprints**
+- [x] Eight blueprints and the company blueprint picker (#1601, build 833; #1603, build 835)
 
 ## Log
 
@@ -35,4 +44,5 @@ Confirmed by the owner on 2026-10-08: "go with your recommendations". Decisions 
 - Pack run 1, IT company Engineering, on the local build: see `pack-run-1-results.md`. The dispatcher, a lead's routing and three role runs worked end to end; each role stopped where a person decides. Found: packs bring no starter rules, playbooks expect tags the project lacks, no MCP tool reads a pull request, a chip separator. A cloud run adds starter rules, pack tags and the separator.
 - Part 4: a cloud run built role hand-overs as workflow steps and the ready-made team workflows (#1604); its review found a spin while paused and a task left in a role's queue when a run ends early; being fixed.
 - Scope 7, part of it: the `role_handoff` workflow step (behind `WORKFLOW_ENGINE` and `DISPATCHER`) and the five ready-made workflows plus the three Manufacturing ones as workflow templates, installed disabled. Left out because no such role exists yet: Design Ops, Customer Success Manager, and the wait for the launch date. Still open: the flow board, and running the chains end to end on a local build.
-
+- Builds 836 to 852: part 4's workflow steps (#1604, 837); pack starter rules and tags, one agent per role (#1606 and #1612 in batch 37, #1616, 845); roles take routed work from their queue (#1613, 840); `pull_request.get` over MCP closes pack run 1's pull request gap (#1622, 851), with GitHub pull requests linked to tasks (#1607, 843; #1619, 847).
+- Local build: the IT company pack applied to AlianHub Platform; Bug Triager, Tech Lead and Support Agent switched on in "Suggests changes".

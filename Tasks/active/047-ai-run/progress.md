@@ -71,7 +71,7 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] AI-6 Findings from rules, and the daily look (#1396, inside build 764)
 - [x] AI-6 The work queue for the connected agent, with claims (#1404, inside build 766)
 - [x] AI-5 "Always do this", and typed decline reasons kept as notes (#1406, inside build 767)
-- [ ] AI-6 Triage of new tasks and estimates. Later: it needs a server key
+- [x] AI-6 Triage of new tasks and estimates with the server model, filed as suggestions (#1609, build 846)
 
 **Step 6: the teammate**
 - [x] S-2 A connected agent sets up an existing project from one plan: `project.setup` (#1420, inside build 771)
@@ -89,7 +89,7 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] T-5 Several agents at once (#1414, inside build 770)
 - [x] S-4 Home as "what next" (#1400, inside build 765)
 - [x] AI-1 One approval for the two jobs the sheet marked "cannot pass yet": a batch that names more than one task takes up to 50 changes and waits as one proposal, and a setup plan can hold a rollup or a formula field beside a view (#1546, inside build 812). The sheet read against today's tools: 10 jobs should pass, 5 with approval (#1530, inside build 812)
-- [ ] AI-1b The replay test in CI. It needs a passing AI-1 run first
+- [x] AI-1b The replay test in CI: the benchmark's tool calls replay with no model (#1623, build 850)
 
 **Step 7: prove it (needs the owner)**
 - [ ] AI-1 measured again: 15 delegations and 3 reserves, three runs each
@@ -125,8 +125,8 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] A user guide for working with your own AI app: `docs/guide/agents/` (#1490, build 799)
 
 **Later, optional (with a server key)**
-- [ ] The Ask box that plans with a model (AI-2, AI-3, T-3)
-- [ ] The in-product manager on a schedule (AI-6)
+- [x] The Ask box that plans with a model (AI-2, AI-3): "Plan changes" files one proposal (#1611, build 842). T-3 not done
+- [x] The in-product manager on a schedule (AI-6): hourly triage job (#1609, build 846)
 - [ ] The generator's wider plan (S-2); the built-in workspace agent (T-2)
 
 ## What is left
@@ -142,7 +142,7 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - A new account, for the S-6 newcomer run.
 - The one-week trial on AlianHub's own project.
 - Row 15: which fifteen jobs count. The sheet's own pick stands until the owner says.
-- Whether the three `MCP_TOOLS_*` flags and `MCP_OAUTH` are on by default on a new install. It changes a security default and needs an access review first. Not planned as done.
+- Done: the three `MCP_TOOLS_*` flags and `MCP_OAUTH` are on by default on a new install, after the access fixes in #1614 (build 841); upgraded installs keep off (#1615, build 848, migration 074).
 - Whether AlianHub's own AI is measured with a server key, at a cap of $10. Recommended: not now.
 - Raised on 2026-10-02: whether a live instance needs today's fixes deployed; #1504's migration on the local database (a dry run first); `STORAGE_DOWNLOAD_SCOPE` and `PERMISSION_ENFORCEMENT_MODE` by default; whether a personal API token may read and write chat as its person.
 
@@ -292,7 +292,7 @@ Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 I
 
 ## Blockers
 
-- **Open, the owner's:** whether `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE`, `MCP_TOOLS_WORK` and `MCP_OAUTH` are on by default. Not planned as done.
+- Closed 2026-10-09: `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE`, `MCP_TOOLS_WORK` and `MCP_OAUTH` are on by default on new installs (#1615, build 848).
 - AI-1, AI-4a, AI-4e and the one-week trial need the owner: the flags on in the local build, and the owner's Claude connected with the manage grant.
 - S-6 needs a new account.
 
@@ -366,3 +366,5 @@ Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 I
 - What passes is filed as one proposal with source `ask` (`Modules/Agents/proposals.js`); the card is the Inbox's own (`intentPreview`), and Approve or Decline in the Ask box call the same decision routes. Approval runs on the approver's own rights inside the filed actions, like a daily-look proposal. A plan is held even where the project would let an agent act at once, and a rule still needs an owner or admin.
 - It runs only when AI is on, a provider is configured and its model is priced; otherwise the box says it needs a key or your own AI. Cost is booked per call by the spend meter under the `ask` feature, so the tenant cap and its alerts apply. The sentence and every name sent are inside the untrusted data block.
 - Not done: a plan names one project (steps for a second are reported, not filed); no per-person time zone for "today" in the prompt (a due day is still read in the person's zone when the change runs).
+- Builds 836 to 852 (all 2026-10-09): agent comments show at once and count as unread (#1608, 838; #1610, 839), with an unread count on list rows (#1617, 844); MCP tool access follows the web app's rules (#1614, 841); the Ask box plans with the server model (#1611, 842); app connections and GitHub pull requests linked to tasks, its own main-menu item (#1607, 843); manager triage on a schedule (#1609, 846); GitHub one-click connect through GitHub sign-in (#1619, 847); MCP tools on by default for new installs (#1615, 848); a daily AI budget (#1618) and every server-key call counted, a failed budget read refusing (#1620, both in 849); the benchmark replay test, AI-1b (#1623, 850); `pull_request.get` over MCP (#1622, 851); the installable app shell (#1621, 852, replaces #1306).
+- Local build: daily AI budget $50, monthly $1,500; `APP_CONNECTIONS=on` in the owner's `.env`. GitHub one-click needs the owner's GitHub app keys (AP-506).

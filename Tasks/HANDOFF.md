@@ -1,20 +1,20 @@
 # Handoff: where to start next session
 
-Updated 2026-10-08 20:35 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
+Updated 2026-10-09 IST. Read this first, then `Tasks/index.md` and the two `progress.md` files named below. Overwrite this file at the end of every session.
 
 ## State
 
 - **Three tasks are in hand.**
-  - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent is the person's own Claude or ChatGPT over MCP (decision 30). **The first measured run is done: 15 of 15 pass** (13 on the first try, jobs 8 and 19 after #1568), in `ai-1-run-1-results.md`.
-  - Task 048, "Team agent packs" (`Tasks/active/048-team-agent-packs/`): role agents per team, workflows between them, one dispatcher, company blueprints. Part 1 (44 playbooks, IT company and Manufacturing) is #1572, waiting for the owner to read it. Step 2 (each role as an MCP prompt and a downloadable skill, behind `MCP_ROLE_PROMPTS`) is #1574, reviewed, waiting on #1572. Part 3, the dispatcher in suggest mode, is with an agent on top of #1574.
+  - Task 047, "AI-run" (`Tasks/active/047-ai-run/`, tracker AP-441): the agent is the person's own Claude or ChatGPT over MCP (decision 30). **The first measured run is done: 15 of 15 pass** (13 on the first try, jobs 8 and 19 after #1568), in `ai-1-run-1-results.md`. On 2026-10-09: AI-1b replay test (#1623), AI-6 manager triage (#1609), the Ask box planning with the server model (#1611), MCP tools on by default for new installs (#1615), a daily AI budget (#1618, #1620).
+  - Task 048, "Team agent packs" (`Tasks/active/048-team-agent-packs/`): role agents per team, workflows between them, one dispatcher, company blueprints. Parts 1 to 6 are merged (playbooks, role prompts, dispatcher, packs with starter rules and one agent per role, workflow hand-overs, company view and blueprints). Left: the flow board, a measured run per pack, the owner's read of the playbooks.
   - Task 046, "great next to ClickUp": no new parity features; fixes, proof and the held PRs remain.
-- **`beta` is at build 833** (#1601). This docs PR becomes the next build.
-- **Live on localhost: build 833**, with `DISPATCHER=on` and `MCP_ROLE_PROMPTS=on` in the owner's `.env` (approved by the owner). Nothing is merged and not built. Start the server only with the "alianhub-api" launch entry: it now unsets the `ANTHROPIC_MODEL` that Claude Code passes down (it had made the server use "opusplan").
+- **`beta` is at build 852** (#1621). This docs PR becomes the next build.
+- **Local build:** `DISPATCHER=on`, `MCP_ROLE_PROMPTS=on` and `APP_CONNECTIONS=on` in the owner's `.env` (approved by the owner). Check which build the server answers with `npm run version:show` after a rebuild. The daily AI budget is $50 and the monthly $1,500. The IT company pack is applied to AlianHub Platform, with Bug Triager, Tech Lead and Support Agent switched on in "Suggests changes". Start the server only with the "alianhub-api" launch entry: it now unsets the `ANTHROPIC_MODEL` that Claude Code passes down (it had made the server use "opusplan").
 - **The owner's local `.env`, changed at the owner's request on 2026-10-08:** the MCP flags (`MCP_OAUTH=both`, issuer localhost:4000, `MCP_TOOLS_DATA/MANAGE/WORK=on`, `MCP_OAUTH_DCR=on`), and the AI provider switched to Anthropic: `LLM_PROVIDER="anthropic"`, `ANTHROPIC_MODEL="claude-sonnet-5-5"`, its price $2/$10 per million in `LLM_PRICING`. The key is in the admin field only; the `.env` key line stays empty. A backup of the old `.env` is in the private handoff folder.
 - **The owner's Claude Code is connected** as `alianhub-oauth` (user scope, OAuth, Manage tasks, Write docs, Read chat). Measured runs: `claude -p "<sentence>" --allowedTools "mcp__alianhub-oauth" --max-turns 40 --output-format json`, from `~`, with the browser pane on the job's start screen.
-- `docs/API.md` and `docs/api/openapi.json` are in sync with build 833.
+- `docs/API.md`, `docs/api/openapi.json`, `docs/ENV.md` and `.env.example` are in sync with build 852.
 
-## Merged since the last handoff (builds 773 to 833)
+## Merged since the last handoff (builds 773 to 852)
 
 | Build | PR | What it carried |
 |---|---|---|
@@ -65,6 +65,24 @@ Updated 2026-10-08 20:35 IST. Read this first, then `Tasks/index.md` and the two
 | 830 | #1598, thirty-fourth batch | Playbooks for e-commerce, agency, professional services, education and construction; the team packs guide |
 | 832 | #1599, thirty-fifth batch | The company view, tuning a role playbook per workspace, the dispatcher's model guess |
 | 833 | #1601, thirty-sixth batch | Clinic playbooks and the company blueprint picker |
+| 834 | #1602 | The docs PR for builds 826 to 833 |
+| 835 | #1603 | The roles the blueprints named but had not written |
+| 836 | #1605 | The docs PR: pack run 1, builds 834 and 835 |
+| 837 | #1604 | 048 part 4: role hand-overs as workflow steps, the ready-made team workflows |
+| 838, 839 | #1608, #1610 | A comment from the connected AI shows at once and counts as unread |
+| 840 | #1613 | Roles take routed work from their queue; offered when a few tools are missing |
+| 841 | #1614 | MCP tool access follows the web app's rules in every case |
+| 842 | #1611 | The Ask box plans with the server model (AI-2, AI-3) |
+| 843 | #1607 | App connections, GitHub pull requests linked to tasks (own main-menu item, behind `APP_CONNECTIONS`) |
+| 844 | #1617 | List rows show the unread comment count |
+| 845 | #1616, thirty-seventh batch | Pack starter rules and tags (#1606), one agent per role (#1612) |
+| 846 | #1609 | AI-6: the project manager triages new tasks with the server model, hourly |
+| 847 | #1619 | GitHub one-click connect through GitHub sign-in |
+| 848 | #1615 | MCP tools and OAuth on by default for new installs (migration 074 keeps upgrades off) |
+| 849 | #1620 | A daily AI budget (#1618, inside); every server-key call counts, a failed budget read refuses |
+| 850 | #1623 | AI-1b: the benchmark's tool calls replay in CI with no model |
+| 851 | #1622 | MCP `pull_request.get` |
+| 852 | #1621 | The installable app shell (replaces #1306) |
 
 Each PR's own title is in `docs/BETA-LOG.md` or on GitHub. The reversible choices they made are in 047's `progress.md`, under "Choices to review".
 
@@ -76,10 +94,8 @@ Since 2026-10-08 the owner gives work as tasks in project AlianHub Platform (AP)
 
 | PR | What | State |
 |---|---|---|
-| #1572, thirty-first batch | Task 048 part 1: 22 IT company and 22 Manufacturing role playbooks (#1570, #1571) and the convention test `tests/conventions/role-playbooks.test.js` | Reviewed and fixed; **held for the owner to read** each set before it merges |
-| #1306 | The installable app shell | **Held.** It merges alone, after its own rebuild and the 14 checks in `.claude/test-cases/PWA.md` |
 | #1364 | A cloud run's API reference catch-up | Replaced. Close it |
-| This PR | The beta log for builds 820 to 822, 047 and 048 progress, this handoff | Not a draft, docs only |
+| This PR | The beta log for builds 836 to 852, API and env docs, 047 and 048 progress, this handoff | Not a draft, docs only |
 
 ## The combined-PR method
 
@@ -108,8 +124,14 @@ Since 2026-10-08 the owner gives work as tasks in project AlianHub Platform (AP)
 ## Waiting for the owner
 
 The full lists are "Needs the owner" in 047's `progress.md` and "Open decisions for the owner" in 046's. The ones that block work or were raised on 2026-10-02:
-1. **Read the 048 playbooks** in #1572 (IT company, then Manufacturing) and say what to change.
-1a. **Revoke the two `sk-ant-usr-` secrets** pasted in chat on 2026-10-08; they were never used or stored.
+Open owner tasks in AlianHub (AP):
+- **AP-506**: add the GitHub app keys `GITHUB_CONNECT_CLIENT_ID` and `GITHUB_CONNECT_CLIENT_SECRET` to `.env` so one-click GitHub connect works.
+- **AP-496**: the four PWA hand checks of the installable app shell (#1621).
+- **AP-504**: revoke the two secrets pasted in chat on 2026-10-08.
+- **AP-498, AP-500, AP-501, AP-502, AP-503**: open owner items; details on each task.
+
+Older items:
+1. **Read the 048 playbooks** (merged in build 825) and say what to change.
 2. **Whether a live instance exists** that needs today's fixes deployed and its logs looked at. Deploying is the owner's.
 3. **How many agents to run.** The owner's standing number is eight local and twelve cloud. At that pace the week's limit does not last to its reset, so the coordinator held to the critical path from 22:20 on 2 October. Ask again after the reset.
 3a. **A rule woken by a narrowed agent token's change** (#1535): its steps are held to the token's projects. One function, `judgedAfter` in `event/writerLimits.js`, switches that to the rule maker's full rights if the owner prefers.
@@ -118,7 +140,7 @@ The full lists are "Needs the owner" in 047's `progress.md` and "Open decisions 
 5. Whether a personal API token may read and write chat as its person. Agent tokens cannot.
 6. The choices in 047's `progress.md` under "Choices to review, builds 773 to 803" and "builds 804 to 806".
 7. About 250 old agent worktrees (22 GB) under `.claude/worktrees/`: clear the ones whose branches are merged, or leave them.
-8. A new account for the newcomer test; the one-week trial; the tracker subtasks only the owner can close; #1306's hand check.
+8. A new account for the newcomer test; the one-week trial; the tracker subtasks only the owner can close.
 
 ## Private notes
 
@@ -126,10 +148,10 @@ Access findings and their state are in `~/.claude/projects/-Users-mevil-Alian-Hu
 
 ## Next steps, in order
 
-1. When the owner has read #1572: merge it, then the 048 step 2 PR (role prompts and skills for the connected AI) after its own review; use one role from the owner's Claude on the local build.
+1. Rebuild the local server on build 852 and hand-check today's merges: GitHub links (after AP-506), the budget, the Ask box plan, manager triage, the installable shell (AP-496).
 2. Ask the owner to see the live view tab by eye (#1578): the coordinator's browser pane is always hidden, so it cannot.
-3. 048: parts 1 to 3, 5 and 6 are built. Left: part 4 as workflow-engine steps; a measured run per pack; the owner's read of the playbooks; the three unlisted e-commerce roles and the 13 "not written yet" roles.
-4. AI-1 measured again (three runs each, with the reserves) and AI-1b, the replay test from these runs.
+3. 048: left are the flow board, a measured run per pack with the starter rules, and the owner's read of the playbooks.
+4. AI-1 measured again (three runs each, with the reserves).
 5. The hand check of build 812 and the held batch 27 items, as before.
 
 ## Learned on 2026-10-02
