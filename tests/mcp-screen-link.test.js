@@ -42,8 +42,10 @@ const server = require('../Modules/Mcp/server');
 
 const {
     CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, L_OPEN, L_SECRET, L_PRIVATE, L_PERSONAL,
-    T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, MISSING, BEFORE, FLAGS, ctx, narrowed, readOnly, outside, settle,
+    T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, MISSING, BEFORE, FLAGS, ctx: plainCtx, narrowed: plainNarrowed, readOnly, outside, settle,
 } = world;
+const ctx = (uid, over) => world.managing(plainCtx(uid, over));
+const narrowed = (uid, projectIds) => world.managing(plainNarrowed(uid, projectIds));
 const { seed, rpcThrough, listedThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);

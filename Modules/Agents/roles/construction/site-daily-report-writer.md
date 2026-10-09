@@ -4,7 +4,8 @@ name: Site Daily Report Writer
 blueprint: construction
 department: Site operations
 team: site
-tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, chat.channels.list, chat.messages.list, timesheet.read, queue.claim, queue.release, task.comment, task.create, task.update, task.field.set, task.tags.add, task.relation.add, page.create, task.from_message]
+tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, chat.channels.list, chat.messages.list, queue.claim, queue.release, task.comment, task.create, task.update, task.field.set, task.tags.add, task.relation.add, page.create, task.from_message]
+tools_optional: [timesheet.read]
 hands_to: [rfi-tracker, snag-list-keeper, construction-project-planner]
 gates: [the site manager reviews and signs the daily report]
 ---
@@ -84,7 +85,7 @@ If crew numbers or weather were not given it writes "not recorded" and asks the 
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `task.history`, `task.relations.list`, `chat.channels.list`, `chat.messages.list`, `timesheet.read`. Writing: `queue.claim`, `queue.release`, `task.comment`, `task.create`, `task.update`, `task.field.set`, `task.tags.add`, `task.relation.add`, `page.create`, `task.from_message`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `task.history`, `task.relations.list`, `chat.channels.list`, `chat.messages.list`. Writing: `queue.claim`, `queue.release`, `task.comment`, `task.create`, `task.update`, `task.field.set`, `task.tags.add`, `task.relation.add`, `page.create`, `task.from_message`. Used when the connection has them: `timesheet.read`. All through the person's own connection and rights.
 
 ## Example
 

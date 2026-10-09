@@ -291,7 +291,7 @@ describe.each(Object.keys(people))('the data tools answer a %s token exactly as 
 
     it('timesheet.read gives the caller\'s own entries, newest first', async () => {
         const out = await call('timesheet.read', {});
-        const mine = who === 'restricted' ? [fx.myA] : [fx.myB, fx.myC, fx.myA];
+        const mine = { restricted: [fx.myA], member: [fx.myC, fx.myA], owner: [fx.myB, fx.myC, fx.myA] }[who];
         expect(out.userId).toBe(ME);
         expect(out.entries.map((e) => e.timesheetId)).toEqual(mine.map((e) => e._id));
         expect(out.entries.find((e) => e.timesheetId === fx.myA._id)).toMatchObject({ taskId: fx.tA._id, projectId: P_A, minutes: 30, startedAt: '2026-09-01T09:00:00.000Z', billable: true });
@@ -330,6 +330,13 @@ describe('timesheet.read for a member the permission matrix grants "Everyone"', 
     beforeEach(() => as('member', { everyone: true }));
 
     it('reads another person\'s entries, still only in the projects the member can open', async () => {
+        expect((await call('timesheet.read', { userId: SOMEONE })).entries.map((e) => e.timesheetId)).toEqual([fx.theirA._id]);
+    });
+
+    it('leaves out their entries on a private list the member is not on', async () => {
+        mockDb.seed(SCHEMA_TYPE.TIMESHEET, {
+            Loggeduser: SOMEONE, ProjectId: P_A, TicketID: fx.tPriv._id, LogStartTime: Date.parse('2026-09-04T09:00:00Z') / 1000, LogTimeDuration: 20, logAddType: 0,
+        });
         expect((await call('timesheet.read', { userId: SOMEONE })).entries.map((e) => e.timesheetId)).toEqual([fx.theirA._id]);
     });
 });

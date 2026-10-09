@@ -22,9 +22,12 @@ async function openKinds(state) {
     const client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
     await client.connect();
     const collection = client.db(state.companyId).collection('agent_proposals');
+    const tokens = client.db(state.companyId).collection('apiTokens');
     const seeded = [];
 
     async function insert({ agent, project, requestedBy, tokenId, what, why, changes }) {
+        // Setup, project and automation changes are filed under the manage grant, which approval asks the token again.
+        if (tokenId) await tokens.updateOne({ _id: new ObjectId(String(tokenId)) }, { $addToSet: { grants: 'tasks:manage' } });
         const _id = new ObjectId();
         const now = new Date();
         await collection.insertOne({

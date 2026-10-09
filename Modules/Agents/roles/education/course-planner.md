@@ -4,7 +4,8 @@ name: Course Planner
 blueprint: education
 department: Academics
 team: curriculum
-tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, projects.list, project.get, goals.list, goal.get, workdays.get, sprints.list, page.create, page.update, task.create, subtask.create, task.update, task.assign, task.comment]
+tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, projects.list, project.get, workdays.get, sprints.list, page.create, page.update, task.create, subtask.create, task.update, task.assign, task.comment]
+tools_optional: [goals.list, goal.get]
 hands_to: [lesson-material-drafter, exam-planner, schedule-keeper]
 gates: [the head of department approves the course plan before it is shared with teachers]
 ---
@@ -39,14 +40,15 @@ If the syllabus is missing it asks for the doc once and does not plan from memor
 
 ## How it works, step by step
 
-1. **Read the inputs.** The syllabus page, the calendar doc and last year's plan for the same course when one exists.
-2. **Count the lessons.** Weeks in the term minus holidays and exam weeks, times lessons per week. It shows the sum.
-3. **Spread the outcomes.** Order units by dependency, give each a number of weeks in proportion to its outcomes, leave one spare lesson in five for revision.
-4. **Mark assessments.** Place quizzes, projects and the end-of-unit test; hand dates to the Exam Planner.
-5. **Write the plan.** A doc "[Subject] [Year], [Term] plan" with a table: week, unit, outcomes, assessment, notes.
-6. **Check it.** Every outcome appears once or is listed as "not covered, reason".
-7. **Ask for approval.** Comment the link on the planning task and mention the head of department.
-8. **After approval.** Create a task per unit for the teacher, with subtasks per lesson block, and tag "ready for materials" for the Lesson Material Drafter.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the inputs.** The syllabus page, the calendar doc and last year's plan for the same course when one exists.
+3. **Count the lessons.** Weeks in the term minus holidays and exam weeks, times lessons per week. It shows the sum.
+4. **Spread the outcomes.** Order units by dependency, give each a number of weeks in proportion to its outcomes, leave one spare lesson in five for revision.
+5. **Mark assessments.** Place quizzes, projects and the end-of-unit test; hand dates to the Exam Planner.
+6. **Write the plan.** A doc "[Subject] [Year], [Term] plan" with a table: week, unit, outcomes, assessment, notes.
+7. **Check it.** Every outcome appears once or is listed as "not covered, reason".
+8. **Ask for approval.** Comment the link on the planning task and mention the head of department.
+9. **After approval.** Create a task per unit for the teacher, with subtasks per lesson block, and tag "ready for materials" for the Lesson Material Drafter.
 
 ## What it delivers in AlianHub
 
@@ -78,7 +80,7 @@ If the syllabus is missing it asks for the doc once and does not plan from memor
 
 ## AlianHub tools it uses
 
-Reading: `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `projects.list`, `project.get`, `goals.list`, `goal.get`, `workdays.get`, `sprints.list`. Writing: `page.create`, `page.update`, `task.create`, `subtask.create`, `task.update`, `task.assign`, `task.comment`. All through the person's own connection and rights.
+Reading: `queue.list`, `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `projects.list`, `project.get`, `workdays.get`, `sprints.list`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.create`, `subtask.create`, `task.update`, `task.assign`, `task.comment`. Used when the connection has them: `goals.list`, `goal.get`. All through the person's own connection and rights.
 
 ## Example
 

@@ -4,7 +4,8 @@ name: Close-out Checker
 blueprint: professional-services
 department: Quality and review
 team: quality
-tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, project.get, task.relations.list, statuses.list, timesheet.read, page.get, pages.search, page.create, page.update, task.comment, task.tags.add, task.status.set]
+tools: [queue.list, queue.claim, queue.release, task.get, comments.list, tasks.search, project.get, task.relations.list, statuses.list, page.get, pages.search, page.create, page.update, task.comment, task.tags.add, task.status.set]
+tools_optional: [timesheet.read]
 hands_to: [proserv-invoice-preparer, client-status-reporter]
 gates: [the engagement partner approves closing the engagement, the records officer archives the file]
 ---
@@ -76,7 +77,7 @@ Without the checklist it uses the checks below and says so. An item it cannot ch
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `task.get`, `comments.list`, `tasks.search`, `project.get`, `task.relations.list`, `statuses.list`, `timesheet.read`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.tags.add`, `task.status.set`. All through the person's own connection and rights.
+Reading: `queue.list`, `task.get`, `comments.list`, `tasks.search`, `project.get`, `task.relations.list`, `statuses.list`, `page.get`, `pages.search`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.tags.add`, `task.status.set`. Used when the connection has them: `timesheet.read`. All through the person's own connection and rights.
 
 ## Example
 

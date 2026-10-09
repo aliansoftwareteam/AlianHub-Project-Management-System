@@ -50,6 +50,24 @@ const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).sli
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const find = (database, type, filter, fields, options) => MongoDbCrudOpration(database, { type, data: [filter, fields || null, options] }, 'find');
 
+/* Who a caller with a narrower view than the whole workspace may see listed: the people of the projects the caller
+ * can open. Owners and admins open every project, and every member but a guest is on a project without a member
+ * list; a guest caller is shown only the people named on their projects. Null means everyone. */
+const sharingPeople = async (ctx, vis, roleOf) => {
+    if (vis.projectIds === null) return null;
+    const projects = vis.projectIds.length
+        ? (await find(ctx.companyId, SCHEMA_TYPE.PROJECTS, { _id: { $in: idForms(vis.projectIds) } }, { isPrivateSpace: 1, isPersonal: 1, personalOwner: 1, AssigneeUserId: 1 })) || []
+        : [];
+    const callerIsGuest = roleOf.get(String(ctx.userId)) === ROLE_GUEST;
+    const openToMembers = !callerIsGuest && projects.some((project) => project.isPrivateSpace !== true && project.isPersonal !== true);
+    const named = new Set([String(ctx.userId)]);
+    projects.forEach((project) => {
+        (project.AssigneeUserId || []).forEach((id) => named.add(String(id)));
+        if (project.isPersonal === true && project.personalOwner) named.add(String(project.personalOwner));
+    });
+    return (userId) => named.has(userId) || [ROLE_OWNER, ROLE_ADMIN].includes(roleOf.get(userId)) || (openToMembers && roleOf.get(userId) !== ROLE_GUEST);
+};
+
 const ID = Object.freeze({ type: 'string', pattern: '^[a-fA-F0-9]{24}$' });
 const REASON = Object.freeze({ reason: { type: 'string', maxLength: 500, description: 'Why, in one line. It is kept in the record of changes.' } });
 const taskTarget = (args) => ({ taskId: str(args.taskId, 40) });
@@ -192,7 +210,7 @@ const TOOLS = [
     {
         name: 'members.list',
         action: 'members.list',
-        description: 'Lists the active members of the workspace by name: id, name and role. With a projectId each row also says whether that person can open the project, which task.assign needs. Changes nothing.',
+        description: 'Lists the active members of the workspace the person works with, by name: id, name and role. Owners and admins see everyone; anyone else sees the people of the projects they can open. With a projectId each row also says whether that person can open the project, which task.assign needs. Changes nothing.',
         input: input({ query: { type: 'string', maxLength: 120, description: 'Part of the name' }, projectId: ID, limit: { type: 'integer', minimum: 1, maximum: cursor.PAGE_MAX } }, []),
         visibility: 'filtered',
         grant: GRANT,
@@ -204,8 +222,10 @@ const TOOLS = [
             if (args.projectId !== undefined && !project) return { ...NO_PROJECT };
             const seats = (await find(ctx.companyId, SCHEMA_TYPE.COMPANY_USERS, { ...ACTIVE_SEAT }, { userId: 1, roleType: 1 })) || [];
             const roleOf = new Map(seats.filter((seat) => isId(seat.userId)).map((seat) => [String(seat.userId), seat.roleType]));
-            const users = roleOf.size
-                ? (await find(dbCollections.GLOBAL, SCHEMA_TYPE.USERS, { _id: { $in: [...roleOf.keys()].map(oid) } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1 })) || []
+            const shares = await sharingPeople(ctx, vis, roleOf);
+            const listedIds = [...roleOf.keys()].filter((userId) => !shares || shares(userId));
+            const users = listedIds.length
+                ? (await find(dbCollections.GLOBAL, SCHEMA_TYPE.USERS, { _id: { $in: listedIds.map(oid) } }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1 })) || []
                 : [];
             const wanted = args.query ? new RegExp(escapeRegex(str(args.query, 120)), 'i') : null;
             const everyone = users

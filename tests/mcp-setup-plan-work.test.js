@@ -230,7 +230,8 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
 
     it('refuses first tasks from a connection that may not create a task with its details', async () => {
         const plan = tasksOnly();
-        await refusedFor(as(INSIDER, { token: { grants: [] } }), plan, /^permission_denied: .*is not allowed to use/);
+        expect(await rpc(as(INSIDER, { token: { grants: [] } }), TOOL, plan)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
+        expect(waiting()).toHaveLength(0);
         delete process.env.MCP_TOOLS_MANAGE;
         await refusedFor(as(INSIDER), plan, /^permission_denied: .*is not allowed to use/);
     });
@@ -372,15 +373,13 @@ describe('approving makes each automation and each task as its own action, after
         expect(taskNamed('Brief')).toBeUndefined();
     });
 
-    it('is not approved once the token no longer holds what the first tasks need', async () => {
+    it('is not approved, in whole or in part, once the token no longer holds the manage grant', async () => {
         const id = await filed(tasksOnly(), as(INSIDER));
         stored(SCHEMA_TYPE.API_TOKENS, tokenOf(INSIDER)).grants = [];
         expect(await approve(id)).toMatchObject({ status: 403, error: expect.stringMatching(/grant/) });
         expect(proposal(id).status).toBe('pending');
+        expect(await approve(id, OWNER, { 0: { lists: [0], statuses: [0] } })).toMatchObject({ status: 403, error: expect.stringMatching(/grant/) });
         expect(listsNamed('Backlog')).toHaveLength(0);
-        const kept = await approve(id, OWNER, { 0: { lists: [0], statuses: [0] } });
-        expect(kept.error).toBeUndefined();
-        expect(listsNamed('Backlog')).toHaveLength(1);
     });
 
     it('reports a task that could not be made beside the ones that were', async () => {
@@ -448,7 +447,8 @@ describe('the "Set up my project" prompt', () => {
     });
 
     it('leaves the first tasks to the calls after the approval on a connection that may not create a task with its details', () => {
-        const plain = promptText(as(OWNER, { token: { grants: [] } }));
+        delete process.env.MCP_TOOLS_MANAGE;
+        const plain = promptText(as(OWNER));
         expect(plain).toMatch(/Then send the statuses, lists, fields and views and the automations together in one call/);
         expect(plain).toMatch(/Then make the rest of what I approved: .*tasks with `task\.create`/);
     });

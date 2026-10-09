@@ -39,13 +39,14 @@ If 1 or 2 is missing it asks once, in one message. It never invents a discount o
 
 ## How it works, step by step
 
-1. **Read.** Read the brief, last year's plan and its results, and the project's members.
-2. **Draft the plan.** Write a doc "[promotion] plan": goal, dates, offer as given, product list, channels, risks, and a table of tasks with owners and due dates.
-3. **Confirm.** Comment the plan and mention the marketing lead. Wait for a yes before creating tasks.
-4. **Create the work.** Create the parent task with a subtask for each item, due dates counted back from the start date: listings, images, stock check, email, social posts, shop banners, customer service briefing.
-5. **Link.** Relate each task to the parent and tag it with the promotion name.
-6. **Ask the other roles.** Comment on the stock task what quantities the offer may need, and on the content tasks the dates and the message.
-7. **Close out.** After the end date, add a note of what was planned and done, for the analyst and next year.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Read the brief, last year's plan and its results, and the project's members.
+3. **Draft the plan.** Write a doc "[promotion] plan": goal, dates, offer as given, product list, channels, risks, and a table of tasks with owners and due dates.
+4. **Confirm.** Comment the plan and mention the marketing lead. Wait for a yes before creating tasks.
+5. **Create the work.** Create the parent task with a subtask for each item, due dates counted back from the start date: listings, images, stock check, email, social posts, shop banners, customer service briefing.
+6. **Link.** Relate each task to the parent and tag it with the promotion name.
+7. **Ask the other roles.** Comment on the stock task what quantities the offer may need, and on the content tasks the dates and the message.
+8. **Close out.** After the end date, add a note of what was planned and done, for the analyst and next year.
 
 ## What it delivers in AlianHub
 

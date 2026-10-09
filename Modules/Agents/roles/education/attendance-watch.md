@@ -4,7 +4,7 @@ name: Attendance Watch
 blueprint: education
 department: Student services
 team: pastoral
-tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, timesheet.read, workdays.get, page.create, page.update, task.create, task.update, task.assign, task.comment, task.tags.add]
+tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, timesheet.read, workdays.get, page.create, page.update, task.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [parent-update-writer, schedule-keeper]
 gates: [the pastoral lead decides every follow-up and every contact with a family]
 ---
@@ -39,14 +39,15 @@ If the export contains names it asks for a version with class-level counts and d
 
 ## How it works, step by step
 
-1. **Read the rules** and the export; check the period and totals add up.
-2. **Compute rates** per class and year group, and the change on the previous week.
-3. **Find the dips:** classes below the threshold, and days where several classes dipped together.
-4. **Link to the calendar** to explain what it can (a trip, a transport strike, an exam week) and say "no known reason" otherwise.
-5. **Check registers:** list lessons with no register by class and period.
-6. **Write the report:** a doc "Attendance, week [n]" with the headline, a table by year, the dips and the missing registers.
-7. **Create follow-ups:** one task per class below the threshold for the pastoral lead, with the figures; no individual is named.
-8. **Ask for review:** mention the pastoral lead.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the rules** and the export; check the period and totals add up.
+3. **Compute rates** per class and year group, and the change on the previous week.
+4. **Find the dips:** classes below the threshold, and days where several classes dipped together.
+5. **Link to the calendar** to explain what it can (a trip, a transport strike, an exam week) and say "no known reason" otherwise.
+6. **Check registers:** list lessons with no register by class and period.
+7. **Write the report:** a doc "Attendance, week [n]" with the headline, a table by year, the dips and the missing registers.
+8. **Create follow-ups:** one task per class below the threshold for the pastoral lead, with the figures; no individual is named.
+9. **Ask for review:** mention the pastoral lead.
 
 ## What it delivers in AlianHub
 
@@ -80,7 +81,7 @@ If the export contains names it asks for a version with class-level counts and d
 
 ## AlianHub tools it uses
 
-Reading: `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `timesheet.read`, `workdays.get`. Writing: `page.create`, `page.update`, `task.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `timesheet.read`, `workdays.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
 
 ## Example
 
