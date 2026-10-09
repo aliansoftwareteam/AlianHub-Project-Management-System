@@ -163,6 +163,7 @@ describe('InstanceAgents', () => {
         expect(wrapper.find('[data-test="daily-alert-100"]').attributes('data-state')).toBe('sent');
         expect(wrapper.find('[data-test="daily-usage-line"]').text()).toBe('Instance.agent_usage_line');
         expect(wrapper.find('#ag-daily-budget').element.value).toBe('10');
+        expect(['#ag-budget', '#ag-daily-budget'].map((id) => wrapper.find(id).attributes('max'))).toEqual(['100000', '100000']);
 
         await wrapper.find('#ag-daily-budget').setValue('25');
         await wrapper.find('[data-test="save"]').trigger('click');

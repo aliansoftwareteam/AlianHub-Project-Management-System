@@ -19,6 +19,7 @@ const alertRules = require('./alertRules');
 const DEFAULTS = Object.freeze({ undoHours: 24, monthlyBudgetUsd: 0, dailyBudgetUsd: 0 });
 const UNDO_HOURS_MIN = 1;
 const UNDO_HOURS_MAX = 168;
+const BUDGET_MAX_USD = 100000;
 const LEVELS = ['80', '100'];
 const PROVIDER_KEYS = Object.freeze({ openai: 'AI_API_KEY', anthropic: 'ANTHROPIC_API_KEY', deepseek: 'DEEPSEEK_API_KEY' });
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
@@ -60,11 +61,13 @@ const validate = ({ undoHours, monthlyBudgetUsd, dailyBudgetUsd, alerts } = {}, 
     if (monthlyBudgetUsd !== undefined) {
         const n = amountOf(monthlyBudgetUsd);
         if (!Number.isFinite(n) || n < 0) return { error: 'monthlyBudgetUsd must be a number of 0 or more (0 means no budget).' };
+        if (n > BUDGET_MAX_USD) return { error: `monthlyBudgetUsd must be at most ${BUDGET_MAX_USD}.` };
         set.agentMonthlyBudgetUsd = n;
     }
     if (dailyBudgetUsd !== undefined) {
         const n = amountOf(dailyBudgetUsd);
         if (!Number.isFinite(n) || n < 0) return { error: 'dailyBudgetUsd must be a number of 0 or more (0 means no daily limit).' };
+        if (n > BUDGET_MAX_USD) return { error: `dailyBudgetUsd must be at most ${BUDGET_MAX_USD}.` };
         set.agentDailyBudgetUsd = n;
     }
     if (alerts !== undefined) {
@@ -99,10 +102,14 @@ const provider = () => {
 };
 
 /* What open runs hold for calls in flight. A reservation left on a finished run
- * is a leftover, never spend, so only open runs count. */
-const runHolds = async (companyId, { from, to }) => {
-    const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ startedAt: { $gte: from }, status: { $in: runs.OPEN } }, 'startedAt reservedUsd'] }, 'find').catch(() => []);
-    return money((open || []).filter((r) => new Date(r.startedAt).getTime() < to.getTime()).reduce((s, r) => s + Number(r.reservedUsd || 0), 0));
+ * is a leftover, never spend, so only open runs count. A run's hold is for a
+ * call being made now, so the day counts every open run, including one that
+ * started before UTC midnight. */
+const runHolds = async (companyId, { from, to }, { anyStart = false } = {}) => {
+    const match = anyStart ? { status: { $in: runs.OPEN } } : { startedAt: { $gte: from }, status: { $in: runs.OPEN } };
+    const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [match, 'startedAt reservedUsd'] }, 'find').catch(() => []);
+    const inRange = anyStart ? (open || []) : (open || []).filter((r) => new Date(r.startedAt).getTime() < to.getTime());
+    return money(inRange.reduce((s, r) => s + Number(r.reservedUsd || 0), 0));
 };
 
 const monthRange = (month) => {
@@ -112,12 +119,11 @@ const monthRange = (month) => {
 
 /* Booked spend from the ledger, plus what is held for calls in flight.
  *
- * Which hold that is depends on the router flag. With it off, agent runs are
- * the only calls that hold anything and they hold it on the run row. With it
- * on, every billed call reserves against the tenant (AICore/reservation.js),
- * including the agent's, so the reservation ledger is the whole in-flight
- * number and the run row's hold is left to the run's own cap — counting both
- * would count an agent call twice. */
+ * Every billed call reserves against the tenant whenever a budget is set
+ * (AICore/reservation.js), and that reservation is what refuses a call over
+ * the day or the month. This number is the agent run's own earlier gate:
+ * with the router on it reads the reservation ledger, with it off the run
+ * rows' holds. Counting both would count an agent call twice. */
 const PERIODS = Object.freeze({
     monthly: {
         key: () => runs.monthKey(), range: monthRange,
@@ -128,6 +134,7 @@ const PERIODS = Object.freeze({
         key: () => spend.dayKey(), range: spend.dayRange,
         booked: (companyId, key) => spend.daily(companyId, key),
         held: (companyId, key) => require('../AICore/reservation').heldUsdOn(companyId, key),
+        anyStart: true,
     },
 });
 
@@ -135,7 +142,7 @@ const ledgerFor = async (companyId, period, key) => {
     const p = PERIODS[period];
     const [booked, reservedUsd] = await Promise.all([
         p.booked(companyId, key),
-        routerEnabled() ? p.held(companyId, key) : runHolds(companyId, p.range(key)),
+        routerEnabled() ? p.held(companyId, key) : runHolds(companyId, p.range(key), { anyStart: Boolean(p.anyStart) }),
     ]);
     return { usedUsd: money(booked.usedUsd), reservedUsd: money(reservedUsd) };
 };
@@ -256,4 +263,4 @@ const alertIfCrossed = async (companyId, source) => {
     return monthly || daily ? { ...(monthly || {}), ...(daily ? { daily } : {}) } : null;
 };
 
-module.exports = { DEFAULTS, UNDO_HOURS_MIN, UNDO_HOURS_MAX, settings, validate, updateSettings, provider, status, headroom, check, alertIfCrossed };
+module.exports = { DEFAULTS, UNDO_HOURS_MIN, UNDO_HOURS_MAX, BUDGET_MAX_USD, settings, validate, updateSettings, provider, status, headroom, check, alertIfCrossed };

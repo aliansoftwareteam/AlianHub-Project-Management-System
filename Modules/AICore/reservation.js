@@ -17,6 +17,10 @@
  * Two independent mechanisms, because the query is what protects the budget on
  * a cluster whose index has not finished building.
  *
+ * **Whatever the router flag says.** A budget holds every billed call once one
+ * is set; the flag only decides which model a call may name, never whether
+ * the budget applies.
+ *
  * **Two budgets, one hold.** A workspace may set a monthly budget, a daily one
  * (UTC day), or both. One hold row is inserted and totalled against each budget
  * that is set; the call goes only if it fits every one of them.
@@ -109,7 +113,7 @@ const refusal = ({ period, estimate, usd, budgetUsd, usedUsd, held }) => ({
 const pass = (state) => ({ ok: true, state, usd: 0, id: null });
 
 /**
- * Hold this call's estimated cost against the workspace's month.
+ * Hold this call's estimated cost against the workspace's day and month.
  *
  * Insert first, then total: two calls racing each other both see the other's
  * hold and at most one of them fits, which is the point. The loser backs its
@@ -118,13 +122,13 @@ const pass = (state) => ({ ok: true, state, usd: 0, id: null });
  * @returns {Promise<{ok:boolean, state:string, usd:number, id:string|null, code?:string, reason?:string}>}
  */
 async function reserve(context, estimate, provider) {
-    if (!routerEnabled()) return pass(RESERVATION.OFF);
-    if (!context.billedToWorkspace || !context.companyId) return pass(RESERVATION.UNBILLED);
-    if (!estimate || !estimate.priced) return pass(RESERVATION.UNBILLED);
+    const skip = (state) => pass(routerEnabled() ? state : RESERVATION.OFF);
+    if (!context.billedToWorkspace || !context.companyId) return skip(RESERVATION.UNBILLED);
+    if (!estimate || !estimate.priced) return skip(RESERVATION.UNBILLED);
 
     const { monthlyBudgetUsd, dailyBudgetUsd } = await settings(context.companyId);
     const limits = [['daily', dailyBudgetUsd], ['monthly', monthlyBudgetUsd]].filter(([, budgetUsd]) => budgetUsd > 0);
-    if (!limits.length) return pass(RESERVATION.NO_BUDGET);
+    if (!limits.length) return skip(RESERVATION.NO_BUDGET);
 
     const usd = money(estimate.costUsd);
     const at = new Date();

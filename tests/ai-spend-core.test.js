@@ -111,11 +111,15 @@ describe('spend is booked at the core boundary', () => {
     it('a booking failure outside tests is logged with the tokens it lost, never swallowed', async () => {
         const env = process.env.NODE_ENV;
         process.env.NODE_ENV = 'production';
-        mockDb.crud.mockImplementationOnce(async () => { throw new Error('mongo down'); });
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (...a) => {
+            if (a[1] && a[1].type === SCHEMA_TYPE.AI_USAGE && a[2] === 'save') throw new Error('mongo down');
+            return real(...a);
+        });
         try {
             const result = await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C } });
             expect(result.content).toBeTruthy();
-        } finally { process.env.NODE_ENV = env; }
+        } finally { process.env.NODE_ENV = env; mockDb.crud.mockImplementation(real); }
         expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('ask spent 1500 tokens that could not be booked: mongo down'));
     });
 
@@ -193,7 +197,7 @@ describe('the budget reads every feature', () => {
             message: 'AI budget reached: $0.01 of $0.01 used this month — new agent runs are refused until the budget is raised or the month ends.',
             changeData: { level: '100', feature: 'page_compose', usedUsd: 0.012, percent: 120 },
         });
-        await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
+        await expect(getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } })).rejects.toMatchObject({ code: 'ai_budget_exhausted', period: 'monthly' });
         expect(handleNotificationtFun).toHaveBeenCalledTimes(1);
     });
 });

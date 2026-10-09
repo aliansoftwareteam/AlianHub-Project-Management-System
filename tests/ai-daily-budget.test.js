@@ -68,6 +68,14 @@ describe('settings', () => {
         expect(budget.validate({ dailyBudgetUsd: 0 })).toEqual({ set: { agentDailyBudgetUsd: 0 } });
         for (const bad of [-1, 'abc', '', null, NaN]) expect(budget.validate({ dailyBudgetUsd: bad })).toEqual({ error: 'dailyBudgetUsd must be a number of 0 or more (0 means no daily limit).' });
     });
+
+    it('caps both budgets at 100000 USD', () => {
+        expect(budget.BUDGET_MAX_USD).toBe(100000);
+        expect(budget.validate({ dailyBudgetUsd: 100000 })).toEqual({ set: { agentDailyBudgetUsd: 100000 } });
+        expect(budget.validate({ monthlyBudgetUsd: '100000' })).toEqual({ set: { agentMonthlyBudgetUsd: 100000 } });
+        expect(budget.validate({ dailyBudgetUsd: 100000.01 })).toEqual({ error: 'dailyBudgetUsd must be at most 100000.' });
+        expect(budget.validate({ monthlyBudgetUsd: 1e9 })).toEqual({ error: 'monthlyBudgetUsd must be at most 100000.' });
+    });
 });
 
 describe('the pre-call reservation', () => {
@@ -138,6 +146,71 @@ describe('the pre-call reservation', () => {
         adapter.embed = jest.fn(async () => ({ vectors: [[0]], inputTokens: 5, model: 'text-embedding-3-small' }));
         await expect(getProvider().embed({ texts: ['x'.repeat(400000)], model: 'text-embedding-3-small', spend: { feature: FEATURES.KNOWLEDGE_EMBED, companyId: C } })).rejects.toMatchObject({ code: reservation.BUDGET_EXHAUSTED, period: 'daily' });
         expect(adapter.embed).not.toHaveBeenCalled();
+    });
+});
+
+describe('with the model router off', () => {
+    beforeEach(() => { delete process.env.AI_MODEL_ROUTER; });
+
+    it('refuses an Ask call over the daily budget before the vendor is reached', async () => {
+        seedCompany({ agentDailyBudgetUsd: 1 });
+        seedSpend(0.5);
+        const refused = await call().catch((e) => e);
+        expect(refused).toMatchObject({ code: reservation.BUDGET_EXHAUSTED, period: 'daily', feature: FEATURES.ASK });
+        expect(adapter.chat).not.toHaveBeenCalled();
+        expect(holds()[0]).toMatchObject({ state: 'released' });
+        expect(ledger()).toHaveLength(1);
+    });
+
+    it('refuses assist, a clarifier question and a task summary over the daily budget the same way', async () => {
+        seedCompany({ agentDailyBudgetUsd: 1 });
+        seedSpend(0.5);
+        for (const feature of [FEATURES.ASSIST, FEATURES.CLARIFIER, FEATURES.TASK_SUMMARY]) {
+            await expect(call({ spend: { feature, companyId: C, userId: 'u1' } })).rejects.toMatchObject({ code: reservation.BUDGET_EXHAUSTED, period: 'daily' });
+        }
+        expect(adapter.chat).not.toHaveBeenCalled();
+    });
+
+    it('refuses an embedding over the daily budget', async () => {
+        seedCompany({ agentDailyBudgetUsd: 0.1 });
+        seedSpend(0.1);
+        adapter.embed = jest.fn(async () => ({ vectors: [[0]], inputTokens: 5, model: 'text-embedding-3-small' }));
+        await expect(getProvider().embed({ texts: ['x'.repeat(400000)], model: 'text-embedding-3-small', spend: { feature: FEATURES.KNOWLEDGE_EMBED, companyId: C } })).rejects.toMatchObject({ code: reservation.BUDGET_EXHAUSTED, period: 'daily' });
+        expect(adapter.embed).not.toHaveBeenCalled();
+    });
+
+    it('lets an Ask call under the cap through, holding it while it runs and settling it after', async () => {
+        seedCompany({ agentDailyBudgetUsd: 2 });
+        seedSpend(0.5);
+        let heldDuring = null;
+        adapter.chat.mockImplementation(async () => { heldDuring = await reservation.heldUsdOn(C); return answer(); });
+        await expect(call()).resolves.toMatchObject({ content: '{"ok":true}' });
+        expect(heldDuring).toBe(ESTIMATE_USD);
+        expect(holds()[0]).toMatchObject({ state: 'settled' });
+        expect(await reservation.heldUsdOn(C)).toBe(0);
+        expect(ledger()).toHaveLength(2);
+    });
+
+    it('sends the configured model, not one named on the call, when a budget is set', async () => {
+        seedCompany({ agentDailyBudgetUsd: 50 });
+        await call({ model: 'gpt-4.1-mini' });
+        expect(ledger().find((r) => r.feature === 'ask' && r.model)).toMatchObject({ model: 'gpt-4.1' });
+        expect(holds()[0]).toMatchObject({ model: 'gpt-4.1' });
+    });
+
+    it('counts an open run started before UTC midnight in today\'s held amount', async () => {
+        seedCompany({ agentDailyBudgetUsd: 10, agentMonthlyBudgetUsd: 100 });
+        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { status: 'running', startedAt: new Date('2026-10-08T23:50:00.000Z'), reservedUsd: 0.7 });
+        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { status: 'completed', startedAt: new Date('2026-10-09T10:00:00.000Z'), reservedUsd: 5 });
+        const room = await budget.headroom(C);
+        expect(room.daily).toMatchObject({ reservedUsd: 0.7, remainingUsd: 9.3 });
+        expect(room.reservedUsd).toBe(0.7);
+    });
+
+    it('holds nothing without a budget', async () => {
+        seedCompany();
+        await expect(call()).resolves.toBeDefined();
+        expect(holds()).toHaveLength(0);
     });
 });
 

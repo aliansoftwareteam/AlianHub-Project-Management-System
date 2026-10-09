@@ -551,8 +551,8 @@ exports.putSettings = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
-        if (!canManageAgents(await callerOf(req, companyId))) return fail(res, 'Owner/admin only.', 403);
         const caller = await callerOf(req, companyId);
+        if (!canManageAgents(caller)) return fail(res, 'Owner/admin only.', 403);
         const before = await budget.settings(companyId);
         const out = await budget.updateSettings(companyId, req.body || {});
         if (out.error) return fail(res, out.error, out.status || 400);
@@ -561,7 +561,9 @@ exports.putSettings = async (req, res) => {
         if (from.monthlyBudgetUsd !== to.monthlyBudgetUsd || from.dailyBudgetUsd !== to.dailyBudgetUsd) {
             await agentAudit.recordBudgetChange(companyId, caller.actor, { from, to, ip: req.ip || '' });
         }
-        socketEmitter.emit('update', { type: 'update', module: 'agent', companyId, data: { kind: BUDGET_CHANGE }, updatedFields: { kind: BUDGET_CHANGE }, actor: { kind: 'human' }, depth: 1 });
+        if (JSON.stringify(before) !== JSON.stringify(out.settings)) {
+            socketEmitter.emit('update', { type: 'update', module: 'agent', companyId, data: { kind: BUDGET_CHANGE }, updatedFields: { kind: BUDGET_CHANGE }, actor: { kind: 'human' }, depth: 1 });
+        }
         return res.send({ status: true, statusText: 'Settings updated.', data: { ...out.settings, provider: budget.provider() } });
     } catch (e) { logger.error(`putSettings: ${e.message}`); return fail(res, e.message, 500); }
 };

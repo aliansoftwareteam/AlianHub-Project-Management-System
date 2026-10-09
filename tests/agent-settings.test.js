@@ -124,7 +124,12 @@ describe('PUT /agents/settings', () => {
         expect(rows[0].meta).toMatchObject({ from: { monthlyBudgetUsd: 0, dailyBudgetUsd: 0 }, to: { monthlyBudgetUsd: 100, dailyBudgetUsd: 7.5 } });
         expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'agent', companyId: C, data: { kind: 'budget' } }));
 
+        socketEmitter.emit.mockClear();
+        expect((await put({ monthlyBudgetUsd: 100, dailyBudgetUsd: 7.5 })).code).toBe(200);
+        expect(socketEmitter.emit).not.toHaveBeenCalled();
+
         expect((await put({ dailyBudgetUsd: 0 })).body.data).toMatchObject({ monthlyBudgetUsd: 100, dailyBudgetUsd: 0 });
+        expect(socketEmitter.emit).toHaveBeenCalledTimes(1);
         await put({ undoHours: 5 });
         expect((mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] || []).filter((row) => row.action === 'agent.budget_changed')).toHaveLength(2);
     });

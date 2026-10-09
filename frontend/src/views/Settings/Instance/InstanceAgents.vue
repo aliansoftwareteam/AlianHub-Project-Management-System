@@ -21,7 +21,7 @@
                     <div class="in-field__help">{{ $t('Instance.agent_budget_help') }}</div>
                 </div>
                 <div class="in-field__control">
-                    <input id="ag-budget" v-model.number="draft.monthlyBudgetUsd" type="number" min="0" step="1" class="ah-input" />
+                    <input id="ag-budget" v-model.number="draft.monthlyBudgetUsd" type="number" min="0" max="100000" step="1" class="ah-input" />
                 </div>
             </div>
 
@@ -31,7 +31,7 @@
                     <div class="in-field__help">{{ $t('Instance.agent_daily_budget_help') }}</div>
                 </div>
                 <div class="in-field__control">
-                    <input id="ag-daily-budget" v-model.number="draft.dailyBudgetUsd" type="number" min="0" step="1" class="ah-input" data-test="daily-budget" />
+                    <input id="ag-daily-budget" v-model.number="draft.dailyBudgetUsd" type="number" min="0" max="100000" step="1" class="ah-input" data-test="daily-budget" />
                 </div>
             </div>
 
