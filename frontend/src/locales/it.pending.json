@@ -2400,6 +2400,7 @@
     "AuditEvents.agent_action": "An agent made a change",
     "AuditEvents.agent_action_refused": "An agent's change was blocked",
     "AuditEvents.agent_action_undone": "An agent's change was undone",
+    "AuditEvents.agent_created": "Created an agent",
     "AuditEvents.agent_deleted": "Deleted an agent",
     "AuditEvents.agent_egress_allowlist": "Changed the sites agents may reach",
     "AuditEvents.agent_egress_refused": "Blocked an agent from reaching a site",

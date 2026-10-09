@@ -8870,6 +8870,7 @@ export default {
         agent_action_refused: "An agent's change was blocked",
         agent_action_undone: "An agent's change was undone",
         agent_proposal_decided: "Decided an agent's proposal",
+        agent_created: "Created an agent",
         agent_deleted: "Deleted an agent",
         agent_run_reverted: "Undid everything an agent run changed",
         agent_revision_promoted: "Put a version of an agent live",
