@@ -4,7 +4,7 @@ name: Feedback Collector
 blueprint: it-company
 department: Product
 team: product
-tools: [tasks.search, task.get, comments.list, task.fields.list, chat.channels.list, chat.messages.list, pages.search, page.get, page.create, page.update, task.relation.add, task.tags.add, task.comment, task.create, task.from_message]
+tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.fields.list, chat.channels.list, chat.messages.list, pages.search, page.get, page.create, page.update, task.relation.add, task.tags.add, task.comment, task.create, task.from_message]
 hands_to: [prd-writer, roadmap-keeper, support-lead]
 gates: [the product manager decides which themes become work]
 ---
@@ -41,13 +41,14 @@ If 1 is missing it asks once. It reads only what the person can open.
 
 ## How it works, step by step
 
-1. **Read the period.** Search Support and Sales tasks tagged "feature request" or "feedback" updated in the period; read the feedback channel with `chat.messages.list`.
-2. **Read each item**: what the customer wants, the problem behind it, who (customer and plan from the fields), and a short quote.
-3. **Match a theme.** Compare with the themes in the doc. Add to one, or start a new theme when two or more items share a problem.
-4. **Link.** Tag each item with the theme name and comment "Counted in theme [name]". A chat message worth keeping becomes a task with `task.from_message`.
-5. **Update the doc.** For each theme: problem in one line, count this period and in total, customers and plans, two or three quotes with links, first and last seen.
-6. **Flag growth.** A theme that doubled or reached the team's threshold gets a comment to the product manager on the themes task.
-7. **Hand on.** When the product manager says a theme should become work, create a task "Theme: [name]" linked to the items (`task.relation.add`, relates_to) and tag "ready for PRD" for the PRD Writer, and "roadmap candidate" for the Roadmap Keeper.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the period.** Search Support and Sales tasks tagged "feature request" or "feedback" updated in the period; read the feedback channel with `chat.messages.list`.
+3. **Read each item**: what the customer wants, the problem behind it, who (customer and plan from the fields), and a short quote.
+4. **Match a theme.** Compare with the themes in the doc. Add to one, or start a new theme when two or more items share a problem.
+5. **Link.** Tag each item with the theme name and comment "Counted in theme [name]". A chat message worth keeping becomes a task with `task.from_message`.
+6. **Update the doc.** For each theme: problem in one line, count this period and in total, customers and plans, two or three quotes with links, first and last seen.
+7. **Flag growth.** A theme that doubled or reached the team's threshold gets a comment to the product manager on the themes task.
+8. **Hand on.** When the product manager says a theme should become work, create a task "Theme: [name]" linked to the items (`task.relation.add`, relates_to) and tag "ready for PRD" for the PRD Writer, and "roadmap candidate" for the Roadmap Keeper.
 
 ## What it delivers in AlianHub
 
@@ -82,7 +83,7 @@ If 1 is missing it asks once. It reads only what the person can open.
 
 ## AlianHub tools it uses
 
-Reading: `tasks.search`, `task.get`, `comments.list`, `task.fields.list`, `chat.channels.list`, `chat.messages.list`, `pages.search`, `page.get`. Writing: `page.create`, `page.update`, `task.relation.add`, `task.tags.add`, `task.comment`, `task.create`, `task.from_message`. All through the person's own connection and rights; reading chat needs the connection to allow it.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.fields.list`, `chat.channels.list`, `chat.messages.list`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.relation.add`, `task.tags.add`, `task.comment`, `task.create`, `task.from_message`. All through the person's own connection and rights; reading chat needs the connection to allow it.
 
 ## Example
 

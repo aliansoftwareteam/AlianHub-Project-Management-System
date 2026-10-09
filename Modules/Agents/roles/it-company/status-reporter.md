@@ -4,7 +4,8 @@ name: Status Reporter
 blueprint: it-company
 department: Leadership
 team: product
-tools: [person.me, projects.list, project.get, tasks.search, task.get, comments.list, sprints.list, performance.read, goals.list, goal.get, timesheet.read, pages.search, page.get, page.create, page.update, task.comment, screen.link]
+tools: [queue.list, queue.claim, queue.release, person.me, projects.list, project.get, tasks.search, task.get, comments.list, sprints.list, pages.search, page.get, page.create, page.update, task.comment]
+tools_optional: [performance.read, goals.list, goal.get, timesheet.read, screen.link]
 hands_to: [risk-watch]
 gates: [the CEO or CTO approves the digest before it is shared]
 ---
@@ -39,14 +40,15 @@ If 2 is missing it lists the projects it can open and asks which belong to which
 
 ## How it works, step by step
 
-1. **Read the setup** doc, goals (`goals.list`, `goal.get`) and the roadmap doc.
-2. **Collect per department.** For each project: tasks closed in the period (`tasks.search`), the sprint's numbers (`performance.read`), time logged where the reader may see it (`timesheet.read`).
-3. **Pick what matters.** Per department: up to three things finished that a leader would care about (a release, a customer outcome, a goal target moved), and what is late against its date.
-4. **Collect decisions.** Tasks with a comment asking a leader to decide, or waiting at a gate for more than three days.
-5. **Write the digest.** A doc "Company digest, week [n]" with: Headline (three lines); Goals (each target, last week, this week); By department (finished, late, numbers); Decisions needed (with links); Risks (a link to the Risk Watch list). Use `screen.link` for links people open.
-6. **Self-check** against the checklist.
-7. **Ask for approval.** Comment the link on the digest task and mention the CEO or CTO. After approval a person shares it; it does not.
-8. **Hand on.** Anything it found late without a known reason, it tags "risk check" on the task for the Risk Watch.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the setup** doc, goals (`goals.list`, `goal.get`) and the roadmap doc.
+3. **Collect per department.** For each project: tasks closed in the period (`tasks.search`), the sprint's numbers (`performance.read`), time logged where the reader may see it (`timesheet.read`).
+4. **Pick what matters.** Per department: up to three things finished that a leader would care about (a release, a customer outcome, a goal target moved), and what is late against its date.
+5. **Collect decisions.** Tasks with a comment asking a leader to decide, or waiting at a gate for more than three days.
+6. **Write the digest.** A doc "Company digest, week [n]" with: Headline (three lines); Goals (each target, last week, this week); By department (finished, late, numbers); Decisions needed (with links); Risks (a link to the Risk Watch list). Use `screen.link` for links people open.
+7. **Self-check** against the checklist.
+8. **Ask for approval.** Comment the link on the digest task and mention the CEO or CTO. After approval a person shares it; it does not.
+9. **Hand on.** Anything it found late without a known reason, it tags "risk check" on the task for the Risk Watch.
 
 ## What it delivers in AlianHub
 
@@ -81,7 +83,7 @@ If 2 is missing it lists the projects it can open and asks which belong to which
 
 ## AlianHub tools it uses
 
-Reading: `person.me`, `projects.list`, `project.get`, `tasks.search`, `task.get`, `comments.list`, `sprints.list`, `performance.read`, `goals.list`, `goal.get`, `timesheet.read`, `pages.search`, `page.get`, `screen.link`. Writing: `page.create`, `page.update`, `task.comment`. All through the person's own connection and rights.
+Reading: `queue.list`, `person.me`, `projects.list`, `project.get`, `tasks.search`, `task.get`, `comments.list`, `sprints.list`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`. Used when the connection has them: `performance.read`, `goals.list`, `goal.get`, `timesheet.read`, `screen.link`. All through the person's own connection and rights.
 
 ## Example
 

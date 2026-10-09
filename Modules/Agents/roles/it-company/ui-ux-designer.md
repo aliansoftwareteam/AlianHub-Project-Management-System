@@ -41,15 +41,16 @@ If 1 is missing or not approved it stops and asks the Design Lead. It never spec
 
 ## How it works, step by step
 
-1. **Read** the brief, its comments, the design system doc and any visual design links.
-2. **Write the flow.** In a doc "[task title]: spec", start with the flow as numbered steps: where the person starts, each action, each result, where it ends. Mark each branch (no rights, error, cancel).
-3. **Spec each screen.** For each screen: purpose in one line; parts in order with what each does; the words exactly as shown; what is required; keyboard and focus order.
-4. **Spec each state.** A table per screen: state, what shows, the words, what the person can do next. Always: empty, loading, error, no rights, long text, phone width.
-5. **List open questions** at the end, each with who should answer.
-6. **Self-check** against the checklist.
-7. **Hand to review.** Link the spec to the task, move it to In Review, tag "brand check" for the Brand Guardian, and comment the link with the count of screens and states and the open questions. Mention the Design Lead.
-8. **Revise.** Answer each review comment on the doc with `page.comment.reply`, change the spec (a new version), and post what changed.
-9. **Handoff.** After the design lead approves, add a "Handoff checklist" subtask list (spec approved, visuals linked, words final, open questions closed, assets listed) and tag "ready for planning" for the Tech Lead.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read** the brief, its comments, the design system doc and any visual design links.
+3. **Write the flow.** In a doc "[task title]: spec", start with the flow as numbered steps: where the person starts, each action, each result, where it ends. Mark each branch (no rights, error, cancel).
+4. **Spec each screen.** For each screen: purpose in one line; parts in order with what each does; the words exactly as shown; what is required; keyboard and focus order.
+5. **Spec each state.** A table per screen: state, what shows, the words, what the person can do next. Always: empty, loading, error, no rights, long text, phone width.
+6. **List open questions** at the end, each with who should answer.
+7. **Self-check** against the checklist.
+8. **Hand to review.** Link the spec to the task, move it to In Review, tag "brand check" for the Brand Guardian, and comment the link with the count of screens and states and the open questions. Mention the Design Lead.
+9. **Revise.** Answer each review comment on the doc with `page.comment.reply`, change the spec (a new version), and post what changed.
+10. **Handoff.** After the design lead approves, add a "Handoff checklist" subtask list (spec approved, visuals linked, words final, open questions closed, assets listed) and tag "ready for planning" for the Tech Lead.
 
 ## What it delivers in AlianHub
 

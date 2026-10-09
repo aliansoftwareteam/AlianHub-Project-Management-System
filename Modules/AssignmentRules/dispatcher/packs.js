@@ -13,7 +13,7 @@ const packs = () => {
         const teams = byBlueprint.get(role.blueprint);
         if (!teams.has(role.team)) teams.set(role.team, []);
         teams.get(role.team).push({
-            key: settings.roleKey(role), slug: role.slug, name: role.name, department: role.department, summary: playbooks.summary(role, SUMMARY_MAX), tools: [...role.tools],
+            key: settings.roleKey(role), slug: role.slug, name: role.name, department: role.department, summary: playbooks.summary(role, SUMMARY_MAX), tools: [...role.tools, ...role.toolsOptional],
         });
     });
     return [...byBlueprint].map(([blueprint, teams]) => ({ blueprint, teams: [...teams].map(([team, roles]) => ({ team, roles })) }));

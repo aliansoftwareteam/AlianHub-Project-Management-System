@@ -38,12 +38,13 @@ If an order has no promised date it flags that first.
 
 ## How it works, step by step
 
-1. **Read.** Search the open orders and read their history.
-2. **Check dates.** Mark each as late, due in 3 days, or fine.
-3. **Draft.** For each late order, comment "Draft message, not sent" with order number, items, promised date and a polite request for a firm date.
-4. **Hand over.** Mention the buyer to send it. AlianHub sends no timed reminder, so chase again when asked, or ask the buyer to add a follow-up task due two working days out.
-5. **Record.** When the buyer reports the answer, update the order task with the new date and the reason.
-6. **Warn.** If the new date misses a promotion, tag "promotion at risk" and comment for the Promotion Planner.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Search the open orders and read their history.
+3. **Check dates.** Mark each as late, due in 3 days, or fine.
+4. **Draft.** For each late order, comment "Draft message, not sent" with order number, items, promised date and a polite request for a firm date.
+5. **Hand over.** Mention the buyer to send it. AlianHub sends no timed reminder, so chase again when asked, or ask the buyer to add a follow-up task due two working days out.
+6. **Record.** When the buyer reports the answer, update the order task with the new date and the reason.
+7. **Warn.** If the new date misses a promotion, tag "promotion at risk" and comment for the Promotion Planner.
 
 ## What it delivers in AlianHub
 

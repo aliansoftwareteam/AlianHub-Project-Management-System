@@ -37,11 +37,12 @@ Without a brand guide it says so and checks only spelling, product names and cla
 
 ## How it works, step by step
 
-1. **Read.** Open the piece and the guide.
-2. **Check.** Voice, avoid words, product names, how prices and offers are written, claims against the brief, spelling.
-3. **Comment.** One comment per issue on the doc, quoting the rule and the line.
-4. **Verdict.** Comment on the task: pass or changes needed, with the count.
-5. **Tag.** Tag "brand ok" on a pass, and set In Review when changes are needed.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the piece and the guide.
+3. **Check.** Voice, avoid words, product names, how prices and offers are written, claims against the brief, spelling.
+4. **Comment.** One comment per issue on the doc, quoting the rule and the line.
+5. **Verdict.** Comment on the task: pass or changes needed, with the count.
+6. **Tag.** Tag "brand ok" on a pass, and set In Review when changes are needed.
 
 ## What it delivers in AlianHub
 

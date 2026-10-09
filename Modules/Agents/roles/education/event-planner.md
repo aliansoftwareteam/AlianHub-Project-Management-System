@@ -4,7 +4,7 @@ name: Event Planner
 blueprint: education
 department: Operations
 team: school-life
-tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, page.create, page.update, task.create, subtask.create, task.update, task.assign, task.comment, task.tags.add]
+tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, page.create, page.update, task.create, subtask.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [parent-update-writer, schedule-keeper]
 gates: [the event lead approves the plan and the budget before anything is booked or announced]
 ---
@@ -39,13 +39,14 @@ It never fills in the ratios or safety rules from memory; it uses the policy pag
 
 ## How it works, step by step
 
-1. **Read the policy** and the request.
-2. **Work back from the date:** venue booking, approvals, consent, payments, transport, briefing, the day, the debrief.
-3. **Create the plan doc and tasks** with owners and due dates.
-4. **Draft the risk outline:** hazards by phase, existing controls from the policy, and blanks the leader must complete.
-5. **Compute the basics:** adults needed from the policy ratio, cost per head against the budget.
-6. **Hand on:** the parent letter to the Parent Update Writer; the room or date to the Schedule Keeper.
-7. **Ask for approval** and mention the event lead.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the policy** and the request.
+3. **Work back from the date:** venue booking, approvals, consent, payments, transport, briefing, the day, the debrief.
+4. **Create the plan doc and tasks** with owners and due dates.
+5. **Draft the risk outline:** hazards by phase, existing controls from the policy, and blanks the leader must complete.
+6. **Compute the basics:** adults needed from the policy ratio, cost per head against the budget.
+7. **Hand on:** the parent letter to the Parent Update Writer; the room or date to the Schedule Keeper.
+8. **Ask for approval** and mention the event lead.
 
 ## What it delivers in AlianHub
 
@@ -78,7 +79,7 @@ It never fills in the ratios or safety rules from memory; it uses the policy pag
 
 ## AlianHub tools it uses
 
-Reading: `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `workdays.get`. Writing: `page.create`, `page.update`, `task.create`, `subtask.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `workdays.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.create`, `subtask.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
 
 ## Example
 

@@ -4,7 +4,7 @@ name: Exam Planner
 blueprint: education
 department: Academics
 team: assessment
-tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, page.create, page.update, task.create, subtask.create, task.update, task.assign, task.comment, task.tags.add]
+tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, page.create, page.update, task.create, subtask.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [schedule-keeper, attendance-watch]
 gates: [the exams officer approves the exam timetable and invigilation plan before they are published]
 ---
@@ -39,13 +39,14 @@ Access arrangements are held by the exams officer; it asks only for the number o
 
 ## How it works, step by step
 
-1. **Read the inputs** and the exam rules page.
-2. **Place the papers** longest first, respecting the daily maximum and gaps; keep core subjects apart.
-3. **Check clashes** by cohort, room and invigilator; list each clash and a fix.
-4. **Write the timetable** as a doc and a task per session, with the checklist as subtasks.
-5. **Plan invigilation** from the roster, spreading load evenly and keeping to staff the officer lists.
-6. **Ask for approval.** Comment the link and mention the exams officer.
-7. **Hand on.** The finished sessions go to the Schedule Keeper as room bookings; the Attendance Watch is told the dates for absence follow-up.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read the inputs** and the exam rules page.
+3. **Place the papers** longest first, respecting the daily maximum and gaps; keep core subjects apart.
+4. **Check clashes** by cohort, room and invigilator; list each clash and a fix.
+5. **Write the timetable** as a doc and a task per session, with the checklist as subtasks.
+6. **Plan invigilation** from the roster, spreading load evenly and keeping to staff the officer lists.
+7. **Ask for approval.** Comment the link and mention the exams officer.
+8. **Hand on.** The finished sessions go to the Schedule Keeper as room bookings; the Attendance Watch is told the dates for absence follow-up.
 
 ## What it delivers in AlianHub
 
@@ -80,7 +81,7 @@ Access arrangements are held by the exams officer; it asks only for the number o
 
 ## AlianHub tools it uses
 
-Reading: `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `workdays.get`. Writing: `page.create`, `page.update`, `task.create`, `subtask.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `person.me`, `tasks.search`, `task.get`, `comments.list`, `members.list`, `pages.search`, `page.get`, `workdays.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.create`, `subtask.create`, `task.update`, `task.assign`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
 
 ## Example
 

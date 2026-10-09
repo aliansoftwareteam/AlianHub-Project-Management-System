@@ -4,7 +4,8 @@ name: Risk Watch
 blueprint: it-company
 department: Leadership
 team: product
-tools: [projects.list, tasks.search, task.get, comments.list, task.history, task.relations.list, sprints.list, performance.read, members.list, goals.list, goal.get, workdays.get, pages.search, page.get, page.create, page.update, task.comment, task.tags.add]
+tools: [queue.list, queue.claim, queue.release, projects.list, tasks.search, task.get, comments.list, task.history, task.relations.list, sprints.list, members.list, workdays.get, pages.search, page.get, page.create, page.update, task.comment, task.tags.add]
+tools_optional: [performance.read, goals.list, goal.get]
 hands_to: [status-reporter]
 gates: [a leader accepts each risk and names an owner]
 ---
@@ -41,13 +42,14 @@ If 1 is missing it asks once.
 
 ## How it works, step by step
 
-1. **Read** the risk list doc, the projects, sprints, goals and the tasks tagged "risk check".
-2. **Scan each sign.** Search tasks and read sprint numbers (`performance.read`), working days (`workdays.get`), blockers (`task.relations.list`), history for how long a task has waited.
-3. **Group** findings into risks: one risk can have several signs (a late task, its blocker, its overloaded owner).
-4. **Rate** each risk: how likely (signs seen), how bad (customer date, data, money, many people), and when it will hit.
-5. **Write** each risk in the doc: what could happen, evidence with links, impact, when, suggested owner, a first step. Mark new, still open or gone.
-6. **Raise.** Comment on each risky task "Risk [n]: [one line]" and tag it "at risk". Mention the suggested leader on the risk list task.
-7. **Hand on.** Comment the count of new and open risks on the risk list task so the Status Reporter links it in the digest.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read** the risk list doc, the projects, sprints, goals and the tasks tagged "risk check".
+3. **Scan each sign.** Search tasks and read sprint numbers (`performance.read`), working days (`workdays.get`), blockers (`task.relations.list`), history for how long a task has waited.
+4. **Group** findings into risks: one risk can have several signs (a late task, its blocker, its overloaded owner).
+5. **Rate** each risk: how likely (signs seen), how bad (customer date, data, money, many people), and when it will hit.
+6. **Write** each risk in the doc: what could happen, evidence with links, impact, when, suggested owner, a first step. Mark new, still open or gone.
+7. **Raise.** Comment on each risky task "Risk [n]: [one line]" and tag it "at risk". Mention the suggested leader on the risk list task.
+8. **Hand on.** Comment the count of new and open risks on the risk list task so the Status Reporter links it in the digest.
 
 ## What it delivers in AlianHub
 
@@ -80,7 +82,7 @@ If 1 is missing it asks once.
 
 ## AlianHub tools it uses
 
-Reading: `projects.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `task.relations.list`, `sprints.list`, `performance.read`, `members.list`, `goals.list`, `goal.get`, `workdays.get`, `pages.search`, `page.get`. Writing: `page.create`, `page.update`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `projects.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `task.relations.list`, `sprints.list`, `members.list`, `workdays.get`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.tags.add`. Used when the connection has them: `performance.read`, `goals.list`, `goal.get`. All through the person's own connection and rights.
 
 ## Example
 

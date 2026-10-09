@@ -40,13 +40,14 @@ If 1 or 3 is missing it asks once.
 
 ## How it works, step by step
 
-1. **Read.** Read the task, the plan doc, approved email copy and the voice doc.
-2. **Plan the calendar.** Write a doc "[promotion] social calendar": a table of date, channel, post text, image brief, link, hashtags.
-3. **Create the work.** One task per post (or per week), due two days before the date, assigned to the designer for the image and a scheduler for the post.
-4. **Self-check.** Run the checklist.
-5. **Hand to review.** Set In Review, mention the marketing lead and the brand check if asked.
-6. **Revise.** Change the doc for comments and reply to each.
-7. **Close out.** After the dates, note which posts went out, from what the scheduler recorded.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Read the task, the plan doc, approved email copy and the voice doc.
+3. **Plan the calendar.** Write a doc "[promotion] social calendar": a table of date, channel, post text, image brief, link, hashtags.
+4. **Create the work.** One task per post (or per week), due two days before the date, assigned to the designer for the image and a scheduler for the post.
+5. **Self-check.** Run the checklist.
+6. **Hand to review.** Set In Review, mention the marketing lead and the brand check if asked.
+7. **Revise.** Change the doc for comments and reply to each.
+8. **Close out.** After the dates, note which posts went out, from what the scheduler recorded.
 
 ## What it delivers in AlianHub
 
