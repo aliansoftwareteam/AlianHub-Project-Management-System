@@ -307,6 +307,20 @@ describe('the AI quality page', () => {
         expect(data.heldOut).toBeNull();
     });
 
+    it('says the cost is unavailable, rather than failing the page, when the spend ledger cannot be read', async () => {
+        seedRatings();
+        const real = db().crud.getMockImplementation();
+        db().crud.mockImplementation(async (...a) => {
+            if (a[1] && a[1].type === SCHEMA_TYPE.AI_USAGE) throw new Error('mongo down');
+            return real(...a);
+        });
+        let res;
+        try { res = await call(quality.getQuality, { uid: OWNER, query: { days: '30' } }); } finally { db().crud.mockImplementation(real); }
+        expect(res.body.status).toBe(true);
+        expect(res.body.data.cost).toMatchObject({ unavailable: true, usedUsd: null, features: [] });
+        expect(res.body.data.ratings).toMatchObject({ up: 2, down: 2 });
+    });
+
     it('runs the held-out question set on demand without a model and keeps the result', async () => {
         const res = await call(quality.runHeldOut, { uid: OWNER });
         expect(res.body.status).toBe(true);

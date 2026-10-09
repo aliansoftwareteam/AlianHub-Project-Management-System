@@ -165,7 +165,8 @@
 
                     <section class="ah-card ai-quality__card" :aria-labelledby="`${uid}-cost`">
                         <h2 :id="`${uid}-cost`" class="ah-label">{{ $t('AiQuality.cost_title', { month: cost.month }) }}</h2>
-                        <p v-if="!cost.features.length" class="ah-small">{{ $t('AiQuality.no_cost') }}</p>
+                        <p v-if="cost.unavailable" class="ah-small" data-test="cost-unavailable">{{ $t('AiQuality.cost_unavailable') }}</p>
+                        <p v-else-if="!cost.features.length" class="ah-small">{{ $t('AiQuality.no_cost') }}</p>
                         <div v-else class="ai-quality__scroll">
                             <table class="ai-quality__table" data-test="cost">
                                 <thead>

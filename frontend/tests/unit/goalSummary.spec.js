@@ -132,6 +132,7 @@ describe('a summary that is behind the goal', () => {
 describe('a refusal', () => {
     it.each([
         [402, { code: 'ai_budget_exhausted', message: 'ai_budget_exhausted: spent' }, "This workspace's AI budget for the month is spent."],
+        [503, { code: 'budget_unavailable', message: 'budget_unavailable: unread' }, "The workspace's AI budget could not be checked, so no summary was made. Try again in a moment."],
         [409, { code: 'ai_unavailable', message: 'off' }, 'AI is not available right now.'],
         [502, { code: 'summary_failed', message: 'vendor down' }, 'The summary could not be written. Try again.']
     ])('%s is said in the page\'s own words and leaves the button to try again', async (status, data, said) => {

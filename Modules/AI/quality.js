@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const logger = require('../../Config/loggerConfig');
 const spend = require('../AICore/spend');
+const budgetRead = require('../AICore/budgetRead');
 const askEval = require('./askEval');
 
 /* The AI quality page: owners and admins only. It names no person; a shared answer appears only because
@@ -109,7 +110,10 @@ const getQuality = async (req, res) => {
         const [disliked, heldOut, cost] = await Promise.all([
             dislikedOf(companyId, rows, since),
             latestRun(companyId),
-            spend.monthly(companyId, monthOf(now)),
+            spend.monthly(companyId, monthOf(now)).catch((error) => {
+                if (!budgetRead.isUnavailable(error)) throw error;
+                return { unavailable: true, usedUsd: null, features: [] };
+            }),
         ]);
         const up = rows.filter((row) => row.rating === 'up').length;
         return res.send({

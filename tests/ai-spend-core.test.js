@@ -111,11 +111,15 @@ describe('spend is booked at the core boundary', () => {
     it('a booking failure outside tests is logged with the tokens it lost, never swallowed', async () => {
         const env = process.env.NODE_ENV;
         process.env.NODE_ENV = 'production';
-        mockDb.crud.mockImplementationOnce(async () => { throw new Error('mongo down'); });
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (...a) => {
+            if (a[1] && a[1].type === SCHEMA_TYPE.AI_USAGE && a[2] === 'save') throw new Error('mongo down');
+            return real(...a);
+        });
         try {
             const result = await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C } });
             expect(result.content).toBeTruthy();
-        } finally { process.env.NODE_ENV = env; }
+        } finally { process.env.NODE_ENV = env; mockDb.crud.mockImplementation(real); }
         expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('ask spent 1500 tokens that could not be booked: mongo down'));
     });
 
@@ -144,15 +148,136 @@ describe('the pricing gate applies to every feature', () => {
         expect(ledger()[0]).toMatchObject({ feature: 'task_summary', costUsd: 0, priced: true, billedToWorkspace: true });
     });
 
-    it('a local or personal account pays its own way: no refusal, a row that is never billed to the workspace', async () => {
+    it.each(['local', 'personal'])('a %s account calling the server key is priced like any other call', async (account) => {
         adapter.model = 'gpt-9-mystery';
-        adapter.chat.mockImplementation(async () => answer({ model: 'gpt-9-mystery' }));
-        await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.AGENT_RUN, companyId: C, account: 'local', runId: 'r1' } });
-        await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.AGENT_RUN, companyId: C, account: 'personal', runId: 'r2' } });
+        const call = getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.AGENT_RUN, companyId: C, account, runId: 'r1' } });
+        await expect(call).rejects.toMatchObject({ code: usage.UNPRICED_MODEL });
+        expect(adapter.chat).not.toHaveBeenCalled();
+    });
+});
+
+describe('a personal or local account calling the server key is billed to the workspace', () => {
+    it.each(['local', 'personal'])('a %s call over the daily cap is refused and the vendor is not called', async (account) => {
+        seedCompany({ agentDailyBudgetUsd: 0.01 });
+        mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'ask', costUsd: 0.011, totalTokens: 10, priced: true, billedToWorkspace: true, at: new Date() });
+        const call = getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.AGENT_RUN, companyId: C, account, runId: 'r1' } });
+        await expect(call).rejects.toMatchObject({ code: 'ai_budget_exhausted', period: 'daily' });
+        expect(adapter.chat).not.toHaveBeenCalled();
+        expect(ledger()).toHaveLength(1);
+    });
+
+    it.each(['local', 'personal'])('a %s call under the cap is booked to the workspace and counts toward the day', async (account) => {
+        seedCompany({ agentDailyBudgetUsd: 1 });
+        await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.AGENT_RUN, companyId: C, account, runId: 'r1' } });
+        expect(adapter.chat).toHaveBeenCalledTimes(1);
+        expect(ledger()[0]).toMatchObject({ billedToWorkspace: true, priced: true, costUsd: CALL_USD, runId: 'r1' });
+        expect(await budget.status(C)).toMatchObject({ usedUsd: CALL_USD, daily: { usedUsd: CALL_USD } });
+    });
+});
+
+describe('a budget that cannot be read refuses the call', () => {
+    beforeEach(() => budget.forgetLimits());
+
+    const failing = (type, op) => {
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (...a) => {
+            if (a[1] && a[1].type === type && (!op || a[2] === op)) throw new Error('mongo down');
+            return real(...a);
+        });
+        return () => mockDb.crud.mockImplementation(real);
+    };
+
+    it('a failed company settings read refuses as budget_unavailable, logs it, and the vendor is not called', async () => {
+        seedCompany({ agentDailyBudgetUsd: 5 });
+        const restore = failing(dbCollections.COMPANIES, 'findOne');
+        try {
+            const call = getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
+            await expect(call).rejects.toMatchObject({ code: 'budget_unavailable', message: expect.stringMatching(/^budget_unavailable: /) });
+        } finally { restore(); }
+        expect(adapter.chat).not.toHaveBeenCalled();
+        expect(ledger()).toHaveLength(0);
+        expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('the workspace AI budget settings could not be read'));
+    });
+
+    it('a failed ledger read refuses as budget_unavailable and leaves no hold behind', async () => {
+        seedCompany({ agentMonthlyBudgetUsd: 5 });
+        const restore = failing(SCHEMA_TYPE.AI_USAGE, 'aggregate');
+        try {
+            const call = getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
+            await expect(call).rejects.toMatchObject({ code: 'budget_unavailable' });
+        } finally { restore(); }
+        expect(adapter.chat).not.toHaveBeenCalled();
+        expect((mockDb.store[SCHEMA_TYPE.AI_RESERVATIONS] || []).filter((r) => r.state === 'held')).toHaveLength(0);
+        expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('the AI spend ledger could not be read'));
+    });
+
+    it('a new agent run is refused with the same code', async () => {
+        seedCompany({ agentMonthlyBudgetUsd: 5 });
+        const restore = failing(SCHEMA_TYPE.AI_USAGE, 'find');
+        let out;
+        try { out = await runs.canStart(agent(), { companyId: C }); } finally { restore(); }
+        expect(out).toMatchObject({ ok: false, code: 'budget_unavailable' });
+    });
+});
+
+describe('the budget limits are read once a minute per company', () => {
+    const LIMIT_FIELDS = 'agentMonthlyBudgetUsd agentDailyBudgetUsd';
+    const limitReads = () => mockDb.calls.filter((c) => c.type === dbCollections.COMPANIES && c.method === 'findOne' && c.data && c.data[1] === LIMIT_FIELDS).length;
+    const ask = () => getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
+    const failCompanyReads = () => {
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (...a) => {
+            if (a[1] && a[1].type === dbCollections.COMPANIES && a[2] === 'findOne') throw new Error('mongo down');
+            return real(...a);
+        });
+        return () => mockDb.crud.mockImplementation(real);
+    };
+
+    beforeEach(() => budget.forgetLimits());
+    afterEach(() => { process.env.AI_BUDGET_CACHE_MS = '0'; });
+
+    it('reads the company once for several calls, and again as soon as the budget is changed', async () => {
+        process.env.AI_BUDGET_CACHE_MS = String(budget.DEFAULT_LIMITS_CACHE_MS);
+        seedCompany({ agentDailyBudgetUsd: 1 });
+        await ask();
+        await ask();
+        expect(limitReads()).toBe(1);
+
+        await budget.updateSettings(C, { dailyBudgetUsd: 0.001 });
+        await expect(ask()).rejects.toMatchObject({ code: 'ai_budget_exhausted', period: 'daily' });
+        expect(limitReads()).toBe(2);
+    });
+
+    it('a failed read goes on for a workspace last seen without a budget, and logs it', async () => {
+        seedCompany();
+        await ask();
+        const restore = failCompanyReads();
+        try { await ask(); } finally { restore(); }
         expect(adapter.chat).toHaveBeenCalledTimes(2);
-        expect(ledger()).toHaveLength(2);
-        expect(ledger()[0]).toMatchObject({ billedToWorkspace: false, priced: false, costUsd: null, totalTokens: 1500, runId: 'r1' });
-        expect((await budget.status(C)).usedUsd).toBe(0);
+        expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('it had no budget when last read, so the call goes ahead'));
+    });
+
+    it('a failed read refuses for a workspace last seen with a budget', async () => {
+        seedCompany({ agentMonthlyBudgetUsd: 5 });
+        await ask();
+        const restore = failCompanyReads();
+        try { await expect(ask()).rejects.toMatchObject({ code: 'budget_unavailable' }); } finally { restore(); }
+        expect(adapter.chat).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('the reservation reads the billed total with one aggregate', () => {
+    it('matches the per-feature view for the month and the day', async () => {
+        const spend = require('../Modules/AICore/spend');
+        await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
+        await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.PROJECT_PLAN, companyId: C, userId: 'u1' } });
+        mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'guide', costUsd: 0.0125, totalTokens: 10, billedToWorkspace: true, at: new Date() });
+        mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'guide', costUsd: null, priced: false, totalTokens: 10, billedToWorkspace: true, at: new Date() });
+        mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'guide', costUsd: 9, totalTokens: 10, billedToWorkspace: false, at: new Date() });
+        const month = runs.monthKey();
+        expect(await spend.monthlyTotal(C, month)).toEqual({ usedUsd: (await spend.monthly(C, month)).usedUsd });
+        expect(await spend.dailyTotal(C)).toEqual({ usedUsd: (await spend.daily(C)).usedUsd });
+        expect((await spend.monthlyTotal(C, month)).usedUsd).toBe(0.0245);
     });
 });
 
@@ -162,7 +287,7 @@ describe('the budget reads every feature', () => {
         await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
         await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.PROJECT_PLAN, companyId: C, userId: 'u1' } });
         await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.PROJECT_PLAN, companyId: C, userId: 'u1' } });
-        await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.MEETING_NOTES, companyId: C, account: 'personal' } });
+        mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'meeting_notes', costUsd: 3, totalTokens: 10, billedToWorkspace: false, at: new Date() });
         const lastMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1) - 36e5);
         mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'guide', costUsd: 5, totalTokens: 10, billedToWorkspace: true, at: lastMonth });
 
@@ -183,17 +308,20 @@ describe('the budget reads every feature', () => {
     });
 
     it('a non-agent feature announces the 80% and 100% levels once each, naming the feature', async () => {
-        seedCompany({ agentMonthlyBudgetUsd: 0.01 });
+        seedCompany({ agentMonthlyBudgetUsd: 0.01205 });
         await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
         expect(handleNotificationtFun).not.toHaveBeenCalled();
         await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.PAGE_COMPOSE, companyId: C, userId: 'u2' } });
         expect(handleNotificationtFun).toHaveBeenCalledTimes(1);
         expect(handleNotificationtFun.mock.calls[0][0].body).toMatchObject({
             changeType: 'agent_budget', userId: 'u2', projectId: '', taskId: '', assigneeUsers: ['owner1'],
-            message: 'AI budget reached: $0.01 of $0.01 used this month — new agent runs are refused until the budget is raised or the month ends.',
-            changeData: { level: '100', feature: 'page_compose', usedUsd: 0.012, percent: 120 },
+            message: 'AI budget reached: $0.01 of $0.01205 used this month — new AI calls are refused until the budget is raised or the month ends.',
+            changeData: { level: '100', feature: 'page_compose', usedUsd: 0.012, percent: 100 },
         });
+        adapter.chat.mockImplementation(async () => answer({ inputTokens: 5, outputTokens: 0, totalTokens: 5 }));
         await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
+        expect(adapter.chat).toHaveBeenCalledTimes(3);
+        expect(ledger()).toHaveLength(3);
         expect(handleNotificationtFun).toHaveBeenCalledTimes(1);
     });
 });

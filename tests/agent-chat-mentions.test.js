@@ -89,7 +89,7 @@ jest.mock('../Modules/AICore/usage', () => ({
 }));
 jest.mock('../Modules/Agents/budget', () => ({
     check: jest.fn(async () => ({ ok: true, reason: '' })),
-    headroom: jest.fn(async () => ({ budgetUsd: 0, usedUsd: 0, reservedUsd: 0 })),
+    headroom: jest.fn(async () => ({ budgetUsd: 0, usedUsd: 0, reservedUsd: 0, daily: { budgetUsd: 0, usedUsd: 0, reservedUsd: 0 } })),
     alertIfCrossed: jest.fn(async () => null),
 }));
 jest.mock('../Modules/Knowledge/ingest/events', () => ({ publishCommentChanged: jest.fn(), publishGuideSaved: jest.fn() }));

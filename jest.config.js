@@ -13,7 +13,7 @@ module.exports = {
             ...base,
             displayName: 'unit',
             testMatch: ['<rootDir>/tests/*.test.js'],
-            setupFiles: ['<rootDir>/tests/support/shift-clock.js'],
+            setupFiles: ['<rootDir>/tests/support/shift-clock.js', '<rootDir>/tests/support/budget-cache.js'],
             testPathIgnorePatterns: [...base.testPathIgnorePatterns, ...clockSkip.backend]
         },
         { ...base, displayName: 'conventions', testMatch: ['<rootDir>/tests/conventions/*.test.js'] },

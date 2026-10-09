@@ -5,7 +5,7 @@ jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ ROLE_OWNER: 1, ROLE_ADMIN: 2, getRoleType: jest.fn(async (c, uid) => (uid === 'member1' ? 3 : 1)), isPrivileged: (r) => r === 1 || r === 2 }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
-jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => (req.agent ? { kind: 'agent', userId: req.uid, agentId: 'a1' } : { kind: 'human', userId: req.uid })), isAgent: (a) => a.kind === 'agent' }));
+jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async (req) => (req.agent ? { kind: 'agent', userId: req.uid, agentId: 'a1' } : { kind: 'human', userId: req.uid })), isAgent: (a) => a.kind === 'agent', attribution: (a) => ({ actorId: a.userId, actorType: 'human', label: '' }) }));
 jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(() => { throw new Error('not configured'); }) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
@@ -37,7 +37,7 @@ afterEach(() => { ENV.forEach((k) => { if (saved[k] === undefined) delete proces
 describe('GET /agents/settings', () => {
     it('answers the defaults when the company has nothing stored', async () => {
         const r = await get();
-        expect(r.body).toEqual({ status: true, statusText: 'Settings fetched.', data: { undoHours: 24, monthlyBudgetUsd: 0, alerts: { enabled: false, errorRatePct: 20, errorMinRuns: 5, approvalFloorPct: 50, approvalDropPts: 20, costForecastPct: 110, queueAgeMinutes: 15 }, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
+        expect(r.body).toEqual({ status: true, statusText: 'Settings fetched.', data: { undoHours: 24, monthlyBudgetUsd: 0, dailyBudgetUsd: 0, alerts: { enabled: false, errorRatePct: 20, errorMinRuns: 5, approvalFloorPct: 50, approvalDropPts: 20, costForecastPct: 110, queueAgeMinutes: 15 }, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
     });
 
     it('falls back to the defaults when the stored values are out of range', async () => {
@@ -102,7 +102,7 @@ describe('PUT /agents/settings', () => {
     it('stores valid values, clears the company cache and answers the settings shape', async () => {
         const r = await put({ undoHours: '48', monthlyBudgetUsd: 25.5 });
         expect(r.code).toBe(200);
-        expect(r.body).toEqual({ status: true, statusText: 'Settings updated.', data: { undoHours: 48, monthlyBudgetUsd: 25.5, alerts: { enabled: false, errorRatePct: 20, errorMinRuns: 5, approvalFloorPct: 50, approvalDropPts: 20, costForecastPct: 110, queueAgeMinutes: 15 }, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
+        expect(r.body).toEqual({ status: true, statusText: 'Settings updated.', data: { undoHours: 48, monthlyBudgetUsd: 25.5, dailyBudgetUsd: 0, alerts: { enabled: false, errorRatePct: 20, errorMinRuns: 5, approvalFloorPct: 50, approvalDropPts: 20, costForecastPct: 110, queueAgeMinutes: 15 }, provider: { name: null, hasKey: false, region: null, model: null, priced: null } } });
         expect(company()).toMatchObject({ agentUndoHours: 48, agentMonthlyBudgetUsd: 25.5 });
         expect(removeCache).toHaveBeenCalledWith(`companyData_${C}`);
         expect((await get()).body.data).toMatchObject({ undoHours: 48, monthlyBudgetUsd: 25.5 });
@@ -110,6 +110,37 @@ describe('PUT /agents/settings', () => {
         expect((await put({ monthlyBudgetUsd: 0 })).body.data).toMatchObject({ undoHours: 48, monthlyBudgetUsd: 0 });
         expect((await put({ undoHours: 168 })).body.data.undoHours).toBe(168);
         expect((await put({ undoHours: 1 })).body.data.undoHours).toBe(1);
+    });
+
+    it('stores the daily budget beside the monthly one, audits the change, announces it and clears the cache', async () => {
+        const socketEmitter = require('../event/socketEventEmitter');
+        const r = await put({ monthlyBudgetUsd: 100, dailyBudgetUsd: '7.5' });
+        expect(r.code).toBe(200);
+        expect(r.body.data).toMatchObject({ monthlyBudgetUsd: 100, dailyBudgetUsd: 7.5 });
+        expect(company()).toMatchObject({ agentMonthlyBudgetUsd: 100, agentDailyBudgetUsd: 7.5 });
+        expect(removeCache).toHaveBeenCalledWith(`companyData_${C}`);
+        const rows = (mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] || []).filter((row) => row.action === 'agent.budget_changed');
+        expect(rows).toHaveLength(1);
+        expect(rows[0].meta).toMatchObject({ from: { monthlyBudgetUsd: 0, dailyBudgetUsd: 0 }, to: { monthlyBudgetUsd: 100, dailyBudgetUsd: 7.5 } });
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'agent', companyId: C, data: { kind: 'budget' } }));
+
+        socketEmitter.emit.mockClear();
+        expect((await put({ monthlyBudgetUsd: 100, dailyBudgetUsd: 7.5 })).code).toBe(200);
+        expect(socketEmitter.emit).not.toHaveBeenCalled();
+
+        expect((await put({ dailyBudgetUsd: 0 })).body.data).toMatchObject({ monthlyBudgetUsd: 100, dailyBudgetUsd: 0 });
+        expect(socketEmitter.emit).toHaveBeenCalledTimes(1);
+        await put({ undoHours: 5 });
+        expect((mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] || []).filter((row) => row.action === 'agent.budget_changed')).toHaveLength(2);
+    });
+
+    it('refuses a bad daily budget and keeps an agent or member from setting it', async () => {
+        const bad = await put({ dailyBudgetUsd: -1 });
+        expect(bad.code).toBe(400);
+        expect(bad.body.statusText).toBe('dailyBudgetUsd must be a number of 0 or more (0 means no daily limit).');
+        expect((await put({ dailyBudgetUsd: 5 }, { uid: 'member1' })).code).toBe(403);
+        expect((await put({ dailyBudgetUsd: 5 }, { agent: true })).code).toBe(403);
+        expect(company().agentDailyBudgetUsd).toBeUndefined();
     });
 
     it('is owner/admin only, and never for an agent', async () => {
