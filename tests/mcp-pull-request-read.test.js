@@ -83,6 +83,7 @@ const connect = (db = mockDb, over = {}) => db.seed(SCHEMA_TYPE.INTEGRATION_CONN
     _id: CONNECTION, type: 'github', name: 'GitHub', config: { token: TOKEN, repo: REPO }, projectIds: [P_OPEN], connectedBy: OWNER, status: 'connected', enabled: true, deletedStatusKey: 0, ...over,
 });
 const read = (caller, args) => rpc(caller, TOOL, args);
+const NOT_LINKED = { error: 'Only a pull request linked to a task you can open can be read. It links itself when its title or branch carries the task key, or a person adds the link on the task.' };
 
 beforeEach(() => {
     seed();
@@ -175,8 +176,8 @@ describe('reading a pull request', () => {
 describe('what the person cannot open is not read', () => {
     it('a repository linked only to a project the person cannot open is refused, and GitHub is not asked', async () => {
         connect(mockDb, { projectIds: [P_PRIVATE] });
-        expect(await read(ctx(OUTSIDER), { number: 42 })).toMatchObject({ refused: true, reason: expect.stringMatching(/not_visible/) });
-        expect(await read(ctx(OUTSIDER), { url: `https://github.com/${REPO}/pull/42` })).toMatchObject({ refused: true });
+        expect(await read(ctx(OUTSIDER), { number: 42 })).toEqual(NOT_LINKED);
+        expect(await read(ctx(OUTSIDER), { url: `https://github.com/${REPO}/pull/42` })).toEqual(NOT_LINKED);
         expect(safeFetch).not.toHaveBeenCalled();
         expect(await read(ctx(INSIDER), { number: 42 })).toMatchObject({ number: 42 });
     });
@@ -196,7 +197,7 @@ describe('what the person cannot open is not read', () => {
 
     it('a connection kept to other projects is refused', async () => {
         connect();
-        expect(await read(narrowed(OWNER, [P_PRIVATE]), { number: 42 })).toMatchObject({ refused: true });
+        expect(await read(narrowed(OWNER, [P_PRIVATE]), { number: 42 })).toEqual(NOT_LINKED);
         expect(safeFetch).not.toHaveBeenCalled();
     });
 
@@ -216,15 +217,31 @@ describe('the number and address paths follow the task list rules', () => {
     });
 
     it('a pull request linked only to a task on a list hidden from the person is refused', async () => {
-        expect(await read(ctx(OUTSIDER), { number: 43 })).toMatchObject({ refused: true, reason: expect.stringMatching(/not_visible/) });
-        expect(await read(ctx(OUTSIDER), { url: `https://github.com/${REPO}/pull/43` })).toMatchObject({ refused: true });
+        expect(await read(ctx(OUTSIDER), { number: 43 })).toEqual(NOT_LINKED);
+        expect(await read(ctx(OUTSIDER), { url: `https://github.com/${REPO}/pull/43` })).toEqual(NOT_LINKED);
         expect(safeFetch).not.toHaveBeenCalled();
         expect(await read(ctx(INSIDER), { number: 43 })).toEqual({ error: expect.stringMatching(/cannot find that pull request/) });
     });
 
-    it('a pull request linked to no task is refused', async () => {
-        expect(await read(ctx(OWNER), { number: 99 })).toMatchObject({ refused: true });
+    it('a pull request linked to no task gets the same answer as a hidden one', async () => {
+        expect(await read(ctx(OWNER), { number: 99 })).toEqual(NOT_LINKED);
         expect(safeFetch).not.toHaveBeenCalled();
+    });
+
+    it('a link to another pull request, or to the same number in another repository, is not taken for it', async () => {
+        Object.assign(stored(SCHEMA_TYPE.TASKS, T_OPEN), { links: [
+            { url: `https://github.com/${REPO}/pull/4`, kind: 'pr' },
+            { url: `https://github.com/${REPO}/pull/420`, kind: 'pr' },
+            { url: 'https://github.com/acme/web-old/pull/42', kind: 'pr' },
+            { url: 'https://github.com/other/web/pull/42', kind: 'pr' },
+        ] });
+        expect(await read(ctx(OWNER), { number: 42 })).toEqual(NOT_LINKED);
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+
+    it('a stored link with spaces around it still counts', async () => {
+        stored(SCHEMA_TYPE.TASKS, T_OPEN).links = [{ url: `  https://github.com/${REPO}/pull/42/files \n`, kind: 'pr' }];
+        expect(await read(ctx(OWNER), { number: 42 })).toMatchObject({ number: 42, task: { taskId: T_OPEN } });
     });
 
     it('an address naming a repository of dots only is not taken', async () => {
@@ -242,7 +259,7 @@ describe('the person who connected GitHub', () => {
         stored(SCHEMA_TYPE.PROJECTS, P_PRIVATE).AssigneeUserId = [];
         safeFetch.mockClear();
         expect(await read(ctx(OWNER), { taskId: T_PRIVATE })).toEqual({ error: expect.stringMatching(/not linked to the GitHub repository/) });
-        expect(await read(ctx(OWNER), { number: 44 })).toMatchObject({ refused: true });
+        expect(await read(ctx(OWNER), { number: 44 })).toEqual(NOT_LINKED);
         expect(safeFetch).not.toHaveBeenCalled();
     });
 });
