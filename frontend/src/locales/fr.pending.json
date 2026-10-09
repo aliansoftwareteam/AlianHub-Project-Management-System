@@ -6563,6 +6563,7 @@
     "List.tags": "Tags",
     "List.toggle_subtasks": "Show subtasks",
     "List.tracking_now": "Tracking now",
+    "List.unread_comments": "{count} unread comments",
     "List.wip": "In progress {used}/{limit}",
     "MainChat.add_reaction": "Add reaction",
     "MainChat.attach": "Attach a file",

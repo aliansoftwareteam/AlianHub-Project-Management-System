@@ -52,6 +52,7 @@
             <button v-else type="button" class="lv2__name" :title="data.TaskName" @click.stop="open">{{ data.TaskName }}</button>
             <span v-if="!renaming && metaText" class="lv2__key">{{ metaText }}</span>
             <TaskHomeMark v-if="!renaming && !isSub" :task="data" :list="viewedList" />
+            <TaskUnreadMark v-if="!renaming" :task="data" @open="open" />
             <span v-if="tracking" class="lv2__timer" :title="$t('List.tracking_now')">● {{ timerText }}</span>
             <TaskAgentMark v-if="!renaming" :task-id="String(data._id)" />
             <button v-if="agentLine" type="button" class="lv2__agent-line" :title="agentLine" @click.stop="$emit('review-agent', proposal)">
@@ -145,6 +146,7 @@ import { defaultColumns, listColumnClass } from "@/views/Projects/composables/vi
 import { taskMenuItems } from "@/views/Projects/composables/taskMenu";
 import TaskHomeMark from "@/views/Projects/components/TaskHomeMark.vue";
 import TaskAgentMark from "@/views/Projects/components/TaskAgentMark.vue";
+import TaskUnreadMark from "@/views/Projects/components/TaskUnreadMark.vue";
 import { MAX_DEPTH } from "@taskTreeRules";
 
 defineOptions({ name: "ListRow" });
