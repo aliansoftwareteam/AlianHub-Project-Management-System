@@ -8,17 +8,21 @@ Every id below is a placeholder.
 
 ## For the person who runs the server
 
-Everything below is off until you switch it on. Each setting is read on every call, so a value you set takes effect without rebuilding anything; restart the server after you edit `.env`.
+Connecting your own AI works out of the box: `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` are on when `.env` does not name them, and so is `AGENT_TAINT_ROUTING`, which holds an outside app's risky writes for a person. Everything else below is off until you switch it on. Each setting is read on every call, so a value you set takes effect without rebuilding anything; restart the server after you edit `.env`.
+
+Having the tools on gives nobody more than they had. Every call still acts as one person, with only what that person can open and change in the web app. A connected app holds only the permissions its person ticked on the consent screen, and the manage and chat permissions only when an owner or admin also approved them for that app. A personal token holds only what it was created with.
+
+To turn something off, set it in `.env` and restart: `MCP_OAUTH=off` stops apps connecting by address, `MCP_TOOLS_DATA=off`, `MCP_TOOLS_MANAGE=off` or `MCP_TOOLS_WORK=off` takes that group of tools away (`false`, `0` and `no` work too). An explicit value always wins over the default. `AGENT_TAINT_ROUTING` can also be set under Instance settings, Security ("Hold risky AI writes for approval"); turning it off lets those writes apply at once.
 
 | Setting | Default | What it turns on |
 |---|---|---|
-| `MCP_OAUTH` | off | Connecting Claude or ChatGPT by address, with a consent screen. `on`, `true`, `1` and `yes` mean `both` (apps and personal tokens work). `only` refuses personal tokens. Needs `MCP_OAUTH_ISSUER` or `APIURL` to be an `https` origin (plain `http` only on `localhost` outside production), or the server does not start. |
-| `MCP_TOOLS_DATA` | off | The data tools: the projects, lists, statuses, comments, docs and timesheet reads, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `proposal.get`, and reading chat. It is also the only setting that offers the `chat:read` permission |
-| `MCP_TOOLS_MANAGE` | off | The task management tools and the doc writing tools, and the `tasks:manage` and `docs:manage` permissions. A token or app gets them only by asking for them by name |
-| `MCP_TOOLS_WORK` | off | Tags, links between tasks, lists, doc comments, goals, fields, saved views, project setup, new projects, automations, dashboard cards and the work queue. They need no manage permission |
+| `MCP_OAUTH` | on (`both`) | Connecting Claude or ChatGPT by address, with a consent screen. `on`, `true`, `1` and `yes` mean `both` (apps and personal tokens work). `only` refuses personal tokens. Needs `MCP_OAUTH_ISSUER` or `APIURL` to be an `https` origin (plain `http` only on `localhost` outside production). Set on by hand with any other issuer, the server does not start; left unset, it stays off and the server says why in one startup log line. |
+| `MCP_TOOLS_DATA` | on | The data tools: the projects, lists, statuses, comments, docs and timesheet reads, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `proposal.get`, and reading chat. It is also the only setting that offers the `chat:read` permission |
+| `MCP_TOOLS_MANAGE` | on | The task management tools and the doc writing tools, and the `tasks:manage` and `docs:manage` permissions. A token or app gets them only by asking for them by name |
+| `MCP_TOOLS_WORK` | on | Tags, links between tasks, lists, doc comments, goals, fields, saved views, project setup, new projects, automations, dashboard cards and the work queue. They need no manage permission |
 | `MCP_TOOLS_V2` | off | Names next to ids, paged lists, tool annotations, and an approval for any call rated as one that cannot be undone or that reaches the whole workspace |
 | `AGENT_PERFORMANCE_READ` | off | `performance.read` |
-| `AGENT_TAINT_ROUTING` | off | A connected app's write that reaches past one task waits for a person. See "What happens to a write" |
+| `AGENT_TAINT_ROUTING` | on while any of the four above is on | A connected app's write that reaches past one task waits for a person. See "What happens to a write" |
 | `EXTERNAL_AGENT_SESSIONS` | off | Delegating a task to a connected app, and the tools `session.activity`, `session.complete` and `session.fail` |
 | `MCP_OAUTH_DCR` | off | Lets an app register itself. With it off, an owner or admin adds the app under Settings, Agent clients, or the app names itself by a client ID metadata document |
 | `MCP_CURSOR_SECRET` | derived | The key that signs list cursors while `MCP_TOOLS_V2` is on. At least 32 characters and not equal to `JWT_SECRET` |
@@ -69,7 +73,7 @@ Taking it back works at each level and takes effect on the app's next call: an o
 80 tools in all. How to read the tables:
 
 - **Permission** is the scope an OAuth app needs. A personal token with the read scope holds every `*:read` scope, and one with the write scope holds every `*:write` scope, except the manage and chat permissions, which a token holds only as grants.
-- **What it does** says how a call ends with the settings at their defaults (`MCP_TOOLS_V2` and `AGENT_TAINT_ROUTING` off, a project on "Act on single tasks, propose anything wider"):
+- **What it does** says how a personal token's call ends with the settings at their defaults (`MCP_TOOLS_V2` off, a project on "Act on single tasks, propose anything wider"). A connected app's write that reaches past one task follows "What happens to a write", since `AGENT_TAINT_ROUTING` is on by default:
   - **Reads**: nothing changes.
   - **At once**: the change is made and recorded in the audit log. Where the result says `undoable: true`, a person can undo it.
   - **Waits**: the call changes nothing. It files a request in the AI Inbox, answers `pending: true` and a `proposalId`, and a person approves or declines it.
