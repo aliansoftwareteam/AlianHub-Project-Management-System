@@ -2,9 +2,11 @@
 	<div>
 		<SkipLink/>
 		<OfflineBanner/>
+		<UpdateReadyNotice/>
 		<DemoBanner/>
 		<MaintenanceBanner/>
 		<MaintenanceCard v-if="maintenanceBlocksPage"/>
+		<OfflineStart v-else-if="pageUnavailable"/>
 		<template v-else-if="$route.meta.requiresAuth">
 			<template v-if="shellReady">
                 <!-- Mounted at the root so an incoming call rings wherever the user is,
@@ -36,6 +38,7 @@
 			<div v-else-if="!companyId?.length && $route.name === 'Create_Company'" class="d-flex align-items-center justify-content-center lds-roller h-100dvh">
 				<router-view/>
 			</div>
+			<OfflineStart v-else-if="away"/>
 			<div v-else class="d-flex align-items-center justify-content-center lds-roller h-100dvh">
 				<img :src="logo" alt="logo" class="position-ab z-index-1 company__logo">
 				<div class="spinner"></div>
@@ -98,7 +101,10 @@ import { useLiveProjects } from '@/views/Projects/liveProjects';
 import { useLiveLists } from '@/views/Projects/liveLists';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
-import { initOffline } from '@/offline';
+import OfflineStart from '@/components/offline/OfflineStart.vue';
+import UpdateReadyNotice from '@/components/molecules/UpdateReadyNotice/UpdateReadyNotice.vue';
+import { away, initOffline, pageUnavailable } from '@/offline';
+import { dropWorkerRuntimeCaches } from '@/serviceWorker/registration';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
 import { adoptAccountPrefs } from '@/views/Settings/Language/localePrefs';
@@ -521,6 +527,7 @@ async function getFirebaseData() {
 }
 async function changeCompany(cid) {
     try {
+        dropWorkerRuntimeCaches();
         const uid = userId.value || localStorage.getItem("userId");
         const companyDetail = getters['settings/companies'].find((x) => x._id === cid)
         if(!companyDetail && !getters['settings/companies'].length && uid){

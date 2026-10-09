@@ -30,6 +30,8 @@ import * as env from '@/config/env';
 import Cookies from 'js-cookie'
 import { loginReturnPath } from '@/views/Integrations/githubReturn'
 import { readSetupStatus, isKnownInstalled } from './setupStatus';
+import { readSessionUser } from './sessionCheck';
+import { markAway } from '@/offline';
 import { opensWithoutWorkspace } from './withoutWorkspace';
 
 
@@ -150,9 +152,15 @@ router.beforeEach(async(to, _, next) => {
 		fullPath = removeCodeParam(to.fullPath);
 	}
 	const localUserId = localStorage.getItem("userId");
-	const app = localUserId ? await apiRequestWithoutCompnay('get',`${env.USER_UPATE}/${localUserId}`) : null;
-	let user = app && app?.status === 200 ? app?.data || null : null;
-	
+	const { user, unreachable } = await readSessionUser(localUserId, (id) => apiRequestWithoutCompnay('get',`${env.USER_UPATE}/${id}`));
+	// Opened with no connection: App.vue draws the offline screen, or the sign-in page says it is offline.
+	if (unreachable) {
+		setTitle({title: to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
+		markAway();
+		next();
+		return;
+	}
+
 	// onAuthStateChanged(authInst, (user) => {
 		// CHECK META FOR AUTH REQUIRED
 		// const requiresAuth = to.matched.some(record => record.meta.requiresAuth);

@@ -147,6 +147,7 @@ package-lock.json
 # End-to-end suite output
 /e2e/.state/
 /e2e/report/
+/e2e/shell-builds/
 /e2e/test-results/
 /e2e/visual-proposed/
 /e2e/visual-report/

@@ -200,6 +200,11 @@
     "description": "Product name shown in emails and page titles.",
     "default": "Alian Hub"
   },
+  "APP_SHELL_WORKER": {
+    "group": "security",
+    "description": "Set to off to withdraw the web app's service worker from every browser: /sw.js then answers with a worker that deletes every cache it holds for this address, unregisters itself and handles no requests, so the next page load of each browser runs without one. People keep working; the app no longer opens without a network until this is unset and they load the page again. Unset or on serves the worker of the build. Read on each request, so a change through the environment needs a restart and nothing else.",
+    "default": "on"
+  },
   "AUDIT_CHAIN": {
     "group": "security",
     "description": "Set to true to chain every new audit row per company: each row carries a sequence number, the previous row's hash and an HMAC-SHA256 keyed with AUDIT_CHAIN_KEY, a change to a row is appended as a new row instead of editing it, retention anchors the rows it deletes and keeps audit rows at least as long as agent runs, and the audit log reports each row as verified, broken or unchained. Names, email, IP address and user agent are outside the hash. Needs AUDIT_CHAIN_KEY; without a valid key the chain stays off and an error is logged. Unset or false keeps rows unchained and edited in place.",

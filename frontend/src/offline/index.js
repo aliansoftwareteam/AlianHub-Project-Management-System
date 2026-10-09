@@ -22,6 +22,8 @@ export const retryIn = ref(0);
 export const queue = ref([]);
 export const conflicts = ref([]);
 export const away = computed(() => !isOnline.value || unreachable.value);
+// The first page of this visit could not be loaded while away, so there is nothing on screen to keep.
+export const pageUnavailable = ref(false);
 
 let replayer = null;
 let started = false;
@@ -76,12 +78,16 @@ export const maybeCacheResponse = (type, endPoint, resData) => {
     } catch (e) { /* offline cache is best-effort */ }
 };
 
+export const markAway = () => {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) isOnline.value = false;
+    else unreachable.value = true;
+    startTicker();
+};
+
 export const handleOfflineFailure = async (type, endPoint, data, dataType, err) => {
     try {
         if (!rules.isOfflineError(err)) return null;
-        if (typeof navigator !== 'undefined' && navigator.onLine === false) isOnline.value = false;
-        else unreachable.value = true;
-        startTicker();
+        markAway();
         if (rules.isCacheableGet(type, endPoint)) {
             const cached = await db.cacheGet(rules.cacheKeyFor(endPoint));
             return cached !== undefined ? rules.makeCachedResponse(cached) : null;

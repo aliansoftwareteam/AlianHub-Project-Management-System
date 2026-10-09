@@ -118,6 +118,7 @@
                             <ShellIcon :name="shellState.theme === 'dark' ? 'sun' : 'moon'" :size="15" />
                             <span>{{ shellState.theme === 'dark' ? $t('Shell.theme_light') : $t('Shell.theme_dark') }}</span>
                         </button>
+                        <InstallAppItem @done="closePopovers()" />
                         <button type="button" class="ah-pop__item" role="menuitem" data-test="open-shortcuts" :aria-keyshortcuts="ariaKeyShortcuts('help')" @click="showShortcuts()">
                             <ShellIcon name="command" :size="15" /><span>{{ $t('Shortcuts.title') }}</span>
                             <KeyHint shortcut="help" />
@@ -147,6 +148,7 @@ import { computed, defineEmits, inject, onMounted, onUnmounted, ref, watch } fro
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import ShellIcon from "./ShellIcon.vue";
+import InstallAppItem from "./InstallAppItem.vue";
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
 import { useGetterFunctions } from "@/composable/index.js";
 import { useAppVersion } from "@/composable/useAppVersion";

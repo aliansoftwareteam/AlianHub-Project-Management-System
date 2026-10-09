@@ -169,6 +169,13 @@ jobs:
           path: frontend/dist
           retention-days: 1
           if-no-files-found: error
+      - run: node ../e2e/support/shellBuilds.js ../e2e/shell-builds
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e2e-shell-builds
+          path: e2e/shell-builds
+          retention-days: 1
+          if-no-files-found: error
 
   # One API test reads the built app shell, so these wait for the build as well.
   integration:
@@ -247,8 +254,14 @@ jobs:
         with:
           name: e2e-frontend-dist
           path: frontend/dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-shell-builds
+          path: e2e/shell-builds
       - run: npx playwright install --with-deps chromium
       - run: npm run e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          E2E_SHELL_BUILDS: ${{ github.workspace }}/e2e/shell-builds
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
