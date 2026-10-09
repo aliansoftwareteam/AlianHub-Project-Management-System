@@ -872,6 +872,7 @@
     "Ai.role_hint": "Saved with the other settings. Changing it changes who receives routed work.",
     "Ai.role_lead": "The role this agent plays. The dispatcher hands a role's tasks to the least loaded agent that plays it.",
     "Ai.role_none": "No role",
+    "Ai.role_option": "{name} · {department}",
     "Ai.run": "run",
     "Ai.run_failed": "The run did not start.",
     "Ai.run_n": "run #{n}",

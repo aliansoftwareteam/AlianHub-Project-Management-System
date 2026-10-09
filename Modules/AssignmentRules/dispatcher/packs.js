@@ -183,7 +183,6 @@ async function writeAll(companyId, plans, actorId) {
     for (const plan of plans.filter((one) => one.body)) await settings.save(companyId, plan.projectId, plan.body, actorId);
 }
 
-/* Each write records how to take it back; a failed apply takes back what it wrote, last first. */
 const journal = () => {
     const steps = [];
     return {
@@ -239,11 +238,8 @@ async function recordApply(companyId, { blueprint, projectIds, plans, agents, ac
     return applyId;
 }
 
-/* Turns the pack's roles on and nothing else: the mode stays as the project has it, so a project whose dispatcher is
- * off routes nothing until a person switches it on. A project that already has every role is left unwritten.
- * With starterRules the roles' own routing rules join the project's, each once; with proposeTags the tags the roles
- * hand work on with are proposed, for a person to approve. Settings, rules, tag approvals and agents are all planned
- * and checked before the first write, and a write that fails takes back the ones before it. */
+/* The mode stays as the project has it, so a project whose dispatcher is off routes nothing until a person switches it
+ * on. Everything is planned and checked before the first write, so a pack lands whole or not at all. */
 async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
     const projectIds = projectIdsOf(body);
     const pack = rolesOfPack(body);
@@ -315,8 +311,7 @@ const appliesOf = async (companyId, applyId) => ((await MongoDbCrudOpration(comp
     .map((row) => ({ projectId: String(row.projectId), entry: (row.teamPacks || []).find((one) => one && one.applyId === applyId) }))
     .filter((row) => row.entry);
 
-/* Takes back what the apply named by applyId recorded: the roles it turned on, the rules it added, its tag approval
- * while nobody has decided it, and the agents it made or widened. A rule a person has since changed stays. */
+/* A rule a person has changed since the pack added it stays: it must match the recorded one by id and by content. */
 async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     const actorId = actor.id;
     const projectIds = projectIdsOf(body);

@@ -65,13 +65,13 @@
                     </section>
 
                     <section v-if="roles.length" class="ah-card ai-agent" data-test="role">
-                        <div class="ah-label">{{ $t('Ai.role') }}</div>
-                        <p class="ai-lead" style="margin:6px 0 10px">{{ $t('Ai.role_lead') }}</p>
                         <div class="ah-field">
+                            <div class="ah-label">{{ $t('Ai.role') }}</div>
+                            <span class="ah-small">{{ $t('Ai.role_lead') }}</span>
                             <label class="ah-field__label" for="agent-role">{{ $t('Ai.role') }}</label>
                             <select id="agent-role" v-model="form.role" class="ah-input" :disabled="!canManage" data-test="role-pick">
                                 <option value="">{{ $t('Ai.role_none') }}</option>
-                                <option v-for="role in roles" :key="role.id" :value="role.id">{{ role.name }} · {{ role.department }}</option>
+                                <option v-for="role in roles" :key="role.id" :value="role.id">{{ $t('Ai.role_option', { name: role.name, department: role.department }) }}</option>
                             </select>
                             <span class="ah-field__hint">{{ $t('Ai.role_hint') }}</span>
                         </div>

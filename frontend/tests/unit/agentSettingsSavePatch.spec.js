@@ -122,6 +122,15 @@ describe('the role picker', () => {
         expect(puts()[0][2]).toEqual({ _id: 'a1', role: 'it-company/bug-triager' });
     });
 
+    it('names each role with its department through the translations, with no inline style', async () => {
+        withRoles();
+        const wrapper = await mountSettings();
+        const option = wrapper.findAll('[data-test="role-pick"] option')[1];
+        expect(option.text()).toBe('Ai.role_option');
+        expect((await import('@/locales/en')).default.Ai.role_option).toBe('{name} · {department}');
+        expect(wrapper.find('[data-test="role"]').findAll('[style]')).toHaveLength(0);
+    });
+
     it('clears the role with the empty choice', async () => {
         withRoles({ role: 'it-company/bug-triager' });
         const wrapper = await mountSettings();

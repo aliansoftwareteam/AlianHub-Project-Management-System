@@ -3128,6 +3128,7 @@ export default {
         role_lead: "The role this agent plays. The dispatcher hands a role's tasks to the least loaded agent that plays it.",
         role_none: "No role",
         role_hint: "Saved with the other settings. Changing it changes who receives routed work.",
+        role_option: "{name} · {department}",
         skills_lead: "A skill is a playbook plus the short list of actions it may take. Nothing outside this list can ever run.",
         off: "off",
         low_risk_note: "Low risk = comment, nudge, status within a list, reports. Moves between lists and assignments still go to the AI Inbox.",

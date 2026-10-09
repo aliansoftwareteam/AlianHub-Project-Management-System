@@ -65,9 +65,8 @@ const actionsOf = (role) => registry.allowedActionsToStore([...new Set([...SKILL
 /* An agent with no projects named may work in any, so it already covers every project. */
 const overlaps = (agent, projectIds) => !idsOf(agent).length || idsOf(agent).some((id) => projectIds.includes(id));
 
-/* One agent per role across these projects. A role that already has an agent whose projects overlap them, whoever made
- * it, is reused and widened to the projects it lacks rather than doubled. Only reads, so a pack is planned whole before
- * anything is written. */
+/* A role that already has an agent whose projects overlap these, whoever made it, reuses and widens that agent rather
+ * than getting a second one. */
 async function plan(companyId, roleKeys, projectIds) {
     const existing = await find(companyId, SCHEMA_TYPE.AGENTS, [{ role: { $in: roleKeys }, deletedStatusKey: { $ne: 1 } }, { role: 1, projectIds: 1, name: 1 }, { sort: { createdAt: 1, _id: 1 } }]);
     const reuse = [];
@@ -165,8 +164,6 @@ const whyKept = async (companyId, agent, blueprint, projectIds) => {
     return '';
 };
 
-/* Removes the agents an apply made when nobody has used or changed them. One that is running, has worked, was edited,
- * was not made by this pack, or reaches a project outside the ones the undo was checked for, stays and is named. */
 async function remove(companyId, blueprint, agentIds, projectIds, actor) {
     const removed = [];
     const kept = [];
@@ -191,7 +188,6 @@ async function remove(companyId, blueprint, agentIds, projectIds, actor) {
     return { removed, kept };
 }
 
-/* A role skill the apply made goes with its agents, unless a live agent still names it. */
 async function dropUnusedSkills(companyId, keys) {
     const dropped = [];
     for (const key of [...new Set(keys || [])]) {
@@ -203,7 +199,6 @@ async function dropUnusedSkills(companyId, keys) {
     return dropped;
 }
 
-/* Gives back the projects an apply added to an agent it reused, where the agent still has them. */
 async function narrow(companyId, widened) {
     const narrowed = [];
     for (const { agentId, projectIds } of widened) {
