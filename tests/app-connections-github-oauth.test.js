@@ -286,6 +286,23 @@ describe('disconnecting', () => {
         expect(rows()).toHaveLength(0);
     });
 
+    it('does not wait on GitHub', async () => {
+        await complete(await stateFor());
+        axios.delete.mockReturnValue(new Promise(() => {}));
+        const r = await call(integrations.disconnect, OWNER, { params: { id: String(rows()[0]._id) } });
+        expect(r.body.status).toBe(true);
+        expect(axios.delete).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ timeout: 5000 }));
+    });
+
+    it('revokes with the app that issued the grant, and skips when that app is no longer configured', async () => {
+        await complete(await stateFor());
+        expect(rows()[0].config.clientId).toBe('Iv1.connectclient');
+        Object.assign(process.env, { GITHUB_CONNECT_CLIENT_ID: 'Iv1.newer', GITHUB_CONNECT_CLIENT_SECRET: 'newer-secret' });
+        await call(integrations.disconnect, OWNER, { params: { id: String(rows()[0]._id) } });
+        expect(axios.delete).not.toHaveBeenCalled();
+        expect(require('../Config/loggerConfig').warn).toHaveBeenCalledWith(expect.stringMatching(/no longer configured/));
+    });
+
     it('asks GitHub nothing for a pasted token', async () => {
         await call(integrations.connect, OWNER, { body: { type: 'github', config: { token: 'ghp_abcdefghijklmnopqrstuvwxyz0123456789', repo: 'acme/web' } } });
         await call(integrations.disconnect, OWNER, { params: { id: String(rows()[0]._id) } });

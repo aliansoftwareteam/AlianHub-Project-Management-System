@@ -116,6 +116,7 @@
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
+import { withoutGithubReturn } from "./githubReturn";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -144,7 +145,6 @@ const reposLoaded = ref(false);
 const pickedRepo = ref("");
 
 const GITHUB_OUTCOMES = ["expired", "denied", "rights", "off", "failed"];
-const GITHUB_RETURN_KEYS = ["github", "state", "code"];
 const GITHUB_REFUSALS = { 400: "github_expired", 403: "github_rights", 409: "github_off" };
 
 const route = useRoute();
@@ -243,12 +243,11 @@ const saveRepo = async (conn) => {
     if (!error.value) choosingRepo.value = "";
 };
 
-/* GitHub returns here with the code in the address; it leaves the address before it is used. */
 const finishGithub = async () => {
     const query = route.query || {};
     const { github: outcome, state, code } = query;
     if (!outcome) return;
-    await router.replace({ query: Object.fromEntries(Object.entries(query).filter(([key]) => !GITHUB_RETURN_KEYS.includes(key))) });
+    await router.replace({ query: withoutGithubReturn(query) });
     if (outcome !== "complete") {
         if (GITHUB_OUTCOMES.includes(outcome)) error.value = t(`AppConnections.github_${outcome}`);
         return;

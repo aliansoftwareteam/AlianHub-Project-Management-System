@@ -9,6 +9,7 @@ vi.mock('vue-router', async (importOriginal) => ({ ...(await importOriginal()), 
 import AppConnections from '@/views/Integrations/AppConnections.vue';
 import en from '@/locales/en.js';
 import integrationRoutes from '@/router/integrations';
+import { loginReturnPath } from '@/views/Integrations/githubReturn';
 
 const i18n = config.global.plugins[0];
 i18n.global.setLocaleMessage('en', en);
@@ -133,6 +134,12 @@ describe('the App connections page', () => {
             await flushPromises();
             expect(apiRequest).toHaveBeenCalledWith('put', expect.stringMatching(/\/connections\/c1\/repo$/), { repo: 'acme/web' });
         });
+    });
+
+    it('leaves a GitHub code and state out of the address a lapsed session returns to', () => {
+        const to = { path: '/c1/app-connections', fullPath: '/c1/app-connections?github=complete&state=s&code=k&tab=x', query: { github: 'complete', state: 's', code: 'k', tab: 'x' } };
+        expect(loginReturnPath(to)).toBe('/c1/app-connections?tab=x');
+        expect(loginReturnPath({ path: '/c1/home', fullPath: '/c1/home?a=1', query: { a: '1' } })).toBe('/c1/home?a=1');
     });
 
     it('has a title that goes through the locale', () => {

@@ -50,21 +50,24 @@ const withoutSecrets = (config) => Object.fromEntries(Object.entries(config || {
 
 const isOAuth = (row) => !!row && row.type === 'github' && (row.config || {}).auth === 'oauth';
 
-/* Never throws: ending the grant at GitHub is a courtesy that must not block a reconnect or a disconnect. */
-const revokeGrant = async (token) => {
+/* Never rejects, and callers do not wait on it: ending the grant at GitHub must not hold up a reconnect or a disconnect. */
+const revokeGrant = async (grant) => {
+    if (!grant || !grant.token) return;
     try {
-        if (token && !await oauth.revokeToken(token)) logger.warn('appConnections github: GitHub did not revoke the earlier grant');
+        const outcome = await oauth.revokeToken(grant.token, grant.issuer);
+        if (outcome === 'skipped') logger.warn('appConnections github: the GitHub app that issued the earlier grant is no longer configured, so it was not revoked');
+        else if (outcome !== 'revoked') logger.warn('appConnections github: GitHub did not revoke the earlier grant');
     } catch (e) {
         logger.warn(`appConnections github revoke: ${(e && e.message) || e}`);
     }
 };
 
 const grantOf = async (companyId, row) => {
-    if (!isOAuth(row)) return '';
-    try { return await tokenOf(companyId, row); } catch (e) { return ''; }
+    if (!isOAuth(row)) return null;
+    try { return { token: await tokenOf(companyId, row), issuer: String((row.config || {}).clientId || '') }; } catch (e) { return null; }
 };
 
-const revokeGrantOf = async (companyId, row) => revokeGrant(await grantOf(companyId, row));
+const revokeGrantOf = async (companyId, row) => { revokeGrant(await grantOf(companyId, row)); };
 
 exports.authorize = async (req, res) => {
     try {
@@ -115,12 +118,12 @@ exports.complete = async (req, res) => {
         const account = await api.accountOf({ token, companyId }).catch(() => ({ id: '', login: '' }));
         const existing = await liveGithub(companyId);
         const before = (existing && existing.config) || {};
-        const oldToken = await grantOf(companyId, existing);
+        const earlier = await grantOf(companyId, existing);
         let repo = before.repo || '';
         if (repo && !await api.canReadRepo({ repo, token, companyId }).catch(() => true)) repo = '';
         const sameReading = !!existing && !!account.id && before.accountId === account.id && repo === (before.repo || '');
 
-        const config = { ...withoutSecrets(before), token, auth: 'oauth', accountId: account.id, accountLogin: account.login };
+        const config = { ...withoutSecrets(before), token, auth: 'oauth', clientId: oauth.clientId(), accountId: account.id, accountLogin: account.login };
         if (repo) config.repo = repo; else delete config.repo;
         const uid = String(req.uid || '');
         const actor = { id: uid, ip: requestAddress(req) };
@@ -141,7 +144,7 @@ exports.complete = async (req, res) => {
                 data: { _id: id, type: 'github', name: 'GitHub', ...kept.set, secretsVersion: R.SECRETS_VERSION, status: 'connected', enabled: true, createdBy: uid, connectedBy: uid, connectedAt: new Date(), deletedStatusKey: 0 },
             }, 'save');
         }
-        if (oldToken && oldToken !== token) await revokeGrant(oldToken);
+        if (earlier && earlier.token !== token) revokeGrant(earlier);
         removeCache(`integration_connections:${companyId}`);
         connectionsChanged(companyId, id, { status: 'connected', enabled: true });
         recordAuditFromReq(req, { action: 'app_connection.connected', entityType: 'integration', entityId: String(id), entityName: 'GitHub', meta: { via: 'oauth' } });

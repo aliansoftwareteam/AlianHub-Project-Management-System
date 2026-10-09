@@ -83,7 +83,7 @@ exports.connect = async (req, res) => {
                     data: [{ _id: existing._id }, { $set: { ...kept.set, name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(req.uid || ''), connectedBy: String(req.uid || ''), ...(sameTarget(existing, check.value) ? {} : { sync: {}, connectedAt: new Date() }) }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
                 }, 'findOneAndUpdate');
                 await H.retireSecrets({ companyId, handles: kept.stale, actor });
-                await revokeGrant(earlierGrant);
+                revokeGrant(earlierGrant);
                 removeCache(`integration_connections:${companyId}`);
                 connectionsChanged(companyId, existing._id, { status: 'connected', enabled: true });
                 return res.send({ status: true, statusText: 'Updated.', data: R.redact(upd) });

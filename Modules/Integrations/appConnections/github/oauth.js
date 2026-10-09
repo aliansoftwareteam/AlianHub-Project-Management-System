@@ -15,6 +15,14 @@ const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const clientId = () => String(process.env.GITHUB_CONNECT_CLIENT_ID || process.env.GITHUB_CLIENT_ID || '').trim();
 const clientSecret = () => String(process.env.GITHUB_CONNECT_CLIENT_SECRET || process.env.GITHUB_CLIENT_SECRET || '').trim();
+const secretOf = (id) => {
+    const pairs = [
+        [process.env.GITHUB_CONNECT_CLIENT_ID, process.env.GITHUB_CONNECT_CLIENT_SECRET],
+        [process.env.GITHUB_CLIENT_ID, process.env.GITHUB_CLIENT_SECRET],
+    ].map(([pid, secret]) => [String(pid || '').trim(), String(secret || '').trim()]);
+    const found = pairs.find(([pid, secret]) => id && pid === id && secret);
+    return found ? found[1] : '';
+};
 const oauthBase = () => String(process.env.GITHUB_BASE_OAUTH_URL || 'https://github.com/login/oauth').replace(/\/+$/, '');
 const apiBase = () => String(process.env.APIURL || '').replace(/\/+$/, '');
 const fallbackOrigin = () => String(process.env.WEBURL || '').split(',').map((entry) => entry.trim().replace(/\/+$/, '')).find(Boolean) || apiBase();
@@ -96,21 +104,22 @@ async function exchangeCode({ code, verifier }, post = axios.post) {
     return { token: String(body.access_token), scope: String(body.scope || '') };
 }
 
-/* Best effort: a grant GitHub will not revoke is logged by the caller and never stops the person's own action. */
-async function revokeToken(token, del = axios.delete) {
-    if (!token || !clientId() || !clientSecret()) return false;
-    const res = await del(`https://api.github.com/applications/${encodeURIComponent(clientId())}/token`, {
-        auth: { username: clientId(), password: clientSecret() },
+/* Only the app that issued a grant can end it; when that app is no longer configured, nothing is asked. */
+async function revokeToken(token, issuer, del = axios.delete) {
+    const secret = secretOf(String(issuer || ''));
+    if (!token || !secret) return 'skipped';
+    const res = await del(`https://api.github.com/applications/${encodeURIComponent(issuer)}/token`, {
+        auth: { username: issuer, password: secret },
         data: { access_token: token },
         headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'AlianHub' },
-        timeout: 15000,
+        timeout: 5000,
         validateStatus: () => true,
     });
-    return res.status === 204;
+    return res.status === 204 ? 'revoked' : 'refused';
 }
 
 module.exports = {
     CALLBACK_PATH, SCOPE, STATE_TTL_SECONDS, MAX_STATE_LENGTH, MAX_CODE_LENGTH,
     isConfigured, redirectUri, fallbackOrigin, returnOriginOf, encodeState, decodeState, verifierOf, sessionMatches, usableCode, spendNonce,
-    authorizeUrl, exchangeCode, revokeToken,
+    clientId, authorizeUrl, exchangeCode, revokeToken,
 };

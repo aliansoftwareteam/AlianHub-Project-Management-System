@@ -28,6 +28,7 @@ import dashboard from "../plugins/dashboard/router";
 import { apiRequestWithoutCompnay } from '@/services'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
+import { loginReturnPath } from '@/views/Integrations/githubReturn'
 import { readSetupStatus, isKnownInstalled } from './setupStatus';
 import { opensWithoutWorkspace } from './withoutWorkspace';
 
@@ -161,7 +162,7 @@ router.beforeEach(async(to, _, next) => {
 
 		if(user === null && requiresAuth === true) {
 			// IF USER IS NOT LOGGED IN AND REQUESTS AUTH REQUIRED PAGE
-			next({name: 'Log-in', query: {redirect_url: fullPath}});
+			next({name: 'Log-in', query: {redirect_url: to.query.github ? loginReturnPath(to) : fullPath}});
 			return;
 		} else if(user !== null && requiresAuth === false) {
 			// IF USER IS LOGGED IN AND REQUESTS NO AUTH REQUIRED PAGE
