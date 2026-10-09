@@ -165,6 +165,7 @@ describe('Team packs', () => {
         const box = wrapper.find('[data-test="tp-create-agents"] input');
         expect(box.element.checked).toBe(true);
         expect(wrapper.find('[data-test="tp-create-agents"]').text()).toContain('Create the team\'s agents');
+        expect(wrapper.find('[data-test="tp-create-agents"]').text()).toContain('Each starts paused');
         await box.setValue(false);
         await wrapper.find('[data-test="tp-project"] input').setValue(true);
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
@@ -179,6 +180,7 @@ describe('Team packs', () => {
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
         await flushPromises();
         expect(wrapper.find('[data-test="tp-agents"]').text()).toContain('Created 2 agents.');
+        expect(wrapper.find('[data-test="tp-agents-paused"]').text()).toContain('The new agents are paused.');
         await wrapper.find('[data-test="tp-undo"]').trigger('click');
         await flushPromises();
         const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);

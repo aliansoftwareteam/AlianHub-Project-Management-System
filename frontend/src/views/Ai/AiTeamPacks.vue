@@ -73,7 +73,7 @@
                             <label class="tp-row" data-test="tp-create-agents">
                                 <input v-model="createAgents" class="ah-check" type="checkbox" />
                                 <span class="tp-row__name">{{ $t('TeamPacks.create_agents') }}</span>
-                                <span class="ah-small tp-row__roles">{{ $t('TeamPacks.create_agents_hint') }}</span>
+                                <span class="ah-small tp-row__roles">{{ $t('TeamPacks.create_agents_paused_hint') }}</span>
                             </label>
 
                             <div class="tp-actions">
@@ -97,6 +97,7 @@
                                 <li v-for="project in result.projects" :key="project.projectId" class="ah-small" :data-mode="project.mode">{{ projectLine(project) }}</li>
                             </ul>
                             <p v-if="agentLine" class="ah-small tp-muted" data-test="tp-agents">{{ agentLine }}</p>
+                            <p v-if="!undone && madeAgents.length" class="ah-small tp-muted" data-test="tp-agents-paused">{{ $t('TeamPacks.agents_paused_note') }}</p>
                             <ul v-if="keptAgents.length" class="tp-list" data-test="tp-kept">
                                 <li v-for="agent in keptAgents" :key="agent.agentId" class="ah-small">{{ $t('TeamPacks.agent_kept', { name: agent.name }) }}</li>
                             </ul>

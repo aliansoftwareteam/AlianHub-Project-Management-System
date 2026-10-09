@@ -124,9 +124,10 @@ describe('team packs make one agent per role', () => {
         expect(live()).toHaveLength(engineering.length);
         const triager = live().find((agent) => agent.role === TRIAGER);
         expect(triager).toMatchObject({
-            name: 'Bug Triager · IT company', projectIds: [String(one._id), String(two._id)], paused: false, autonomy: 1, ownerId: EDITOR, madeBy: 'team-pack:it-company', skills: [{ key: 'role.bug-triager', enabled: true }],
+            name: 'Bug Triager · IT company', projectIds: [String(one._id), String(two._id)], paused: true, pausedReason: 'team_pack', autonomy: 1, ownerId: EDITOR, madeBy: 'team-pack:it-company', skills: [{ key: 'role.bug-triager', enabled: true }],
         });
         expect(triager.autonomy).toBeLessThan(3);
+        expect(triager.trigger).toBeUndefined();
         const skill = store(SCHEMA_TYPE.AGENT_SKILLS).find((row) => row.key === 'role.bug-triager');
         expect(skill.prompt.instructions).toContain(playbooks.find('it-company', 'bug-triager').body.slice(0, 80));
         expect(store(SCHEMA_TYPE.AGENT_SKILLS)).toHaveLength(engineering.length);
@@ -177,14 +178,19 @@ describe('team packs make one agent per role', () => {
         expect(live()).toHaveLength(engineering.length);
     });
 
-    it('lets least-loaded routing pick the new agents, and the org chart lists them', async () => {
+    it('routes nothing and offers no mention to the new agents until a person switches one on, and the org chart lists them', async () => {
         seedRules(GRANTS);
         const project = seedProject();
         const res = await applyPack([project]);
         await call('PUT', SETTINGS, { params: { projectId: String(project._id) }, body: { mode: 'apply', threshold: 80, roles: engineering, rules: [] } });
         const queue = require('../Modules/AssignmentRules/dispatcher/queue');
+        expect(await queue.leastLoaded(C, TRIAGER, String(project._id))).toBeNull();
+        const mine = res.body.data.agents.made.find((a) => a.roleKey === TRIAGER).agentId;
+        const mentionable = await require('../Modules/Agents/triggers').runnableAgents(C, OWNER, { _id: oid(), ProjectID: String(project._id), AssigneeUserId: [] });
+        expect(mentionable.map((agent) => String(agent._id))).not.toContain(mine);
+        agentsOf().find((agent) => String(agent._id) === mine).paused = false;
         const picked = await queue.leastLoaded(C, TRIAGER, String(project._id));
-        expect(picked.id).toBe(res.body.data.agents.made.find((a) => a.roleKey === TRIAGER).agentId);
+        expect(picked.id).toBe(mine);
         const chart = await call('GET', '/api/v2/assignment-rules/dispatcher/company/org-chart', { uid: OWNER });
         const role = chart.body.data.blueprints.flatMap((b) => b.teams).flatMap((t) => t.roles).find((r) => r.key === TRIAGER);
         expect(role.agents.map((a) => a.id)).toEqual([picked.id]);

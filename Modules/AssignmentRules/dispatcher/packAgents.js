@@ -16,6 +16,7 @@ const SKILL_PROMPT_MAX = 19000;
 const REPLY_MAX = 1500;
 const SKILL_ACTIONS = Object.freeze(['task.get', 'task.comment']);
 const AUTONOMY = 1;
+const PAUSED_REASON = 'team_pack';
 const SMALL_WORDS = Object.freeze({ it: 'IT' });
 
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
@@ -61,8 +62,8 @@ const actionsOf = (role) => registry.allowedActionsToStore([...new Set([...SKILL
 const sameRole = (agent, roleKey, projectIds) => agent.role === roleKey && sameIds(idsOf(agent), projectIds);
 
 /* One agent per role for exactly these projects. A role that already has an agent for the same projects is left as it
- * is, whoever made that agent. The agents start below L3, which is what keeps them off every schedule until a person
- * raises their autonomy; routed work reaches them at once because they are not paused. */
+ * is, whoever made that agent. A new agent starts paused and with no mention trigger, so neither a mention nor routed
+ * work reaches it until a person switches it on. */
 async function create(companyId, roleKeys, projectIds, actorId) {
     const existing = await find(companyId, SCHEMA_TYPE.AGENTS, [{ role: { $in: roleKeys }, deletedStatusKey: { $ne: 1 } }, { role: 1, projectIds: 1, name: 1 }, { limit: AGENT_ROWS }]);
     const made = [];
@@ -83,7 +84,9 @@ async function create(companyId, roleKeys, projectIds, actorId) {
             skills: [{ key: skill, name: role.name, enabled: true }],
             allowedActions: actionsOf(role),
             autonomy: AUTONOMY,
-            trigger: 'mention',
+            paused: true,
+            pausedReason: PAUSED_REASON,
+            pausedAt: new Date(),
             madeBy: madeBy(role.blueprint),
         }, { ownerId: actorId });
         made.push({ roleKey: key, agentId: String(saved._id), name: saved.name });
