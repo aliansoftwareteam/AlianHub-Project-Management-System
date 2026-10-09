@@ -203,6 +203,18 @@ describe('list.create', () => {
         await settle();
         expect(list(result.sprintId).deletedStatusKey).toBe(1);
     });
+
+    it('is taken back by undo only for someone the list route would let delete it', async () => {
+        const { result } = await rpc(ctx(INSIDER), 'list.create', { projectId: P_OPEN, name: 'Kept list' });
+        const [row] = audits('list.create', 'applied');
+        setRule('sprint_delete', false);
+        await expect(inverses.list(CID, row.meta.undo, { userId: INSIDER })).rejects.toThrow(/project\.sprint_delete is not allowed/);
+        expect(list(result.sprintId).deletedStatusKey).toBe(0);
+        setRule('sprint_delete', true);
+        await inverses.list(CID, row.meta.undo, { userId: INSIDER });
+        await settle();
+        expect(list(result.sprintId).deletedStatusKey).toBe(1);
+    });
 });
 
 describe('list.rename', () => {

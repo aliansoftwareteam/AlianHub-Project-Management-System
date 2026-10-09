@@ -15,7 +15,7 @@ const GRANT_ID = '0123456789abcdef0123456789abcdef';
 const ISSUER = 'https://hub.work.test';
 const TAGS = [{ uid: 'tag_bug', tagName: 'Bug', tagColor: '#ff0000' }, { uid: 'tag_api', tagName: 'API', tagColor: '#0000ff' }];
 const PRIVATE_TAGS = [{ uid: 'tag_secret', tagName: 'Secret', tagColor: '#00ff00' }];
-const PROJECT_KEYS = ['project_list', 'project_details', 'project_sprint_create', 'project_sprint_name_edit', 'sprint_type_change'];
+const PROJECT_KEYS = ['project_list', 'project_details', 'project_sprint_create', 'project_sprint_name_edit', 'sprint_type_change', 'sprint_delete'];
 const BEFORE = ['tasks.next', 'tasks.search', 'task.get', 'task.comment', 'task.status.set', 'task.link', 'task.create', 'subtask.create', 'timelog.start', 'timelog.stop', 'docs.read'];
 const FLAGS = ['MCP_TOOLS_WORK', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_DATA', 'MCP_TOOLS_V2', 'AGENT_TAINT_ROUTING', 'MCP_OAUTH', 'MCP_OAUTH_ISSUER'];
 
