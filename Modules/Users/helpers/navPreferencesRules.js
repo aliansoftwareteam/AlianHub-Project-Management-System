@@ -1,6 +1,6 @@
 // Must list every `key` in frontend/src/components/organisms/Shell/navItems.js; tests/user-nav-preferences.test.js checks it.
 const NAV_ITEM_IDS = [
-    'home', 'everything', 'goals', 'projects', 'inbox', 'planner', 'chat', 'ai', 'docs', 'dash', 'time',
+    'home', 'everything', 'goals', 'projects', 'inbox', 'planner', 'chat', 'ai', 'docs', 'appConnections', 'dash', 'time',
     'portfolio', 'automations', 'approvals', 'integrations', 'connections', 'externalData',
     'milestone', 'variance', 'custom', 'capacity', 'audit',
     'notepad', 'clips', 'reminders', 'talk', 'tour',
