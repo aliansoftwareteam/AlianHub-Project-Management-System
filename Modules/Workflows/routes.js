@@ -12,6 +12,8 @@ exports.init = (app) => {
     app.put('/api/v2/workflows/definitions/:id', setByPerson('workflow.definition.update'), ctrl.updateDefinition);
     app.patch('/api/v2/workflows/definitions/:id/enabled', setByPerson('workflow.definition.enable'), ctrl.setDefinitionEnabled);
     app.delete('/api/v2/workflows/definitions/:id', setByPerson('workflow.definition.delete'), ctrl.deleteDefinition);
+    app.get('/api/v2/workflows/templates', ctrl.listTemplates);
+    app.post('/api/v2/workflows/templates/:key/install', setByPerson('workflow.template.install'), ctrl.installTemplate);
     app.get('/api/v2/workflows/approvals', ctrl.listApprovals);
     app.get('/api/v2/workflows/runs', ctrl.listRuns);
     app.post('/api/v2/workflows/runs', agentsRefused('workflow.run.start'), ctrl.startRun);

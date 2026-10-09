@@ -17,6 +17,7 @@ const executors = require('./executors');
 const queue = require('./queue');
 const stepTypes = require('./stepTypes');
 const definitions = require('./definitions');
+const templates = require('./templates');
 const dryRun = require('./dryRun');
 const { canReadProject } = require('../../Config/projectAccess');
 const { canReadTask, TASK_READ_FIELDS } = require('../Tasks/helpers/taskReadAccess');
@@ -330,6 +331,8 @@ const stepControl = (action, write) => async (req, res) => {
 
         const step = await write(ctx.companyId, run._id, req.params.stepId, { by: ctx.caller.actor.userId, reason: reasonOf(req) });
         if (!step) return fail(res, REFUSED_STATE[action], 409);
+        if (action === 'skip') await executors.ended({ companyId: ctx.companyId, run, step, why: `skipped by a person: ${reasonOf(req) || 'no reason given'}` })
+            .catch((error) => logger.error(`[workflow-api] skipStep: cleaning up after ${step.stepId} failed: ${error.message}`));
 
         await store.reopenRun(ctx.companyId, run._id);
         const dispatched = await queue.dispatch(ctx.companyId, run._id);
@@ -537,6 +540,46 @@ exports.createDefinition = async (req, res) => {
         return ok(res, 'Workflow saved.', saved);
     } catch (error) {
         logger.error(`[workflow-api] createDefinition: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
+const TEMPLATES_NEED = 'Needs WORKFLOW_ENGINE and DISPATCHER on.';
+
+const templateView = (template, installable) => ({
+    key: template.key, name: template.name, description: template.description, roles: templates.roleKeysOf(template), steps: template.steps.length,
+    installable, ...(installable ? {} : { notInstallableReason: TEMPLATES_NEED }),
+});
+
+exports.listTemplates = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        const installable = flag.roleHandoffSteps();
+        return ok(res, 'Workflow templates fetched.', templates.all().map((template) => templateView(template, installable)));
+    } catch (error) {
+        logger.error(`[workflow-api] listTemplates: ${error.message}`);
+        return fail(res, error.message, 500);
+    }
+};
+
+/* POST /api/v2/workflows/templates/:key/install
+ * A template becomes an ordinary saved definition, disabled; a person enables it and starts a run on a task. */
+exports.installTemplate = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        const template = templates.find(req.params.key);
+        if (!template) return fail(res, 'That workflow template does not exist.', 404);
+        if (!flag.roleHandoffSteps()) return fail(res, TEMPLATES_NEED, 409);
+        const { errors, value } = definitionFrom(templates.copyOf(template));
+        if (errors.length) return failFields(res, errors);
+        const saved = await definitions.create(ctx.companyId, { ...value, by: ctx.caller.actor.userId });
+        return ok(res, 'Workflow saved.', saved);
+    } catch (error) {
+        logger.error(`[workflow-api] installTemplate: ${error.message}`);
         return fail(res, error.message, error.status || 500);
     }
 };

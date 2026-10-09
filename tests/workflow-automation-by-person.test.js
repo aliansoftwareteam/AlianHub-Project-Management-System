@@ -36,6 +36,7 @@ jest.mock('../Modules/service.js', () => mockStub());
 jest.mock('../Modules/Workflows/queue', () => ({ dispatch: jest.fn(async () => true) }));
 
 process.env.WORKFLOW_ENGINE = 'on';
+process.env.DISPATCHER = 'on';
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/mcpManageWorld');
@@ -129,6 +130,7 @@ let fx;
 /* [what, the route, how the request is prepared (params, body, and whether the change was made)] */
 const SET_BY_A_PERSON = [
     ['saving a workflow', 'POST /api/v2/workflows/definitions', () => ({ body: definitionBody(), done: () => definitions().length === 1 })],
+    ['adding a ready-made workflow', 'POST /api/v2/workflows/templates/:key/install', () => ({ params: { key: 'marketing-campaign-launch' }, done: () => definitions().length === 1 })],
     ['changing a workflow', 'PUT /api/v2/workflows/definitions/:id', () => { seedDefinition(); return { params: { id: WORKFLOW }, body: definitionBody({ name: 'Renamed' }), done: () => definitions()[0].name === 'Renamed' }; }],
     ['turning a workflow on', 'PATCH /api/v2/workflows/definitions/:id/enabled', () => { seedDefinition(); return { params: { id: WORKFLOW }, body: { enabled: true }, done: () => definitions()[0].enabled === true }; }],
     ['removing a workflow', 'DELETE /api/v2/workflows/definitions/:id', () => { seedDefinition(); return { params: { id: WORKFLOW }, done: () => definitions()[0].deletedStatusKey === 1 }; }],
@@ -156,7 +158,7 @@ beforeEach(() => {
     matcher.invalidateAll();
 });
 afterEach(settle);
-afterAll(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2', 'WORKFLOW_ENGINE'].forEach((key) => { delete process.env[key]; }); });
+afterAll(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2', 'WORKFLOW_ENGINE', 'DISPATCHER'].forEach((key) => { delete process.env[key]; }); });
 
 describe('what sets the work that runs with no person there', () => {
     it.each(SET_BY_A_PERSON)('%s is a signed-in person\'s', async (_what, route, prepare) => {

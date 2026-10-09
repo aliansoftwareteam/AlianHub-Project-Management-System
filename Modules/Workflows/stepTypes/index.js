@@ -10,6 +10,7 @@ const wait = require('./wait');
 const loop = require('./loop');
 const waiting = require('./waiting');
 const externalAgent = require('./externalAgent');
+const roleHandoff = require('./roleHandoff');
 
 // The step types, and what each one is.
 //
@@ -166,7 +167,11 @@ const CONTRACTS = Object.freeze([
     },
 ]);
 
-const contracts = () => (executors.has(externalAgent.TYPE) ? [...CONTRACTS, externalAgent.CONTRACT] : CONTRACTS);
+const contracts = () => [
+    ...CONTRACTS,
+    ...(executors.has(externalAgent.TYPE) ? [externalAgent.CONTRACT] : []),
+    ...(executors.has(roleHandoff.TYPE) ? [roleHandoff.CONTRACT] : []),
+];
 
 const get = (type) => contracts().find((contract) => contract.key === String(type)) || null;
 
@@ -261,6 +266,10 @@ const validateSteps = (steps = []) => {
             }
         }
 
+        if (step.type === roleHandoff.TYPE && config.role && !require('../../AssignmentRules/dispatcher/settings').roleOf(config.role)) {
+            errors.push(`${at}.config.role: there is no role "${config.role}"`);
+        }
+
         if (step.type === wait.TIMER) {
             if (!config.at && !config.atFrom) errors.push(`${at}.config: needs "at" or "atFrom"`);
             checkRef(config.atFrom, ids, `${at}.config.atFrom`, errors);
@@ -308,4 +317,5 @@ module.exports = {
     TIMER: wait.TIMER,
     LOOP: loop.TYPE,
     EXTERNAL_AGENT: externalAgent.TYPE,
+    ROLE_HANDOFF: roleHandoff.TYPE,
 };
