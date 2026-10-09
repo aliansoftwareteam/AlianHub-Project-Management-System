@@ -3,8 +3,19 @@ import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { streamAsk } from "./askStream";
 import { messageKey } from "./askWhy";
+import { sendProposalDecision } from "@/composable/agentProposals";
 
 const CODE_KEYS = Object.freeze({ thread_not_found: "Ask.error_thread_not_found" });
+
+const PLAN_KEYS = Object.freeze({
+    ai_off: "Ask.plan_ai_off",
+    no_key: "Ask.plan_needs_key",
+    unpriced: "Ask.plan_unpriced",
+    nothing_planned: "Ask.plan_nothing",
+    too_long: "Ask.plan_too_long",
+    project_not_found: "Ask.plan_project_not_found",
+    plan_failed: "Ask.plan_failed"
+});
 
 const storedTurn = (turn) => {
     const cited = Array.isArray(turn.cited) ? turn.cited : [];
@@ -126,6 +137,60 @@ export function useAskConversation({ t }) {
         return true;
     };
 
+    /* A sentence planned with the server's model. It comes back as a proposal the person approves or declines; nothing is made before. */
+    const plan = async ({ sentence, projectId = "" }) => {
+        const asked = String(sentence || "").trim();
+        if (!asked || streaming.value) return false;
+        seq += 1;
+        turns.value.push({ key: `local-${seq}`, question: asked, answer: "", mode: "plan", cited: [], sources: [], cannot: [], status: "planning", error: "" });
+        const live = turns.value[turns.value.length - 1];
+        streaming.value = true;
+        announcement.value = "";
+        try {
+            const res = await apiRequest("post", env.AI_ASK_PLAN, { sentence: asked, ...(projectId ? { projectId } : {}) });
+            const body = res?.data || {};
+            const data = body.data || {};
+            const code = data.code || body.code;
+            if (body.status && data.planned) {
+                Object.assign(live, {
+                    status: "planned",
+                    plan: { proposalId: data.proposalId, summary: data.summary || "", changes: data.changes || [], cannot: data.cannot || [], decision: "pending", busy: false, error: "" }
+                });
+                announcement.value = t("Ask.plan_ready");
+            } else {
+                Object.assign(live, {
+                    status: body.status ? "plan_none" : "plan_error",
+                    error: PLAN_KEYS[code] ? t(PLAN_KEYS[code]) : body.statusText || t("Ask.plan_failed"),
+                    needsAi: code === "no_key",
+                    cannot: data.cannot || []
+                });
+                announcement.value = live.error;
+            }
+        } catch {
+            Object.assign(live, { status: "plan_error", error: t("Ask.plan_failed") });
+            announcement.value = live.error;
+        } finally {
+            streaming.value = false;
+        }
+        return true;
+    };
+
+    const decidePlan = async (turn, verb) => {
+        const planned = turn && turn.plan;
+        if (!planned || planned.busy || planned.decision !== "pending") return;
+        planned.busy = true;
+        planned.error = "";
+        try {
+            const res = await sendProposalDecision(planned.proposalId, verb);
+            if (res?.data?.status) planned.decision = verb === "approve" ? "approved" : "declined";
+            else planned.error = res?.data?.statusText || res?.data?.message || t("Ask.plan_decide_failed");
+        } catch {
+            planned.error = t("Ask.plan_decide_failed");
+        } finally {
+            planned.busy = false;
+        }
+    };
+
     /* An answer the command palette already fetched from /ask. It belongs to no thread, so a follow-up starts one. */
     const seed = (question, answer) => {
         const asked = String(question || "").trim();
@@ -176,5 +241,5 @@ export function useAskConversation({ t }) {
         }
     };
 
-    return { turns, threadId, threads, threadsLoading, streaming, announcement, send, seed, stop, newQuestion, loadThreads, openThread, removeThread };
+    return { turns, threadId, threads, threadsLoading, streaming, announcement, send, plan, decidePlan, seed, stop, newQuestion, loadThreads, openThread, removeThread };
 }
