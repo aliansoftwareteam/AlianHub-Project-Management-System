@@ -1,4 +1,5 @@
 const logger = require('../../../Config/loggerConfig');
+const socketEmitter = require('../../../event/socketEventEmitter');
 const { actingUser } = require('../../Sprints/helpers/actingUser');
 const { RuleError } = require('../rules');
 const flag = require('./flag');
@@ -48,13 +49,26 @@ exports.applyPack = async (req, res) => {
         const companyId = companyOf(req);
         const body = req.body || {};
         const undone = body.undo === true;
-        const result = undone ? await packs.undo(companyId, body, actor.id) : await packs.apply(companyId, body, actor.id);
-        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length);
-        if (changed.length) {
+        const agentAccess = require('../../Agents/access');
+        const managesAgents = agentAccess.canManageAgents(await agentAccess.callerOf(req, companyId));
+        const result = undone ? await packs.undo(companyId, body, actor, { managesAgents }) : await packs.apply(companyId, body, actor.id, { managesAgents });
+        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length));
+        const agentsChanged = undone ? result.agents.removed : result.agents.made;
+        const agentsTouched = agentsChanged.length || (undone ? result.agents.narrowed : result.agents.widened).length;
+        if (agentsTouched) {
+            socketEmitter.emit('update', { type: 'update', module: 'dispatcherAgents', companyId: String(companyId), data: { blueprint: result.blueprint } });
+        }
+        if (changed.length || agentsTouched) {
             audit.packChanged(companyId, actor, undone, {
                 blueprint: result.blueprint,
                 teams: result.teams,
-                projects: changed.map((project) => ({ projectId: project.projectId, roles: undone ? project.removed : project.added })),
+                projects: changed.map((project) => ({
+                    projectId: project.projectId,
+                    roles: undone ? project.removed : project.added,
+                    rules: project.rules.length,
+                    ...(undone ? {} : { tags: project.tags }),
+                })),
+                agents: { [undone ? 'removed' : 'created']: agentsChanged.map((agent) => agent.agentId), kept: result.agents.kept.map((agent) => agent.agentId), ...(undone ? { narrowed: result.agents.narrowed.map((agent) => agent.agentId) } : { widened: result.agents.widened.map((agent) => agent.agentId) }) },
             });
         }
         return res.json({ status: true, statusText: undone ? 'Team pack undone' : 'Team pack applied', data: result });

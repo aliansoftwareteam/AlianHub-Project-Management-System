@@ -7,6 +7,8 @@ department: Creative
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, pages.search, page.get, page.versions.list, page.comments.list, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.assign, task.tags.add]
 hands_to: [seo-specialist, agency-brand-guardian, client-approval-tracker]
 gates: [the creative lead reviews every draft, the client approves before anything is published]
+starter_rules: [tag:content]
+tags: [content]
 ---
 
 # Agency Content Writer (Creative)

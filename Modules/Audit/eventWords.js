@@ -8,6 +8,7 @@ const EVENTS = Object.freeze({
     'agent.action_refused': 'An agent\'s change was blocked',
     'agent.action_undone': 'An agent\'s change was undone',
     'agent.proposal_decided': 'Decided an agent\'s proposal',
+    'agent.created': 'Created an agent',
     'agent.deleted': 'Deleted an agent',
     'agent.run_reverted': 'Undid everything an agent run changed',
     'agent.revision_promoted': 'Put a version of an agent live',

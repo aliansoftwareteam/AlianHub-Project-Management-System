@@ -61,6 +61,21 @@
                                 <span class="ah-field__hint" data-test="tp-projects-hint">{{ atCap ? $t('TeamPacks.projects_cap', { n: MAX_PROJECTS }) : $t('TeamPacks.projects_hint') }}</span>
                             </fieldset>
 
+                            <div v-if="starterRuleCount" class="tp-field">
+                                <label class="tp-row">
+                                    <input v-model="withStarterRules" class="ah-check" type="checkbox" data-test="tp-starter-rules" />
+                                    <span class="tp-row__name">{{ $t('TeamPacks.starter_rules') }}</span>
+                                </label>
+                                <span class="ah-field__hint" data-test="tp-starter-rules-hint">{{ $t('TeamPacks.starter_rules_hint', { n: starterRuleCount }, starterRuleCount) }}</span>
+                            </div>
+                            <p v-if="tagNames.length" class="ah-small tp-muted" data-test="tp-tags-hint">{{ $t('TeamPacks.tags_hint', { names: tagNames.join(', ') }) }}</p>
+
+                            <label v-if="managesAgents" class="tp-row" data-test="tp-create-agents">
+                                <input v-model="createAgents" class="ah-check" type="checkbox" />
+                                <span class="tp-row__name">{{ $t('TeamPacks.create_agents') }}</span>
+                                <span class="ah-small tp-row__roles">{{ $t('TeamPacks.create_agents_paused_hint') }}</span>
+                            </label>
+
                             <div class="tp-actions">
                                 <button
                                     type="button"
@@ -81,7 +96,12 @@
                             <ul class="tp-list">
                                 <li v-for="project in result.projects" :key="project.projectId" class="ah-small" :data-mode="project.mode">{{ projectLine(project) }}</li>
                             </ul>
-                            <div v-if="!undone && addedCount" class="tp-actions">
+                            <p v-if="agentLine" class="ah-small tp-muted" data-test="tp-agents">{{ agentLine }}</p>
+                            <p v-if="!undone && madeAgents.length" class="ah-small tp-muted" data-test="tp-agents-paused">{{ $t('TeamPacks.agents_paused_note') }}</p>
+                            <ul v-if="keptAgents.length" class="tp-list" data-test="tp-kept">
+                                <li v-for="agent in keptAgents" :key="agent.agentId" class="ah-small">{{ $t(KEPT_WHY[agent.why] || 'TeamPacks.agent_kept', { name: agent.name }) }}</li>
+                            </ul>
+                            <div v-if="!undone && (changedCount || madeAgents.length)" class="tp-actions">
                                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="tp-undo" :disabled="busy" @click="undo">
                                     {{ busy ? $t('TeamPacks.undoing') : $t('TeamPacks.undo') }}
                                 </button>
@@ -131,7 +151,12 @@ const busy = ref(false);
 const error = ref("");
 const result = ref(null);
 const undone = ref(false);
+const withStarterRules = ref(true);
+const undoneKept = ref([]);
+const createAgents = ref(true);
 
+const KEPT_WHY = Object.freeze({ running: "TeamPacks.agent_kept_running", edited: "TeamPacks.agent_kept_edited" });
+const managesAgents = computed(() => isOwnerOrAdmin(getters["settings/companyUserDetail"]?.roleType));
 const needsKey = computed(() => aiAvailability.state === AI_STATE.UNCONFIGURED);
 /* The server checks every project again; this only keeps out of reach what it would refuse. A project with its own
  * roles is judged by rules this page does not hold, so only an owner or admin is offered it here. */
@@ -146,18 +171,45 @@ const projects = computed(() => (getters["projectData/projects"]?.data || [])
 const atCap = computed(() => projectIds.value.length >= MAX_PROJECTS);
 const teamsOfPack = computed(() => (packs.value.find((pack) => pack.blueprint === blueprint.value) || { teams: [] }).teams);
 const roleCount = computed(() => teamsOfPack.value.filter((team) => teams.value.includes(team.team)).reduce((sum, team) => sum + team.roles.length, 0));
+const chosenRoles = computed(() => teamsOfPack.value.filter((team) => teams.value.includes(team.team)).flatMap((team) => team.roles));
+const starterRuleCount = computed(() => chosenRoles.value.reduce((sum, role) => sum + (role.starterRules || []).length, 0));
+const tagNames = computed(() => {
+    const names = chosenRoles.value.flatMap((role) => role.tags || []);
+    return names.filter((name, at) => names.findIndex((one) => one.toLowerCase() === name.toLowerCase()) === at);
+});
+const ruleCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.rules || []).length, 0));
 const addedCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.added || []).length, 0));
+const changedCount = computed(() => addedCount.value + ruleCount.value + (result.value?.projects || []).filter((project) => project.proposalId).length);
+const madeAgents = computed(() => result.value?.agents?.made || []);
+const keptAgents = computed(() => (undone.value ? undoneKept.value : []));
+const agentLine = computed(() => {
+    if (undone.value) return undoneKept.value.length ? t("TeamPacks.agents_undone_some_kept", { n: undoneKept.value.length }, undoneKept.value.length) : t("TeamPacks.agents_undone");
+    const made = madeAgents.value.length;
+    const reused = result.value?.agents?.kept?.length || 0;
+    if (!made && !reused) return "";
+    return t("TeamPacks.agents_made", { n: made, reused }, made);
+});
 const projectName = (id) => (projects.value.find((p) => p.id === String(id)) || {}).name || id;
+
+const tagCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.tags || []).length, 0));
 
 const resultHead = computed(() => {
     if (undone.value) return t("TeamPacks.undone");
-    return addedCount.value ? t("TeamPacks.applied", { n: addedCount.value }, addedCount.value) : t("TeamPacks.nothing_new");
+    if (addedCount.value) return t("TeamPacks.applied", { n: addedCount.value }, addedCount.value);
+    return ruleCount.value || tagCount.value ? t("TeamPacks.roles_were_on") : t("TeamPacks.nothing_new");
 });
 
 const projectLine = (project) => {
     const name = projectName(project.projectId);
-    if (project.mode === "off") return t("TeamPacks.project_off", { project: name });
-    return t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) });
+    const rules = (project.rules || []).length;
+    const tags = project.tags || [];
+    return [
+        project.mode === "off" ? t("TeamPacks.project_off", { project: name }) : t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) }),
+        rules ? t("TeamPacks.rules_added", { n: rules }, rules) : "",
+        project.skippedRules ? t("TeamPacks.rules_waiting", { n: project.skippedRules }, project.skippedRules) : "",
+        project.rulesAwaitingTags ? t("TeamPacks.rules_await_tags", { n: project.rulesAwaitingTags }, project.rulesAwaitingTags) : "",
+        tags.length ? t("TeamPacks.tags_proposed", { n: tags.length, names: tags.join(", ") }, tags.length) : ""
+    ].filter(Boolean).join(" ");
 };
 
 watch(blueprint, () => {
@@ -191,8 +243,16 @@ async function apply() {
     busy.value = true;
     error.value = "";
     try {
-        result.value = await applyTeamPack({ blueprint: blueprint.value, teams: teams.value, projectIds: projectIds.value });
+        result.value = await applyTeamPack({
+            blueprint: blueprint.value,
+            teams: teams.value,
+            projectIds: projectIds.value,
+            starterRules: withStarterRules.value && starterRuleCount.value > 0,
+            proposeTags: tagNames.value.length > 0,
+            createAgents: managesAgents.value && createAgents.value
+        });
         undone.value = false;
+        undoneKept.value = [];
     } catch (e) {
         error.value = failText(e, t("TeamPacks.failed"));
     } finally {
@@ -205,7 +265,8 @@ async function undo() {
     busy.value = true;
     error.value = "";
     try {
-        await undoTeamPack(result.value);
+        const answer = await undoTeamPack(result.value);
+        undoneKept.value = answer?.agents?.kept || [];
         undone.value = true;
     } catch (e) {
         error.value = failText(e, t("TeamPacks.undo_failed"));

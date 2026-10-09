@@ -3,7 +3,7 @@
         <div class="trs__chip" :class="{ 'trs__chip--done': !waiting }">
             <span class="trs__text">
                 <strong>{{ headline }}</strong>
-                <span v-if="reason" class="trs__reason">{{ reason }}</span>
+                <span v-if="reason" class="trs__reason"><span aria-hidden="true">&nbsp;·&nbsp;</span>{{ reason }}</span>
                 <span v-if="modelReason" class="trs__model-reason" data-test="model-reason"><span class="trs__label">{{ $t('Dispatcher.model_reason') }}</span> {{ modelReason }}</span>
             </span>
             <span v-if="canDecide && waiting" class="trs__actions">
@@ -150,8 +150,7 @@ async function addOffer() {
 }
 .trs__chip--done, .trs__offer { background: var(--surface-2); border: 1px solid var(--border); }
 .trs__text { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
-.trs__reason { color: var(--ink-2); margin-left: 4px; }
-.trs__reason::before { content: "\00b7\00a0"; }
+.trs__reason { color: var(--ink-2); }
 .trs__model-reason { display: block; color: var(--ink-2); white-space: normal; }
 .trs__label { font-weight: 600; }
 .trs__actions { display: inline-flex; flex-wrap: wrap; gap: 6px; min-width: 0; }

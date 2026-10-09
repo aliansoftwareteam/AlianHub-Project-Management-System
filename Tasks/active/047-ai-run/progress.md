@@ -359,6 +359,7 @@ Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 I
 - The live view tab did not appear on the real build although its spec passed: a hidden tab drops its socket. Fixed in #1578 (build 822). Not seen by eye: the coordinator's browser pane is always hidden.
 - The local server's AI provider switched to Anthropic Sonnet 5.5 at the owner's request; the key is in the admin field.
 
+- AI-6, triage with the server model: the project manager asks the configured model once per batch of new tasks for a priority, an estimate and a likely duplicate, each filed as a suggestion a person accepts (`Modules/Agents/managerTriage.js`, hourly job `projectTriage`). Skips with AI off, no priced provider or the cap reached.
 
 ### 2026-10-09
 - AI-2 and AI-3, the optional "with a server key" slice: the Ask box has a "Plan changes" mode. `POST /api/v1/ai/ask/plan` (`Modules/AI/askPlan.js`) gives the server's model the person's own view of the workspace (projects, lists and people read through the MCP read tools as that person) and the MCP write tools' schemas for `task.create`, `fields.create`, `view.create` and `automation.create`. Each step it answers is taken by `tools.planned` (`Modules/Mcp/tools.js`) through the road a connected agent's change takes, as far as filing: schema, visibility, the holder's permissions, the project's pause. It is never performed there.

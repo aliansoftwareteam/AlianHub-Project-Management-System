@@ -7,6 +7,8 @@ team: staffing
 tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, timesheet.read, page.create, page.update, task.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [schedule-keeper]
 gates: [the deputy head approves every cover assignment before staff are told]
+starter_rules: [tag:cover]
+tags: [cover]
 ---
 
 # Cover Planner (Operations)
