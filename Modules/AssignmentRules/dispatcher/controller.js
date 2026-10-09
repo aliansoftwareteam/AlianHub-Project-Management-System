@@ -1,4 +1,6 @@
 const logger = require('../../../Config/loggerConfig');
+const socketEmitter = require('../../../event/socketEventEmitter');
+const { removeCache } = require('../../../utils/commonFunctions');
 const { actingUser } = require('../../Sprints/helpers/actingUser');
 const { RuleError } = require('../rules');
 const flag = require('./flag');
@@ -48,9 +50,14 @@ exports.applyPack = async (req, res) => {
         const companyId = companyOf(req);
         const body = req.body || {};
         const undone = body.undo === true;
-        const result = undone ? await packs.undo(companyId, body, actor.id) : await packs.apply(companyId, body, actor.id);
+        const result = undone ? await packs.undo(companyId, body, actor) : await packs.apply(companyId, body, actor.id);
         const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length));
-        if (changed.length) {
+        const agentsChanged = undone ? result.agents.removed : result.agents.made;
+        if (agentsChanged.length) {
+            removeCache(`agents:${companyId}`);
+            socketEmitter.emit('update', { type: 'update', module: 'dispatcherAgents', companyId: String(companyId), data: { blueprint: result.blueprint } });
+        }
+        if (changed.length || agentsChanged.length) {
             audit.packChanged(companyId, actor, undone, {
                 blueprint: result.blueprint,
                 teams: result.teams,
@@ -60,6 +67,7 @@ exports.applyPack = async (req, res) => {
                     rules: project.rules.length,
                     ...(undone ? {} : { tags: project.tags }),
                 })),
+                agents: { [undone ? 'removed' : 'created']: agentsChanged.map((agent) => agent.agentId), kept: result.agents.kept.map((agent) => agent.agentId) },
             });
         }
         return res.json({ status: true, statusText: undone ? 'Team pack undone' : 'Team pack applied', data: result });

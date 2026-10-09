@@ -5,12 +5,14 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const logger = require('../../../Config/loggerConfig');
 const { RuleError } = require('../rules');
 const settings = require('./settings');
+const packAgents = require('./packAgents');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const MAX_PROJECTS = 50;
 const SUMMARY_MAX = 280;
 const PACK_AGENT = Object.freeze({ _id: 'team-pack', name: 'Team pack' });
 const TAG_ACTION = 'tag.create';
+const MAX_AGENTS = 200;
 
 const packs = () => {
     const byBlueprint = new Map();
@@ -210,14 +212,23 @@ async function apply(companyId, body, actorId) {
             ...(proposed.failed ? { tagsFailed: true } : {}),
         });
     }
-    return { blueprint: pack.blueprint, teams: pack.teams, projects };
+    const agents = body.createAgents === false ? { made: [], kept: [] } : await packAgents.create(companyId, pack.roles, projectIds, actorId);
+    return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 
 const mapOf = (value) => (value && typeof value === 'object' && !Array.isArray(value) ? value : {});
 
-/* Takes back what a pack added, as its answer listed it: its roles, the rules it wrote and the tag approval it filed
- * while nobody has decided it, and never a role or a rule outside that pack. A rule a person has since changed stays. */
-async function undo(companyId, body, actorId) {
+const agentIdsOf = (body) => {
+    const given = Array.isArray(body.agents) ? body.agents.map((id) => String(id).trim().toLowerCase()) : [];
+    if (given.length > MAX_AGENTS || !given.every((id) => OBJECT_ID.test(id))) throw new RuleError(`agents must list at most ${MAX_AGENTS} agent ids.`);
+    return [...new Set(given)];
+};
+
+/* Takes back what a pack added, as its answer listed it: its roles, the rules it wrote, the tag approval it filed
+ * while nobody has decided it, and the agents it made that have done no work. Never a role or a rule outside that
+ * pack; a rule a person has since changed stays, and so does an agent that has worked. */
+async function undo(companyId, body, actor) {
+    const actorId = actor.id;
     const projectIds = projectIdsOf(body);
     const pack = rolesOfPack(body);
     const given = mapOf(body.roles);
@@ -247,7 +258,8 @@ async function undo(companyId, body, actorId) {
         const withdrawn = await withdrawProposal(companyId, plan.projectId, givenProposals[plan.projectId]).catch(() => false);
         projects.push({ projectId: plan.projectId, removed: plan.removed, rules: plan.rules, mode: plan.mode, tagsWithdrawn: withdrawn });
     }
-    return { blueprint: pack.blueprint, teams: pack.teams, projects };
+    const agents = await packAgents.remove(companyId, pack.blueprint, agentIdsOf(body), projectIds, actor);
+    return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 
 module.exports = { MAX_PROJECTS, packs, normaliseProjectIds, apply, undo };

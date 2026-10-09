@@ -141,7 +141,7 @@ describe('team packs', () => {
         expect(emitted.filter((e) => e.module === 'dispatcherSettings' && e.companyId === C)).toHaveLength(2);
         expect(audited()).toEqual([expect.objectContaining({
             companyId: C, actorId: EDITOR, action: 'dispatcher.pack_applied', entityType: 'team_pack',
-            meta: { blueprint: 'it-company', teams: ['engineering'], projects: [{ projectId: String(live._id), roles: engineering, rules: 0, tags: [] }, { projectId: String(quiet._id), roles: engineering, rules: 0, tags: [] }] },
+            meta: { blueprint: 'it-company', teams: ['engineering'], projects: [{ projectId: String(live._id), roles: engineering, rules: 0, tags: [] }, { projectId: String(quiet._id), roles: engineering, rules: 0, tags: [] }], agents: { created: expect.any(Array), kept: [] } },
         })]);
         expect(new Set(mockDb.calls.map((c) => c.companyId).filter((id) => id !== dbCollections.GLOBAL))).toEqual(new Set([C]));
     });

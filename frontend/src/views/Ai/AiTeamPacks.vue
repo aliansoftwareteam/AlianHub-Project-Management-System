@@ -70,6 +70,12 @@
                             </div>
                             <p v-if="tagNames.length" class="ah-small tp-muted" data-test="tp-tags-hint">{{ $t('TeamPacks.tags_hint', { names: tagNames.join(', ') }) }}</p>
 
+                            <label class="tp-row" data-test="tp-create-agents">
+                                <input v-model="createAgents" class="ah-check" type="checkbox" />
+                                <span class="tp-row__name">{{ $t('TeamPacks.create_agents') }}</span>
+                                <span class="ah-small tp-row__roles">{{ $t('TeamPacks.create_agents_hint') }}</span>
+                            </label>
+
                             <div class="tp-actions">
                                 <button
                                     type="button"
@@ -90,7 +96,11 @@
                             <ul class="tp-list">
                                 <li v-for="project in result.projects" :key="project.projectId" class="ah-small" :data-mode="project.mode">{{ projectLine(project) }}</li>
                             </ul>
-                            <div v-if="!undone && changedCount" class="tp-actions">
+                            <p v-if="agentLine" class="ah-small tp-muted" data-test="tp-agents">{{ agentLine }}</p>
+                            <ul v-if="keptAgents.length" class="tp-list" data-test="tp-kept">
+                                <li v-for="agent in keptAgents" :key="agent.agentId" class="ah-small">{{ $t('TeamPacks.agent_kept', { name: agent.name }) }}</li>
+                            </ul>
+                            <div v-if="!undone && (changedCount || madeAgents.length)" class="tp-actions">
                                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="tp-undo" :disabled="busy" @click="undo">
                                     {{ busy ? $t('TeamPacks.undoing') : $t('TeamPacks.undo') }}
                                 </button>
@@ -141,6 +151,8 @@ const error = ref("");
 const result = ref(null);
 const undone = ref(false);
 const withStarterRules = ref(true);
+const undoneKept = ref([]);
+const createAgents = ref(true);
 
 const needsKey = computed(() => aiAvailability.state === AI_STATE.UNCONFIGURED);
 /* The server checks every project again; this only keeps out of reach what it would refuse. A project with its own
@@ -165,6 +177,15 @@ const tagNames = computed(() => {
 const ruleCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.rules || []).length, 0));
 const addedCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.added || []).length, 0));
 const changedCount = computed(() => addedCount.value + ruleCount.value + (result.value?.projects || []).filter((project) => project.proposalId).length);
+const madeAgents = computed(() => result.value?.agents?.made || []);
+const keptAgents = computed(() => (undone.value ? undoneKept.value : []));
+const agentLine = computed(() => {
+    if (undone.value) return undoneKept.value.length ? t("TeamPacks.agents_undone_kept", { n: undoneKept.value.length }, undoneKept.value.length) : t("TeamPacks.agents_undone");
+    const made = madeAgents.value.length;
+    const reused = result.value?.agents?.kept?.length || 0;
+    if (!made && !reused) return "";
+    return t("TeamPacks.agents_made", { n: made, reused }, made);
+});
 const projectName = (id) => (projects.value.find((p) => p.id === String(id)) || {}).name || id;
 
 const tagCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.tags || []).length, 0));
@@ -224,9 +245,11 @@ async function apply() {
             teams: teams.value,
             projectIds: projectIds.value,
             starterRules: withStarterRules.value && starterRuleCount.value > 0,
-            proposeTags: tagNames.value.length > 0
+            proposeTags: tagNames.value.length > 0,
+            createAgents: createAgents.value
         });
         undone.value = false;
+        undoneKept.value = [];
     } catch (e) {
         error.value = failText(e, t("TeamPacks.failed"));
     } finally {
@@ -239,7 +262,8 @@ async function undo() {
     busy.value = true;
     error.value = "";
     try {
-        await undoTeamPack(result.value);
+        const answer = await undoTeamPack(result.value);
+        undoneKept.value = answer?.agents?.kept || [];
         undone.value = true;
     } catch (e) {
         error.value = failText(e, t("TeamPacks.undo_failed"));

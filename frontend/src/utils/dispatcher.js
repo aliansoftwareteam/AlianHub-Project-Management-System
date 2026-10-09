@@ -37,7 +37,7 @@ export const fetchTeamPacks = () => apiRequest("get", `${BASE}/team-packs`, unde
 
 export const applyTeamPack = (body) => apiRequest("post", `${BASE}/team-packs`, body).then(dataOf);
 
-/* Turns off only what `applied` (the answer of applyTeamPack) turned on: its roles, its rules and its tag approval while nobody has decided it. */
+/* Turns off only what `applied` (the answer of applyTeamPack) turned on: its roles, its rules, its tag approval while nobody has decided it, and the agents it made that have done no work. */
 export const undoTeamPack = (applied) => apiRequest("post", `${BASE}/team-packs`, {
     undo: true,
     blueprint: applied.blueprint,
@@ -45,7 +45,8 @@ export const undoTeamPack = (applied) => apiRequest("post", `${BASE}/team-packs`
     projectIds: applied.projects.map((project) => project.projectId),
     roles: Object.fromEntries(applied.projects.map((project) => [project.projectId, project.added])),
     rules: Object.fromEntries(applied.projects.map((project) => [project.projectId, project.rules || []])),
-    proposals: Object.fromEntries(applied.projects.filter((project) => project.proposalId).map((project) => [project.projectId, project.proposalId]))
+    proposals: Object.fromEntries(applied.projects.filter((project) => project.proposalId).map((project) => [project.projectId, project.proposalId])),
+    agents: (applied.agents?.made || []).map((agent) => agent.agentId)
 }).then(dataOf);
 
 export const DISPATCHER_CHANGED_EVENT = "dispatcherChanged";
