@@ -5,7 +5,8 @@ const { removeCache } = require('../../../utils/commonFunctions');
 const logger = require('../../../Config/loggerConfig');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { pinSessionTenant } = require('../../../Config/tenant');
-const { recordAudit, recordAuditFromReq } = require('../../Audit/recorder');
+const { recordAuditFromReq } = require('../../Audit/recorder');
+const { requestAddress } = require('../../../utils/requestAddress');
 const R = require('../helpers/integrationsRules');
 const H = require('../helpers/secretHandles');
 const { connectionsChanged } = require('../helpers/connectionsChanged');
@@ -15,8 +16,15 @@ const api = require('./github/api');
 
 const T = SCHEMA_TYPE.INTEGRATION_CONNECTIONS;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const STALE = 'This GitHub sign-in is no longer valid. Click Connect again.';
+const UNCONFIGURED = 'One-click GitHub needs GITHUB_CONNECT_CLIENT_ID and GITHUB_CONNECT_CLIENT_SECRET on the server.';
 
 const refuse = (res, code, statusText) => res.status(code).send({ status: false, statusText, message: statusText });
+
+const failed = (res, e, what) => {
+    logger.error(`appConnections github ${what}: ${(e && e.message) || e}`);
+    return refuse(res, 500, 'Something went wrong.');
+};
 
 const managerOrRefuse = async (req, res) => {
     const companyId = pinSessionTenant(req, res);
@@ -40,62 +48,105 @@ const tokenOf = async (companyId, conn) => (await H.openSecrets({ companyId, row
 
 const withoutSecrets = (config) => Object.fromEntries(Object.entries(config || {}).filter(([key]) => !R.secretKeys('github').includes(key)));
 
+const isOAuth = (row) => !!row && row.type === 'github' && (row.config || {}).auth === 'oauth';
+
+/* Never throws: ending the grant at GitHub is a courtesy that must not block a reconnect or a disconnect. */
+const revokeGrant = async (token) => {
+    try {
+        if (token && !await oauth.revokeToken(token)) logger.warn('appConnections github: GitHub did not revoke the earlier grant');
+    } catch (e) {
+        logger.warn(`appConnections github revoke: ${(e && e.message) || e}`);
+    }
+};
+
+const grantOf = async (companyId, row) => {
+    if (!isOAuth(row)) return '';
+    try { return await tokenOf(companyId, row); } catch (e) { return ''; }
+};
+
+const revokeGrantOf = async (companyId, row) => revokeGrant(await grantOf(companyId, row));
+
 exports.authorize = async (req, res) => {
     try {
         const companyId = await managerOrRefuse(req, res);
         if (!companyId) return undefined;
-        if (!oauth.isConfigured()) return refuse(res, 409, 'One-click GitHub needs GITHUB_CONNECT_CLIENT_ID and GITHUB_CONNECT_CLIENT_SECRET on the server.');
-        const state = oauth.encodeState({ companyId, userId: req.uid, returnOrigin: oauth.returnOriginOf(req) });
-        return res.send({ status: true, statusText: 'Open GitHub to connect.', data: { url: oauth.authorizeUrl(state) } });
-    } catch (e) { logger.error(`appConnections github authorize: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+        if (!oauth.isConfigured()) return refuse(res, 409, UNCONFIGURED);
+        const signed = oauth.encodeState({ companyId, userId: req.uid, sessionId: req.sessionId, returnOrigin: oauth.returnOriginOf(req) });
+        return res.send({ status: true, statusText: 'Open GitHub to connect.', data: { url: oauth.authorizeUrl(signed) } });
+    } catch (e) { return failed(res, e, 'authorize'); }
 };
 
-/* Public: GitHub's redirect carries no session, so the signed state names the company and person, and their rights are read again here. */
-exports.callback = async (req, res) => {
-    const { code, state, error } = req.query || {};
-    const decoded = oauth.decodeState(state);
-    const back = (outcome) => {
-        const origin = (decoded && decoded.returnOrigin) || oauth.apiBase();
-        const page = decoded ? `/${decoded.companyId}/app-connections` : '/';
-        return res.redirect(`${origin}${page}?github=${outcome}`);
-    };
-    try {
-        if (!decoded) return back('expired');
-        if (!oauth.spendNonce(decoded.nonce, decoded.exp)) return back('expired');
-        if (error) return back('denied');
-        if (!code) return back('failed');
-        const { companyId, userId } = decoded;
-        if (!flag.enabled() || !oauth.isConfigured()) return back('off');
-        if (!isPrivileged(await getRoleType(companyId, userId))) return back('rights');
+/* Public, and it exchanges nothing: it hands the code to the signed-in page in the URL fragment, which no server or referrer receives. */
+exports.callback = (req, res) => {
+    const query = req.query || {};
+    const claims = oauth.decodeState(query.state);
+    res.set({ 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
+    const go = (origin, path, params) => res.redirect(302, `${origin}/#${path}?${new URLSearchParams(params)}`);
+    if (!claims) return go(oauth.fallbackOrigin(), '/', { github: 'expired' });
+    const origin = claims.returnOrigin || oauth.fallbackOrigin();
+    const page = `/${claims.companyId}/app-connections`;
+    if (query.error) return go(origin, page, { github: 'denied' });
+    const code = oauth.usableCode(query.code);
+    if (!code) return go(origin, page, { github: 'failed' });
+    return go(origin, page, { github: 'complete', state: query.state, code });
+};
 
-        const { token } = await oauth.exchangeCode(code);
-        const actor = { id: String(userId), ip: '' };
+/* Only the person who started the sign-in, in the same session and workspace, and still an owner or admin, completes it. */
+exports.complete = async (req, res) => {
+    try {
+        const companyId = await managerOrRefuse(req, res);
+        if (!companyId) return undefined;
+        if (!oauth.isConfigured()) return refuse(res, 409, UNCONFIGURED);
+        const body = req.body || {};
+        const claims = oauth.decodeState(body.state);
+        const code = oauth.usableCode(body.code);
+        if (!claims || claims.companyId !== String(companyId) || claims.userId !== String(req.uid) || !oauth.sessionMatches(claims, req.sessionId) || !code) return refuse(res, 400, STALE);
+        if (!oauth.spendNonce(claims.nonce, claims.exp)) return refuse(res, 400, STALE);
+        const verifier = oauth.verifierOf(claims);
+        if (!verifier) return refuse(res, 400, STALE);
+
+        let token;
+        try {
+            ({ token } = await oauth.exchangeCode({ code, verifier }));
+        } catch (e) {
+            logger.error(`appConnections github exchange: ${(e && e.message) || e}`);
+            return refuse(res, 400, STALE);
+        }
+        const account = await api.accountOf({ token, companyId }).catch(() => ({ id: '', login: '' }));
         const existing = await liveGithub(companyId);
-        const config = { ...withoutSecrets(existing && existing.config), token, auth: 'oauth' };
+        const before = (existing && existing.config) || {};
+        const oldToken = await grantOf(companyId, existing);
+        let repo = before.repo || '';
+        if (repo && !await api.canReadRepo({ repo, token, companyId }).catch(() => true)) repo = '';
+        const sameReading = !!existing && !!account.id && before.accountId === account.id && repo === (before.repo || '');
+
+        const config = { ...withoutSecrets(before), token, auth: 'oauth', accountId: account.id, accountLogin: account.login };
+        if (repo) config.repo = repo; else delete config.repo;
+        const uid = String(req.uid || '');
+        const actor = { id: uid, ip: requestAddress(req) };
         const kept = await H.storeSecrets({ companyId, type: 'github', config, existing, actor });
         let id;
         if (existing) {
             id = existing._id;
+            const sync = sameReading ? { ...(existing.sync || {}), failures: 0, nextAttemptAt: null, lastError: '' } : {};
             await MongoDbCrudOpration(companyId, {
                 type: T,
-                data: [{ _id: existing._id }, { $set: { ...kept.set, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(userId), connectedBy: String(userId) }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
+                data: [{ _id: existing._id }, { $set: { ...kept.set, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: uid, connectedBy: uid, sync, ...(sameReading ? {} : { connectedAt: new Date() }) }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
             }, 'findOneAndUpdate');
             await H.retireSecrets({ companyId, handles: kept.stale, actor });
         } else {
             id = new mongoose.Types.ObjectId();
             await MongoDbCrudOpration(companyId, {
                 type: T,
-                data: { _id: id, type: 'github', name: 'GitHub', ...kept.set, secretsVersion: R.SECRETS_VERSION, status: 'connected', enabled: true, createdBy: String(userId), connectedBy: String(userId), connectedAt: new Date(), deletedStatusKey: 0 },
+                data: { _id: id, type: 'github', name: 'GitHub', ...kept.set, secretsVersion: R.SECRETS_VERSION, status: 'connected', enabled: true, createdBy: uid, connectedBy: uid, connectedAt: new Date(), deletedStatusKey: 0 },
             }, 'save');
         }
+        if (oldToken && oldToken !== token) await revokeGrant(oldToken);
         removeCache(`integration_connections:${companyId}`);
         connectionsChanged(companyId, id, { status: 'connected', enabled: true });
-        recordAudit(companyId, { actorId: String(userId), action: 'app_connection.connected', entityType: 'integration', entityId: String(id), entityName: 'GitHub', meta: { via: 'oauth' } });
-        return back('connected');
-    } catch (e) {
-        logger.error(`appConnections github callback: ${e.message}`);
-        return back('failed');
-    }
+        recordAuditFromReq(req, { action: 'app_connection.connected', entityType: 'integration', entityId: String(id), entityName: 'GitHub', meta: { via: 'oauth' } });
+        return res.send({ status: true, statusText: 'Connected.', data: { id: String(id), repo, account: account.login } });
+    } catch (e) { return failed(res, e, 'complete'); }
 };
 
 exports.repos = async (req, res) => {
@@ -108,7 +159,7 @@ exports.repos = async (req, res) => {
         if (!token) return refuse(res, 400, 'No GitHub token is stored; connect GitHub again.');
         const data = await api.listRepos({ token, companyId, page: (req.query || {}).page });
         return res.send({ status: true, statusText: 'Repositories.', data });
-    } catch (e) { logger.error(`appConnections github repos: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, e, 'repos'); }
 };
 
 exports.setRepo = async (req, res) => {
@@ -131,5 +182,9 @@ exports.setRepo = async (req, res) => {
         connectionsChanged(companyId, conn._id, { target: repo });
         recordAuditFromReq(req, { action: 'app_connection.repo', entityType: 'integration', entityId: String(conn._id), entityName: conn.name || 'GitHub', meta: { repo } });
         return res.send({ status: true, statusText: 'Updated.', data: { id: String(conn._id), repo } });
-    } catch (e) { logger.error(`appConnections github setRepo: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
+    } catch (e) { return failed(res, e, 'setRepo'); }
 };
+
+exports.grantOf = grantOf;
+exports.revokeGrant = revokeGrant;
+exports.revokeGrantOf = revokeGrantOf;

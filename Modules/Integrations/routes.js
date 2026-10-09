@@ -19,9 +19,9 @@ exports.init = (app) => {
     app.get('/api/v1/integrations/app-connections', hub.hub);
     app.put('/api/v1/integrations/connections/:id/projects', agentsRefused('integration.update'), hub.setProjects);
     app.get('/api/v1/integrations/github/authorize', agentsRefused('integration.connect'), github.authorize);
-    app.get('/api/v1/integrations/connections/:id/github-repos', github.repos);
+    app.post('/api/v1/integrations/github/complete', agentsRefused('integration.connect'), github.complete);
+    app.get('/api/v1/integrations/connections/:id/github-repos', agentsRefused('integration.update'), github.repos);
     app.put('/api/v1/integrations/connections/:id/repo', agentsRefused('integration.update'), github.setRepo);
-    // Outside /api/v1/integrations: GitHub's redirect carries no JWT, and the signed state authenticates it.
     app.get(CALLBACK_PATH, githubCallbackLimiter, github.callback);
 
     // AUTO-06 — PUBLIC Slack slash-command webhook (NOT under /api/v1/integrations,

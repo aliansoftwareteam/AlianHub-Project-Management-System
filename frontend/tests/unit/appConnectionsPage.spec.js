@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
 
-const { apiRequest } = vi.hoisted(() => ({ apiRequest: vi.fn() }));
+const { apiRequest, route, replace } = vi.hoisted(() => ({ apiRequest: vi.fn(), route: { query: {} }, replace: vi.fn() }));
 
 vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('vue-router', async (importOriginal) => ({ ...(await importOriginal()), useRoute: () => route, useRouter: () => ({ replace }) }));
 
 import AppConnections from '@/views/Integrations/AppConnections.vue';
 import en from '@/locales/en.js';
@@ -28,7 +29,7 @@ const open = async (canManage) => {
 const buttons = (wrapper) => wrapper.findAll('button').map((b) => b.text());
 
 describe('the App connections page', () => {
-    beforeEach(() => { apiRequest.mockReset(); });
+    beforeEach(() => { apiRequest.mockReset(); replace.mockReset(); route.query = {}; });
 
     it('shows a member the status alone, with no button that changes a connection', async () => {
         const wrapper = await open(false);
@@ -85,6 +86,38 @@ describe('the App connections page', () => {
             const labels = wrapper.findAll('[data-app="github"] .ah-field .ah-label').map((l) => l.text());
             expect(labels).toEqual([en.AppConnections.field_github_token, en.AppConnections.field_github_repo]);
             expect(wrapper.find('[data-one-click-off]').text()).toBe(en.AppConnections.one_click_off);
+        });
+
+        it('finishes a GitHub sign-in on the signed-in page and takes the code out of the address first', async () => {
+            route.query = { github: 'complete', state: 'signed', code: 'abc', tab: 'x' };
+            apiRequest.mockImplementation(async (method) => (method === 'post'
+                ? { data: { status: true, data: { id: 'c1', repo: '' } } }
+                : { data: { status: true, data: { enabled: true, canManage: true, apps: [{ ...github, oneClick: true }], projects: [] } } }));
+            const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
+            await flushPromises();
+            expect(replace).toHaveBeenCalledWith({ query: { tab: 'x' } });
+            expect(apiRequest).toHaveBeenCalledWith('post', expect.stringMatching(/\/github\/complete$/), { state: 'signed', code: 'abc' });
+            expect(wrapper.find('[data-notice]').text()).toBe(en.AppConnections.github_connected);
+        });
+
+        it('words a refused sign-in from the locale, not from the server', async () => {
+            route.query = { github: 'complete', state: 'signed', code: 'abc' };
+            apiRequest.mockImplementation(async (method) => {
+                if (method === 'post') throw Object.assign(new Error('x'), { response: { status: 400, data: { statusText: 'Server words' } } });
+                return { data: { status: true, data: { enabled: true, canManage: true, apps: [{ ...github, oneClick: true }], projects: [] } } };
+            });
+            const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
+            await flushPromises();
+            expect(wrapper.text()).toContain(en.AppConnections.github_expired);
+            expect(wrapper.text()).not.toContain('Server words');
+        });
+
+        it('says one-click is off when the server answers that it is not set up', async () => {
+            const wrapper = await openWith(true);
+            apiRequest.mockRejectedValueOnce(Object.assign(new Error('x'), { response: { status: 409, data: { statusText: 'Server words' } } }));
+            await connectButton(wrapper).trigger('click');
+            await flushPromises();
+            expect(wrapper.text()).toContain(en.AppConnections.github_off);
         });
 
         it('offers a repository picker on a connection made through sign-in', async () => {

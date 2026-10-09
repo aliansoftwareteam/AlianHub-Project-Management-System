@@ -43,4 +43,6 @@ async function handle(ctx, event) {
     return done;
 }
 
-module.exports = { type: 'github', poll, handle };
+const waiting = (config) => (config.repo ? '' : 'No repository is picked yet.');
+
+module.exports = { type: 'github', poll, handle, waiting };

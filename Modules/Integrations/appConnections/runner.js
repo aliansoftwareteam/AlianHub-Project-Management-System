@@ -38,9 +38,11 @@ async function syncConnection({ companyId, connection, now = Date.now(), get }) 
         const linked = Array.isArray(held.projectIds) ? held.projectIds.map(String) : [];
         const visible = actingUserId ? new Set(await visibleProjectIds(companyId, actingUserId)) : new Set();
         const projectIds = linked.filter((id) => visible.has(id));
-        if (!projectIds.length) {
-            await state.record(companyId, held._id, { cursor: new Date(now).toISOString(), lastSyncAt: new Date(now), lockUntil: null, lastError: linked.length ? 'The person who connected this app can no longer open any linked project.' : 'No project is linked yet.', failures: 0, nextAttemptAt: null });
-            return { events: 0, projects: 0 };
+        const unlinked = linked.length ? 'The person who connected this app can no longer open any linked project.' : 'No project is linked yet.';
+        const waiting = projectIds.length ? (connector.waiting && connector.waiting(held.config || {})) || '' : unlinked;
+        if (waiting) {
+            await state.record(companyId, held._id, { cursor: new Date(now).toISOString(), lastSyncAt: new Date(now), lockUntil: null, lastError: waiting, failures: 0, nextAttemptAt: null });
+            return { events: 0, projects: projectIds.length };
         }
 
         const config = await H.openSecrets({ companyId, row: held });

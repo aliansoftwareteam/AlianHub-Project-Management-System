@@ -51,7 +51,6 @@ const parsed = (res) => {
     try { return JSON.parse(res.body); } catch (e) { throw new Error('GitHub sent a reply that is not JSON.'); }
 };
 
-/* One page of the repositories the token can read, most recently pushed first; at most REPO_PAGES pages are offered. */
 async function listRepos({ token, companyId, page = 1, get = defaultGet }) {
     const at = Math.min(Math.max(1, Math.floor(Number(page)) || 1), REPO_PAGES);
     const url = `https://api.github.com/user/repos?affiliation=owner,collaborator,organization_member&sort=pushed&per_page=${PAGE_SIZE}&page=${at}`;
@@ -63,9 +62,14 @@ async function listRepos({ token, companyId, page = 1, get = defaultGet }) {
 
 async function canReadRepo({ repo, token, companyId, get = defaultGet }) {
     const res = await get(`https://api.github.com/repos/${repo}`, { token, companyId });
-    if (res.status === 404) return false;
+    if ([401, 403, 404].includes(res.status) && !rateLimited(res)) return false;
     parsed(res);
     return true;
 }
 
-module.exports = { listPulls, listRepos, canReadRepo, defaultGet, PAGE_SIZE, MAX_PAGES, REPO_PAGES };
+async function accountOf({ token, companyId, get = defaultGet }) {
+    const body = parsed(await get('https://api.github.com/user', { token, companyId }));
+    return { id: String((body && body.id) || ''), login: String((body && body.login) || '') };
+}
+
+module.exports = { listPulls, listRepos, canReadRepo, accountOf, defaultGet, PAGE_SIZE, MAX_PAGES, REPO_PAGES };

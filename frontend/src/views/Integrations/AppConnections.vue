@@ -115,6 +115,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -142,7 +143,12 @@ const reposMore = ref(false);
 const reposLoaded = ref(false);
 const pickedRepo = ref("");
 
-const GITHUB_OUTCOMES = ["connected", "expired", "denied", "rights", "off", "failed"];
+const GITHUB_OUTCOMES = ["expired", "denied", "rights", "off", "failed"];
+const GITHUB_RETURN_KEYS = ["github", "state", "code"];
+const GITHUB_REFUSALS = { 400: "github_expired", 403: "github_rights", 409: "github_off" };
+
+const route = useRoute();
+const router = useRouter();
 
 const when = (value) => new Date(value).toLocaleString();
 const stateOf = (conn) => {
@@ -151,6 +157,7 @@ const stateOf = (conn) => {
 };
 const chipOf = (conn) => ({ "ah-chip--ok": stateOf(conn) === "connected", "ah-chip--warn": stateOf(conn) === "paused", "ah-chip--danger": stateOf(conn) === "error" });
 
+const githubFailure = (e) => t(`AppConnections.${GITHUB_REFUSALS[e?.response?.status] || "github_failed"}`);
 const failure = (e) => e?.response?.data?.statusText || e?.message || t("AppConnections.failed");
 
 const load = async () => {
@@ -190,9 +197,9 @@ const openConnect = async (app) => {
         try {
             const res = await apiRequest("get", `${env.INTEGRATIONS}/github/authorize`);
             if (res?.data?.status && res.data.data?.url) window.location.assign(res.data.data.url);
-            else error.value = res?.data?.statusText || t("AppConnections.failed");
+            else error.value = t("AppConnections.github_failed");
         } catch (e) {
-            error.value = failure(e);
+            error.value = githubFailure(e);
         } finally {
             busy.value = false;
         }
@@ -236,16 +243,29 @@ const saveRepo = async (conn) => {
     if (!error.value) choosingRepo.value = "";
 };
 
-const readGithubOutcome = () => {
-    const params = new URLSearchParams(window.location.search);
-    const outcome = params.get("github");
+/* GitHub returns here with the code in the address; it leaves the address before it is used. */
+const finishGithub = async () => {
+    const query = route.query || {};
+    const { github: outcome, state, code } = query;
     if (!outcome) return;
-    params.delete("github");
-    const rest = params.toString();
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
-    if (!GITHUB_OUTCOMES.includes(outcome)) return;
-    if (outcome === "connected") notice.value = t("AppConnections.github_connected");
-    else error.value = t(`AppConnections.github_${outcome}`);
+    await router.replace({ query: Object.fromEntries(Object.entries(query).filter(([key]) => !GITHUB_RETURN_KEYS.includes(key))) });
+    if (outcome !== "complete") {
+        if (GITHUB_OUTCOMES.includes(outcome)) error.value = t(`AppConnections.github_${outcome}`);
+        return;
+    }
+    if (typeof state !== "string" || typeof code !== "string") return;
+    busy.value = true;
+    try {
+        const res = await apiRequest("post", `${env.INTEGRATIONS}/github/complete`, { state, code });
+        if (res?.data?.status) {
+            notice.value = t("AppConnections.github_connected");
+            await load();
+        } else error.value = t("AppConnections.github_failed");
+    } catch (e) {
+        error.value = githubFailure(e);
+    } finally {
+        busy.value = false;
+    }
 };
 
 const connect = async (app) => {
@@ -273,7 +293,7 @@ const saveProjects = async (conn) => {
 
 onMounted(async () => {
     await load();
-    readGithubOutcome();
+    await finishGithub();
 });
 </script>
 
