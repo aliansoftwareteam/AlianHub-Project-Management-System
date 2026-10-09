@@ -228,6 +228,8 @@ const ACTIONS = Object.freeze({
     'integration.update': 'Change an integration',
     'integration.disconnect': 'Disconnect an integration',
     'app_connection.projects': 'Link an app to projects',
+    'app_connection.connected': 'Connect an app through its sign-in',
+    'app_connection.repo': 'Pick the repository an app reads',
     'app_connection.sync': 'Check a connected app for changes',
     'app_connection.task_linked': 'Link a pull request to a task',
     'app_connection.task_moved': 'Note a merged pull request on a task',

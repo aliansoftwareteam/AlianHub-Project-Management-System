@@ -8,7 +8,8 @@ const REPO = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/;
  * GitHub timestamps have a second's resolution, so the newest comes back once more and its claims turn it away. */
 async function poll({ companyId, config, since, get }) {
     if (!config.token) throw new Error('No GitHub token is stored; connect GitHub again.');
-    if (!REPO.test(String(config.repo || ''))) throw new Error('The repository must look like owner/repo.');
+    if (!config.repo) throw new Error('No repository is picked yet; pick one on App connections.');
+    if (!REPO.test(String(config.repo))) throw new Error('The repository must look like owner/repo.');
     const { pulls, truncated } = await api.listPulls({ repo: config.repo, token: config.token, companyId, since, get });
     const events = pulls.flatMap((pull) => eventsOfPull(config.repo, pull));
     const seen = pulls.map((pull) => pull.updated_at);
@@ -42,4 +43,6 @@ async function handle(ctx, event) {
     return done;
 }
 
-module.exports = { type: 'github', poll, handle };
+const waiting = (config) => (config.repo ? '' : 'No repository is picked yet.');
+
+module.exports = { type: 'github', poll, handle, waiting };
