@@ -31,6 +31,7 @@ const workFlag = require('./workFlag');
 const argsSchema = require('./argsSchema');
 const { taskRow, planRow } = require('./taskRows');
 const { searchFilters } = require('./searchFilters');
+const { clientMessage } = require('./clientError');
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
@@ -467,7 +468,7 @@ const batchTool = (ctx, operation) => {
 
 const outcomeOf = (error) => (error instanceof actions.RefusedError
     ? { ok: false, refused: true, reason: error.message, auditId: error.auditId || null }
-    : { ok: false, error: error.message });
+    : { ok: false, error: clientMessage(error, 'batch operation') });
 
 /* One operation of a batch: a write tool this caller has, run exactly as a call of its own, with its outcome instead of a throw. */
 const batchItem = async (ctx, operation) => {
