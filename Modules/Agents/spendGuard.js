@@ -39,6 +39,10 @@ const forRun = ({ companyId, run, actor }) => {
         if (month.budgetUsd > 0 && money(month.usedUsd + month.reservedUsd) > month.budgetUsd) {
             return { cap: 'company', limit: month.budgetUsd, remaining: month.budgetUsd - month.usedUsd - (month.reservedUsd - usd) };
         }
+        const day = month.daily;
+        if (day.budgetUsd > 0 && money(day.usedUsd + day.reservedUsd) > day.budgetUsd) {
+            return { cap: 'daily', limit: day.budgetUsd, remaining: day.budgetUsd - day.usedUsd - (day.reservedUsd - usd) };
+        }
         return null;
     };
 

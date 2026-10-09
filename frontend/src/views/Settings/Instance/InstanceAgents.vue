@@ -27,6 +27,16 @@
 
             <div class="in-field">
                 <div>
+                    <label class="in-field__label" for="ag-daily-budget">{{ $t('Instance.agent_daily_budget') }}</label>
+                    <div class="in-field__help">{{ $t('Instance.agent_daily_budget_help') }}</div>
+                </div>
+                <div class="in-field__control">
+                    <input id="ag-daily-budget" v-model.number="draft.dailyBudgetUsd" type="number" min="0" step="1" class="ah-input" data-test="daily-budget" />
+                </div>
+            </div>
+
+            <div class="in-field">
+                <div>
                     <span class="in-field__label">{{ $t('Instance.agent_usage') }}</span>
                     <div class="in-field__help ah-mono">{{ view.month }}</div>
                 </div>
@@ -42,6 +52,29 @@
                             class="ah-chip"
                             :class="alertChip(a)"
                             :data-test="`alert-${a.threshold}`"
+                            :data-state="a.at ? 'sent' : 'quiet'"
+                        >{{ a.at ? $t('Instance.agent_alert_sent', { threshold: a.threshold, at: when(a.at) }) : $t('Instance.agent_alert_quiet', { threshold: a.threshold }) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="in-field">
+                <div>
+                    <span class="in-field__label">{{ $t('Instance.agent_usage_today') }}</span>
+                    <div class="in-field__help ah-mono">{{ view.daily.day }}</div>
+                </div>
+                <div class="in-field__control">
+                    <div class="in-meter" :class="`is-${view.daily.level}`" role="progressbar" :aria-valuenow="view.daily.percent" aria-valuemin="0" aria-valuemax="100" :aria-label="$t('Instance.agent_usage_today')" data-test="daily-usage-bar">
+                        <span class="in-meter__fill" :style="{ width: `${view.daily.width}%` }"></span>
+                    </div>
+                    <span class="ah-small ah-mono" data-test="daily-usage-line">{{ dailyLine }}</span>
+                    <div class="in-alerts">
+                        <span
+                            v-for="a in view.daily.alerts"
+                            :key="a.threshold"
+                            class="ah-chip"
+                            :class="alertChip(a)"
+                            :data-test="`daily-alert-${a.threshold}`"
                             :data-state="a.at ? 'sent' : 'quiet'"
                         >{{ a.at ? $t('Instance.agent_alert_sent', { threshold: a.threshold, at: when(a.at) }) : $t('Instance.agent_alert_quiet', { threshold: a.threshold }) }}</span>
                     </div>
@@ -112,15 +145,18 @@ const busy = ref(false);
 const error = ref("");
 const budget = ref(null);
 const provider = ref({ name: "", hasKey: false, region: "", model: "", priced: null });
-const draft = reactive({ undoHours: 24, monthlyBudgetUsd: 0 });
+const draft = reactive({ undoHours: 24, monthlyBudgetUsd: 0, dailyBudgetUsd: 0 });
 let baseline = { ...draft };
 
 const privileged = computed(() => isOwnerOrAdmin(Number(getters["settings/companyUserDetail"]?.roleType)));
 const view = computed(() => budgetView(budget.value));
-const dirty = computed(() => draft.undoHours !== baseline.undoHours || draft.monthlyBudgetUsd !== baseline.monthlyBudgetUsd);
+const dirty = computed(() => draft.undoHours !== baseline.undoHours || draft.monthlyBudgetUsd !== baseline.monthlyBudgetUsd || draft.dailyBudgetUsd !== baseline.dailyBudgetUsd);
 const usageLine = computed(() => (view.value.cap > 0
     ? t("Instance.agent_usage_line", { used: view.value.used.toFixed(2), cap: view.value.cap.toFixed(0), percent: view.value.percent })
     : t("Instance.agent_usage_uncapped", { used: view.value.used.toFixed(2) })));
+const dailyLine = computed(() => (view.value.daily.cap > 0
+    ? t("Instance.agent_usage_line", { used: view.value.daily.used.toFixed(2), cap: view.value.daily.cap.toFixed(0), percent: view.value.daily.percent })
+    : t("Instance.agent_usage_daily_uncapped", { used: view.value.daily.used.toFixed(2) })));
 
 const when = (at) => (at ? new Date(at).toLocaleString() : "");
 const featureLabel = (feature) => t(featureLabelKey(feature));
@@ -134,8 +170,9 @@ const unwrap = (res) => {
 function seed(settings) {
     draft.undoHours = Number(settings.undoHours ?? 24);
     draft.monthlyBudgetUsd = Number(settings.monthlyBudgetUsd ?? 0);
+    draft.dailyBudgetUsd = Number(settings.dailyBudgetUsd ?? 0);
     provider.value = { name: settings.provider?.name || "", hasKey: settings.provider?.hasKey === true, region: settings.provider?.region || "", model: settings.provider?.model || "", priced: settings.provider?.priced === true };
-    baseline = { undoHours: draft.undoHours, monthlyBudgetUsd: draft.monthlyBudgetUsd };
+    baseline = { undoHours: draft.undoHours, monthlyBudgetUsd: draft.monthlyBudgetUsd, dailyBudgetUsd: draft.dailyBudgetUsd };
 }
 
 async function load() {
@@ -154,7 +191,7 @@ async function load() {
 async function save() {
     busy.value = true;
     try {
-        const res = await apiRequest("put", env.AGENT_SETTINGS, { undoHours: draft.undoHours, monthlyBudgetUsd: draft.monthlyBudgetUsd });
+        const res = await apiRequest("put", env.AGENT_SETTINGS, { undoHours: draft.undoHours, monthlyBudgetUsd: draft.monthlyBudgetUsd, dailyBudgetUsd: draft.dailyBudgetUsd });
         seed(unwrap(res));
         const budgetRes = await apiRequest("get", env.AGENT_BUDGET).catch(() => null);
         if (budgetRes?.data?.status === true) budget.value = budgetRes.data.data || budget.value;

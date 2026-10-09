@@ -17,6 +17,10 @@
  * Two independent mechanisms, because the query is what protects the budget on
  * a cluster whose index has not finished building.
  *
+ * **Two budgets, one hold.** A workspace may set a monthly budget, a daily one
+ * (UTC day), or both. One hold row is inserted and totalled against each budget
+ * that is set; the call goes only if it fits every one of them.
+ *
  * The trade is deliberate: an expired hold on a call that is somehow still
  * running can let the month go slightly over, and money already spent is
  * always booked to the ledger by the meter. Over-holding forever is the worse
@@ -36,6 +40,7 @@ const DEFAULT_TTL_MS = 900000;
 
 const money = (n) => Math.round(Number(n || 0) * 10000) / 10000;
 const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
+const dayKey = (d = new Date()) => d.toISOString().slice(0, 10);
 
 const ttlMs = () => {
     const ms = Number(process.env.AI_RESERVATION_TTL_MS);
@@ -47,6 +52,11 @@ const monthRange = (month) => {
     return { from, to: new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1)) };
 };
 
+const dayRange = (day) => {
+    const from = new Date(`${day}T00:00:00.000Z`);
+    return { from, to: new Date(from.getTime() + 24 * 60 * 60 * 1000) };
+};
+
 /**
  * USD held by calls in flight this month: unsettled, unexpired holds only.
  *
@@ -56,9 +66,8 @@ const monthRange = (month) => {
  * row in first sees only itself and goes, the later one sees both and is
  * refused. Insertion order is the ObjectId's, which is what `_id` sorts by.
  */
-async function heldUsd(companyId, month = monthKey(), { now = new Date(), upTo = null } = {}) {
+async function heldBetween(companyId, { from, to }, { now = new Date(), upTo = null } = {}) {
     if (!companyId) return 0;
-    const { from, to } = monthRange(month);
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AI_RESERVATIONS,
         data: [[
@@ -72,19 +81,29 @@ async function heldUsd(companyId, month = monthKey(), { now = new Date(), upTo =
     return money((rows && rows[0] && rows[0].usd) || 0);
 }
 
-const settings = (companyId) => require('../Agents/budget').settings(companyId);
-const booked = (companyId, month) => require('./spend').monthly(companyId, month);
+const heldUsd = (companyId, month = monthKey(), opts) => heldBetween(companyId, monthRange(month), opts);
 
-const refusal = ({ estimate, usd, budgetUsd, usedUsd, held }) => ({
+/** USD held by calls in flight on one UTC day, counted the same way. */
+const heldUsdOn = (companyId, day = dayKey(), opts) => heldBetween(companyId, dayRange(day), opts);
+
+const settings = (companyId) => require('../Agents/budget').settings(companyId);
+
+const PERIODS = Object.freeze({
+    daily: { label: 'daily budget', left: 'today (UTC)', key: dayKey, booked: (companyId, key) => require('./spend').daily(companyId, key), held: heldUsdOn },
+    monthly: { label: 'budget', left: 'this month', key: monthKey, booked: (companyId, key) => require('./spend').monthly(companyId, key), held: heldUsd },
+});
+
+const refusal = ({ period, estimate, usd, budgetUsd, usedUsd, held }) => ({
     ok: false,
     state: RESERVATION.REFUSED,
     code: BUDGET_EXHAUSTED,
+    period,
     usd,
     budgetUsd,
     usedUsd,
     heldUsd: held,
     estimate,
-    reason: `${BUDGET_EXHAUSTED}: this call is estimated at $${money(usd).toFixed(4)} and the workspace budget of $${budgetUsd} has $${money(budgetUsd - usedUsd - (held - usd)).toFixed(4)} left this month`,
+    reason: `${BUDGET_EXHAUSTED}: this call is estimated at $${money(usd).toFixed(4)} and the workspace ${PERIODS[period].label} of $${budgetUsd} has $${money(budgetUsd - usedUsd - (held - usd)).toFixed(4)} left ${PERIODS[period].left}`,
 });
 
 const pass = (state) => ({ ok: true, state, usd: 0, id: null });
@@ -103,12 +122,12 @@ async function reserve(context, estimate, provider) {
     if (!context.billedToWorkspace || !context.companyId) return pass(RESERVATION.UNBILLED);
     if (!estimate || !estimate.priced) return pass(RESERVATION.UNBILLED);
 
-    const { monthlyBudgetUsd: budgetUsd } = await settings(context.companyId);
-    if (!(budgetUsd > 0)) return pass(RESERVATION.NO_BUDGET);
+    const { monthlyBudgetUsd, dailyBudgetUsd } = await settings(context.companyId);
+    const limits = [['daily', dailyBudgetUsd], ['monthly', monthlyBudgetUsd]].filter(([, budgetUsd]) => budgetUsd > 0);
+    if (!limits.length) return pass(RESERVATION.NO_BUDGET);
 
     const usd = money(estimate.costUsd);
     const at = new Date();
-    const month = monthKey(at);
     const row = await MongoDbCrudOpration(context.companyId, {
         type: SCHEMA_TYPE.AI_RESERVATIONS,
         data: {
@@ -123,13 +142,17 @@ async function reserve(context, estimate, provider) {
     }, 'save');
 
     const id = row && row._id ? row._id : null;
-    const ticket = { ok: true, state: RESERVATION.HELD, usd, id: id ? String(id) : null, estimate, companyId: String(context.companyId), month };
-    const [spent, held] = await Promise.all([booked(context.companyId, month), heldUsd(context.companyId, month, { now: at, upTo: id })]);
-    const usedUsd = money(spent.usedUsd);
-    if (money(usedUsd + held) <= budgetUsd) return ticket;
+    const ticket = { ok: true, state: RESERVATION.HELD, usd, id: id ? String(id) : null, estimate, companyId: String(context.companyId), month: monthKey(at), day: dayKey(at) };
+    const totals = await Promise.all(limits.map(async ([period, budgetUsd]) => {
+        const key = PERIODS[period].key(at);
+        const [spent, held] = await Promise.all([PERIODS[period].booked(context.companyId, key), PERIODS[period].held(context.companyId, key, { now: at, upTo: id })]);
+        return { period, budgetUsd, usedUsd: money(spent.usedUsd), held };
+    }));
+    const over = totals.find((t) => money(t.usedUsd + t.held) > t.budgetUsd);
+    if (!over) return ticket;
 
     await close(ticket, RESERVATION.RELEASED);
-    const refused = refusal({ estimate, usd, budgetUsd, usedUsd, held });
+    const refused = refusal({ estimate, usd, ...over });
     logger.info(`${LOG_PREFIX} ${context.companyId}: ${context.feature} refused — ${refused.reason}`);
     return refused;
 }
@@ -165,4 +188,4 @@ async function stranded(companyId, now = new Date()) {
     return rows || [];
 }
 
-module.exports = { reserve, reconcile, release, heldUsd, stranded, monthKey, ttlMs, BUDGET_EXHAUSTED, DEFAULT_TTL_MS };
+module.exports = { reserve, reconcile, release, heldUsd, heldUsdOn, stranded, monthKey, dayKey, ttlMs, BUDGET_EXHAUSTED, DEFAULT_TTL_MS };

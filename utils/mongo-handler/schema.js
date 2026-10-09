@@ -2960,6 +2960,16 @@ const schema = {
             type: Number,
             required: false
         },
+        // 0 or unset = no daily limit; the day is the UTC day
+        agentDailyBudgetUsd: {
+            type: Number,
+            required: false
+        },
+        // { day: 'YYYY-MM-DD', '80': Date|null, '100': Date|null }
+        agentDailyBudgetAlerts: {
+            type: Object,
+            required: false
+        },
         // { month: 'YYYY-MM', '80': Date|null, '100': Date|null }
         agentBudgetAlerts: {
             type: Object,

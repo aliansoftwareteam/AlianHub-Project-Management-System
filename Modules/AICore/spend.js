@@ -122,7 +122,7 @@ function metered(adapter) {
             if (!ticket.ok) {
                 call.skip(adapter.name, requestedModel, ticket.code);
                 telemetry.setAttributes(call.attributes());
-                throw Object.assign(new Error(ticket.reason), { code: ticket.code, feature: context.feature });
+                throw Object.assign(new Error(ticket.reason), { code: ticket.code, period: ticket.period, feature: context.feature });
             }
             call.attempt(adapter.name, requestedModel);
             const startedAt = Date.now();
@@ -163,7 +163,7 @@ function metered(adapter) {
             const texts = Array.isArray(opts && opts.texts) ? opts.texts : [];
             const estimate = preflight({ messages: texts.map((content) => ({ role: 'user', content })), maxTokens: 0, model, feature: context.feature });
             const ticket = await reservation.reserve(context, estimate, adapter.name);
-            if (!ticket.ok) throw Object.assign(new Error(ticket.reason), { code: ticket.code, feature: context.feature });
+            if (!ticket.ok) throw Object.assign(new Error(ticket.reason), { code: ticket.code, period: ticket.period, feature: context.feature });
             let result;
             try {
                 result = await asCompany(context, () => adapter.embed(opts));
@@ -199,7 +199,7 @@ async function audio({ spend, model, provider, usdPerMinute, seconds, estimated 
     await aiSwitch.assertAllowed(context.companyId);
     const hold = { priced: true, costUsd: audioUsd(seconds, usdPerMinute), model, inputTokens: 0, outputTokens: 0 };
     const ticket = await reservation.reserve(context, hold, provider);
-    if (!ticket.ok) throw Object.assign(new Error(ticket.reason), { code: ticket.code, feature: context.feature });
+    if (!ticket.ok) throw Object.assign(new Error(ticket.reason), { code: ticket.code, period: ticket.period, feature: context.feature });
     let result;
     try {
         result = await asCompany(context, call);
@@ -233,25 +233,40 @@ const monthRange = (month) => {
     return { from, to: new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1)) };
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const dayKey = (d = new Date()) => d.toISOString().slice(0, 10);
+const dayRange = (day) => {
+    const from = new Date(`${day}T00:00:00.000Z`);
+    return { from, to: new Date(from.getTime() + DAY_MS) };
+};
+
 const money = (n) => Math.round(Number(n || 0) * 10000) / 10000;
 
-/* This month's workspace-billed spend, in total and per feature (largest first). */
-async function monthly(companyId, month) {
-    const { from, to } = monthRange(month);
+async function between(companyId, { from, to }) {
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.AI_USAGE, data: [{ at: { $gte: from, $lt: to }, billedToWorkspace: true }, 'feature costUsd totalTokens'],
     }, 'find').catch(() => []);
-    const byFeature = new Map();
+    return rows || [];
+}
+
+const byFeature = (rows) => {
+    const groups = new Map();
     (rows || []).forEach((r) => {
         const key = r.feature || UNKNOWN_FEATURE;
-        const cur = byFeature.get(key) || { feature: key, usd: 0, calls: 0, tokens: 0 };
+        const cur = groups.get(key) || { feature: key, usd: 0, calls: 0, tokens: 0 };
         cur.usd += Number(r.costUsd || 0);
         cur.calls += 1;
         cur.tokens += Number(r.totalTokens || 0);
-        byFeature.set(key, cur);
+        groups.set(key, cur);
     });
-    const features = [...byFeature.values()].map((f) => ({ ...f, usd: money(f.usd) })).sort((a, b) => b.usd - a.usd || a.feature.localeCompare(b.feature));
+    const features = [...groups.values()].map((f) => ({ ...f, usd: money(f.usd) })).sort((a, b) => b.usd - a.usd || a.feature.localeCompare(b.feature));
     return { usedUsd: money(features.reduce((s, f) => s + f.usd, 0)), features };
-}
+};
 
-module.exports = { metered, audio, monthly, contextOf, ensurePriced, AUDIO_MINUTE };
+/* This month's workspace-billed spend, in total and per feature (largest first). */
+const monthly = async (companyId, month) => byFeature(await between(companyId, monthRange(month)));
+
+/* The same for one UTC day, which is what the daily budget is read against. */
+const daily = async (companyId, day = dayKey()) => byFeature(await between(companyId, dayRange(day)));
+
+module.exports = { metered, audio, monthly, daily, dayKey, dayRange, contextOf, ensurePriced, AUDIO_MINUTE };

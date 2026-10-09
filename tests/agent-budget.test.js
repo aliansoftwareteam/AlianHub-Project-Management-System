@@ -62,6 +62,7 @@ describe('budget.status', () => {
         expect(await budget.status(C)).toEqual({
             month: runs.monthKey(), usedUsd: 5.5, budgetUsd: 10, percent: 55, alerts: { 80: null, 100: null },
             features: [{ feature: 'project_plan', usd: 3, calls: 1, tokens: 10 }, { feature: 'agent_run', usd: 2.5, calls: 1, tokens: 10 }],
+            daily: { day: new Date().toISOString().slice(0, 10), usedUsd: 5.5, budgetUsd: 0, percent: 0, alerts: { 80: null, 100: null } },
         });
     });
 
@@ -76,7 +77,7 @@ describe('budget.status', () => {
         seedSpend(17, { feature: 'ask' });
         const r = { code: 200, body: null }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; };
         await ctrl.getBudget({ headers: { companyid: C }, query: {}, uid: 'owner1' }, r);
-        expect(r.body).toEqual({ status: true, statusText: 'Budget fetched.', data: { month: runs.monthKey(), usedUsd: 17, budgetUsd: 20, percent: 85, alerts: { 80: '2026-09-01T10:00:00.000Z', 100: null }, features: [{ feature: 'ask', usd: 17, calls: 1, tokens: 10 }] } });
+        expect(r.body).toEqual({ status: true, statusText: 'Budget fetched.', data: { month: runs.monthKey(), usedUsd: 17, budgetUsd: 20, percent: 85, alerts: { 80: '2026-09-01T10:00:00.000Z', 100: null }, features: [{ feature: 'ask', usd: 17, calls: 1, tokens: 10 }], daily: { day: new Date().toISOString().slice(0, 10), usedUsd: 17, budgetUsd: 0, percent: 0, alerts: { 80: null, 100: null } } } });
     });
 
     it('forgets last month\'s alert stamps', async () => {

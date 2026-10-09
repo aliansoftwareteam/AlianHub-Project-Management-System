@@ -78,6 +78,19 @@ describe('the run spend cap is checked before the model call (defect 15)', () =>
         expect(refusalRows()[0].meta.params.estimatedUsd).toBeGreaterThan(0.01);
     });
 
+    it('a call estimated over the company\'s remaining daily budget is refused naming the daily cap, even with the month wide open', async () => {
+        mockDb.store[dbCollections.COMPANIES][0].agentMonthlyBudgetUsd = 500;
+        mockDb.store[dbCollections.COMPANIES][0].agentDailyBudgetUsd = 0.05;
+        mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'agent_run', costUsd: 0.03, totalTokens: 10, priced: true, billedToWorkspace: true, at: new Date() });
+        const run = await start();
+        const out = await execute(run);
+
+        expect(chat).not.toHaveBeenCalled();
+        expect(out).toMatchObject({ status: 'stopped', outcome: expect.stringMatching(/the daily cap of \$0\.0500 has \$0\.0200 left$/) });
+        expect(refusalRows()[0].meta.params).toMatchObject({ cap: 'daily', limitUsd: 0.05, remainingUsd: 0.02 });
+        expect(runRow(run._id).reservedUsd).toBe(0);
+    });
+
     it('counts what the run already spent: a second call that would cross the cap is refused', async () => {
         const run = await start({ spendCapUsd: 0.05 });
         await runs.patch(C, run._id, { 'spend.usd': 0.03 });
