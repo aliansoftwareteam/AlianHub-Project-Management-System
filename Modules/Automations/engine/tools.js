@@ -4,7 +4,6 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { recordAudit } = require('../../Audit/recorder');
 const { ACTOR_SERVICE, serviceStamp } = require('../../Agents/serviceIdentity');
 const socketEmitter = require('../../../event/socketEventEmitter');
-const knowledgeEvents = require('../../Knowledge/ingest/events');
 const { canPostToThread, threadOf } = require('../../Comments/helpers/threadWriteAccess');
 const { sprintPlacementOf } = require('../../Tasks/helpers/sprintPlacement');
 const { slotUnder } = require('../../Tasks/helpers/taskTree');
@@ -71,6 +70,22 @@ const emitAutomationUpdate = (companyId, doc, updatedFields, depth) => {
         updatedFields,
         actor: { kind: 'automation', userId: null },
         depth: (Number(depth) || 0) + 1,
+    });
+};
+
+/* The web route's insert emit: open threads show the comment at once, and the event bus reads it as comment.created.
+ * An agent acting as the viewer is the viewer's own userId, so the client tells rows apart by _id, never by author. */
+const emitCommentInsert = (companyId, saved, context) => {
+    const data = typeof saved.toObject === 'function' ? saved.toObject() : saved;
+    const kind = context.actorType === 'agent' ? 'agent' : 'automation';
+    socketEmitter.emit('insert', {
+        type: 'insert',
+        module: 'comments',
+        companyId,
+        data,
+        updatedFields: {},
+        actor: { kind, userId: kind === 'agent' && context.actingUserId ? String(context.actingUserId) : null },
+        depth: (Number(context.depth) || 0) + 1,
     });
 };
 
@@ -163,7 +178,7 @@ const addComment = async (companyId, taskId, body, context = {}, { replyTo = '' 
         },
     }, 'save');
 
-    if (saved && saved._id) knowledgeEvents.publishCommentChanged(companyId, saved._id, 'created');
+    if (saved && saved._id) emitCommentInsert(companyId, saved, context);
 
     recordAutomationAudit(companyId, context, {
         action: 'automation.task.comment',
