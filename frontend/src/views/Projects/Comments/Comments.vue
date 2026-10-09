@@ -62,7 +62,7 @@
                         :showDay="data.showDifference"
                         :showUser="showUserInfo(data, messages[index - 1])"
                         :showMessageTime="showMessageTime(data, messages[index - 1])"
-                        :showUnread="unreadMessages !== 0 && index === (messages.length - (unreadMessages)) ? unreadMessages : 0"
+                        :showUnread="unreadDivider !== 0 && index === (messages.length - (unreadDivider)) ? unreadDivider : 0"
                         :class="{'mb-1': (index === messages.length - 1)}"
 
                         :mainChat="mainChat"
@@ -255,6 +255,7 @@ import { isOnViewerSide } from "@/utils/commentSide";
 import CommentThread from "@/components/molecules/CommentThread/CommentThread.vue";
 import { applyCommentEvent, isTaskThread } from "@/composable/commentThreads";
 import { placeOfIncoming } from "./incomingComment";
+import { readsOnOpen, dividerAfterCount } from "./unreadOnOpen";
 import { fetchOwnAi, fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
 import { maskOf } from "@/utils/iconMask";
 
@@ -467,12 +468,13 @@ watch(() => [props.taskId, props.mainChat, props.newChat], async ([taskId]) => {
     if (taskId === props.taskId) mentionAgents.value = agents;
 }, { immediate: true });
 const unreadMessages = ref(0);
+const unreadDivider = ref(0);
 let debounceTimeout;
-const countGetter = computed(() => {
-    return getters["users/myCounts"]?.data?.[`${props.taskId ? "task" : "project"}_${projectData.value._id}${props.taskId ? `_${props.sprintId}_${props.taskId}` : ``}_comments`] || 0
-})
-watch(countGetter, (val) => {
+const countKey = computed(() => `${props.taskId ? "task" : "project"}_${projectData.value._id}${props.taskId ? `_${props.sprintId}_${props.taskId}` : ``}_comments`)
+const countGetter = computed(() => getters["users/myCounts"]?.data?.[countKey.value] || 0)
+watch([countKey, countGetter], ([key, val], [oldKey] = []) => {
     unreadMessages.value = val;
+    unreadDivider.value = dividerAfterCount({ divider: unreadDivider.value, count: val, threadChanged: key !== oldKey });
 }, {immediate: true})
 const userCommentCount = computed(() => {
     return  getters["users/myCounts"]?.data || {}
@@ -720,6 +722,15 @@ watch([loadingChat, clientWidth], ([loading]) => {
     }
 })
 
+watch([loadingChat, countKey], ([loading]) => {
+    if(loading) return;
+    setTimeout(() => {
+        if(readsOnOpen({ taskId: props.taskId, mainChat: props.mainChat, newChat: props.newChat, unread: unreadMessages.value })) {
+            updateCount(true, 0);
+        }
+    })
+}, {immediate: true})
+
 watch(() => props.userIds, () => {
     setUsers();
 })
@@ -815,6 +826,7 @@ function watchScroll(e) {
 }
 
 function watchClick(e) {
+    if(!unreadMessages.value) unreadDivider.value = 0;
     if(unreadMessages.value && document.hasFocus()) {
         e.preventDefault();
 
@@ -2033,8 +2045,8 @@ async function sendMessageFun(messageData,isReset = true) {
                         getMessages();
                     }
 
-                    // SET COUNT TO ZERO
                     resetUnread.value = true;
+                    unreadDivider.value = 0;
                     updateCount(true, 0);
 
                     if (edited) {
