@@ -37,6 +37,11 @@ const managerOrRefuse = async (req, res) => {
     return null;
 };
 
+const sameTarget = (existing, next) => {
+    const keep = (type, config) => Object.fromEntries(Object.entries(config || {}).filter(([key]) => !R.secretKeys(type).includes(key)));
+    return JSON.stringify(keep(existing.type, existing.config)) === JSON.stringify(keep(next.type, next.config));
+};
+
 exports.listCatalog = async (req, res) => {
     try {
         const connectors = require('../Agents/connectors/flag').requested();
@@ -72,7 +77,7 @@ exports.connect = async (req, res) => {
                 const kept = await H.storeSecrets({ companyId, type: check.value.type, config: check.value.config, existing, actor });
                 const upd = await MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
-                    data: [{ _id: existing._id }, { $set: { ...kept.set, name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(req.uid || '') }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
+                    data: [{ _id: existing._id }, { $set: { ...kept.set, name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(req.uid || ''), connectedBy: String(req.uid || ''), ...(sameTarget(existing, check.value) ? {} : { sync: {} }) }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
                 }, 'findOneAndUpdate');
                 await H.retireSecrets({ companyId, handles: kept.stale, actor });
                 removeCache(`integration_connections:${companyId}`);
@@ -82,7 +87,7 @@ exports.connect = async (req, res) => {
         const kept = await H.storeSecrets({ companyId, type: check.value.type, config: check.value.config, actor });
         const data = {
             _id: new mongoose.Types.ObjectId(), type: check.value.type, name: check.value.name, ...kept.set, secretsVersion: R.SECRETS_VERSION,
-            status: 'connected', enabled: true, createdBy: String(req.uid || ''), connectedAt: new Date(), deletedStatusKey: 0,
+            status: 'connected', enabled: true, createdBy: String(req.uid || ''), connectedBy: String(req.uid || ''), connectedAt: new Date(), deletedStatusKey: 0,
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data }, 'save');
         removeCache(`integration_connections:${companyId}`);

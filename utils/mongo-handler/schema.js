@@ -1761,7 +1761,11 @@ const schema = {
         status: { type: String, default: 'connected', required: false },
         enabled: { type: Boolean, default: true, required: false },
         createdBy: { type: String, required: false },
+        connectedBy: { type: String, required: false },
         connectedAt: { type: Date, required: false },
+        projectIds: { type: [String], default: undefined, required: false },
+        // Poll state: { cursor, lastSyncAt, lastError, failures, nextAttemptAt, lockUntil, handled: [event keys] }.
+        sync: { type: Object, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // AHE-3838 — one row per (user, cloud storage provider). Distinct from

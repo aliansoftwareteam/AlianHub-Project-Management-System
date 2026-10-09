@@ -18,6 +18,15 @@ export default [
         component: () => import(/* webpackChunkName: "IntegrationsHub" */ '@/views/Integrations/ConnectionsPage.vue'),
     },
     {
+        path: '/:cid/app-connections',
+        name: 'AppConnections',
+        meta: {
+            title: "App connections",
+            requiresAuth: true
+        },
+        component: () => import(/* webpackChunkName: "IntegrationsHub" */ '@/views/Integrations/AppConnections.vue'),
+    },
+    {
         path: '/:cid/external-data',
         name: 'ExternalData',
         meta: {
