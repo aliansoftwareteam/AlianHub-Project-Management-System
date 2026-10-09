@@ -343,6 +343,7 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     }
     const agents = await packAgents.remove(companyId, pack.blueprint, agentIds, reached, actor);
     agents.narrowed = await packAgents.narrow(companyId, widened);
+    agents.skillsRemoved = await packAgents.dropUnusedSkills(companyId, applied.flatMap((row) => row.entry.skills || []));
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [{ projectId: { $in: applied.map((row) => row.projectId) } }, { $pull: { teamPacks: { applyId } } }],
     }, 'updateMany');

@@ -258,6 +258,30 @@ describe('team packs make one agent per role', () => {
         expect(audited()).toEqual([expect.objectContaining({ action: 'dispatcher.pack_undone', meta: expect.objectContaining({ agents: expect.objectContaining({ kept: [worked] }) }) })]);
     });
 
+    it('keeps an agent with runs in progress or that a person edited, drops the role skills nothing uses, and writes an agent audit row for each agent', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        const applied = await applyPack([project]);
+        const made = applied.body.data.agents.made;
+        const agentRows = (action) => store(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => row.action === action).map((row) => row.entityId);
+        expect(agentRows('agent.created').sort()).toEqual(made.map((a) => a.agentId).sort());
+        const [running, edited, ...rest] = made;
+        mockDb.seed(SCHEMA_TYPE.AGENT_RUNS, { agentId: running.agentId, status: 'running', startedAt: new Date() });
+        mockDb.seed(SCHEMA_TYPE.AGENT_REVISIONS, { agentId: edited.agentId, n: 2, state: 'live', snapshot: {} });
+        const keepsSkill = rest[0];
+        const skillOf = (roleKey) => `role.${roleKey.split('/')[1]}`;
+        mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: oid(), name: 'Mine', role: keepsSkill.roleKey, projectIds: [oid()], skills: [{ key: skillOf(keepsSkill.roleKey), enabled: true }], deletedStatusKey: 0 });
+
+        const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), applyId: applied.body.data.applyId } });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.data.agents.kept.map((a) => [a.agentId, a.why])).toEqual([[running.agentId, 'running'], [edited.agentId, 'edited']]);
+        expect(res.body.data.agents.removed.map((a) => a.agentId)).toEqual(rest.map((a) => a.agentId));
+        expect(agentRows('agent.deleted').sort()).toEqual(rest.map((a) => a.agentId).sort());
+        const skillsLeft = store(SCHEMA_TYPE.AGENT_SKILLS).map((row) => row.key).sort();
+        expect(skillsLeft).toEqual([running, edited, keepsSkill].map((a) => skillOf(a.roleKey)).sort());
+        expect(res.body.data.agents.skillsRemoved.sort()).toEqual(rest.slice(1).map((a) => skillOf(a.roleKey)).sort());
+    });
+
     it('keeps an agent that was handed queue work, or that a person sent to another project since', async () => {
         seedRules(GRANTS);
         const one = seedProject();

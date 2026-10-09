@@ -174,7 +174,7 @@ describe('Team packs', () => {
 
         apiRequest.mockImplementation((type, url, body) => {
             if (type === 'get') return ok({ on: true, packs: PACKS });
-            if (body.undo) return ok({ projects: [], agents: { removed: [{ agentId: 'g1', name: 'Bug Triager · IT company' }], kept: [{ agentId: 'g2', name: 'Code Reviewer · IT company', why: 'has_worked' }] } });
+            if (body.undo) return ok({ projects: [], agents: { removed: [{ agentId: 'g1', name: 'Bug Triager · IT company' }], kept: [{ agentId: 'g2', name: 'Code Reviewer · IT company', why: 'has_worked' }, { agentId: 'g3', name: 'QA Engineer · IT company', why: 'running' }] } });
             return ok({ blueprint: 'it-company', teams: ['engineering'], applyId: 'ap2', projects: [{ projectId: 'p1', added: [TRIAGER.key], mode: 'off' }], agents: { made: [{ agentId: 'g1', roleKey: TRIAGER.key, name: 'Bug Triager · IT company' }, { agentId: 'g2', roleKey: REVIEWER.key, name: 'Code Reviewer · IT company' }], kept: [] } });
         });
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
@@ -185,8 +185,9 @@ describe('Team packs', () => {
         await flushPromises();
         const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);
         expect(undo[2].applyId).toBe('ap2');
-        expect(wrapper.find('[data-test="tp-agents"]').text()).toContain('One agent stays because it has done work.');
-        expect(wrapper.find('[data-test="tp-kept"]').text()).toContain('Code Reviewer · IT company stays');
+        expect(wrapper.find('[data-test="tp-agents"]').text()).toContain('2 agents stay.');
+        expect(wrapper.find('[data-test="tp-kept"]').text()).toContain('Code Reviewer · IT company stays: it has done work');
+        expect(wrapper.find('[data-test="tp-kept"]').text()).toContain('QA Engineer · IT company stays: it has runs in progress.');
     });
 
     it('says the dispatcher is off and keeps the button shut', async () => {

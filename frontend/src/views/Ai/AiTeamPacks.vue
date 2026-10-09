@@ -99,7 +99,7 @@
                             <p v-if="agentLine" class="ah-small tp-muted" data-test="tp-agents">{{ agentLine }}</p>
                             <p v-if="!undone && madeAgents.length" class="ah-small tp-muted" data-test="tp-agents-paused">{{ $t('TeamPacks.agents_paused_note') }}</p>
                             <ul v-if="keptAgents.length" class="tp-list" data-test="tp-kept">
-                                <li v-for="agent in keptAgents" :key="agent.agentId" class="ah-small">{{ $t('TeamPacks.agent_kept', { name: agent.name }) }}</li>
+                                <li v-for="agent in keptAgents" :key="agent.agentId" class="ah-small">{{ $t(KEPT_WHY[agent.why] || 'TeamPacks.agent_kept', { name: agent.name }) }}</li>
                             </ul>
                             <div v-if="!undone && (changedCount || madeAgents.length)" class="tp-actions">
                                 <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="tp-undo" :disabled="busy" @click="undo">
@@ -155,6 +155,7 @@ const withStarterRules = ref(true);
 const undoneKept = ref([]);
 const createAgents = ref(true);
 
+const KEPT_WHY = Object.freeze({ running: "TeamPacks.agent_kept_running", edited: "TeamPacks.agent_kept_edited" });
 const managesAgents = computed(() => isOwnerOrAdmin(getters["settings/companyUserDetail"]?.roleType));
 const needsKey = computed(() => aiAvailability.state === AI_STATE.UNCONFIGURED);
 /* The server checks every project again; this only keeps out of reach what it would refuse. A project with its own
@@ -182,7 +183,7 @@ const changedCount = computed(() => addedCount.value + ruleCount.value + (result
 const madeAgents = computed(() => result.value?.agents?.made || []);
 const keptAgents = computed(() => (undone.value ? undoneKept.value : []));
 const agentLine = computed(() => {
-    if (undone.value) return undoneKept.value.length ? t("TeamPacks.agents_undone_kept", { n: undoneKept.value.length }, undoneKept.value.length) : t("TeamPacks.agents_undone");
+    if (undone.value) return undoneKept.value.length ? t("TeamPacks.agents_undone_some_kept", { n: undoneKept.value.length }, undoneKept.value.length) : t("TeamPacks.agents_undone");
     const made = madeAgents.value.length;
     const reused = result.value?.agents?.kept?.length || 0;
     if (!made && !reused) return "";

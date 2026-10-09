@@ -18,6 +18,7 @@ const SKILL_ACTIONS = Object.freeze(['task.get', 'task.comment']);
 const AUTONOMY = 1;
 const PAUSED_REASON = 'team_pack';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const OPEN_RUNS = Object.freeze(['queued', 'running', 'waiting_approval']);
 const SMALL_WORDS = Object.freeze({ it: 'IT' });
 
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
@@ -120,12 +121,15 @@ async function write(companyId, planned, actorId, written) {
             pausedAt: new Date(),
             madeBy: madeBy(role.blueprint),
         }, { ownerId: actorId });
+        const by = { kind: 'human', userId: String(actorId) };
         written.done(`the agent ${saved.name}`, async () => {
             await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.AGENTS, data: [{ _id: saved._id }, { $set: { deletedStatusKey: 1, deletedAt: new Date(), deletedBy: String(actorId), paused: true, pausedReason: 'deleted' } }],
             }, 'updateOne');
+            await agentAudit.recordAgentDeleted(companyId, by, { agentId: String(saved._id), agentName: saved.name });
             runs.emitAgent(companyId, { agentId: String(saved._id), deleted: true });
         });
+        await agentAudit.recordAgentCreated(companyId, by, { agentId: String(saved._id), agentName: saved.name, madeBy: madeBy(role.blueprint) });
         made.push({ roleKey, agentId: String(saved._id), name: saved.name });
     }
     return { made, kept, widened, skills: [...madeSkills] };
@@ -147,8 +151,22 @@ const hasWorked = async (companyId, agentId) => {
     return ran + handed > 0;
 };
 
-/* Removes the agents a pack made, as its answer listed them, when nobody has used them. An agent that has worked, was
- * not made by this pack, or reaches a project outside the ones the undo was checked for, stays and is named. */
+const isRunning = async (companyId, agentId) => (await count(companyId, SCHEMA_TYPE.AGENT_RUNS, { agentId: String(agentId), status: { $in: OPEN_RUNS } })) > 0;
+
+/* The pack's own create writes the first revision; any later one is a person's save or rollback. */
+const isEdited = async (companyId, agentId) => (await count(companyId, SCHEMA_TYPE.AGENT_REVISIONS, { agentId: String(agentId) })) > 1;
+
+const whyKept = async (companyId, agent, blueprint, projectIds) => {
+    if (agent.madeBy !== madeBy(blueprint)) return 'not_made_by_pack';
+    if (!idsOf(agent).every((one) => projectIds.includes(one))) return 'other_projects';
+    if (await isRunning(companyId, agent._id)) return 'running';
+    if (await isEdited(companyId, agent._id)) return 'edited';
+    if (await hasWorked(companyId, agent._id)) return 'has_worked';
+    return '';
+};
+
+/* Removes the agents an apply made when nobody has used or changed them. One that is running, has worked, was edited,
+ * was not made by this pack, or reaches a project outside the ones the undo was checked for, stays and is named. */
 async function remove(companyId, blueprint, agentIds, projectIds, actor) {
     const removed = [];
     const kept = [];
@@ -156,10 +174,7 @@ async function remove(companyId, blueprint, agentIds, projectIds, actor) {
         const agent = plain(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: oid(id), deletedStatusKey: { $ne: 1 } }] }, 'findOne'));
         if (!agent) continue;
         const entry = { agentId: String(agent._id), name: agent.name || '' };
-        let why = '';
-        if (agent.madeBy !== madeBy(blueprint)) why = 'not_made_by_pack';
-        else if (!idsOf(agent).every((one) => projectIds.includes(one))) why = 'other_projects';
-        else if (await hasWorked(companyId, agent._id)) why = 'has_worked';
+        const why = await whyKept(companyId, agent, blueprint, projectIds);
         if (why) {
             kept.push({ ...entry, why });
             continue;
@@ -174,6 +189,18 @@ async function remove(companyId, blueprint, agentIds, projectIds, actor) {
         removed.push(entry);
     }
     return { removed, kept };
+}
+
+/* A role skill the apply made goes with its agents, unless a live agent still names it. */
+async function dropUnusedSkills(companyId, keys) {
+    const dropped = [];
+    for (const key of [...new Set(keys || [])]) {
+        const users = await count(companyId, SCHEMA_TYPE.AGENTS, { deletedStatusKey: { $ne: 1 }, skills: { $elemMatch: { key } } });
+        if (users) continue;
+        await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: [{ key }] }, 'deleteOne');
+        dropped.push(key);
+    }
+    return dropped;
 }
 
 /* Gives back the projects an apply added to an agent it reused, where the agent still has them. */
@@ -192,4 +219,4 @@ async function narrow(companyId, widened) {
     return narrowed;
 }
 
-module.exports = { agentName, skillKeyOf, plan, write, create, remove, narrow, hasWorked };
+module.exports = { agentName, skillKeyOf, plan, write, create, remove, narrow, dropUnusedSkills, hasWorked };
