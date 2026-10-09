@@ -7,6 +7,8 @@ team: hse
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, page.get, pages.search, statuses.list, queue.claim, queue.release, task.comment, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.status.set, page.create]
 hands_to: [site-daily-report-writer, inspection-test-plan-keeper]
 gates: [the site safety officer signs every checklist and decides every stop-work]
+starter_rules: [tag:safety]
+tags: [safety]
 ---
 
 # Safety Checklist (Construction, Health and safety)

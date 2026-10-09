@@ -7,6 +7,8 @@ team: quality
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, task.relations.list, task.history, page.get, pages.search, page.versions.list, page.version.get, page.comments.list, page.comment.create, page.create, task.comment, task.status.set, task.tags.add]
 hands_to: [document-drafter, client-status-reporter]
 gates: [the senior reviewer signs off the deliverable, the engagement partner approves anything that goes to the client]
+starter_rules: [tag:needs-review]
+tags: [needs-review]
 ---
 
 # Review Checklist (Quality and review)

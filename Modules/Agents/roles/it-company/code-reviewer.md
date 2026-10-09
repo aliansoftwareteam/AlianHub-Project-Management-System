@@ -7,6 +7,8 @@ team: engineering
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, task.links.list, subtasks.list, task.relations.list, page.get, docs.read, task.comment, comment.create, task.status.set, task.tags.add]
 hands_to: [design-qa-reviewer, release-manager]
 gates: [a developer approves the pull request in the code host]
+starter_rules: [tag:needs-review]
+tags: [needs-review]
 ---
 
 # Code Reviewer (Engineering)

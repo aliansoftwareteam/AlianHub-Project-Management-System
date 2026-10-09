@@ -19,6 +19,8 @@ const MAX_VALUES = 20;
 const MAX_TEXT = 200;
 const NUMBER_LISTS = Object.freeze(['taskTypeKeys', 'statusKeys']);
 const TEXT_LISTS = Object.freeze(['tags', 'priorities', 'sprintIds']);
+const RULE_ID = /^[a-f0-9]{24}$/;
+const ruleIdOf = (rule) => (rule && RULE_ID.test(String(rule.id || '')) ? { id: String(rule.id) } : {});
 const DEFAULTS = Object.freeze({ mode: 'off', threshold: THRESHOLD.DEFAULT, modelGuess: false, roles: [], rules: [], revision: 0 });
 
 const roleKey = (role) => `${role.blueprint}/${role.slug}`;
@@ -55,7 +57,7 @@ const view = (stored) => {
         threshold: Number.isInteger(threshold) && threshold >= THRESHOLD.MIN && threshold <= THRESHOLD.MAX ? threshold : THRESHOLD.DEFAULT,
         modelGuess: given.modelGuess === true,
         roles: Array.isArray(given.roles) ? given.roles.map(String) : [],
-        rules: Array.isArray(given.rules) ? given.rules.map((rule) => ({ role: String((rule && rule.role) || ''), when: cleanWhen(rule && rule.when) })) : [],
+        rules: Array.isArray(given.rules) ? given.rules.map((rule) => ({ ...ruleIdOf(rule), role: String((rule && rule.role) || ''), when: cleanWhen(rule && rule.when) })) : [],
         revision: Number(given.revision) || 0,
     };
 };
@@ -81,7 +83,7 @@ function validate(body = {}) {
         if (!roleOf(rule && rule.role)) throw new RuleError(`There is no role "${textOf(rule && rule.role)}".`);
         const when = cleanWhen(rule.when);
         if (!Object.keys(when).length) throw new RuleError('Every routing rule needs at least one condition.');
-        return { role: String(rule.role), when };
+        return { ...ruleIdOf(rule), role: String(rule.role), when };
     });
     return { mode, threshold, modelGuess: body.modelGuess === true, roles: [...new Set(roles.map(String))], rules: cleanRules };
 }
