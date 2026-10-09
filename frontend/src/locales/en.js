@@ -3700,6 +3700,7 @@ export default {
         unknown_project: "—"
     },
     List: {
+        unread_comments: "{count} unread comments",
         col_task: "Task",
         col_assignee: "Assignee",
         col_due: "Due",
