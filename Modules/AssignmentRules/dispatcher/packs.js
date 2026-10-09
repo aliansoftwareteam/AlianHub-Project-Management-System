@@ -131,26 +131,27 @@ const pendingTagNames = async (companyId, projectId) => {
 };
 
 /* One approval per project holds all its tags, so a person decides them together; nothing is added to the project before then. */
-async function proposeTags(companyId, projectId, names, blueprint) {
-    if (!names.length || !require('../../Agents/registry').get(TAG_ACTION)) return { names: [], proposalId: null };
-    try {
-        const waiting = await pendingTagNames(companyId, projectId);
-        const fresh = names.filter((name) => !waiting.has(lower(name)));
-        if (!fresh.length) return { names: [], proposalId: null };
-        const proposal = await require('../../Agents/proposals').create(companyId, {
+async function tagProposalFor(companyId, projectId, names, blueprint) {
+    if (!names.length || !require('../../Agents/registry').get(TAG_ACTION)) return null;
+    const waiting = await pendingTagNames(companyId, projectId);
+    const fresh = names.filter((name) => !waiting.has(lower(name)));
+    if (!fresh.length) return null;
+    const proposals = require('../../Agents/proposals');
+    const changes = fresh.map((name) => ({ action: TAG_ACTION, params: { projectId, name }, label: `Add the tag "${name}"` }));
+    const check = proposals.validateChanges(changes);
+    if (!check.valid) throw new RuleError(`Project ${projectId}: the tags cannot be proposed. ${check.reason}`, 400);
+    return {
+        names: fresh,
+        input: {
             agent: PACK_AGENT,
             projectId,
             what: `Add ${fresh.length} tag${fresh.length === 1 ? '' : 's'} for the ${blueprint} team pack`,
             why: 'The roles of this team pack hand work on with these tags, and the project does not have them yet.',
-            changes: fresh.map((name) => ({ action: TAG_ACTION, params: { projectId, name }, label: `Add the tag "${name}"` })),
-            source: require('../../Agents/proposals').SOURCE_SYSTEM,
+            changes,
+            source: proposals.SOURCE_SYSTEM,
             allowedActions: [TAG_ACTION],
-        });
-        return { names: fresh, proposalId: String(proposal._id) };
-    } catch (error) {
-        logger.error(`[team-pack] could not propose tags for project ${projectId}: ${error.message}`);
-        return { names: [], proposalId: null, failed: true };
-    }
+        },
+    };
 }
 
 async function withdrawProposal(companyId, projectId, proposalId) {
@@ -163,22 +164,51 @@ async function withdrawProposal(companyId, projectId, proposalId) {
     return Boolean(await proposals.withdraw(companyId, proposalId, 'The team pack was undone.'));
 }
 
+const validateAll = (plans) => plans.filter((plan) => plan.body).forEach((plan) => {
+    try {
+        settings.validate(plan.body);
+    } catch (error) {
+        throw new RuleError(`Project ${plan.projectId}: ${error.message}`, error.statusCode || 400);
+    }
+});
+
 /* Every project's new settings are checked before any is written, so a pack lands in all of its projects or in none. */
 async function writeAll(companyId, plans, actorId) {
-    plans.filter((plan) => plan.body).forEach((plan) => {
-        try {
-            settings.validate(plan.body);
-        } catch (error) {
-            throw new RuleError(`Project ${plan.projectId}: ${error.message}`, error.statusCode || 400);
-        }
-    });
+    validateAll(plans);
     for (const plan of plans.filter((one) => one.body)) await settings.save(companyId, plan.projectId, plan.body, actorId);
 }
+
+/* Each write records how to take it back; a failed apply takes back what it wrote, last first. */
+const journal = () => {
+    const steps = [];
+    return {
+        done: (what, takeBack) => { steps.push({ what, takeBack }); },
+        async rollBack() {
+            const left = [];
+            for (const step of steps.reverse()) {
+                try {
+                    await step.takeBack();
+                } catch (error) {
+                    logger.error(`[team-pack] could not take back ${step.what}: ${error.message}`);
+                    left.push(step.what);
+                }
+            }
+            return left;
+        },
+    };
+};
+
+const failedApply = (error, left) => {
+    const why = error instanceof RuleError ? ` ${error.message}` : '';
+    if (left.length) return new RuleError(`The team pack could not be applied, and ${left.join(', ')} could not be taken back. Check them before trying again.${why}`, 500);
+    return new RuleError(`The team pack could not be applied, so nothing was changed.${why || ' Please try again.'}`, error instanceof RuleError ? error.statusCode : 500);
+};
 
 /* Turns the pack's roles on and nothing else: the mode stays as the project has it, so a project whose dispatcher is
  * off routes nothing until a person switches it on. A project that already has every role is left unwritten.
  * With starterRules the roles' own routing rules join the project's, each once; with proposeTags the tags the roles
- * hand work on with are proposed, for a person to approve, once the settings are saved. */
+ * hand work on with are proposed, for a person to approve. Settings, rules, tag approvals and agents are all planned
+ * and checked before the first write, and a write that fails takes back the ones before it. */
 async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
     const projectIds = projectIdsOf(body);
     const pack = rolesOfPack(body);
@@ -192,32 +222,47 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
         const added = pack.roles.filter((key) => !kept.includes(key));
         const starter = body.starterRules === true ? starterRulesFor(pack.roles, project, current.rules) : { made: [], skipped: 0 };
         const changed = added.length || starter.made.length;
+        const tags = body.proposeTags === true ? tagNamesFor(pack.roles, project) : [];
         plans.push({
             projectId,
             added,
             mode: current.mode,
             rules: starter.made,
             skippedRules: starter.skipped,
-            tags: body.proposeTags === true ? tagNamesFor(pack.roles, project) : [],
+            proposal: await tagProposalFor(companyId, projectId, tags, pack.blueprint),
+            previous: bodyWith(current, kept, current.rules),
             body: changed ? bodyWith(current, [...kept, ...added], [...current.rules, ...starter.made]) : null,
         });
     }
-    await writeAll(companyId, plans, actorId);
-    const projects = [];
-    for (const plan of plans) {
-        const proposed = await proposeTags(companyId, plan.projectId, plan.tags, pack.blueprint);
-        projects.push({
-            projectId: plan.projectId,
-            added: plan.added,
-            mode: plan.mode,
-            rules: plan.rules,
-            skippedRules: plan.skippedRules,
-            tags: proposed.names,
-            proposalId: proposed.proposalId,
-            ...(proposed.failed ? { tagsFailed: true } : {}),
-        });
+    validateAll(plans);
+    const agentPlan = createAgents ? await packAgents.plan(companyId, pack.roles, projectIds) : null;
+
+    const proposals = require('../../Agents/proposals');
+    const written = journal();
+    let agents = { made: [], kept: [], widened: [] };
+    try {
+        for (const plan of plans.filter((one) => one.body)) {
+            await settings.save(companyId, plan.projectId, plan.body, actorId);
+            written.done(`the dispatcher settings of project ${plan.projectId}`, () => settings.save(companyId, plan.projectId, plan.previous, actorId));
+        }
+        for (const plan of plans.filter((one) => one.proposal)) {
+            plan.proposalId = String((await proposals.create(companyId, plan.proposal.input))._id);
+            written.done(`the tag approval of project ${plan.projectId}`, () => proposals.withdraw(companyId, plan.proposalId, 'The team pack could not be applied.'));
+        }
+        if (agentPlan) agents = await packAgents.write(companyId, agentPlan, actorId, written);
+    } catch (error) {
+        logger.error(`[team-pack] apply of ${pack.blueprint} failed: ${(error && error.message) || error}`);
+        throw failedApply(error, await written.rollBack());
     }
-    const agents = createAgents ? await packAgents.create(companyId, pack.roles, projectIds, actorId) : { made: [], kept: [], widened: [] };
+    const projects = plans.map((plan) => ({
+        projectId: plan.projectId,
+        added: plan.added,
+        mode: plan.mode,
+        rules: plan.rules,
+        skippedRules: plan.skippedRules,
+        tags: plan.proposal ? plan.proposal.names : [],
+        proposalId: plan.proposalId || null,
+    }));
     return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 

@@ -308,6 +308,76 @@ describe('team packs make one agent per role', () => {
         expect(agentsOf()).toHaveLength(0);
     });
 
+    describe('applies a pack whole or not at all', () => {
+        const BUGS = [{ name: 'Task', value: 'task', key: 1 }, { name: 'Bug', value: 'bug', key: 4 }];
+        const dispatcherOf = (project) => store(SCHEMA_TYPE.ASSIGNMENT_RULES).find((row) => String(row.projectId) === String(project._id))?.dispatcher;
+        const full = (projects) => call('POST', PACKS, {
+            body: { blueprint: 'it-company', teams: ['engineering'], projectIds: projects.map((project) => String(project._id)), starterRules: true, proposeTags: true, createAgents: true },
+        });
+        afterEach(() => {
+            jest.restoreAllMocks();
+            delete process.env.MCP_TOOLS_WORK;
+        });
+
+        it('takes back the settings, rules, tag approvals, skills, agents and widened projects it wrote when an agent fails, and says so', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const one = seedProject({ taskTypeCounts: BUGS });
+            const two = seedProject({ taskTypeCounts: BUGS });
+            const mine = oid();
+            mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: mine, name: 'Mine', role: TRIAGER, projectIds: ids(one), deletedStatusKey: 0 });
+            const agentRecord = require('../Modules/Agents/agentRecord');
+            const real = agentRecord.createAgentRecord;
+            let n = 0;
+            jest.spyOn(agentRecord, 'createAgentRecord').mockImplementation(async (...args) => {
+                n += 1;
+                if (n === 3) throw new Error('disk full');
+                return real(...args);
+            });
+            recordAudit.mockClear();
+            const res = await full([one, two]);
+            expect(res.statusCode).toBe(500);
+            expect(res.body.message).toBe('The team pack could not be applied, so nothing was changed. Please try again.');
+            expect(dispatcherOf(one)).toMatchObject({ roles: [], rules: [] });
+            expect(dispatcherOf(two)).toMatchObject({ roles: [], rules: [] });
+            expect(store(SCHEMA_TYPE.AGENT_PROPOSALS)).toHaveLength(2);
+            expect(store(SCHEMA_TYPE.AGENT_PROPOSALS).every((row) => row.status !== 'pending')).toBe(true);
+            expect(live().map((agent) => String(agent._id))).toEqual([mine]);
+            expect(live()[0].projectIds.map(String)).toEqual(ids(one));
+            expect(store(SCHEMA_TYPE.AGENT_SKILLS)).toEqual([]);
+            expect(audited()).toEqual([]);
+        });
+
+        it('takes back the saved settings when the tag approval cannot be filed', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            jest.spyOn(require('../Modules/Agents/proposals'), 'create').mockRejectedValue(new Error('timeout'));
+            const res = await full([project]);
+            expect(res.statusCode).toBe(500);
+            expect(res.body.message).toContain('nothing was changed');
+            expect(dispatcherOf(project)).toMatchObject({ roles: [], rules: [] });
+            expect(agentsOf()).toEqual([]);
+        });
+
+        it('names what it could not take back', async () => {
+            seedRules(GRANTS);
+            const project = seedProject();
+            const settings = require('../Modules/AssignmentRules/dispatcher/settings');
+            const save = settings.save;
+            let saves = 0;
+            jest.spyOn(settings, 'save').mockImplementation(async (...args) => {
+                saves += 1;
+                if (saves > 1) throw new Error('down');
+                return save(...args);
+            });
+            jest.spyOn(require('../Modules/Agents/agentRecord'), 'createAgentRecord').mockRejectedValue(new Error('down'));
+            const res = await full([project]);
+            expect(res.statusCode).toBe(500);
+            expect(res.body.message).toContain(`the dispatcher settings of project ${String(project._id)} could not be taken back`);
+        });
+    });
+
     it('builds a valid skill from every playbook in every blueprint', async () => {
         const { validateSkill } = require('../Modules/Agents/skills/validateSkill');
         const roleSkill = require('../Modules/Agents/roleSkill');

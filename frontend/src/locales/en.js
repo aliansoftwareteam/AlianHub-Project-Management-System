@@ -13479,7 +13479,6 @@ export default {
         rules_added: "Added one routing rule. | Added {n} routing rules.",
         rules_waiting: "One starter rule waits for a tag or task type this project lacks. | {n} starter rules wait for a tag or task type this project lacks.",
         tags_proposed: "Proposed one tag for approval: {names}. | Proposed {n} tags for approval: {names}.",
-        tags_failed: "The tags could not be proposed.",
         project_on: "{project}: the dispatcher is in {mode} mode.",
         project_off: "{project}: the dispatcher is off in this project, so the roles wait until someone switches it on in the project's settings.",
         mode_suggest: "suggest",

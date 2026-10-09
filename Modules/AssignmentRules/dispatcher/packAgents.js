@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
-const { createAgentRecord } = require('../../Agents/agentRecord');
+const agentRecord = require('../../Agents/agentRecord');
 const roleSkill = require('../../Agents/roleSkill');
 const skillRecord = require('../../Agents/skillRecord');
 const overrides = require('../../Agents/rolePlaybookOverrides');
@@ -10,6 +10,7 @@ const runs = require('../../Agents/runs');
 const registry = require('../../Agents/registry');
 const knowledgeMemory = require('../../Knowledge/memory/publish');
 const settings = require('./settings');
+const { RuleError } = require('../rules');
 
 const SKILL_PROMPT_MAX = 19000;
 const REPLY_MAX = 1500;
@@ -32,11 +33,11 @@ const skillKeyOf = (role) => ['role', role.slug].join('.');
 
 /* The skill is one per role and company, written from the company's current playbook text; an edited copy a person
  * made of it is theirs and is not overwritten. */
-async function ensureSkill(companyId, role, actorId) {
+async function skillInputFor(companyId, role) {
     const key = skillKeyOf(role);
-    if (await skillRecord.findData(companyId, key)) return key;
+    if (await skillRecord.findData(companyId, key)) return null;
     const body = await overrides.findFor(companyId, role.blueprint, role.slug);
-    await skillRecord.createSkill(companyId, {
+    const input = {
         key,
         name: role.name,
         description: roleSkill.skillDescription(role),
@@ -50,8 +51,10 @@ async function ensureSkill(companyId, role, actorId) {
         },
         emit: [{ action: 'task.comment', label: `Post the ${role.name}'s reply`, params: { body: `{{answer.reply | clip:${REPLY_MAX}}}` } }],
         summary: '{{answer.reply | clip:300}}',
-    }, { createdBy: actorId });
-    return key;
+    };
+    const checked = skillRecord.validateSkill(input);
+    if (!checked.ok) throw new RuleError(`The skill for ${role.name} cannot be made from its playbook.`, 400);
+    return input;
 }
 
 /* The playbook names MCP tools; the ones the registry does not know as agent actions are left out by allowedActionsToStore. */
@@ -61,33 +64,54 @@ const actionsOf = (role) => registry.allowedActionsToStore([...new Set([...SKILL
 const overlaps = (agent, projectIds) => !idsOf(agent).length || idsOf(agent).some((id) => projectIds.includes(id));
 
 /* One agent per role across these projects. A role that already has an agent whose projects overlap them, whoever made
- * it, is reused and widened to the projects it lacks rather than doubled. A new agent starts paused and with no mention
- * trigger, so neither a mention nor routed work reaches it until a person switches it on. */
-async function create(companyId, roleKeys, projectIds, actorId) {
+ * it, is reused and widened to the projects it lacks rather than doubled. Only reads, so a pack is planned whole before
+ * anything is written. */
+async function plan(companyId, roleKeys, projectIds) {
     const existing = await find(companyId, SCHEMA_TYPE.AGENTS, [{ role: { $in: roleKeys }, deletedStatusKey: { $ne: 1 } }, { role: 1, projectIds: 1, name: 1 }, { sort: { createdAt: 1, _id: 1 } }]);
-    const made = [];
-    const kept = [];
-    const widened = [];
+    const reuse = [];
+    const create = [];
     for (const key of roleKeys) {
         const have = existing.find((agent) => agent.role === key && overlaps(agent, projectIds));
         if (have) {
-            const missing = idsOf(have).length ? projectIds.filter((id) => !idsOf(have).includes(id)) : [];
-            if (missing.length) {
-                await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: have._id }, { $addToSet: { projectIds: { $each: missing } } }] }, 'updateOne');
-                runs.emitAgent(companyId, { agentId: String(have._id) });
-                widened.push({ roleKey: key, agentId: String(have._id), name: have.name || '', projectIds: missing });
-            }
-            kept.push({ roleKey: key, agentId: String(have._id), name: have.name || '' });
+            reuse.push({ roleKey: key, agent: have, missing: idsOf(have).length ? projectIds.filter((id) => !idsOf(have).includes(id)) : [] });
             continue;
         }
         const role = settings.roleOf(key);
-        const skill = await ensureSkill(companyId, role, actorId);
-        const saved = await createAgentRecord(companyId, {
+        create.push({ roleKey: key, role, skill: await skillInputFor(companyId, role) });
+    }
+    return { projectIds, reuse, create };
+}
+
+/* A new agent starts paused and with no mention trigger, so neither a mention nor routed work reaches it until a person
+ * switches it on. Each write is handed to `written`, which takes it back if a later step of the pack fails. */
+async function write(companyId, planned, actorId, written) {
+    const kept = [];
+    const widened = [];
+    const made = [];
+    for (const { roleKey, agent, missing } of planned.reuse) {
+        if (missing.length) {
+            await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ _id: agent._id }, { $addToSet: { projectIds: { $each: missing } } }] }, 'updateOne');
+            written.done(`the projects of the agent ${agent.name || agent._id}`, () => MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.AGENTS, data: [{ _id: agent._id }, { $pull: { projectIds: { $in: missing } } }],
+            }, 'updateOne'));
+            runs.emitAgent(companyId, { agentId: String(agent._id) });
+            widened.push({ roleKey, agentId: String(agent._id), name: agent.name || '', projectIds: missing });
+        }
+        kept.push({ roleKey, agentId: String(agent._id), name: agent.name || '' });
+    }
+    const madeSkills = new Set();
+    for (const { roleKey, role, skill } of planned.create) {
+        if (skill && !madeSkills.has(skill.key)) {
+            const saved = await skillRecord.createSkill(companyId, skill, { createdBy: actorId });
+            madeSkills.add(skill.key);
+            written.done(`the skill ${skill.key}`, () => MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_SKILLS, data: [{ _id: saved._id }] }, 'deleteOne'));
+        }
+        const saved = await agentRecord.createAgentRecord(companyId, {
             name: agentName(role),
             description: roleSkill.skillDescription(role),
-            role: key,
-            projectIds: [...projectIds],
-            skills: [{ key: skill, name: role.name, enabled: true }],
+            role: roleKey,
+            projectIds: [...planned.projectIds],
+            skills: [{ key: skillKeyOf(role), name: role.name, enabled: true }],
             allowedActions: actionsOf(role),
             autonomy: AUTONOMY,
             paused: true,
@@ -95,10 +119,19 @@ async function create(companyId, roleKeys, projectIds, actorId) {
             pausedAt: new Date(),
             madeBy: madeBy(role.blueprint),
         }, { ownerId: actorId });
-        made.push({ roleKey: key, agentId: String(saved._id), name: saved.name });
+        written.done(`the agent ${saved.name}`, async () => {
+            await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.AGENTS, data: [{ _id: saved._id }, { $set: { deletedStatusKey: 1, deletedAt: new Date(), deletedBy: String(actorId), paused: true, pausedReason: 'deleted' } }],
+            }, 'updateOne');
+            runs.emitAgent(companyId, { agentId: String(saved._id), deleted: true });
+        });
+        made.push({ roleKey, agentId: String(saved._id), name: saved.name });
     }
     return { made, kept, widened };
 }
+
+const ignoreTakeBack = { done: () => {} };
+const create = async (companyId, roleKeys, projectIds, actorId) => write(companyId, await plan(companyId, roleKeys, projectIds), actorId, ignoreTakeBack);
 
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
 const count = (companyId, type, match) => MongoDbCrudOpration(companyId, { type, data: [match] }, 'countDocuments').then((n) => Number(n) || 0);
@@ -142,4 +175,4 @@ async function remove(companyId, blueprint, agentIds, projectIds, actor) {
     return { removed, kept };
 }
 
-module.exports = { agentName, skillKeyOf, create, remove, hasWorked };
+module.exports = { agentName, skillKeyOf, plan, write, create, remove, hasWorked };

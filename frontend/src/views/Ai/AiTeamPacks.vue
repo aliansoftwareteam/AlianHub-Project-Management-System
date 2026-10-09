@@ -206,8 +206,7 @@ const projectLine = (project) => {
         project.mode === "off" ? t("TeamPacks.project_off", { project: name }) : t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) }),
         rules ? t("TeamPacks.rules_added", { n: rules }, rules) : "",
         project.skippedRules ? t("TeamPacks.rules_waiting", { n: project.skippedRules }, project.skippedRules) : "",
-        tags.length ? t("TeamPacks.tags_proposed", { n: tags.length, names: tags.join(", ") }, tags.length) : "",
-        project.tagsFailed ? t("TeamPacks.tags_failed") : ""
+        tags.length ? t("TeamPacks.tags_proposed", { n: tags.length, names: tags.join(", ") }, tags.length) : ""
     ].filter(Boolean).join(" ");
 };
 
