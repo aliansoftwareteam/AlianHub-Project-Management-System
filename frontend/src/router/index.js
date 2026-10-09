@@ -23,6 +23,7 @@ import team from './team';
 import trash from './trash';
 
 import { useCustomComposable } from '@/composable'
+import { i18n } from '@/locales/main'
 import dashboard from "../plugins/dashboard/router";
 import { apiRequestWithoutCompnay } from '@/services'
 import * as env from '@/config/env';
@@ -156,7 +157,7 @@ router.beforeEach(async(to, _, next) => {
 		// const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 		const requiresAuth = to.meta.requiresAuth;
 		// SET PAGE TITLE
-		setTitle({title: to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
+		setTitle({title: to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
 
 		if(user === null && requiresAuth === true) {
 			// IF USER IS NOT LOGGED IN AND REQUESTS AUTH REQUIRED PAGE

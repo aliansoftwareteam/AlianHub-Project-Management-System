@@ -118,6 +118,7 @@ const SCHEMA_TYPE = {
     ROLE_PLAYBOOK_OVERRIDES: "role_playbook_overrides",
     CALLS: "calls",
     INTEGRATION_CONNECTIONS: "integration_connections",
+    APP_CONNECTION_EVENTS: "app_connection_events",
     CLOUD_STORAGE_CONNECTIONS: "cloud_storage_connections",
     FORMS: "forms",
     FORM_SUBMISSIONS: "form_submissions",
