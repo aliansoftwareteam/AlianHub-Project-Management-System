@@ -130,15 +130,12 @@ const findRunningTimer = (companyId, taskId, userId) => MongoDbCrudOpration(comp
 
 /* The people a comment names are told the way the comment route tells them.
  * A delivery that fails is logged: the comment is already written. */
-const announceMentions = async (companyId, commentId) => {
+const announceMentions = async (companyId, commentId, mentionIds = []) => {
+    if (!mentionIds.length) return [];
     try {
-        const { resolveMentionIds, deliverMentions } = require('../Comments/helpers/commentNotifications');
-        const { threadOf } = require('../Comments/helpers/threadWriteAccess');
+        const { deliverMentions } = require('../Comments/helpers/commentNotifications');
         const comment = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(commentId) }] }, 'findOne');
         if (!comment) return [];
-        const mentionIds = await resolveMentionIds(companyId, comment.userId, threadOf(comment), comment.message);
-        if (!mentionIds.length) return [];
-        await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(commentId) }, { $set: { mentionIds } }] }, 'updateOne');
         (await deliverMentions(companyId, comment, mentionIds)).forEach((error) => logger.error(`agent comment mention not delivered: ${(error && error.message) || error}`));
         return mentionIds;
     } catch (error) {
@@ -174,14 +171,14 @@ const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action
     const marked = params.notifyMentions ? await require('../Comments/helpers/namedMentions').markMentions(companyId, written) : null;
     const body = marked ? marked.message : written;
     const reply = params.replyTo ? await commentReplies.repliedTo(companyId, params.taskId, params.replyTo) : null;
-    const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth), { replyTo: reply ? String(reply.comment._id) : '' });
+    const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth), { replyTo: reply ? String(reply.comment._id) : '', resolveMentions: Boolean(params.notifyMentions) });
     const a = attribution(actor);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
         data: [{ _id: oid(r.commentId) }, { $set: { userId: String(actor.userId || a.actorId), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null } }],
     }, 'updateOne').catch(() => {});
     if (!actor.runId) await startsNamedAgents(companyId, actor, { taskId: params.taskId, body, depth, approvedBy });
-    const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId) : null;
+    const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId, r.mentionIds || []) : null;
     if (reply) await commentReplies.announceReply(companyId, r.commentId, reply.comment, mentioned);
     return {
         result: { commentId: r.commentId, ...(reply ? { threadOf: reply.rootId } : {}), ...(mentioned ? mentionAnswer(marked, mentioned, actor.userId) : {}) },
