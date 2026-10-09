@@ -47,8 +47,10 @@ const server = require('../Modules/Mcp/server');
 
 const {
     CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, L_OPEN, L_SECRET, L_PRIVATE, L_PERSONAL, T_OPEN,
-    MISSING, BEFORE, FLAGS, EVERYONE, ctx, narrowed, readOnly, outside, routeTable, asPerson, settle,
+    MISSING, BEFORE, FLAGS, EVERYONE, ctx: plainCtx, narrowed: plainNarrowed, readOnly, outside, routeTable, asPerson, settle,
 } = world;
+const ctx = (uid, over) => world.managing(plainCtx(uid, over));
+const narrowed = (uid, projectIds) => world.managing(plainNarrowed(uid, projectIds));
 const { seed, rows, stored, audits, setRule, rpcThrough, listedThrough, seedGrant, filedBy } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
@@ -99,15 +101,15 @@ describe('the flag decides whether the tools exist', () => {
         expect((await rpc(ctx(OWNER), 'list.create', { projectId: P_OPEN, name: 'Later' })).rpcError).toMatchObject({ code: -32601 });
     });
 
-    it('on, each tool is a rated registry action held to the keys the list routes ask for, with a plain scope and no grant', async () => {
+    it('on, each tool is a rated registry action held to the keys the list routes ask for, under the manage grant', async () => {
         expect(await listed(ctx(OWNER))).toEqual(expect.arrayContaining(NAMES));
         expect(registry.permissionsFor('lists.list')).toEqual([{ key: 'project.project_list', write: false }]);
         expect(registry.permissionsFor('list.create')).toEqual([{ key: 'project.project_sprint_create', write: true }]);
         expect(registry.permissionsFor('list.rename')).toEqual([{ key: 'project.project_sprint_name_edit', write: true }]);
         expect(registry.permissionsFor('list.move')).toEqual([{ key: 'project.project_sprint_name_edit', anyOf: EDIT_KEYS.map((key) => `project.${key}`), write: true }]);
-        expect(NAMES.map((name) => scopes.scopeForTool(name))).toEqual(['projects:read', 'tasks:write', 'tasks:write', 'tasks:write']);
+        expect(NAMES.map((name) => scopes.scopeForTool(name))).toEqual(['projects:read', 'tasks:manage', 'tasks:manage', 'tasks:manage']);
         NAMES.slice(1).forEach((name) => expect(actions.rating(name)).toEqual({ write: true, reversible: true, scope: 'project', money: false }));
-        expect(tools.registered().filter((tool) => NAMES.includes(tool.name)).some((tool) => tool.grant)).toBe(false);
+        expect(tools.registered().filter((tool) => NAMES.includes(tool.name)).map((tool) => tool.grant)).toEqual([undefined, 'tasks:manage', 'tasks:manage', 'tasks:manage']);
         expect(tools.names().filter((name) => /delete|archive|trash/.test(name))).toEqual([]);
     });
 });
@@ -198,6 +200,18 @@ describe('list.create', () => {
         expect(list(result.sprintId).deletedStatusKey).toBe(0);
         mockDb.store[SCHEMA_TYPE.TASKS].pop();
         await inverses.list(CID, row.meta.undo, { userId: OWNER });
+        await settle();
+        expect(list(result.sprintId).deletedStatusKey).toBe(1);
+    });
+
+    it('is taken back by undo only for someone the list route would let delete it', async () => {
+        const { result } = await rpc(ctx(INSIDER), 'list.create', { projectId: P_OPEN, name: 'Kept list' });
+        const [row] = audits('list.create', 'applied');
+        setRule('sprint_delete', false);
+        await expect(inverses.list(CID, row.meta.undo, { userId: INSIDER })).rejects.toThrow(/project\.sprint_delete is not allowed/);
+        expect(list(result.sprintId).deletedStatusKey).toBe(0);
+        setRule('sprint_delete', true);
+        await inverses.list(CID, row.meta.undo, { userId: INSIDER });
         await settle();
         expect(list(result.sprintId).deletedStatusKey).toBe(1);
     });
@@ -324,17 +338,17 @@ describe('scopes and outside clients', () => {
     it('needs the write scope for a write and the read scope for the read', async () => {
         const before = everythingNow();
         expect(await rpc(readOnly(OWNER), 'list.create', { projectId: P_OPEN, name: 'x' })).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
-        expect(await rpc(outside(OWNER, ['projects:read']), 'list.rename', rename)).toMatchObject({ isError: true, error: 'This connection was not given the tasks:write permission. Ask the person to connect you again and allow it.' });
+        expect(await rpc(outside(OWNER, ['projects:read']), 'list.rename', rename)).toMatchObject({ isError: true, error: 'This connection was not given the tasks:manage permission, which list.rename needs. Ask the person to connect you again and allow it.' });
         expect(await rpc(outside(OWNER, ['tasks:write']), 'lists.list', { projectId: P_OPEN })).toMatchObject({ isError: true, error: 'This connection was not given the projects:read permission. Ask the person to connect you again and allow it.' });
         expect(everythingNow()).toBe(before);
-        expect(await rpc(outside(OUTSIDER, ['tasks:write']), 'list.rename', rename)).toMatchObject({ ok: true });
+        expect(await rpc(outside(OUTSIDER, ['tasks:write', 'tasks:manage']), 'list.rename', rename)).toMatchObject({ ok: true });
     });
 
-    it('under taint routing is refused a list change, or files it for a person when the connection holds the manage scope', async () => {
+    it('is refused a list change without the manage scope, and under taint routing files it for a person when the connection holds the manage scope', async () => {
         process.env.AGENT_TAINT_ROUTING = 'on';
         const before = everythingNow();
         for (const [name, args] of [['list.create', { projectId: P_OPEN, name: 'x' }], ['list.rename', rename], ['list.move', { projectId: P_OPEN, sprintId: L_OPEN, folderId: F_TOP }]]) {
-            expect(await rpc(outside(OWNER, ['tasks:write']), name, args)).toMatchObject({ refused: true, reason: expect.stringMatching(/outside client/) });
+            expect(await rpc(outside(OWNER, ['tasks:write']), name, args)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
         }
         expect(proposals.create).not.toHaveBeenCalled();
         expect(await rpc(outside(OWNER, ['tasks:write', 'tasks:manage']), 'list.rename', rename)).toMatchObject({ ok: false, pending: true });

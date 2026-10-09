@@ -90,7 +90,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'project_custom_field', name: 'project_custom_field', isParent: false, parentId: String(parent._id), roles: [{ key: 3, permission: true }, { key: 0, permission: false }] });
     setRule('task_custom_field', false, [0]);
     [OWNER, INSIDER, OUTSIDER, GUEST].forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, {
-        _id: TOKEN.replace(/.$/, String([OWNER, INSIDER, OUTSIDER, GUEST].indexOf(userId) + 1)), userId, active: true, scopes: ['read', 'write'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
+        _id: TOKEN.replace(/.$/, String([OWNER, INSIDER, OUTSIDER, GUEST].indexOf(userId) + 1)), userId, active: true, scopes: ['read', 'write'], grants: ['tasks:manage'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
     }));
     jest.spyOn(memory, 'rememberApprovedChanges').mockResolvedValue([]);
 });
@@ -101,7 +101,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 const as = (uid, over = {}) => {
     const id = TOKEN.replace(/.$/, String([OWNER, INSIDER, OUTSIDER, GUEST].indexOf(uid) + 1));
     const base = ctx(uid, over);
-    return { ...base, actor: { ...base.actor, tokenId: id }, token: { ...base.token, _id: id } };
+    return { ...base, actor: { ...base.actor, tokenId: id }, token: { ...base.token, _id: id, grants: ['tasks:manage'] } };
 };
 
 describe('the flag decides whether the tool exists', () => {
@@ -114,13 +114,13 @@ describe('the flag decides whether the tool exists', () => {
         expect(fields()).toHaveLength(0);
     });
 
-    it('on, it is a rated registry action held to the keys the field route asks for, with a plain scope and no grant', async () => {
+    it('on, it is a rated registry action held to the keys the field route asks for, under the manage grant', async () => {
         expect(await listed(as(OWNER))).toContain(TOOL);
         expect(registry.permissionsFor(TOOL)).toEqual([{ key: KEYS[0], anyOf: KEYS, write: true }]);
         expect(registry.get(TOOL)).toMatchObject({ risk: 'medium', undoable: true, write: true, proposeOnly: true });
         expect(actions.rating(TOOL)).toEqual({ write: true, reversible: true, scope: 'project', money: false });
-        expect(scopes.scopeForTool(TOOL)).toBe('tasks:write');
-        expect(tools.registered().find((tool) => tool.name === TOOL).grant).toBeUndefined();
+        expect(scopes.scopeForTool(TOOL)).toBe('tasks:manage');
+        expect(tools.registered().find((tool) => tool.name === TOOL).grant).toBe('tasks:manage');
     });
 });
 
@@ -200,7 +200,7 @@ describe('who may ask for a field', () => {
 
     it('files for an outside client only under the manage scope its person granted, which approval asks again', async () => {
         const args = { projectId: P_OPEN, fields: [{ name: 'Client', type: 'text' }] };
-        expect(await rpc(outside(INSIDER, ['tasks:write']), TOOL, args)).toMatchObject({ refused: true, reason: expect.stringMatching(/needs a person's approval/) });
+        expect(await rpc(outside(INSIDER, ['tasks:write']), TOOL, args)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
         expect(waiting()).toHaveLength(0);
         const scopesHeld = ['tasks:read', 'tasks:write', 'tasks:manage'];
         const grant = seedGrant(INSIDER, scopesHeld);

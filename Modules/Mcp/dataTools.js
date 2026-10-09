@@ -131,7 +131,8 @@ const PROJECT_ARG = { projectId: { type: 'string' } };
 const entryProjects = (ctx, vis, args, sheetVisible) => {
     let allowed = sheetVisible ? sheetVisible.map(String) : null;
     const narrow = (ids) => { allowed = allowed === null ? ids : allowed.filter((id) => ids.includes(id)); };
-    if (Array.isArray(ctx.projectIds) && ctx.projectIds.length) narrow((vis.projectIds || ctx.projectIds).map(String));
+    if (vis.projectIds) narrow(vis.projectIds.map(String));
+    else if (Array.isArray(ctx.projectIds) && ctx.projectIds.length) narrow(ctx.projectIds.map(String));
     if (args.projectId !== undefined && args.projectId !== '') narrow(vis.allowsProject(args.projectId) ? [String(args.projectId)] : []);
     return allowed;
 };
@@ -331,6 +332,7 @@ const TOOLS = [
             const uid = String(ctx.userId);
             const target = args.userId ? str(args.userId, 40) : uid;
             let sheetVisible = null;
+            let closedTasks = [];
             if (target !== uid) {
                 const sheet = await resolveSheetScope(ctx.companyId, uid, SHEET_PERMISSION.user);
                 if (!sheet.everyone || !isId(target)) {
@@ -340,6 +342,7 @@ const TOOLS = [
                     });
                 }
                 sheetVisible = sheet.visible;
+                closedTasks = sheet.closedTasks || [];
             }
             const { range, error } = dayRange(args);
             if (error) return { error };
@@ -348,6 +351,7 @@ const TOOLS = [
             if (projects !== null) filter.ProjectId = { $in: idForms(projects) };
             else if (vis.excludedProjectIds.length) filter.ProjectId = { $nin: idForms(vis.excludedProjectIds) };
             if (range) filter.LogStartTime = range;
+            if (closedTasks.length) filter.TicketID = { $nin: idForms(closedTasks) };
             const out = await listOf(ctx, 'timesheet.read', args, 'entries', { type: SCHEMA_TYPE.TIMESHEET, filter, sort: { LogStartTime: -1, _id: -1 } }, entryRow, async (rows) => {
                 const named = await names.resolver(ctx, { projectIds: rows.map((e) => idOf(e.ProjectId)), userIds: [target] });
                 return rows.map((e) => ({ ref: `timesheet:${e._id}`, ...entryRow(e), project: named.project(idOf(e.ProjectId)), person: named.person(target, idOf(e.ProjectId)) }));

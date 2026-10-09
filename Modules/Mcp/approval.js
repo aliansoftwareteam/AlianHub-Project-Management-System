@@ -27,6 +27,7 @@ const refused = (error, status = 403) => ({ error, status });
 
 /* The action of a change, and those its plan runs for its automations and first tasks, each held to what a call of its own is held to. */
 const PLAN = 'project.setup';
+const NEW_PAGE = 'page.create';
 const actionsOf = (change) => [change.action, ...(change.action === PLAN ? planWork.actionsIn(change.params) : [])];
 
 /* A new project sits in no project yet, and a dashboard or a timesheet week in none at all: like a goal each is the workspace's, which a
@@ -42,6 +43,10 @@ const targetOf = (params = {}, action = '') => {
     if (params.listProjectId && params.sprintId) Object.assign(target, { projectId: String(params.listProjectId), sprintId: String(params.sprintId) });
     if (params.pageId) target.pageId = String(params.pageId);
     if (params.goalId) Object.assign(target, goalTokens.WRITE_TARGET);
+    if (action === NEW_PAGE) {
+        if (params.parentPageId) target.pageId = String(params.parentPageId);
+        if (!params.projectId) Object.assign(target, goalTokens.WRITE_TARGET);
+    }
     return target;
 };
 

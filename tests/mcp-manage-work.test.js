@@ -604,6 +604,12 @@ describe('page.create and page.update for a token created to write docs', () => 
         expect(snapshot()).toBe(before);
     });
 
+    it('page.create is asked again at approval for its parent doc, and for the workspace when it names no project', () => {
+        const approval = require('../Modules/Mcp/approval');
+        expect(approval.targetOf({ title: 'x', projectId: P_OPEN, parentPageId: fx.pageTheirs._id }, 'page.create')).toEqual({ projectId: P_OPEN, pageId: fx.pageTheirs._id });
+        expect(approval.targetOf({ title: 'x' }, 'page.create')).toEqual({ companyWide: true });
+    });
+
     it('a token created to manage tasks writes no doc, and one created to write docs changes no task', async () => {
         const before = snapshot();
         for (const name of DOC_TOOLS) {

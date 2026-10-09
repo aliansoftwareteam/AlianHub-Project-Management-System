@@ -9,6 +9,7 @@ const scopes = require('./scopes');
 const manageFlag = require('./manageFlag');
 const dataFlag = require('./dataFlag');
 const writerLimits = require('../../event/writerLimits');
+const { clientMessage } = require('./clientError');
 const instructions = require('./instructions');
 const prompts = require('./prompts');
 const rolePlaybookOverrides = require('../Agents/rolePlaybookOverrides');
@@ -243,8 +244,7 @@ const handleRpc = async (ctx, message) => {
                     });
                 }
                 if (error && (error.code === -32601 || error.code === -32602)) return rpcError(id, error.code, error.message);
-                logger.error(`mcp tools/call ${name}: ${error.message}`);
-                return rpcResult(id, { ...contentResult({ error: error.message }), isError: true });
+                return rpcResult(id, { ...contentResult({ error: clientMessage(error, `tools/call ${name}`) }), isError: true });
             }
         }
 
@@ -283,8 +283,8 @@ const post = async (req, res) => {
         if (!replies.length) return res.status(202).end();
         return res.json(batch ? replies : replies[0]);
     } catch (error) {
-        logger.error(`mcp post: ${error.message}`);
-        return res.status(500).json(rpcError(null, -32603, error.message));
+        logger.error(`mcp post: ${error && error.stack ? error.stack : error}`);
+        return res.status(500).json(rpcError(null, -32603, 'Internal error'));
     }
 };
 

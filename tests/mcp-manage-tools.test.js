@@ -480,6 +480,21 @@ describe('subtasks.list, members.list and tasks.search', () => {
         expect(Object.fromEntries(onPrivate.members.map((member) => [member.name, member.opensProject]))).toEqual({ 'Adam Admin': true, 'Mia Member': false, 'Olivia Owner': true, 'Priya Other': true });
     });
 
+    it('lists, for anyone but an unnarrowed owner or admin, only the people of the projects they can open', async () => {
+        const GUEST = '6f0000000000000000000005';
+        const LONER = '6f0000000000000000000006';
+        [[GUEST, 0], [LONER, 0]].forEach(([userId, roleType]) => mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId, roleType, status: 2, isDelete: false }));
+        [[GUEST, 'Gus Guest'], [LONER, 'Lou Loner']].forEach(([_id, Employee_Name]) => mockDb.seed(SCHEMA_TYPE.USERS, { _id, Employee_Name }));
+        mockDb.store[SCHEMA_TYPE.PROJECTS].find((project) => String(project._id) === P_PRIVATE).AssigneeUserId = [OTHER, GUEST];
+        const ids = async (caller) => (await rpc(caller, 'members.list', {})).members.map((member) => member.userId).sort();
+        expect(await ids(ctx(OWNER))).toEqual([OWNER, ADMIN, MEMBER, OTHER, GUEST, LONER].sort());
+        expect(await ids(ctx(MEMBER))).toEqual([OWNER, ADMIN, MEMBER, OTHER].sort());
+        expect(await ids(ctx(OTHER, { projectIds: [P_PRIVATE] }))).toEqual([OWNER, ADMIN, OTHER, GUEST].sort());
+        expect(await ids(ctx(OWNER, { projectIds: [P_PRIVATE] }))).toEqual([OWNER, ADMIN, OTHER, GUEST].sort());
+        mockDb.store[SCHEMA_TYPE.RULES].filter((rule) => rule.key === 'task_list').forEach((rule) => rule.roles.push({ key: 0, permission: true }));
+        expect(await ids(ctx(GUEST))).toEqual([OWNER, ADMIN, OTHER, GUEST].sort());
+    });
+
     it('tasks.search filters by assignee, list and due date, and each task carries what planning needs', async () => {
         const mine = await rpc(ctx(OWNER), 'tasks.search', { projectId: P_OPEN, assigneeId: MEMBER });
         expect(mine.tasks.map((task) => task.key)).toEqual(['OPN-1']);
