@@ -1,5 +1,7 @@
-// Read on every call like the other feature flags: off, the registry, the ratings
-// and the MCP tool list are exactly what they were before these tools existed.
+const { isOn } = require('./defaultOn');
+
+// Read on every call like the other feature flags: an explicit off leaves the registry, the ratings
+// and the MCP tool list exactly what they were before these tools existed.
 const ACTIONS = Object.freeze([
     'fields.list', 'subtasks.list', 'members.list', 'task.history', 'task.links.list',
     'task.edit', 'task.assignees.set', 'task.field.set', 'task.move', 'task.archive', 'task.restore',
@@ -13,7 +15,7 @@ const GRANT = 'tasks:manage';
 const DOCS_GRANT = 'docs:manage';
 const GRANTS = Object.freeze([GRANT, DOCS_GRANT]);
 
-const enabled = () => ['on', 'true', '1'].includes(String(process.env.MCP_TOOLS_MANAGE || 'off').trim().toLowerCase());
+const enabled = () => isOn(process.env.MCP_TOOLS_MANAGE);
 
 /* A personal token holds the grants it was created with; an OAuth token holds a grant as the scope of that name,
  * which its client asked for, its person ticked and its workspace approved. */

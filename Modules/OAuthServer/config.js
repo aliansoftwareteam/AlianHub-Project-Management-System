@@ -53,8 +53,10 @@ const flagOn = (value) => FLAG_ON.includes(String(value || '').trim().toLowerCas
 const MODE = Object.freeze({ OFF: 'off', BOTH: 'both', ONLY: 'only' });
 
 // on, true, 1 and yes predate the modes and mean both: personal access tokens still work on /mcp.
+// Unset means both, unless the issuer would stop the server at boot: then it stays off (see unsetIssuerProblem).
 const mode = (env = process.env) => {
     const value = String(env.MCP_OAUTH || '').trim().toLowerCase();
+    if (value === '') return issuerProblem(env) ? MODE.OFF : MODE.BOTH;
     if (value === MODE.ONLY) return MODE.ONLY;
     if (value === MODE.BOTH || flagOn(value)) return MODE.BOTH;
     return MODE.OFF;
@@ -108,6 +110,9 @@ const issuerProblem = (env = process.env) => {
     return `MCP_OAUTH_ISSUER (or APIURL) "${raw}" must be https; plain http is allowed only on a loopback host outside production`;
 };
 
+/* Why a server that left MCP_OAUTH unset is running without it, for one startup log line. */
+const unsetIssuerProblem = (env = process.env) => (String(env.MCP_OAUTH || '').trim() === '' ? issuerProblem(env) : '');
+
 const assertIssuer = (env = process.env) => {
     const problem = issuerProblem(env);
     if (problem) throw new Error(`${problem}. Set MCP_OAUTH_ISSUER or turn MCP_OAUTH off.`);
@@ -138,5 +143,5 @@ const endpoints = (env = process.env) => {
 
 module.exports = {
     SCOPES, READ_SCOPES, MANAGE_SCOPES, CHAT_SCOPE, OPT_IN_SCOPES, PLAIN_SCOPES, isManageScope, isOptInScope, offeredScopes, namedScopes, mayAskFor, CODE_TTL_MS, CODE_REUSE_WINDOW_MS, DEFAULTS, MODE,
-    mode, isOn, dcrOn, lifetimes, rateLimitPerMinute, metadataCacheMs, issuer, issuerProblem, assertIssuer, resource, canonicalResource, endpoints,
+    mode, isOn, dcrOn, lifetimes, rateLimitPerMinute, metadataCacheMs, issuer, issuerProblem, unsetIssuerProblem, assertIssuer, resource, canonicalResource, endpoints,
 };

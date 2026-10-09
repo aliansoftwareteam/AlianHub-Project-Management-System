@@ -7,7 +7,12 @@ const { baseUrlError } = require('../AICore/llmProvider/compatibleClient');
 
 const GROUPS = ['general', 'mail', 'storage', 'ai', 'auth', 'calling', 'security'];
 
-const field = (key, group, type, extra = {}) => ({ key, group, type, secret: type === 'secret', default: '', ...extra });
+const taintDefaultOn = (env) => {
+    const { anyToolOn } = require('../Mcp/defaultOn');
+    return anyToolOn(env) || require('../OAuthServer/config').isOn(env);
+};
+
+const field = (key, group, type, extra = {}) =>({ key, group, type, secret: type === 'secret', default: '', ...extra });
 
 const CATALOG = [
     field('APP_NAME', 'general', 'text', { default: 'AlianHub', label: 'Product name' }),
@@ -92,6 +97,12 @@ const CATALOG = [
         validate: allowlistError,
     }),
     field('HELMET_ENABLED', 'security', 'boolean', { default: 'true', label: 'Security response headers', restart: true }),
+    field('AGENT_TAINT_ROUTING', 'security', 'boolean', {
+        default: (env) => (taintDefaultOn(env) ? 'true' : 'false'),
+        normalise: (value) => (/^(true|on|1|yes)$/i.test(String(value).trim()) ? 'true' : 'false'),
+        label: 'Hold risky AI writes for approval',
+        help: 'A risky write by an agent that read outside content, or by an outside AI app, waits for a person to approve it. On by default while the MCP tools or MCP_OAUTH are on.',
+    }),
     field('PERMISSION_ENFORCEMENT_MODE', 'security', 'select', {
         default: 'off',
         options: ['off', 'report', 'enforce'],
@@ -134,14 +145,16 @@ function describeSettings({ saved = {}, env = {}, locked = [] }) {
     return CATALOG.map((def) => {
         const fromEnv = lockedSet.has(def.key) ? env[def.key] : undefined;
         const fromSaved = saved[def.key];
+        const fallback = typeof def.default === 'function' ? def.default(env) : def.default;
         const source = fromEnv !== undefined && fromEnv !== '' ? 'env'
             : fromSaved !== undefined && fromSaved !== '' ? 'saved'
-                : def.default !== '' ? 'default' : 'unset';
-        const effective = source === 'env' ? fromEnv : source === 'saved' ? fromSaved : def.default;
+                : fallback !== '' ? 'default' : 'unset';
+        const raw = source === 'env' ? fromEnv : source === 'saved' ? fromSaved : fallback;
+        const effective = def.normalise && source !== 'unset' ? def.normalise(raw) : raw;
         const value = def.secret ? (source === 'unset' ? { set: false } : { set: true }) : effective;
         return {
             key: def.key, group: def.group, type: def.type, secret: def.secret, label: def.label, help: def.help || '',
-            options: def.options || null, default: def.default, restart: Boolean(def.restart), public: Boolean(def.public),
+            options: def.options || null, default: fallback, restart: Boolean(def.restart), public: Boolean(def.public),
             value, source, locked: source === 'env',
         };
     });

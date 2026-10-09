@@ -1,5 +1,7 @@
-// Read on every call like the other feature flags: off, the registry, the ratings
-// and the MCP tool list are exactly what they were before these tools existed.
+const { isOn } = require('./defaultOn');
+
+// Read on every call like the other feature flags: an explicit off leaves the registry, the ratings
+// and the MCP tool list exactly what they were before these tools existed.
 const ACTIONS = Object.freeze([
     'tags.list', 'task.tags.add', 'task.tags.remove', 'tag.create',
     'task.relations.list', 'task.relation.add', 'task.relation.remove',
@@ -12,6 +14,6 @@ const ACTIONS = Object.freeze([
     'timesheet.week', 'timesheet.week.submit',
 ]);
 
-const enabled = () => ['on', 'true', '1'].includes(String(process.env.MCP_TOOLS_WORK || 'off').trim().toLowerCase());
+const enabled = () => isOn(process.env.MCP_TOOLS_WORK);
 
 module.exports = { ACTIONS, enabled };
