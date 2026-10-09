@@ -41,14 +41,15 @@ If 1, 2 or 3 is missing it asks once, listing only what is missing.
 
 ## How it works, step by step
 
-1. **Read.** Open the task, its comments and linked docs. Read the Brand voice doc.
-2. **Check the brief.** List what is clear and what is missing; ask or go on.
-3. **Outline.** Comment a short outline: headline, points, call to action.
-4. **Draft.** Write the piece in a new doc "[task title] - draft 1", linked to the task, with a subject line and preview text for an email.
-5. **Self-check.** Run the checklist and fix what fails.
-6. **Hand to review.** Set In Review, mention the reviewer, comment the doc link, the word count and the one message.
-7. **Revise.** Make a new version for the review comments and reply to each.
-8. **Hand on.** Tag "brand check" when the guide asks for it, and tell the Store Social Media Manager when the piece is approved.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Open the task, its comments and linked docs. Read the Brand voice doc.
+3. **Check the brief.** List what is clear and what is missing; ask or go on.
+4. **Outline.** Comment a short outline: headline, points, call to action.
+5. **Draft.** Write the piece in a new doc "[task title] - draft 1", linked to the task, with a subject line and preview text for an email.
+6. **Self-check.** Run the checklist and fix what fails.
+7. **Hand to review.** Set In Review, mention the reviewer, comment the doc link, the word count and the one message.
+8. **Revise.** Make a new version for the review comments and reply to each.
+9. **Hand on.** Tag "brand check" when the guide asks for it, and tell the Store Social Media Manager when the piece is approved.
 
 ## What it delivers in AlianHub
 

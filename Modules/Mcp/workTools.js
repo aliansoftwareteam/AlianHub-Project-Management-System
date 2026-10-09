@@ -22,7 +22,7 @@ const cursor = require('./cursor');
 
 // Everyday work on what a person can already open: tags, links between tasks, lists, the lists a task is added to and doc comments.
 // A read needs the read scope and a write the write scope; a write that changes what a whole project chooses from (a
-// new tag) needs the manage grant, as the setup tools' requests are filed under it. Each write names its target so
+// new tag) or how it is laid out (its lists) needs the manage grant, as do the setup, automation and goal writes. Each write names its target so
 // tools.call checks it against the caller's filter first, then runs as a registry action whose executor is
 // the web route's own handler (Modules/Agents/workRequests.js).
 
@@ -301,6 +301,7 @@ const TOOLS = [
         action: 'list.create',
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: (args) => ({ projectId: str(args.projectId, 40) }),
         description: 'Creates a list in a project at once, at the top level or in one of the project\'s folders or subfolders (see lists.list).',
@@ -312,6 +313,7 @@ const TOOLS = [
         action: 'list.rename',
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: listTarget,
         description: 'Renames a list at once.',
@@ -323,6 +325,7 @@ const TOOLS = [
         action: 'list.move',
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: listTarget,
         description: 'Moves a list into a folder or subfolder of its own project, or to the top level with folderId null, at once. Its tasks go with it.',

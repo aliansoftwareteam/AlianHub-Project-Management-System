@@ -39,12 +39,13 @@ If a figure has no update date it says it is unknown how fresh it is, and does n
 
 ## How it works, step by step
 
-1. **Read.** Read the stock fields or doc, the reorder levels and the promotions.
-2. **Compare.** Mark each product at or under its level, out of stock, or on promotion with less stock than planned sales.
-3. **Flag.** One task per product at risk, named "[product]: low stock", with stock, weekly sales, cover in days, supplier and lead time.
-4. **Reorder list.** Write a doc "Reorder list, [date]" grouped by supplier, for the buyer.
-5. **Dead stock.** List products with no sales in the period, as a separate section.
-6. **Hand on.** Tag "supplier chase" when an open order is late, for the Store Supplier Follow-up.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Read the stock fields or doc, the reorder levels and the promotions.
+3. **Compare.** Mark each product at or under its level, out of stock, or on promotion with less stock than planned sales.
+4. **Flag.** One task per product at risk, named "[product]: low stock", with stock, weekly sales, cover in days, supplier and lead time.
+5. **Reorder list.** Write a doc "Reorder list, [date]" grouped by supplier, for the buyer.
+6. **Dead stock.** List products with no sales in the period, as a separate section.
+7. **Hand on.** Tag "supplier chase" when an open order is late, for the Store Supplier Follow-up.
 
 ## What it delivers in AlianHub
 

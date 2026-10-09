@@ -215,6 +215,15 @@ describe('page.comment.create', () => {
         expect(comments(PG_PRIVATE_PROJECT).map((entry) => String(entry._id))).toEqual([C_ELSEWHERE]);
         expect(comment(result.commentId)).toMatchObject({ isDeleted: true, deletedBy: OWNER });
     });
+
+    it('is taken back only by its author or an admin, as the delete route allows', async () => {
+        const { result } = await rpc(ctx(INSIDER), 'page.comment.create', { pageId: PG_OPEN, text: 'Mine to take back' });
+        const [row] = audits('page.comment.create', 'applied');
+        await expect(inverses.pageComment(CID, row.meta.undo, { userId: OUTSIDER })).rejects.toThrow(/Only the author or an admin/);
+        expect(comment(result.commentId).isDeleted).not.toBe(true);
+        await inverses.pageComment(CID, row.meta.undo, { userId: INSIDER });
+        expect(comment(result.commentId)).toMatchObject({ isDeleted: true, deletedBy: INSIDER });
+    });
 });
 
 describe('page.comment.reply', () => {

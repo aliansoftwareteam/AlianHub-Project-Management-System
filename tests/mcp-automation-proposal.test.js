@@ -88,7 +88,7 @@ const undo = (id, uid = OWNER) => proposals.undoApproval(CID, id, decision(uid))
 const tokenOf = (uid) => TOKEN.replace(/.$/, String(PEOPLE.indexOf(uid) + 1));
 const as = (uid, over = {}) => {
     const base = ctx(uid, over);
-    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid) } };
+    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid), grants: ['tasks:manage'] } };
 };
 const filed = async (caller, args) => {
     const out = await rpc(caller, TOOL, args);
@@ -103,7 +103,7 @@ const setRole = (uid, roleType) => { rows(SCHEMA_TYPE.COMPANY_USERS).find((row) 
 
 beforeEach(() => {
     seed();
-    PEOPLE.forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, { _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], projectIds: [], expiresAt: new Date(Date.now() + 86400000) }));
+    PEOPLE.forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, { _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], grants: ['tasks:manage'], projectIds: [], expiresAt: new Date(Date.now() + 86400000) }));
     jest.spyOn(memory, 'rememberApprovedChanges').mockResolvedValue([]);
     matcher.invalidateAll();
 });
@@ -126,9 +126,9 @@ describe('the flag decides whether the tools exist', () => {
         expect(registry.get(TOOL)).toMatchObject({ risk: 'high', undoable: true, write: true, proposeOnly: true, gate: 'owner_admin' });
         expect(actions.rating(TOOL)).toEqual({ write: true, reversible: true, scope: 'project', money: false });
         expect(registry.get(READ)).toMatchObject({ risk: 'low', write: false });
-        expect(scopes.scopeForTool(TOOL)).toBe('tasks:write');
+        expect(scopes.scopeForTool(TOOL)).toBe('tasks:manage');
         expect(scopes.scopeForTool(READ)).toBe('projects:read');
-        expect(tools.registered().find((tool) => tool.name === TOOL).grant).toBeUndefined();
+        expect(tools.registered().find((tool) => tool.name === TOOL).grant).toBe('tasks:manage');
         expect(standingApprovals.kindRefusal(TOOL)).toMatch(/proposed every time/);
     });
 });

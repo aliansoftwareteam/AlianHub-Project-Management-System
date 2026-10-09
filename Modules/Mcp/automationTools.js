@@ -69,6 +69,7 @@ const TOOLS = [
         action: rules.ACTION,
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: (args) => ({ projectId: str(args.projectId, 40) }),
         description: 'Proposes one automation for one project: a trigger, optional conditions (all must hold) and the steps to take, in the terms of automation.catalogue. '

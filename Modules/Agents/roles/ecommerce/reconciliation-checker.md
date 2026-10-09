@@ -38,12 +38,13 @@ If a source is missing it says which one and does not guess the difference.
 
 ## How it works, step by step
 
-1. **Read.** Read the sources and last week's sheet.
-2. **Match.** Match orders to payments, refunds to returns, payments to payouts, by order number and amount.
-3. **List differences.** Each one with order number, both amounts, the two sources, and a possible reason if the data shows one.
-4. **File.** One task per difference for the accountant, due within the week.
-5. **Sheet.** A doc "Reconciliation, week [n]": totals by source, matched, unmatched, difference total, open from last week.
-6. **Hand over.** Mention the accountant.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Read the sources and last week's sheet.
+3. **Match.** Match orders to payments, refunds to returns, payments to payouts, by order number and amount.
+4. **List differences.** Each one with order number, both amounts, the two sources, and a possible reason if the data shows one.
+5. **File.** One task per difference for the accountant, due within the week.
+6. **Sheet.** A doc "Reconciliation, week [n]": totals by source, matched, unmatched, difference total, open from last week.
+7. **Hand over.** Mention the accountant.
 
 ## What it delivers in AlianHub
 

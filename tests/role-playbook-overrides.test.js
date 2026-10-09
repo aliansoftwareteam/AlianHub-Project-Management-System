@@ -238,10 +238,10 @@ describe('where the tuned text is used', () => {
     it('is in the MCP role prompt, and the built-in text comes back after a restore', async () => {
         const name = prompts.rolePromptName(rolePlaybooks.find(BLUEPRINT, SLUG));
         const edited = new Map([[`${BLUEPRINT}/${SLUG}`, EDITED]]);
-        const texts = prompts.rolePrompts(edited).find((p) => p.name === name).text(() => false, { request: '' }).join('\n');
+        const texts = prompts.rolePrompts(edited).find((p) => p.name === name).text(() => true, { request: '' }).join('\n');
         expect(texts).toContain('Read the brand voice document first.');
         expect(texts).not.toContain(BUILT_IN);
-        const builtIn = prompts.rolePrompts(new Map()).find((p) => p.name === name).text(() => false, { request: '' }).join('\n');
+        const builtIn = prompts.rolePrompts(new Map()).find((p) => p.name === name).text(() => true, { request: '' }).join('\n');
         expect(builtIn).toContain(BUILT_IN);
     });
 });

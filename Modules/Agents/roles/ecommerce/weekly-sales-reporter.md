@@ -4,7 +4,8 @@ name: Weekly Sales Reporter
 blueprint: ecommerce
 department: Reporting
 team: operations
-tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, goals.list, goal.get, timesheet.read, task.history, pages.search, page.get, page.create, page.update, task.comment, task.tags.add]
+tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, pages.search, page.get, page.create, page.update, task.comment, task.tags.add]
+tools_optional: [goals.list, goal.get, timesheet.read]
 hands_to: [promotion-planner, stock-alert]
 gates: [the shop manager reviews the report before it is shared]
 ---
@@ -38,12 +39,13 @@ If the figures are missing it asks once for where they are. It never estimates a
 
 ## How it works, step by step
 
-1. **Read.** Read the figures, last week's report and the plan.
-2. **Collect the work.** Search tasks closed and open this week by project: promotions, listings, returns, service, buying.
-3. **Write.** A doc "Shop report, week [n]": sales against last week and the plan, orders, average order value if given, returns rate, service times, promotions, stock problems, listings added.
-4. **Explain.** For each move, name the work behind it, or say "no work found that explains it".
-5. **Questions.** List figures that disagree and what is unclear.
-6. **Hand to review.** Mention the shop manager.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Read.** Read the figures, last week's report and the plan.
+3. **Collect the work.** Search tasks closed and open this week by project: promotions, listings, returns, service, buying.
+4. **Write.** A doc "Shop report, week [n]": sales against last week and the plan, orders, average order value if given, returns rate, service times, promotions, stock problems, listings added.
+5. **Explain.** For each move, name the work behind it, or say "no work found that explains it".
+6. **Questions.** List figures that disagree and what is unclear.
+7. **Hand to review.** Mention the shop manager.
 
 ## What it delivers in AlianHub
 
@@ -75,7 +77,7 @@ If the figures are missing it asks once for where they are. It never estimates a
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `goals.list`, `goal.get`, `timesheet.read`, `task.history`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.tags.add`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `fields.list`, `tags.list`, `members.list`, `task.history`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.tags.add`. Used when the connection has them: `goals.list`, `goal.get`, `timesheet.read`. All through the person's own connection and rights.
 
 ## Example
 

@@ -51,8 +51,10 @@ const goalTokens = require('../Modules/Goals/goalTokens');
 
 const {
     CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, L_OPEN, L_SECRET, L_PRIVATE, T_OPEN, T_PRIVATE,
-    MISSING, T_OPEN_2, BEFORE, FLAGS, EVERYONE, ctx, narrowed, readOnly, outside, routeTable, asPerson, settle,
+    MISSING, T_OPEN_2, BEFORE, FLAGS, EVERYONE, ctx: plainCtx, narrowed: plainNarrowed, readOnly, outside, routeTable, asPerson, settle,
 } = world;
+const ctx = (uid, over) => world.managing(plainCtx(uid, over));
+const narrowed = (uid, projectIds) => world.managing(plainNarrowed(uid, projectIds));
 const { seed, audits, setRule, rpcThrough, listedThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
@@ -114,13 +116,13 @@ describe('the flag decides whether the tools exist', () => {
         expect((await rpc(ctx(INSIDER), 'goal.target.set', { goalId: quiet._id, targetId: quiet.targets[0].id, value: 5 })).rpcError).toMatchObject({ code: -32601 });
     });
 
-    it('on, each tool is a rated registry action with a plain scope, and needs no grant', async () => {
+    it('on, each tool is a rated registry action under the manage grant', async () => {
         expect(await listed(ctx(OWNER))).toEqual(expect.arrayContaining(NAMES));
         NAMES.forEach((name) => expect(registry.permissionsFor(name)).toEqual([{ key: 'task.task_list', write: false }]));
         READS.forEach((name) => expect(actions.rating(name)).toEqual({ write: false, reversible: true, scope: 'workspace', money: false }));
         WRITES.forEach((name) => expect(actions.rating(name)).toEqual({ write: true, reversible: true, scope: 'workspace', money: false }));
-        expect(NAMES.map((name) => scopes.scopeForTool(name))).toEqual(['projects:read', 'projects:read', 'tasks:write', 'tasks:write', 'tasks:write']);
-        expect(tools.registered().filter((tool) => NAMES.includes(tool.name)).map((tool) => tool.grant)).toEqual([undefined, undefined, undefined, undefined, undefined]);
+        expect(NAMES.map((name) => scopes.scopeForTool(name))).toEqual(['projects:read', 'projects:read', 'tasks:manage', 'tasks:manage', 'tasks:manage']);
+        expect(tools.registered().filter((tool) => NAMES.includes(tool.name)).map((tool) => tool.grant)).toEqual([undefined, undefined, 'tasks:manage', 'tasks:manage', 'tasks:manage']);
         expect(WRITES.map((name) => workTools.filedUnder(name))).toEqual(['tasks:manage', 'tasks:manage', 'tasks:manage']);
     });
 
@@ -314,20 +316,17 @@ describe('goal.target.set', () => {
     it('needs the write scope: a read-only token and an OAuth token without it are refused', async () => {
         const before = goalsNow();
         expect(await rpc(readOnly(INSIDER), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
-        expect(await rpc(outside(INSIDER, ['projects:read']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This connection was not given the tasks:write permission. Ask the person to connect you again and allow it.' });
+        expect(await rpc(outside(INSIDER, ['projects:read']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This connection was not given the tasks:manage permission, which goal.target.set needs. Ask the person to connect you again and allow it.' });
         expect(await rpc(ctx(INSIDER, { allowedActions: ['goals.list'] }), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ refused: true, reason: expect.stringMatching(/is not switched on for this connection/) });
         expect(goalsNow()).toBe(before);
     });
 
-    it('runs for an outside client, and under taint routing waits for a person or is refused', async () => {
-        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 2 })).toMatchObject({ ok: true });
+    it('runs for an outside client holding the manage scope, and under taint routing waits for a person', async () => {
+        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 2 })).toMatchObject({ isError: true });
+        expect(await rpc(outside(INSIDER, ['tasks:write', 'tasks:manage']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 2 })).toMatchObject({ ok: true });
 
         process.env.AGENT_TAINT_ROUTING = 'on';
         const before = goalsNow();
-        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 }))
-            .toMatchObject({ refused: true, reason: expect.stringMatching(/reaches the whole workspace.*needs a person's approval/) });
-        expect(proposals.create).not.toHaveBeenCalled();
-
         expect(await rpc(outside(INSIDER, ['tasks:write', 'tasks:manage']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 }))
             .toMatchObject({ ok: false, pending: true, proposalId: 'proposal-1' });
         expect(proposals.create.mock.calls[0][1]).toMatchObject({ requestedBy: INSIDER, changes: [{ action: 'goal.target.set', params: { goalId: quiet._id, targetId: number(quiet), value: 5 } }] });
@@ -450,7 +449,7 @@ describe('goal.target.sources.add and goal.target.sources.remove', () => {
         process.env.AGENT_TAINT_ROUTING = 'on';
         const before = goalsNow();
         const args = { goalId: shared._id, targetId: counted(shared), kind: 'task', sourceId: T_OPEN };
-        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.sources.add', args)).toMatchObject({ refused: true, reason: expect.stringMatching(/needs a person's approval/) });
+        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.sources.add', args)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
         expect(await rpc(outside(INSIDER, ['tasks:write', 'tasks:manage']), 'goal.target.sources.add', args)).toMatchObject({ ok: false, pending: true });
         expect(proposals.create).toHaveBeenCalledTimes(1);
         expect(goalsNow()).toBe(before);

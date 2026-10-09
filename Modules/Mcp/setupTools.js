@@ -266,6 +266,7 @@ const TOOLS = [
         action: 'fields.create',
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: projectTarget,
         description: `Adds up to ${setup.FIELDS_MAX} custom fields to one project in one call, each with a name and a type: ${setup.CREATE_TYPES.join(', ')}. `
@@ -289,6 +290,7 @@ const TOOLS = [
         action: 'view.create',
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: projectTarget,
         description: `Adds a saved view to one project: a ${Object.keys(setup.VIEW_KINDS).join(', ')} view with its own name, grouping, sorting, filters and columns. `
@@ -311,6 +313,7 @@ const TOOLS = [
         action: 'project.setup',
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: projectTarget,
         description: 'Sets up a project that exists from one plan, in one call: '
@@ -342,6 +345,7 @@ const TOOLS = [
         action: projects.ACTION,
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: () => WRITE_TARGET,
         description: 'Asks for a new project, in one call: its name, what it is for, and the plan project.setup takes, '
@@ -367,6 +371,7 @@ const TOOLS = [
         action: copies.ACTION,
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: (args) => ({ ...WRITE_TARGET, ...projectTarget(args) }),
         description: 'Asks for a copy of a project the person can open, in one call: the project and the name of the copy. '
@@ -392,6 +397,7 @@ const TOOLS = [
         action: lists.FOLDER,
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: projectTarget,
         description: 'Asks for a new folder in a project, in one call: its name and, if wanted, lists to create inside it, lists the project already has to move into it, '
@@ -419,6 +425,7 @@ const TOOLS = [
         action: lists.SPRINT,
         visibility: 'filtered',
         strict: true,
+        grant: GRANT,
         filedUnder: GRANT,
         target: (args) => ({ projectId: str(args.projectId, 40), sprintId: str(args.sprintId, 40) }),
         description: 'Makes a list a sprint with a first day and a last day, or changes the days of a list that is already a sprint. '

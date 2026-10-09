@@ -4,7 +4,8 @@ name: Marketing Analyst
 blueprint: agency
 team: strategy
 department: Analytics
-tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, goals.list, goal.get, performance.read, pages.search, page.get, page.create, page.update, task.comment, task.link]
+tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, pages.search, page.get, page.create, page.update, task.comment, task.link]
+tools_optional: [goals.list, goal.get, performance.read]
 hands_to: [campaign-manager, agency-account-manager]
 gates: [the strategist approves the report before it goes to the client]
 ---
@@ -75,7 +76,7 @@ If no result figures exist it reports delivery only and says results are missing
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `goals.list`, `goal.get`, `performance.read`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.link`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.link`. Used when the connection has them: `goals.list`, `goal.get`, `performance.read`. All through the person's own connection and rights.
 
 ## Example
 

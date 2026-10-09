@@ -258,11 +258,17 @@ const removeComment = async (companyId, comment, uid) => {
     return updated;
 };
 
-/* What an undo of a comment made for a person takes back: the live comment on that doc, with its replies. */
+const ONLY_AUTHOR_OR_ADMIN = 'Only the author or an admin can delete this comment.';
+const mayDelete = async (companyId, uid, comment) => String(comment.userId) === String(uid) || isCompanyAdmin(companyId, uid);
+
+/* What an undo of a comment made for a person takes back: the live comment on that doc, with its replies, for
+ * whom the delete route would let remove it. */
 exports.withdrawComment = async (companyId, pageId, commentId, uid) => {
     if (!isObjectIdString(pageId) || !isObjectIdString(commentId)) return null;
     const comment = await findComment(companyId, { _id: pageId }, commentId);
-    return comment ? removeComment(companyId, comment, String(uid)) : null;
+    if (!comment) return null;
+    if (!(await mayDelete(companyId, String(uid), comment))) throw Object.assign(new Error(ONLY_AUTHOR_OR_ADMIN), { status: 403, deterministic: true });
+    return removeComment(companyId, comment, String(uid));
 };
 
 /* DELETE /api/v2/pages/:id/comments/:commentId — the author or an admin; a thread goes with its replies. */
@@ -271,9 +277,7 @@ exports.deleteComment = async (req, res) => {
         const target = await loadTarget(req, res);
         if (!target) return undefined;
         const { companyId, uid, comment } = target;
-        if (String(comment.userId) !== uid && !(await isCompanyAdmin(companyId, uid))) {
-            return fail(res, 'Only the author or an admin can delete this comment.', 403);
-        }
+        if (!(await mayDelete(companyId, uid, comment))) return fail(res, ONLY_AUTHOR_OR_ADMIN, 403);
         if (!(await removeComment(companyId, comment, uid))) return fail(res, COMMENT_NOT_FOUND, 404);
         return res.send({ status: true, statusText: 'Comment deleted.', data: { _id: String(comment._id) } });
     } catch (error) {

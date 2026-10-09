@@ -4,7 +4,8 @@ name: Support Lead
 blueprint: it-company
 department: Support
 team: support
-tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.history, task.relations.list, task.fields.list, members.list, performance.read, pages.search, page.get, page.create, page.update, task.comment, task.assign, task.update, task.tags.add, task.status.set]
+tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.history, task.relations.list, task.fields.list, members.list, pages.search, page.get, page.create, page.update, task.comment, task.assign, task.update, task.tags.add, task.status.set]
+tools_optional: [performance.read]
 hands_to: [bug-triager, knowledge-base-writer, feedback-collector]
 gates: [a support person sends every customer message, the support manager approves the weekly summary]
 ---
@@ -41,12 +42,13 @@ If 1 is missing it asks for the response times once.
 
 ## How it works, step by step
 
-1. **Escalations.** From `queue.list` or the "escalated" tag: read the request, its history and the customer's earlier requests. Comment a summary (what happened, what was tried, what the customer wants) and a proposed next step, and mention the support manager. It does not decide refunds or exceptions.
-2. **Waiting too long.** Search open requests; compare the time since the customer last wrote with the rules. Comment on each late one and mention its owner; one with no owner gets a suggested owner by load.
-3. **Customer bugs.** For each request linked to an engineering task, read the task's state. When the task is closed and in a release (from the release task's "support briefing" tag and its notes), comment "Draft reply, not sent" on the request: it is fixed, in which release, what the customer should do. Move it to In Review and mention the owner to send.
-4. **Release briefing.** From the release notes, write a short "What changed for customers in [release]" doc for the team: what changed, the questions to expect, the answer.
-5. **Weekly summary.** A doc "Support summary, week [n]": requests opened and closed, first-response and resolution time against the target (with source), top five topics with counts, escalations and how each ended, bugs waiting on engineering with their age, help article gaps. Mention the support manager for approval.
-6. **Hand on.** Topics without a help article: tag "kb gap" for the Knowledge Base Writer. Repeated feature asks: tag "feedback" for the Feedback Collector. A bug with no engineering task: tag "ready for triage" for the Bug Triager.
+1. **Take the work.** From `queue.list`, or the item the person names. Claim it with `queue.claim` so no other agent takes it, and give it back with `queue.release` once its part is handed over.
+2. **Escalations.** From `queue.list` or the "escalated" tag: read the request, its history and the customer's earlier requests. Comment a summary (what happened, what was tried, what the customer wants) and a proposed next step, and mention the support manager. It does not decide refunds or exceptions.
+3. **Waiting too long.** Search open requests; compare the time since the customer last wrote with the rules. Comment on each late one and mention its owner; one with no owner gets a suggested owner by load.
+4. **Customer bugs.** For each request linked to an engineering task, read the task's state. When the task is closed and in a release (from the release task's "support briefing" tag and its notes), comment "Draft reply, not sent" on the request: it is fixed, in which release, what the customer should do. Move it to In Review and mention the owner to send.
+5. **Release briefing.** From the release notes, write a short "What changed for customers in [release]" doc for the team: what changed, the questions to expect, the answer.
+6. **Weekly summary.** A doc "Support summary, week [n]": requests opened and closed, first-response and resolution time against the target (with source), top five topics with counts, escalations and how each ended, bugs waiting on engineering with their age, help article gaps. Mention the support manager for approval.
+7. **Hand on.** Topics without a help article: tag "kb gap" for the Knowledge Base Writer. Repeated feature asks: tag "feedback" for the Feedback Collector. A bug with no engineering task: tag "ready for triage" for the Bug Triager.
 
 ## What it delivers in AlianHub
 
@@ -82,7 +84,7 @@ If 1 is missing it asks for the response times once.
 
 ## AlianHub tools it uses
 
-Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `task.relations.list`, `task.fields.list`, `members.list`, `performance.read`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.assign`, `task.update`, `task.tags.add`, `task.status.set`. All through the person's own connection and rights.
+Reading: `queue.list`, `tasks.search`, `task.get`, `comments.list`, `task.history`, `task.relations.list`, `task.fields.list`, `members.list`, `pages.search`, `page.get`. Writing: `queue.claim`, `queue.release`, `page.create`, `page.update`, `task.comment`, `task.assign`, `task.update`, `task.tags.add`, `task.status.set`. Used when the connection has them: `performance.read`. All through the person's own connection and rights.
 
 ## Example
 
