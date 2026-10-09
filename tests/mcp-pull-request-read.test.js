@@ -44,20 +44,23 @@ const actions = require('../Modules/Agents/actions');
 const tools = require('../Modules/Mcp/tools');
 const scopes = require('../Modules/Mcp/scopes');
 const server = require('../Modules/Mcp/server');
+const permissions = require('../Modules/Agents/permissions');
+const logger = require('../Config/loggerConfig');
 
-const { OWNER, INSIDER, OUTSIDER, P_OPEN, P_PRIVATE, T_OPEN, T_PRIVATE, FLAGS, ctx, narrowed, settle } = world;
+const { OWNER, INSIDER, OUTSIDER, P_OPEN, P_PRIVATE, T_OPEN, T_SECRET, T_PRIVATE, FLAGS, ctx, narrowed, settle } = world;
 const { seed, stored, rpcThrough, listedThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 
 const TOOL = 'pull_request.get';
+const SHA = 'abc1234def0000000000000000000000000000ff';
 const TOKEN = 'ghp_TheWorkspaceKeyThatNeverLeaves0123456789';
 const REPO = 'acme/web';
 const CONNECTION = '6f0000000000000000000e01';
 
 const PULL = {
     number: 42, title: 'WEB-7 Speed up the board', state: 'closed', merged: true, merged_at: '2026-10-08T10:00:00Z', draft: false,
-    html_url: `https://github.com/${REPO}/pull/42`, user: { login: 'dev-ana' }, head: { ref: 'feat/web-7-board', sha: 'abc1234def' }, base: { ref: 'beta' },
+    html_url: `https://github.com/${REPO}/pull/42`, user: { login: 'dev-ana' }, head: { ref: 'feat/web-7-board', sha: SHA }, base: { ref: 'beta' },
     created_at: '2026-10-07T09:00:00Z', updated_at: '2026-10-08T10:00:00Z', closed_at: '2026-10-08T10:00:00Z',
     changed_files: 120, additions: 300, deletions: 40, body: `Closes WEB-7.\n${'x'.repeat(5000)}`,
 };
@@ -71,13 +74,13 @@ const github = (over = {}) => safeFetch.mockImplementation(async (url) => {
     if (over[path]) return over[path](url);
     if (path === `/repos/${REPO}/pulls/42`) return reply(200, PULL);
     if (path === `/repos/${REPO}/pulls/42/files`) return reply(200, FILES);
-    if (path === `/repos/${REPO}/commits/abc1234def/check-runs`) return reply(200, RUNS);
-    if (path === `/repos/${REPO}/commits/abc1234def/status`) return reply(200, STATUS);
+    if (path === `/repos/${REPO}/commits/${SHA}/check-runs`) return reply(200, RUNS);
+    if (path === `/repos/${REPO}/commits/${SHA}/status`) return reply(200, STATUS);
     return reply(404, { message: 'Not Found' });
 });
 
 const connect = (db = mockDb, over = {}) => db.seed(SCHEMA_TYPE.INTEGRATION_CONNECTIONS, {
-    _id: CONNECTION, type: 'github', name: 'GitHub', config: { token: TOKEN, repo: REPO }, projectIds: [P_OPEN], status: 'connected', enabled: true, deletedStatusKey: 0, ...over,
+    _id: CONNECTION, type: 'github', name: 'GitHub', config: { token: TOKEN, repo: REPO }, projectIds: [P_OPEN], connectedBy: OWNER, status: 'connected', enabled: true, deletedStatusKey: 0, ...over,
 });
 const read = (caller, args) => rpc(caller, TOOL, args);
 
@@ -130,20 +133,22 @@ describe('reading a pull request', () => {
     });
 
     it('never puts the key in what it answers, whatever GitHub says', async () => {
-        github({ [`/repos/${REPO}/commits/abc1234def/check-runs`]: () => { throw new Error(`socket hang up for ${TOKEN}`); } });
+        github({ [`/repos/${REPO}/commits/${SHA}/check-runs`]: () => { throw new Error(`socket hang up for ${TOKEN}`); } });
         const answer = await read(ctx(OUTSIDER), { taskId: T_OPEN });
         expect(answer.checks).toMatchObject({ conclusion: 'unknown' });
         expect(JSON.stringify(answer)).not.toContain(TOKEN);
         expect(JSON.stringify(answer)).not.toContain('secret diff');
         safeFetch.mockReset();
         safeFetch.mockImplementation(async () => { throw new Error(`refused ${TOKEN}`); });
+        logger.warn.mockClear();
         const failed = await read(ctx(OUTSIDER), { number: 42 });
-        expect(failed.error).toMatch(/GitHub could not be read/);
-        expect(JSON.stringify(failed)).not.toContain(TOKEN);
+        expect(failed).toEqual({ error: 'GitHub could not be read just now. Try again later.' });
+        expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('refused'));
+        logger.warn.mock.calls.forEach(([line]) => expect(line).not.toContain(TOKEN));
     });
 
     it('reads by number or address, and the next page of files', async () => {
-        expect(await read(ctx(OUTSIDER), { number: 42 })).toMatchObject({ number: 42, state: 'merged' });
+        expect(await read(ctx(OUTSIDER), { number: 42 })).toMatchObject({ number: 42, state: 'merged', task: { taskId: T_OPEN } });
         expect(await read(ctx(OUTSIDER), { url: `https://github.com/${REPO}/pull/42/files` })).toMatchObject({ number: 42 });
         const second = await read(ctx(OUTSIDER), { number: 42, filesPage: 3 });
         expect(second).toMatchObject({ filesPage: 3 });
@@ -201,6 +206,68 @@ describe('what the person cannot open is not read', () => {
         expect(await read(elsewhere, { number: 42 })).toEqual({ error: expect.stringMatching(/GitHub is not connected/) });
         expect(await read(elsewhere, { taskKey: 'WEB-7' })).toEqual({ error: expect.stringMatching(/GitHub is not connected/) });
         expect(safeFetch).not.toHaveBeenCalled();
+    });
+});
+
+describe('the number and address paths follow the task list rules', () => {
+    beforeEach(() => {
+        connect();
+        Object.assign(stored(SCHEMA_TYPE.TASKS, T_SECRET), { TaskKey: 'SEC-1', links: [{ url: `https://github.com/${REPO}/pull/43`, kind: 'pr' }] });
+    });
+
+    it('a pull request linked only to a task on a list hidden from the person is refused', async () => {
+        expect(await read(ctx(OUTSIDER), { number: 43 })).toMatchObject({ refused: true, reason: expect.stringMatching(/not_visible/) });
+        expect(await read(ctx(OUTSIDER), { url: `https://github.com/${REPO}/pull/43` })).toMatchObject({ refused: true });
+        expect(safeFetch).not.toHaveBeenCalled();
+        expect(await read(ctx(INSIDER), { number: 43 })).toEqual({ error: expect.stringMatching(/cannot find that pull request/) });
+    });
+
+    it('a pull request linked to no task is refused', async () => {
+        expect(await read(ctx(OWNER), { number: 99 })).toMatchObject({ refused: true });
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+
+    it('an address naming a repository of dots only is not taken', async () => {
+        expect(await read(ctx(OWNER), { url: 'https://github.com/acme/../pull/42' })).toEqual({ error: expect.stringMatching(/not the address/) });
+    });
+});
+
+describe('the person who connected GitHub', () => {
+    it('once they lose access to a linked project, its pull requests are not served', async () => {
+        connect(mockDb, { connectedBy: INSIDER, projectIds: [P_OPEN, P_PRIVATE] });
+        Object.assign(stored(SCHEMA_TYPE.TASKS, T_PRIVATE), { links: [{ url: `https://github.com/${REPO}/pull/44`, kind: 'pr' }] });
+        github({ [`/repos/${REPO}/pulls/44`]: () => reply(200, { ...PULL, number: 44 }), [`/repos/${REPO}/pulls/44/files`]: () => reply(200, []) });
+        expect(await read(ctx(OWNER), { taskId: T_PRIVATE })).toMatchObject({ number: 44 });
+        expect(await read(ctx(OWNER), { number: 44 })).toMatchObject({ number: 44 });
+        stored(SCHEMA_TYPE.PROJECTS, P_PRIVATE).AssigneeUserId = [];
+        safeFetch.mockClear();
+        expect(await read(ctx(OWNER), { taskId: T_PRIVATE })).toEqual({ error: expect.stringMatching(/not linked to the GitHub repository/) });
+        expect(await read(ctx(OWNER), { number: 44 })).toMatchObject({ refused: true });
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+});
+
+describe('narrowed and in-app callers', () => {
+    beforeEach(() => connect(mockDb, { projectIds: [P_OPEN, P_PRIVATE] }));
+
+    it('a connection kept to other projects does not reach a task outside them', async () => {
+        expect(await read(narrowed(OWNER, [P_PRIVATE]), { taskId: T_OPEN })).toEqual({ error: expect.stringMatching(/task was not found/) });
+        expect(await read(narrowed(OWNER, [P_PRIVATE]), { taskKey: 'WEB-7' })).toEqual({ error: expect.stringMatching(/task was not found/) });
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+
+    it('the Ask agent is judged task by task: the first project refuses, a later one allows', async () => {
+        const ask = { companyId: world.CID, userId: INSIDER, actor: { kind: 'agent', userId: INSIDER, agentId: null, agentName: 'Ask', viaAccount: 'workspace', tokenId: null, runId: null }, projectIds: [], ip: '1.1.1.1' };
+        const real = permissions.holderMay;
+        const spy = jest.spyOn(permissions, 'holderMay').mockImplementation((companyId, actor, action, params, options) => (
+            action === TOOL && params && params.taskId === T_OPEN ? Promise.resolve({ allowed: false, reason: 'the project keeps its tasks from this person' }) : real(companyId, actor, action, params, options)));
+        try {
+            expect(await tools.readOwn(ask, TOOL, { number: 42 })).toMatchObject({ number: 42, task: { taskId: T_PRIVATE } });
+            stored(SCHEMA_TYPE.TASKS, T_PRIVATE).links = [];
+            await expect(tools.readOwn(ask, TOOL, { number: 42 })).rejects.toBeInstanceOf(actions.RefusedError);
+        } finally {
+            spy.mockRestore();
+        }
     });
 });
 

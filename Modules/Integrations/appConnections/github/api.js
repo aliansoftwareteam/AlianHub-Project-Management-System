@@ -15,13 +15,15 @@ const header = (res, name) => (res.headers || {})[name];
 const rateLimited = (res) => res.status === 429
     || (res.status === 403 && (String(header(res, 'x-ratelimit-remaining')) === '0' || header(res, 'retry-after') !== undefined));
 
-const refusal = (res) => {
+const refusalOf = (res) => {
     if (res.status === 401) return new Error('GitHub refused the token (401). Connect GitHub again with a new token.');
     if (res.status === 404) return new Error('GitHub cannot find the repository, or the token cannot read it (404).');
     if (rateLimited(res)) return Object.assign(new Error('GitHub rate limit reached; trying again later.'), { rateLimited: true, retry: { after: header(res, 'retry-after'), reset: header(res, 'x-ratelimit-reset') } });
     if (res.status === 403) return new Error('GitHub refused access to the repository (403).');
     return new Error(`GitHub answered ${res.status}.`);
 };
+
+const refusal = (res) => Object.assign(refusalOf(res), { githubStatus: res.status });
 
 /* Pull requests updated at or after `since`, read newest first until the list reaches `since`, returned oldest first.
  * Only a list longer than MAX_PAGES is cut, and then `truncated` tells the caller to keep its cursor where it was. */
