@@ -119,7 +119,7 @@ const checks = {
     },
     cost_forecast: async (companyId, s, now, settings) => {
         if (!(settings.monthlyBudgetUsd > 0)) return [];
-        const { usedUsd } = await spend.monthly(companyId, runs.monthKey(now));
+        const { usedUsd } = await spend.monthlyTotal(companyId, runs.monthKey(now));
         return costBreaches({ usedUsd, budgetUsd: settings.monthlyBudgetUsd, now }, s);
     },
     queue_age: async (companyId, s, now) => {

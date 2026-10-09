@@ -1670,6 +1670,7 @@
     "AiQuality.col_up": "Up",
     "AiQuality.cost_title": "Cost per feature, {month}",
     "AiQuality.cost_total": "Total",
+    "AiQuality.cost_unavailable": "This month's AI spend could not be read right now. Try again in a moment.",
     "AiQuality.disliked_privacy": "An answer appears here only when the person who rated it chose to include it.",
     "AiQuality.disliked_title": "Most disliked",
     "AiQuality.down_count": "{n} down",

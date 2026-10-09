@@ -210,6 +210,7 @@ describe('the reservation is atomic on the run row', () => {
     });
 
     it('a budget that cannot be read refuses the call as budget_unavailable and keeps no hold', async () => {
+        require('../Modules/Agents/budget').forgetLimits();
         mockDb.store[dbCollections.COMPANIES][0].agentDailyBudgetUsd = 5;
         const run = await start({ spendCapUsd: 1 });
         const real = mockDb.crud.getMockImplementation();

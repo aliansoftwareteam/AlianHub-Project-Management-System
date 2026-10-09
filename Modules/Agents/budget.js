@@ -30,8 +30,24 @@ const readCompany = (companyId) => MongoDbCrudOpration(dbCollections.GLOBAL, {
     type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, 'agentUndoHours agentMonthlyBudgetUsd agentDailyBudgetUsd agentBudgetAlerts agentDailyBudgetAlerts agentAlerts'],
 }, 'findOne').catch(budgetRead.rethrow(companyId, 'the workspace AI budget settings'));
 
+const DEFAULT_LIMITS_CACHE_MS = 60000;
+const limitsCacheMs = () => {
+    const raw = process.env.AI_BUDGET_CACHE_MS;
+    const ms = Number(raw);
+    return raw !== undefined && raw !== '' && Number.isFinite(ms) && ms >= 0 ? ms : DEFAULT_LIMITS_CACHE_MS;
+};
+
+/* The last budget read per company, kept after it expires: it answers a read that fails. */
+const knownLimits = new Map();
+
+const forgetLimits = (companyId) => {
+    if (companyId === undefined) knownLimits.clear();
+    else knownLimits.delete(String(companyId));
+};
+
 const writeCompany = async (companyId, set) => {
     await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, { $set: set }] }, 'updateOne');
+    forgetLimits(companyId);
     removeCache(`companyData_${companyId}`);
 };
 
@@ -49,6 +65,34 @@ const settingsOf = (company) => {
 };
 
 const settings = async (companyId) => settingsOf(await readCompany(companyId));
+
+const unbudgeted = (limits) => !(limits.monthlyBudgetUsd > 0) && !(limits.dailyBudgetUsd > 0);
+
+/* The monthly and daily budget the pre-call gates hold every call against, read at most once
+ * per company every AI_BUDGET_CACHE_MS. When the read fails, a workspace last seen without a
+ * budget goes on without one; one last seen with a budget, or never seen, is refused. */
+const limits = async (companyId) => {
+    const key = String(companyId);
+    const last = knownLimits.get(key);
+    const age = last ? Date.now() - last.at : -1;
+    if (age >= 0 && age < limitsCacheMs()) return last.value;
+    let company;
+    try {
+        company = await MongoDbCrudOpration(dbCollections.GLOBAL, {
+            type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, 'agentMonthlyBudgetUsd agentDailyBudgetUsd'],
+        }, 'findOne');
+    } catch (cause) {
+        if (last && unbudgeted(last.value)) {
+            logger.warn(`[ai-budget] ${key}: the workspace AI budget settings could not be read (${cause.message}); it had no budget when last read, so the call goes ahead`);
+            return last.value;
+        }
+        throw budgetRead.unavailable(key, 'the workspace AI budget settings', cause);
+    }
+    const { monthlyBudgetUsd, dailyBudgetUsd } = settingsOf(company);
+    const value = { monthlyBudgetUsd, dailyBudgetUsd };
+    knownLimits.set(key, { at: Date.now(), value });
+    return value;
+};
 
 const amountOf = (value) => (typeof value === 'number' ? value : (typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN));
 
@@ -177,7 +221,7 @@ const status = async (companyId) => {
 
 /* What the month and the day can still absorb, for the pre-call gate. `budgetUsd` 0 means no budget. */
 const headroom = async (companyId) => {
-    const { monthlyBudgetUsd, dailyBudgetUsd } = await settings(companyId);
+    const { monthlyBudgetUsd, dailyBudgetUsd } = await limits(companyId);
     const [month, day] = await Promise.all([
         ledgerFor(companyId, 'monthly', PERIODS.monthly.key()),
         ledgerFor(companyId, 'daily', PERIODS.daily.key()),
@@ -270,4 +314,4 @@ const alertIfCrossed = async (companyId, source) => {
     return monthly || daily ? { ...(monthly || {}), ...(daily ? { daily } : {}) } : null;
 };
 
-module.exports = { DEFAULTS, UNDO_HOURS_MIN, UNDO_HOURS_MAX, BUDGET_MAX_USD, settings, validate, updateSettings, provider, status, headroom, check, alertIfCrossed };
+module.exports = { DEFAULTS, UNDO_HOURS_MIN, UNDO_HOURS_MAX, BUDGET_MAX_USD, DEFAULT_LIMITS_CACHE_MS, settings, limits, forgetLimits, validate, updateSettings, provider, status, headroom, check, alertIfCrossed };

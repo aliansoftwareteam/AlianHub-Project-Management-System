@@ -68,6 +68,11 @@
     "description": "Days a replay record is kept before the TTL index deletes it.",
     "default": "30"
   },
+  "AI_BUDGET_CACHE_MS": {
+    "group": "ai",
+    "description": "How long a workspace's AI budget settings are kept in memory before the next call reads them again; a change made in settings is seen at once on this server.",
+    "default": "60000"
+  },
   "AI_RESERVATION_TTL_MS": {
     "group": "ai",
     "description": "How long a budget reservation holds a workspace's money before it is treated as stranded and stops counting; a process killed mid-call leaves one behind.",

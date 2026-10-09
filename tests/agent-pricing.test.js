@@ -113,6 +113,18 @@ describe('a run on an unpriced model is refused before it starts', () => {
         expect(usage.checkConfiguredModelPriced()).toEqual({ ok: true, reason: '', model: 'gpt-4.1' });
     });
 
+    it('checks the model the agent pins, not only the configured one', async () => {
+        const config = require('../Config/config');
+        const kept = { key: config.AI_API_KEY, model: config.AI_MODEL };
+        Object.assign(config, { AI_API_KEY: 'test-key', AI_MODEL: MYSTERY });
+        configure(MYSTERY);
+        try {
+            expect(await runs.canStart(agent({ model: 'gpt-4.1' }), { companyId: C })).toEqual({ ok: true, reason: '' });
+            expect(await runs.canStart(agent(), { companyId: C, skill: { model: 'gpt-4.1' } })).toEqual({ ok: true, reason: '' });
+            expect(await runs.canStart(agent({ model: 'gpt-9-other-mystery' }), { companyId: C })).toMatchObject({ ok: false, code: 'unpriced_model', model: MYSTERY });
+        } finally { Object.assign(config, { AI_API_KEY: kept.key, AI_MODEL: kept.model }); }
+    });
+
     it('does not stand in for a missing provider — that fails on its own', async () => {
         expect(usage.checkConfiguredModelPriced()).toEqual({ ok: true, reason: '', model: null });
         expect(await runs.canStart(agent(), { companyId: C })).toEqual({ ok: true, reason: '' });

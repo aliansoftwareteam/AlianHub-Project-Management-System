@@ -56,7 +56,15 @@ const pausedIn = async (companyId, projectIds) => ((await projectLimits.pausedAm
 
 /* Can this agent start a run right now? Returns { ok, reason }. A run names the project it works in as `projectId`,
  * or each of several as `projectIds`: where agents are paused in one of them, the start is refused. */
-const canStart = async (agent, { trigger, viaAccount, companyId, depth, projectId, projectIds } = {}) => {
+/* The model a run asks for, as AICore/modelCall picks it: the skill's pin, then the agent's. A pin
+ * that validates is priced; one that does not is dropped at call time and the configured model runs. */
+const priceCheckFor = (agent, skill) => {
+    const pinned = (skill && skill.model) || (agent && agent.model) || null;
+    if (pinned && require('../AICore/modelPin').validatePin(pinned).ok) return { ok: true };
+    return usage.checkConfiguredModelPriced();
+};
+
+const canStart = async (agent, { trigger, viaAccount, companyId, depth, projectId, projectIds, skill } = {}) => {
     if (!agent) return { ok: false, reason: 'Agent not found.' };
     if (clampDepth(depth) >= MAX_DEPTH) return { ok: false, reason: LOOP_DEPTH_EXCEEDED, code: LOOP_DEPTH_EXCEEDED, depth: clampDepth(depth), maxDepth: MAX_DEPTH };
     if (agent.paused) return { ok: false, reason: `Agent is paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.` };
@@ -68,7 +76,7 @@ const canStart = async (agent, { trigger, viaAccount, companyId, depth, projectI
         return { ok: false, reason: error.message, code: aiSwitch.AI_OFF };
     }
     const via = viaAccount || agent.account || 'workspace';
-    const price = usage.checkConfiguredModelPriced();
+    const price = priceCheckFor(agent, skill);
     if (!price.ok) return { ok: false, reason: price.reason, code: price.code, model: price.model };
     const month = agent.spendMonth && agent.spendMonth.month === monthKey() ? agent.spendMonth : { usd: 0 };
     if (Number(agent.spendCapUsd) > 0 && Number(month.usd || 0) >= Number(agent.spendCapUsd)) {

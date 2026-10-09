@@ -176,6 +176,8 @@ describe('a personal or local account calling the server key is billed to the wo
 });
 
 describe('a budget that cannot be read refuses the call', () => {
+    beforeEach(() => budget.forgetLimits());
+
     const failing = (type, op) => {
         const real = mockDb.crud.getMockImplementation();
         mockDb.crud.mockImplementation(async (...a) => {
@@ -215,6 +217,52 @@ describe('a budget that cannot be read refuses the call', () => {
         let out;
         try { out = await runs.canStart(agent(), { companyId: C }); } finally { restore(); }
         expect(out).toMatchObject({ ok: false, code: 'budget_unavailable' });
+    });
+});
+
+describe('the budget limits are read once a minute per company', () => {
+    const LIMIT_FIELDS = 'agentMonthlyBudgetUsd agentDailyBudgetUsd';
+    const limitReads = () => mockDb.calls.filter((c) => c.type === dbCollections.COMPANIES && c.method === 'findOne' && c.data && c.data[1] === LIMIT_FIELDS).length;
+    const ask = () => getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
+    const failCompanyReads = () => {
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (...a) => {
+            if (a[1] && a[1].type === dbCollections.COMPANIES && a[2] === 'findOne') throw new Error('mongo down');
+            return real(...a);
+        });
+        return () => mockDb.crud.mockImplementation(real);
+    };
+
+    beforeEach(() => budget.forgetLimits());
+    afterEach(() => { process.env.AI_BUDGET_CACHE_MS = '0'; });
+
+    it('reads the company once for several calls, and again as soon as the budget is changed', async () => {
+        process.env.AI_BUDGET_CACHE_MS = String(budget.DEFAULT_LIMITS_CACHE_MS);
+        seedCompany({ agentDailyBudgetUsd: 1 });
+        await ask();
+        await ask();
+        expect(limitReads()).toBe(1);
+
+        await budget.updateSettings(C, { dailyBudgetUsd: 0.001 });
+        await expect(ask()).rejects.toMatchObject({ code: 'ai_budget_exhausted', period: 'daily' });
+        expect(limitReads()).toBe(2);
+    });
+
+    it('a failed read goes on for a workspace last seen without a budget, and logs it', async () => {
+        seedCompany();
+        await ask();
+        const restore = failCompanyReads();
+        try { await ask(); } finally { restore(); }
+        expect(adapter.chat).toHaveBeenCalledTimes(2);
+        expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('it had no budget when last read, so the call goes ahead'));
+    });
+
+    it('a failed read refuses for a workspace last seen with a budget', async () => {
+        seedCompany({ agentMonthlyBudgetUsd: 5 });
+        await ask();
+        const restore = failCompanyReads();
+        try { await expect(ask()).rejects.toMatchObject({ code: 'budget_unavailable' }); } finally { restore(); }
+        expect(adapter.chat).toHaveBeenCalledTimes(1);
     });
 });
 
@@ -260,14 +308,14 @@ describe('the budget reads every feature', () => {
     });
 
     it('a non-agent feature announces the 80% and 100% levels once each, naming the feature', async () => {
-        seedCompany({ agentMonthlyBudgetUsd: 0.012 });
+        seedCompany({ agentMonthlyBudgetUsd: 0.01205 });
         await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.ASK, companyId: C, userId: 'u1' } });
         expect(handleNotificationtFun).not.toHaveBeenCalled();
         await getProvider().chat({ messages: MESSAGES, spend: { feature: FEATURES.PAGE_COMPOSE, companyId: C, userId: 'u2' } });
         expect(handleNotificationtFun).toHaveBeenCalledTimes(1);
         expect(handleNotificationtFun.mock.calls[0][0].body).toMatchObject({
             changeType: 'agent_budget', userId: 'u2', projectId: '', taskId: '', assigneeUsers: ['owner1'],
-            message: 'AI budget reached: $0.01 of $0.012 used this month — new AI calls are refused until the budget is raised or the month ends.',
+            message: 'AI budget reached: $0.01 of $0.01205 used this month — new AI calls are refused until the budget is raised or the month ends.',
             changeData: { level: '100', feature: 'page_compose', usedUsd: 0.012, percent: 100 },
         });
         adapter.chat.mockImplementation(async () => answer({ inputTokens: 5, outputTokens: 0, totalTokens: 5 }));

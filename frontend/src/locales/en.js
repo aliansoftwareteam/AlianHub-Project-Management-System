@@ -12870,6 +12870,7 @@ export default {
         cost_title: "Cost per feature, {month}",
         cost_total: "Total",
         no_cost: "No model calls were billed to this workspace this month.",
+        cost_unavailable: "This month's AI spend could not be read right now. Try again in a moment.",
         kind_ask_turn: "Ask answer",
         kind_preview: "Preview",
         kind_proposal: "Agent proposal",

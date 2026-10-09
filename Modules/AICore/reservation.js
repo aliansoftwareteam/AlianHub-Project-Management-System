@@ -88,7 +88,7 @@ const heldUsd = (companyId, month = monthKey(), opts) => heldBetween(companyId, 
 /** USD held by calls in flight on one UTC day, counted the same way. */
 const heldUsdOn = (companyId, day = dayKey(), opts) => heldBetween(companyId, dayRange(day), opts);
 
-const settings = (companyId) => require('../Agents/budget').settings(companyId);
+const settings = (companyId) => require('../Agents/budget').limits(companyId);
 
 const PERIODS = Object.freeze({
     daily: { label: 'daily budget', left: 'today (UTC)', key: dayKey, booked: (companyId, key) => require('./spend').dailyTotal(companyId, key), held: heldUsdOn },

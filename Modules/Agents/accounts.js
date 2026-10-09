@@ -95,9 +95,8 @@ const monthlySummary = async (companyId, userId, month) => {
     (runs || []).forEach((r) => { if (r.taskId) tasks.add(String(r.taskId)); });
     const minutes = (logs || []).reduce((s, l) => s + (Number(l.LogTimeDuration) || 0), 0);
     const prs = (linkedTasks || []).reduce((s, t) => s + (t.links || []).filter((l) => l.kind === 'pr' && String(l.addedBy) === String(userId) && new Date(l.addedAt) >= from && new Date(l.addedAt) < to).length, 0);
-    const personalUsd = (runs || []).reduce((s, r) => s + Number((r.spend && r.spend.personalUsd) || 0), 0);
     const companyUsd = (runs || []).reduce((s, r) => s + (r.spend && r.spend.billedToWorkspace ? Number(r.spend.usd || 0) : 0), 0);
-    return { month: key, tasksWorked: tasks.size, agentHours: Math.round((minutes / 60) * 10) / 10, prsOpened: prs, usdToCompany: Math.round(companyUsd * 100) / 100, personalUsdEstimate: Math.round(personalUsd * 100) / 100 };
+    return { month: key, tasksWorked: tasks.size, agentHours: Math.round((minutes / 60) * 10) / 10, prsOpened: prs, usdToCompany: Math.round(companyUsd * 100) / 100 };
 };
 
 module.exports = { MODES, PROVIDERS, getPolicy, connectedPaused, setPolicy, getAccount, link, unlink, monthlySummary };
