@@ -6,6 +6,7 @@
 
         <div class="apc__body ah-scroll">
             <p class="ah-small">{{ $t('AppConnections.lead') }}</p>
+            <p v-if="enabled && !canManage" class="ah-small">{{ $t('AppConnections.read_only') }}</p>
             <p v-if="error" class="ah-field__error" role="alert">{{ error }}</p>
             <p v-if="loaded && !enabled" class="ah-card apc__off">{{ $t('AppConnections.off') }}</p>
 
@@ -15,16 +16,16 @@
                         <span class="apc__icon" aria-hidden="true">{{ app.icon }}</span>
                         <div class="apc__id">
                             <strong class="apc__name">{{ app.name }}</strong>
-                            <span class="ah-small">{{ app.description }}</span>
+                            <span class="ah-small">{{ $t(`AppConnections.desc_${app.key}`) }}</span>
                         </div>
-                        <button v-if="!app.connections.length || app.multiple" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openConnect(app)">
+                        <button v-if="canManage && (!app.connections.length || app.multiple)" type="button" class="ah-btn ah-btn--primary ah-btn--sm" @click="openConnect(app)">
                             {{ $t('AppConnections.connect') }}
                         </button>
                     </header>
 
-                    <form v-if="connecting === app.key" class="apc__form" @submit.prevent="connect(app)">
+                    <form v-if="canManage && connecting === app.key" class="apc__form" @submit.prevent="connect(app)">
                         <label v-for="field in app.fields" :key="field.key" class="ah-field">
-                            <span class="ah-label">{{ field.label }}</span>
+                            <span class="ah-label">{{ $t(`AppConnections.field_${app.key}_${field.key}`) }}</span>
                             <input v-model="values[field.key]" class="ah-input" :type="field.secret ? 'password' : 'text'" :required="field.required" autocomplete="off" />
                         </label>
                         <div class="apc__actions">
@@ -38,12 +39,14 @@
                             <span class="ah-chip" :class="chipOf(conn)">{{ $t(`AppConnections.state_${stateOf(conn)}`) }}</span>
                             <span v-if="conn.target" class="ah-chip ah-chip--mono">{{ conn.target }}</span>
                             <span class="apc__spacer"></span>
-                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="toggle(conn)">
-                                {{ conn.enabled ? $t('AppConnections.pause') : $t('AppConnections.resume') }}
-                            </button>
-                            <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy" @click="disconnect(conn)">
-                                {{ confirming === conn.id ? $t('AppConnections.confirm_disconnect') : $t('AppConnections.disconnect') }}
-                            </button>
+                            <template v-if="canManage">
+                                <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="toggle(conn)">
+                                    {{ conn.enabled ? $t('AppConnections.pause') : $t('AppConnections.resume') }}
+                                </button>
+                                <button type="button" class="ah-btn ah-btn--danger ah-btn--sm" :disabled="busy" @click="disconnect(conn)">
+                                    {{ confirming === conn.id ? $t('AppConnections.confirm_disconnect') : $t('AppConnections.disconnect') }}
+                                </button>
+                            </template>
                         </div>
 
                         <dl v-if="app.syncs" class="apc__facts">
@@ -64,11 +67,12 @@
                         <div v-if="app.syncs" class="apc__projects">
                             <span class="ah-label">{{ $t('AppConnections.projects') }}</span>
                             <div class="apc__chips">
-                                <span v-for="p in conn.projects" :key="p.id" class="ah-chip ah-chip--brand">{{ p.name || p.id }}</span>
-                                <span v-if="!conn.projects.length" class="ah-small">{{ $t('AppConnections.no_projects') }}</span>
+                                <span v-for="p in conn.projects" :key="p.id" class="ah-chip ah-chip--brand">{{ p.hidden ? $t('AppConnections.hidden_project') : p.name }}</span>
+                                <span v-if="!canManage && conn.hiddenProjects" class="ah-small">{{ $t('AppConnections.hidden_projects', { count: conn.hiddenProjects }, conn.hiddenProjects) }}</span>
+                                <span v-if="!conn.projects.length && !conn.hiddenProjects" class="ah-small">{{ $t('AppConnections.no_projects') }}</span>
                             </div>
-                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="editProjects(conn)">{{ $t('AppConnections.link_projects') }}</button>
-                            <div v-if="editing === conn.id" class="apc__picker">
+                            <button v-if="canManage" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="editProjects(conn)">{{ $t('AppConnections.link_projects') }}</button>
+                            <div v-if="canManage && editing === conn.id" class="apc__picker">
                                 <label v-for="p in projects" :key="p.id" class="apc__pick">
                                     <input v-model="picked" type="checkbox" :value="p.id" />
                                     <span>{{ p.name }}</span>
@@ -98,6 +102,7 @@ const { t } = useI18n();
 
 const loaded = ref(false);
 const enabled = ref(false);
+const canManage = ref(false);
 const apps = ref([]);
 const projects = ref([]);
 const error = ref("");
@@ -122,6 +127,7 @@ const load = async () => {
         const res = await apiRequest("get", `${env.INTEGRATIONS}/app-connections`);
         const data = res?.data?.status ? res.data.data : null;
         enabled.value = !!data?.enabled;
+        canManage.value = !!data?.canManage;
         apps.value = data?.apps || [];
         projects.value = data?.projects || [];
         error.value = data ? "" : res?.data?.statusText || t("AppConnections.failed");

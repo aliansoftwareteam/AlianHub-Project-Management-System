@@ -2,7 +2,7 @@
    page still opens by its address, from the palette and from More. */
 export const NAV_MODES = ["simple", "full"];
 export const DEFAULT_NAV_MODE = "full";
-export const SIMPLE_PLACES = ["home", "everything", "projects", "inbox", "ai"];
+export const SIMPLE_PLACES = ["home", "everything", "projects", "inbox", "ai", "appConnections"];
 export const PHONE_TABS = {
     full: ["home", "inbox", "chat", "ai"],
     simple: ["home", "everything", "inbox", "ai"]

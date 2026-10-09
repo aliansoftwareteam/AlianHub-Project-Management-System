@@ -45,6 +45,7 @@ export function useNavItems(companyId) {
         { key: "chat", label: "Shell.chat", icon: "chat", to: to("chats"), match: (r) => String(r.name || "").startsWith("chat"), show: allowed("chat") },
         { key: "ai", label: "Shell.ai", icon: "ai", to: to("AiAsk"), match: (r) => isAiSectionRoute(r.name), show: exists("AiAsk") && aiReachable.value },
         { key: "docs", label: "Shell.docs", icon: "docs", to: to("Pages"), match: (r) => r.name === "Pages", show: ready.value },
+        { key: "appConnections", label: "AppConnections.nav", icon: "appConnections", to: to("AppConnections"), match: (r) => r.name === "AppConnections", show: ready.value && exists("AppConnections") },
         { key: "dash", label: "Shell.dash", icon: "dash", to: to("Dashboards"), match: (r) => r.name === "Dashboards", show: exists("Dashboards") && allowed("project.project_list") },
         { key: "time", label: "Shell.time", icon: "time", to: timesheetRoute.value ? to(timesheetRoute.value) : null, match: (r) => String(r.name || "").includes("Timesheet"), show: !!timesheetRoute.value }
     ].filter((i) => i.show));
@@ -59,7 +60,6 @@ export function useNavItems(companyId) {
                     { key: "approvals", label: "Time.approvals", icon: "checkSquare", to: to("Approvals"), match: (r) => r.name === "Approvals", show: ready.value && exists("Approvals") && canApprove(companyUser.value) },
                     { key: "integrations", label: "Header.Integrations", icon: "integrations", to: to("IntegrationsHub"), match: (r) => r.name === "IntegrationsHub", show: ready.value && exists("IntegrationsHub") },
                     { key: "connections", label: "Parity.nav_connections", icon: "key", to: to("Connections"), match: (r) => r.name === "Connections", show: ready.value && exists("Connections") },
-                    { key: "appConnections", label: "AppConnections.nav", icon: "integrations", to: to("AppConnections"), match: (r) => r.name === "AppConnections", show: ready.value && exists("AppConnections") },
                     { key: "externalData", label: "Provenance.nav_external_data", icon: "globe", to: to("ExternalData"), match: (r) => r.name === "ExternalData", show: ready.value && exists("ExternalData") }
                 ]
             },
@@ -109,8 +109,8 @@ export function useNavItems(companyId) {
     const rail = computed(() => {
         if (!simple.value) return places.value;
         const kept = shellState.nav.pinned || [];
-        const five = SIMPLE_PLACES.map((key) => places.value.find((item) => item.key === key)).filter(Boolean).map(inSimple);
-        return [...five, ...places.value.filter((item) => !SIMPLE_PLACES.includes(item.key) && kept.includes(item.key))];
+        const chosen = SIMPLE_PLACES.map((key) => places.value.find((item) => item.key === key)).filter(Boolean).map(inSimple);
+        return [...chosen, ...places.value.filter((item) => !SIMPLE_PLACES.includes(item.key) && kept.includes(item.key))];
     });
     const more = computed(() => {
         const tucked = simple.value ? places.value.filter((item) => !rail.value.some((shown) => shown.key === item.key)) : [];

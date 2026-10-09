@@ -21,7 +21,7 @@ export default [
         path: '/:cid/app-connections',
         name: 'AppConnections',
         meta: {
-            title: "App connections",
+            titleKey: "AppConnections.title",
             requiresAuth: true
         },
         component: () => import(/* webpackChunkName: "IntegrationsHub" */ '@/views/Integrations/AppConnections.vue'),
