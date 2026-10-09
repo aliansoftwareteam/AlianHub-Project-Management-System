@@ -37,6 +37,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const { routerEnabled } = require('./llmProvider/normalise');
 const { RESERVATION } = require('./decision');
+const budgetRead = require('./budgetRead');
 
 const LOG_PREFIX = '[ai-reservation]';
 const BUDGET_EXHAUSTED = 'ai_budget_exhausted';
@@ -78,10 +79,7 @@ async function heldBetween(companyId, { from, to }, { now = new Date(), upTo = n
             { $match: { state: RESERVATION.HELD, at: { $gte: from, $lt: to }, expiresAt: { $gt: now }, ...(upTo ? { _id: { $lte: upTo } } : {}) } },
             { $group: { _id: null, usd: { $sum: '$amountUsd' } } },
         ]],
-    }, 'aggregate').catch((e) => {
-        logger.error(`${LOG_PREFIX} ${companyId}: held total unavailable, treated as 0: ${e.message}`);
-        return [];
-    });
+    }, 'aggregate').catch(budgetRead.rethrow(companyId, 'the held AI reservations'));
     return money((rows && rows[0] && rows[0].usd) || 0);
 }
 
@@ -93,8 +91,8 @@ const heldUsdOn = (companyId, day = dayKey(), opts) => heldBetween(companyId, da
 const settings = (companyId) => require('../Agents/budget').settings(companyId);
 
 const PERIODS = Object.freeze({
-    daily: { label: 'daily budget', left: 'today (UTC)', key: dayKey, booked: (companyId, key) => require('./spend').daily(companyId, key), held: heldUsdOn },
-    monthly: { label: 'budget', left: 'this month', key: monthKey, booked: (companyId, key) => require('./spend').monthly(companyId, key), held: heldUsd },
+    daily: { label: 'daily budget', left: 'today (UTC)', key: dayKey, booked: (companyId, key) => require('./spend').dailyTotal(companyId, key), held: heldUsdOn },
+    monthly: { label: 'budget', left: 'this month', key: monthKey, booked: (companyId, key) => require('./spend').monthlyTotal(companyId, key), held: heldUsd },
 });
 
 const refusal = ({ period, estimate, usd, budgetUsd, usedUsd, held }) => ({
@@ -112,6 +110,11 @@ const refusal = ({ period, estimate, usd, budgetUsd, usedUsd, held }) => ({
 
 const pass = (state) => ({ ok: true, state, usd: 0, id: null });
 
+const unreadable = (context) => {
+    logger.info(`${LOG_PREFIX} ${context.companyId}: ${context.feature} refused — ${budgetRead.REASON}`);
+    return { ok: false, state: RESERVATION.REFUSED, code: budgetRead.BUDGET_UNAVAILABLE, reason: budgetRead.REASON };
+};
+
 /**
  * Hold this call's estimated cost against the workspace's day and month.
  *
@@ -126,7 +129,14 @@ async function reserve(context, estimate, provider) {
     if (!context.billedToWorkspace || !context.companyId) return skip(RESERVATION.UNBILLED);
     if (!estimate || !estimate.priced) return skip(RESERVATION.UNBILLED);
 
-    const { monthlyBudgetUsd, dailyBudgetUsd } = await settings(context.companyId);
+    let budgets;
+    try {
+        budgets = await settings(context.companyId);
+    } catch (error) {
+        if (budgetRead.isUnavailable(error)) return unreadable(context);
+        throw error;
+    }
+    const { monthlyBudgetUsd, dailyBudgetUsd } = budgets;
     const limits = [['daily', dailyBudgetUsd], ['monthly', monthlyBudgetUsd]].filter(([, budgetUsd]) => budgetUsd > 0);
     if (!limits.length) return skip(RESERVATION.NO_BUDGET);
 
@@ -147,11 +157,18 @@ async function reserve(context, estimate, provider) {
 
     const id = row && row._id ? row._id : null;
     const ticket = { ok: true, state: RESERVATION.HELD, usd, id: id ? String(id) : null, estimate, companyId: String(context.companyId), month: monthKey(at), day: dayKey(at) };
-    const totals = await Promise.all(limits.map(async ([period, budgetUsd]) => {
-        const key = PERIODS[period].key(at);
-        const [spent, held] = await Promise.all([PERIODS[period].booked(context.companyId, key), PERIODS[period].held(context.companyId, key, { now: at, upTo: id })]);
-        return { period, budgetUsd, usedUsd: money(spent.usedUsd), held };
-    }));
+    let totals;
+    try {
+        totals = await Promise.all(limits.map(async ([period, budgetUsd]) => {
+            const key = PERIODS[period].key(at);
+            const [spent, held] = await Promise.all([PERIODS[period].booked(context.companyId, key), PERIODS[period].held(context.companyId, key, { now: at, upTo: id })]);
+            return { period, budgetUsd, usedUsd: money(spent.usedUsd), held };
+        }));
+    } catch (error) {
+        await close(ticket, RESERVATION.RELEASED);
+        if (budgetRead.isUnavailable(error)) return unreadable(context);
+        throw error;
+    }
     const over = totals.find((t) => money(t.usedUsd + t.held) > t.budgetUsd);
     if (!over) return ticket;
 
@@ -192,4 +209,4 @@ async function stranded(companyId, now = new Date()) {
     return rows || [];
 }
 
-module.exports = { reserve, reconcile, release, heldUsd, heldUsdOn, stranded, monthKey, dayKey, ttlMs, BUDGET_EXHAUSTED, DEFAULT_TTL_MS };
+module.exports = { reserve, reconcile, release, heldUsd, heldUsdOn, stranded, monthKey, dayKey, ttlMs, BUDGET_EXHAUSTED, BUDGET_UNAVAILABLE: budgetRead.BUDGET_UNAVAILABLE, DEFAULT_TTL_MS };

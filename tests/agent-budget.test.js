@@ -36,7 +36,7 @@ const lastMonth = () => { const d = new Date(); d.setUTCDate(1); d.setUTCHours(1
 const spend = async (usd, over = {}) => {
     summarize.mockReturnValueOnce({ costUsd: usd, totalTokens: 100, model: 'm' });
     const run = await runs.create(C, { agent: agent(), taskId: TASK_ID, projectId: 'p1', skill: 'qa-review', ...over });
-    if (run.viaAccount === 'workspace') seedSpend(usd, { runId: String(run._id) });
+    seedSpend(usd, { runId: String(run._id) });
     return runs.recordSpend(C, run, { totalTokens: 100 }, 'm');
 };
 
@@ -155,18 +155,16 @@ describe('80% and 100% alerts fire once each', () => {
         expect(handleNotificationtFun).toHaveBeenCalledTimes(1);
     });
 
-    it('stays silent without a budget, for personal-account runs, and survives a failed notification', async () => {
+    it('stays silent without a budget, counts a personal-account run, and survives a failed notification', async () => {
         await spend(50);
         expect(handleNotificationtFun).not.toHaveBeenCalled();
 
-        seedCompany({ agentMonthlyBudgetUsd: 10 });
-        await spend(30, { viaAccount: 'personal' });
-        expect(handleNotificationtFun).not.toHaveBeenCalled();
-
+        seedCompany({ agentMonthlyBudgetUsd: 100 });
         handleNotificationtFun.mockRejectedValueOnce(new Error('smtp down'));
-        const out = await spend(9);
-        expect(out.usd).toBe(9);
+        const out = await spend(35, { viaAccount: 'personal' });
+        expect(out.usd).toBe(35);
         expect(handleNotificationtFun).toHaveBeenCalledTimes(1);
         expect(company().agentBudgetAlerts[80]).toEqual(expect.any(Date));
+        expect(company().agentBudgetAlerts[100]).toBeNull();
     });
 });

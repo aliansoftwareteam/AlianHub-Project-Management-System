@@ -12,6 +12,7 @@ const { SRC, loadLocale } = require('./conventions/locale-keys');
 const undo = require('../Modules/Agents/undo');
 const revert = require('../Modules/Agents/revert');
 const spendGuard = require('../Modules/Agents/spendGuard');
+const budgetRead = require('../Modules/AICore/budgetRead');
 const permissions = require('../Modules/Agents/permissions');
 const visibility = require('../Modules/Mcp/visibility');
 const stepCredential = require('../Modules/Workflows/stepCredential');
@@ -47,8 +48,8 @@ describe('the reasons the server writes as codes', () => {
     });
 
     it('have a sentence each: the codes that come in front of the server\'s own words', () => {
-        const codes = [permissions.REASON, spendGuard.REASON, visibility.NOT_VISIBLE];
-        expect(codes).toEqual(['permission_denied', 'spend_cap_exceeded', 'not_visible']);
+        const codes = [permissions.REASON, spendGuard.REASON, visibility.NOT_VISIBLE, budgetRead.BUDGET_UNAVAILABLE];
+        expect(codes).toEqual(['permission_denied', 'spend_cap_exceeded', 'not_visible', 'budget_unavailable']);
         expect(unworded(codes)).toEqual([]);
         codes.forEach((code) => expect(auditWords).toMatch(new RegExp(`\\b${code}: `)));
     });

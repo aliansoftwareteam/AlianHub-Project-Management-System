@@ -14,6 +14,7 @@ jest.mock('../Modules/Agents/memory', () => ({ contextFor: jest.fn(async () => '
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { dbCollections } = require('../Config/collections');
 const { getProvider } = require('../Modules/AICore/llmProvider');
+const logger = require('../Config/loggerConfig');
 const { estimateCall } = require('../Modules/AICore/estimate');
 const pageAudit = require('../Modules/Agents/engine/pageAudit');
 const findingMemory = require('../Modules/Agents/engine/findingMemory');
@@ -201,10 +202,51 @@ describe('the reservation is atomic on the run row', () => {
         expect(refusalRows()).toHaveLength(1);
     });
 
-    it('a personal or local run is not held against the workspace caps', async () => {
-        const run = await start({ spendCapUsd: 0.001, viaAccount: 'personal' });
+    it.each(['personal', 'local'])('a %s run spends the server key, so it is held against the run cap like any other', async (viaAccount) => {
+        const run = await start({ spendCapUsd: 0.001, viaAccount });
         const ticket = await spendGuard.forRun({ companyId: C, run, actor }).reserve(estimate);
-        expect(ticket).toEqual({ ok: true, usd: 0, estimate });
+        expect(ticket).toMatchObject({ ok: false, code: 'spend_cap_exceeded', cap: 'run' });
         expect(runRow(run._id).reservedUsd).toBe(0);
+    });
+
+    it('a budget that cannot be read refuses the call as budget_unavailable and keeps no hold', async () => {
+        mockDb.store[dbCollections.COMPANIES][0].agentDailyBudgetUsd = 5;
+        const run = await start({ spendCapUsd: 1 });
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (...a) => {
+            if (a[1] && a[1].type === dbCollections.COMPANIES) throw new Error('mongo down');
+            return real(...a);
+        });
+        let ticket;
+        try {
+            ticket = await spendGuard.forRun({ companyId: C, run, actor }).reserve(estimate);
+        } finally { mockDb.crud.mockImplementation(real); }
+        expect(ticket).toMatchObject({ ok: false, code: 'budget_unavailable', reason: expect.stringMatching(/^budget_unavailable: /) });
+        expect(runRow(run._id).reservedUsd).toBe(0);
+        expect(refusalRows()).toHaveLength(1);
+        expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('could not be read'));
+    });
+});
+
+describe('a run started under a personal or local account still spends the server key', () => {
+    it.each(['personal', 'local'])('a %s run over the daily cap is refused before the vendor call', async (viaAccount) => {
+        mockDb.store[dbCollections.COMPANIES][0].agentDailyBudgetUsd = 0.05;
+        mockDb.seed(SCHEMA_TYPE.AI_USAGE, { feature: 'agent_run', costUsd: 0.03, totalTokens: 10, priced: true, billedToWorkspace: true, at: new Date() });
+        const run = await start({ viaAccount });
+        const out = await execute(run);
+
+        expect(chat).not.toHaveBeenCalled();
+        expect(out).toMatchObject({ status: 'stopped', outcome: expect.stringMatching(/the daily cap of \$0\.0500 has \$0\.0200 left$/) });
+        expect(runRow(run._id).reservedUsd).toBe(0);
+    });
+
+    it.each(['personal', 'local'])('a %s run under the cap is billed to the workspace', async (viaAccount) => {
+        mockDb.store[dbCollections.COMPANIES][0].agentDailyBudgetUsd = 5;
+        const run = await start({ viaAccount });
+        await execute(run);
+
+        expect(chat).toHaveBeenCalledTimes(1);
+        expect(runRow(run._id)).toMatchObject({ viaAccount, reservedUsd: 0, spend: { usd: 0.006, tokens: 1500, billedToWorkspace: true } });
+        expect(mockDb.store[SCHEMA_TYPE.AGENTS][0].spendMonth).toMatchObject({ usd: 0.006 });
     });
 });

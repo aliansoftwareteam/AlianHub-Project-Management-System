@@ -9,6 +9,7 @@ const runs = require('./runs');
 const spend = require('../AICore/spend');
 const { routerEnabled } = require('../AICore/llmProvider/normalise');
 const alertRules = require('./alertRules');
+const budgetRead = require('../AICore/budgetRead');
 
 // Company-level agent settings (undo window, monthly and daily budget) and this
 // month's and today's AI spend, read from the ledger every model call books into (AICore/spend),
@@ -27,7 +28,7 @@ const money = (n) => Math.round(Number(n || 0) * 10000) / 10000;
 
 const readCompany = (companyId) => MongoDbCrudOpration(dbCollections.GLOBAL, {
     type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, 'agentUndoHours agentMonthlyBudgetUsd agentDailyBudgetUsd agentBudgetAlerts agentDailyBudgetAlerts agentAlerts'],
-}, 'findOne').catch(() => null);
+}, 'findOne').catch(budgetRead.rethrow(companyId, 'the workspace AI budget settings'));
 
 const writeCompany = async (companyId, set) => {
     await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, { $set: set }] }, 'updateOne');
@@ -107,7 +108,7 @@ const provider = () => {
  * started before UTC midnight. */
 const runHolds = async (companyId, { from, to }, { anyStart = false } = {}) => {
     const match = anyStart ? { status: { $in: runs.OPEN } } : { startedAt: { $gte: from }, status: { $in: runs.OPEN } };
-    const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [match, 'startedAt reservedUsd'] }, 'find').catch(() => []);
+    const open = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [match, 'startedAt reservedUsd'] }, 'find').catch(budgetRead.rethrow(companyId, 'the open agent runs'));
     const inRange = anyStart ? (open || []) : (open || []).filter((r) => new Date(r.startedAt).getTime() < to.getTime());
     return money(inRange.reduce((s, r) => s + Number(r.reservedUsd || 0), 0));
 };
@@ -127,12 +128,12 @@ const monthRange = (month) => {
 const PERIODS = Object.freeze({
     monthly: {
         key: () => runs.monthKey(), range: monthRange,
-        booked: (companyId, key) => spend.monthly(companyId, key),
+        booked: (companyId, key) => spend.monthlyTotal(companyId, key),
         held: (companyId, key) => require('../AICore/reservation').heldUsd(companyId, key),
     },
     daily: {
         key: () => spend.dayKey(), range: spend.dayRange,
-        booked: (companyId, key) => spend.daily(companyId, key),
+        booked: (companyId, key) => spend.dailyTotal(companyId, key),
         held: (companyId, key) => require('../AICore/reservation').heldUsdOn(companyId, key),
         anyStart: true,
     },
@@ -188,7 +189,13 @@ const headroom = async (companyId) => {
 };
 
 const check = async (companyId) => {
-    const s = await status(companyId);
+    let s;
+    try {
+        s = await status(companyId);
+    } catch (error) {
+        if (budgetRead.isUnavailable(error)) return { ok: false, reason: error.message, code: error.code };
+        throw error;
+    }
     if (s.daily.budgetUsd > 0 && s.daily.usedUsd >= s.daily.budgetUsd) {
         return { ok: false, reason: `Company daily AI budget reached ($${s.daily.usedUsd.toFixed(2)} of $${s.daily.budgetUsd} today, UTC).` };
     }
@@ -212,7 +219,7 @@ const messageOf = (view, level) => {
             : `AI daily budget at ${view.percent}%: $${view.usedUsd.toFixed(2)} of $${view.budgetUsd} used today (UTC).`;
     }
     return level === '100'
-        ? `AI budget reached: $${view.usedUsd.toFixed(2)} of $${view.budgetUsd} used this month — new agent runs are refused until the budget is raised or the month ends.`
+        ? `AI budget reached: $${view.usedUsd.toFixed(2)} of $${view.budgetUsd} used this month — new AI calls are refused until the budget is raised or the month ends.`
         : `AI budget at ${view.percent}%: $${view.usedUsd.toFixed(2)} of $${view.budgetUsd} used this month.`;
 };
 

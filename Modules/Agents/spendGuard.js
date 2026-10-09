@@ -3,6 +3,7 @@ const usage = require('../AICore/usage');
 const runs = require('./runs');
 const budget = require('./budget');
 const agentAudit = require('./agentAudit');
+const budgetRead = require('../AICore/budgetRead');
 
 // The pre-call spend gate for one run. Every model call is priced from an
 // estimate first and refused before the vendor request when it does not fit
@@ -17,8 +18,6 @@ const REASON = 'spend_cap_exceeded';
 const ACTION = 'model.call';
 const money = (n) => Math.round(Number(n || 0) * 10000) / 10000;
 const dollars = (n) => `$${money(n).toFixed(4)}`;
-
-const billed = (run) => run.viaAccount !== 'personal' && run.viaAccount !== 'local';
 
 const hold = (companyId, runId, usd) => runs.patch(companyId, runId, {}, { $inc: { reservedUsd: money(usd) } });
 
@@ -53,7 +52,6 @@ const forRun = ({ companyId, run, actor }) => {
 
     return {
         async reserve(estimate) {
-            if (!billed(run)) return { ok: true, usd: 0, estimate };
             if (!estimate.priced) {
                 const reason = usage.unpricedMessage(estimate.model);
                 const ticket = { ok: false, code: usage.UNPRICED_MODEL, reason, cap: 'run', limit: cap, remaining: cap, estimate };
@@ -63,10 +61,18 @@ const forRun = ({ companyId, run, actor }) => {
             const usd = money(estimate.costUsd);
             const held = await hold(companyId, runId, usd);
             if (!held) return { ok: false, code: 'run_missing', reason: 'the run no longer exists', estimate };
-            const over = await exceeded(held, usd);
+            let over;
+            try {
+                over = await exceeded(held, usd);
+            } catch (error) {
+                if (!budgetRead.isUnavailable(error)) { await hold(companyId, runId, -usd); throw error; }
+                over = { unreadable: true };
+            }
             if (!over) return { ok: true, usd, estimate };
             await hold(companyId, runId, -usd);
-            const ticket = refusal({ estimate, ...over });
+            const ticket = over.unreadable
+                ? { ok: false, code: budgetRead.BUDGET_UNAVAILABLE, reason: budgetRead.REASON, cap: 'company', estimate }
+                : refusal({ estimate, ...over });
             logger.info(`[agent-run] ${runId}: ${ticket.reason}`);
             await audit(ticket);
             return ticket;

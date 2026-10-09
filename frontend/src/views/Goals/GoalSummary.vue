@@ -23,7 +23,7 @@ import { hourCycleOption } from "@/utils/clockText";
 
 defineOptions({ name: "GoalSummary" });
 
-const ERROR_KEYS = { ai_budget_exhausted: "Goals.summary_budget", ai_unavailable: "Goals.summary_unavailable" };
+const ERROR_KEYS = { ai_budget_exhausted: "Goals.summary_budget", budget_unavailable: "Goals.summary_budget_unavailable", ai_unavailable: "Goals.summary_unavailable" };
 
 const props = defineProps({
     goal: { type: Object, required: true }
