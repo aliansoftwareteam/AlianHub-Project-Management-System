@@ -145,9 +145,10 @@ sooner by its `recheck`:
   role): `outcome: released`; the steps after it are skipped, or run anyway with
   `onRelease: continue`;
 - the deadline passes (`deadlineMs`, seven days by default): the task is withdrawn
-  from the role's queue and the step fails without a retry. Under a run deadline
-  the step gives up at least a minute (or its own `deadlineMs`) before the run's,
-  since the hop guard would otherwise refuse the step before it could withdraw;
+  from the role's queue and the step fails without a retry. The deadline counts
+  from the hand-over and is cut to a minute before the run's, so the step can
+  still withdraw; the hop guard measures a waiting step's `deadlineMs` from its
+  hand-over too. A person's retry, or resume of a failed step, hands it over again;
 - the role does not exist, is not on for the task's project, or the task is gone
   or done: the step fails at once, naming the cause, and withdraws the task if it
   had handed it over. A closed or deleted task wakes a waiting step. While agents
