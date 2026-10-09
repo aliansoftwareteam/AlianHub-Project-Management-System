@@ -2,33 +2,33 @@
     <div v-if="modelValue" class="jimport__overlay" @click.self="$emit('update:modelValue', false)">
         <div class="jimport__card">
             <div class="d-flex align-items-center justify-content-between jimport__head">
-                <span class="font-size-16 font-weight-700">{{ $t('Projects.import_jira') }}</span>
-                <span class="cursor-pointer font-size-16 jimport__close" @click="$emit('update:modelValue', false)">&#10005;</span>
+                <span class="import-jira-modal-font-size-16 import-jira-modal-font-weight-700">{{ $t('Projects.import_jira') }}</span>
+                <span class="cursor-pointer import-jira-modal-font-size-16 jimport__close" @click="$emit('update:modelValue', false)">&#10005;</span>
             </div>
 
-            <div class="font-size-12 gray81 jimport__hint">{{ $t('Projects.import_jira_hint') }}</div>
+            <div class="import-jira-modal-font-size-12 import-jira-modal-gray81 jimport__hint">{{ $t('Projects.import_jira_hint') }}</div>
 
-            <span class="font-size-12 jimport__sample" @click="downloadSample">&#8595; {{ $t('Projects.download_sample') }}</span>
+            <span class="import-jira-modal-font-size-12 jimport__sample" @click="downloadSample">&#8595; {{ $t('Projects.download_sample') }}</span>
 
-            <input ref="fileEl" type="file" accept=".csv,.xlsx" class="font-size-13 jimport__file" @change="parseFile" />
+            <input ref="fileEl" type="file" accept=".csv,.xlsx" class="import-jira-modal-font-size-13 jimport__file" @change="parseFile" />
 
-            <div v-if="rows.length" class="font-size-13 jimport__preview">
+            <div v-if="rows.length" class="import-jira-modal-font-size-13 jimport__preview">
                 {{ $t('Projects.import_rows_found', { count: rows.length }, rows.length) }}
             </div>
 
             <div class="d-flex align-items-center jimport__controls" v-if="rows.length">
-                <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
+                <span class="import-jira-modal-font-size-13 import-jira-modal-font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
                 <select v-model="selectedSprintId" class="ah-input jimport__select">
                     <option v-for="sprint in sprintOptions" :key="'ji-'+sprint.id" :value="sprint.id">
                         {{ listLabel(sprint) }}
                     </option>
                 </select>
-                <button class="btn-primary font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId" @click="startImport">
+                <button class="btn-primary import-jira-modal-font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId" @click="startImport">
                     {{ isImporting ? $t('Projects.importing') : $t('Projects.start_import') }}
                 </button>
             </div>
 
-            <div v-if="resultText" class="font-size-13 jimport__result">{{ resultText }}</div>
+            <div v-if="resultText" class="import-jira-modal-font-size-13 jimport__result">{{ resultText }}</div>
         </div>
     </div>
 </template>
@@ -201,5 +201,26 @@ function startImport() {
     padding: 8px 10px;
     background: var(--surface-2);
     border-radius: 6px;
+}
+</style>
+
+<style scoped>
+.import-jira-modal-font-weight-500 {
+    font-weight: 500 !important;
+}
+.import-jira-modal-font-weight-700 {
+    font-weight: 700 !important;
+}
+.import-jira-modal-font-size-12 {
+    font-size: 12px;
+}
+.import-jira-modal-font-size-13 {
+    font-size: 13px;
+}
+.import-jira-modal-font-size-16 {
+    font-size: 16px;
+}
+.import-jira-modal-gray81 {
+    color: var(--ink-2);
 }
 </style>

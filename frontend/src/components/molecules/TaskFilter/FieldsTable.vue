@@ -38,7 +38,7 @@
                         <template #options>
                             <div v-if="mainOptions.length > 0">
                                 <div v-for="(option, i) in mainOptions" :key="i" class="cursor-pointer filter-status-field" @click="$refs.keyRefs[index].click(), resetFields(item), handleSelected('keys', item, option, index)">
-                                    <span class="fields-table-font-size-14 font-weight-400">{{ keyLabel(option) }}</span>
+                                    <span class="fields-table-font-size-14 fields-table-font-weight-400">{{ keyLabel(option) }}</span>
                                 </div>
                             </div>
                             <div v-else class="fields-table-font-size-13 tf-muted">{{$t('Filters.no_data_found')}}</div>
@@ -59,7 +59,7 @@
                         </template>
                         <template #options>
                             <div v-for="(option, i) in item.comparisonsData" :key="i" class="cursor-pointer filter-status-field" @click="$refs.compRef[index].click(), handleSelected('comparison', item, option)">
-                                <span class="font-weight-400" :class="{'fields-table-font-size-14' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767}">{{ `${$t(`Filters.${option.name}`)}` }}</span>
+                                <span class="fields-table-font-weight-400" :class="{'fields-table-font-size-14' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767}">{{ `${$t(`Filters.${option.name}`)}` }}</span>
                             </div>
                         </template>
                     </CustomDropDown>
@@ -87,29 +87,29 @@
                                     <span v-for="(option, i) in item.displayData" :key="i">
                                         <span v-if="i < numberOfItem" class="d-flex align-items-center">
                                             <span class="status_square m0px-6px" :title="option.name" :style="{'background-color': option.textColor}"></span>
-                                            <span class="mr-5-px" :class="{'font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">{{ option.name }}</span>
+                                            <span class="mr-5-px" :class="{'fields-table-font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">{{ option.name }}</span>
                                         </span>
                                     </span>
-                                    <span v-if="item.displayData.length > numberOfItem" class="mr-5-px span-count" :class="{'font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">+{{ item.displayData.length - numberOfItem}}</span>
+                                    <span v-if="item.displayData.length > numberOfItem" class="mr-5-px span-count" :class="{'fields-table-font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">+{{ item.displayData.length - numberOfItem}}</span>
                                 </div>
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'Task_Priority'">
                                     <span v-for="(option, i) in item.displayData" :key="i">
                                         <span v-if="i < numberOfItem" class="d-flex align-items-center">
                                             <img v-if="bundledPriorityIcon(option)" :src="bundledPriorityIcon(option)" alt="" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
                                             <WasabiIamgeCompp v-else-if="storedOptionImage(option)" :data="{url: option.statusImage}" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
-                                            <span class="mr-5-px" :class="{'ml-5-px': !hasOptionImage(option), 'font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">{{ option.name }}</span>
+                                            <span class="mr-5-px" :class="{'ml-5-px': !hasOptionImage(option), 'fields-table-font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">{{ option.name }}</span>
                                         </span>
                                     </span>
-                                    <span v-if="item.displayData.length > numberOfItem" class="mr-5-px span-count" :class="{'font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">+{{ item.displayData.length - numberOfItem}}</span>
+                                    <span v-if="item.displayData.length > numberOfItem" class="mr-5-px span-count" :class="{'fields-table-font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">+{{ item.displayData.length - numberOfItem}}</span>
                                 </div>
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'TaskTypeKey'">
                                     <span v-for="(option, i) in item.displayData" :key="i">
                                         <span v-if="i < numberOfItem" class="d-flex align-items-center">
                                             <TaskTypeIcon v-if="option.taskImage" :taskType="option" :style="{ margin:  clientWidth > 767 ? '0px 5px' : '0px 8px 0 13px', maxWidth: '14px'}" />
-                                            <span class="font-size-12 mr-5-px" :class="{'ml-5-px': !option.taskImage, 'font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767}">{{ option.name }}</span>
+                                            <span class="fields-table-font-size-12 mr-5-px" :class="{'ml-5-px': !option.taskImage, 'fields-table-font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767}">{{ option.name }}</span>
                                         </span>
                                     </span>
-                                    <span v-if="item.displayData.length > numberOfItem" class="font-size-12 mr-5-px span-count">+{{ item.displayData.length - numberOfItem}}</span>
+                                    <span v-if="item.displayData.length > numberOfItem" class="fields-table-font-size-12 mr-5-px span-count">+{{ item.displayData.length - numberOfItem}}</span>
                                 </div>
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'Task_Leader'">
                                     <span v-for="(option, i) in item.displayData" :key="i">
@@ -118,15 +118,15 @@
                                             <WasabiIamgeCompp class="task__leader-img" :data="{url: option.image}" :userImage="true" v-if="option.image" :title="option.name"/>
                                         </span>
                                     </span>
-                                    <span v-if="item.displayData.length > numberOfItem" class="font-size-12 mr-5-px span-count">+{{ item.displayData.length - numberOfItem}}</span>
+                                    <span v-if="item.displayData.length > numberOfItem" class="fields-table-font-size-12 mr-5-px span-count">+{{ item.displayData.length - numberOfItem}}</span>
                                 </div>
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'tagsArray'">
                                     <span v-for="(option, i) in item.displayData" :key="i">
                                         <span v-if="i < numberOfItem" class="d-flex align-items-center">
-                                            <span class="ml-5-px border-radius-12-px font-size-12 tags__array" :style="tagChipColors(option)">{{ option.name }}</span>
+                                            <span class="ml-5-px border-radius-12-px fields-table-font-size-12 tags__array" :style="tagChipColors(option)">{{ option.name }}</span>
                                         </span>
                                     </span>
-                                    <span v-if="item.displayData.length > numberOfItem" class="font-size-12 ml-5-px mr-5-px span-count">+{{ item.displayData.length - numberOfItem}}</span>
+                                    <span v-if="item.displayData.length > numberOfItem" class="fields-table-font-size-12 ml-5-px mr-5-px span-count">+{{ item.displayData.length - numberOfItem}}</span>
                                 </div>
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'AssigneeUserId'">
                                    <span v-for="(option, i) in item.displayData" :key="i">
@@ -140,11 +140,11 @@
                                             </span>
                                         </span>
                                     </span>
-                                    <span v-if="item.displayData.length > numberOfItem" class="font-size-12 mr-5-px span-count">+{{ item.displayData.length - numberOfItem}}</span>
+                                    <span v-if="item.displayData.length > numberOfItem" class="fields-table-font-size-12 mr-5-px span-count">+{{ item.displayData.length - numberOfItem}}</span>
                                 </div>
                                 <div class="d-flex align-items-center" v-if="item.name.value === 'DueDate'">
                                    <span v-for="(option, i) in item.displayData" :key="i">
-                                        <span class="mr-5-px" :class="{'font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">{{ $t(`dashboardCard.${option.key}`) }}</span>
+                                        <span class="mr-5-px" :class="{'fields-table-font-size-12' : clientWidth > 767 , 'fields-table-font-size-14' : clientWidth <= 767 }">{{ $t(`dashboardCard.${option.key}`) }}</span>
                                     </span>
                                 </div>
                                 <img :src="clientWidth > 767 ? selectArrow : selectArrowMobile" alt="dropdown" width="13" class="position-ab select__arrow">
@@ -157,7 +157,7 @@
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="statusArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)" customClasses=""/>
-                                                <span class="ml-5-px" :class="{'font-size-12 tf-link' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767 }" >{{$t('Filters.select_all')}}</span>
+                                                <span class="ml-5-px" :class="{'fields-table-font-size-12 tf-link' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767 }" >{{$t('Filters.select_all')}}</span>
                                             </div>
                                             <!-- <img src="@/assets/images/svg/help_icon.svg" alt="" height="14" width="14" @click.stop.prevent=""/> -->
                                         </label>
@@ -182,7 +182,7 @@
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="priorities.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px" :class="{'font-size-12 tf-link' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px" :class="{'fields-table-font-size-12 tf-link' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
                                             </div>
                                             <!-- <img src="@/assets/images/svg/help_icon.svg" alt="" height="14" width="14" @click.stop.prevent=""/> -->
                                         </label>
@@ -208,7 +208,7 @@
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="taskTypeArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px" :class="{'font-size-12 tf-link' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px" :class="{'fields-table-font-size-12 tf-link' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
                                             </div>
                                             <!-- <img src="@/assets/images/svg/help_icon.svg" alt="" height="14" width="14" @click.stop.prevent=""/> -->
                                         </label>
@@ -233,7 +233,7 @@
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px font-size-12 tf-link">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px fields-table-font-size-12 tf-link">{{$t('Filters.select_all')}}</span>
                                             </div>
                                         </label>
                                         <div class="p-10px pb-0px w-100 pt-15px">
@@ -259,7 +259,7 @@
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="tagsArray.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px" :class="{'font-size-12 tf-link' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px" :class="{'fields-table-font-size-12 tf-link' : clientWidth > 767 , 'fields-table-font-size-16' : clientWidth <= 767 }">{{$t('Filters.select_all')}}</span>
                                             </div>
                                             <!-- <img src="@/assets/images/svg/help_icon.svg" alt="" height="14" width="14" @click.stop.prevent=""/> -->
                                         </label>
@@ -283,7 +283,7 @@
                                         <label :for="'selectAll'+index" class="cursor-pointer d-flex align-items-center label-all" v-if="users.filter((x) => x.name.toLowerCase().indexOf(search.toLowerCase()) !== -1).length">
                                             <div class="d-flex align-items-center check__component-wrapper">
                                                 <CheckboxComponent :id="'selectAll'+index" v-model="item.isAllChecked" :value="item.isAllChecked" @click="allSelect(item)"/>
-                                                <span  class="ml-5-px font-size-12 tf-link">{{$t('Filters.select_all')}}</span>
+                                                <span  class="ml-5-px fields-table-font-size-12 tf-link">{{$t('Filters.select_all')}}</span>
                                             </div>
                                         </label>
                                         <div class="p-10px pb-0px w-100 pt-15px">
@@ -656,5 +656,14 @@ function getFilteredOptions (comparison){
 }
 .fields-table-font-size-20 {
     font-size: 20px !important;
+}
+</style>
+
+<style scoped>
+.fields-table-font-weight-400 {
+    font-weight: 400 !important;
+}
+.fields-table-font-size-12 {
+    font-size: 12px;
 }
 </style>

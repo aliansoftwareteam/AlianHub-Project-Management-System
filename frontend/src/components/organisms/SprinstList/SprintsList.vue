@@ -2,7 +2,7 @@
     <div class="sprint position-re" :id="`sprint_${sprint?.id}`">
         <div
             v-if="sprint && folderLegend"
-            class="cursor-default black position-ab bg-white border border-radius-5-px color52 p0x-10px sprint__foldername"
+            class="cursor-default sprints-list-black position-ab sprints-list-bg-white border border-radius-5-px sprints-list-color52 p0x-10px sprint__foldername"
         >
             {{folderLegend}}
         </div>
@@ -222,15 +222,15 @@
                     <div class="ai-generated-task-div">
                         <div v-for="(sub,index) in taskListAi" :key="index" class="border-bottom px-1 subtask__item-input d-flex align-items-center">
                             <img :src="aiIcon" class="mr-3px" />
-                            <label class="d-flex align-items-center font-weight-400 font-size-13">
+                            <label class="d-flex align-items-center sprints-list-font-weight-400 sprints-list-font-size-13">
                                 {{sub.title}}
                             </label>
                             <input type="checkbox" v-model="sub.isSelected" @click="handleChecked(sub)" class="ml-auto" />
                         </div>
                     </div>
                     <div class="d-flex justify-content-end p15x-0px">
-                        <button v-if="taskListAi.length" class="outline-primary mr-10-px font-size-16 font-weight-400" @click="taskListAi = []">{{$t('Projects.cancel')}}</button>
-                        <button v-if="taskListAi.filter((x) => x.isSelected===true).length" class="btn-primary mr-10-px font-size-16 font-weight-400" @click="createTaskWithAi()">{{`Create ${taskListAi.filter((x) => x.isSelected===true).length} Task`}}</button>
+                        <button v-if="taskListAi.length" class="outline-primary mr-10-px sprints-list-font-size-16 sprints-list-font-weight-400" @click="taskListAi = []">{{$t('Projects.cancel')}}</button>
+                        <button v-if="taskListAi.filter((x) => x.isSelected===true).length" class="btn-primary mr-10-px sprints-list-font-size-16 sprints-list-font-weight-400" @click="createTaskWithAi()">{{`Create ${taskListAi.filter((x) => x.isSelected===true).length} Task`}}</button>
                     </div>
                 </div>
                 <div v-if="isSpinner">
@@ -1146,3 +1146,23 @@ function startTaskTour(key) {
 
 </style>
 <style scoped src="./style.css"></style>
+<style scoped>
+.sprints-list-black {
+    color: var(--ink);
+}
+.sprints-list-bg-white {
+    background-color: var(--surface);
+}
+.sprints-list-color52 {
+    color: var(--ink-2);
+}
+.sprints-list-font-weight-400 {
+    font-weight: 400 !important;
+}
+.sprints-list-font-size-13 {
+    font-size: 13px;
+}
+.sprints-list-font-size-16 {
+    font-size: 16px;
+}
+</style>

@@ -11,19 +11,19 @@
             @update:visible="$emit('closeSidebar', $event)" :top="clientWidth <= 767 ? '0px' : '46px'"
         >
             <template #head-left>
-                <div class="blue font-ui">{{ $t('Templates.ai_sidebar_title') }}</div>
+                <div class="create-template-with-ai-blue font-ui">{{ $t('Templates.ai_sidebar_title') }}</div>
             </template>
             <template #body>
                 <div class="sidbar-bodytamplate" v-if="activeTab === 1">
                     <div class="mb-1">
-                        <label class="dark-gray">{{$t('Templates.ai_label_category')}} <span class="text-red">*</span></label>
+                        <label class="create-template-with-ai-dark-gray">{{$t('Templates.ai_label_category')}} <span class="text-red">*</span></label>
                         <select v-model="category" class="form-control" :disabled="isSpinner">
                             <option value="">{{ $t('PlaceHolder.Select') }}</option>
                             <option v-for="item in categories" :value="item" :key="item">{{ item }}</option>
                         </select>
                     </div>
                     <div class="mb-1">
-                        <label class="dark-gray" for="description-textarea">{{ $t('Templates.ai_label_description') }}</label>
+                        <label class="create-template-with-ai-dark-gray" for="description-textarea">{{ $t('Templates.ai_label_description') }}</label>
                         <textarea
                             id="description-textarea"
                             :placeholder="customPlaceholder"
@@ -70,11 +70,11 @@
                                         />
                                     </template>
                                 </div>
-                                <div class="blue template-title">{{ item.TemplateName }}</div>
+                                <div class="create-template-with-ai-blue template-title">{{ item.TemplateName }}</div>
                             </li>
                         </ul>
                     </div>
-                    <div v-else class="mt-30px font-size-14">{{ $t('Templates.msg_search_result_not_found')}} <strong>"{{ buttonDisplayText }}"</strong></div>
+                    <div v-else class="mt-30px create-template-with-ai-font-size-14">{{ $t('Templates.msg_search_result_not_found')}} <strong>"{{ buttonDisplayText }}"</strong></div>
                 </div>
                 <div class="sidbar-bodytamplate bg-transparent" v-if="activeTab === 3">
                     <div class="d-flex justify-content-between">
@@ -88,8 +88,8 @@
                         </button>
                     </div>
                     <div class="template-detail">
-                        <h5 class="font-size-20 mb-10px">{{ finalObject?.TemplateName }}</h5>
-                        <span class="font-size-15">{{ finalObject?.Description }}</span>
+                        <h5 class="create-template-with-ai-font-size-20 mb-10px">{{ finalObject?.TemplateName }}</h5>
+                        <span class="create-template-with-ai-font-size-15">{{ finalObject?.Description }}</span>
                     </div>
                     <div class="preview-wrapper mt-2" v-if="finalObject && Object.keys(finalObject).length">
                         <div class="d-flex justify-content-between align-items-center item-block">
@@ -137,7 +137,7 @@
                         <div class="d-flex justify-content-between align-items-center item-block" v-if="projectViews">
                             <h5>{{ $t('Projects.required_view') }}
                                 <span class="text-red">*</span>
-                                <span v-if="!isInvalidViews.length" class="ml-5px red font-size-12 font-weight-400">{{ $t('Templates.ai_min_view_msg_text') }}</span>
+                                <span v-if="!isInvalidViews.length" class="ml-5px red create-template-with-ai-font-size-12 create-template-with-ai-font-weight-400">{{ $t('Templates.ai_min_view_msg_text') }}</span>
                             </h5>
                             <ul class="d-flex align-items-center">
                                 <li class="item cursor-pointer" :key="index" v-for="(item, index) in projectViews">
@@ -528,4 +528,28 @@ onMounted(() => {
             transform: rotate(360deg);
         }
     }
+</style>
+
+<style scoped>
+.create-template-with-ai-blue {
+    color: var(--brand) !important;
+}
+.create-template-with-ai-dark-gray {
+    color: var(--ink);
+}
+.create-template-with-ai-font-size-14 {
+    font-size: 14px;
+}
+.create-template-with-ai-font-size-20 {
+    font-size: 20px !important;
+}
+.create-template-with-ai-font-size-15 {
+    font-size: 15px;
+}
+.create-template-with-ai-font-size-12 {
+    font-size: 12px;
+}
+.create-template-with-ai-font-weight-400 {
+    font-weight: 400 !important;
+}
 </style>

@@ -3,10 +3,10 @@
     <Sidebar className="create_template_sidebar" :visible="createTemplateSidebar" :grouped="true" :enable-search="false"
         :multi-select="false" @clear="items = []" :width="!isDisplayTemplate ? '607px' : '1329px'" @update:visible="$emit('closeSidebar',$event)" :top="clientWidth <= 767 ? '0px' : '46px'">
         <template #head-left>
-                <div class="blue font-ui">{{ $t('Templates.create_template') }}</div>
+                <div class="create-template-blue font-ui">{{ $t('Templates.create_template') }}</div>
             </template>
             <template #head-right>
-                <button class="bg-white cancelButtonTeam blue font-ui cursor-pointer" @click="handleCloseSidebar">{{$t('Projects.cancel')}}</button>
+                <button class="create-template-bg-white cancelButtonTeam create-template-blue font-ui cursor-pointer" @click="handleCloseSidebar">{{$t('Projects.cancel')}}</button>
             </template>
         <template #body>
             <div class="sidbar-bodytamplate">
@@ -35,10 +35,10 @@
                     <TemplateAllDetailPage v-if="activeIndex === (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 7 : 6)" v-model="formData"/>
                 </div>
                 <div class="conditional-btn-wrapper d-flex justify-content-end mt-29px">
-                    <button v-if="activeIndex > 0 && !isSpinner"  @click="prevStep()" class="cursor-pointer conditional-previous-step btn border-primary border-radius-4-px blue bg-white">{{ $t('Projects.previous') }}</button>
-                    <button v-if="activeIndex < (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 7 : 6) && activeIndex !== -1" @click="nextStep()" class="conditional__template-project btn-primary font-ui font-size-16" :class="[{'conditional__template-projectstepOne' : activeIndex === 0}]">{{ $t('Home.Next') }}</button>
-                    <button v-else-if="activeIndex !== -1 && !isSpinner" @click="submitData()" class="submit-btn create__template btn btn-primary" >{{ $t('Templates.create_template') }}</button>
-                    <button v-else-if="isSpinner" type="button" class="btn btn-blue btn-login btn-disabled font-ui btn-primary font-weight-500 pointer-event-none" disabled><span id="btn-spinner"></span>{{$t('Auth.loading')}}...</button>
+                    <button v-if="activeIndex > 0 && !isSpinner"  @click="prevStep()" class="cursor-pointer conditional-previous-step create-template-btn border-primary border-radius-4-px create-template-blue create-template-bg-white">{{ $t('Projects.previous') }}</button>
+                    <button v-if="activeIndex < (JSON.parse(JSON.stringify(formData?.alianAppsObj)).length && JSON.parse(JSON.stringify(formData?.alianAppsObj))?.find((e)=>e.key === 'CustomFields')?.appStatus === true && currentCompany?.planFeature?.customFields === true ? 7 : 6) && activeIndex !== -1" @click="nextStep()" class="conditional__template-project btn-primary font-ui create-template-font-size-16" :class="[{'conditional__template-projectstepOne' : activeIndex === 0}]">{{ $t('Home.Next') }}</button>
+                    <button v-else-if="activeIndex !== -1 && !isSpinner" @click="submitData()" class="submit-btn create__template create-template-btn btn-primary" >{{ $t('Templates.create_template') }}</button>
+                    <button v-else-if="isSpinner" type="button" class="create-template-btn btn-blue btn-login btn-disabled font-ui btn-primary create-template-font-weight-500 pointer-event-none" disabled><span id="btn-spinner"></span>{{$t('Auth.loading')}}...</button>
                 </div>
             </div>
         </template>
@@ -379,4 +379,29 @@ const  { checkAllFields } = useValidation();
 </script>
 <style scoped>
 @import "./style.css";
+</style>
+<style scoped>
+.create-template-blue {
+    color: var(--brand) !important;
+}
+.create-template-bg-white {
+    background-color: var(--surface);
+}
+.create-template-btn {
+    margin-left: 5px;
+    padding: 4px 14px;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 24px;
+    font-family: var(--font-ui);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.create-template-font-size-16 {
+    font-size: 16px;
+}
+.create-template-font-weight-500 {
+    font-weight: 500 !important;
+}
 </style>

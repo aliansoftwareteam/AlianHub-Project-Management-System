@@ -2,15 +2,15 @@
     <div class="list__taskstatus-sidebar">
         <Sidebar width="374px" :zIndex="props.zTndex" >
             <template #head-left>
-                <div class="font-size-18 font-weight-700 black font-ui">{{title}}</div>
+                <div class="task-status-sidebar-font-size-18 task-status-sidebar-font-weight-700 task-status-sidebar-black font-ui">{{title}}</div>
             </template>
             <template #head-right>
-                <span class="add_status font-size-12 font-weight-400" v-if="isOpenAddStatus === false && isAddStatus === true" @click="isOpenAddStatus = true,formData.status.value = ''">+ {{props.type === 'task_type' ? $t("Home.add_task_type") : $t("Projects.add_status")}}</span>
+                <span class="add_status task-status-sidebar-font-size-12 task-status-sidebar-font-weight-400" v-if="isOpenAddStatus === false && isAddStatus === true" @click="isOpenAddStatus = true,formData.status.value = ''">+ {{props.type === 'task_type' ? $t("Home.add_task_type") : $t("Projects.add_status")}}</span>
                     <img :src="closeBlueImage" @click="isSidebarOpen = false,$emit('closesidebar',taskSelectedStatus)" />
             </template>
             <template #body>
                 <div class="tts__body">
-                <div class="p-15px search-bar__input bg-white">
+                <div class="p-15px search-bar__input task-status-sidebar-bg-white">
                     <InputText  
                         v-model="search"
                         :placeholder="$t('PlaceHolder.search')"
@@ -20,7 +20,7 @@
                         :height="clientWidth <= 767 ? '50px' : '30px'"
                     />
                 </div>
-                <div v-if="isOpenAddStatus && isAddStatus === true"  class="open__add-status position-re d-flex align-items-center justify-content-between bg-white" :class="[{'openinput_sidebar' : type !== 'task_type'}]">
+                <div v-if="isOpenAddStatus && isAddStatus === true"  class="open__add-status position-re d-flex align-items-center justify-content-between task-status-sidebar-bg-white" :class="[{'openinput_sidebar' : type !== 'task_type'}]">
                     <input type="color" v-if="props.type !== 'task_type'" v-model="statusColor" class="status__color-input position-ab">
                     <input v-if="props.type === 'task_type'" type="file" class="d-none"  ref="task_type_image" accept="image/*" @change="checkFile">
                     <button v-if="props.type === 'task_type'" class="cursor-pointer upload-image-btn btn-primary mr-10px" type="button" @click="showIconPicker = !showIconPicker">
@@ -47,16 +47,16 @@
                         <img :src="greenCheck" class="greenCheck_sidebar vertical-middle mr-13px" @click="addTaskStatus()">
                         <img :src="deleteRed" alt="cancel" @click="isOpenAddStatus = false,formData.status.error='',resetIconState()" class="deleteRed_sidebar vertical-middle">
                     </span>
-                    <div class="position-ab red font-size-11 error-text">{{formData.status.error}}</div>
+                    <div class="position-ab red task-status-sidebar-font-size-11 error-text">{{formData.status.error}}</div>
                 </div>
-                <div v-if="props.type === 'task_type' && isOpenAddStatus && showIconPicker" class="tasktype__iconpop bg-white">
+                <div v-if="props.type === 'task_type' && isOpenAddStatus && showIconPicker" class="tasktype__iconpop task-status-sidebar-bg-white">
                     <div class="tasktype__iconpop-toggle">
                         <button type="button" :class="{ active: iconSource === 'library' }" @click="iconSource = 'library'">{{ $t('dashboardCard.icon_library') }}</button>
                         <button type="button" :class="{ active: iconSource === 'upload' }" @click="iconSource = 'upload'; $refs.task_type_image.click()">{{ $t('dashboardCard.icon_upload') }}</button>
                     </div>
                     <IconPicker v-if="iconSource === 'library'" v-model="selectedIconValue" v-model:color="selectedIconColor" />
                 </div>
-                <div class="overflow-y-auto sidebar-options overflow-x-hidden bg-white" :role="filteredStatusOptions && filteredStatusOptions.length ? 'listbox' : null">
+                <div class="overflow-y-auto sidebar-options overflow-x-hidden task-status-sidebar-bg-white" :role="filteredStatusOptions && filteredStatusOptions.length ? 'listbox' : null">
                     <template v-if="filteredStatusOptions && filteredStatusOptions.length">
                         <SidebarItems
                             v-for="(item, itemIndex) in filteredStatusOptions"
@@ -456,4 +456,28 @@ const organizeDataArray = (data) => {
    ignored the icon picker and could overflow the panel. */
 .tts__body { display: flex; flex-direction: column; height: 100%; }
 .tts__body .sidebar-options { flex: 1 1 auto; min-height: 0; }
+</style>
+
+<style scoped>
+.task-status-sidebar-font-size-18 {
+    font-size: 18px !important;
+}
+.task-status-sidebar-font-weight-700 {
+    font-weight: 700 !important;
+}
+.task-status-sidebar-black {
+    color: var(--ink);
+}
+.task-status-sidebar-font-size-12 {
+    font-size: 12px;
+}
+.task-status-sidebar-font-weight-400 {
+    font-weight: 400 !important;
+}
+.task-status-sidebar-bg-white {
+    background-color: var(--surface);
+}
+.task-status-sidebar-font-size-11 {
+    font-size: 11px;
+}
 </style>

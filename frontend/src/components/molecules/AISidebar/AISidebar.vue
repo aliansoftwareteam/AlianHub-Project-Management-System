@@ -7,7 +7,7 @@
             <template #head-mid>
                 <div>
                     <div class="d-flex flex-column align-items-center">
-                        <span class="font-size-22 font-weight-700 white text-center pb-20px head-title">{{$t("AI.ai_title")}}</span>
+                        <span class="ai-sidebar-font-size-22 ai-sidebar-font-weight-700 ai-sidebar-white text-center pb-20px head-title">{{$t("AI.ai_title")}}</span>
                         <input type="search" :placeHolder="`${$t('AI.ai_sidebar_placeholder')}`" class="ai-input" v-model="search">
                     </div>
                 </div>
@@ -22,11 +22,11 @@
                             <div v-for="(item, index) in filterCategories" :key="index" class="prompt-wrapper cursor-pointer">
                                 <h3 class="p-10px">{{item.categoryName}}</h3>
                                 <div class="flex-wrap d-flex prompt-listing">
-                                    <div v-for="(prompt, index) in item.readMore ? filterPrompts.filter((x) => x.categoryRef === item.key) : filterPrompts.filter((x) => x.categoryRef === item.key).filter((x, index) => index < 9)" :key="index" class="prompt-div text-ellipsis font-size-12 font-weight-400 GunPowder" @click="openPromptDetail(prompt)">
+                                    <div v-for="(prompt, index) in item.readMore ? filterPrompts.filter((x) => x.categoryRef === item.key) : filterPrompts.filter((x) => x.categoryRef === item.key).filter((x, index) => index < 9)" :key="index" class="prompt-div text-ellipsis ai-sidebar-font-size-12 ai-sidebar-font-weight-400 ai-sidebar-GunPowder" @click="openPromptDetail(prompt)">
                                         <span>{{prompt.title}}</span>
                                     </div>
-                                    <span v-if="item.readMore ? false : prompts.filter((x) => x.categoryRef === item.key).length > 9" @click="readMoreFun(item)" class="prompt-div text-ellipsis font-size-12 font-weight-400 darkblue read-more-less">{{$t('AI.read_more')}}</span>
-                                    <span v-if="item.readMore" class="prompt-div text-ellipsis font-size-12 font-weight-400 darkblue read-more-less" @click="item.readMore = false">{{$t('AI.read_less')}}</span>
+                                    <span v-if="item.readMore ? false : prompts.filter((x) => x.categoryRef === item.key).length > 9" @click="readMoreFun(item)" class="prompt-div text-ellipsis ai-sidebar-font-size-12 ai-sidebar-font-weight-400 darkblue read-more-less">{{$t('AI.read_more')}}</span>
+                                    <span v-if="item.readMore" class="prompt-div text-ellipsis ai-sidebar-font-size-12 ai-sidebar-font-weight-400 darkblue read-more-less" @click="item.readMore = false">{{$t('AI.read_less')}}</span>
                                 </div>
                             </div>
                         </template>
@@ -216,5 +216,26 @@ const filterCategories = computed(() => {
     .ai-sidebar .head-title {
         max-width: 250px;
     }
+}
+</style>
+
+<style scoped>
+.ai-sidebar-font-size-22 {
+    font-size: 22px;
+}
+.ai-sidebar-font-weight-700 {
+    font-weight: 700 !important;
+}
+.ai-sidebar-white {
+    color: var(--on-brand) !important;
+}
+.ai-sidebar-font-size-12 {
+    font-size: 12px;
+}
+.ai-sidebar-font-weight-400 {
+    font-weight: 400 !important;
+}
+.ai-sidebar-GunPowder {
+    color: var(--ink-2);
 }
 </style>

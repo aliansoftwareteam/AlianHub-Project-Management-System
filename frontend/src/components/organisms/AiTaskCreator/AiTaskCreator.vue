@@ -120,7 +120,7 @@
                     <div v-if="plan.links && plan.links.length" class="aitc__links-note">🔗 {{ $t('AiTask.links_note', { n: plan.links.length }, plan.links.length) }}</div>
                     <div v-if="plan.epics && plan.epics.length" class="aitc__links-note">📁 {{ $t('AiTask.epics_note', { n: plan.epics.length }, plan.epics.length) }}</div>
                     <div v-if="plan.customFields && plan.customFields.length" class="aitc__links-note">🏷️ {{ $t('AiTask.fields_note', { n: plan.customFields.length }, plan.customFields.length) }}</div>
-                    <div class="aitc__plan style-scroll">
+                    <div class="aitc__plan ai-task-creator-style-scroll">
                         <!-- full: sprints, each with its tasks -->
                         <template v-if="mode === 'full'">
                             <div v-for="(sprint, si) in (plan.sprints || [])" :key="si" class="aitc__sprint">
@@ -633,4 +633,20 @@ function successMessage(totals) {
 .aitc__status { font-size: 14px; font-weight: 600; color: var(--ink-label); margin: 0; }
 .aitc__sub { font-size: 12px; color: var(--ink-2); margin: 8px 0 0; }
 @keyframes aitc-spin { to { transform: rotate(360deg); } }
+</style>
+
+<style scoped>
+.ai-task-creator-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.ai-task-creator-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--border);
+    border-radius: 8px;
+}
+.ai-task-creator-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

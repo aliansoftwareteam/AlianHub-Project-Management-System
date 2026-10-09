@@ -29,7 +29,7 @@
                     <span class="ah-sr-only">{{ $t('CustomField.rollup_function') }}</span>
                     <div class="d-flex border-gray border-radius-5-px align-items-center p-4px justify-content-between">
                         <div class="d-flex align-items-center">
-                            <span class="ml-8px font-size-13 font-weight-400 gray81 d-block text-capitalize">{{ rollupFunction }}</span>
+                            <span class="ml-8px rollup-component-font-size-13 rollup-component-font-weight-400 rollup-component-gray81 d-block text-capitalize">{{ rollupFunction }}</span>
                         </div>
                         <div class="mr-8px">
                             <img class="rotate-z-90" :src="dropDownArrow" alt="">
@@ -54,7 +54,7 @@
                         <span class="ah-sr-only">{{ $t('CustomField.rollup_source_field') }}</span>
                         <div class="d-flex border-gray border-radius-5-px align-items-center p-4px justify-content-between">
                             <div class="d-flex align-items-center">
-                                <span class="ml-8px font-size-13 font-weight-400 gray81 d-block">{{ rollupSourceLabel }}</span>
+                                <span class="ml-8px rollup-component-font-size-13 rollup-component-font-weight-400 rollup-component-gray81 d-block">{{ rollupSourceLabel }}</span>
                             </div>
                             <div class="mr-8px">
                                 <img class="rotate-z-90" :src="dropDownArrow" alt="">
@@ -205,3 +205,15 @@
 
     defineExpose({handleTabComp,handleSubmitComp});
 </script>
+
+<style scoped>
+.rollup-component-font-size-13 {
+    font-size: 13px;
+}
+.rollup-component-font-weight-400 {
+    font-weight: 400 !important;
+}
+.rollup-component-gray81 {
+    color: var(--ink-2);
+}
+</style>

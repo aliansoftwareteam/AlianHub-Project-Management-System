@@ -21,10 +21,10 @@
                     @keyup="handleSearch"
                     :width="'392px'"
                 />
-                <button v-if="checkPermission('settings.settings_custom_field') === true" class="btn btn-primary" @click="emit('isVisible')">+ {{$t('CustomField.add_new_custom_field')}}</button>
+                <button v-if="checkPermission('settings.settings_custom_field') === true" class="custom-field-list-btn btn-primary" @click="emit('isVisible')">+ {{$t('CustomField.add_new_custom_field')}}</button>
             </div>
             <div v-if="finalCustomFieldData && finalCustomFieldData.length" class="custom-field__table-wrapper">
-                <div class="custome-field-table style-scroll w-full">
+                <div class="custome-field-table custom-field-list-style-scroll w-full">
                     <table border class="custome-field__table">
                         <thead>
                             <tr>
@@ -61,7 +61,7 @@
                                 <td :class="[{'pointer-event-none':!item.isDelete}]">
                                     <DropDown mode="listbox" multiselectable @isVisible="handelSubmit(index), handleOutsideClick($event)" :bodyClass="{'custom__field__dropdown':true}">
                                         <template #button="{ triggerAttrs }">
-                                            <button type="button" class="dropdown-trigger project_bg d-flex GunPowder font-size-13" v-bind="triggerAttrs" :disabled="!item.isDelete">
+                                            <button type="button" class="dropdown-trigger project_bg d-flex custom-field-list-GunPowder custom-field-list-font-size-13" v-bind="triggerAttrs" :disabled="!item.isDelete">
                                                 <span v-if="item?.global" class="project_ellipsis">{{ $t('CustomField.all_projects') }}</span>
                                                 <span v-else-if="item?.projectId && item?.projectId?.length" class="project_ellipsis">
                                                     <template
@@ -84,7 +84,7 @@
                                                     :isOutline="false"
                                                     @input="searchFunction(item)"
                                                 />
-                                                <span class="text-nowrap ml-5-px font-size-12 font-weight-400 blue cursor-pointer" @click="handleChecked(index)" v-if="!searchProject">{{finalCustomFieldDataTest[index].global === true ? $t('Filters.unselect_all') : $t('Filters.select_all')}}</span>
+                                                <span class="text-nowrap ml-5-px custom-field-list-font-size-12 custom-field-list-font-weight-400 blue cursor-pointer" @click="handleChecked(index)" v-if="!searchProject">{{finalCustomFieldDataTest[index].global === true ? $t('Filters.unselect_all') : $t('Filters.select_all')}}</span>
                                             </div>
                                         </template>
                                         <template #options v-if="item.isDelete">
@@ -115,7 +115,7 @@
                                 <td :class="[{'pointer-event-none':!item.isDelete}]">
                                     <DropDown mode="listbox">
                                         <template #button="{ triggerAttrs }">
-                                            <button type="button" class="dropdown-trigger project_bg project_type d-flex GunPowder font-size-13" :ref="customFieldType" v-bind="triggerAttrs" :disabled="!item.isDelete">
+                                            <button type="button" class="dropdown-trigger project_bg project_type d-flex custom-field-list-GunPowder custom-field-list-font-size-13" :ref="customFieldType" v-bind="triggerAttrs" :disabled="!item.isDelete">
                                                 <span class="field__title field__title__type text-capitalize">{{ item?.type || 'Na' }}</span>
                                                 <img :src="selectArrowMobile" alt="" class="cursor-pointer ml_1">
                                             </button>
@@ -401,3 +401,41 @@
     };
 </script>
 <style scoped src="./style.css"></style>
+<style scoped>
+.custom-field-list-btn {
+    margin-left: 5px;
+    padding: 4px 14px;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 24px;
+    font-family: var(--font-ui);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.custom-field-list-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.custom-field-list-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.custom-field-list-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
+.custom-field-list-GunPowder {
+    color: var(--ink-2);
+}
+.custom-field-list-font-size-13 {
+    font-size: 13px;
+}
+.custom-field-list-font-size-12 {
+    font-size: 12px;
+}
+.custom-field-list-font-weight-400 {
+    font-weight: 400 !important;
+}
+</style>

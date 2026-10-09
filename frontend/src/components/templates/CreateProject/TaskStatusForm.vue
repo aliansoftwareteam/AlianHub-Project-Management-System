@@ -61,7 +61,7 @@
                     :useDataArray="useTaskStatusArr"
                     :projectData="projectData"
                 />
-                <button class="cursor-pointer btn btn-primary addstatus-btn ml-0 mb-20px" type="button" @click="openTaskStatusSidebar()">+ {{$t('Projects.add_status')}}</button>
+                <button class="cursor-pointer task-status-form-btn btn-primary addstatus-btn ml-0 mb-20px" type="button" @click="openTaskStatusSidebar()">+ {{$t('Projects.add_status')}}</button>
                 <div class="task-status-form-red">
                     <span v-if="errorMsgTask" class="task-status-form-font-size-11">{{errorMsgTask}}</span>
                 </div>
@@ -601,5 +601,16 @@ const { t } = useI18n();
     line-height: 21px !important;
     font-weight: 500 !important;
     color: var(--ink) !important;
+}
+.task-status-form-btn {
+    margin-left: 5px;
+    padding: 4px 14px;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 24px;
+    font-family: var(--font-ui);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 </style>

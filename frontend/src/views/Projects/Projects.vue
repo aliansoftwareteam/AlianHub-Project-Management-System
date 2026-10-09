@@ -34,7 +34,7 @@
                                         <div v-if="editProject" class="position-re project-titlerename-input ml-10px mr-5px" :class="{'list-type-error': projectName.error }">
                                             <input
                                                 type="text"
-                                                class="form-control project__name-input"
+                                                class="projects-form-control project__name-input"
                                                 v-model.trim="projectName.value"
                                                 :placeholder="$t('errorPage.project_name')"
                                                 :maxLength="250"
@@ -111,7 +111,7 @@
                                         </div>
                                     </div>
                                     <div class="key-wapper" v-if="clientWidth > 767">
-                                        <span class="text-ellipsis border-left projects-font-size-13 text-uppercase key-text pl-11px pr-10px GunPowder" :title="projectData.ProjectCode">
+                                        <span class="text-ellipsis border-left projects-font-size-13 text-uppercase key-text pl-11px pr-10px projects-GunPowder" :title="projectData.ProjectCode">
                                             {{ projectData?.ProjectCode }}
                                         </span>
                                     </div>
@@ -135,9 +135,9 @@
                                             <div class="project__requirementcomponent-wrapper" v-if="projectData?.ProjectRequiredComponent && (embedViews).length">
                                                 <DropDown mode="listbox" :bodyClass="{'dropdown-width':true}" @isVisible="(val)=> !val? (renameValue = {name:'',id:''}) :''">
                                                     <template #button>
-                                                        <div class="d-flex p9x-13px" ref="project_tabs_components" :class="{'bg-light-gray':activeTab == 'EmbedView'}">
+                                                        <div class="d-flex p9x-13px" ref="project_tabs_components" :class="{'projects-bg-light-gray':activeTab == 'EmbedView'}">
                                                             <img :src="!selectedEmbedView ? icons[embedViews[0].type] : icons[selectedEmbedView.type]" alt="" class="list_make_as_defaultimg">
-                                                            <span class="projects-font-size-14 text-ellipsis gray81 mw-50 ml-10px">{{!selectedEmbedView ? embedViews[0].name : selectedEmbedView.name}}</span>
+                                                            <span class="projects-font-size-14 text-ellipsis projects-gray81 mw-50 ml-10px">{{!selectedEmbedView ? embedViews[0].name : selectedEmbedView.name}}</span>
                                                             <div class="view-count">
                                                                 {{ (embedViews).length }}
                                                                 <img :src="whiteDownArrow" alt="" class="ml-2px">
@@ -227,7 +227,7 @@
                             />
                             </template>
                         </ProjectHeader>
-                        <div v-if="showLoader" class="d-flex box-shadow-6 position-fi z-index-10 right-22px bottom-22px projects-bg-white p-10px border-radius-5-px align-items-center">
+                        <div v-if="showLoader" class="d-flex projects-box-shadow-6 position-fi z-index-10 right-22px bottom-22px projects-bg-white p-10px border-radius-5-px align-items-center">
                             <div class="progress-container d-flex align-items-center position-re">
                                 <div class="progress-circle" :style="circleStyle">
                                     <span class="progress-text">{{ currentProgress }}%</span>
@@ -361,7 +361,7 @@
                             <div>
                                 <div>
                                     <img src="@/assets/images/Frame.png" alt="fram_img"/>
-                                    <h3 class="projects-font-size-22 projects-font-weight-700 text-center projects-line-height-33 black">
+                                    <h3 class="projects-font-size-22 projects-font-weight-700 text-center projects-line-height-33 projects-black">
                                         {{ $t('Projects.archived_notice') }}
                                     </h3>
                                 </div>
@@ -1600,5 +1600,45 @@ function closeModal() {
 }
 .projects-line-height-33 {
     line-height: 33px;
+}
+.projects-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.projects-GunPowder {
+    color: var(--ink-2);
+}
+.projects-gray81 {
+    color: var(--ink-2);
+}
+.projects-black {
+    color: var(--ink);
+}
+.projects-box-shadow-6 {
+    box-shadow: var(--shadow-pop);
+}
+.projects-form-control {
+    height: 30px;
+    max-width: 100%;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0px 10px;
+    font-family: var(--font-ui);
+    font-weight: 400;
+    color: var(--ink-2);
+    font-size: 13px;
+}
+.projects-form-control:focus-visible {
+    outline-color: var(--brand)
+}
+.projects-form-control::placeholder {
+    font-weight: 400;
+    font-size: 13px;
+    color: var(--ink-2);
+    line-height: 19.24px;
+}
+@media(max-width: 767px){
+    .projects-form-control {font-size: 14px;line-height: 22px;color: var(--ink-label) !important;}
+    .projects-form-control::placeholder {color: var(--ink-2) !important;line-height: 22px !important;}
 }
 </style>
