@@ -17,6 +17,7 @@ const REPLY_MAX = 1500;
 const SKILL_ACTIONS = Object.freeze(['task.get', 'task.comment']);
 const AUTONOMY = 1;
 const PAUSED_REASON = 'team_pack';
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const SMALL_WORDS = Object.freeze({ it: 'IT' });
 
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
@@ -127,7 +128,7 @@ async function write(companyId, planned, actorId, written) {
         });
         made.push({ roleKey, agentId: String(saved._id), name: saved.name });
     }
-    return { made, kept, widened };
+    return { made, kept, widened, skills: [...madeSkills] };
 }
 
 const ignoreTakeBack = { done: () => {} };
@@ -175,4 +176,20 @@ async function remove(companyId, blueprint, agentIds, projectIds, actor) {
     return { removed, kept };
 }
 
-module.exports = { agentName, skillKeyOf, plan, write, create, remove, hasWorked };
+/* Gives back the projects an apply added to an agent it reused, where the agent still has them. */
+async function narrow(companyId, widened) {
+    const narrowed = [];
+    for (const { agentId, projectIds } of widened) {
+        if (!OBJECT_ID.test(String(agentId)) || !(projectIds || []).length) continue;
+        const result = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.AGENTS, data: [{ _id: oid(agentId), deletedStatusKey: { $ne: 1 } }, { $pull: { projectIds: { $in: projectIds.map(String) } } }],
+        }, 'updateOne');
+        if (result && (result.modifiedCount || result.nModified)) {
+            runs.emitAgent(companyId, { agentId: String(agentId) });
+            narrowed.push({ agentId: String(agentId), projectIds: projectIds.map(String) });
+        }
+    }
+    return narrowed;
+}
+
+module.exports = { agentName, skillKeyOf, plan, write, create, remove, narrow, hasWorked };

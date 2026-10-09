@@ -44,9 +44,9 @@ const serve = ({ on = true, refuse = null } = {}) => apiRequest.mockImplementati
     if (url.endsWith('/team-packs') && type === 'get') return ok({ on, packs: PACKS });
     if (url.endsWith('/team-packs') && type === 'post') {
         if (refuse) return Promise.reject({ response: { status: refuse, data: { statusText: 'refused' } } });
-        if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: body.roles[projectId], mode: 'off' })) });
+        if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: [TRIAGER.key, REVIEWER.key], mode: 'off' })), agents: { removed: [], kept: [], narrowed: [] } });
         applied = body;
-        return ok({ blueprint: body.blueprint, teams: body.teams, agents: { made: [], kept: [] }, projects: [
+        return ok({ blueprint: body.blueprint, teams: body.teams, applyId: 'ap1', agents: { made: [], kept: [], widened: [] }, projects: [
             { projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', rules: body.starterRules ? [RULE] : [], skippedRules: 0, tags: ['bug', 'needs-triage'], proposalId: 'prop1' },
             { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off', rules: [], skippedRules: 1, tags: [], proposalId: null }
         ] });
@@ -126,7 +126,7 @@ describe('Team packs', () => {
         await wrapper.find('[data-test="tp-undo"]').trigger('click');
         await flushPromises();
         const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);
-        expect(undo[2]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], roles: { p1: [TRIAGER.key, REVIEWER.key], p2: [TRIAGER.key, REVIEWER.key] }, rules: { p1: [RULE], p2: [] }, proposals: { p1: 'prop1' }, agents: [] });
+        expect(undo[2]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], applyId: 'ap1' });
         expect(wrapper.find('[data-test="tp-result"]').text()).toContain('The pack\'s roles are off again.');
         expect(wrapper.find('[data-test="tp-undo"]').exists()).toBe(false);
     });
@@ -175,7 +175,7 @@ describe('Team packs', () => {
         apiRequest.mockImplementation((type, url, body) => {
             if (type === 'get') return ok({ on: true, packs: PACKS });
             if (body.undo) return ok({ projects: [], agents: { removed: [{ agentId: 'g1', name: 'Bug Triager · IT company' }], kept: [{ agentId: 'g2', name: 'Code Reviewer · IT company', why: 'has_worked' }] } });
-            return ok({ blueprint: 'it-company', teams: ['engineering'], projects: [{ projectId: 'p1', added: [TRIAGER.key], mode: 'off' }], agents: { made: [{ agentId: 'g1', roleKey: TRIAGER.key, name: 'Bug Triager · IT company' }, { agentId: 'g2', roleKey: REVIEWER.key, name: 'Code Reviewer · IT company' }], kept: [] } });
+            return ok({ blueprint: 'it-company', teams: ['engineering'], applyId: 'ap2', projects: [{ projectId: 'p1', added: [TRIAGER.key], mode: 'off' }], agents: { made: [{ agentId: 'g1', roleKey: TRIAGER.key, name: 'Bug Triager · IT company' }, { agentId: 'g2', roleKey: REVIEWER.key, name: 'Code Reviewer · IT company' }], kept: [] } });
         });
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
         await flushPromises();
@@ -184,7 +184,7 @@ describe('Team packs', () => {
         await wrapper.find('[data-test="tp-undo"]').trigger('click');
         await flushPromises();
         const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);
-        expect(undo[2].agents).toEqual(['g1', 'g2']);
+        expect(undo[2].applyId).toBe('ap2');
         expect(wrapper.find('[data-test="tp-agents"]').text()).toContain('One agent stays because it has done work.');
         expect(wrapper.find('[data-test="tp-kept"]').text()).toContain('Code Reviewer · IT company stays');
     });

@@ -2330,8 +2330,11 @@ const schema = {
         updatedBy: { type: String, required: false },
         updatedAt: { type: Date, required: false },
         // The dispatcher (Modules/AssignmentRules/dispatcher): { mode: off | suggest | apply, threshold, modelGuess, roles: ['blueprint/slug'],
-        // rules: [{ role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
+        // rules: [{ id?, role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
         dispatcher: { type: Object, required: false },
+        // What each team pack applied here, so its undo takes back only that (Modules/AssignmentRules/dispatcher/packs.js):
+        // [{ applyId, blueprint, projectIds, roles, rules: [{ id, role, when }], proposalId, agents: { made, widened: [{ agentId, projectIds }] }, skills, by, at }]
+        teamPacks: { type: Array, default: undefined, required: false },
     },
     // One decision per task revision: what the rules chose, why, and what became of it. `inputHash` covers the task text
     // and the rule revision, so the same task is never decided twice for the same input.

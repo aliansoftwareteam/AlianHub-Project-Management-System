@@ -249,36 +249,39 @@ describe('team packs make one agent per role', () => {
         recordAudit.mockClear();
 
         const res = await call('POST', PACKS, {
-            body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), roles: { [String(project._id)]: applied.body.data.projects[0].added }, agents: [...made.map((a) => a.agentId), mine] },
+            body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), applyId: applied.body.data.applyId, agents: [mine] },
         });
         expect(res.statusCode).toBe(200);
         expect(res.body.data.agents.removed).toHaveLength(made.length - 1);
-        expect(res.body.data.agents.kept).toEqual([expect.objectContaining({ agentId: worked, why: 'has_worked' }), expect.objectContaining({ agentId: mine, why: 'not_made_by_pack' })]);
+        expect(res.body.data.agents.kept).toEqual([expect.objectContaining({ agentId: worked, why: 'has_worked' })]);
         expect(live().map((a) => String(a._id)).sort()).toEqual([worked, mine].sort());
-        expect(audited()).toEqual([expect.objectContaining({ action: 'dispatcher.pack_undone', meta: expect.objectContaining({ agents: expect.objectContaining({ kept: [worked, mine] }) }) })]);
+        expect(audited()).toEqual([expect.objectContaining({ action: 'dispatcher.pack_undone', meta: expect.objectContaining({ agents: expect.objectContaining({ kept: [worked] }) }) })]);
     });
 
-    it('keeps an agent that was handed queue work, or that reaches a project the undo was not checked for', async () => {
+    it('keeps an agent that was handed queue work, or that a person sent to another project since', async () => {
         seedRules(GRANTS);
         const one = seedProject();
         const two = seedProject();
         const first = await applyPack([one]);
-        const wide = await applyPack([two]);
-        const handed = first.body.data.agents.made[0].agentId;
+        const [handed, moved] = first.body.data.agents.made.map((a) => a.agentId);
         mockDb.seed(SCHEMA_TYPE.PROJECT_FINDINGS, { rule: 'handed_over', status: 'open', facts: { agentId: handed } });
-        const res = await call('POST', PACKS, {
-            body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(one), roles: {}, agents: [handed, wide.body.data.agents.made[0].agentId] },
-        });
-        expect(res.body.data.agents.removed).toEqual([]);
-        expect(res.body.data.agents.kept.map((a) => a.why)).toEqual(['has_worked', 'other_projects']);
+        agentsOf().find((agent) => String(agent._id) === moved).projectIds = [String(one._id), String(two._id)];
+        const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(one), applyId: first.body.data.applyId } });
+        expect(res.body.data.agents.removed).toHaveLength(engineering.length - 2);
+        expect(res.body.data.agents.kept.map((a) => [a.agentId, a.why])).toEqual([[handed, 'has_worked'], [moved, 'other_projects']]);
     });
 
-    it('refuses agent ids that are not ids', async () => {
+    it('gives back the projects it widened a reused agent to, and leaves the agent', async () => {
         seedRules(GRANTS);
-        const project = seedProject();
-        const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), roles: {}, agents: ['nope'] } });
-        expect(res.statusCode).toBe(400);
-        expect(live()).toHaveLength(0);
+        const one = seedProject();
+        const two = seedProject();
+        await applyPack([one]);
+        const wider = await applyPack([one, two]);
+        const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: [...ids(one), ...ids(two)], applyId: wider.body.data.applyId } });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.data.agents.narrowed).toHaveLength(engineering.length);
+        expect(live()).toHaveLength(engineering.length);
+        live().forEach((agent) => expect(agent.projectIds.map(String)).toEqual(ids(one)));
     });
 
     it('lets only an owner or admin create or remove agents through a pack, and turns a member\'s roles on without them', async () => {
@@ -294,7 +297,7 @@ describe('team packs make one agent per role', () => {
         expect(quiet.body.data.agents).toEqual({ made: [], kept: [], widened: [] });
         expect(agentsOf()).toHaveLength(0);
         const made = await applyPack([project]);
-        const undo = await call('POST', PACKS, { uid: EDITOR, body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), roles: {}, agents: made.body.data.agents.made.map((a) => a.agentId) } });
+        const undo = await call('POST', PACKS, { uid: EDITOR, body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ids(project), applyId: made.body.data.applyId } });
         expect(undo.statusCode).toBe(403);
         expect(live()).toHaveLength(engineering.length);
     });
