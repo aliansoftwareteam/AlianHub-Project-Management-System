@@ -212,6 +212,13 @@ describe('an OAuth token is held to the one scope each data tool needs', () => {
         const out = await call('projects.list', {}, oauth(['projects:read']));
         expect(out.projects.length).toBeGreaterThan(0);
     });
+
+    it('holds a token caller to its scope whatever flags its context carries; only the session read skips it', async () => {
+        await expect(call('projects.list', {}, { ...oauth(['tasks:read']), session: true })).rejects.toMatchObject({ code: -32004 });
+        const own = await tools.readOwn(ctx({ token: null }), 'projects.list', {});
+        expect(own.projects.length).toBeGreaterThan(0);
+        await expect(tools.readOwn(ctx(), 'comment.create', { taskId: '6f00000000000000000000ff', text: 'x' })).rejects.toMatchObject({ code: -32601 });
+    });
 });
 
 const expected = {

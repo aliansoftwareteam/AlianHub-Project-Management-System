@@ -17,6 +17,22 @@ const PLAN_KEYS = Object.freeze({
     plan_failed: "Ask.plan_failed"
 });
 
+const STEP_KEYS = Object.freeze({
+    "task.create": "Ask.plan_step_task",
+    "fields.create": "Ask.plan_step_fields",
+    "view.create": "Ask.plan_step_view",
+    "automation.create": "Ask.plan_step_automation"
+});
+
+const REASON_KEYS = Object.freeze({
+    other_project: "Ask.plan_reason_other_project",
+    no_project: "Ask.plan_reason_no_project",
+    not_allowed: "Ask.plan_reason_not_allowed",
+    not_found: "Ask.plan_reason_not_found",
+    incomplete: "Ask.plan_reason_incomplete",
+    refused: "Ask.plan_reason_refused"
+});
+
 const storedTurn = (turn) => {
     const cited = Array.isArray(turn.cited) ? turn.cited : [];
     return {
@@ -137,6 +153,12 @@ export function useAskConversation({ t }) {
         return true;
     };
 
+    /* The server names a step by its tool and says why by a code; the model's own notes come in the sentence's language. */
+    const notPlanned = (list) => (Array.isArray(list) ? list : []).map((item) => ({
+        text: item.step ? t(STEP_KEYS[item.step] || "Ask.plan_step_other") : String(item.text || ""),
+        reason: item.code ? t(REASON_KEYS[item.code] || REASON_KEYS.refused) : String(item.reason || "")
+    }));
+
     /* A sentence planned with the server's model. It comes back as a proposal the person approves or declines; nothing is made before. */
     const plan = async ({ sentence, projectId = "" }) => {
         const asked = String(sentence || "").trim();
@@ -154,7 +176,7 @@ export function useAskConversation({ t }) {
             if (body.status && data.planned) {
                 Object.assign(live, {
                     status: "planned",
-                    plan: { proposalId: data.proposalId, summary: data.summary || "", changes: data.changes || [], cannot: data.cannot || [], decision: "pending", busy: false, error: "" }
+                    plan: { proposalId: data.proposalId, summary: data.summary || "", changes: data.changes || [], cannot: notPlanned(data.cannot), decision: "pending", busy: false, error: "" }
                 });
                 announcement.value = t("Ask.plan_ready");
             } else {
@@ -162,7 +184,7 @@ export function useAskConversation({ t }) {
                     status: body.status ? "plan_none" : "plan_error",
                     error: PLAN_KEYS[code] ? t(PLAN_KEYS[code]) : body.statusText || t("Ask.plan_failed"),
                     needsAi: code === "no_key",
-                    cannot: data.cannot || []
+                    cannot: notPlanned(data.cannot)
                 });
                 announcement.value = live.error;
             }

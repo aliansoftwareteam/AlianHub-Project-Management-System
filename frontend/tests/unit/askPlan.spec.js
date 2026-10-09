@@ -47,6 +47,24 @@ describe('planning a sentence in the Ask box', () => {
         expect(ask.streaming.value).toBe(false);
     });
 
+    it('words the server\'s step names and reason codes from the locale, and keeps the model\'s own notes as written', async () => {
+        apiRequest.mockResolvedValue(planned({ cannot: [
+            { step: 'task.create', code: 'other_project' },
+            { step: 'view.create', code: 'no_project' },
+            { step: 'automation.create', code: 'not_allowed', detail: 'permission_denied: automation' },
+            { text: 'email me', reason: 'there is no email step' }
+        ] }));
+        const ask = conversation();
+        await ask.plan({ sentence: 'several things' });
+        expect(ask.turns.value[0].plan.cannot).toEqual([
+            { text: t('Ask.plan_step_task'), reason: t('Ask.plan_reason_other_project') },
+            { text: t('Ask.plan_step_view'), reason: t('Ask.plan_reason_no_project') },
+            { text: t('Ask.plan_step_automation'), reason: t('Ask.plan_reason_not_allowed') },
+            { text: 'email me', reason: 'there is no email step' }
+        ]);
+        expect(t('Ask.plan_reason_no_project')).not.toBe(t('Ask.plan_reason_other_project'));
+    });
+
     it('makes nothing until approved: planning calls no decision route', async () => {
         apiRequest.mockResolvedValue(planned());
         await conversation().plan({ sentence: 'Add a Budget field' });

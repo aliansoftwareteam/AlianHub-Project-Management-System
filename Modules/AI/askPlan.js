@@ -34,13 +34,11 @@ const GATE_TEXT = Object.freeze({
     [CODE.UNPRICED]: 'The configured model has no price on file, so a sentence cannot be planned with it.',
 });
 
-const STEP_WORDS = Object.freeze({
-    'task.create': 'Create a task',
-    'fields.create': 'Add custom fields',
-    'view.create': 'Add a saved view',
-    'automation.create': 'Add an automation',
+/* Why a step was not planned. The server sends the code and the step's tool name; the client words both. */
+const REASON = Object.freeze({
+    OTHER_PROJECT: 'other_project', NO_PROJECT: 'no_project', NOT_ALLOWED: 'not_allowed', NOT_FOUND: 'not_found', INCOMPLETE: 'incomplete', REFUSED: 'refused',
 });
-const stepWords = (name) => STEP_WORDS[name] || 'A step';
+const BAD_ARGUMENTS = -32602;
 
 const tools = () => require('../Mcp/tools');
 const str = (value, max) => String(value === undefined || value === null ? '' : value).slice(0, max);
@@ -113,15 +111,15 @@ const toolsOffered = () => TOOLS.map((name) => tools().planTool(name)).filter(Bo
 
 const dayOf = (now) => `${now.toISOString().slice(0, 10)} (${now.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })})`;
 
-const promptFor = ({ sentence, places, people, offered, now }) => [
+const dataFor = ({ places, people, offered, now }) => [
     `TODAY: ${dayOf(now)}`,
     `TOOLS: ${JSON.stringify(offered.map(schemaOf))}`,
-    'SENTENCE:',
-    sentence,
-    '',
     `PLACES (projects, each with its lists): ${JSON.stringify(places)}`,
     `PEOPLE: ${JSON.stringify(people)}`,
 ].join('\n');
+
+/* The person's sentence is the request, so it travels after the data block and outside it; only workspace text is data. */
+const messageFor = ({ sentence, ...data }) => `${untrusted.wrap(dataFor(data))}\n\nSENTENCE (the request, from the person):\n${untrusted.escape(sentence)}`;
 
 const stepsOf = (raw) => {
     if (!raw || typeof raw !== 'object' || !Array.isArray(raw.steps)) return null;
@@ -136,7 +134,14 @@ const cannotOf = (raw) => (raw && Array.isArray(raw.cannot) ? raw.cannot : [])
     .slice(0, MAX_STEPS)
     .map((c) => ({ text: str(c.text, 300), reason: str(c.reason, 300) }));
 
-const refusalText = (error) => str(error && error.message, 400);
+const refusalOf = (step, error) => {
+    const detail = str(error && (error.error || error.message), 400);
+    const code = (error && error.code === BAD_ARGUMENTS && REASON.INCOMPLETE)
+        || (/permission_denied|not allowed/i.test(detail) && REASON.NOT_ALLOWED)
+        || (/not_visible|not_found|not found/i.test(detail) && REASON.NOT_FOUND)
+        || REASON.REFUSED;
+    return { step, code, detail };
+};
 
 /* The steps the model proposed, each taken as far as filing by the MCP road's own checks (schema, visibility, the
  * holder's permissions, the project's pause). A step that fails any of them is reported, never filed. */
@@ -147,10 +152,10 @@ const checked = async (ctx, steps, why) => {
         try {
             // eslint-disable-next-line no-await-in-loop
             const out = await tools().planned(ctx, step.tool, { ...step.arguments, reason: why });
-            if (out.answer) cannot.push({ text: stepWords(step.tool), reason: str(out.answer.error || out.answer.message, 400) });
-            else ready.push({ tool: out.tool, params: out.params });
+            if (out.answer) cannot.push(refusalOf(step.tool, { error: out.answer.error || out.answer.message }));
+            else ready.push({ tool: out.tool, params: out.params, step: step.tool });
         } catch (error) {
-            cannot.push({ text: stepWords(step.tool), reason: refusalText(error) });
+            cannot.push(refusalOf(step.tool, error));
         }
     }
     return { ready, cannot };
@@ -165,10 +170,17 @@ const inOneProject = async (companyId, ready) => {
     const kept = [];
     const left = [];
     ready.forEach((r, at) => {
-        if (!home || (reached[at].length === 1 && reached[at][0] === home)) kept.push(r);
-        else left.push({ text: stepWords(r.tool.name), reason: 'This step is about another project. Ask for it in a sentence of its own.' });
+        const ids = reached[at];
+        if (!home || (ids.length === 1 && ids[0] === home)) kept.push(r);
+        else left.push({ step: r.step, code: ids.length ? REASON.OTHER_PROJECT : REASON.NO_PROJECT });
     });
     return { kept, left, projectId: home };
+};
+
+/* fields.create sets the values it was given through task.field.set, so only a change carrying values needs that action. */
+const setsValues = ({ params }) => {
+    const values = params && params.values;
+    return Array.isArray(values) ? values.length > 0 : values !== undefined && values !== null;
 };
 
 const fileProposal = async (ctx, { projectId, summary, ready }) => {
@@ -176,7 +188,7 @@ const fileProposal = async (ctx, { projectId, summary, ready }) => {
     const actions = require('../Agents/actions');
     const { toolLabel } = require('../Agents/changeLabels');
     const changes = ready.map(({ tool, params }) => ({ action: tool.action, params, label: toolLabel(tool.name), rating: actions.rating(tool.action) }));
-    const allowedActions = [...new Set([...changes.map((c) => c.action), FIELD_SET])];
+    const allowedActions = [...new Set([...changes.map((c) => c.action), ...(changes.some(setsValues) ? [FIELD_SET] : [])])];
     return proposals.create(ctx.companyId, {
         agent: { _id: ASK_AGENT_ID, name: ASK_NAME },
         projectId,
@@ -226,7 +238,7 @@ const planSentence = async (req, { sentence, projectId } = {}, { now = new Date(
 
     const result = await withTimeout(getProvider().chat({
         systemPrompt: untrusted.withNotice(SYSTEM_PROMPT),
-        messages: [{ role: 'user', content: untrusted.wrap(promptFor({ sentence: asked, places, people, offered, now })) }],
+        messages: [{ role: 'user', content: messageFor({ sentence: asked, places, people, offered, now }) }],
         jsonMode: true,
         temperature: 0.1,
         maxTokens: MAX_TOKENS,
@@ -273,4 +285,4 @@ const plan = async (req, res) => {
     }
 };
 
-module.exports = { plan, planSentence, gateOf, CODE, TOOLS, MAX_SENTENCE, ASK_AGENT_ID };
+module.exports = { plan, planSentence, gateOf, CODE, REASON, TOOLS, MAX_SENTENCE, ASK_AGENT_ID };

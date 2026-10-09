@@ -397,29 +397,38 @@ const readied = async (ctx, tool, args) => {
     return { params, rule, held: tainted || (rule.decision === projectPolicy.DECISION.PROPOSE ? rule.reason : '') };
 };
 
-/* Run a tool for an MCP caller. Reads are authorised through the registry;
- * writes go through actions.perform, so they are audited and undoable. */
-const call = async (ctx, name, args = {}) => {
-    if (sessionTools.owns(name)) return sessionTools.call(ctx, name, args);
+const resolved = async (ctx, name) => {
     const plain = offered().find((t) => t.name === String(name));
     if (!plain) throw Object.assign(new Error(`Unknown tool "${name}"`), { code: -32601 });
     const tool = formFor(ctx, plain);
     await require('../Workflows/externalSession').checkToolCall(ctx, tool.name);
     if (!['filtered', 'none'].includes(tool.visibility)) throw new Error(`${tool.name} declares no visibility`);
+    return tool;
+};
+
+const runRead = async (ctx, tool, args) => {
+    refuseBadArguments(tool, args);
     const filtered = tool.visibility === 'filtered';
+    let vis;
+    const seen = async () => { vis = vis || await visibility.forCaller(ctx); return vis; };
+    const params = tool.readParams ? tool.readParams(args) : { taskId: args.taskId };
+    if (!tool.authorizesPerProject) await actions.authorizeRead({
+        companyId: ctx.companyId, actor: ctx.actor, action: tool.action, params, ip: ctx.ip, allowedActions: ctx.allowedActions,
+        opens: filtered ? async () => visibility.opensNamed(ctx.companyId, await seen(), params) : null,
+    });
+    return tool.run(ctx, args, filtered ? await seen() : undefined);
+};
+
+/* Run a tool for an MCP caller. Reads are authorised through the registry;
+ * writes go through actions.perform, so they are audited and undoable. */
+const call = async (ctx, name, args = {}) => {
+    if (sessionTools.owns(name)) return sessionTools.call(ctx, name, args);
+    const tool = await resolved(ctx, name);
 
     if (tool.run) {
-        const refused = ctx.session ? '' : scopeRefusal(ctx, tool, false);
+        const refused = scopeRefusal(ctx, tool, false);
         if (refused) throw Object.assign(new Error(refused), { code: -32004 });
-        refuseBadArguments(tool, args);
-        let vis;
-        const seen = async () => { vis = vis || await visibility.forCaller(ctx); return vis; };
-        const params = tool.readParams ? tool.readParams(args) : { taskId: args.taskId };
-        if (!tool.authorizesPerProject) await actions.authorizeRead({
-            companyId: ctx.companyId, actor: ctx.actor, action: tool.action, params, ip: ctx.ip, allowedActions: ctx.allowedActions,
-            opens: filtered ? async () => visibility.opensNamed(ctx.companyId, await seen(), params) : null,
-        });
-        return tool.run(ctx, args, filtered ? await seen() : undefined);
+        return runRead(ctx, tool, args);
     }
 
     admitWrite(ctx, tool, args);
@@ -446,10 +455,12 @@ const call = async (ctx, name, args = {}) => {
 
 /* A read tool for the person's own session (the Ask box), which holds no token: what it answers is what a connection
  * of that person is shown, through the same registry, permission and visibility checks. */
-const readOwn = (ctx, name, args = {}) => {
-    const tool = offered().find((t) => t.name === String(name));
-    if (!tool || !tool.run) throw Object.assign(new Error(`${name} is not a tool that can be read`), { code: -32601 });
-    return call({ ...ctx, session: true }, name, args);
+const readOwn = async (ctx, name, args = {}) => {
+    const notReadable = () => Object.assign(new Error(`${name} is not a tool that can be read`), { code: -32601 });
+    if (sessionTools.owns(name) || !offered().some((t) => t.name === String(name) && t.run)) throw notReadable();
+    const tool = await resolved(ctx, name);
+    if (!tool.run) throw notReadable();
+    return runRead(ctx, tool, args);
 };
 
 /* A write tool taken to the point where it is filed and no further, for a caller that is the person's own session and

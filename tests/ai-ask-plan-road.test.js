@@ -129,7 +129,7 @@ describe('the Ask box asks no more than the person could', () => {
         for (const uid of [OUTSIDER, GUEST]) {
             const out = await plan(uid, [BUDGET]);
             expect(out.data).toMatchObject({ planned: false, code: 'nothing_planned' });
-            expect(out.data.cannot[0]).toMatchObject({ text: 'Add custom fields', reason: expect.stringMatching(/permission_denied: project\.project_custom_field/) });
+            expect(out.data.cannot[0]).toMatchObject({ step: 'fields.create', code: 'not_allowed', detail: expect.stringMatching(/permission_denied: project\.project_custom_field/) });
         }
         expect(waiting()).toHaveLength(0);
         expect(fields()).toHaveLength(0);
@@ -138,7 +138,7 @@ describe('the Ask box asks no more than the person could', () => {
     it('answers a project the person cannot open as a project that does not exist', async () => {
         const out = await plan(OUTSIDER, [{ ...BUDGET, arguments: { ...BUDGET.arguments, projectId: P_PRIVATE } }]);
         expect(out.data.planned).toBe(false);
-        expect(out.data.cannot[0].reason).toMatch(/not_visible/);
+        expect(out.data.cannot[0]).toMatchObject({ code: 'not_found', detail: expect.stringMatching(/not_visible/) });
         expect(waiting()).toHaveLength(0);
     });
 
