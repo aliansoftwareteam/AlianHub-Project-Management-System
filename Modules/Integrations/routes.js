@@ -12,7 +12,7 @@ exports.init = (app) => {
     app.get('/api/v1/integrations/connections', ctrl.listConnections);
     app.post('/api/v1/integrations/connections', agentsRefused('integration.connect'), ctrl.connect);
     app.put('/api/v1/integrations/connections/:id', agentsRefused('integration.update'), ctrl.updateConnection);
-    app.delete('/api/v1/integrations/connections/:id', ctrl.disconnect);
+    app.delete('/api/v1/integrations/connections/:id', agentsRefused('integration.disconnect'), ctrl.disconnect);
     app.get('/api/v1/integrations/app-connections', hub.hub);
     app.put('/api/v1/integrations/connections/:id/projects', agentsRefused('integration.update'), hub.setProjects);
 

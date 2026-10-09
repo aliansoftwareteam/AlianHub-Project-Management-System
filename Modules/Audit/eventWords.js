@@ -225,6 +225,7 @@ const ACTIONS = Object.freeze({
     'pto.decide': 'Approve or turn down time off',
     'integration.connect': 'Connect an integration',
     'integration.update': 'Change an integration',
+    'integration.disconnect': 'Disconnect an integration',
     'app_connection.projects': 'Link an app to projects',
     'app_connection.sync': 'Check a connected app for changes',
     'app_connection.task_linked': 'Link a pull request to a task',

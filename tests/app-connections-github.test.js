@@ -16,7 +16,11 @@ jest.mock('../Modules/Agents/scope', () => ({
     visibleProjectIds: async () => mockVisible.ids,
     visibleProjects: async () => mockVisible.ids.map((id) => ({ _id: id, ProjectName: id === 'bbbbbbbbbbbbbbbbbbbbbb01' ? 'Web' : 'Other' })),
 }));
-jest.mock('../Modules/Integrations/helpers/secretHandles', () => ({ openSecrets: async ({ row }) => ({ ...row.config }) }));
+jest.mock('../Modules/Integrations/helpers/secretHandles', () => ({
+    openSecrets: async ({ row }) => ({ ...row.config }),
+    storeSecrets: async ({ config }) => ({ set: { config }, stale: [] }),
+    retireSecrets: async () => {},
+}));
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(async (companyId, uid) => (uid in mockRoles ? mockRoles[uid] : null)),
     isPrivileged: (roleType) => roleType === 1 || roleType === 2,
@@ -34,6 +38,9 @@ const backoff = require('../Modules/Integrations/appConnections/backoff');
 const runner = require('../Modules/Integrations/appConnections/runner');
 const scheduler = require('../Modules/Integrations/appConnections/scheduler');
 const hub = require('../Modules/Integrations/appConnections/controller');
+const integrations = require('../Modules/Integrations/controller');
+const socketEmitter = require('../event/socketEventEmitter');
+const { appConnectionEventsSchema } = require('../utils/mongo-handler/createSchema');
 
 const COMPANY = 'aaaaaaaaaaaaaaaaaaaaaaaa';
 const PERSON = '200000000000000000000001';
@@ -60,6 +67,8 @@ const github = (pages) => jest.fn(async (url) => {
     const rows = pages[page - 1] || [];
     return { status: 200, body: JSON.stringify(rows), headers: {} };
 });
+
+beforeAll(() => mockDb.uniqueFromSchema(SCHEMA_TYPE.APP_CONNECTION_EVENTS, appConnectionEventsSchema));
 
 let connection;
 let task;
@@ -104,12 +113,36 @@ describe('listing pull requests updated since the cursor', () => {
         expect(get.mock.calls[0][0]).toContain('/repos/acme/web/pulls?state=all&sort=updated&direction=desc');
         expect(get.mock.calls[0][1].token).toBe(TOKEN);
     });
+    it('keeps reading pages until it reaches the cursor, however many changed', async () => {
+        const full = (n) => Array.from({ length: api.PAGE_SIZE }, (_, i) => pull({ number: n * 1000 + i, updated_at: '2026-10-09T11:00:00Z' }));
+        const get = github([full(1), full(2), full(3), [pull({ number: 7, updated_at: '2026-10-09T10:00:00Z' }), pull({ number: 6, updated_at: '2026-09-01T00:00:00Z' })]]);
+        const { pulls, truncated } = await api.listPulls({ repo: 'acme/web', token: TOKEN, since: '2026-10-09T09:00:00Z', get });
+        expect(get).toHaveBeenCalledTimes(4);
+        expect(pulls).toHaveLength(3 * api.PAGE_SIZE + 1);
+        expect(pulls[0].number).toBe(7);
+        expect(truncated).toBe(false);
+    });
+
     it('reports a list cut by the page limit, so the cursor is not moved past what was not seen', async () => {
         const full = (n) => Array.from({ length: api.PAGE_SIZE }, (_, i) => pull({ number: n * 100 + i, updated_at: '2026-10-09T11:00:00Z' }));
         const get = jest.fn(async () => ({ status: 200, body: JSON.stringify(full(1)), headers: {} }));
         const { truncated } = await api.listPulls({ repo: 'acme/web', token: TOKEN, since: '2026-10-01T00:00:00Z', get });
         expect(truncated).toBe(true);
         expect(get).toHaveBeenCalledTimes(api.MAX_PAGES);
+    });
+});
+
+describe('the cursor', () => {
+    it('moves to the newest pull request read', async () => {
+        await run(github([[pull({ number: 2, updated_at: '2026-10-09T11:30:00Z' }), pull({ number: 1, updated_at: '2026-10-09T10:00:00Z' })]]));
+        expect(rowOf().sync.cursor).toBe('2026-10-09T11:30:00Z');
+    });
+
+    it('stays where it was when the list was cut, so nothing older is skipped', async () => {
+        const full = Array.from({ length: api.PAGE_SIZE }, (_, i) => pull({ number: i + 1, updated_at: '2026-10-09T11:00:00Z' }));
+        await run(jest.fn(async () => ({ status: 200, body: JSON.stringify(full), headers: {} })));
+        expect(rowOf().sync.cursor).toBe(new Date('2026-10-01T00:00:00Z').toISOString());
+        expect(rowOf().sync.lastError).toMatch(/nothing is skipped/);
     });
 });
 
@@ -127,6 +160,17 @@ describe('a pull request is opened', () => {
         expect(taskRow().links).toHaveLength(1);
         expect(tools.addComment).toHaveBeenCalledTimes(1);
         expect(mockAudit.filter((a) => a.action === 'app_connection.task_linked')).toHaveLength(1);
+    });
+
+    it('never comments twice when an old pull request is updated again, however much happened in between', async () => {
+        await run(github([[pull()]]));
+        const claim = require('../Modules/Integrations/appConnections/syncState').claimer(COMPANY, rowOf());
+        for (let i = 0; i < 2500; i += 1) await claim(`github:acme/web#${1000 + i}:opened:${task._id}`);
+        const later = NOW + 30 * 24 * 60 * 60 * 1000;
+        await run(github([[pull({ updated_at: new Date(later - 1000).toISOString(), body: 'a new label' })]]), later);
+        expect(tools.addComment).toHaveBeenCalledTimes(1);
+        expect(taskRow().links).toHaveLength(1);
+        expect(mockDb.store[SCHEMA_TYPE.APP_CONNECTION_EVENTS].filter((r) => r.key === `github:acme/web#12:opened:${task._id}`)).toHaveLength(1);
     });
 
     it('escapes what the pull request title says before it becomes a comment', async () => {
@@ -200,6 +244,25 @@ describe('an app that fails', () => {
         expect(new Date(rowOf().sync.nextAttemptAt).getTime()).toBe(NOW + backoff.POLL_MS + 1000 + 2 * backoff.POLL_MS);
     });
 
+    it('waits for the time GitHub names in Retry-After', async () => {
+        await run(jest.fn(async () => ({ status: 429, body: '{}', headers: { 'retry-after': '120' } })));
+        expect(new Date(rowOf().sync.nextAttemptAt).getTime()).toBe(NOW + 120 * 1000);
+        expect(rowOf().sync.lastError).toMatch(/rate limit/);
+    });
+
+    it('waits until the rate limit window resets when the hourly budget is spent', async () => {
+        const reset = Math.floor(NOW / 1000) + 45 * 60;
+        await run(jest.fn(async () => ({ status: 403, body: '{}', headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(reset) } })));
+        expect(new Date(rowOf().sync.nextAttemptAt).getTime()).toBe(reset * 1000);
+    });
+
+    it('takes Retry-After over the reset time, and never waits past the ceiling', () => {
+        const error = { retry: { after: '60', reset: String(Math.floor(NOW / 1000) + 3600) } };
+        expect(backoff.nextAttempt(error, 1, NOW)).toBe(NOW + 60 * 1000);
+        expect(backoff.nextAttempt({ retry: { reset: String(Math.floor(NOW / 1000) + 24 * 3600) } }, 1, NOW)).toBe(NOW + backoff.MAX_DELAY_MS);
+        expect(backoff.nextAttempt(new Error('x'), 3, NOW)).toBe(NOW + backoff.delayAfter(3));
+    });
+
     it('starts again from zero after one good poll', async () => {
         await run(jest.fn(async () => ({ status: 500, body: '', headers: {} })));
         await run(github([[]]), NOW + backoff.POLL_MS + 1000);
@@ -252,7 +315,7 @@ describe('the App connections page', () => {
     it('says it is off by default', async () => {
         delete process.env.APP_CONNECTIONS;
         const r = await call(hub.hub, MEMBER);
-        expect(r.body.data).toEqual({ enabled: false, apps: [], projects: [] });
+        expect(r.body.data).toEqual({ enabled: false, canManage: false, apps: [], projects: [] });
     });
 
     it('lists every app with its status, last sync, last error and projects, and never a secret', async () => {
@@ -268,6 +331,45 @@ describe('the App connections page', () => {
         expect(text).not.toContain('handled');
         expect(text).not.toContain('lockUntil');
         expect(r.body.data.apps.find((a) => a.key === 'slack').syncs).toBe(false);
+    });
+
+    it('names only the linked projects the viewer can open', async () => {
+        process.env.APP_CONNECTIONS = 'true';
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: OTHER_PROJECT, ProjectName: 'Secret plans', deletedStatusKey: 0 });
+        rowOf().projectIds = [PROJECT, OTHER_PROJECT];
+
+        const member = await call(hub.hub, MEMBER);
+        expect(JSON.stringify(member.body)).not.toContain('Secret plans');
+        expect(JSON.stringify(member.body)).not.toContain(OTHER_PROJECT);
+        const seen = member.body.data.apps.find((a) => a.key === 'github').connections[0];
+        expect(seen).toMatchObject({ projects: [{ id: PROJECT, name: 'Web' }], hiddenProjects: 1 });
+        expect(member.body.data.canManage).toBe(false);
+
+        const owner = await call(hub.hub, PERSON);
+        expect(JSON.stringify(owner.body)).not.toContain('Secret plans');
+        expect(owner.body.data.apps.find((a) => a.key === 'github').connections[0].projects).toEqual([{ id: PROJECT, name: 'Web' }, { id: OTHER_PROJECT, name: '', hidden: true }]);
+        expect(owner.body.data.canManage).toBe(true);
+    });
+
+    it('tells other screens when linked projects are saved', async () => {
+        process.env.APP_CONNECTIONS = 'true';
+        socketEmitter.emit.mockClear();
+        await call(hub.setProjects, PERSON, { params: { id: String(connection._id) }, body: { projectIds: [PROJECT] } });
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({
+            module: 'integrationConnections', companyId: COMPANY, data: { _id: String(connection._id) }, updatedFields: { projectIds: [PROJECT] },
+        }));
+    });
+
+    it('starts a connection moved to another repository from now, not from when it was first connected', async () => {
+        const r = await call(integrations.connect, PERSON, { body: { type: 'github', name: 'GitHub', config: { token: TOKEN, repo: 'acme/other' } } });
+        expect(r.body.status).toBe(true);
+        expect(new Date(rowOf().connectedAt).getTime()).toBeGreaterThan(Date.parse('2026-10-02T00:00:00Z'));
+        expect(rowOf().sync).toEqual({});
+    });
+
+    it('keeps the start of a connection given a new token for the same repository', async () => {
+        await call(integrations.connect, PERSON, { body: { type: 'github', name: 'GitHub', config: { token: `${TOKEN.slice(0, -1)}X`, repo: 'acme/web' } } });
+        expect(new Date(rowOf().connectedAt).toISOString()).toBe('2026-10-01T00:00:00.000Z');
     });
 
     it('lets only an owner or admin link projects, and only real ones', async () => {

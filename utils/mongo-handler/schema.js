@@ -1766,9 +1766,13 @@ const schema = {
         connectedBy: { type: String, required: false },
         connectedAt: { type: Date, required: false },
         projectIds: { type: [String], default: undefined, required: false },
-        // Poll state: { cursor, lastSyncAt, lastError, failures, nextAttemptAt, lockUntil, handled: [event keys] }.
         sync: { type: Object, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    appConnectionEvents: {
+        key: { type: String, required: true },
+        connectionId: { type: String, required: false },
+        taskId: { type: String, required: false },
     },
     // AHE-3838 — one row per (user, cloud storage provider). Distinct from
     // integrationConnections above, which holds the COMPANY's app registration:

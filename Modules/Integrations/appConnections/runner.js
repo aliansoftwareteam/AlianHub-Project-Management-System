@@ -16,6 +16,11 @@ const audit = (companyId, connection, entry) => recordAudit(companyId, {
     ...AUDIT_ACTOR, entityType: 'integration', entityId: String(connection._id), entityName: connection.name || connection.type, ...entry,
 });
 
+const lastErrorOf = (results, truncated) => {
+    if (truncated) return 'More changed than one check can read; the start point is kept so nothing is skipped.';
+    return results.failed ? 'Some events could not be applied; see the audit log.' : '';
+};
+
 const actingUserOf = (connection) => String(connection.connectedBy || connection.createdBy || '');
 
 /* One connection, one poll. Events are applied oldest first; an event that fails is recorded and not retried,
@@ -41,7 +46,7 @@ async function syncConnection({ companyId, connection, now = Date.now(), get }) 
         const config = await H.openSecrets({ companyId, row: held });
         R.secretKeys(held.type).forEach((key) => secrets.push(config[key]));
         const since = (held.sync && held.sync.cursor) || (held.connectedAt && new Date(held.connectedAt).toISOString()) || new Date(now).toISOString();
-        const { events, cursor } = await connector.poll({ companyId, connection: held, config, since, get });
+        const { events, cursor, truncated } = await connector.poll({ companyId, connection: held, config, since, get });
 
         const ctx = { companyId, connection: held, actingUserId, projectIds, claim: state.claimer(companyId, held) };
         const results = { events: events.length, acted: 0, failed: 0 };
@@ -59,7 +64,7 @@ async function syncConnection({ companyId, connection, now = Date.now(), get }) 
         }
 
         await state.record(companyId, held._id, {
-            cursor: cursor || since, lastSyncAt: new Date(now), lastError: results.failed ? 'Some events could not be applied; see the audit log.' : '',
+            cursor: cursor || since, lastSyncAt: new Date(now), lastError: lastErrorOf(results, truncated),
             failures: 0, nextAttemptAt: null, lockUntil: null, lastEvents: results.events,
         });
         if (results.events) audit(companyId, held, { action: 'app_connection.sync', meta: { events: results.events, acted: results.acted, failed: results.failed } });
@@ -68,7 +73,7 @@ async function syncConnection({ companyId, connection, now = Date.now(), get }) 
         const failures = Number((held.sync && held.sync.failures) || 0) + 1;
         const message = backoff.cleanError(error, secrets);
         await state.record(companyId, held._id, {
-            lastError: message, failures: failures, nextAttemptAt: new Date(now + backoff.delayAfter(failures)), lockUntil: null,
+            lastError: message, failures: failures, nextAttemptAt: new Date(backoff.nextAttempt(error, failures, now)), lockUntil: null,
         }).catch((e) => logger.error(`[appConnections] could not record a failure for ${held._id}: ${e.message}`));
         audit(companyId, held, { action: 'app_connection.error', meta: { message, failures } });
         return { error: message, failures };

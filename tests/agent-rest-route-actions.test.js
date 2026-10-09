@@ -157,6 +157,7 @@ const NO_ACTION = {
     'creating the tasks of a generated plan': ['POST /api/v1/ai/project/:projectId/tasks/execute', { plan: {} }, { projectId: P_OPEN }],
     'connecting an outside service': ['POST /api/v1/integrations/connections', { type: 'webhook', name: 'Hook', config: {} }],
     'changing a connection to an outside service': ['PUT /api/v1/integrations/connections/:id', { name: 'Hook' }, { id: CONNECTION }],
+    'removing a connection to an outside service': ['DELETE /api/v1/integrations/connections/:id', {}, { id: CONNECTION }],
 };
 
 /* New tasks that carry more than a filed task does. */

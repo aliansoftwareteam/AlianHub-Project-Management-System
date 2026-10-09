@@ -2,7 +2,7 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const backoff = require('./backoff');
 
-const HANDLED_KEPT = 2000;
+const DUPLICATE_KEY = 11000;
 const T = SCHEMA_TYPE.INTEGRATION_CONNECTIONS;
 
 const inSync = (fields) => Object.fromEntries(Object.entries(fields).map(([name, value]) => [['sync', name].join('.'), value]));
@@ -22,13 +22,17 @@ const lease = async (companyId, connection, now) => {
     return held || null;
 };
 
-/* The claim is one conditional write: whoever pushes the key first acts, and every later try finds it there. */
-const claimer = (companyId, connection) => async (key) => {
-    const won = await MongoDbCrudOpration(companyId, {
-        type: T,
-        data: [{ _id: connection._id, [path('handled')]: { $ne: key } }, { $push: { [path('handled')]: { $each: [key], $slice: -HANDLED_KEPT } } }, { returnDocument: 'after' }],
-    }, 'findOneAndUpdate');
-    return !!won;
+/* Whoever inserts the event's row first acts; the unique key turns every later try away, however old the event. */
+const claimer = (companyId, connection) => async (key, taskId) => {
+    try {
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.APP_CONNECTION_EVENTS, data: { key: String(key), connectionId: String(connection._id), taskId: taskId ? String(taskId) : undefined },
+        }, 'save');
+        return true;
+    } catch (error) {
+        if (error && (error.code === DUPLICATE_KEY || /E11000/.test(String(error.message)))) return false;
+        throw error;
+    }
 };
 
-module.exports = { record, lease, claimer, HANDLED_KEPT };
+module.exports = { record, lease, claimer };

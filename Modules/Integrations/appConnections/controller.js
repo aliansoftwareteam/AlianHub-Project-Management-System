@@ -11,6 +11,7 @@ const { visibleProjects } = require('../../Agents/scope');
 const R = require('../helpers/integrationsRules');
 const flag = require('./flag');
 const registry = require('./registry');
+const { connectionsChanged } = require('../helpers/connectionsChanged');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const PROJECTS_MAX = 100;
@@ -20,13 +21,24 @@ const refuse = (res, code, statusText) => res.status(code).send({ status: false,
 
 const targetOf = (row) => { const c = row.config || {}; return c.repo || c.project || c.default_channel || ''; };
 
-const connectionRow = (row, names) => {
+/* A linked project the viewer cannot open is never named. An admin is told its id, so a save keeps the link; anyone else only how many. */
+const linkedProjects = (row, names, privileged) => {
+    const ids = (row.projectIds || []).map(String);
+    const shown = ids.filter((id) => names.has(id)).map((id) => ({ id, name: names.get(id) }));
+    const unseen = ids.filter((id) => !names.has(id));
+    return {
+        projects: privileged ? [...shown, ...unseen.map((id) => ({ id, name: '', hidden: true }))] : shown,
+        hiddenProjects: unseen.length,
+    };
+};
+
+const connectionRow = (row, names, privileged) => {
     const sync = row.sync || {};
     return {
         id: String(row._id), name: row.name, enabled: row.enabled !== false, status: row.status, target: targetOf(row),
         connectedAt: row.connectedAt || null, secrets: R.redact(row).secrets,
         lastSyncAt: sync.lastSyncAt || null, lastError: sync.lastError || '', failures: Number(sync.failures) || 0, nextAttemptAt: sync.nextAttemptAt || null,
-        projects: (row.projectIds || []).map((id) => ({ id: String(id), name: names.get(String(id)) || '' })),
+        ...linkedProjects(row, names, privileged),
     };
 };
 
@@ -34,23 +46,20 @@ exports.hub = async (req, res) => {
     try {
         const companyId = pinSessionTenant(req, res);
         if (!companyId) return undefined;
-        if (!flag.enabled()) return res.send({ status: true, data: { enabled: false, apps: [], projects: [] } });
-        const [rows, projects] = await Promise.all([
+        if (!flag.enabled()) return res.send({ status: true, data: { enabled: false, canManage: false, apps: [], projects: [] } });
+        const [rows, projects, roleType] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: T, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { updatedAt: -1 } }] }, 'find'),
             visibleProjects(companyId, req.uid),
+            getRoleType(companyId, req.uid),
         ]);
+        const privileged = isPrivileged(roleType);
         const names = new Map((projects || []).map((p) => [String(p._id), p.ProjectName || '']));
-        const unseen = [...new Set((rows || []).flatMap((r) => (r.projectIds || []).map(String)).filter((id) => !names.has(id)))];
-        if (unseen.length) {
-            const rest = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: idForms(unseen) } }, { ProjectName: 1 }] }, 'find').catch(() => []);
-            (rest || []).forEach((p) => names.set(String(p._id), p.ProjectName || ''));
-        }
         const apps = R.getCatalog().map((item) => ({
             key: item.key, name: item.name, category: item.category, icon: item.icon, description: item.description, multiple: item.multiple, fields: item.fields,
             syncs: !!registry.get(item.key),
-            connections: (rows || []).filter((r) => r.type === item.key).map((r) => connectionRow(r, names)),
+            connections: (rows || []).filter((r) => r.type === item.key).map((r) => connectionRow(r, names, privileged)),
         }));
-        return res.send({ status: true, data: { enabled: true, apps, projects: (projects || []).map((p) => ({ id: String(p._id), name: p.ProjectName || '' })) } });
+        return res.send({ status: true, data: { enabled: true, canManage: privileged, apps, projects: (projects || []).map((p) => ({ id: String(p._id), name: p.ProjectName || '' })) } });
     } catch (e) { logger.error(`appConnections hub: ${e.message}`); return res.send({ status: false, statusText: e.message }); }
 };
 
@@ -79,6 +88,7 @@ exports.setProjects = async (req, res) => {
             type: T, data: [{ _id: conn._id }, { $set: { projectIds: ids, updatedBy: String(req.uid || '') } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         removeCache(`integration_connections:${companyId}`);
+        connectionsChanged(companyId, id, { projectIds: ids });
         recordAuditFromReq(req, { action: 'app_connection.projects', entityType: 'integration', entityId: id, entityName: conn.name || conn.type, meta: { projects: ids.length } });
         return res.send({ status: true, statusText: 'Updated.', data: { id, projectIds: (updated.projectIds || []).map(String) } });
     } catch (e) { logger.error(`appConnections setProjects: ${e.message}`); return res.send({ status: false, statusText: e.message }); }

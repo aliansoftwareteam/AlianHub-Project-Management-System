@@ -4,15 +4,15 @@ const actions = require('../taskActions');
 
 const REPO = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/;
 
-/* `since` is where the last poll got to; GitHub timestamps have a second's resolution, so the pull request that
- * sets the cursor comes back once more and the ledger drops the event it already acted on. */
+/* The cursor moves to the newest pull request read, or stays at `since` when the list was cut, so nothing older is skipped;
+ * GitHub timestamps have a second's resolution, so the newest comes back once more and its claims turn it away. */
 async function poll({ companyId, config, since, get }) {
     if (!config.token) throw new Error('No GitHub token is stored; connect GitHub again.');
     if (!REPO.test(String(config.repo || ''))) throw new Error('The repository must look like owner/repo.');
     const { pulls, truncated } = await api.listPulls({ repo: config.repo, token: config.token, companyId, since, get });
     const events = pulls.flatMap((pull) => eventsOfPull(config.repo, pull));
     const seen = pulls.map((pull) => pull.updated_at);
-    const cursor = seen.length ? (truncated ? seen[0] : seen[seen.length - 1]) : since || null;
+    const cursor = seen.length && !truncated ? seen[seen.length - 1] : since || null;
     return { events, cursor, truncated };
 }
 
@@ -28,7 +28,7 @@ async function handle(ctx, event) {
     const tasks = await actions.findTasks(ctx.companyId, ctx.projectIds, d.keys);
     const done = [];
     for (const task of tasks) {
-        if (!await ctx.claim(`${event.key}:${task._id}`)) continue;
+        if (!await ctx.claim(`${event.key}:${task._id}`, task._id)) continue;
         if (event.kind === 'opened') {
             const link = await actions.addLink(ctx.companyId, task, { url: d.url, label: `PR #${d.number} ${d.title}` }, ctx.actingUserId);
             await actions.addComment(ctx.companyId, task, openedText(d), ctx.actingUserId);
