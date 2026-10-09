@@ -16,6 +16,7 @@ const ssoDomainRecheck = require("./Modules/SSO/domainRecheck");
 const credentialExpiryNotices = require("./Modules/ApiTokens/expiryNotices");
 const projectDailyLook = require("./Modules/Agents/manager/dailyLook");
 const projectTriage = require("./Modules/Agents/managerTriage");
+const appConnections = require("./Modules/Integrations/appConnections/scheduler");
 
 // UTC unless the operator pins another zone: the only choice that survives a DST
 // switch, a container reboot or a base-image swap without shifting schedules.
@@ -50,6 +51,7 @@ job('projectDailyLook', '45 * * * *', () => projectDailyLook.runForAllCompanies(
 job('projectTriage', '50 * * * *', () => projectTriage.runForAllCompanies());
 job('recurringTasks', '*/15 * * * *', () => recurringTasks.runRecurringForAllCompanies());
 job('reminders', '* * * * *', () => reminders.runRemindersForAllCompanies());
+job('appConnections', '*/5 * * * *', () => appConnections.runForAllCompanies());
 job('timeReminders', '0 17 * * *', () => timeReminders.runRemindersForAllCompanies());
 
 module.exports = { job, CRON_TZ };
