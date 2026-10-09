@@ -7,6 +7,8 @@ team: compliance
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, members.list, page.create, page.update, task.create, task.comment, task.tags.add, task.assign]
 hands_to: [staff-roster-checker]
 gates: [the practice manager decides what happens when a record has expired]
+starter_rules: [tag:credential]
+tags: [credential]
 ---
 
 # Credential Expiry Watch (Clinic administration, Compliance)

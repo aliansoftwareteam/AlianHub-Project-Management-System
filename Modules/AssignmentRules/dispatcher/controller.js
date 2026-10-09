@@ -49,12 +49,17 @@ exports.applyPack = async (req, res) => {
         const body = req.body || {};
         const undone = body.undo === true;
         const result = undone ? await packs.undo(companyId, body, actor.id) : await packs.apply(companyId, body, actor.id);
-        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length);
+        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length));
         if (changed.length) {
             audit.packChanged(companyId, actor, undone, {
                 blueprint: result.blueprint,
                 teams: result.teams,
-                projects: changed.map((project) => ({ projectId: project.projectId, roles: undone ? project.removed : project.added })),
+                projects: changed.map((project) => ({
+                    projectId: project.projectId,
+                    roles: undone ? project.removed : project.added,
+                    rules: project.rules.length,
+                    ...(undone ? {} : { tags: project.tags }),
+                })),
             });
         }
         return res.json({ status: true, statusText: undone ? 'Team pack undone' : 'Team pack applied', data: result });

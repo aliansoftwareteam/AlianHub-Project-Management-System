@@ -7,6 +7,8 @@ team: front-desk
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, chat.messages.list, members.list, task.from_message, task.update, task.field.set, task.tags.add, task.assign, task.comment]
 hands_to: [appointment-follow-up-list]
 gates: [a front desk person answers every request]
+starter_rules: [tag:front-desk]
+tags: [front-desk]
 ---
 
 # Front Desk Request Sorter (Clinic administration, Front desk)

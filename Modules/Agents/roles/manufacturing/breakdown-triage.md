@@ -7,6 +7,8 @@ team: maintenance
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, task.history, task.relations.list, members.list, page.get, pages.search, task.create, task.field.set, task.tags.add, task.relation.add, task.comment, task.status.set]
 hands_to: [maintenance-planner, spare-parts-watch, schedule-change-watch]
 gates: [the maintenance lead sets the priority and assigns the technician]
+starter_rules: [tag:breakdown]
+tags: [breakdown]
 ---
 
 # Breakdown Triage (Manufacturing, Maintenance)

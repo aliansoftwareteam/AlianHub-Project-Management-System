@@ -7,6 +7,8 @@ team: pastoral
 tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, timesheet.read, workdays.get, page.create, page.update, task.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [parent-update-writer, schedule-keeper]
 gates: [the pastoral lead decides every follow-up and every contact with a family]
+starter_rules: [tag:attendance]
+tags: [attendance]
 ---
 
 # Attendance Watch (Student services)

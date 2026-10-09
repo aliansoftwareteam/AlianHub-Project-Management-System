@@ -7,6 +7,8 @@ team: engineering
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.history, task.fields.list, fields.list, tags.list, members.list, sprints.list, task.relations.list, task.from_message, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.comment, task.status.set]
 hands_to: [tech-lead]
 gates: [engineering lead confirms Urgent bugs]
+starter_rules: [type:Bug]
+tags: [bug, needs-triage]
 ---
 
 # Bug Triager (Engineering)

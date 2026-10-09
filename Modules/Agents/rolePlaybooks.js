@@ -5,8 +5,14 @@ const logger = require('../../Config/loggerConfig');
 const ROOT = path.join(__dirname, 'roles');
 const KEYS = ['slug', 'name', 'blueprint', 'department', 'team', 'tools', 'hands_to', 'gates'];
 const LISTS = ['tools', 'hands_to', 'gates'];
-const OPTIONAL_LISTS = ['tools_optional'];
+const OPTIONAL_LISTS = ['tools_optional', 'starter_rules', 'tags'];
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const STARTER_KINDS = Object.freeze(['type', 'tag', 'priority']);
+const STARTER_RULE = /^(type|tag|priority):\s*(\S.*)$/;
+const PRIORITIES = Object.freeze(['URGENT', 'HIGH', 'MEDIUM', 'LOW']);
+const MAX_STARTER = 5;
+const MAX_TAGS = 6;
+const TAG_MAX = 50;
 
 class PlaybookError extends Error {}
 
@@ -23,6 +29,22 @@ const parseFrontmatter = (block) => Object.fromEntries(block.split('\n').filter(
     return [key, list ? list[1].split(',').map((item) => item.trim()).filter(Boolean) : value.trim()];
 }));
 
+const optionalOf = (meta, fail) => {
+    const starterRules = (meta.starter_rules || []).map((entry) => {
+        const [, kind, value] = entry.match(STARTER_RULE) || [];
+        if (!kind) fail(`the starter rule "${entry}" must be written ${STARTER_KINDS.join(', ')} then a colon and a value`);
+        if (kind === 'priority' && !PRIORITIES.includes(value.trim())) fail(`the starter rule "${entry}" must name one of ${PRIORITIES.join(', ')}`);
+        return { kind, value: value.trim() };
+    });
+    if (starterRules.length > MAX_STARTER) fail(`starter_rules may list at most ${MAX_STARTER} rules`);
+    const tags = (meta.tags || []).map((name) => name.trim());
+    if (tags.length > MAX_TAGS) fail(`tags may list at most ${MAX_TAGS} tags`);
+    const long = tags.find((name) => name.length > TAG_MAX);
+    if (long) fail(`the tag "${long}" is longer than ${TAG_MAX} characters`);
+    if (new Set(tags.map((name) => name.toLowerCase())).size !== tags.length) fail('tags names a tag twice');
+    return { starterRules, tags };
+};
+
 const parse = (text, rel) => {
     const fail = (why) => { throw new PlaybookError(`Role playbook ${rel}: ${why}`); };
     const match = String(text).replace(/\r\n/g, '\n').match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
@@ -37,6 +59,7 @@ const parse = (text, rel) => {
     if (rel !== undefined && rel !== path.join(meta.blueprint, `${meta.slug}.md`)) fail(`it must live at ${path.join(meta.blueprint, `${meta.slug}.md`)}`);
     const body = match[2].trim();
     if (!body) fail('the playbook text is empty');
+    const optional = optionalOf(meta, fail);
     return {
         slug: meta.slug,
         name: meta.name,
@@ -48,6 +71,8 @@ const parse = (text, rel) => {
         routed: meta.routed !== 'false',
         handsTo: meta.hands_to,
         gates: meta.gates,
+        starterRules: optional.starterRules,
+        tags: optional.tags,
         body,
     };
 };
@@ -101,4 +126,4 @@ const whoFor = async (companyId, key, max = 300) => {
     return summary(body ? { ...role, body } : role, max);
 };
 
-module.exports = { PlaybookError, parse, readAll, all, find, summary, useOverrides, whoFor };
+module.exports = { STARTER_KINDS, PRIORITIES, PlaybookError, parse, readAll, all, find, summary, useOverrides, whoFor };
