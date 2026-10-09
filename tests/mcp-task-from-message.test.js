@@ -1,10 +1,15 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-2: message to task. A connected agent turns a message its person can read into a task that holds the
-   message's text, through the same create the other task tools use, so the project's rule, approval and undo apply. */
+   message's text, through the same create the other task tools use, so the project's rule, approval and undo apply.
+   A comment on a task is read under the grant that creates tasks; a channel message also needs the chat scope, and
+   a direct message is never read. */
 process.env.STORAGE_TYPE = 'server';
 const mockDb = require('./fixtures/fakeMongo').create();
+const mockElsewhere = require('./fixtures/fakeMongo').create();
+const mockOtherCompany = '6f00000000000000000000c2';
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
-    MongoDbCrudOpration: (companyId, q, method) => mockDb.crud(companyId, q, method),
+    MongoDbCrudOpration: (companyId, q, method) => (String(companyId) === mockOtherCompany ? mockElsewhere : mockDb).crud(companyId, q, method),
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0, flushAll: () => {} } }));
@@ -48,17 +53,26 @@ const server = require('../Modules/Mcp/server');
 mongoHelper.getTotalSprintCount = async () => true;
 
 const {
-    CID, OWNER, MEMBER, OTHER, OUTSIDER, P_OPEN, P_PRIVATE, P_DEST, CHAT, S_OPEN, S_NEXT, S_SECRET, S_DEST, S_PRIVATE,
-    TASKS_GRANT, PLAIN_SCOPES, settle, ctx, olderToken, readOnly, outside,
+    CID, OWNER, ADMIN, MEMBER, OTHER, P_OPEN, P_PRIVATE, P_DEST, CHAT, S_OPEN, S_NEXT, S_SECRET, S_DEST, S_PRIVATE,
+    TASKS_GRANT, PLAIN_SCOPES, TOKEN, settle, withGrants, olderToken, readOnly, outside,
 } = world;
 const { seed, stored, rows, audits, rpcThrough, listedThrough, seedGrant } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
 
 const TOOL = 'task.from_message';
+const CHAT_SCOPE = 'chat:read';
+/* The connection most of this file speaks through creates tasks and reads chat; `tasksOnly` holds the first alone. */
+const ctx = (uid, over = {}) => world.ctx(uid, { token: { _id: TOKEN, userId: uid, scopes: ['read', 'write'], grants: [TASKS_GRANT, CHAT_SCOPE], active: true }, ...over });
+const tasksOnly = (uid) => withGrants(uid, [TASKS_GRANT]);
+const NEEDS_CHAT = { ok: false, error: expect.stringMatching(/is not allowed to read chat \(it needs chat:read\)/) };
+const TEAM_SPACE = '6f0000000000000000000c11';
+const C_OPEN = '6f0000000000000000000c21';
+const C_SECRET = '6f0000000000000000000c22';
+const C_DIRECT = '6f0000000000000000000c20';
 const MISSING = '6f0000000000000000000fff';
 const BASE = 'https://hub.example.test';
-const NOT_FOUND = { ok: false, error: 'message not found' };
+const NOT_FOUND = { ok: false, error: 'That message was not found. Check the id.' };
 const ADDRESS_KEYS = ['WEBURL', 'APIURL'];
 const savedAddress = Object.fromEntries(ADDRESS_KEYS.map((key) => [key, process.env[key]]));
 const { DONE, CONNECTED } = projectPolicy;
@@ -79,6 +93,14 @@ beforeEach(() => {
     jest.clearAllMocks();
     fx = seed();
     ADDRESS_KEYS.forEach((key) => { delete process.env[key]; });
+    process.env.AGENT_TAINT_ROUTING = 'off';
+    mockDb.seed(SCHEMA_TYPE.MAIN_CHATS, { _id: TEAM_SPACE, default: false, ProjectName: 'Team chat' });
+    const channel = (_id, name, projectId, extra = {}) => mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id, name, projectId, deletedStatusKey: 0, ...extra });
+    channel(C_OPEN, 'scratch', TEAM_SPACE);
+    channel(C_SECRET, 'leads', TEAM_SPACE, { private: true, AssigneeUserId: [OTHER] });
+    channel(C_DIRECT, 'direct', CHAT);
+    Object.keys(mockElsewhere.store).forEach((type) => { mockElsewhere.store[type].length = 0; });
+    mockElsewhere.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OWNER, roleType: 1, status: 2, isDelete: false });
 });
 afterEach(settle);
 afterAll(() => {
@@ -88,7 +110,7 @@ afterAll(() => {
 
 describe('the tool exists with the tools that manage tasks', () => {
     it('off, it is not offered and answers as an unknown tool', async () => {
-        delete process.env.MCP_TOOLS_MANAGE;
+        process.env.MCP_TOOLS_MANAGE = 'off';
         expect(await listed(ctx(OWNER))).not.toContain(TOOL);
         expect(await make(ctx(OWNER), { messageId: idOf(message()) })).toEqual({ rpcError: { code: -32601, message: `Unknown tool "${TOOL}"` } });
         expect(scopes.scopeForTool(TOOL)).toBeNull();
@@ -106,8 +128,8 @@ describe('the tool exists with the tools that manage tasks', () => {
         const id = idOf(message());
         expect(await listed(olderToken(OWNER))).not.toContain(TOOL);
         const before = taskCount();
-        expect(await make(olderToken(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
-        expect(await make(readOnly(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/read-only/) });
+        expect(await make(olderToken(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
+        expect(await make(readOnly(OWNER), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/only read/) });
         expect(taskCount()).toBe(before);
     });
 
@@ -151,14 +173,13 @@ describe('a message the person can read becomes a task', () => {
         expect(placeOf(stored(out.result.taskId))).toEqual([P_OPEN, S_OPEN]);
     });
 
-    it('a direct message the person is in needs a place named, and then becomes a task there', async () => {
-        const direct = message({ projectId: CHAT, sprintId: undefined, taskId: fx.chat._id, userId: OUTSIDER, message: 'Can you look at the invoice export?' });
-        fx.chat.AssigneeUserId = [OWNER, OUTSIDER];
+    it('a message in a chat channel that belongs to no list needs a place named, and then becomes a task there', async () => {
+        const inChat = message({ projectId: TEAM_SPACE, sprintId: C_OPEN, message: 'Can you look at the invoice export?' });
         const before = taskCount();
-        const unplaced = await make(ctx(OWNER), { messageId: idOf(direct) });
+        const unplaced = await make(ctx(OWNER), { messageId: idOf(inChat) });
         expect(unplaced).toMatchObject({ ok: false, error: expect.stringMatching(/which project/i) });
         expect(taskCount()).toBe(before);
-        const out = await make(ctx(OWNER), { messageId: idOf(direct), projectId: P_OPEN, sprintId: S_NEXT });
+        const out = await make(ctx(OWNER), { messageId: idOf(inChat), projectId: P_OPEN, sprintId: S_NEXT });
         expect(stored(out.result.taskId)).toMatchObject({ TaskName: 'Can you look at the invoice export?' });
         expect(placeOf(stored(out.result.taskId))).toEqual([P_OPEN, S_NEXT]);
     });
@@ -315,17 +336,134 @@ describe('the project\'s rule for agents holds it exactly as it holds a create',
 
     it('an outside client is held, or refused, exactly as its create is', async () => {
         process.env.AGENT_TAINT_ROUTING = 'on';
-        const granted = [...PLAIN_SCOPES, TASKS_GRANT];
+        const granted = [...PLAIN_SCOPES, TASKS_GRANT, CHAT_SCOPE];
         seedGrant(OWNER, granted);
         const id = idOf(message());
         const plain = await rpc(outside(OWNER, granted), 'task.create', { projectId: P_OPEN, sprintId: S_OPEN, title: 'Plain' });
         expect(outcomeOf(await make(outside(OWNER, granted), { messageId: id }))).toBe(outcomeOf(plain));
-        expect(await make(outside(OWNER, PLAIN_SCOPES), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
+        expect(await make(outside(OWNER, PLAIN_SCOPES), { messageId: id })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
     });
 
     it('runs inside a batch as one of its changes', async () => {
+        const before = taskCount();
+        const out = await rpc(ctx(OWNER), 'tasks.batch', { operations: [{ tool: TOOL, arguments: { messageId: idOf(message()) } }] });
+        expect(out).toMatchObject({ ok: true, applied: 1, notApplied: 0 });
+        expect(taskCount()).toBe(before + 1);
+    });
+
+    it('two of them in a batch are two new tasks, so the batch waits and creates nothing', async () => {
+        const before = taskCount();
         const out = await rpc(ctx(OWNER), 'tasks.batch', { operations: [{ tool: TOOL, arguments: { messageId: idOf(message()) } }, { tool: TOOL, arguments: { messageId: MISSING } }] });
-        expect(out).toMatchObject({ applied: 1, notApplied: 1 });
-        expect(out.items[1]).toMatchObject({ ok: false, error: 'message not found' });
+        expect(out).toMatchObject({ pending: true, applied: 0, notApplied: 2, waiting: 1 });
+        expect(out.items[0]).toMatchObject({ ok: false, pending: true });
+        expect(out.items[1]).toMatchObject({ ok: false, error: 'That message was not found. Check the id.' });
+        expect(taskCount()).toBe(before);
+        expect(proposals.create).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('chat is read only with the chat scope, and a direct message never', () => {
+    const PEOPLE = [['an owner', OWNER], ['an admin', ADMIN], ['a member', MEMBER]];
+    const APP = [...PLAIN_SCOPES, TASKS_GRANT];
+    const CONNECTIONS = [
+        ['a token', false, (uid) => tasksOnly(uid)],
+        ['a token', true, (uid) => ctx(uid)],
+        ['an app', false, (uid) => outside(uid, APP)],
+        ['an app', true, (uid) => outside(uid, [...APP, CHAT_SCOPE])],
+    ];
+    const CALLERS = PEOPLE.flatMap(([who, uid]) => CONNECTIONS.map(([how, chat, connect]) => [`${who} through ${how} ${chat ? 'with' : 'without'} the chat scope`, uid, chat, connect]));
+    const RUNS_THE_WORKSPACE = [OWNER, ADMIN];
+    const TEXT = 'Only for the people in this thread';
+    const PLACED = { projectId: P_OPEN, sprintId: S_NEXT };
+
+    const conversation = (people) => mockDb.seed(SCHEMA_TYPE.TASKS, {
+        TaskName: 'Quiet word', TaskKey: '--', CompanyId: CID, ProjectID: CHAT, sprintId: C_DIRECT, mainChat: true, AssigneeUserId: people, deletedStatusKey: 0,
+    });
+    const nothingMade = (before, answer) => {
+        expect(taskCount()).toBe(before);
+        expect(JSON.stringify(answer)).not.toContain(TEXT);
+        expect(rows(SCHEMA_TYPE.TASKS).some((task) => String(task.rawDescription || '').includes(TEXT))).toBe(false);
+        expect(proposals.create).not.toHaveBeenCalled();
+    };
+    const made = (before, answer) => {
+        expect(answer).toMatchObject({ ok: true });
+        expect(taskCount()).toBe(before + 1);
+        expect(stored(answer.result.taskId).rawDescription).toContain(TEXT);
+    };
+
+    describe.each(CALLERS)('%s', (_who, uid, chat, connect) => {
+        it('makes a task from a comment on a task they can open', async () => {
+            const comment = message({ taskId: fx.top._id, message: TEXT });
+            const before = taskCount();
+            made(before, await make(connect(uid), { messageId: idOf(comment) }));
+        });
+
+        it.each([
+            ['the channel of a list they can open', () => message({ message: TEXT }), {}],
+            ['a chat channel they are in', () => message({ projectId: TEAM_SPACE, sprintId: C_OPEN, message: TEXT }), PLACED],
+        ])('reads a message in %s only with the chat scope', async (_where, post, place) => {
+            const before = taskCount();
+            const answer = await make(connect(uid), { messageId: idOf(post()), ...place });
+            if (chat) return made(before, answer);
+            expect(answer).toEqual(NEEDS_CHAT);
+            return nothingMade(before, answer);
+        });
+
+        it.each([
+            ['a private chat channel', () => message({ projectId: TEAM_SPACE, sprintId: C_SECRET, message: TEXT })],
+            ['the channel of a private list', () => message({ sprintId: S_SECRET, message: TEXT })],
+        ])('reads a message in %s they are not in only where the web app shows it to them, and only with the chat scope', async (_where, post) => {
+            const before = taskCount();
+            const answer = await make(connect(uid), { messageId: idOf(post()), ...PLACED });
+            if (RUNS_THE_WORKSPACE.includes(uid) && chat) return made(before, answer);
+            expect(answer).toEqual(RUNS_THE_WORKSPACE.includes(uid) ? NEEDS_CHAT : NOT_FOUND);
+            return nothingMade(before, answer);
+        });
+
+        it.each([
+            ['they are in', () => conversation([uid, OTHER])],
+            ['between two other people', () => fx.chat],
+        ])('reads no direct message %s, with a place named or without', async (_which, talk) => {
+            const task = talk();
+            const direct = message({ projectId: CHAT, sprintId: String(task.sprintId || ''), taskId: idOf(task), message: TEXT });
+            const before = taskCount();
+            for (const place of [{}, PLACED]) {
+                const answer = await make(connect(uid), { messageId: idOf(direct), ...place });
+                expect(answer).toEqual(NOT_FOUND);
+                nothingMade(before, answer);
+            }
+        });
+
+        it('reads no message of another company', async () => {
+            const there = connect(uid);
+            there.companyId = mockOtherCompany;
+            const before = taskCount();
+            for (const row of [message({ message: TEXT }), message({ taskId: fx.top._id, message: TEXT })]) {
+                const answer = await make(there, { messageId: idOf(row), ...PLACED });
+                expect(JSON.stringify(answer)).not.toContain(TEXT);
+                expect(answer.ok).not.toBe(true);
+            }
+            expect(taskCount()).toBe(before);
+        });
+    });
+
+    it('a token kept to some projects reads no chat channel, and a list\'s channel only inside them', async () => {
+        const inChat = message({ projectId: TEAM_SPACE, sprintId: C_OPEN, message: TEXT });
+        expect(await make(ctx(OWNER, { projectIds: [P_OPEN] }), { messageId: idOf(inChat), ...PLACED })).toEqual(NOT_FOUND);
+        expect(await make(ctx(OWNER, { projectIds: [P_OPEN, TEAM_SPACE] }), { messageId: idOf(inChat), ...PLACED })).toEqual(NOT_FOUND);
+        expect(await make(ctx(OWNER, { projectIds: [P_OPEN] }), { messageId: idOf(message({ message: TEXT })) })).toMatchObject({ ok: true });
+    });
+
+    it('a scope named on a token without the person having given it reads no channel', async () => {
+        const named = world.ctx(OWNER, { token: { _id: TOKEN, userId: OWNER, scopes: ['read', 'write', CHAT_SCOPE], grants: [TASKS_GRANT], active: true } });
+        expect(await make(named, { messageId: idOf(message({ message: TEXT })) })).toEqual(NEEDS_CHAT);
+    });
+
+    it('inside a batch a channel message is held to the same scope', async () => {
+        const before = taskCount();
+        const out = await rpc(tasksOnly(OWNER), 'tasks.batch', { operations: [{ tool: TOOL, arguments: { messageId: idOf(message({ message: TEXT })) } }] });
+        expect(out).toMatchObject({ applied: 0, notApplied: 1 });
+        expect(out.items[0]).toMatchObject({ ok: false, error: expect.stringMatching(/chat:read/) });
+        nothingMade(before, out);
     });
 });

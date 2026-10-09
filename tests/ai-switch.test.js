@@ -147,7 +147,7 @@ describe('talk to text', () => {
     const call = async (companyId) => {
         const handler = transcribe.transcribe[transcribe.transcribe.length - 1];
         const res = { statusCode: 200, body: null, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; }, send(body) { this.body = body; return this; } };
-        await handler({ headers: { companyid: companyId }, uid: 'u1', body: {}, file: { buffer: Buffer.from('RIFF'), mimetype: 'audio/webm', originalname: 'a.webm' } }, res);
+        await handler({ headers: { companyid: companyId }, uid: 'u1', body: {}, file: { buffer: Buffer.from('RIFF\0\0\0\0WAVE', 'latin1'), mimetype: 'audio/webm', originalname: 'a.webm' } }, res);
         return res;
     };
 

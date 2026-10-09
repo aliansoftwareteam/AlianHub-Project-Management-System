@@ -366,7 +366,7 @@ describe('the live check on a session bound to a waiting step', () => {
             const risky = require('../Modules/Agents/registry').keys().find((key) => rating(key) && escalations(rating(key)).length);
             expect(heldForApproval(ctxFor(), risky)).toMatch(/outside client/);
         } finally {
-            delete process.env.AGENT_TAINT_ROUTING;
+            process.env.AGENT_TAINT_ROUTING = 'off';
         }
     });
 });

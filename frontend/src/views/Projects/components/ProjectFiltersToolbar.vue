@@ -1,5 +1,5 @@
 <template>
-    <div class="task-assigneesearch-groupbywrapper pft" :class="{ 'pft--search-open': searchOpen, 'pft--phone': sheetMode }">
+    <div class="task-assigneesearch-groupbywrapper pft" role="toolbar" :aria-label="$t('Projects.view_toolbar')" :class="{ 'pft--search-open': searchOpen, 'pft--phone': sheetMode }">
         <div class="d-flex align-items-center justify-content-between flex-wrap task-filtersearchassignee-wrapper" v-if="['ProjectListView', 'Calendar', 'ProjectKanban','TableView'].includes(activeTab)">
             <div class="d-flex align-items-center justify-content-start task-filtersearch">
                 <TaskFilter :projectData="projectData" @apply="onApplyFilter" @clear="onClearFilter" v-if="!sheetMode && Object.keys(projectData).length > 0"/>
@@ -13,6 +13,7 @@
                         :placeHolder="$t('PlaceHolder.search')"
                         :aria-label="$t('PlaceHolder.search')"
                         class="pft__input"
+                        :maxlength="SEARCH_TEXT_MAX"
                         :value="taskSearch"
                         @input="$emit('update:taskSearch', $event.target.value)"
                     >
@@ -96,6 +97,7 @@
                             <DropDownOption v-for="item in groupByOptions" :key="item.id" :selected="item.id === groupBy" @click="$emit('update:groupBy', item.id); $refs.group_by_status.click()">
                                 <div class="pft__group-option">
                                     <span v-if="item.image" class="ah-mask-icon pft__group-icon" :style="maskOf(item.image)" aria-hidden="true"></span>
+                                    <ShellIcon v-else-if="item.icon" :name="item.icon" :size="12" />
                                     <span>{{ groupLabel(item) }}</span>
                                 </div>
                             </DropDownOption>
@@ -136,6 +138,18 @@
                         </button>
                     </div>
                     <ProvenanceFilter :modelValue="doneBy" @update:modelValue="(v) => $emit('update:doneBy', v)" />
+                    <button
+                        type="button"
+                        class="pft__ctl pft__pill pft__agent-work"
+                        :class="{ 'is-active': agentWorking }"
+                        :aria-pressed="agentWorking"
+                        :title="$t('AgentWork.filter_hint')"
+                        data-test="agent-work-filter"
+                        @click="$emit('update:agentWorking', !agentWorking)"
+                    >
+                        <ShellIcon name="ai" :size="14" />
+                        <span>{{ $t('AgentWork.filter') }}</span>
+                    </button>
                 </template>
                 <span v-else class="pft__mode-chip">{{ $t('ProjectSlider.archived_list') }}</span>
                 <DropDown mode="menu" id="more_features" themed :title="$t('Projects.more_features')" :zIndex="sheetMode ? SHEET_MENU_Z : 10">
@@ -225,6 +239,7 @@ import { ref, computed, defineProps, defineEmits, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { canUseAi } from "@/composable/aiAvailability";
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import { SEARCH_TEXT_MAX } from '@/utils/searchText';
 import { useRoute } from 'vue-router';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
@@ -288,6 +303,7 @@ const props = defineProps({
     taskDescriptionSearch: { type: Boolean, default: false },
     filterUsers: { type: Array, default: () => [] },
     doneBy: { type: String, default: 'all' },
+    agentWorking: { type: Boolean, default: false },
     userSidebar: { type: Boolean, default: false },
     collapsed: { type: Boolean, default: true },
     groupBy: { type: [Number, String], default: 0 },
@@ -331,6 +347,7 @@ const emit = defineEmits([
     'toggleSearch',
     'manageFilterUsers',
     'update:doneBy',
+    'update:agentWorking',
     'changeAssignee',
     'openAi',
     'openAiAssist',
@@ -363,6 +380,7 @@ const activeFilterCount = computed(() => [
     props.filterUsers.includes(props.userId),
     assigneeFilterCount.value > 0,
     props.doneBy !== DONE_BY_ALL,
+    props.agentWorking,
     advancedApplied.value,
 ].filter(Boolean).length);
 

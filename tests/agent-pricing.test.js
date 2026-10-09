@@ -102,15 +102,27 @@ describe('every configurable vendor ships priced defaults', () => {
 });
 
 describe('a run on an unpriced model is refused before it starts', () => {
-    it('canStart names the model and the missing price, for workspace and personal accounts alike', async () => {
+    it('canStart names the model and the missing price, for workspace, personal and local accounts alike', async () => {
         configure(MYSTERY);
         const refused = { ok: false, reason: usage.unpricedMessage(MYSTERY), code: 'unpriced_model', model: MYSTERY };
         expect(await runs.canStart(agent(), { companyId: C })).toEqual(refused);
         expect(await runs.canStart(agent({ account: 'personal' }), { companyId: C })).toEqual(refused);
-        expect(await runs.canStart(agent(), { companyId: C, viaAccount: 'local' })).toEqual({ ok: true, reason: '' });
+        expect(await runs.canStart(agent(), { companyId: C, viaAccount: 'local' })).toEqual(refused);
         configure('gpt-4.1');
         expect(await runs.canStart(agent(), { companyId: C })).toEqual({ ok: true, reason: '' });
         expect(usage.checkConfiguredModelPriced()).toEqual({ ok: true, reason: '', model: 'gpt-4.1' });
+    });
+
+    it('checks the model the agent pins, not only the configured one', async () => {
+        const config = require('../Config/config');
+        const kept = { key: config.AI_API_KEY, model: config.AI_MODEL };
+        Object.assign(config, { AI_API_KEY: 'test-key', AI_MODEL: MYSTERY });
+        configure(MYSTERY);
+        try {
+            expect(await runs.canStart(agent({ model: 'gpt-4.1' }), { companyId: C })).toEqual({ ok: true, reason: '' });
+            expect(await runs.canStart(agent(), { companyId: C, skill: { model: 'gpt-4.1' } })).toEqual({ ok: true, reason: '' });
+            expect(await runs.canStart(agent({ model: 'gpt-9-other-mystery' }), { companyId: C })).toMatchObject({ ok: false, code: 'unpriced_model', model: MYSTERY });
+        } finally { Object.assign(config, { AI_API_KEY: kept.key, AI_MODEL: kept.model }); }
     });
 
     it('does not stand in for a missing provider — that fails on its own', async () => {
@@ -153,7 +165,7 @@ describe('recordSpend never books tokens as $0 on an unpriced model', () => {
         expect(mockDb.store[SCHEMA_TYPE.AGENTS][0].spendMonth).toBeUndefined();
     });
 
-    it('still records a priced run, a token-less failure, and a local run at zero', async () => {
+    it('still records a priced run and a token-less failure; a local run is priced like any other', async () => {
         const priced = await start();
         expect(await runs.recordSpend(C, priced, { inputTokens: 1000000, outputTokens: 0 }, 'gpt-4.1')).toEqual({ usd: 2, tokens: 1000000, capReached: false });
         expect(mockDb.store[SCHEMA_TYPE.AGENT_RUNS][0].spend).toMatchObject({ tokens: 1000000, usd: 2, model: 'gpt-4.1' });
@@ -162,7 +174,8 @@ describe('recordSpend never books tokens as $0 on an unpriced model', () => {
         expect(await runs.recordSpend(C, empty, {}, MYSTERY)).toEqual({ usd: 0, tokens: 0, capReached: false });
 
         const local = await start({ viaAccount: 'local' });
-        expect(await runs.recordSpend(C, local, { inputTokens: 500, outputTokens: 500 }, 'llama3')).toEqual({ usd: 0, tokens: 1000, capReached: false });
+        await expect(runs.recordSpend(C, local, { inputTokens: 500, outputTokens: 500 }, 'llama3')).rejects.toMatchObject({ code: 'unpriced_model' });
+        expect(await runs.recordSpend(C, local, { inputTokens: 1000000, outputTokens: 0 }, 'gpt-4.1')).toEqual({ usd: 2, tokens: 1000000, capReached: false });
     });
 });
 

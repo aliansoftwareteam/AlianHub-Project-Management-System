@@ -23,7 +23,7 @@
                  they are the same question asked twice. Whose numbers these are moved to
                  the card header, next to the period it covers. -->
             <div class="tss-meta">
-                <span class="tss-total">{{ $t('dashboardCard.tss_total', { n: total }) }}</span>
+                <span class="tss-total">{{ $t('dashboardCard.tss_total', { n: total }, total) }}</span>
                 <input
                     v-model="userSearch"
                     type="search"
@@ -482,12 +482,10 @@ onMounted(load);
    empty cells use: a table this wide is mostly dashes, and they should sit well behind the
    numbers that are actually there. */
 .tss {
-    --ink: #1f2430;
-    --body: #3a3f52;
-    --muted: #8b90a3;
+    --body: var(--ink-label);
+    --muted: var(--ink-2);
     --faint: #c9cdd8;
-    --hairline: #eef0f5;
-    --surface: #f7f8fb;
+    --surface: var(--surface-2);
     --accent: #0e7490;
     --accent-tint: #eaf4f7;
 }
@@ -546,7 +544,7 @@ onMounted(load);
 }
 /* Nothing in it: the tile stays for the sake of a stable row, but recedes so the eye lands
    on the statuses that do have work in them. */
-.tss-box.is-zero { background: #fafbfd; }
+.tss-box.is-zero { background: var(--surface-2); }
 .tss-box.is-zero .tss-num { color: var(--faint); }
 .tss-box.is-zero .tss-dot { background: var(--faint); }
 
@@ -572,7 +570,7 @@ onMounted(load);
     transition: background-color .12s ease, border-color .12s ease;
 }
 .tss-search::placeholder { color: var(--muted); }
-.tss-search:focus { background-color: #fff; border-color: var(--accent); }
+.tss-search:focus { background-color: var(--surface); border-color: var(--accent); }
 
 /* The table is the only thing that scrolls, and it takes whatever height the card has left.
    `min-height: 0` is what allows it to shrink inside the flex column — without it the
@@ -582,9 +580,9 @@ onMounted(load);
    the last column and read as clipped numbers. */
 .tss-table-wrap::-webkit-scrollbar { width: 7px; height: 7px; }
 .tss-table-wrap::-webkit-scrollbar-track { background: transparent; }
-.tss-table-wrap::-webkit-scrollbar-thumb { background: #dcdfe8; border-radius: 4px; }
+.tss-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 .tss-table-wrap::-webkit-scrollbar-thumb:hover { background: #c3c8d6; }
-.tss-table-wrap { scrollbar-width: thin; scrollbar-color: #dcdfe8 transparent; }
+.tss-table-wrap { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
 .tss-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .tss-th {
@@ -592,7 +590,7 @@ onMounted(load);
     top: 0;
     z-index: 1;
     /* Opaque, or the rows show through as they pass under it. */
-    background: #fff;
+    background: var(--surface);
     font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
     color: var(--muted); text-align: left; padding: 2px 8px 7px 0;
     /* Bottom-aligned so a status name that wraps to two lines still shares a baseline with
@@ -632,7 +630,7 @@ onMounted(load);
 /* An overrun is the one figure here worth colouring. Scoped under .tss-matrix so it
    outranks the muted colour the rule above sets at equal weight — a bare .tss-over loses
    that fight and the number stays grey. */
-.tss-matrix .tss-td--hours.tss-over { color: #b45309; font-weight: 600; }
+.tss-matrix .tss-td--hours.tss-over { color: var(--warn-ink); font-weight: 600; }
 .tss-matrix .tss-th--num { overflow-wrap: anywhere; }
 /* Other is a real column but not a status: set off by a rule so the eye reads the status
    columns as one group and this as the remainder, not as one more status. */
@@ -642,7 +640,7 @@ onMounted(load);
 .tss-chip {
     display: inline-block; max-width: 100%;
     padding: 1px 7px; border-radius: 9px;
-    background: #eef0f6; color: var(--muted);
+    background: var(--fill); color: var(--muted);
     font-size: 10.5px; line-height: 16px; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis; vertical-align: middle;
 }
@@ -650,7 +648,7 @@ onMounted(load);
    that side of the table rather than floating after the numbers. */
 .tss-drill-row > .tss-td--tail { padding-left: 8px; }
 /* Tracing one person across nine columns is the main thing asked of this table. */
-.tss-matrix tbody .tss-tr:hover .tss-td { background: #fbfcfe; }
+.tss-matrix tbody .tss-tr:hover .tss-td { background: var(--surface-2); }
 /* Only a cell with something behind it is clickable — an empty one has no list to open.
    It reads as a plain number until the pointer is on it: nine teal numbers per row would
    turn the table into a wall of links.
@@ -666,7 +664,7 @@ onMounted(load);
     color: var(--accent);
     box-shadow: inset 0 -2px 0 0 var(--accent);
 }
-.tss-matrix .tss-tr.is-open .tss-td { background: #f8fbfc; }
+.tss-matrix .tss-tr.is-open .tss-td { background: var(--surface-2); }
 .tss-matrix .tss-tr.is-open .tss-td--user { font-weight: 600; color: var(--ink); }
 
 /* The open list. Its rows belong to the matrix, so they inherit its columns and the hours
@@ -674,7 +672,7 @@ onMounted(load);
    edge carries the status colour, which is what ties the list to the cell that opened it. */
 .tss-drill-head > .tss-drill-cell,
 .tss-drill-msg > .tss-drill-cell,
-.tss-drill-row > .tss-td { background: #f8fafc; box-shadow: inset 3px 0 0 0 var(--tss-accent, transparent); }
+.tss-drill-row > .tss-td { background: var(--surface-2); box-shadow: inset 3px 0 0 0 var(--tss-accent, transparent); }
 /* Only the first cell of a row can carry the accent bar; the rest just take the tint. */
 .tss-drill-row > .tss-td ~ .tss-td { box-shadow: none; }
 .tss-drill-head > .tss-drill-cell { position: relative; padding: 7px 30px 5px 12px; }
@@ -686,8 +684,8 @@ onMounted(load);
    into itself, so the fixed-width hours columns beside it do not move. */
 .tss-drill-row > .tss-td--task { padding-left: 12px; }
 /* The row border belongs to the <tr> under border-collapse, so it is set there. */
-.tss-drill-row { border-bottom-color: #edf0f4; }
-.tss-matrix tbody .tss-drill-row:hover > .tss-td { background: #f2f6f9; }
+.tss-drill-row { border-bottom-color: var(--hairline); }
+.tss-matrix tbody .tss-drill-row:hover > .tss-td { background: var(--fill); }
 .tss-drill-close {
     position: absolute; top: 4px; right: 8px;
     width: 20px; height: 20px;
@@ -696,7 +694,7 @@ onMounted(load);
     font-size: 11px; color: var(--muted); cursor: pointer; line-height: 1;
     transition: background .12s ease, color .12s ease;
 }
-.tss-drill-close:hover { background: #eceef4; color: var(--body); }
+.tss-drill-close:hover { background: var(--fill); color: var(--body); }
 /* The region carries the scrollbar, so without this the last column sits under it and the
    numbers read as clipped. The width above already reserves the column; this is the gap. */
 .tss-th:last-child, .tss-td:last-child { padding-right: 14px; }

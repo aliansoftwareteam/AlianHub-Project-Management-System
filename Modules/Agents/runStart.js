@@ -1,0 +1,36 @@
+const projectPolicy = require('./projectPolicy');
+const projectLimits = require('./projectLimits');
+const audit = require('./agentAudit');
+const { runningIn } = require('./manager/places');
+
+// A workspace agent's run that an agent starts for its person: on the run route, or by naming the agent in a comment
+// it posts on a comment route or through its MCP tool. A person's own start is not asked here.
+
+const START = 'agent.run.start';
+/* Over MCP an agent starts one by naming it in a task.comment, so the project answers for the start as it does for that comment. */
+const ASKED_AS = 'task.comment';
+
+const fullReason = (atOnce) => `This project already has ${atOnce} ${atOnce === 1 ? 'agent' : 'agents'} at work, which is as many as it allows at once. Wait until one of them finishes, then ask again.`;
+
+/* Why the project holds the start, or '' when it takes it. The count of tasks is asked last: an answer of yes there is kept.
+ * `asked` says the project's rule for the comment was asked already, as it is for one made through an MCP tool, so
+ * only its places for agents at work are left to ask. */
+const heldBy = async (companyId, actor, task, { asked = false } = {}) => {
+    const projectId = String(task.ProjectID || '');
+    const [{ atOnce }, running] = await Promise.all([projectLimits.read(companyId, projectId), runningIn(companyId, projectId)]);
+    if (running >= atOnce) return fullReason(atOnce);
+    if (asked) return '';
+    const rule = await projectPolicy.ask({ companyId, actor, action: ASKED_AS, params: { taskId: String(task._id) }, applying: true });
+    return rule.decision === projectPolicy.DECISION.ACT ? '' : rule.reason;
+};
+
+/* For a caller with no answer of its own to give: a start that is held is recorded, and false comes back. */
+const admits = async (companyId, actor, task, { path = '', ip = '', asked = false } = {}) => {
+    const reason = await heldBy(companyId, actor, task, { asked });
+    if (!reason) return true;
+    const taskId = String(task._id);
+    await audit.recordRefusal(companyId, actor, { action: START, reason, params: { taskId }, entityId: taskId, path, ip });
+    return false;
+};
+
+module.exports = { START, heldBy, admits };

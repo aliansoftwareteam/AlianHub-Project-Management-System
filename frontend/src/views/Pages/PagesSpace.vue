@@ -65,9 +65,9 @@
             <div class="ah-toolbar">
                 <span class="ah-toolbar__title">
                     {{ $t('Docs.docs') }}
-                    <span class="ah-label hub__stats">{{ $t('Docs.pages_count', { n: pages.length }) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
+                    <span class="ah-label hub__stats">{{ $t('Docs.pages_count', { n: pages.length }, pages.length) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
                 </span>
-                <select v-model="view" class="hub__view-select">
+                <select v-model="view" class="hub__view-select" :aria-label="$t('Docs.view_select')">
                     <option value="recent">{{ $t('Docs.recent') }}</option>
                     <option value="mine">{{ $t('Docs.mine') }}</option>
                     <option value="shared">{{ $t('Docs.shared_with_me') }}</option>
@@ -143,7 +143,7 @@
                 </template>
 
                 <template v-else-if="view === 'shared'">
-                    <EmptyState v-if="!sharedWithMe.length" class="hub__empty" illustration="docs" data-test="docs-empty-shared" :heading-level="2" :title="$t('Docs.no_shared_with_me')" :message="$t('Docs.no_shared_with_me_hint')" />
+                    <EmptyState v-if="!sharedWithMe.length" class="hub__empty" illustration="docs" data-test="docs-empty-shared" :heading-level="2" :title="$t('Docs.no_shared_with_me')" :message="$t('Docs.no_shared_with_me_hint')" :action-label="$t('Docs.see_recent')" @action="view = 'recent'" />
                     <div v-else class="hub__grid" data-test="docs-shared-with-me">
                         <DocCard v-for="page in sharedWithMe" :key="'sw-' + page._id" :page="page" @open="open" />
                     </div>
@@ -151,7 +151,7 @@
 
                 <template v-else-if="view === 'wiki'">
                     <div class="hub__section-head">
-                        <span class="ah-label">{{ $t('Docs.pages_count', { n: wikiPages.length }) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
+                        <span class="ah-label">{{ $t('Docs.pages_count', { n: wikiPages.length }, wikiPages.length) }}<template v-if="staleCount"> · {{ $t('Docs.stale_count', { n: staleCount }) }}</template></span>
                         <button type="button" class="ah-btn ah-btn--sm" :class="onlyDue ? 'ah-btn--outline' : 'ah-btn--secondary'" @click="onlyDue = !onlyDue">{{ $t('Docs.needs_review') }}</button>
                     </div>
                     <EmptyState
@@ -169,7 +169,7 @@
                 </template>
 
                 <template v-else-if="view === 'agents'">
-                    <EmptyState v-if="!agentDrafts.length" class="hub__empty" illustration="docs" data-test="docs-empty-agents" :heading-level="2" :title="$t('Docs.no_agent_drafts_title')" :message="$t('Docs.no_agent_drafts_hint')" />
+                    <EmptyState v-if="!agentDrafts.length" class="hub__empty" illustration="docs" data-test="docs-empty-agents" :heading-level="2" :title="$t('Docs.no_agent_drafts_title')" :message="$t('Docs.no_agent_drafts_hint')" :action-label="$t('Docs.see_recent')" @action="view = 'recent'" />
                     <AgentList v-else :rows="agentDrafts" @open="open" @approve="approve" />
                 </template>
 
@@ -208,7 +208,7 @@
                             <ShellIcon name="plus" :size="13" />{{ $t('Docs.new_doc') }}
                         </button>
                     </div>
-                    <EmptyState v-if="!projectRows.length" class="hub__empty" illustration="docs" data-test="docs-empty-project" :heading-level="2" :title="$t('Docs.no_project_docs')" :message="$t('Docs.no_project_docs_hint')" />
+                    <EmptyState v-if="!projectRows.length" class="hub__empty" illustration="docs" data-test="docs-empty-project" :heading-level="2" :title="$t('Docs.no_project_docs')" :message="$t('Docs.no_project_docs_hint')" :action-label="$t('Docs.new_doc')" :action-allowed="writesDocs" @action="createDoc({})" />
                     <DocList v-else :rows="projectRows" tree @open="open" />
                 </template>
             </div>
@@ -223,6 +223,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
@@ -337,12 +338,12 @@ function fetchTrash() {
 
 watch(view, (value) => { if (value === 'trash') fetchTrash(); });
 
-const SHARES_CHANGED = 'docSharesChanged';
+const DOCS_SIGNALS = ['docSharesChanged', 'docsChanged'];
 let listening = null;
 function listenOn(socket) {
-    if (listening) listening.off(SHARES_CHANGED, fetchPages);
+    if (listening) DOCS_SIGNALS.forEach((event) => listening.off(event, fetchPages));
     listening = socket && typeof socket.on === 'function' ? socket : null;
-    if (listening) listening.on(SHARES_CHANGED, fetchPages);
+    if (listening) DOCS_SIGNALS.forEach((event) => listening.on(event, fetchPages));
 }
 /* The socket is replaced when the connection is made again. */
 watch(() => store.getters['settings/getSocketInstance'], listenOn, { immediate: true });
@@ -418,7 +419,7 @@ const avatarNode = (userId, agent) => {
     if (agent) return h('span', { class: 'ah-avatar ah-avatar--sm ah-avatar--agent' }, h(ShellIcon, { name: 'agent', size: 12 }));
     const user = userOf(userId);
     if (!user) return null;
-    return h('span', { class: 'ah-avatar ah-avatar--sm', title: user.name }, user.image ? h('img', { src: user.image, alt: '' }) : user.initials);
+    return h('span', { class: 'ah-avatar ah-avatar--sm', title: user.name }, h(AvatarImage, { src: user.image || '' }, () => user.initials));
 };
 
 const reviewChip = (page) => (page.isWiki

@@ -12,15 +12,13 @@
 import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
 import { defineComponent,defineProps, inject, ref } from "vue";
 import { useProjects } from '@/composable/projects';
-import { useGetterFunctions } from "@/composable";
 import moment from "moment";
+import { clockText } from "@/utils/clockText";
 import { useStore } from 'vuex';
 import { notificationHtml } from "@/utils/notificationHtml";
 const { getters } = useStore();
 
 const {getDateAndTime} = useProjects();
-const {getUser} = useGetterFunctions();
-const userId = inject('$userId');
 const dateFormatInject = inject('$dateFormat');
 const dateFormat = ref(getters?.['settings/companyDateFormat']?.dateFormat || dateFormatInject?.value || 'DD/MM/YYYY');
 
@@ -41,14 +39,10 @@ function convert(message) {
 
     const matches = message.match(regex);
     const dateMatch = message.match(dateRegex);
-    const format = getUser(userId.value).timeFormat;
     if (matches) {
         for (const match of matches) {
             const timestamp = match.replace("TIMESTAMP_", "");
-            const formattedTime = Number(format) === 12
-            ? moment(parseInt(timestamp)).format("hh:mm A")
-            : moment(parseInt(timestamp)).format("HH:mm");
-            updatedMessage = updatedMessage.replace(match, formattedTime);
+            updatedMessage = updatedMessage.replace(match, clockText(parseInt(timestamp)));
         }
     }
     if (dateMatch) {

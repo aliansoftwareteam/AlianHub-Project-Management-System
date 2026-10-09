@@ -1,10 +1,10 @@
 <template>
-    <div class="project-item-wrapper position-re mb-2px" :class="[{'opacity-5' : item?.isRestrict === true || item?.status === 'close', 'bg-light-gray-v1 py-5px': selected}]" id="projectleftlistsingle_driver">
+    <div class="project-item-wrapper position-re mb-2px" :class="[{'opacity-5' : item?.isRestrict === true || item?.status === 'close', 'item-bg-light-gray-v1 py-5px': selected}]" id="projectleftlistsingle_driver">
         <div
-            class="project-item cursor-pointer ml-016 border-radius-5-px hover-bg-light-purple-v1" @click="item?.status !== 'close' && $emit('change', item)"
+            class="project-item cursor-pointer ml-016 border-radius-5-px item-hover-bg-light-purple-v1" @click="item?.status !== 'close' && $emit('change', item)"
             :class="{
-                'bg-light-purple-v2': selected && ($route.params.folderId || $route.params.sprintId),
-                'bg-light-purple-v1': selected && !($route.params.folderId && $route.params.sprintId),
+                'item-bg-light-purple-v2': selected && ($route.params.folderId || $route.params.sprintId),
+                'item-bg-light-purple-v1': selected && !($route.params.folderId && $route.params.sprintId),
                 'new_project_add': new Date(item?.createdAt).getTime() > new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() - 2).getTime()
             }"
         >
@@ -23,11 +23,11 @@
                 </template>
                 <div class="d-flex flex-column text-ellipsis ml-6px w-100" v-if="!editName">
                     <div class="d-flex align-items-center justify-content-between">
-                        <span class="text-ellipsis project-sb-ptitle font-size-13 font-weight-500 mw-80" :title="item.ProjectName">
+                        <span class="text-ellipsis project-sb-ptitle item-font-size-13 item-font-weight-500 mw-80" :title="item.ProjectName">
                             {{item.ProjectName}}
                         </span>
                         <div class="d-flex align-items-center lastproject__activity-wrapper">
-                            <span v-if="lastActivity && !isOpened && !isShowArchived" class="font-size-11 project-last-activity">
+                            <span v-if="lastActivity && !isOpened && !isShowArchived" class="item-font-size-11 project-last-activity">
                                 {{getTimeAgo(lastActivity * 1000)}}
                             </span>
                             <DropDown mode="menu" :id="item.id" @isVisible="(val) => isOpened = val" :title="item.ProjectName" v-if="
@@ -92,7 +92,7 @@
                                         </div>
                                     </DropDownOption>
                                     <DropDownOption v-if="checkPermission('project.project_list',item.isGlobalPermission) === true && checkPermission('project.project_delete',item.isGlobalPermission) === true" @click="showSidebar = true, archive = 2">
-                                        <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon red">
+                                        <div class="d-flex align-items-center project-mobile-desc mobile-deleteIcon item-red">
                                             <img :src="deleteIcon" alt="deleteIcon" class="mr-10px">
                                             {{$t('Projects.delete')}}
                                         </div>
@@ -102,7 +102,7 @@
                         </div>
                     </div>
                     <div class="d-flex align-items-center justify-content-between" v-if="!isShowArchived">
-                        <span class="font-size-11 gray text-ellipsis" >{{item.projectStatusData.find((x) => x.value === item.status)?.name}}</span>
+                        <span class="item-font-size-11 item-gray text-ellipsis" >{{item.projectStatusData.find((x) => x.value === item.status)?.name}}</span>
                         <!-- <img :src="publicFolderIcon" alt="publicFolderIcon" v-if="!item.isPrivateSpace && !editName" style="margin-left: 10px;"> -->
                         <div class="d-flex align-items-center">
                             <div class="count-block parent-count-block ml-5px" v-if="showCounts({project: item, showArchived: showArchivedProjects}).count"  :style="showCounts({project: item, showArchived: showArchivedProjects}).styles">
@@ -174,7 +174,7 @@
                         'type':projectName.type,
                         'event':$event.event})"
                     />
-                    <div class="red position-ab z-index-1 font-size-11 error__text-data">{{projectName.error}}</div>
+                    <div class="item-red position-ab z-index-1 item-font-size-11 error__text-data">{{projectName.error}}</div>
                 </div>
             </div>
         </div>
@@ -772,5 +772,35 @@ const handleSidebarClose = () => {
 }
 .create__sprint-folder{
     padding: 4px 10px 0px 32px;
+}
+</style>
+
+<style scoped>
+.item-gray {
+    color: var(--ink-2);
+}
+.item-red {
+    color: var(--danger-ink);
+}
+.item-bg-light-gray-v1 {
+    background-color: var(--surface-2);
+}
+.item-bg-light-purple-v1 {
+    background-color: var(--brand-tint);
+}
+.item-bg-light-purple-v2 {
+    background-color: var(--brand-tint);
+}
+.item-hover-bg-light-purple-v1:hover {
+    background-color: var(--surface-hover) !important;
+}
+.item-font-weight-500 {
+    font-weight: 500 !important;
+}
+.item-font-size-11 {
+    font-size: 11px;
+}
+.item-font-size-13 {
+    font-size: 13px;
 }
 </style>

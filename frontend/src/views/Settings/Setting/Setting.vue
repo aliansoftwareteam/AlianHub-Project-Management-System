@@ -1,5 +1,5 @@
 <template>
-<div class="main-setting_wrapper style-scroll p-1">
+<div class="main-setting_wrapper setting-style-scroll p-1">
     <div v-if="checkPermission('settings.settings_edit_company') !== null || checkPermission('settings.settings_task_priority') !== null
         || checkPermission('settings.milestone_weekly_range') !== null || checkPermission('settings.settings_file_extensions') !== null
         || checkPermission('settings.settings_project_milestone_status') !== null">
@@ -77,4 +77,20 @@ defineComponent({
 /* .main-setting_wrapper{
     height: calc(100vh - 101px);
 } */
+</style>
+
+<style scoped>
+.setting-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.setting-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.setting-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

@@ -155,6 +155,23 @@
     flex: none;
 }
 
+.mbv__row:has(+ .mbv__agent) { border-bottom: 0; padding-bottom: 4px; }
+.mbv__agent {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-width: 0;
+    padding: 0 14px 10px 47px;
+    border-bottom: 1px solid var(--hairline);
+    color: var(--ink-2);
+    font-size: 12px;
+}
+.mbv__agent:last-child { border-bottom: 0; }
+.mbv__agent-name { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.mbv__agent-note { min-width: 0; overflow-wrap: anywhere; }
+.mbv__agent-where { flex-basis: 100%; }
+
 .mbv__role-select {
     max-width: 100%;
     height: 28px;

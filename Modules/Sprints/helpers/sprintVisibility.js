@@ -75,6 +75,18 @@ const hiddenSprintIds = async (companyId, uid, projectIds) => {
     return (sprints || []).filter((sprint) => !canSeeSprint(sprint, mine)).map((sprint) => sprint._id);
 };
 
+/* canSeeSprintById for many lists in one read: those of `sprintIds` that are private and the person is not on. */
+const hiddenAmong = async (companyId, uid, sprintIds) => {
+    const ids = asObjectIds([...new Set((sprintIds || []).map(String))]);
+    if (!ids.length) return [];
+    const [sprints, identities] = await Promise.all([
+        MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: { $in: ids }, private: true }, 'private AssigneeUserId'] }, 'find'),
+        sprintIdentities(companyId, uid),
+    ]);
+    const mine = identitySet(identities);
+    return (sprints || []).filter((sprint) => !canSeeSprint(sprint, mine)).map((sprint) => String(sprint._id));
+};
+
 const canSeeSprintById = async (companyId, uid, sprintId) => {
     if (!OBJECT_ID.test(String(sprintId || ''))) return true;
     const [sprint, identities] = await Promise.all([
@@ -126,6 +138,7 @@ module.exports = {
     canSeeSprint,
     canSeeSprintById,
     hiddenSprintIds,
+    hiddenAmong,
     identitySet,
     sprintIdentities,
     visibleSprintClause,

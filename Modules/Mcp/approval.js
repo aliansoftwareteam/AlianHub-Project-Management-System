@@ -3,12 +3,17 @@ const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { isExpired, hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const registry = require('../Agents/registry');
-const permissions = require('../Agents/permissions');
+const { holderMayInEach } = require('./propose');
 const visibility = require('./visibility');
 const manageFlag = require('./manageFlag');
 const manageTools = require('./manageTools');
 const workTools = require('./workTools');
 const goalTokens = require('../Goals/goalTokens');
+const { ACTION: NEW_PROJECT } = require('../Agents/projectCreate');
+const { ACTION: PROJECT_COPY } = require('../Agents/projectDuplicate');
+const dashboards = require('../Agents/dashboardRequests');
+const planWork = require('../Agents/planWork');
+const timesheetWeek = require('../Agents/timesheetWeek');
 
 // An approved MCP proposal runs as the token's person, not as the approver, so
 // approval re-asks everything the original call was asked and adds the
@@ -20,8 +25,17 @@ const GATE_OWNER_ADMIN = 'owner_admin';
 
 const refused = (error, status = 403) => ({ error, status });
 
-const targetOf = (params = {}) => {
-    const target = {};
+/* The action of a change, and those its plan runs for its automations and first tasks, each held to what a call of its own is held to. */
+const PLAN = 'project.setup';
+const NEW_PAGE = 'page.create';
+const actionsOf = (change) => [change.action, ...(change.action === PLAN ? planWork.actionsIn(change.params) : [])];
+
+/* A new project sits in no project yet, and a dashboard or a timesheet week in none at all: like a goal each is the workspace's, which a
+ * token kept to some projects is refused. So is a copy of a project, which also needs the project it is copied from to be one that can be opened. */
+const WORKSPACE_WIDE = Object.freeze([NEW_PROJECT, PROJECT_COPY, dashboards.ACTION, timesheetWeek.SUBMIT]);
+const targetOf = (params = {}, action = '') => {
+    const target = WORKSPACE_WIDE.includes(action) ? { ...goalTokens.WRITE_TARGET } : {};
+    if (action === PROJECT_COPY) target.projectId = String(params.sourceProjectId || '');
     if (params.taskId) target.taskId = String(params.taskId);
     if (params.relatedTaskId) target.relatedTaskId = String(params.relatedTaskId);
     if (params.projectId) target.projectId = String(params.projectId);
@@ -29,6 +43,10 @@ const targetOf = (params = {}) => {
     if (params.listProjectId && params.sprintId) Object.assign(target, { projectId: String(params.listProjectId), sprintId: String(params.sprintId) });
     if (params.pageId) target.pageId = String(params.pageId);
     if (params.goalId) Object.assign(target, goalTokens.WRITE_TARGET);
+    if (action === NEW_PAGE) {
+        if (params.parentPageId) target.pageId = String(params.parentPageId);
+        if (!params.projectId) Object.assign(target, goalTokens.WRITE_TARGET);
+    }
     return target;
 };
 
@@ -55,7 +73,7 @@ const tokenFiler = async (companyId, p, changes) => {
     if (!token) return refused('The token that filed this proposal has been revoked, deleted or has expired.');
     if (String(token.userId || '') !== String(p.requestedBy || '')) return refused('The token that filed this proposal belongs to someone else now.');
     if (!hasScope(token, 'write')) return refused('The token that filed this proposal no longer has the write scope.');
-    const lacking = changes.map((c) => manageTools.grantOfAction(c.action)).filter(Boolean).some((grant) => !manageFlag.holdsGrant(token, grant));
+    const lacking = changes.flatMap(actionsOf).map((action) => manageTools.grantOfAction(action)).filter(Boolean).some((grant) => !manageFlag.holdsGrant(token, grant));
     if (lacking) return refused('The token that filed this proposal does not hold the grant this change needs.');
     return { tokenLists: [p.tokenProjectIds, token.projectIds].filter((l) => Array.isArray(l) && l.length).map((l) => l.map(String)) };
 };
@@ -65,15 +83,37 @@ const tokenFiler = async (companyId, p, changes) => {
 const grantFiler = async (companyId, p, changes) => {
     const held = await require('./oauthAuth').standingOfGrant({ companyId, grantId: p.oauthGrantId, clientId: p.oauthClientId, userId: p.requestedBy });
     if (!held) return refused('The connection that filed this proposal has been revoked, has expired, or its app is no longer approved in this workspace.');
-    const covered = changes.every((c) => { const grant = manageTools.grantOfAction(c.action) || workTools.filedUnder(c.action); return Boolean(grant) && held.includes(grant); });
+    const covered = changes.flatMap(actionsOf).every((action) => { const grant = manageTools.grantOfAction(action) || workTools.filedUnder(action); return Boolean(grant) && held.includes(grant); });
     if (!covered) return refused('The connection that filed this proposal no longer holds the grant this change needs.');
     return { tokenLists: [] };
 };
 
-/* null when a person may approve this MCP proposal as filed; otherwise { error, status }. */
-const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
+const LACKS = Object.freeze({ STANDING: 'standing', RIGHT: 'right', SIGHT: 'sight' });
+
+/* The changes only the person they were asked for approves, each with why anyone else may not. */
+const REQUESTER_ALONE = Object.freeze({ [dashboards.ACTION]: dashboards.approverRefusal, [timesheetWeek.SUBMIT]: timesheetWeek.approverRefusal });
+const approvedByRequesterAlone = (change) => Boolean(change) && Object.hasOwn(REQUESTER_ALONE, change.action);
+
+/* What the approver themselves is asked of one change of a proposal filed over MCP: null when they may approve it;
+ * otherwise { error, lacks }. The approval below and the lists (Agents/approverRights) both ask it here, so a row
+ * is offered as open exactly when its approval would be taken. */
+const approverRefusal = async (companyId, userId, proposal, change) => {
+    const params = change.params || {};
+    const notTheirs = approvedByRequesterAlone(change) ? REQUESTER_ALONE[change.action](userId, proposal.requestedBy) : '';
+    if (notTheirs) return { error: notTheirs, lacks: LACKS.STANDING };
+    const own = await holderMayInEach(companyId, { kind: 'human', userId: String(userId) }, change.action, params);
+    if (!own.allowed) return { error: `The approver may not make this change: ${own.reason}`, lacks: LACKS.RIGHT };
+    if (!(await reachable(companyId, { userId: String(userId), projectIds: [] }, targetOf(params, change.action)))) {
+        return { error: 'The approver cannot open what this change touches.', lacks: LACKS.SIGHT };
+    }
+    return null;
+};
+
+/* null when a person may approve this MCP proposal as filed; otherwise { error, status }. `kept` are its changes
+ * with the parts of a plan the person left out taken out (Agents/planChoice.js), which is all an approver may change. */
+const refusalFor = async (companyId, p, { decider, isPrivileged, edited, changes: kept }) => {
     if (Array.isArray(edited) && edited.length) return refused('A proposal from an MCP call is approved or declined as filed; it cannot be edited.', 409);
-    const changes = Array.isArray(p.changes) ? p.changes : [];
+    const changes = Array.isArray(kept) ? kept : (Array.isArray(p.changes) ? p.changes : []);
     const gated = changes.some((c) => { const a = registry.get(c.action); return a && a.gate === GATE_OWNER_ADMIN; });
     if ((gated || p.gate === GATE_OWNER_ADMIN) && !isPrivileged) return refused('This proposal needs an Owner or Admin.');
 
@@ -82,12 +122,10 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     const { tokenLists } = filer;
 
     for (const c of changes) {
-        const target = targetOf(c.params);
         // eslint-disable-next-line no-await-in-loop
-        const own = await permissions.holderMay(companyId, { kind: 'human', userId: decider.userId }, c.action, c.params || {});
-        if (!own.allowed) return refused(`The approver may not make this change: ${own.reason}`);
-        // eslint-disable-next-line no-await-in-loop
-        if (!(await reachable(companyId, { userId: decider.userId, projectIds: [] }, target))) return refused('The approver cannot open what this change touches.');
+        const notApprovers = await approverRefusal(companyId, decider.userId, p, c);
+        if (notApprovers) return refused(notApprovers.error);
+        const target = targetOf(c.params, c.action);
         // eslint-disable-next-line no-await-in-loop
         if (!(await reachable(companyId, { userId: p.requestedBy, projectIds: [] }, target))) return refused('The person behind the token (the requester) can no longer open what this change touches.');
         for (const list of tokenLists) {
@@ -98,4 +136,4 @@ const refusalFor = async (companyId, p, { decider, isPrivileged, edited }) => {
     return null;
 };
 
-module.exports = { refusalFor, targetOf, reachable, liveToken };
+module.exports = { LACKS, refusalFor, approverRefusal, approvedByRequesterAlone, targetOf, reachable, liveToken };

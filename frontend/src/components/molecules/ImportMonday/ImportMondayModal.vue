@@ -13,7 +13,7 @@
             <input ref="fileEl" type="file" accept=".csv,.xlsx" class="font-size-13 mimport__file" @change="parseFile" />
 
             <div v-if="rows.length" class="font-size-13 mimport__preview">
-                {{ $t('Projects.import_rows_found', { count: rows.length }) }}
+                {{ $t('Projects.import_rows_found', { count: rows.length }, rows.length) }}
             </div>
 
             <!-- Column mapping (defaults auto-detected; editable) -->
@@ -21,7 +21,7 @@
                 <div class="font-size-13 font-weight-600 mb-5px">{{ $t('Projects.map_columns') }}</div>
                 <div v-for="field in mapFields" :key="field.key" class="d-flex align-items-center mimport__map-row">
                     <span class="font-size-13 mimport__map-label">{{ $t(field.label) }}<span v-if="field.required" class="red"> *</span></span>
-                    <select v-model="mapping[field.key]" class="mimport__select font-size-13">
+                    <select v-model="mapping[field.key]" class="ah-input mimport__select">
                         <option value="">{{ $t('Projects.col_none') }}</option>
                         <option v-for="h in headers" :key="field.key + h" :value="h">{{ h }}</option>
                     </select>
@@ -30,7 +30,7 @@
 
             <div class="d-flex align-items-center mimport__controls" v-if="rows.length">
                 <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
-                <select v-model="selectedSprintId" class="mimport__select font-size-13">
+                <select v-model="selectedSprintId" class="ah-input mimport__select">
                     <option v-for="sprint in sprintOptions" :key="'mon-'+sprint.id" :value="sprint.id">
                         {{ listLabel(sprint) }}
                     </option>
@@ -205,20 +205,20 @@ function startImport() {
 </script>
 
 <style scoped>
-.mimport__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.mimport__card { background: #fff; border-radius: 10px; width: min(540px, 92vw); padding: 16px 20px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18); max-height: 90vh; overflow-y: auto; }
+.mimport__overlay { position: fixed; inset: 0; background: var(--scrim); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.mimport__card { background: var(--surface); color: var(--ink); color-scheme: var(--scheme); border-radius: 10px; width: min(540px, 92vw); padding: 16px 20px; box-shadow: var(--shadow-modal); max-height: 90vh; overflow-y: auto; }
 .mimport__head { margin-bottom: 8px; }
-.mimport__close { color: #9a9a9a; }
-.mimport__close:hover { color: #e84a4a; }
+.mimport__close { color: var(--ink-2); }
+.mimport__close:hover { color: var(--danger); }
 .mimport__hint { margin-bottom: 12px; }
-.mimport__sample { display: inline-block; margin-bottom: 12px; color: #2f3990; text-decoration: underline; cursor: pointer; }
+.mimport__sample { display: inline-block; margin-bottom: 12px; color: var(--brand); text-decoration: underline; cursor: pointer; }
 .mimport__sample:hover { opacity: 0.8; }
 .mimport__file { margin-bottom: 12px; }
 .mimport__preview { margin-bottom: 10px; }
-.mimport__map { margin-bottom: 12px; padding: 10px 12px; background: #f7f9fc; border-radius: 8px; }
+.mimport__map { margin-bottom: 12px; padding: 10px 12px; background: var(--surface-2); border-radius: 8px; }
 .mimport__map-row { margin-bottom: 6px; }
 .mimport__map-label { min-width: 120px; }
 .mimport__controls { margin-top: 4px; }
-.mimport__select { border: 1px solid #e0e0e0; border-radius: 6px; padding: 6px 8px; background: #fff; min-width: 200px; }
-.mimport__result { margin-top: 12px; padding: 8px 10px; background: #f7f9fc; border-radius: 6px; }
+.ah-input.mimport__select { width: auto; min-width: 200px; }
+.mimport__result { margin-top: 12px; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; }
 </style>

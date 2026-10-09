@@ -1051,7 +1051,7 @@
     .dashboard-range-label {
         font-size: 12px;
         font-weight: 600;
-        color: #3a3f52;
+        color: var(--ink-label);
     }
     .dashboard-range-picker {
         min-width: 210px;
@@ -1075,7 +1075,7 @@
     }
     .dashboard-range-hint {
         font-size: 11px;
-        color: #9aa0b4;
+        color: var(--ink-2);
     }
     .center_no_record_found {
         position: absolute;
@@ -1084,27 +1084,27 @@
         transform: translate(-50%, -50%);
     }
     .vgl-layout {
-        background-color: #f5f3f3;
+        background-color: var(--fill);
         user-select: none;
     }
     .empty-layout {
         height: calc(100vh - 106px) !important;
     }
     :deep(.vgl-item:not(.vgl-item--placeholder)) {
-        background-color: #ccc;
-        border: 1px solid black;
+        background-color: var(--fill);
+        border: 1px solid var(--border);
     }
     :deep(.vgl-item--resizing) {
         opacity: 90%;
     }
     :deep(.vgl-item--static) {
-        background-color: #cce;
+        background-color: var(--brand-tint);
     }
     .layout-json {
         padding: 10px;
         margin-top: 10px;
-        background-color: #ddd;
-        border: 1px solid black;
+        background-color: var(--fill);
+        border: 1px solid var(--border);
     }
     .columns {
         columns: 120px;
@@ -1115,8 +1115,8 @@
         height: calc(100% - 5px);
         margin: 5px;
         content: '';
-        background-image: linear-gradient(to right, lightgrey 1px, transparent 1px),
-            linear-gradient(to bottom, lightgrey 1px, transparent 1px);
+        background-image: linear-gradient(to right, var(--hairline) 1px, transparent 1px),
+            linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
             background-size: calc(calc(100% - 5px) / 12) 40px;
         background-repeat: repeat;
     }
@@ -1130,11 +1130,11 @@
         overflow: hidden;
     }
     .grid_layout_hover .vgl-item__resizer:before {
-        border-color: transparent transparent #bbbbbb;
-        border-bottom-color:#bbbbbb;
+        border-color: transparent transparent var(--border);
+        border-bottom-color:var(--border);
     }
     .vgl-item--placeholder {
-        background-color: #D4D4D4;
+        background-color: var(--border);
         opacity: 1;
         border-radius: 12px;
     }

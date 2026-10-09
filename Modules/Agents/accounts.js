@@ -8,9 +8,10 @@ const { invalidateAgentAccountCache } = require('./actor');
 //   workspace — the company's key, server-side, can run unattended
 //   personal  — the developer's own Claude Code / Cursor / Codex; AlianHub never holds a key
 //   local     — Ollama / vLLM inside the network
-// Rules that live here: personal spend is never billed to the workspace, a personal
-// account cannot run unattended, admins can require a mode, and unlinking revokes the
-// token but keeps every comment, PR and hour on its task.
+// Rules that live here: a personal account cannot run unattended, admins can require
+// a mode, and unlinking revokes the token but keeps every comment, PR and hour on its
+// task. A run started under any of them that calls the model server-side spends the
+// server's key, so it is billed to the workspace (AICore/spend).
 
 const MODES = Object.freeze(['workspace', 'personal', 'local']);
 const PROVIDERS = Object.freeze(['claude-code', 'cursor', 'codex', 'antigravity', 'ollama', 'vllm', 'other']);
@@ -19,17 +20,33 @@ const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } ca
 const getPolicy = async (companyId) => {
     const company = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, 'agentPolicy'] }, 'findOne').catch(() => null);
     const p = (company && company.agentPolicy) || {};
-    return { allowedModes: Array.isArray(p.allowedModes) && p.allowedModes.length ? p.allowedModes.filter((m) => MODES.includes(m)) : [...MODES], requireCheckBeforeDone: Boolean(p.requireCheckBeforeDone) };
+    return {
+        allowedModes: Array.isArray(p.allowedModes) && p.allowedModes.length ? p.allowedModes.filter((m) => MODES.includes(m)) : [...MODES],
+        requireCheckBeforeDone: Boolean(p.requireCheckBeforeDone),
+        connectedPaused: p.connectedPaused === true,
+    };
 };
 
-const setPolicy = async (companyId, { allowedModes, requireCheckBeforeDone }) => {
+/* Whether the workspace has its connected agents paused. A read that fails is thrown, so a pause never reads as off. */
+const connectedPaused = async (companyId) => {
+    const company = await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, 'agentPolicy'] }, 'findOne');
+    return Boolean(company && company.agentPolicy && company.agentPolicy.connectedPaused === true);
+};
+
+/* `connectedPaused` holds every connected agent of the workspace (./projectPolicy.js) until a person sets it back.
+ * Turning it on takes every queue item out of the agents' hands, so no task still reads as being worked on. */
+const setPolicy = async (companyId, { allowedModes, requireCheckBeforeDone, connectedPaused: pause }, pausedBy = '') => {
     const modes = Array.isArray(allowedModes) ? allowedModes.filter((m) => MODES.includes(m)) : null;
     if (allowedModes !== undefined && (!modes || !modes.length)) return { error: `allowedModes must be drawn from ${MODES.join(', ')}.` };
+    if (pause !== undefined && typeof pause !== 'boolean') return { error: 'connectedPaused must be true or false.' };
     const set = {};
     if (modes) set['agentPolicy.allowedModes'] = modes;
     if (requireCheckBeforeDone !== undefined) set['agentPolicy.requireCheckBeforeDone'] = Boolean(requireCheckBeforeDone);
+    if (pause !== undefined) Object.assign(set, { 'agentPolicy.connectedPaused': pause, 'agentPolicy.connectedPausedBy': String(pausedBy || ''), 'agentPolicy.connectedPausedAt': new Date() });
+    const from = await getPolicy(companyId);
     await MongoDbCrudOpration(dbCollections.GLOBAL, { type: dbCollections.COMPANIES, data: [{ _id: oid(companyId) }, { $set: set }] }, 'updateOne');
-    return { policy: await getPolicy(companyId) };
+    if (pause === true) await require('./manager/workQueue').dropClaimsIn(companyId);
+    return { from, policy: await getPolicy(companyId) };
 };
 
 const getAccount = async (userId) => {
@@ -58,6 +75,7 @@ const unlink = async (companyId, userId) => {
         type: SCHEMA_TYPE.API_TOKENS, data: [{ userId: String(userId), $or: [{ kind: 'agent' }, { 'agentAccount.mode': { $exists: true } }] }, { $set: { active: false } }],
     }, 'updateMany').catch(() => ({ modifiedCount: 0 }));
     invalidateAgentAccountCache(userId);
+    await require('./manager/chatQuestions').connectionEnded(companyId, userId);
     return { revokedTokens: (revoked && (revoked.modifiedCount || revoked.nModified)) || 0 };
 };
 
@@ -77,8 +95,8 @@ const monthlySummary = async (companyId, userId, month) => {
     (runs || []).forEach((r) => { if (r.taskId) tasks.add(String(r.taskId)); });
     const minutes = (logs || []).reduce((s, l) => s + (Number(l.LogTimeDuration) || 0), 0);
     const prs = (linkedTasks || []).reduce((s, t) => s + (t.links || []).filter((l) => l.kind === 'pr' && String(l.addedBy) === String(userId) && new Date(l.addedAt) >= from && new Date(l.addedAt) < to).length, 0);
-    const personalUsd = (runs || []).reduce((s, r) => s + Number((r.spend && r.spend.personalUsd) || 0), 0);
-    return { month: key, tasksWorked: tasks.size, agentHours: Math.round((minutes / 60) * 10) / 10, prsOpened: prs, usdToCompany: 0, personalUsdEstimate: Math.round(personalUsd * 100) / 100 };
+    const companyUsd = (runs || []).reduce((s, r) => s + (r.spend && r.spend.billedToWorkspace ? Number(r.spend.usd || 0) : 0), 0);
+    return { month: key, tasksWorked: tasks.size, agentHours: Math.round((minutes / 60) * 10) / 10, prsOpened: prs, usdToCompany: Math.round(companyUsd * 100) / 100 };
 };
 
-module.exports = { MODES, PROVIDERS, getPolicy, setPolicy, getAccount, link, unlink, monthlySummary };
+module.exports = { MODES, PROVIDERS, getPolicy, connectedPaused, setPolicy, getAccount, link, unlink, monthlySummary };

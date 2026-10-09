@@ -46,6 +46,9 @@
                     <button v-if="canCreate && !filters.archived && !creating" type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="gls-empty-new" @click="creating = true">
                         {{ $t('Goals.new_goal') }}
                     </button>
+                    <button v-else-if="filters.archived" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="gls-empty-back" @click="filter({ archived: false })">
+                        {{ $t('Goals.back_to_goals') }}
+                    </button>
                 </div>
                 <template v-else>
                     <section v-for="group in groups" :key="group.id" class="gls__group" :data-group="group.id" :aria-labelledby="`gls-group-${group.id}`">

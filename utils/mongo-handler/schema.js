@@ -1025,6 +1025,8 @@ const schema = {
         savedReportId: { type: String, required: true },
         cadence: { type: String, default: 'weekly', required: false },
         recipients: { type: Array, default: [], required: false },
+        // Who last set the recipients: outside addresses are sent to only while this person is an owner or admin.
+        recipientsBy: { type: String, required: false },
         active: { type: Boolean, default: true, required: false },
         lastRunAt: { type: Date, required: false },
         nextRunAt: { type: Date, required: false },
@@ -1165,8 +1167,25 @@ const schema = {
         closedAt: { type: Date, required: false },
         // The connected agent that holds the item in the work queue: { by, userId, name, at, until }. Absent, or past `until`, the item is free.
         claim: { type: Object, required: false },
-        // { why: 'taken_back' | 'finished', userId, name, at }: not handed to an agent again while the row stays open.
+        // { why: 'taken_back' | 'finished' | 'withdrawn', userId, name, at }: not handed to an agent again while the row stays open.
         leftQueue: { type: Object, required: false },
+    },
+    // What agents leave while they work (Modules/Agents/workMarks.js): one row per scope and key, taken by a conditional write.
+    //   place:<projectId> / <n>   one of the project's places for agents at work; `by` holds it for the queue item `ref`
+    //   hand / <connection>       the one queue item `ref` a connected agent holds
+    //   read:<taskId> / <reader>  the task's change stamp `seen` when that agent last read it
+    //   turn / <taskId>           the agent `by` that is changing the task until `until`
+    //   direct:<projectId> / <connection>  the tasks that connection `changed` there on its own lately, each { id, at }
+    agentWorkMarks: {
+        scope: { type: String, required: true },
+        key: { type: String, required: true },
+        by: { type: String, required: false },
+        ref: { type: String, required: false },
+        at: { type: Date, required: false },
+        until: { type: Date, required: false },
+        seen: { type: Date, required: false },
+        changed: { type: Array, default: undefined, required: false },
+        rev: { type: Number, default: 0, required: false },
     },
     // Agents as teammates — managed by Modules/Agents.
     agents: {
@@ -1179,6 +1198,10 @@ const schema = {
         skills: { type: Array, default: [], required: false },
         // Subset of Modules/Agents/registry.js keys this agent may use. Empty = every registry action.
         allowedActions: { type: Array, default: [], required: false },
+        // The role it plays ('blueprint/slug' of Modules/Agents/roles), so the dispatcher can give a role's task to the least loaded of its agents.
+        role: { type: String, required: false },
+        // 'team-pack:<blueprint>' on an agent a team pack made, so undoing the pack can find it again.
+        madeBy: { type: String, required: false },
         projectIds: { type: Array, default: [], required: false },
         // 0 suggest everything · 1 act on low risk · 2 act on medium, propose the rest · 3 also on a schedule
         autonomy: { type: Number, default: 0, required: false },
@@ -1215,6 +1238,12 @@ const schema = {
         idempotencyKey: { type: String, required: false },
         viaAccount: { type: String, required: false },
         startedBy: { type: String, required: false },
+        // What the request that started the run was held to (event/writerLimits.js); the run's skill executes under it
+        startedUnder: {
+            agent: { type: Boolean, required: false },
+            chat: { type: Boolean, required: false },
+            projectIds: { type: [String], default: undefined, required: false },
+        },
         startedAt: { type: Date, required: false },
         finishedAt: { type: Date, required: false },
         // set with the terminal status; the TTL index deletes the run once it passes
@@ -1460,6 +1489,8 @@ const schema = {
         agentName: { type: String, required: false },
         runId: { type: String, required: false },
         taskId: { type: String, required: false },
+        // Every task a batch names. A person who cannot read one of them does not see the proposal (Agents/access.js).
+        taskIds: { type: [String], default: undefined, required: false },
         projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
         what: { type: String, required: true },
         why: { type: String, required: false },
@@ -1497,8 +1528,20 @@ const schema = {
         allowedActions: { type: Array, required: false },
         // Set on a change a standing approval applied: it is filed already approved, by the person who made that approval.
         standingApprovalId: { type: String, required: false },
+        // Set on the parts of a plan an approval left to be made later (Agents/planFollowUp.js): the proposal they came from.
+        splitFrom: { type: String, required: false },
+        // Set where those parts were tried and not made: the person who approved, who alone may try them once more, and why they were not made.
+        retryBy: { type: String, required: false },
+        retryWhy: { type: String, required: false },
+        // [{ part, name, error }] — what an approved change answered that it did not make, kept so the finished proposal says why
+        notMade: { type: Array, default: undefined, required: false },
     },
     // "Always do this": one kind of change, by one connection, in one project — managed by Modules/Agents/standingApprovals.js.
+    rolePlaybookOverrides: {
+        key: { type: String, required: true },
+        body: { type: String, required: true },
+        updatedBy: { type: String, required: true },
+    },
     agentStandingApprovals: {
         projectId: { type: String, required: true },
         action: { type: String, required: true },
@@ -1630,6 +1673,8 @@ const schema = {
          * and these say why, so a pending row is readable as blocked rather
          * than as failed-and-retrying. */
         waitingSince: { type: Date, required: false },
+        // When a role_handoff step put its task in the role's queue; the step's deadline counts from here.
+        handedAt: { type: Date, required: false },
         waitUntil: { type: Date, required: false },
         waitReason: { type: String, required: false },
         approvalId: { type: String, required: false },
@@ -1720,8 +1765,16 @@ const schema = {
         status: { type: String, default: 'connected', required: false },
         enabled: { type: Boolean, default: true, required: false },
         createdBy: { type: String, required: false },
+        connectedBy: { type: String, required: false },
         connectedAt: { type: Date, required: false },
+        projectIds: { type: [String], default: undefined, required: false },
+        sync: { type: Object, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    appConnectionEvents: {
+        key: { type: String, required: true },
+        connectionId: { type: String, required: false },
+        taskId: { type: String, required: false },
     },
     // AHE-3838 — one row per (user, cloud storage provider). Distinct from
     // integrationConnections above, which holds the COMPANY's app registration:
@@ -2284,6 +2337,12 @@ const schema = {
         revision: { type: Number, required: false, default: 1 },
         updatedBy: { type: String, required: false },
         updatedAt: { type: Date, required: false },
+        // The dispatcher (Modules/AssignmentRules/dispatcher): { mode: off | suggest | apply, threshold, modelGuess, roles: ['blueprint/slug'],
+        // rules: [{ id?, role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
+        dispatcher: { type: Object, required: false },
+        // What each team pack applied here, so its undo takes back only that (Modules/AssignmentRules/dispatcher/packs.js):
+        // [{ applyId, blueprint, projectIds, roles, rules: [{ id, role, when }], proposalId, agents: { made, widened: [{ agentId, projectIds }] }, skills, by, at }]
+        teamPacks: { type: Array, default: undefined, required: false },
     },
     // One decision per task revision: what the rules chose, why, and what became of it. `inputHash` covers the task text
     // and the rule revision, so the same task is never decided twice for the same input.
@@ -2301,6 +2360,30 @@ const schema = {
         model: { type: String, required: false, default: '' },
         rulesRevision: { type: Number, required: false, default: 0 },
         rulesBy: { type: String, required: false, default: '' },
+        resolvedBy: { type: String, required: false, default: '' },
+        resolvedAt: { type: Date, required: false },
+        createdAt: { type: Date, required: false },
+        updatedAt: { type: Date, required: false },
+    },
+    // Which role the dispatcher routed a task to, why, and what a lead made of it (Modules/AssignmentRules/dispatcher).
+    // state: suggested | needs_routing | applied | accepted | dismissed | routed | superseded. `inputHash` covers the task fields the rules read
+    // and the dispatcher revision, so a task is routed once per input.
+    dispatchDecisions: {
+        taskId: { type: String, required: true },
+        projectId: { type: String, required: true },
+        inputHash: { type: String, required: true },
+        trigger: { type: String, required: false, default: 'create' },
+        state: { type: String, required: true },
+        mode: { type: String, required: false, default: 'suggest' },
+        role: { type: String, required: false, default: null },
+        source: { type: String, required: false, default: null },
+        ruleIndex: { type: Number, required: false, default: null },
+        confidence: { type: Number, required: false, default: null },
+        reason: { type: String, required: false, default: null },
+        agentId: { type: String, required: false, default: null },
+        skipped: { type: Array, required: false, default: [] },
+        taskTypeKey: { type: Number, required: false, default: null },
+        chosenRole: { type: String, required: false, default: null },
         resolvedBy: { type: String, required: false, default: '' },
         resolvedAt: { type: Date, required: false },
         createdAt: { type: Date, required: false },
@@ -2867,7 +2950,9 @@ const schema = {
     companies: {
         // { by, anchor } — set only by scripts/seed-scale.js, which writes to and drops no company without it.
         scaleSeed: { type: Object, required: false },
-        // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone }
+        // The id of the migration that wrote this row for a workspace opened without one; its down() deletes no row without it.
+        rowRepairedBy: { type: String, required: false },
+        // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone, connectedPaused, connectedPausedBy, connectedPausedAt }
         agentPolicy: {
             type: Object,
             required: false
@@ -2878,6 +2963,16 @@ const schema = {
         },
         agentMonthlyBudgetUsd: {
             type: Number,
+            required: false
+        },
+        // 0 or unset = no daily limit; the day is the UTC day
+        agentDailyBudgetUsd: {
+            type: Number,
+            required: false
+        },
+        // { day: 'YYYY-MM-DD', '80': Date|null, '100': Date|null }
+        agentDailyBudgetAlerts: {
+            type: Object,
             required: false
         },
         // { month: 'YYYY-MM', '80': Date|null, '100': Date|null }
@@ -3609,6 +3704,11 @@ const schema = {
             type: Object,
             required: false
         },
+        // { atOnce, directTasks, paused, pausedBy, pausedAt, updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectLimits.js).
+        agentLimits: {
+            type: Object,
+            required: false
+        },
         // { on, updatedBy, updatedAt }; absent means off (Modules/Agents/manager/settings.js).
         agentManager: {
             type: Object,
@@ -3617,6 +3717,21 @@ const schema = {
         // The day (YYYY-MM-DD) of the last daily look: the mark a server takes before it looks, so two never look on one day.
         agentManagerLookedOn: {
             type: String,
+            required: false
+        },
+        // The day (YYYY-MM-DD) of the last triage: the mark a server takes before it asks the model.
+        agentManagerTriagedOn: {
+            type: String,
+            required: false
+        },
+        // The creation time up to which the manager's model has triaged new tasks (Modules/Agents/managerTriage.js).
+        agentManagerTriagedAt: {
+            type: Date,
+            required: false
+        },
+        // Ids of tasks created at exactly agentManagerTriagedAt that were already triaged.
+        agentManagerTriagedIds: {
+            type: [String],
             required: false
         },
         ProjectType: {
@@ -4559,6 +4674,8 @@ const schema = {
         agentAsk: { type: Object, required: false },
         agentCitations: { type: Array, required: false },
         agentChanges: { type: Array, required: false },
+        // A chat message that asked its author's own connected AI (Modules/Agents/manager/chatQuestions.js): { at }. It names nobody.
+        ownAiAsk: { type: Object, required: false },
         // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
         importedFrom: { type: String, required: false },
         // The import job that saved the comment, and its time and author in the file, by which the same file imported
@@ -5079,6 +5196,8 @@ const schema = {
         status: { type: String, default: 'ready', required: false },
         recapPostedAt: { type: Date, required: false },
         createdBy: { type: String, required: false },
+        editedBy: { type: String, required: false },
+        editedAt: { type: Date, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false }
     },
     folders:{

@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 046, MCP parity part 3: an outside agent reads the comments on a doc, comments, replies and assigns a
    thread through the doc comment routes' own handlers, as the person behind its token and no further. */
 process.env.STORAGE_TYPE = 'server';
@@ -69,7 +70,7 @@ const C_THREAD = '6f0000000000000000000801';
 const C_REPLY = '6f0000000000000000000802';
 const C_GONE = '6f0000000000000000000803';
 const C_ELSEWHERE = '6f0000000000000000000804';
-const NO_PAGE = 'not_visible: the page is not one the person behind this token can open';
+const NO_PAGE = 'not_visible: that doc was not found, or the person cannot open it. Ask the person which doc they mean.';
 
 const comments = (pageId) => rows(SCHEMA_TYPE.PAGE_COMMENTS).filter((row) => String(row.pageId) === pageId && row.isDeleted !== true);
 const comment = (id) => stored(SCHEMA_TYPE.PAGE_COMMENTS, id);
@@ -102,7 +103,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tools exist', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         NAMES.forEach((name) => { expect(registry.has(name)).toBe(false); expect(actions.rating(name)).toBeNull(); });
         expect((await rpc(ctx(OWNER), 'page.comment.create', { pageId: PG_OPEN, text: 'Hello' })).rpcError).toMatchObject({ code: -32601 });
@@ -131,7 +132,7 @@ describe('page.comments.list', () => {
 
     it('answers a doc the person cannot open as it answers a missing id', async () => {
         const missing = await rpc(ctx(OWNER), 'page.comments.list', { pageId: MISSING });
-        expect(missing).toEqual({ error: 'page not found' });
+        expect(missing).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
         for (const uid of [OUTSIDER, GUEST]) expect(await rpc(ctx(uid), 'page.comments.list', { pageId: PG_PRIVATE_PROJECT })).toEqual(missing);
         for (const uid of [OWNER, ADMIN, OUTSIDER, GUEST]) {
             expect(await rpc(ctx(uid), 'page.comments.list', { pageId: PG_PERSONAL })).toEqual(missing);
@@ -143,8 +144,8 @@ describe('page.comments.list', () => {
     });
 
     it('stays inside the projects a token was narrowed to, and off the workspace\'s own docs', async () => {
-        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_PRIVATE_PROJECT })).toEqual({ error: 'page not found' });
-        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_COMPANY })).toEqual({ error: 'page not found' });
+        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_PRIVATE_PROJECT })).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
+        expect(await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_COMPANY })).toEqual({ error: 'That doc was not found. Ask the person which doc they mean.' });
         expect(await rpc(ctx(INSIDER), 'page.comments.list', { pageId: PG_COMPANY })).toEqual({ pageId: PG_COMPANY, comments: [] });
         expect((await rpc(narrowed(INSIDER, [P_OPEN]), 'page.comments.list', { pageId: PG_OPEN, limit: 1 })).comments).toHaveLength(1);
     });
@@ -215,6 +216,15 @@ describe('page.comment.create', () => {
         expect(comments(PG_PRIVATE_PROJECT).map((entry) => String(entry._id))).toEqual([C_ELSEWHERE]);
         expect(comment(result.commentId)).toMatchObject({ isDeleted: true, deletedBy: OWNER });
     });
+
+    it('is taken back only by its author or an admin, as the delete route allows', async () => {
+        const { result } = await rpc(ctx(INSIDER), 'page.comment.create', { pageId: PG_OPEN, text: 'Mine to take back' });
+        const [row] = audits('page.comment.create', 'applied');
+        await expect(inverses.pageComment(CID, row.meta.undo, { userId: OUTSIDER })).rejects.toThrow(/Only the author or an admin/);
+        expect(comment(result.commentId).isDeleted).not.toBe(true);
+        await inverses.pageComment(CID, row.meta.undo, { userId: INSIDER });
+        expect(comment(result.commentId)).toMatchObject({ isDeleted: true, deletedBy: INSIDER });
+    });
 });
 
 describe('page.comment.reply', () => {
@@ -283,9 +293,9 @@ describe('scopes and outside clients', () => {
 
     it('needs the write scope for a write and the docs scope for the read', async () => {
         const before = commentsNow();
-        expect(await rpc(readOnly(OWNER), 'page.comment.create', say)).toMatchObject({ isError: true, error: 'This token is read-only.' });
-        expect(await rpc(outside(OWNER, ['docs:read']), 'page.comment.create', say)).toMatchObject({ isError: true, error: 'This token lacks the tasks:write scope.' });
-        expect(await rpc(outside(OWNER, ['tasks:write']), 'page.comments.list', { pageId: PG_OPEN })).toMatchObject({ isError: true, error: 'This token lacks the docs:read scope.' });
+        expect(await rpc(readOnly(OWNER), 'page.comment.create', say)).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
+        expect(await rpc(outside(OWNER, ['docs:read']), 'page.comment.create', say)).toMatchObject({ isError: true, error: 'This connection was not given the tasks:write permission. Ask the person to connect you again and allow it.' });
+        expect(await rpc(outside(OWNER, ['tasks:write']), 'page.comments.list', { pageId: PG_OPEN })).toMatchObject({ isError: true, error: 'This connection was not given the docs:read permission. Ask the person to connect you again and allow it.' });
         expect(commentsNow()).toBe(before);
         expect(await rpc(outside(OUTSIDER, ['tasks:write']), 'page.comment.create', say)).toMatchObject({ ok: true });
         expect((await rpc(readOnly(OUTSIDER), 'page.comments.list', { pageId: PG_OPEN })).comments).toHaveLength(3);

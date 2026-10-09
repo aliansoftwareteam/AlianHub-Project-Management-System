@@ -52,6 +52,8 @@ const FORMATS = {
     embed_url: { test: isEmbeddableUrl, message: 'must be a valid https:// URL.' },
 };
 
+const isGithubRepo = (value) => FORMATS.github_repo.test(String(value || ''));
+
 const invalid = (field, reason) => ({ valid: false, field, reason });
 
 const fieldProblem = (field, value) => {
@@ -105,4 +107,4 @@ const redact = (conn) => {
     return { ...o, config: cfg, secrets };
 };
 
-module.exports = { CATALOG, SECRETS_VERSION: secretField.VERSION, byKey, getCatalog, validateConnection, secretFieldProblem, redact, isEmbeddableUrl, secretKeys, sealConfig, openConfig };
+module.exports = { CATALOG, isGithubRepo, SECRETS_VERSION: secretField.VERSION, byKey, getCatalog, validateConnection, secretFieldProblem, redact, isEmbeddableUrl, secretKeys, sealConfig, openConfig };

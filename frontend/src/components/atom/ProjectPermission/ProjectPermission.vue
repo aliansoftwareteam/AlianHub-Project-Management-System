@@ -5,19 +5,19 @@
                 <img :src="closeBlueImage" alt="closeButton" class="cursor-pointer" @click="$emit('isClose',true)"/>
             </template>
             <template #body>
-                <div :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.projectWisePermisson}]" class="add_permission_project bg-white d-flex justify-content-between align-items-center"> 
+                <div :class="[{'pointer-event-none opacity-5 blur-3-px':!currentCompany?.planFeature?.projectWisePermisson}]" class="add_permission_project project-permission-bg-white d-flex justify-content-between align-items-center"> 
                     <div class="add_permission_para">
-                        <span class="main_para d-block black font-size-14 font-ui font-weight-500" v-if="projectRawRules?.length">{{$t('Permissions.project_permission_title_enable')}}</span>
-                        <span class="main_para d-block black font-size-14 font-ui font-weight-500" v-else>{{$t('Permissions.project_permission_title_disable')}}</span>
-                        <span v-if="projectRawRules?.length === 0" class="second_para d-block GunPowder font-size-12 font-ui font-weight-400">{{$t('Permissions.project_permission_description')}}.</span>
+                        <span class="main_para d-block project-permission-black project-permission-font-size-14 font-ui project-permission-font-weight-500" v-if="projectRawRules?.length">{{$t('Permissions.project_permission_title_enable')}}</span>
+                        <span class="main_para d-block project-permission-black project-permission-font-size-14 font-ui project-permission-font-weight-500" v-else>{{$t('Permissions.project_permission_title_disable')}}</span>
+                        <span v-if="projectRawRules?.length === 0" class="second_para d-block project-permission-GunPowder project-permission-font-size-12 font-ui project-permission-font-weight-400">{{$t('Permissions.project_permission_description')}}.</span>
                     </div>
                     <div v-if="checkPermission('settings.settings_security_permissions') == true">
-                        <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-if="projectRawRules?.length === 0" class="bg-white permissionButton border-primary font-size-16 blue mr-010 cursor-pointer" :class="[{'disableButton font-size-16':isSpinner}]" @click="applyProjectPermision">{{$t('Permissions.apply_permission')}}</button>
-                        <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-else class="bg-white permissionButton border-primary blue mr-010 cursor-pointer font-size-16" @click="resetProjectPermission()" :class="[{'disableButton font-size-16':isSpinner}]">{{$t('Permissions.reset_permission')}}</button>
+                        <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-if="projectRawRules?.length === 0" class="project-permission-bg-white permissionButton project-permission-border-primary project-permission-font-size-16 project-permission-blue mr-010 cursor-pointer" :class="[{'disableButton project-permission-font-size-16':isSpinner}]" @click="applyProjectPermision">{{$t('Permissions.apply_permission')}}</button>
+                        <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-else class="project-permission-bg-white permissionButton project-permission-border-primary project-permission-blue mr-010 cursor-pointer project-permission-font-size-16" @click="resetProjectPermission()" :class="[{'disableButton project-permission-font-size-16':isSpinner}]">{{$t('Permissions.reset_permission')}}</button>
                     </div>
                     <div v-else-if="checkPermission('settings.settings_security_permissions') == false">
-                        <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-if="projectRawRules?.length === 0" class="bg-white permissionButton border-primary font-size-16 blue mr-010 cursor-pointer disableButton" :class="[{'disableButton font-size-16':isSpinner}]">{{$t('Permissions.apply_permission')}}</button>
-                        <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-else class="bg-white permissionButton border-primary blue mr-010 cursor-pointer font-size-16 disableButton" :class="[{'disableButton font-size-16':isSpinner}]">{{$t('Permissions.reset_permission')}}</button>
+                        <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-if="projectRawRules?.length === 0" class="project-permission-bg-white permissionButton project-permission-border-primary project-permission-font-size-16 project-permission-blue mr-010 cursor-pointer disableButton" :class="[{'disableButton project-permission-font-size-16':isSpinner}]">{{$t('Permissions.apply_permission')}}</button>
+                        <button :disabled="!currentCompany?.planFeature?.projectWisePermisson" v-else class="project-permission-bg-white permissionButton project-permission-border-primary project-permission-blue mr-010 cursor-pointer project-permission-font-size-16 disableButton" :class="[{'disableButton project-permission-font-size-16':isSpinner}]">{{$t('Permissions.reset_permission')}}</button>
                     </div>
                 </div>
                 <SecurityPermissions v-if="projectRawRules && projectRawRules.length > 0" :from="'project_rules'" :projectData="projectData" :isSpinnerProject="isSpinner"></SecurityPermissions> 
@@ -127,6 +127,39 @@
         }
     }
 </script>
+
+<style scoped>
+.project-permission-font-size-12 {
+    font-size: 12px;
+}
+.project-permission-font-size-14 {
+    font-size: 14px;
+}
+.project-permission-font-size-16 {
+    font-size: 16px;
+}
+.project-permission-font-weight-400 {
+    font-weight: 400 !important;
+}
+.project-permission-font-weight-500 {
+    font-weight: 500 !important;
+}
+.project-permission-bg-white {
+    background-color: var(--surface);
+}
+.project-permission-GunPowder {
+    color: var(--ink-2);
+}
+.project-permission-black {
+    color: var(--ink);
+}
+.project-permission-blue {
+    color: var(--brand) !important;
+}
+.project-permission-border-primary {
+    border: 1px solid var(--brand) !important;
+}
+</style>
 
 <style src="./style.css">
 </style>

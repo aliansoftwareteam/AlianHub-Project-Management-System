@@ -104,6 +104,7 @@ const dbCollections = {
     WORKFLOW_DEFINITIONS: "workflow_definitions",
     AGENT_FINDINGS: "agent_findings",
     PROJECT_FINDINGS: "project_findings",
+    AGENT_WORK_MARKS: "agent_work_marks",
     AGENTS: "agents",
     AGENT_RUNS: "agent_runs",
     AGENT_REVISIONS: "agent_revisions",
@@ -115,8 +116,10 @@ const dbCollections = {
     AGENT_PROPOSALS: "agent_proposals",
     AGENT_STANDING_APPROVALS: "agent_standing_approvals",
     AGENT_SKILLS: "agent_skills",
+    ROLE_PLAYBOOK_OVERRIDES: "role_playbook_overrides",
     CALLS: "calls",
     INTEGRATION_CONNECTIONS: "integration_connections",
+    APP_CONNECTION_EVENTS: "app_connection_events",
     CLOUD_STORAGE_CONNECTIONS: "cloud_storage_connections",
     FORMS: "forms",
     FORM_SUBMISSIONS: "form_submissions",
@@ -151,6 +154,7 @@ const dbCollections = {
     AI_EVAL_RUNS: "ai_eval_runs",
     ASSIGNMENT_RULES: "assignment_rules",
     ASSIGNMENT_DECISIONS: "assignment_decisions",
+    DISPATCH_DECISIONS: "dispatch_decisions",
     AI_PROFILES: "ai_profiles",
 }
 

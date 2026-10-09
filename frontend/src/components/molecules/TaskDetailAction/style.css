@@ -85,8 +85,8 @@ ul.task-detail-action-ul li a {
 }
 
 .selected-watcher {
-    color: blue;
-    background: aliceblue;
+    color: var(--brand);
+    background: var(--brand-tint);
 }
 .horizontalDocs {
     margin-right: 16px;
@@ -128,10 +128,10 @@ ul.task-detail-action-ul li a {
 }
 .watcher__action-dropdown .search__text::placeholder{
     font-size: 14px !important;
-    color: #949DA8 !important;
+    color: var(--ink-2) !important;
 }
 .wasabi__emp-image{
-    border: 2px solid #fff !important; 
+    border: 2px solid var(--surface) !important; 
     width: 30px !important;
     height: 30px !important;
     border-radius: 30px !important;
@@ -153,7 +153,7 @@ ul.task-detail-action-ul li a {
 .reminder-modal__overlay{
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.35);
+    background: var(--scrim);
     display: flex;
     align-items: center;
     justify-content: center;

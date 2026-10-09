@@ -299,14 +299,14 @@ onBeforeUnmount(() => {
     position: fixed; right: 20px; bottom: 20px; z-index: 3000;
     display: flex; align-items: center; gap: 18px;
     padding: 14px 16px; border-radius: 14px;
-    background: #fff; box-shadow: 0 12px 34px rgba(23, 30, 52, .22);
+    background: var(--surface); box-shadow: var(--shadow-pop);
     animation: call-ring-in .18s ease-out;
 }
 @keyframes call-ring-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 .call-ring__who { display: flex; align-items: center; gap: 11px; }
 .call-ring__text { display: flex; flex-direction: column; }
-.call-ring__name { font-size: 13.5px; font-weight: 600; color: #1e2436; }
-.call-ring__sub { font-size: 11.5px; color: #7b8496; }
+.call-ring__name { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.call-ring__sub { font-size: 11.5px; color: var(--ink-2); }
 .call-ring__actions { display: flex; align-items: center; gap: 9px; }
 /* Deliberately plain next to accept and decline: silencing the ringer is a preference,
    not one of the two answers being asked for. */
@@ -314,16 +314,16 @@ onBeforeUnmount(() => {
     width: 28px; height: 28px; flex: none;
     display: inline-flex; align-items: center; justify-content: center;
     border: none; border-radius: 50%; background: transparent;
-    color: #9aa3b4; cursor: pointer; transition: background .12s ease, color .12s ease;
+    color: var(--ink-2); cursor: pointer; transition: background .12s ease, color .12s ease;
 }
-.call-ring__quiet:hover { background: #eef0f5; color: #5b6472; }
+.call-ring__quiet:hover { background: var(--fill); color: var(--ink-2); }
 
 /* In-call window. */
 .call-win {
     position: fixed; right: 20px; bottom: 20px; z-index: 3000;
     width: 340px; border-radius: 14px; overflow: hidden;
-    background: #171e2e; color: #fff;
-    box-shadow: 0 16px 40px rgba(23, 30, 52, .32);
+    background: var(--rail); color: var(--rail-ink-strong);
+    box-shadow: var(--shadow-pop);
     display: flex; flex-direction: column;
 }
 .call-win--audio { width: 280px; }
@@ -343,20 +343,20 @@ onBeforeUnmount(() => {
     flex: none; width: 26px; height: 26px;
     display: inline-flex; align-items: center; justify-content: center;
     border: none; border-radius: 6px; background: transparent;
-    color: #97a1b5; cursor: pointer; transition: background .12s ease, color .12s ease;
+    color: var(--rail-ink); cursor: pointer; transition: background .12s ease, color .12s ease;
 }
-.call-win__expand:hover { background: #2b3448; color: #fff; }
+.call-win__expand:hover { background: var(--rail-active); color: var(--rail-ink-strong); }
 .call-win__name { font-size: 13.5px; font-weight: 600; }
-.call-win__status { font-size: 11.5px; color: #97a1b5; font-variant-numeric: tabular-nums; }
-.call-win__stage { position: relative; background: #0f1421; min-height: 150px; display: flex; align-items: center; justify-content: center; }
+.call-win__status { font-size: 11.5px; color: var(--rail-ink); font-variant-numeric: tabular-nums; }
+.call-win__stage { position: relative; background: var(--rail); min-height: 150px; display: flex; align-items: center; justify-content: center; }
 .call-win--audio .call-win__stage { min-height: 120px; }
-.call-win__remote { width: 100%; max-height: 240px; object-fit: cover; display: block; background: #0f1421; }
+.call-win__remote { width: 100%; max-height: 240px; object-fit: cover; display: block; background: var(--rail); }
 .call-win__avatar { padding: 22px 0; }
 /* Picture-in-picture, deliberately small: the point of the window is the other person. */
 .call-win__local {
     position: absolute; right: 10px; bottom: 10px;
     width: 84px; height: 62px; object-fit: cover;
-    border-radius: 8px; border: 2px solid rgba(255, 255, 255, .18); background: #0f1421;
+    border-radius: 8px; border: 2px solid var(--rail-active); background: var(--rail);
 }
 .call-win__local--off { display: flex; align-items: center; justify-content: center; }
 /* Their mic state, pinned to the stage. Top-left so it never collides with the
@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
     position: absolute; left: 10px; top: 10px;
     width: 26px; height: 26px; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
-    background: rgba(214, 69, 80, .92); color: #fff;
+    background: var(--danger); color: var(--on-danger);
 }
 .call-win__warn { margin: 0; padding: 8px 14px; font-size: 11px; color: #f0b46b; background: rgba(240, 180, 107, .1); }
 .call-win__actions { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 12px; }
@@ -373,7 +373,7 @@ onBeforeUnmount(() => {
 .call-btn {
     width: 42px; height: 42px; border: none; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
-    background: #2b3448; color: #fff; cursor: pointer;
+    background: var(--rail-active); color: var(--rail-ink-strong); cursor: pointer;
     transition: background .12s ease, transform .08s ease;
 }
 .call-btn:hover { background: #384360; }
@@ -385,15 +385,15 @@ onBeforeUnmount(() => {
 .call-btn--on:hover { background: #2a6ec8; }
 .call-btn--accept { background: #22a06b; }
 .call-btn--accept:hover { background: #1c8a5b; }
-.call-btn--decline { background: #d64550; }
-.call-btn--decline:hover { background: #bb3a44; }
+.call-btn--decline { background: var(--danger); color: var(--on-danger); }
+.call-btn--decline:hover { background: var(--danger-ink); }
 /* The ringing card sits on white, so its buttons need their own resting colour. */
 .call-ring .call-btn { box-shadow: 0 2px 8px rgba(23, 30, 52, .18); }
 
 .call-toast {
     position: fixed; right: 20px; bottom: 20px; z-index: 3000;
     max-width: 300px; padding: 11px 14px; border-radius: 10px;
-    background: #1e2436; color: #fff; font-size: 12.5px; cursor: pointer;
-    box-shadow: 0 10px 26px rgba(23, 30, 52, .22);
+    background: var(--ink); color: var(--surface); font-size: 12.5px; cursor: pointer;
+    box-shadow: var(--shadow-pop);
 }
 </style>

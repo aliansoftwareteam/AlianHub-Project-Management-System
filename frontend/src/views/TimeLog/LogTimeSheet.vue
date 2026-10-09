@@ -16,7 +16,7 @@
                 <i18n-t keypath="Time.overnight_body" tag="div" class="lt__alert-body">
                     <template #start>{{ s.startClock }}</template>
                     <template #when>{{ s.whenLabel }}</template>
-                    <template #task><strong>{{ s.taskName }}</strong></template>
+                    <template #task><strong>{{ s.taskName || $t('Time.task_not_open') }}</strong></template>
                     <template #recorded>{{ formatHm(s.recordedMinutes) }}</template>
                 </i18n-t>
                 <div class="tv-row-actions">
@@ -113,8 +113,10 @@ import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import moment from 'moment';
+import { clockText } from '@/utils/clockText';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
+import { typedSearchText } from '@/utils/searchText';
 import { useTimer, formatMinutes, formatHm, formatClock } from '@/composable/useTimer';
 import { timeLogFailureKey } from '@/composable/timeLogFailure';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
@@ -189,7 +191,7 @@ const overnightSessions = computed(() => {
     return list.map((s) => {
         const started = moment(s.startedAt);
         const when = started.isSame(moment(), 'day') ? t('Time.today') : (started.isSame(moment().subtract(1, 'day'), 'day') ? t('Time.yesterday') : started.format('MMM D'));
-        return { ...s, startClock: started.format('HH:mm'), whenLabel: when, error: sessionErrors.value[s.key] || '' };
+        return { ...s, startClock: clockText(started), whenLabel: when, error: sessionErrors.value[s.key] || '' };
     });
 });
 
@@ -229,7 +231,7 @@ const fetchAssigned = async () => {
         await loadProjectNames();
         const match = { AssigneeUserId: { $in: [uid.value] }, deletedStatusKey: { $in: [0, null] } };
         const q = search.value.trim();
-        if (q) match.TaskName = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+        if (q) match.TaskName = { $regex: typedSearchText(q), $options: 'i' };
         const findQuery = [{ $match: match }, { $sort: { updatedAt: -1 } }, { $limit: 30 }, { $project: { TaskName: 1, ProjectID: 1, sprintId: 1 } }];
         const res = await apiRequest('post', `${env.TASK}/find`, { findQuery });
         const list = Array.isArray(res && res.data) ? res.data : [];
@@ -297,7 +299,7 @@ const trimSession = async (s) => {
         emit('logged', { message: success.value });
         loadToday();
     } catch (e) {
-        sessionErrors.value = { ...sessionErrors.value, [s.key]: t('Time.trim_failed') };
+        sessionErrors.value = { ...sessionErrors.value, [s.key]: t(timeLogFailureKey(e, 'Time.trim_failed')) };
     } finally {
         busy.value = '';
     }

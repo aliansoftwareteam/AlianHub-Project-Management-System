@@ -2,10 +2,13 @@ const mongoose = require('mongoose');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
+const socketEmitter = require('../../event/socketEventEmitter');
 const registry = require('./registry');
 const runs = require('./runs');
 const { TYPE_LIST: PROVIDER_ERROR_TYPES } = require('../AICore/providerError');
 const proposals = require('./proposals');
+const proposalText = require('./proposalText');
+const approverRights = require('./approverRights');
 const standingApprovals = require('./standingApprovals');
 const accounts = require('./accounts');
 const { isAgent } = require('./actor');
@@ -31,6 +34,11 @@ const { DEFAULT_RATE_LIMIT_PER_DAY } = require('./dailyRunLimit');
 const confidence = require('./engine/confidence');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const triggers = require('./triggers');
+const { agentsRefused } = require('./guard');
+const { personDecides, refuse } = require('./personDecides');
+const runStart = require('./runStart');
+const proposalFiling = require('./proposalFiling');
+const { tokenAllowsProject } = require('../../Config/tokenNarrowing');
 
 // Every /api/v2/agents route sits behind the company-header JWT check, so the header is the verified tenant.
 const companyOf = (req) => String(req.headers['companyid'] || '');
@@ -65,7 +73,7 @@ const idempotencyKeyOf = (req) => {
     return raw;
 };
 
-const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, REFUSAL } = access;
+const { humanActor, callerOf, canManageAgents, canControlRun, canActAsAgent, visibleProjectIdsFor, agentProjectsFor, readScopeOf, canSeeRun, canSeeProposal, decidesProposals, REFUSAL } = access;
 
 /* A run that is someone else's private work is not there for an owner or admin; a member's standing
  * on a run is decided by the checks each route already makes. */
@@ -107,6 +115,12 @@ const refuseSkills = async (res, companyId, set) => {
     return errors.length ? fail(res, 'The agent names skills that cannot run.', 400, { data: { errors } }) : null;
 };
 
+const roleNameOf = (key) => {
+    const [blueprint, slug] = String(key || '').split('/');
+    const role = blueprint && slug ? require('./rolePlaybooks').find(blueprint, slug) : null;
+    return role ? role.name : '';
+};
+
 const agentPatchFields = (body) => {
     const set = {};
     if (body.name !== undefined) set.name = String(body.name).trim().slice(0, 80);
@@ -122,6 +136,7 @@ const agentPatchFields = (body) => {
     if (body.schedule !== undefined && typeof body.schedule === 'object') set.schedule = body.schedule;
     if (body.rateLimitPerDay !== undefined) set.rateLimitPerDay = Math.max(0, Number(body.rateLimitPerDay) || 0);
     if (body.confidenceFloor !== undefined) set.confidenceFloor = confidence.floorToStore(body.confidenceFloor);
+    if (body.role !== undefined) set.role = require('./agentRole').roleOf(body.role);
     return set;
 };
 
@@ -138,7 +153,7 @@ exports.listAgents = async (req, res) => {
             callerOf(req, companyId).then((caller) => visibleProjectIdsFor(companyId, caller)),
         ]);
         const agents = await skillRecord.enrichAgentSkills(companyId, rows || []);
-        return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map((agent) => ({ ...agent, ...agentProjectsFor(agent, visible) })) });
+        return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map((agent) => ({ ...agent, ...agentProjectsFor(agent, visible), roleName: roleNameOf(agent.role) })) });
     } catch (e) { logger.error(`listAgents: ${e.message}`); return fail(res, e.message, 500); }
 };
 
@@ -341,7 +356,7 @@ exports.pauseAll = async (req, res) => {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         if (refuseUnlessManager(res, await callerOf(req, companyId), 'Agents cannot pause agents.')) return undefined;
-        const out = await runs.pauseAll(companyId, `pause all by ${req.uid}`);
+        const out = await runs.pauseAll(companyId, `pause all by ${req.uid}`, req.uid);
         return res.send({ status: true, statusText: 'All agents paused.', data: out });
     } catch (e) { logger.error(`pauseAll: ${e.message}`); return fail(res, e.message, 500); }
 };
@@ -476,7 +491,8 @@ exports.startRun = async (req, res) => {
         if (taskId) {
             task = await tools.getTask(companyId, taskId).catch(() => null);
             if (!task) return fail(res, 'Task not found.', 404);
-            if (human && !(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
+            if (!triggers.isWorkTask(task) || !tokenAllowsProject(req.apiToken, task.ProjectID)) return fail(res, 'Task not found.', 404);
+            if (!(await triggers.mayRunOn(companyId, actor.userId, task))) return fail(res, 'Task not found.', 404);
             if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) return fail(res, 'This agent is not scoped to that project.', 403);
         }
         if (!task) {
@@ -484,6 +500,10 @@ exports.startRun = async (req, res) => {
             // never executed and never finished — "running" forever in every counter.
             return fail(res, 'This agent needs a task to run on. Assign the agent to a task, @mention it in a task comment, or run it on a task from the agent\'s page.');
         }
+        const paused = await runs.pausedIn(companyId, task.ProjectID);
+        if (paused) return fail(res, paused, 409);
+        const held = human ? '' : await runStart.heldBy(companyId, actor, task);
+        if (held) return refuse(req, res, actor, { action: runStart.START, reason: held, params: { taskId: String(task._id) }, entityId: String(task._id) });
         const { run, deduplicated } = await runs.start(companyId, { agent, taskId, projectId: task && task.ProjectID, skill: runs.skillSlugOf(agent, skill), trigger: TRIGGERS.includes(trigger) ? trigger : 'manual', startedBy: actor.userId, viaAccount: isAgent(actor) ? actor.viaAccount : agent.account, note, spendCapUsd, notifyMe: Boolean(notifyMe), idempotencyKey });
         const plain = typeof run.toObject === 'function' ? run.toObject() : { ...run };
         if (deduplicated) return res.send({ status: true, statusText: 'Run already started.', data: { ...plain, deduplicated: true } });
@@ -537,9 +557,19 @@ exports.putSettings = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
-        if (!canManageAgents(await callerOf(req, companyId))) return fail(res, 'Owner/admin only.', 403);
+        const caller = await callerOf(req, companyId);
+        if (!canManageAgents(caller)) return fail(res, 'Owner/admin only.', 403);
+        const before = await budget.settings(companyId);
         const out = await budget.updateSettings(companyId, req.body || {});
         if (out.error) return fail(res, out.error, out.status || 400);
+        const limitsOf = (s) => ({ monthlyBudgetUsd: s.monthlyBudgetUsd, dailyBudgetUsd: s.dailyBudgetUsd });
+        const [from, to] = [limitsOf(before), limitsOf(out.settings)];
+        if (from.monthlyBudgetUsd !== to.monthlyBudgetUsd || from.dailyBudgetUsd !== to.dailyBudgetUsd) {
+            await agentAudit.recordBudgetChange(companyId, caller.actor, { from, to, ip: req.ip || '' });
+        }
+        if (JSON.stringify(before) !== JSON.stringify(out.settings)) {
+            socketEmitter.emit('update', { type: 'update', module: 'agent', companyId, data: { kind: BUDGET_CHANGE }, updatedFields: { kind: BUDGET_CHANGE }, actor: { kind: 'human' }, depth: 1 });
+        }
         return res.send({ status: true, statusText: 'Settings updated.', data: { ...out.settings, provider: budget.provider() } });
     } catch (e) { logger.error(`putSettings: ${e.message}`); return fail(res, e.message, 500); }
 };
@@ -582,19 +612,45 @@ exports.putRoutingPolicy = async (req, res) => {
     } catch (e) { logger.error(`putRoutingPolicy: ${e.message}`); return fail(res, e.message, 500); }
 };
 
+/* What the AI Inbox page draws a proposal from, beside the proposal itself: for a person, the one card of a batch
+ * and the card of each change that waits (the same the Inbox queue shows, naming only what that person may see, and
+ * marking the parts of a plan that person may not approve), and which changes came with no words of their own. */
+const asCards = async (companyId, caller, listed, locks) => {
+    const intentPreview = require('./intentPreview');
+    const cards = (build, rows) => (caller.human
+        ? build(companyId, caller.actor.userId, rows, { locks }).catch((e) => { logger.error(`proposal cards: ${e.message}`); return new Map(); })
+        : new Map());
+    const [batches, previews] = await Promise.all([cards(intentPreview.forBatches, listed), cards(intentPreview.forProposals, listed.filter((p) => p.status === proposals.STATUS.PENDING))]);
+    const { markOf } = require('./changeLabels');
+    return listed.map((p) => ({
+        ...p,
+        changes: (Array.isArray(p.changes) ? p.changes : []).map((change, at) => {
+            const preview = (previews.get(String(p._id)) || [])[at];
+            return { ...change, ...markOf(change), ...(preview ? { preview } : {}) };
+        }),
+        ...(batches.has(String(p._id)) ? { batch: batches.get(String(p._id)) } : {}),
+    }));
+};
+
 /* GET /api/v2/agents/proposals?status=pending&bucket=primary|later&agentId= */
 exports.listProposals = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId) return fail(res, 'companyId is required.');
         const q = req.query || {};
-        const readScope = await readScopeOf(companyId, await callerOf(req, companyId));
-        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope });
-        return res.send({ status: true, statusText: 'Proposals fetched.', data: out.proposals, counts: out.counts });
+        const caller = await callerOf(req, companyId);
+        const readScope = await readScopeOf(companyId, caller);
+        // An agent reads what waits; whether a row is a person's to decide is said to a person.
+        // The rights behind a waiting plan are read once for this request, for its standing and for its card.
+        const locks = new Map();
+        const out = await proposals.list(companyId, { status: q.status === 'all' ? undefined : (q.status || 'pending'), bucket: q.bucket, agentId: q.agentId, limit: q.limit, ...readScope, viewer: caller.human ? caller : null, locks });
+        return res.send({ status: true, statusText: 'Proposals fetched.', data: await asCards(companyId, caller, out.proposals, locks), counts: out.counts });
     } catch (e) { logger.error(`listProposals: ${e.message}`); return fail(res, e.message, 500); }
 };
 
-/* POST /api/v2/agents/proposals — only an agent files one, and only in its own name */
+const NAMED_NOT_FOUND = 'A task, project, list, doc or run this proposal names was not found.';
+
+/* POST /api/v2/agents/proposals — only an agent files one, only in its own name, only about what its person can open, only in the projects it works in, and a plan only as a connected agent could file it */
 exports.createProposal = async (req, res) => {
     try {
         const companyId = companyOf(req);
@@ -607,32 +663,56 @@ exports.createProposal = async (req, res) => {
         if (!canActAsAgent(caller, agentId)) return fail(res, REFUSAL.ACT_AS_AGENT, 403);
         const agent = await runs.getAgent(companyId, agentId);
         if (!agent) return fail(res, 'Agent not found.', 404);
+        if (!proposalText.words(b.what)) return fail(res, 'what is required: say in one sentence what the proposal does.');
         if (actor.tokenId && require('./connectors/slackPost').hasSlackChange(b.changes)) return fail(res, 'A Slack message is proposed only by a workspace agent\'s own run, not through a token.', 403);
-        const saved = await proposals.create(companyId, { agent, runId: b.runId || actor.runId, taskId: b.taskId, projectId: b.projectId, what: b.what, why: b.why, changes: b.changes, gate: b.gate, priority: b.priority, cost: b.cost });
+        const runId = b.runId || actor.runId;
+        const open = await proposalFiling.namesOnlyOpenThings(companyId, actor.userId, b) && (!runId || await proposalFiling.ownRun(companyId, actor.userId, agentId, runId));
+        if (!open) return fail(res, NAMED_NOT_FOUND, 404);
+        if (!(await proposalFiling.insideAgentScope(companyId, agent, b))) return fail(res, 'This agent is not scoped to that project.', 403);
+        const refused = await proposalFiling.refusedChange(companyId, actor, b);
+        if (refused) return refuse(req, res, actor, { ...refused, entityId: refused.params.taskId });
+        const stopped = await proposalFiling.stoppedPlan(companyId, actor, agent, b);
+        if (stopped && stopped.error) return fail(res, stopped.error, 400);
+        if (stopped) return refuse(req, res, actor, { ...stopped, entityId: stopped.params.projectId });
+        const saved = await proposals.create(companyId, { agent, runId, taskId: b.taskId, projectId: b.projectId, what: b.what, why: b.why, changes: b.changes, gate: proposalFiling.gateAsked(b.gate), priority: b.priority, cost: b.cost });
         return res.send({ status: true, statusText: 'Proposal filed.', data: saved });
     } catch (e) { logger.error(`createProposal: ${e.message}`); return fail(res, e.message, e.status || 500); }
 };
 
-const decide = (fn) => async (req, res) => {
+/* An approval stays approved when part of it was not made (proposals.approve keeps `notMade`); its answer names what. */
+const approvalText = (out) => {
+    const notMade = (out && out.proposal && Array.isArray(out.proposal.notMade)) ? out.proposal.notMade : [];
+    if (!notMade.length) return 'Done.';
+    const lines = notMade.map((entry) => [entry.name, entry.error].filter(Boolean).join(': ')).join(' ');
+    const madeAny = Array.isArray(out.applied) && out.applied.some((change) => change && change.ok);
+    return `${madeAny ? 'Approved, but part of it was not made.' : 'Approved, but nothing was made.'} ${lines}`;
+};
+
+/* `heldTo`, when given, is asked of the caller and the proposal before the decision is taken; it answers a refusal or null. */
+const decide = (action, fn, heldTo = null) => async (req, res) => {
     try {
+        if (!(await personDecides(req, res, action))) return undefined;
         const companyId = companyOf(req);
         if (!companyId || !OBJECT_ID.test(req.params.id)) return fail(res, 'companyId and a valid proposal id are required.');
         const caller = await callerOf(req, companyId);
-        if (!caller.human) return fail(res, 'Agents cannot decide proposals — a person has to.', 403);
+        if (!caller.human) return fail(res, REFUSAL.DECIDE_PERSON, 403);
         // One answer for a proposal that is not there and one the caller may not see.
         const proposal = await proposals.get(companyId, req.params.id);
         if (!proposal || !(await canSeeProposal(companyId, caller, proposal))) return fail(res, 'Proposal not found.', 404);
-        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
+        if (!decidesProposals(caller)) return fail(res, REFUSAL.DECIDE_MEMBER, 403, refusalOf({ reason: 'not_permitted' }));
+        const held = heldTo ? await heldTo(companyId, caller, proposal) : null;
+        if (held) return fail(res, held.error, held.status, refusalOf(held));
+        const out = await fn(companyId, req.params.id, { decider: caller.actor, isPrivileged: caller.privileged, changes: req.body && req.body.changes, parts: req.body && req.body.parts, reason: req.body && req.body.reason, ip: req.ip || '', always: Boolean(req.body) && req.body.always === true, viaToken: Boolean(req.apiToken) });
         if (out.error) return fail(res, out.error, out.status || 400, refusalOf(out));
-        return res.send({ status: true, statusText: 'Done.', data: out });
+        return res.send({ status: true, statusText: action === 'proposal.approve' ? approvalText(out) : 'Done.', data: out });
     } catch (e) { logger.error(`proposal decision: ${e.message}`); return fail(res, e.message, 500); }
 };
 
 const approveOnceOrAlways = (companyId, id, { always, ...decision }) => (always ? standingApprovals.approveAlways(companyId, id, decision) : proposals.approve(companyId, id, decision));
 
-exports.approveProposal = decide(approveOnceOrAlways);
-exports.declineProposal = decide(proposals.decline);
-exports.undoProposal = decide(proposals.undoApproval);
+exports.approveProposal = decide('proposal.approve', approveOnceOrAlways);
+exports.declineProposal = decide('proposal.decline', proposals.decline, approverRights.declineRefusal);
+exports.undoProposal = decide('proposal.undo', proposals.undoApproval);
 
 /* GET / PUT / DELETE /api/v2/agents/account — my personal coding-agent link */
 exports.getAccount = async (req, res) => {
@@ -675,16 +755,28 @@ exports.getPolicy = async (req, res) => {
     } catch (e) { return fail(res, e.message, 500); }
 };
 
-exports.setPolicy = async (req, res) => {
+const POLICY_EDIT_ACTION = 'workspace.agent_policy.edit';
+const POLICY_CHANGE = 'policy';
+const BUDGET_CHANGE = 'budget';
+
+/* An API token never changes it, whoever holds it: the policy is what holds a token's agent. */
+const saveWorkspacePolicy = async (req, res) => {
     try {
         const companyId = companyOf(req);
         if (!companyId || !req.uid) return fail(res, 'Unauthorized.', 401);
-        if (!canManageAgents(await callerOf(req, companyId))) return fail(res, 'Owner/admin only.', 403);
-        const out = await accounts.setPolicy(companyId, req.body || {});
+        if (req.apiToken) return fail(res, 'An API token cannot change the workspace\'s agent settings.', 403);
+        const caller = await callerOf(req, companyId);
+        if (!canManageAgents(caller)) return fail(res, 'Owner/admin only.', 403);
+        const out = await accounts.setPolicy(companyId, req.body || {}, caller.actor.userId);
         if (out.error) return fail(res, out.error, out.status || 400);
+        await agentAudit.recordWorkspacePolicyChange(companyId, caller.actor, { from: out.from, to: out.policy, ip: req.ip || '' });
+        socketEmitter.emit('update', { type: 'update', module: 'agent', companyId, data: { kind: POLICY_CHANGE }, updatedFields: { kind: POLICY_CHANGE }, actor: { kind: 'human' }, depth: 1 });
         return res.send({ status: true, statusText: 'Policy updated.', data: out.policy });
     } catch (e) { logger.error(`setPolicy: ${e.message}`); return fail(res, e.message, 500); }
 };
+
+exports.setPolicy = [agentsRefused(POLICY_EDIT_ACTION), saveWorkspacePolicy];
+exports.POLICY_EDIT_ACTION = POLICY_EDIT_ACTION;
 
 /* GET /api/v2/agents/team — the Team board (13h): people and agents, what each
  * is on right now, load for the week, PTO, and a composed standup. */
@@ -724,7 +816,7 @@ exports.routableTasks = async (req, res) => {
         const sprints = await hiddenSprintFilter(companyId, req.uid, wanted);
         const rows = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
-            data: [{ ...sprints, deletedStatusKey: { $ne: 1 }, ProjectID: { $in: wanted }, statusType: { $nin: ['close', 'done', 'default_close'] } },
+            data: [{ ...sprints, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, ProjectID: { $in: wanted }, statusType: { $nin: ['close', 'done', 'default_close'] } },
                    'TaskName TaskKey status statusType Task_Priority ProjectID tagsArray AssigneeUserId totalEstimatedTime updatedAt links description rawDescription',
                    { sort: { updatedAt: -1 }, limit }],
         }, 'find').catch(() => []);

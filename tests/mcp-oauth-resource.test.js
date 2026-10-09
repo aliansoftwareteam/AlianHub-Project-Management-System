@@ -1,9 +1,10 @@
+require('./fixtures/mcpFlagsOff');
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
 jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: jest.fn(async () => true) }));
 jest.mock('../Modules/ApiTokens/controller', () => ({ verifyToken: jest.fn(), logTokenActivity: jest.fn() }));
 jest.mock('../Modules/Agents/actor', () => ({ resolveActor: jest.fn(async () => ({ kind: 'agent', userId: '6f0000000000000000000001' })) }));
 jest.mock('../Modules/Agents/actions', () => ({ RefusedError: class RefusedError extends Error {} }));
-jest.mock('../Modules/Agents/registry', () => ({ NEVER: [] }));
+jest.mock('../Modules/Agents/registry', () => ({ ...jest.requireActual('../Modules/Agents/registry'), NEVER: [] }));
 jest.mock('../Modules/Mcp/tools', () => ({ manifest: () => [], usable: () => [], call: jest.fn(async () => ({ ok: true })) }));
 
 const express = require('express');
@@ -46,9 +47,9 @@ afterEach(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete p
 
 beforeEach(() => {
     jest.clearAllMocks();
-    delete process.env.MCP_OAUTH;
+    process.env.MCP_OAUTH = 'off';
     delete process.env.MCP_OAUTH_ISSUER;
-    delete process.env.MCP_TOOLS_MANAGE;
+    process.env.MCP_TOOLS_MANAGE = 'off';
     process.env.APIURL = `${ISSUER}/`;
     apiTokens.verifyToken.mockResolvedValue(tokenWith(['read', 'write']));
 });
@@ -94,9 +95,15 @@ describe('protected resource metadata (RFC 9728)', () => {
     });
 
     it.each(['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp'])('answers 404 for %s with the flag off', async (path) => {
-        const base = await serve({ APIURL: `${ISSUER}/` });
+        const base = await serve({ MCP_OAUTH: 'off', APIURL: `${ISSUER}/` });
         const res = await fetch(`${base}${path}`, { headers: { accept: 'application/json' } });
         expect(res.status).toBe(404);
+    });
+
+    it('serves the metadata with the flag unset and an https issuer', async () => {
+        const base = await serve({ APIURL: `${ISSUER}/` });
+        const res = await fetch(`${base}/.well-known/oauth-protected-resource/mcp`, { headers: { accept: 'application/json' } });
+        expect(res.status).toBe(200);
     });
 });
 

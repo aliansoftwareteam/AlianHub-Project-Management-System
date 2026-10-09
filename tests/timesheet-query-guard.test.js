@@ -12,6 +12,7 @@ jest.mock('../Config/permissionGuard', () => ({
 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn() }));
 jest.mock('../Modules/PersonalList/ownership', () => ({ ...jest.requireActual('../Modules/PersonalList/ownership'), othersPersonalListIds: jest.fn(async () => []) }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ ...jest.requireActual('../Modules/Sprints/helpers/sprintVisibility'), hiddenSprintIds: jest.fn(async () => []) }));
 jest.mock('../Modules/EstimatedTime/aiTaskEstimator', () => ({ estimateAndPersist: jest.fn(), _internal: {} }));
 jest.mock('../Modules/LogTime/controllerV2/helpers', () => ({ updateRemainingTime: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
@@ -364,6 +365,33 @@ describe('review 635: POST /api/v1/timesheet/timelog', () => {
         grant({});
         const r = await call(timeLog.getTimeLogTimeSheet, {});
         expect(r.code).toBe(200);
+    });
+
+    it('reads typed text in a named stage as text, inside a facet too', async () => {
+        getRoleType.mockResolvedValue(3);
+        grant({});
+        const r = await call(timeLog.getTimeLogTimeSheet, {
+            taskIds,
+            addFields: { $addFields: { hit: { $regexMatch: { input: '$note', regex: 'a|b', options: 'i' } } } },
+            facet: { $facet: { rows: [{ $match: { TaskName: { $regex: '(a+)+$', $options: 'i' } } }] } },
+        });
+        expect(r.code).toBe(200);
+        expect(sentPipeline().slice(1)).toEqual([
+            { $addFields: { hit: { $regexMatch: { input: '$note', regex: 'a\\|b', options: 'i' } } } },
+            { $facet: { rows: [{ $match: { TaskName: { $regex: '\\(a\\+\\)\\+\\$', $options: 'i' } } }] } },
+        ]);
+    });
+
+    it.each([
+        ['text that is not text', { $regex: { $literal: 'x' } }],
+        ['text longer than a search takes', { $regex: 'a'.repeat(201) }],
+        ['flags that are not flags', { $regex: 'a', $options: 'g; drop' }],
+    ])('refuses %s in a facet with 400', async (label, condition) => {
+        getRoleType.mockResolvedValue(3);
+        grant({});
+        const r = await call(timeLog.getTimeLogTimeSheet, { taskIds, facet: { $facet: { rows: [{ $match: { TaskName: condition } }] } } });
+        expect(r.code).toBe(400);
+        expect(mockCrud).not.toHaveBeenCalled();
     });
 });
 

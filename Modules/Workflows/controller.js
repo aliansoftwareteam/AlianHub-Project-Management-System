@@ -1,8 +1,11 @@
 const logger = require('../../Config/loggerConfig');
+const telemetry = require('../../Config/telemetry');
 const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const { getRoleType } = require('../../Config/permissionGuard');
-const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { nonMembersOf, guestsOf, NOT_A_MEMBER, NOT_A_GUEST } = require('../../Config/companyMembers');
+const { ROLE_GUEST } = require('../../Config/roleTypes');
 const access = require('../Agents/access');
+const { personDecides, isSignedInSession } = require('../Agents/personDecides');
 const revert = require('../Agents/revert');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
@@ -14,7 +17,11 @@ const executors = require('./executors');
 const queue = require('./queue');
 const stepTypes = require('./stepTypes');
 const definitions = require('./definitions');
+const templates = require('./templates');
 const dryRun = require('./dryRun');
+const { canReadProject } = require('../../Config/projectAccess');
+const { canReadTask, TASK_READ_FIELDS } = require('../Tasks/helpers/taskReadAccess');
+const { readableTaskIds } = require('../Tasks/helpers/taskWritePlacement');
 
 // The workflow API: start a run, read a run and its steps, and apply the four
 // controls a person has over a step that went wrong.
@@ -38,6 +45,8 @@ const REASON_MAX = 500;
 const AGENT_STEP_ID = 'sAgent';
 
 const UNAVAILABLE = 'The workflow engine is off. Set WORKFLOW_ENGINE=on to use workflows.';
+// Steps sent with a start are a workflow nobody saved, and what runs with no person there is set by a person signed in.
+const STEPS_BY_A_PERSON = 'An API token starts a saved workflow. Steps written into the request need a person signed in to AlianHub.';
 
 const fail = (res, statusText, code) => res.status(code || 400).send({ status: false, statusText, message: statusText });
 const ok = (res, statusText, data) => res.send({ status: true, statusText, data });
@@ -78,10 +87,16 @@ const readableRun = async (companyId, caller, runId) => {
     const run = await store.getRun(companyId, runId);
     if (!run) return null;
     if (caller.privileged) return (await access.readableRuns(companyId, caller, [run])).length ? run : null;
-    if (String(run.startedBy || '') === String(caller.actor.userId)) return run;
-    const visible = await access.visibleProjectIdsFor(companyId, caller);
-    if (run.projectId && visible && visible.includes(String(run.projectId))) return run;
-    return null;
+    return (await readByMember(companyId, caller, await access.visibleProjectIdsFor(companyId, caller), run)) ? run : null;
+};
+
+/* Someone who is not an owner or admin reads a run they started, and a run of a project they can open; a run
+ * on a task, only when they can open that task. */
+const readByMember = async (companyId, caller, visible, run) => {
+    const uid = String(caller.actor.userId);
+    if (String(run.startedBy || '') === uid) return true;
+    if (!run.projectId || !visible || !visible.includes(String(run.projectId))) return false;
+    return !OBJECT_ID.test(String(run.taskId || '')) || (await readableTaskIds(companyId, uid, [String(run.taskId)])).length === 1;
 };
 
 const CREDENTIAL_FIELDS = ['credentialId', 'previousCredentialId'];
@@ -155,10 +170,15 @@ const validateSteps = (raw) => {
     return steps;
 };
 
+/* Every person a step names owns or takes over an approval, which a member of the company decides. */
 const outsidersIn = async (companyId, steps) => {
     const named = stepTypes.peopleIn(steps);
-    const outside = new Set(await nonMembersOf(companyId, named.map((person) => person.id)));
-    return named.filter((person) => outside.has(person.id)).map((person) => `${person.path}: ${NOT_A_MEMBER}`);
+    const ids = named.map((person) => person.id);
+    const [outside, guests] = await Promise.all([nonMembersOf(companyId, ids), guestsOf(companyId, ids)]);
+    return named.flatMap((person) => {
+        if (outside.includes(person.id)) return [`${person.path}: ${NOT_A_MEMBER}`];
+        return guests.includes(person.id) ? [`${person.path}: ${NOT_A_GUEST}`] : [];
+    });
 };
 
 const refuseOutsiders = async (companyId, steps) => {
@@ -220,6 +240,7 @@ exports.startRun = async (req, res) => {
             if (!saved) return fail(res, 'Workflow not found.', 404);
             if (!saved.enabled) return fail(res, 'This workflow is turned off. Turn it on before starting a run.', 409);
         }
+        if (!saved && body.steps !== undefined && !isSignedInSession(req)) return fail(res, STEPS_BY_A_PERSON, 403);
         const steps = saved ? validateSteps(saved.steps) : stepsFor(body);
         await refuseOutsiders(ctx.companyId, steps);
         const dedupeKey = key ? `api:${ctx.caller.actor.userId}:${key}` : null;
@@ -230,6 +251,7 @@ exports.startRun = async (req, res) => {
             source: 'api',
             dedupeKey,
             startedBy: ctx.caller.actor.userId,
+            traceId: telemetry.traceIdNow() || telemetry.newTraceId(),
             agentId: body.agentId ? String(body.agentId) : null,
             taskId: body.taskId ? String(body.taskId) : null,
             projectId: body.projectId ? String(body.projectId) : null,
@@ -262,8 +284,10 @@ exports.listRuns = async (req, res) => {
         const rows = (await store.listRuns(ctx.companyId, req.query || {})) || [];
         if (ctx.caller.privileged) return ok(res, 'Runs fetched.', await access.readableRuns(ctx.companyId, ctx.caller, rows));
         const visible = await access.visibleProjectIdsFor(ctx.companyId, ctx.caller);
-        const mine = rows.filter((run) => String(run.startedBy || '') === String(ctx.caller.actor.userId)
-            || (run.projectId && visible && visible.includes(String(run.projectId))));
+        const uid = String(ctx.caller.actor.userId);
+        const openTasks = new Set(await readableTaskIds(ctx.companyId, uid, rows.map((run) => run.taskId)));
+        const mine = rows.filter((run) => String(run.startedBy || '') === uid
+            || (run.projectId && visible && visible.includes(String(run.projectId)) && (!OBJECT_ID.test(String(run.taskId || '')) || openTasks.has(String(run.taskId)))));
         return ok(res, 'Runs fetched.', mine);
     } catch (error) {
         logger.error(`[workflow-api] listRuns: ${error.message}`);
@@ -307,6 +331,8 @@ const stepControl = (action, write) => async (req, res) => {
 
         const step = await write(ctx.companyId, run._id, req.params.stepId, { by: ctx.caller.actor.userId, reason: reasonOf(req) });
         if (!step) return fail(res, REFUSED_STATE[action], 409);
+        if (action === 'skip') await executors.ended({ companyId: ctx.companyId, run, step, why: `skipped by a person: ${reasonOf(req) || 'no reason given'}` })
+            .catch((error) => logger.error(`[workflow-api] skipStep: cleaning up after ${step.stepId} failed: ${error.message}`));
 
         await store.reopenRun(ctx.companyId, run._id);
         const dispatched = await queue.dispatch(ctx.companyId, run._id);
@@ -415,14 +441,14 @@ exports.listDefinitions = async (req, res) => {
  * "somebody else got there first" answer are the ones it already had.
  *
  * Who may answer is not the manage rule on its own: an approval names an owner,
- * and the owner of the step answers it whatever their role. An Owner or an Admin
+ * and the owner of the step answers it when they hold a member's seat. An Owner or an Admin
  * may answer any of them, because they can already retry, skip and compensate
  * the step the approval is holding. A past owner may not: a request handed on is
  * not theirs any more. */
 const ownsApproval = (caller, request) => Boolean(request.ownerUserId)
     && String(request.ownerUserId) === String(caller.actor.userId);
 
-const mayDecide = (caller, request) => caller.privileged || ownsApproval(caller, request);
+const mayDecide = (caller, request) => caller.privileged || (Boolean(caller.member) && ownsApproval(caller, request));
 
 const approvalRow = (request, run, step, names) => {
     const owners = (request.owners || []).map(String);
@@ -514,6 +540,46 @@ exports.createDefinition = async (req, res) => {
         return ok(res, 'Workflow saved.', saved);
     } catch (error) {
         logger.error(`[workflow-api] createDefinition: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
+const TEMPLATES_NEED = 'Needs WORKFLOW_ENGINE and DISPATCHER on.';
+
+const templateView = (template, installable) => ({
+    key: template.key, name: template.name, description: template.description, roles: templates.roleKeysOf(template), steps: template.steps.length,
+    installable, ...(installable ? {} : { notInstallableReason: TEMPLATES_NEED }),
+});
+
+exports.listTemplates = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        const installable = flag.roleHandoffSteps();
+        return ok(res, 'Workflow templates fetched.', templates.all().map((template) => templateView(template, installable)));
+    } catch (error) {
+        logger.error(`[workflow-api] listTemplates: ${error.message}`);
+        return fail(res, error.message, 500);
+    }
+};
+
+/* POST /api/v2/workflows/templates/:key/install
+ * A template becomes an ordinary saved definition, disabled; a person enables it and starts a run on a task. */
+exports.installTemplate = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        const template = templates.find(req.params.key);
+        if (!template) return fail(res, 'That workflow template does not exist.', 404);
+        if (!flag.roleHandoffSteps()) return fail(res, TEMPLATES_NEED, 409);
+        const { errors, value } = definitionFrom(templates.copyOf(template));
+        if (errors.length) return failFields(res, errors);
+        const saved = await definitions.create(ctx.companyId, { ...value, by: ctx.caller.actor.userId });
+        return ok(res, 'Workflow saved.', saved);
+    } catch (error) {
+        logger.error(`[workflow-api] installTemplate: ${error.message}`);
         return fail(res, error.message, error.status || 500);
     }
 };
@@ -612,6 +678,7 @@ const approvalAnswer = async (companyId, request, caller, statusText, res, extra
  * body: { decision: 'approved' | 'rejected', comment? } */
 exports.decideApproval = async (req, res) => {
     try {
+        if (!(await personDecides(req, res, 'workflow.approval.decide'))) return undefined;
         const ctx = await approvalContext(req, res);
         if (!ctx) return undefined;
         const decision = String((req.body || {}).decision || '');
@@ -635,19 +702,20 @@ exports.decideApproval = async (req, res) => {
 
 /* The real thing the author wants to try the workflow against, read rather than
  * touched. A task that is not there is an answer, not an error: the plan comes
- * back saying the input was not found. */
-const inputFor = async (companyId, body) => {
+ * back saying the input was not found, and it says the same of one the author
+ * cannot open. */
+const inputFor = async (companyId, uid, body) => {
     if (OBJECT_ID.test(String(body.taskId || ''))) {
         const task = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS, data: [{ _id: String(body.taskId) }, { TaskName: 1, ProjectID: 1 }],
+            type: SCHEMA_TYPE.TASKS, data: [{ _id: String(body.taskId), mainChat: { $ne: true } }, { TaskName: 1, ...TASK_READ_FIELDS }],
         }, 'findOne');
-        if (!task) return { kind: 'task', id: String(body.taskId), found: false };
+        if (!task || !(await canReadTask(companyId, uid, task))) return { kind: 'task', id: String(body.taskId), found: false };
         return { kind: 'task', id: String(task._id), name: task.TaskName || '', projectId: task.ProjectID ? String(task.ProjectID) : null, found: true };
     }
     if (OBJECT_ID.test(String(body.projectId || ''))) {
-        const project = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.PROJECTS, data: [{ _id: String(body.projectId) }, { ProjectName: 1 }],
-        }, 'findOne');
+        const project = (await canReadProject(companyId, uid, String(body.projectId))).allowed
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: String(body.projectId) }, { ProjectName: 1 }] }, 'findOne')
+            : null;
         if (!project) return { kind: 'project', id: String(body.projectId), found: false };
         return { kind: 'project', id: String(project._id), name: project.ProjectName || '', found: true };
     }
@@ -674,7 +742,7 @@ exports.dryRun = async (req, res) => {
         const steps = Array.isArray(body.steps) ? body.steps : [];
         if (!steps.length) return fail(res, 'steps must be a non-empty array');
         if (steps.length > MAX_STEPS) return fail(res, `a workflow may not have more than ${MAX_STEPS} steps`);
-        const input = await inputFor(ctx.companyId, body);
+        const input = await inputFor(ctx.companyId, String(ctx.caller.actor.userId), body);
         return ok(res, 'Dry run planned.', dryRun.plan({ steps, deadlineMs: body.deadlineMs, budgetUsd: body.budgetUsd, input }));
     } catch (error) {
         logger.error(`[workflow-api] dryRun: ${error.message}`);
@@ -693,7 +761,9 @@ exports.reassignApproval = async (req, res) => {
         const toUserId = String((req.body || {}).toUserId || '');
         if (!OBJECT_ID.test(toUserId)) return fail(res, 'A valid toUserId is required.');
         if (toUserId === String(ctx.request.ownerUserId || '')) return fail(res, 'This approval is already theirs.', 409);
-        if ((await getRoleType(ctx.companyId, toUserId)) === null) return fail(res, 'That person is not a member of this company.');
+        const theirRole = await getRoleType(ctx.companyId, toUserId);
+        if (theirRole === null) return fail(res, 'That person is not a member of this company.');
+        if (theirRole === ROLE_GUEST) return fail(res, NOT_A_GUEST);
         const moved = await approvals.reassign(ctx.companyId, {
             runId: req.params.id,
             stepId: req.params.stepId,

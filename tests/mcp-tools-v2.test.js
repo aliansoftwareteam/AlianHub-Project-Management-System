@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -163,7 +164,7 @@ describe('names in results', () => {
             priorityName: 'High', taskType: { key: 2, name: 'Bug' }, assignees: [{ id: USER, name: 'Mevil B' }, { id: MATE, name: 'Asha K' }],
         });
         const hidden = seedTask({ sprintId: PRIVATE_SPRINT });
-        expect(await tools.call(ctxFor(), 'task.get', { taskId: hidden._id })).toEqual({ error: 'task not found' });
+        expect(await tools.call(ctxFor(), 'task.get', { taskId: hidden._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
     });
 
     it('gives docs.read a ref and the page\'s project name', async () => {
@@ -286,7 +287,7 @@ describe('destructive calls open a proposal', () => {
         expect(proposals.create).toHaveBeenCalledTimes(1);
         const saved = mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS][0];
         expect(saved).toMatchObject({ source: 'mcp', requestedBy: USER, tokenId: TOKEN, tokenProjectIds: [PROJECT], taskId: t._id, status: 'pending' });
-        expect(saved.changes).toEqual([expect.objectContaining({ action: 'task.comment', params: { taskId: t._id, body: 'drop it' } })]);
+        expect(saved.changes).toEqual([expect.objectContaining({ action: 'task.comment', params: { taskId: t._id, body: 'drop it', notifyMentions: true } })]);
         expect(out).toEqual({ ok: false, pending: true, approval: 'pending', proposalRef: `proposal:${saved._id}`, proposalId: String(saved._id), message: expect.stringMatching(/approv/i) });
     });
 
@@ -310,7 +311,7 @@ describe('destructive calls open a proposal', () => {
         const t = seedTask();
         irreversible('task.comment');
         const oauth = ctxFor({ token: { oauth: true, scopes: ['tasks:read', 'tasks:write'] }, oauth: { clientId: 'cli', grantId: 'g1', scopes: ['tasks:write'] } });
-        await expect(tools.call(oauth, 'task.comment', { taskId: t._id, body: 'x' })).rejects.toMatchObject({ refused: true, message: expect.stringMatching(/personal access token/) });
+        await expect(tools.call(oauth, 'task.comment', { taskId: t._id, body: 'x' })).rejects.toMatchObject({ refused: true, message: expect.stringMatching(/cannot ask for it/) });
         expect(proposals.create).not.toHaveBeenCalled();
         expect(actions.perform).not.toHaveBeenCalled();
     });

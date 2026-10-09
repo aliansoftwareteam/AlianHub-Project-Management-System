@@ -63,14 +63,14 @@
     border-radius: 10px;
     width: 100%;
     max-width: 160px;
-    background: #FFF;
+    background: var(--surface);
 }
 .time_tracking_wapper .download-links-wapper.cursor-pointer.download-links-wapper.cursor-pointer.active{
-    background: #EAEDFF;
+    background: var(--brand-tint);
 }
 .time_tracking_wapper .download-links-wapper:hover {
-    background: #EAEDFF;
-    border: 1px solid #2F3990
+    background: var(--brand-tint);
+    border: 1px solid var(--brand)
 }
 .time_tracking_wapper .download-links-img{
     padding:10px 10px 13px 10px;
@@ -128,7 +128,7 @@
 }
 
 .time_tracking_wapper .download-links-wapper .osversion{
-color:#818181;
+color:var(--ink-2);
 text-align: center;
 font-family: var(--font-ui);
 font-size: 16px;

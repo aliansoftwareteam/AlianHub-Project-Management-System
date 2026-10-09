@@ -91,7 +91,7 @@
 </script>
 <style>
 .upload-body-dragged {
-    background-color: #FFFFFFd6;
+    background-color: color-mix(in srgb, var(--surface) 84%, transparent);
     border: 2px dashed;
     display: flex;
     align-items: center;

@@ -92,7 +92,7 @@
         </header>
 
         <TaskAgentStrip v-if="stripRun" :run="stripRun" />
-        <TaskAgentClaim v-if="task._id" :task-id="String(task._id)" />
+        <TaskAgentClaim v-if="task._id" :task-id="String(task._id)" :round="claimRound" />
 
         <div class="ah-detail__body">
             <div class="ah-detail__main ah-scroll" ref="mainEl">
@@ -197,7 +197,7 @@
                         :sections="filesSections"
                     />
                     <div v-else-if="activeTab === 'relations' && task._id" class="ah-detail__relations">
-                        <LinkedTasks ref="linkedTasksRef" :task="task" />
+                        <LinkedTasks ref="linkedTasksRef" :task="task" @changed="fetchRelations" />
                         <p class="ah-detail__relations-note ah-small">{{ $t('TaskPanel.relations_note') }}</p>
                     </div>
                 </div>
@@ -277,6 +277,7 @@
                     :isMainSpinner="isSpinner"
                     :clientWidth="clientWidth"
                     @agent-run="loadAgentRun"
+                    @agent-handed="claimRound += 1"
                 >
                     <template #status>
                         <button
@@ -370,7 +371,7 @@ import TaskDetailTab from "@/components/molecules/TaskDetailTab/TaskDetailTab.vu
 import TaskDetailRightSide from "@/components/organisms/TaskDetailRightSide/TaskDetailRightSide.vue";
 import LinkedTasks from "@/components/organisms/LinkedTasks/LinkedTasks.vue";
 import Comments from "@/views/Projects/Comments/Comments.vue";
-import { mentionsAnAgent } from "@/utils/agentMention";
+import { mentionsAnAgent, mentionsOwnAi } from "@/utils/agentMention";
 import ActivityLog from "@/components/templates/ActivityLog/ActivityLog.vue";
 import PagesPanel from "@/components/molecules/Pages/PagesPanel.vue";
 import TagChip from "@/components/atom/TagChip/TagChip.vue";
@@ -396,6 +397,7 @@ import { canControlRun } from "@/views/Ai/agentAccess";
 import taskClass from "@/utils/TaskOperations";
 import { onInstantEdit } from "@/utils/instantTaskEdit";
 import { ownEditsInFlight } from "@/utils/taskUpdateMarker";
+import { closingToastKey } from "./taskLeftToast";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { publicConfig } from "@/config/publicConfig";
@@ -595,6 +597,9 @@ function projectSlice() {
 /* The panel shows its own copy of the task, which the store's row does not reach. */
 const stopFollowingEdits = onInstantEdit((taskId, fields) => {
     if (String(taskId) === String(props.taskId)) task.value = { ...task.value, ...fields };
+    else if (subTasks.value.some((sub) => String(sub._id) === String(taskId))) {
+        subTasks.value = subTasks.value.map((sub) => (String(sub._id) === String(taskId) ? { ...sub, ...fields } : sub));
+    }
 });
 
 /* The actor's own socket room does not echo taskUpdate back, so push the change
@@ -914,7 +919,8 @@ watch(taskDetailGetter, (newVal) => {
     }
     const deleted = updatedFields?.deletedStatusKey === 1 || updatedFields?.deletedStatusKey === 2;
     if (deleted && (fullDocument?._id === props.taskId || fullDocument?.isParentTask)) {
-        $toast.info(t(updatedFields.deletedStatusKey === 1 ? "Toast.Task_deleted_successfully" : "Toast.Task_archived_successfully"), { position: "top-right" });
+        const toastKey = closingToastKey(newVal, props.taskId);
+        if (toastKey) $toast.info(t(toastKey), { position: "top-right" });
         emit("close");
         return;
     }
@@ -1047,12 +1053,16 @@ function onCommentInsert(data) {
     if (String(data?.fullDocument?.taskId || "") !== String(props.taskId)) return;
     summaryRef.value?.refresh?.();
     if (mentionsAnAgent(data.fullDocument.message)) loadAgentRun();
+    // The server files the hand-over just after it saves the comment, so the line is read a moment later.
+    if (mentionsOwnAi(data.fullDocument.message)) setTimeout(() => { claimRound.value += 1; }, HAND_OVER_SETTLE_MS);
 }
 
 /* The strip reads the open run on this task; a parent may still hand one in
  * (agentRun) and that wins, since it already knows more than the poll does. */
 const STRIP_STATUS = { running: "running", queued: "running", waiting_approval: "review" };
 const AGENT_RUN_POLL_MS = 15000;
+const HAND_OVER_SETTLE_MS = 1500;
+const claimRound = ref(0);
 const liveRun = ref(null);
 let agentRunPoll = null;
 const SESSION_STRIP_STATUS = { offered: "running", active: "running", completed: "done", failed: "failed", revoked: "failed", unresponsive: "failed" };
@@ -1120,14 +1130,25 @@ function onAgentSession(session) {
     scheduleSessionPoll();
 }
 
+function listenLive() {
+    if (socket?.value?.on) {
+        socket.value.on("taskDetail_agentSession", onAgentSession);
+        socket.value.on("commentInsert", onCommentInsert);
+    }
+    dispatch("projectData/getTaskDetailSnapShot", { taskId: props.taskId }).catch((error) => console.error(error));
+}
+
+/* A tab that comes back into view gets a new connection (App.vue); the room and the listeners of the old one went with it. */
+watch(() => socket?.value, (next, previous) => {
+    if (next && previous && next !== previous) listenLive();
+});
+
 onMounted(async () => {
     loadTask();
     loadAgentRun();
     loadAgentSessions();
-    if (socket?.value?.on) socket.value.on("taskDetail_agentSession", onAgentSession);
+    listenLive();
     document.addEventListener("visibilitychange", visibilityHandler);
-    if (socket?.value?.on) socket.value.on("commentInsert", onCommentInsert);
-    dispatch("projectData/getTaskDetailSnapShot", { taskId: props.taskId }).catch((error) => console.error(error));
 });
 
 onBeforeUnmount(() => {

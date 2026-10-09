@@ -8,7 +8,7 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const socketEmitter = require('../../event/socketEventEmitter');
 const tools = require('../Automations/engine/tools');
 const permissions = require('./permissions');
-const { runAs, byline, toolNameOf } = require('./actingAgent');
+const { runAs, byline, markOf } = require('./actingAgent');
 const { descriptionBlockFrom } = require('../Tasks/helpers/descriptionBlock');
 
 // Task changes an agent makes the way a person makes them: each goes through the task routes' own
@@ -31,11 +31,10 @@ const ARCHIVED_WITH_PARENT = 3;
 const ASSIGN_MODES = Object.freeze(['set', 'add', 'remove']);
 const LINK_KINDS = Object.freeze(['pr', 'branch', 'doc', 'url']);
 const LINKS_MAX = 10;
-const AGENT_NAME_MAX = 60;
 const NO_KEY = '--';
 const KEY_READS = 10;
 const KEY_WAIT_MS = 30;
-const CANNOT_OPEN_PROJECT = 'A person named here cannot open this project.';
+const CANNOT_OPEN_PROJECT = 'Someone named here cannot open this project. Pick people who are on the project, or ask the person to add them first.';
 const SUBTASK_MOVES_WITH_PARENT = 'A subtask moves with its parent: move the top-level task instead.';
 
 const refuse = (message) => new tools.DeterministicError(message);
@@ -44,7 +43,7 @@ const oid = (value) => new mongoose.Types.ObjectId(String(value));
 
 const personOf = (actor) => {
     const uid = idOf(actor && actor.userId);
-    if (!OBJECT_ID.test(uid)) throw refuse('a task change needs a person to make it as');
+    if (!OBJECT_ID.test(uid)) throw refuse('This change has to be made for a person. Ask the person to connect you again.');
     return uid;
 };
 
@@ -53,8 +52,8 @@ const personOf = (actor) => {
 const whoOf = (actor, depth = 0) => {
     const uid = personOf(actor);
     if (!actor || actor.kind !== 'agent') return { uid, via: '', mark: null };
-    const via = String(toolNameOf(actor)).slice(0, AGENT_NAME_MAX);
-    return { uid, via, mark: { userId: uid, agentId: idOf(actor.agentId || actor.clientId) || null, agentName: via, depth: Math.max(0, Number(depth) || 0) } };
+    const mark = markOf(actor, uid, depth);
+    return { uid, via: mark.agentName, mark };
 };
 
 /* The person's name arrives escaped from the route's own preparation; the agent's is escaped here. */
@@ -62,7 +61,7 @@ const namedWith = (who, person, escapeText) => ({ ...person, Employee_Name: byli
 
 const liveTask = async (companyId, taskId) => {
     const task = await tools.getTask(companyId, taskId);
-    if (Number(task.deletedStatusKey) === TRASHED) throw refuse(`task ${taskId} not found`);
+    if (Number(task.deletedStatusKey) === TRASHED) throw refuse(`Task ${taskId} was not found. Check the id, or ask the person which task they mean.`);
     return task;
 };
 
@@ -70,7 +69,7 @@ const storedProject = async (companyId, projectId) => {
     const project = OBJECT_ID.test(idOf(projectId))
         ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(projectId), deletedStatusKey: { $nin: [1] } }] }, 'findOne')
         : null;
-    if (!project) throw refuse('project not found');
+    if (!project) throw refuse('That project was not found. Ask the person which project they mean.');
     return project;
 };
 
@@ -101,7 +100,7 @@ const asRoute = async (companyId, who, action, body, beside = {}) => {
             ['userData', 'user'].filter((key) => payload[key]).forEach((key) => { payload[key] = namedWith(who, payload[key], escapeText); });
         }
         const out = await runAs(who.mark, () => taskMongo[action]({ ...payload, ...beside }));
-        if (out && out.status === false) throw refuse(out.statusText || out.message || `${action} changed nothing`);
+        if (out && out.status === false) throw refuse(out.statusText || out.message || `That change did not do anything. Read the task again, then try once more or tell the person.`);
         return out;
     } catch (error) {
         if (error instanceof TaskWriteRefusal) throw refuse(error.message);
@@ -115,7 +114,7 @@ const EDITS = Object.freeze({
     TaskName: {
         clean: (value) => {
             const title = typeof value === 'string' ? value.trim() : '';
-            if (!title || title.length > TITLE_MAX) throw refuse(`title needs 1 to ${TITLE_MAX} characters`);
+            if (!title || title.length > TITLE_MAX) throw refuse(`The title must be between 1 and ${TITLE_MAX} characters. Shorten it and try again.`);
             return title;
         },
         same: (task, value) => task.TaskName === value,
@@ -124,7 +123,7 @@ const EDITS = Object.freeze({
     },
     rawDescription: {
         clean: (value) => {
-            if (typeof value !== 'string' || value.length > DESCRIPTION_MAX) throw refuse(`description needs text of at most ${DESCRIPTION_MAX} characters`);
+            if (typeof value !== 'string' || value.length > DESCRIPTION_MAX) throw refuse(`The description can be at most ${DESCRIPTION_MAX} characters. Shorten it and try again.`);
             return value;
         },
         same: (task, value) => (task.rawDescription || '') === value,
@@ -136,7 +135,7 @@ const EDITS = Object.freeze({
     Task_Priority: {
         clean: (value) => {
             const priority = String(value || '').toUpperCase();
-            if (!PRIORITIES.includes(priority)) throw refuse(`priority needs one of ${PRIORITIES.join(', ')}`);
+            if (!PRIORITIES.includes(priority)) throw refuse(`The priority must be one of ${PRIORITIES.join(', ')}. Pick one and try again.`);
             return priority;
         },
         same: (task, value) => task.Task_Priority === value,
@@ -150,7 +149,7 @@ const EDITS = Object.freeze({
         clean: (value, zone) => {
             if (value === null) return null;
             const due = instantOf(value, zone);
-            if (!due) throw refuse('dueDate needs a date as YYYY-MM-DD or an ISO date and time, or null to clear it');
+            if (!due) throw refuse('The due date must be a day as YYYY-MM-DD, or a day and time. To clear it, send null.');
             return due;
         },
         same: (task, value) => sameInstant(task.DueDate, value),
@@ -166,7 +165,7 @@ const EDITS = Object.freeze({
     startDate: {
         clean: (value, zone) => {
             const start = instantOf(value, zone);
-            if (!start) throw refuse('startDate needs a date as YYYY-MM-DD or an ISO date and time');
+            if (!start) throw refuse('The start date must be a day as YYYY-MM-DD, or a day and time.');
             return start;
         },
         same: (task, value) => sameInstant(task.startDate, value),
@@ -177,7 +176,7 @@ const EDITS = Object.freeze({
     },
     totalEstimatedTime: {
         clean: (value) => {
-            if (!Number.isInteger(value) || value < 0 || value > ESTIMATE_MAX_MINUTES) throw refuse(`estimateMinutes needs a whole number from 0 to ${ESTIMATE_MAX_MINUTES}`);
+            if (!Number.isInteger(value) || value < 0 || value > ESTIMATE_MAX_MINUTES) throw refuse(`The estimate must be a whole number of minutes from 0 to ${ESTIMATE_MAX_MINUTES}.`);
             return value;
         },
         same: (task, value) => (Number(task.totalEstimatedTime) || 0) === value,
@@ -199,7 +198,7 @@ const cannotOpen = async (companyId, projectId, userIds) => {
 /* The ids a write names as assignees, once each is an active member who can open the project. `held` stay nameable. */
 const assignable = async (companyId, projectId, userIds, held = []) => {
     const named = Array.isArray(userIds) ? [...new Set(userIds.map(idOf))] : null;
-    if (!named || named.length > ASSIGNEES_MAX || named.some((id) => !OBJECT_ID.test(id))) throw refuse(`assignees need a list of at most ${ASSIGNEES_MAX} member ids`);
+    if (!named || named.length > ASSIGNEES_MAX || named.some((id) => !OBJECT_ID.test(id))) throw refuse(`Name at most ${ASSIGNEES_MAX} people, each by member id. Find ids with members.list.`);
     const added = named.filter((id) => !held.includes(id));
     if ((await nonMembersOf(companyId, added)).length) throw refuse(NOT_A_MEMBER);
     if (await cannotOpen(companyId, projectId, added)) throw refuse(CANNOT_OPEN_PROJECT);
@@ -254,6 +253,19 @@ const sprintRef = async (companyId, sprint) => {
     };
 };
 
+/* A subtask lives in its parent's list. The stored row holds the list's ids as ObjectIds (the task schema's
+ * setter), and the route's preparation takes a list only as the plain ids a client sends. */
+const placementUnder = (parent) => {
+    const list = parent.sprintArray || {};
+    const sprintId = idOf(parent.sprintId || list.id);
+    const folderId = idOf(list.folderId || parent.folderObjId);
+    return {
+        sprintId,
+        sprintArray: { id: sprintId, name: list.name || '', ...(folderId ? { folderId, folderName: list.folderName || '' } : {}) },
+        ...(folderId ? { folderObjId: folderId } : {}),
+    };
+};
+
 const destinationOf = async ({ companyId, actor, uid, params }) => {
     const { canReadProject } = require('../../Config/projectAccess');
     const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
@@ -263,9 +275,9 @@ const destinationOf = async ({ companyId, actor, uid, params }) => {
     const sprint = OBJECT_ID.test(sprintId) && OBJECT_ID.test(projectId)
         ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: oid(sprintId), deletedStatusKey: { $nin: [1] } }] }, 'findOne')
         : null;
-    if (!sprint || idOf(sprint.projectId) !== projectId) throw refuse('that list was not found in that project');
-    if (!(await canReadProject(companyId, uid, projectId)).allowed) throw refuse('project not found');
-    if (!isPrivileged(await getRoleType(companyId, uid)) && !(await canSeeSprintById(companyId, uid, sprintId))) throw refuse('that list was not found in that project');
+    if (!sprint || idOf(sprint.projectId) !== projectId) throw refuse('That list was not found in that project. Check sprints.list or ask the person which list they mean.');
+    if (!(await canReadProject(companyId, uid, projectId)).allowed) throw refuse('That project was not found. Ask the person which project they mean.');
+    if (!isPrivileged(await getRoleType(companyId, uid)) && !(await canSeeSprintById(companyId, uid, sprintId))) throw refuse('That list was not found in that project. Check sprints.list or ask the person which list they mean.');
     // A move is held to the key in the project it leaves and in the one it enters, as the task route holds it.
     for (const where of [{ taskId: idOf(params.taskId) }, { projectId }]) {
         const may = await permissions.holderMay(companyId, actor, 'task.move', where);
@@ -277,9 +289,9 @@ const destinationOf = async ({ companyId, actor, uid, params }) => {
 const setArchived = async ({ companyId, who, taskId, to }) => {
     const task = await liveTask(companyId, taskId);
     const from = Number(task.deletedStatusKey) || LIVE;
-    if (to === ARCHIVED && from !== LIVE) throw refuse('the task is already archived');
-    if (to === LIVE && from === ARCHIVED_WITH_PARENT) throw refuse('this subtask was archived with its parent: restore the parent');
-    if (to === LIVE && from !== ARCHIVED) throw refuse('the task is not archived');
+    if (to === ARCHIVED && from !== LIVE) throw refuse('This task is already archived.');
+    if (to === LIVE && from === ARCHIVED_WITH_PARENT) throw refuse('This subtask was archived with its parent. Restore the parent task instead.');
+    if (to === LIVE && from !== ARCHIVED) throw refuse('This task is not archived, so there is nothing to restore.');
     const project = await storedProject(companyId, task.ProjectID);
     await asRoute(companyId, who, 'updateArchiveDelete', {
         companyId, projectData: { ProjectName: project.ProjectName || '' }, sprintId: idOf(task.sprintId), task: { _id: idOf(task._id) }, deletedStatusKey: to,
@@ -326,10 +338,10 @@ const typeNamed = (project, wanted) => {
 const linksFrom = (given, actor) => {
     const { attribution } = require('./actor');
     const by = attribution(actor);
-    if (!Array.isArray(given) || given.length > LINKS_MAX) throw refuse(`links need a list of at most ${LINKS_MAX}`);
+    if (!Array.isArray(given) || given.length > LINKS_MAX) throw refuse(`Send at most ${LINKS_MAX} links.`);
     return given.map((link) => {
         const url = String((link && link.url) || '').trim();
-        if (!/^https?:\/\//i.test(url) || url.length > 2000) throw refuse('each link needs a valid http(s) url');
+        if (!/^https?:\/\//i.test(url) || url.length > 2000) throw refuse('Each link must be a web address starting with http:// or https://.');
         return {
             _id: String(new mongoose.Types.ObjectId()), url,
             kind: LINK_KINDS.includes(link.kind) ? link.kind : (/\/pull\/\d+|\/merge_requests\/\d+/.test(url) ? 'pr' : 'url'),
@@ -342,7 +354,7 @@ const linksFrom = (given, actor) => {
 const createFieldsOf = async ({ companyId, actor, who, project, fields }) => {
     const given = fields && typeof fields === 'object' ? fields : {};
     const unknown = Object.keys(given).filter((name) => !require('./registry').CREATE_FIELDS.includes(name));
-    if (unknown.length) throw refuse(`${unknown.join(', ')} cannot be set when a task is created`);
+    if (unknown.length) throw refuse(`${unknown.join(', ')} cannot be set when a task is created. Create the task first, then change it.`);
     const zone = await zoneOf(who.uid);
     const set = {};
     if (given.rawDescription !== undefined) {
@@ -355,13 +367,13 @@ const createFieldsOf = async ({ companyId, actor, who, project, fields }) => {
         set.dueDateDeadLine = [{ date: set.DueDate }];
     }
     if (given.startDate !== undefined) set.startDate = EDITS.startDate.clean(given.startDate, zone);
-    if (set.startDate && set.DueDate && new Date(set.startDate) > new Date(set.DueDate)) throw refuse('startDate is after dueDate');
+    if (set.startDate && set.DueDate && new Date(set.startDate) > new Date(set.DueDate)) throw refuse('The start date is after the due date. Check both dates.');
     if (given.totalEstimatedTime !== undefined) set.totalEstimatedTime = EDITS.totalEstimatedTime.clean(given.totalEstimatedTime);
     if (given.AssigneeUserId !== undefined) set.AssigneeUserId = await assignable(companyId, idOf(project._id), given.AssigneeUserId);
     if (given.status !== undefined) Object.assign(set, await tools.resolveStatus(companyId, project._id, given.status));
     if (given.TaskType !== undefined) {
         const type = typeNamed(project, given.TaskType);
-        if (!type) throw refuse(`taskType needs one of ${(project.taskTypeCounts || []).map((row) => row && row.name).filter(Boolean).join(', ') || 'the project\'s task types'}`);
+        if (!type) throw refuse(`The task type must be one of ${(project.taskTypeCounts || []).map((row) => row && row.name).filter(Boolean).join(', ') || 'the project\'s task types'}. Pick one and try again.`);
         set.TaskType = type.value;
         set.TaskTypeKey = type.key;
     }
@@ -381,7 +393,7 @@ const listFor = async (companyId, uid, project, sprintId) => {
     const seesAll = isPrivileged(await getRoleType(companyId, uid));
     const identities = seesAll ? [] : await sprintIdentities(companyId, uid);
     const list = lists.find((row) => idOf(row.projectId) === projectId && (seesAll || canSeeSprint(row, identities)));
-    if (!list) throw refuse(sprintId ? 'that list was not found in that project' : 'that project has no list to add a task to');
+    if (!list) throw refuse(sprintId ? 'That list was not found in that project. Check sprints.list or ask the person which list they mean.' : 'That project has no list to add a task to. Ask the person to create one first.');
     return list;
 };
 
@@ -398,7 +410,7 @@ const keyOnceAssigned = async (companyId, taskId) => {
 const createThroughRoute = async ({ companyId, who, project, placement, parent, title, set }) => {
     const rows = flatStatuses(project);
     const opening = rows.find((row) => row.type === 'default_active') || rows[0];
-    if (!opening) throw refuse('that project has no statuses');
+    if (!opening) throw refuse('That project has no statuses yet. Ask the person to add one first.');
     const firstType = (Array.isArray(project.taskTypeCounts) && project.taskTypeCounts[0]) || {};
     const assignees = set.AssigneeUserId || [];
     const data = {
@@ -415,8 +427,36 @@ const createThroughRoute = async ({ companyId, who, project, placement, parent, 
         projectData: { _id: idOf(project._id), CompanyId: String(companyId), lastTaskId: project.lastTaskId || 0, ProjectName: project.ProjectName || '', ProjectCode: project.ProjectCode || '' },
         indexObj: { indexName: 'groupByStatusIndex', searchKey: 'statusKey', searchValue: data.statusKey },
     });
-    if (!created || !created.id) throw refuse('the task was not created');
+    if (!created || !created.id) throw refuse('The task could not be created. Tell the person, and try again later.');
     return { taskId: idOf(created.id), key: await keyOnceAssigned(companyId, created.id), title };
+};
+
+/* The edits a task.edit names that change something, each cleaned as it is stored. */
+const editsOf = (task, params, zone) => {
+    const given = params.fields && typeof params.fields === 'object' ? params.fields : {};
+    const names = Object.keys(given);
+    const unknown = names.filter((name) => !Object.hasOwn(EDITS, name));
+    if (unknown.length) throw refuse(`${unknown.join(', ')} cannot be changed with this tool.`);
+    if (!names.length) throw refuse('Name at least one detail to change.');
+    const wanted = names.map((name) => ({ name, value: EDITS[name].clean(given[name], zone) }));
+    const start = wanted.find((change) => change.name === 'startDate');
+    const due = wanted.find((change) => change.name === 'DueDate');
+    if (start && due && due.value && new Date(start.value) > new Date(due.value)) throw refuse('The start date is after the due date. Check both dates.');
+    return wanted.filter(({ name, value }) => !EDITS[name].same(task, value));
+};
+
+const waitingPlan = ({ companyId, actor, uid, task, changes, zone, approved, applying }) => {
+    const dated = Object.fromEntries(changes.filter(({ name }) => name === 'startDate' || name === 'DueDate').map(({ name, value }) => [name, value]));
+    return Object.keys(dated).length ? require('./waitingTasks').plan({ companyId, actor, uid, task, to: dated, zone, approved, applying }) : null;
+};
+
+/* The waiting tasks a task.edit waiting for approval would move once approved, for its card; nothing is counted or written. */
+const plannedMoves = async ({ companyId, actor, params }) => {
+    const uid = personOf(actor);
+    const task = await liveTask(companyId, params.taskId);
+    const zone = await zoneOf(uid);
+    const waiting = await waitingPlan({ companyId, actor, uid, task, changes: editsOf(task, params, zone), zone, approved: true, applying: false });
+    return waiting ? waiting.answer.moved : [];
 };
 
 const executors = {
@@ -448,44 +488,53 @@ const executors = {
         const title = EDITS.TaskName.clean(params.title);
         const project = await storedProject(companyId, parent.ProjectID);
         const set = await createFieldsOf({ companyId, actor, who, project, fields: params.fields });
-        const placement = { sprintId: idOf(parent.sprintId), sprintArray: parent.sprintArray || {} };
-        const made = await createThroughRoute({ companyId, who, project, placement, parent, title, set });
+        const made = await createThroughRoute({ companyId, who, project, placement: placementUnder(parent), parent, title, set });
         return { result: { subtaskId: made.taskId, key: made.key, title }, undo: { kind: 'subtask', subtaskId: made.taskId, parentTaskId: idOf(parent._id) }, entityId: params.taskId };
     },
 
-    async 'task.edit'({ companyId, actor, params, depth }) {
+    async 'task.edit'({ companyId, actor, params, depth, approvedBy }) {
         const who = whoOf(actor, depth);
         const { uid } = who;
         const task = await liveTask(companyId, params.taskId);
-        const given = params.fields && typeof params.fields === 'object' ? params.fields : {};
-        const names = Object.keys(given);
-        const unknown = names.filter((name) => !Object.hasOwn(EDITS, name));
-        if (unknown.length) throw refuse(`${unknown.join(', ')} cannot be changed here`);
-        if (!names.length) throw refuse('name at least one field to change');
         const zone = await zoneOf(uid);
-        const wanted = names.map((name) => ({ name, value: EDITS[name].clean(given[name], zone) }));
-        const start = wanted.find((change) => change.name === 'startDate');
-        const due = wanted.find((change) => change.name === 'DueDate');
-        if (start && due && due.value && new Date(start.value) > new Date(due.value)) throw refuse('startDate is after dueDate');
-
-        const changes = wanted.filter(({ name, value }) => !EDITS[name].same(task, value));
+        const changes = editsOf(task, params, zone);
+        const waiting = await waitingPlan({ companyId, actor, uid, task, changes, zone, approved: Boolean(approvedBy), applying: true });
         const previous = {};
-        for (const { name, value } of changes) {
-            await EDITS[name].write({ companyId, who, task, value, zone, note: String(params.note || '').slice(0, 500) });
-            Object.assign(previous, EDITS[name].previous(task));
+        try {
+            for (const { name, value } of changes) {
+                await EDITS[name].write({ companyId, who, task, value, zone, note: String(params.note || '').slice(0, 500) });
+                Object.assign(previous, EDITS[name].previous(task));
+            }
+        } catch (error) {
+            if (Object.keys(previous).length) await require('./undo').inverses.update(companyId, { taskId: idOf(task._id), previous }, actor).catch(() => null);
+            throw error;
+        }
+        let shifted = waiting && waiting.rows.length ? waiting.before : [];
+        let answer = waiting ? waiting.answer : null;
+        if (shifted.length) {
+            try {
+                await asRoute(companyId, who, 'bulkUpdateDates', { companyId: String(companyId), dates: waiting.rows, userData: {} });
+            } catch (error) {
+                answer = { ...answer, moved: [], notMoved: answer.moved.map((entry) => ({ taskId: entry.taskId, title: entry.title })), error: `The waiting tasks were not moved: ${error.message}` };
+                shifted = [];
+            }
         }
         const changed = changes.map((change) => change.name);
-        return { result: { changed }, undo: changed.length ? { kind: 'update', taskId: idOf(task._id), previous } : null, entityId: task._id, entityName: task.TaskName };
+        return {
+            result: { changed, ...(answer ? { waitingTasks: answer } : {}) },
+            undo: changed.length ? { kind: 'update', taskId: idOf(task._id), previous, ...(shifted.length ? { shifted } : {}) } : null,
+            entityId: task._id, entityName: task.TaskName,
+        };
     },
 
     async 'task.assignees.set'({ companyId, actor, params, depth }) {
         const who = whoOf(actor, depth);
         const task = await liveTask(companyId, params.taskId);
         const mode = String(params.mode || '');
-        if (!ASSIGN_MODES.includes(mode)) throw refuse(`mode needs one of ${ASSIGN_MODES.join(', ')}`);
+        if (!ASSIGN_MODES.includes(mode)) throw refuse(`The mode must be one of ${ASSIGN_MODES.join(', ')}.`);
         const held = (Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId : []).map(String);
         const named = await assignable(companyId, idOf(task.ProjectID), params.userIds, mode === 'remove' && Array.isArray(params.userIds) ? params.userIds.map(idOf) : held);
-        if (!named.length && mode !== 'set') throw refuse('userIds names no one');
+        if (!named.length && mode !== 'set') throw refuse('Name at least one person by member id.');
         const added = mode === 'remove' ? [] : named.filter((id) => !held.includes(id));
         const removed = mode === 'add' ? [] : held.filter((id) => (mode === 'set' ? !named.includes(id) : named.includes(id)));
 
@@ -510,14 +559,15 @@ const executors = {
         const definition = OBJECT_ID.test(fieldId)
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.CUSTOM_FIELDS, data: [{ _id: oid(fieldId) }] }, 'findOne')
             : null;
-        if (!isTaskFieldOf(definition, task.ProjectID)) throw refuse('that custom field is not one this task\'s project has');
+        if (!isTaskFieldOf(definition, task.ProjectID)) throw refuse('That custom field does not belong to this task\'s project. Check fields.list.');
         const title = definition.fieldTitle || 'The field';
-        if (!fieldAppliesToTask(definition, task)) throw refuse(`${title} is not used for this task's type`);
+        if (!fieldAppliesToTask(definition, task)) throw refuse(`${title} does not apply to this type of task.`);
         const read = storedValueOf(definition, params.value, { zone: await zoneOf(uid) });
         if (read.error) throw refuse(`${title} ${read.error}`);
 
         const held = task.customField && task.customField[fieldId] !== undefined ? task.customField[fieldId] : null;
         await asRoute(companyId, who, 'updateTaskCustomField', { companyId, taskId: idOf(task._id), customFieldId: fieldId, updateDetail: { fieldValue: read.value, _id: fieldId } });
+        await require('./computedFields').recompute({ companyId, who, taskIds: [idOf(task._id)] });
         return { result: { fieldId, title: definition.fieldTitle || '' }, undo: { kind: 'update', taskId: idOf(task._id), previous: { [`customField.${fieldId}`]: held } }, entityId: task._id, entityName: task.TaskName };
     },
 
@@ -526,17 +576,17 @@ const executors = {
         const { uid } = who;
         const task = await liveTask(companyId, params.taskId);
         if (task.ParentTaskId) throw refuse(SUBTASK_MOVES_WITH_PARENT);
-        if ((Number(task.deletedStatusKey) || LIVE) !== LIVE) throw refuse('an archived task is restored before it is moved');
+        if ((Number(task.deletedStatusKey) || LIVE) !== LIVE) throw refuse('This task is archived. Restore it first, then move it.');
         const destination = await destinationOf({ companyId, actor, uid, params });
         const destinationId = idOf(destination.project._id);
-        if (idOf(task.sprintId) === idOf(destination.sprint._id)) throw refuse('the task is already in that list');
+        if (idOf(task.sprintId) === idOf(destination.sprint._id)) throw refuse('The task is already in that list.');
 
         const { loadSubtree } = require('../Tasks/helpers/taskTree');
         const subtree = await loadSubtree(companyId, task._id, { filter: { deletedStatusKey: { $nin: [TRASHED] } } });
         const source = await storedProject(companyId, task.ProjectID);
         const sameProject = idOf(source._id) === destinationId;
         const mapping = sameProject ? { taskStatusData: source.taskStatusData || [], taskTypeCounts: source.taskTypeCounts || [] } : mappedForMove(source, destination.project);
-        if (!sameProject && !coveredByMapping([task, ...subtree], mapping)) throw refuse('a status or task type on this task is not one its project defines, so it cannot be carried into another project');
+        if (!sameProject && !coveredByMapping([task, ...subtree], mapping)) throw refuse('A status or task type on this task does not exist in the other project, so it cannot be moved there. Ask the person to add it there first.');
 
         const carried = (ids) => (sameProject ? (ids || []).map(String) : peopleWhoOpen(companyId, destinationId, (ids || []).map(String).filter((id) => OBJECT_ID.test(id))));
         const body = {
@@ -564,4 +614,4 @@ const executors = {
     },
 };
 
-module.exports = { executors, setArchived, setStatus, whoOf, asRoute, liveTask, storedProject, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };
+module.exports = { executors, plannedMoves, setArchived, setStatus, whoOf, zoneOf, asRoute, liveTask, storedProject, assignable, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };

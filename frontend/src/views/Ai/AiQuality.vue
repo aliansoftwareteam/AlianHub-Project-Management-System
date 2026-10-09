@@ -19,7 +19,7 @@
                         @click="pick(d)"
                         @keydown.right.prevent="step(1)"
                         @keydown.left.prevent="step(-1)"
-                    >{{ $t('AiQuality.window_days', { n: d }) }}</button>
+                    >{{ $t('AiQuality.window_days', { n: d }, d) }}</button>
                 </div>
             </div>
 
@@ -165,7 +165,8 @@
 
                     <section class="ah-card ai-quality__card" :aria-labelledby="`${uid}-cost`">
                         <h2 :id="`${uid}-cost`" class="ah-label">{{ $t('AiQuality.cost_title', { month: cost.month }) }}</h2>
-                        <p v-if="!cost.features.length" class="ah-small">{{ $t('AiQuality.no_cost') }}</p>
+                        <p v-if="cost.unavailable" class="ah-small" data-test="cost-unavailable">{{ $t('AiQuality.cost_unavailable') }}</p>
+                        <p v-else-if="!cost.features.length" class="ah-small">{{ $t('AiQuality.no_cost') }}</p>
                         <div v-else class="ai-quality__scroll">
                             <table class="ai-quality__table" data-test="cost">
                                 <thead>
@@ -206,6 +207,7 @@ import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 import { isOwnerOrAdmin } from "@/utils/roles";
+import { hourCycleOption } from "@/utils/clockText";
 import AiSidebar from "./AiSidebar.vue";
 import { reasonOf } from "./useAgents";
 import { declineReasonText } from "./episodeText";
@@ -249,7 +251,7 @@ const usdText = (usd) => t("AiQuality.usd", { n: Number(usd || 0).toFixed(2) });
 const listText = (list) => (list && list.length ? list.join(", ") : t("AiQuality.held_out_nothing"));
 const whenText = (at) => {
     const date = at ? new Date(at) : null;
-    return date && !Number.isNaN(date.getTime()) ? date.toLocaleString(locale?.value || undefined, { dateStyle: "medium", timeStyle: "short" }) : "";
+    return date && !Number.isNaN(date.getTime()) ? date.toLocaleString(locale?.value || undefined, { dateStyle: "medium", timeStyle: "short", ...hourCycleOption() }) : "";
 };
 
 const load = async () => {

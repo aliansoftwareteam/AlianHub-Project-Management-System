@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, T-3: "show me". An outside agent asks for the web address of a place in AlianHub and gets it only
    for a thing the person behind the connection can open, built from the address this server is set up with. */
 process.env.STORAGE_TYPE = 'server';
@@ -42,8 +43,10 @@ const server = require('../Modules/Mcp/server');
 
 const {
     CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, P_PERSONAL, L_OPEN, L_SECRET, L_PRIVATE, L_PERSONAL,
-    T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, MISSING, BEFORE, FLAGS, ctx, narrowed, readOnly, outside, settle,
+    T_OPEN, T_SECRET, T_PRIVATE, T_PERSONAL, MISSING, BEFORE, FLAGS, ctx: plainCtx, narrowed: plainNarrowed, readOnly, outside, settle,
 } = world;
+const ctx = (uid, over) => world.managing(plainCtx(uid, over));
+const narrowed = (uid, projectIds) => world.managing(plainNarrowed(uid, projectIds));
 const { seed, rpcThrough, listedThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
@@ -51,7 +54,7 @@ const listed = listedThrough(server);
 const TOOL = 'screen.link';
 const BASE = 'https://hub.example.test';
 const AT = `${BASE}/#/${CID}`;
-const NOT_FOUND = { error: 'not found' };
+const NOT_FOUND = { error: 'That place was not found, or the person cannot open it.' };
 const ADDRESS_KEYS = ['WEBURL', 'APIURL'];
 const savedAddress = Object.fromEntries(ADDRESS_KEYS.map((key) => [key, process.env[key]]));
 
@@ -60,7 +63,7 @@ const link = (caller, args) => rpc(caller, TOOL, args);
 
 beforeEach(() => {
     seed();
-    delete process.env.MCP_TOOLS_WORK;
+    process.env.MCP_TOOLS_WORK = 'off';
     process.env.MCP_TOOLS_DATA = 'on';
     process.env.WEBURL = `${BASE}/`;
     delete process.env.APIURL;
@@ -81,7 +84,7 @@ afterAll(() => {
 
 describe('the tool exists with the read tools', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_DATA;
+        process.env.MCP_TOOLS_DATA = 'off';
         expect(tools.names()).toEqual(BEFORE);
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
@@ -147,6 +150,122 @@ describe('an owner gets the address of each kind of place', () => {
             expect(await link(ctx(OWNER), { screen })).toEqual({ url: `${AT}${path}`, screen });
         },
     );
+});
+
+describe('a link that opens it grouped, filtered or on the person\'s own tasks', () => {
+    const V_LIST = '6f0000000000000000000e21';
+    const V_PRIORITY = '6f0000000000000000000e22';
+    const V_MINE_WEEK = '6f0000000000000000000e23';
+    const V_NARROWER = '6f0000000000000000000e24';
+    const V_OFF = '6f0000000000000000000e25';
+    const F_STAGE = '6f0000000000000000000f11';
+    const dueThisWeek = { name: { value: 'DueDate', name: 'due_date', type: 'date', filterOn: 'DueDate' }, comparison: { value: ':=', name: 'Is' }, values: ['This week'], condition: '&&', date: '' };
+    const view = (_id, keyName, title, settings, extra = {}) => ({ _id, id: _id, keyName, name: title, value: title, title, sortIndex: 1, viewStatus: true, ...(settings ? { settings } : {}), ...extra });
+    const everythingStored = () => JSON.stringify([mockDb.store[SCHEMA_TYPE.PROJECTS], mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS] || []]);
+
+    beforeEach(() => {
+        mockDb.store[SCHEMA_TYPE.PROJECTS].find((row) => String(row._id) === P_OPEN).ProjectRequiredComponent = [
+            view(V_NARROWER, 'ProjectListView', 'Invoices by priority', { groupBy: 2, search: 'invoice' }),
+            view(V_OFF, 'ProjectListView', 'Switched off', { groupBy: `cf:${F_STAGE}` }, { viewStatus: false }),
+            view(V_LIST, 'ProjectListView', 'List'),
+            view(V_PRIORITY, 'ProjectListView', 'By priority', { groupBy: 2, sort: { field: 'DueDate', dir: 1 } }),
+            view(V_MINE_WEEK, 'ProjectKanban', 'Mine this week', { me: true, filters: [dueThisWeek] }),
+        ];
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: F_STAGE, fieldTitle: 'Stage', fieldType: 'dropdown', fieldOptions: [{ id: 'o1', label: 'Design' }, { id: 'o2', label: 'Build' }], type: 'task', isDelete: true, global: false, projectId: [P_OPEN] });
+    });
+
+    it('the everything screen opens on the person\'s own tasks', async () => {
+        expect(await link(ctx(OWNER), { screen: 'everything', mine: true })).toEqual({ url: `${AT}/everything?mine=1`, screen: 'everything', mine: true });
+        expect(await link(ctx(OWNER), { screen: 'everything', mine: false })).toEqual({ url: `${AT}/everything`, screen: 'everything' });
+    });
+
+    it('a project opens on the saved view that already shows it that way', async () => {
+        expect(await link(ctx(OUTSIDER), { screen: 'project', projectId: P_OPEN, groupBy: 'priority' })).toEqual({
+            url: `${AT}/project/${P_OPEN}/p?tab=ProjectListView&view=${V_PRIORITY}`, screen: 'project', view: 'list', savedView: 'By priority',
+        });
+        expect(await link(readOnly(OWNER), { screen: 'project', projectId: P_OPEN, view: 'board', mine: true, due: 'this_week' })).toEqual({
+            url: `${AT}/project/${P_OPEN}/p?tab=ProjectKanban&view=${V_MINE_WEEK}`, screen: 'project', view: 'board', savedView: 'Mine this week',
+        });
+    });
+
+    it('a list opens on its project\'s saved view', async () => {
+        expect(await link(ctx(OWNER), { screen: 'list', sprintId: L_OPEN, groupBy: 'priority' })).toEqual({
+            url: `${AT}/project/${P_OPEN}/s/${L_OPEN}?tab=ProjectListView&view=${V_PRIORITY}`, screen: 'list', view: 'list', savedView: 'By priority',
+        });
+    });
+
+    it('gives the plain link and says so when no saved view shows it that way', async () => {
+        const plain = { url: `${AT}/project/${P_OPEN}/p?tab=ProjectListView`, screen: 'project', view: 'list', note: expect.stringMatching(/no saved view/i) };
+        expect(await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'assignee' })).toEqual(plain);
+        expect(await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'priority', mine: true })).toEqual(plain);
+        expect(await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: F_STAGE })).toEqual(plain);
+        expect(await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, mine: true, due: 'this_week' })).toEqual(plain);
+        expect(await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'priority', statuses: ['Blocked'] })).toEqual(plain);
+        expect((await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'assignee' })).note).not.toMatch(/view\.create/);
+        process.env.MCP_TOOLS_WORK = 'on';
+        expect((await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'assignee' })).note).toMatch(/view\.create/);
+    });
+
+    it('refuses what a screen or a view cannot show', async () => {
+        for (const args of [
+            { screen: 'everything', groupBy: 'priority' }, { screen: 'everything', mine: true, due: 'today' }, { screen: 'home', mine: true },
+            { screen: 'task', taskId: T_OPEN, mine: true }, { screen: 'project', projectId: P_OPEN, view: 'gantt', groupBy: 'priority' },
+            { screen: 'project', projectId: P_OPEN, due: 'someday' },
+            { screen: 'project', projectId: P_OPEN, search: 'invoice' },
+        ]) {
+            expect((await link(ctx(OWNER), args)).rpcError).toMatchObject({ code: -32602 });
+        }
+    });
+
+    it('takes a field by its name, as the person says it, and opens the saved view grouped by it', async () => {
+        const project = mockDb.store[SCHEMA_TYPE.PROJECTS].find((row) => String(row._id) === P_OPEN);
+        project.ProjectRequiredComponent.find((row) => row._id === V_OFF).viewStatus = true;
+        expect(await link(ctx(OWNER), { screen: 'list', sprintId: L_OPEN, groupBy: 'stage' })).toEqual({
+            url: `${AT}/project/${P_OPEN}/s/${L_OPEN}?tab=ProjectListView&view=${V_OFF}`, screen: 'list', view: 'list', savedView: 'Switched off',
+        });
+        expect((await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'Priority' })).savedView).toBe('By priority');
+    });
+
+    it('with no saved view grouped that way, hands over the one view.create to offer instead of listing the tasks', async () => {
+        process.env.MCP_TOOLS_WORK = 'on';
+        const out = await link(ctx(OWNER), { screen: 'list', sprintId: L_OPEN, groupBy: 'Stage' });
+        expect(out).toMatchObject({ url: `${AT}/project/${P_OPEN}/s/${L_OPEN}?tab=ProjectListView`, view: 'list' });
+        expect(out.note).toMatch(/do not list the tasks[\s\S]*view\.create[\s\S]*saveView/i);
+        expect(out.saveView).toEqual({ tool: 'view.create', arguments: { projectId: P_OPEN, name: 'By Stage', kind: 'list', groupBy: F_STAGE } });
+    });
+
+    it('says which fields share a name, and that a name is no field of the project, with no link', async () => {
+        const twin = '6f0000000000000000000f12';
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: twin, fieldTitle: 'Stage', fieldType: 'text', type: 'task', isDelete: true, global: true });
+        const out = await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'Stage' });
+        expect(out.url).toBeUndefined();
+        expect(out.error).toMatch(/more than one field[\s\S]*Stage/i);
+        expect(out.fields).toEqual([{ fieldId: F_STAGE, name: 'Stage', type: 'dropdown', options: ['Design', 'Build'] }, { fieldId: twin, name: 'Stage', type: 'text', options: [] }]);
+        const none = await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'colour' });
+        expect(none.url).toBeUndefined();
+        expect(none.error).toMatch(/no field named "colour"/);
+    });
+
+    it('takes a field id only of a field of this project, and offers a view to save only to a caller that can file one', async () => {
+        process.env.MCP_TOOLS_WORK = 'on';
+        const other = '6f0000000000000000000f13';
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: other, fieldTitle: 'Region', fieldType: 'dropdown', type: 'task', isDelete: true, global: false, projectId: [P_PRIVATE] });
+        const out = await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: other });
+        expect(out.url).toBeUndefined();
+        expect(out.error).toMatch(/no field with the id/);
+        const reading = await link(readOnly(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'assignee' });
+        expect(reading.url).toBe(`${AT}/project/${P_OPEN}/p?tab=ProjectListView`);
+        expect(reading.saveView).toBeUndefined();
+        expect(reading.note).not.toMatch(/view\.create/);
+    });
+
+    it('answers a project the person cannot open as before, and writes nothing', async () => {
+        const before = everythingStored();
+        expect(await link(ctx(OUTSIDER), { screen: 'project', projectId: P_PRIVATE, groupBy: 'priority' })).toEqual(NOT_FOUND);
+        expect(await link(ctx(OWNER), { screen: 'list', sprintId: L_PERSONAL, mine: true })).toEqual(NOT_FOUND);
+        await link(ctx(OWNER), { screen: 'project', projectId: P_OPEN, groupBy: 'assignee' });
+        expect(everythingStored()).toBe(before);
+    });
 });
 
 describe('a thing the person cannot open answers as a thing that is not there', () => {

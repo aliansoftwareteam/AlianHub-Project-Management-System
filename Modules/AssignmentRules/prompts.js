@@ -71,4 +71,4 @@ const readDrafts = (raw, allowed) => {
     return allowed.filter((id) => byId.has(id)).map((userId) => ({ userId, when: byId.get(userId) }));
 };
 
-module.exports = { DECIDE, DRAFT, oneLine, decisionPrompt, readPick, draftPrompt, readDrafts };
+module.exports = { DECIDE, DRAFT, oneLine, taskBlock, decisionPrompt, readPick, draftPrompt, readDrafts };

@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const crypto = require('crypto');
 const { approveInWorkspace } = require('./fixtures/oauthApproval');
 
@@ -94,7 +95,7 @@ beforeEach(() => {
     delete process.env.MCP_OAUTH_ISSUER;
     delete process.env.MCP_OAUTH_TOKEN_SECRET;
     delete process.env.API_TOKEN_STRICT;
-    delete process.env.MCP_TOOLS_MANAGE;
+    process.env.MCP_TOOLS_MANAGE = 'off';
     process.env.MCP_OAUTH = 'both';
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Priya', AssignCompany: C });
     apiTokens.verifyToken.mockResolvedValue({ _id: '6f0000000000000000000141', name: 'Laptop', userId: USER, scopes: ['read', 'write'], active: true });
@@ -203,13 +204,13 @@ describe('an OAuth access token on /mcp', () => {
 describe('a client ID metadata document client (a URL, no client row)', () => {
     const DOCUMENT_CLIENT = { clientId: 'https://agent.s10s4.test/oauth/client.json', kind: 'metadata_document', tokenEndpointAuthMethod: 'none', scopes: [], redirectUris: [REDIRECT] };
 
-    it('is accepted and named after its host', async () => {
+    it('is accepted and named after its host, as an app', async () => {
         const { raw, grant } = await mint({ client: DOCUMENT_CLIENT });
         const res = await post(request({ token: raw, body: call('tasks.search') }));
         expect(res.statusCode).toBe(200);
         const [ctx] = tools.call.mock.calls[0];
         expect(ctx.oauth).toMatchObject({ clientId: DOCUMENT_CLIENT.clientId, grantId: grant.grantId });
-        expect(ctx.actor).toMatchObject({ clientId: DOCUMENT_CLIENT.clientId, agentName: 'agent.s10s4.test' });
+        expect(ctx.actor).toMatchObject({ clientId: DOCUMENT_CLIENT.clientId, agentName: 'agent.s10s4.test (app)' });
         expect(store(SCHEMA_TYPE.OAUTH_CLIENTS)).toHaveLength(0);
     });
 
@@ -362,7 +363,7 @@ describe('MCP_OAUTH modes', () => {
 
     it.each([undefined, 'off', 'nonsense'])('with MCP_OAUTH=%s, an OAuth token gets exactly beta\'s 401', async (value) => {
         const { raw } = await mint();
-        if (value === undefined) delete process.env.MCP_OAUTH; else process.env.MCP_OAUTH = value;
+        if (value === undefined) process.env.MCP_OAUTH = 'off'; else process.env.MCP_OAUTH = value;
         apiTokens.verifyToken.mockResolvedValue(null);
         const res = await post(request({ token: raw, query: { companyId: C } }));
         expect(res.statusCode).toBe(401);
@@ -371,7 +372,7 @@ describe('MCP_OAUTH modes', () => {
     });
 
     it('with the flag off, a personal token works exactly as on beta', async () => {
-        delete process.env.MCP_OAUTH;
+        process.env.MCP_OAUTH = 'off';
         const res = await post(request({ token: PAT, query: { companyId: C }, body: call('task.comment'), headers: { 'mcp-protocol-version': '1999-01-01' } }));
         expect(res.statusCode).toBe(200);
         expect(tools.call).toHaveBeenCalledTimes(1);
@@ -440,7 +441,7 @@ describe('attribution of an OAuth call', () => {
         expect(tools.call.mock.calls[0][0].userId).toBe(actor.delegatedBy);
         expect(attribution(actor)).toEqual({
             actorId: client.clientId, actorType: 'agent', agentId: null, viaAccount: 'external',
-            clientId: client.clientId, grantId: grant.grantId, delegatedBy: USER, label: 'S10S4 Agent for Priya',
+            clientId: client.clientId, grantId: grant.grantId, delegatedBy: USER, label: 'S10S4 Agent (app · 127.0.0.1) for Priya',
         });
     });
 

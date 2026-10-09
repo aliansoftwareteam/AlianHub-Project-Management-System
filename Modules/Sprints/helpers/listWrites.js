@@ -4,6 +4,8 @@ const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueri
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprint, sprintIdentities } = require('./sprintVisibility');
 const { ListWriteError } = require('./listWriteError');
+const { namedInUpdate, heldIn } = require('../../../Config/companyMembers');
+const { namedOnProjectRefusal } = require('../../../Config/projectPeople');
 const { folderCascade, folderForList, refuseRestoreUnderHiddenParent, subfoldersFollowing } = require('./folderTree');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -41,14 +43,14 @@ const sprintUpdateFrom = (updateObject) => {
     Object.entries(updateObject).forEach(([operator, fields]) => {
         if (operator === '$set') {
             fieldsOf(operator, fields).forEach(([field, value]) => {
-                if (!SPRINT_SET_FIELDS[field] || !SPRINT_SET_FIELDS[field](value)) throw new ListWriteError(`A sprint update cannot set ${field} to that value.`);
+                if (!SPRINT_SET_FIELDS[field] || !SPRINT_SET_FIELDS[field](value)) throw new ListWriteError(`A list update cannot set ${field} to that value.`);
             });
         } else if (ONE_PERSON_OPERATORS.includes(operator)) {
             fieldsOf(operator, fields).forEach(([field, value]) => {
                 if (!PEOPLE.includes(field) || !isPerson(value)) throw new ListWriteError(`${operator} takes one member or watcher at a time.`);
             });
         } else {
-            throw new ListWriteError(`A sprint update cannot use ${operator}.`);
+            throw new ListWriteError(`A list update cannot use ${operator}.`);
         }
         update[operator] = { ...fields };
     });
@@ -77,6 +79,9 @@ const folderUpdateFrom = (updateObject) => {
     return { $set: { deletedStatusKey: set.deletedStatusKey } };
 };
 
+const changesSharing = (update) => ['private', 'AssigneeUserId'].some((field) => field in (update.$set || {}))
+    || ONE_PERSON_OPERATORS.some((operator) => 'AssigneeUserId' in (update[operator] || {}));
+
 const findOne = (companyId, type, filter, fields) => MongoDbCrudOpration(companyId, { type, data: [filter, fields] }, 'findOne');
 
 const mayOpenSprint = async (companyId, uid, sprint) => canSeeSprint(sprint, await sprintIdentities(companyId, uid))
@@ -85,14 +90,23 @@ const mayOpenSprint = async (companyId, uid, sprint) => canSeeSprint(sprint, awa
 /*
  * Builds the write for PATCH /api/v1/sprint/:id type updateSprint from the stored sprint: a private
  * sprint answers 404 to anyone it is not shared with, a move lands only in a live folder of the
- * sprint's own project, and the project the cascades run in is the stored one.
+ * sprint's own project, and the project the cascades run in is the stored one. A change to who the
+ * sprint is shared with answers how it was shared before, for the people the change takes it from.
+ * Someone the change brings onto the list, as a member or a watcher, can open the list's project;
+ * a chat channel sits in a chat space, not a project, and keeps the company-member rule of its route.
  */
 const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     const update = sprintUpdateFrom(updateObject);
-    if (!OBJECT_ID.test(String(sprintId || ''))) throw new ListWriteError('A valid sprint id is required.');
-    const sprint = await findOne(companyId, SCHEMA_TYPE.SPRINTS, { _id: oid(sprintId) }, { projectId: 1, private: 1, AssigneeUserId: 1 });
+    if (!OBJECT_ID.test(String(sprintId || ''))) throw new ListWriteError('A valid list id is required.');
+    const sprint = await findOne(companyId, SCHEMA_TYPE.SPRINTS, { _id: oid(sprintId) }, { projectId: 1, private: 1, AssigneeUserId: 1, watchers: 1 });
     if (!sprint) return null;
     if (!(await mayOpenSprint(companyId, uid, sprint))) throw new ListWriteError('Sprint not found.', 404);
+    const held = heldIn(sprint, PEOPLE);
+    const broughtIn = namedInUpdate(update, PEOPLE).filter((id) => !held.has(id));
+    if (broughtIn.length && !(await findOne(companyId, SCHEMA_TYPE.MAIN_CHATS, { _id: oid(sprint.projectId) }, { _id: 1 }))) {
+        const reason = await namedOnProjectRefusal(companyId, String(sprint.projectId), broughtIn);
+        if (reason) throw new ListWriteError(reason);
+    }
     const set = update.$set || {};
     if (set.folderId) {
         const folder = await folderForList(companyId, sprint.projectId, set.folderId);
@@ -100,7 +114,8 @@ const prepareSprintUpdate = async (companyId, uid, sprintId, updateObject) => {
     } else if ('folderId' in set) {
         Object.assign(set, { folderId: null, folderName: '' });
     }
-    return { update, projectId: String(sprint.projectId) };
+    const sharedBefore = changesSharing(update) ? { private: sprint.private === true, AssigneeUserId: (sprint.AssigneeUserId || []).map(String) } : undefined;
+    return { update, projectId: String(sprint.projectId), sharedBefore };
 };
 
 /* An archive, delete or restore cascades onto the folder's own sprints and those of the subfolders that follow it, not the ones the client lists. */

@@ -7,9 +7,9 @@ const ptoRules = require('../../Pto/helpers/ptoRules');
 // reads the database or sends anything. A finding carries `fix` only where the change needs no judgement.
 
 const RULE = Object.freeze({
-    SLIPPING: 'slipping', BLOCKED: 'blocked', OVERLOADED: 'overloaded', UNTRIAGED: 'untriaged', STALE: 'stale', NO_OWNER: 'no_owner', NO_ESTIMATE: 'no_estimate',
+    SLIPPING: 'slipping', BLOCKED: 'blocked', OVERLOADED: 'overloaded', UNTRIAGED: 'untriaged', STALE: 'stale', NO_OWNER: 'no_owner', NO_ESTIMATE: 'no_estimate', TRIAGE: 'triage',
 });
-const MOST_URGENT_FIRST = Object.freeze([RULE.SLIPPING, RULE.BLOCKED, RULE.OVERLOADED, RULE.UNTRIAGED, RULE.STALE, RULE.NO_OWNER, RULE.NO_ESTIMATE]);
+const MOST_URGENT_FIRST = Object.freeze([RULE.SLIPPING, RULE.BLOCKED, RULE.OVERLOADED, RULE.UNTRIAGED, RULE.STALE, RULE.NO_OWNER, RULE.NO_ESTIMATE, RULE.TRIAGE]);
 const STALE_WORKING_DAYS = 5;
 const QUIET_BLOCKER_WORKING_DAYS = 3;
 // The capacity report's own default (Modules/CapacityPlanning/controller.js), so the two agree on what a week holds.

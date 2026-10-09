@@ -3,6 +3,9 @@ import { useStore } from 'vuex';
 import { useCustomComposable } from '@/composable';
 import { clearFilterSignal } from './taskFilterSignal';
 import { ALL, cleanDoneBy, doneByMatch } from '@/components/molecules/Provenance/doneByQuery';
+import { agentTaskIds } from './agentWork';
+import { agentWorkMatch } from './agentWorkQuery';
+import { typedSearchText } from '@/utils/searchText';
 
 const withComparisons = (rows) => rows.map((row) => ({ ...row, comparisonsData: [row.comparison] }));
 
@@ -19,7 +22,9 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
     const filterQuery = ref({});
     const filterRows = ref([]);
     const doneBy = ref(ALL);
+    const agentWorking = ref(false);
     const searchTask = ref(false);
+    const searchFailed = ref(false);
     const collapsed = ref(true);
     const groupBy = ref(0);
     const userSidebar = ref(false);
@@ -52,6 +57,7 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
         filterUsers.value = [];
         taskSearch.value = '';
         doneBy.value = ALL;
+        agentWorking.value = false;
         searchTask.value = false;
         filterQuery.value = '';
         filterRows.value = [];
@@ -94,6 +100,7 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
         filterQuery.value = '';
         filterRows.value = [];
         doneBy.value = ALL;
+        agentWorking.value = false;
         clearFilterSignal.value += 1;
         searchMongoDB();
     }
@@ -105,8 +112,9 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
     }
 
     function searchMongoDB() {
+        searchFailed.value = false;
         const doneByCondition = doneByMatch(doneBy.value);
-        if (!taskSearch.value.trim().length && !filterUsers.value.length && !showArchived.value && !Object.keys(filterQuery.value).length && !doneByCondition) {
+        if (!taskSearch.value.trim().length && !filterUsers.value.length && !showArchived.value && !Object.keys(filterQuery.value).length && !doneByCondition && !agentWorking.value) {
             commit('projectData/mutateSearchTask', { data: [], op: 'added' });
             searchTask.value = false;
             return;
@@ -123,16 +131,17 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
 
         const query_by = {};
         const searchStr = taskSearch.value ? taskSearch.value.toString() : '';
+        const typedText = { $regex: typedSearchText(searchStr), $options: 'i' };
         const andOr = '$or';
         query_by[andOr] = [];
         if (taskNameSearch.value) {
-            query_by[andOr].push({ TaskName: { $regex: searchStr, $options: 'i' } });
+            query_by[andOr].push({ TaskName: typedText });
         }
         if (taskKeySearch.value) {
-            query_by[andOr].push({ TaskKey: { $regex: searchStr, $options: 'i' } });
+            query_by[andOr].push({ TaskKey: typedText });
         }
         if (taskDescriptionSearch.value) {
-            query_by[andOr].push({ rawDescription: { $regex: searchStr, $options: 'i' } });
+            query_by[andOr].push({ rawDescription: typedText });
         }
         searchTask.value = true;
         const query = [
@@ -166,12 +175,17 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
             query[0].$match.$and.push(doneByCondition);
         }
 
+        if (agentWorking.value) {
+            query[0].$match.$and.push(agentWorkMatch(agentTaskIds.value));
+        }
+
         if (!seesEveryonesTasks.value) {
             query[0].$match.$and.push({ AssigneeUserId: { $in: [userId.value] } });
         }
 
         dispatch('projectData/searchTask', { query, showArchived: showArchived.value }).catch((error) => {
             console.error('ERROR in search tasks: ', error);
+            searchFailed.value = true;
         });
     }
 
@@ -197,6 +211,11 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
         searchMongoDB();
     };
 
+    const setAgentWorking = (on) => {
+        agentWorking.value = Boolean(on);
+        searchMongoDB();
+    };
+
     const clearFilter = () => {
         filterQuery.value = '';
         filterRows.value = [];
@@ -211,6 +230,10 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
         searchMongoDB();
     });
 
+    watch(() => agentTaskIds.value.slice().sort().join(), () => {
+        if (agentWorking.value) searchMongoDB();
+    });
+
     return {
         taskSearch,
         taskNameSearch,
@@ -220,7 +243,9 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
         filterQuery,
         filterRows,
         doneBy,
+        agentWorking,
         searchTask,
+        searchFailed,
         collapsed,
         groupBy,
         userSidebar,
@@ -234,6 +259,7 @@ export function useProjectSearch(projectData, showArchived, { buildFilterQuery =
         manageFilterUsers,
         applyFilter,
         setDoneBy,
+        setAgentWorking,
         clearFilter,
     };
 }

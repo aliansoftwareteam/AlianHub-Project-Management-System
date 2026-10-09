@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const crypto = require('crypto');
 const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
@@ -331,9 +332,9 @@ describe('approving a Slack message', () => {
         await slack.setAllowedChannels(C, [], { id: OWNER });
         mockSlack.calls.length = 0;
         const out = await approveAs(p._id, OWNER);
-        expect(out.applied).toEqual([{ action: ACTION, ok: false, error: 'That Slack channel is not on this workspace\'s allow-list.' }]);
+        expect(out.applied).toEqual([{ action: ACTION, ok: false, error: 'That Slack channel is not on the list agents may post to. An owner or an admin can add it on the Integrations screen.' }]);
         expect(mockSlack.calls).toHaveLength(0);
-        expect(proposalRow(p._id)).toMatchObject({ status: 'approved', delivery: [expect.objectContaining({ ok: false, error: expect.stringContaining('allow-list') })] });
+        expect(proposalRow(p._id)).toMatchObject({ status: 'approved', delivery: [expect.objectContaining({ ok: false, error: expect.stringContaining('list agents may post to') })] });
     });
 
     it('a stored proposal whose channel was changed by hand is refused at apply time', async () => {
@@ -516,7 +517,7 @@ describe('with the flag off', () => {
     });
 
     it('named but without its preconditions: the screen is told why, and every route refuses', async () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         const catalogue = await call(integrations.listCatalog, MEMBER);
         expect(catalogue.body.connectors).toEqual(['slack']);
         const seen = await call(ctrl.getSlack, ADMIN);

@@ -90,6 +90,10 @@ const ARCHIVED = 2;
 /* What a row carried by its top holds while the top is live, deleted or archived. */
 const CARRIED_KEY = Object.freeze({ [LIVE]: LIVE, [DELETED]: DELETED, [ARCHIVED]: 3 });
 
+/* A move or a convert takes the row off its list by marking it deleted for a moment. That event carries one of
+ * these, so a screen showing the task does not call it a delete. */
+const LEFT_BECAUSE = Object.freeze({ MOVED: 'moved', SUBTASK: 'subtask', TASK: 'task', LIST: 'list' });
+
 /* What one row adds to its sprint's `tasks` and `archiveTaskCount` when its state changes. */
 const sprintCountChange = (from, to, rows = 1) => {
     const live = (key) => (!key ? 1 : 0);
@@ -99,7 +103,7 @@ const sprintCountChange = (from, to, rows = 1) => {
 };
 
 module.exports = {
-    MAX_DEPTH, PLACEMENT_FIELDS, REFUSALS, LIVE, DELETED, ARCHIVED, CARRIED_KEY,
+    MAX_DEPTH, PLACEMENT_FIELDS, REFUSALS, LIVE, DELETED, ARCHIVED, CARRIED_KEY, LEFT_BECAUSE,
     ancestorsOf, depthOf, ancestorsFor, rootIdOf, subtreeHeight, refusal, canNest, wouldCycle, canMoveUnder, staleStamp,
     placementFrom, levelRows, sprintCountChange,
 };

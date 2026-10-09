@@ -18,8 +18,8 @@
                                                 'type': formData.priorityname.type,
                                                 'event': $event.event
                                             })" @input="confirmationErr=''"/>
-                                    <div class="invalid-feedback red" v-if="confirmationErr">{{ confirmationErr }}</div>
-                                    <div class="invalid-feedback red" v-else>{{ formData.priorityname.error }}</div>
+                                    <div class="invalid-feedback setting-task-priority-red" v-if="confirmationErr">{{ confirmationErr }}</div>
+                                    <div class="invalid-feedback setting-task-priority-red" v-else>{{ formData.priorityname.error }}</div>
                                 </div>
                                 <div class="from-group d-flex align-items-center" @click="$refs.fileInputUser.click()">
                                     <label class="cursor-pointer Upload_icon">
@@ -31,7 +31,7 @@
                             </div>
                             <div>
                                 <span class="Upload_img_span">
-                                        {{$t('Settings.maximum_image_size')}} <span class="black"><b>{{ $t('Settings.image_dimensions', { width: 250, height: 250 }) }}</b></span>.
+                                        {{$t('Settings.maximum_image_size')}} <span class="setting-task-priority-black"><b>{{ $t('Settings.image_dimensions', { width: 250, height: 250 }) }}</b></span>.
                                 </span>
                             </div>
                         </div>
@@ -388,4 +388,13 @@ async function removedata() {
     height: 100px;
 }
 @import './style.css'
+</style>
+
+<style scoped>
+.setting-task-priority-red {
+    color: var(--danger-ink);
+}
+.setting-task-priority-black {
+    color: var(--ink);
+}
 </style>

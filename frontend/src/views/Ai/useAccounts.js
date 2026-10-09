@@ -11,7 +11,7 @@ export const MODES = ["workspace", "personal", "local"];
 export const PROVIDERS = ["claude-code", "cursor", "codex", "antigravity", "ollama", "vllm", "other"];
 
 const account = ref(null);
-const policy = ref({ allowedModes: [...MODES], requireCheckBeforeDone: false });
+const policy = ref({ allowedModes: [...MODES], requireCheckBeforeDone: false, connectedPaused: false });
 const summary = ref({});
 const tokens = ref([]);
 const tokenPolicy = ref({ ...DEFAULT_TOKEN_POLICY });
@@ -25,6 +25,13 @@ const peopleHours = ref(null);
 const ok = (res) => res?.data?.status === true;
 const failure = (res, fallback) => res?.data?.statusText || res?.data?.message || fallback;
 const thrown = (error, fallback) => error?.response?.data?.statusText || error?.response?.data?.message || error?.message || fallback;
+
+/* The agent feed hears of the workspace pause with every read of the agents (./agentFeed.js) and notes it here, so
+ * the strip, the AI sidebar, the card in AI > Accounts and Project Details show one state. */
+export function noteConnectedPaused(on) {
+    if (typeof on !== "boolean" || policy.value.connectedPaused === on) return;
+    policy.value = { ...policy.value, connectedPaused: on };
+}
 
 export function useAccounts() {
     const mode = computed(() => (account.value && account.value.mode) || "");
@@ -113,9 +120,9 @@ export function useAccounts() {
         }
     };
 
-    const savePolicy = async (allowedModes) => {
+    const putPolicy = async (body) => {
         try {
-            const res = await apiRequest("put", env.AGENT_POLICY, { allowedModes });
+            const res = await apiRequest("put", env.AGENT_POLICY, body);
             if (!ok(res)) throw new Error(failure(res, "The policy was not saved."));
             policy.value = res.data.data || policy.value;
             return policy.value;
@@ -123,6 +130,10 @@ export function useAccounts() {
             throw new Error(thrown(error, "The policy was not saved."));
         }
     };
+
+    const savePolicy = (allowedModes) => putPolicy({ allowedModes });
+    const saveCheckBeforeDone = (on) => putPolicy({ requireCheckBeforeDone: Boolean(on) });
+    const saveConnectedPaused = (on) => putPolicy({ connectedPaused: Boolean(on) });
 
     const linkAccount = async (body) => {
         try {
@@ -191,6 +202,6 @@ export function useAccounts() {
         account, policy, summary, tokens, tokenPolicy, tokensNeedingExpiry, stepCredentials, stepCredentialPolicy, manifest, runs, peopleHours,
         mode, allowed, isAllowed,
         loadAccount, loadPolicy, loadTokens, loadTokensNeedingExpiry, loadStepCredentials, loadManifest, loadRuns, loadPeopleHours,
-        savePolicy, linkAccount, unlinkAccount, mintToken, revokeToken, renewToken
+        savePolicy, saveCheckBeforeDone, saveConnectedPaused, linkAccount, unlinkAccount, mintToken, revokeToken, renewToken
     };
 }

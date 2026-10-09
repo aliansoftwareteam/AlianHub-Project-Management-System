@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const multer = require('multer');
+const multer = require('../../../utils/contextMulter');
 const logger = require('../../../Config/loggerConfig');
 const { putLocalFile } = require('../../../common-storage/putLocalFile');
 

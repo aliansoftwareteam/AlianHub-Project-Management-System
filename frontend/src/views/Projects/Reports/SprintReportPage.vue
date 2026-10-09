@@ -163,8 +163,8 @@ const cards = computed(() => {
     return [
         { key: 'committed', label: t('Reports.committed'), value: pts(r.committed), unit: t('Reports.pts'), tone: '', focusable: true },
         { key: 'completed', label: t('Reports.completed'), value: pts(r.completed), unit: `${completionPct.value}%`, tone: 'is-ok', focusable: true },
-        { key: 'added', label: t('Reports.added_mid'), value: `+${pts(r.addedAfterStart)}`, unit: t('Reports.n_tasks', { n: tasksOf(r.addedAfterStart) }), tone: 'is-warn', focusable: true },
-        { key: 'carry', label: t('Reports.carry_over'), value: pts(r.unfinished), unit: t('Reports.n_tasks', { n: tasksOf(r.unfinished) }), tone: 'is-danger', focusable: true },
+        { key: 'added', label: t('Reports.added_mid'), value: `+${pts(r.addedAfterStart)}`, unit: t('Reports.n_tasks', { n: tasksOf(r.addedAfterStart) }, tasksOf(r.addedAfterStart)), tone: 'is-warn', focusable: true },
+        { key: 'carry', label: t('Reports.carry_over'), value: pts(r.unfinished), unit: t('Reports.n_tasks', { n: tasksOf(r.unfinished) }, tasksOf(r.unfinished)), tone: 'is-danger', focusable: true },
         { key: 'hours', label: t('Reports.logged_est'), value: `${loggedHours.value}`, unit: `/${plannedHours.value}h`, tone: '', focusable: false },
     ];
 });
@@ -267,7 +267,7 @@ const retroLines = computed(() => {
     const lines = [];
     if (blockers.value.length) {
         const oldest = blockers.value[0];
-        lines.push(t('Reports.retro_blocked', { n: blockers.value.length, days: oldest.blockedDays || 0 }));
+        lines.push(t('Reports.retro_blocked', { n: blockers.value.length, days: t('Reports.days_count', { n: oldest.blockedDays || 0 }, oldest.blockedDays || 0) }, blockers.value.length));
     }
     if (pts(report.value.addedAfterStart)) {
         lines.push(t('Reports.retro_scope', { pct: `${scopeGrowthPct.value}%`, points: pts(report.value.addedAfterStart) }));

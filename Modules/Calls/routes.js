@@ -1,5 +1,6 @@
 const iceConfig = require('./iceConfig');
 const notes = require('./notes');
+const { agentsRefused } = require('../Agents/guard');
 
 exports.init = (app) => {
     // Read-only: the STUN/TURN servers the browser should use, with a short-lived TURN
@@ -9,7 +10,7 @@ exports.init = (app) => {
 
     // Meeting notes written by the notetaker when a call ends. Only participants can read
     // or edit them; the filter enforces that, not the client.
-    app.post('/api/v2/calls/notes', notes.createNotes);
+    app.post('/api/v2/calls/notes', agentsRefused('ai.spend'), notes.createNotes);
     app.get('/api/v2/calls/notes', notes.listNotes);
     app.get('/api/v2/calls/notes/:id', notes.getNotes);
     app.patch('/api/v2/calls/notes/:id', notes.updateNotes);

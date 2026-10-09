@@ -5,10 +5,17 @@ const { canReadProject } = require('../../../Config/projectAccess');
 const { mayListTasksIn } = require('../../Tasks/helpers/taskListProjects');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprintById, hiddenSprintIds } = require('../../Sprints/helpers/sprintVisibility');
+const { agentOf } = require('../../../Config/agentRequest');
+const { DIRECT, CHANNEL, conversationOf } = require('./conversation');
+const { inConversation } = require('./conversationReaders');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const isId = (value) => OBJECT_ID.test(String(value || ''));
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
+
+/* A list or a task is named by text or by a stored id, or left out. A query string can carry a condition in its
+ * place, and a condition is not a thread: the query the read runs would take it as written. */
+const namesId = (value) => value === undefined || value === null || typeof value === 'string' || value._bsontype === 'ObjectId';
 
 const INVALID = { allowed: false, statusCode: 400 };
 const NOT_FOUND = { allowed: false, statusCode: 404 };
@@ -21,12 +28,21 @@ const chatSpace = (companyId, id) => findOne(companyId, SCHEMA_TYPE.MAIN_CHATS, 
 /* The answer GET /api/v1/task/:id and the comment room join give; a direct message is only its
  * participants', owners included. */
 const canOpenTask = async (companyId, uid, task, privileged) => {
-    if (task.mainChat === true) return (task.AssigneeUserId || []).map(String).includes(uid);
+    if (task.mainChat === true) return inConversation(task, uid);
     const project = await canReadProject(companyId, uid, task.ProjectID);
     if (!project.allowed && !project.missing) return false;
     if (privileged) return true;
     if (project.allowed && !(await mayListTasksIn(companyId, uid, task.ProjectID))) return false;
     return canSeeSprintById(companyId, uid, task.sprintId);
+};
+
+/* A thread an agent's request is kept from, as that agent's person: every direct message, and a channel unless the
+ * agent's token was given chat. */
+const keptFromAgent = async (companyId, uid, thread) => {
+    const agent = agentOf(uid);
+    if (!agent) return false;
+    const kind = await conversationOf(companyId, thread);
+    return kind === DIRECT || (kind === CHANNEL && !agent.chat);
 };
 
 /*
@@ -38,8 +54,9 @@ const canOpenTask = async (companyId, uid, task, privileged) => {
 const commentThreadAccess = async (companyId, uid, { projectId, sprintId, taskId } = {}) => {
     const company = String(companyId || '');
     const user = String(uid || '');
-    if (!isId(projectId)) return INVALID;
+    if (!isId(projectId) || !namesId(sprintId) || !namesId(taskId)) return INVALID;
     if (!isId(company) || !isId(user)) return NOT_FOUND;
+    if (await keptFromAgent(company, user, { projectId, sprintId, taskId })) return NOT_FOUND;
 
     const project = await canReadProject(company, user, projectId);
     if (!project.allowed) {

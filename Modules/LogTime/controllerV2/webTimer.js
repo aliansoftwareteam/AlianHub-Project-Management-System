@@ -9,6 +9,8 @@ const { removeCache } = require('../../../utils/commonFunctions');
 const { isPeriodLocked, PERIOD_LOCKED } = require('../../TimesheetApproval/helpers/lockGuard');
 const { updateProjectForTimelog, updateRemainingTime } = require('./helpers');
 const T = require('./timerRules');
+const { othersPersonalListIds } = require('../../PersonalList/ownership');
+const { openTasksById, openProjectsById } = require('../../Tasks/helpers/openNames');
 
 const { sessionTenantOf, TenantError } = require('../../../Config/tenant');
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
@@ -48,16 +50,10 @@ exports.listRunningTimers = async (req, res) => {
                 { sort: { LogStartTime: -1 }, limit: 20 },
             ],
         }, 'find') || [];
-        const taskIds = [...new Set(sessions.map((s) => String(s.TicketID || '')).filter(Boolean))].map(oid).filter(Boolean);
-        const projectIds = [...new Set(sessions.map((s) => String(s.ProjectId || '')).filter(Boolean))].map(oid).filter(Boolean);
-        const [tasks, projects] = await Promise.all([
-            taskIds.length ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds } }, { TaskName: 1, sprintId: 1, ProjectID: 1 }] }, 'find').catch(() => []) : [],
-            projectIds.length ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: projectIds } }, { ProjectName: 1, projectIcon: 1 }] }, 'find').catch(() => []) : [],
+        const [taskById, projectById] = await Promise.all([
+            openTasksById(companyId, req.uid, sessions.map((s) => s.TicketID), { TaskName: 1 }).catch(() => ({})),
+            openProjectsById(companyId, req.uid, sessions.map((s) => s.ProjectId), { ProjectName: 1, projectIcon: 1 }).catch(() => ({})),
         ]);
-        const taskById = {};
-        (tasks || []).forEach((t) => { taskById[String(t._id)] = t; });
-        const projectById = {};
-        (projects || []).forEach((p) => { projectById[String(p._id)] = p; });
         const data = sessions.map((s) => {
             const t = taskById[String(s.TicketID)];
             const p = projectById[String(s.ProjectId)];
@@ -101,10 +97,11 @@ exports.trimTimer = async (req, res) => {
         if (String(entry.Loggeduser) !== String(req.uid)) {
             const roleType = await getRoleType(companyId, req.uid);
             if (!isPrivileged(roleType)) return res.send({ status: false, statusText: 'You can only trim your own timers.' });
+            if ((await othersPersonalListIds(companyId, String(req.uid))).includes(String(entry.ProjectId || ''))) return res.send({ status: false, statusText: 'Timer session not found.' });
         }
         const startSec = Number(entry.LogStartTime) || 0;
         const locked = await isPeriodLocked({ companyId, userId: entry.Loggeduser, date: new Date(startSec * 1000) });
-        if (locked) return res.send({ status: false, statusText: 'This timesheet period is approved and locked.' });
+        if (locked) return res.send({ status: false, statusText: 'This timesheet period is approved and locked.', code: PERIOD_LOCKED });
 
         const bounds = T.trimBounds({ startSec, minutes: check.minutes });
         const updated = await MongoDbCrudOpration(companyId, {

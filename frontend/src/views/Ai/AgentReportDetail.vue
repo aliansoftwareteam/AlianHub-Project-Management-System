@@ -41,7 +41,7 @@
 <script setup>
 import { computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
-import moment from "moment";
+import { weekdayClockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 
@@ -56,7 +56,7 @@ const companyId = computed(() => injectedCompanyId?.value ?? injectedCompanyId ?
 
 const body = computed(() => props.report.report || {});
 const sections = computed(() => (body.value.sections || []).map((s) => ({ ...s, items: s.items || [] })));
-const when = computed(() => moment(props.report.slotAt || props.report.startedAt).format("ddd D MMM, HH:mm"));
+const when = computed(() => weekdayClockText(props.report.slotAt || props.report.startedAt));
 const deliveredLine = computed(() => {
     const d = body.value.delivered || {};
     const channels = ["inbox", "email", "comment", "page"].filter((c) => d[c]).map((c) => t(`Ai.report_channel_${c}`));

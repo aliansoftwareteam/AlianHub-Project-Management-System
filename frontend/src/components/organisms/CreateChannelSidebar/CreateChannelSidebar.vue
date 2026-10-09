@@ -6,13 +6,13 @@
                     <h4>{{$t('Channel.msg1')}}.</h4>
                 </div>
                 <div class="cch h-100 p-10px" v-else>
-                    <div class="position-ab d-flex align-items-center justify-content-center z-index-7 w-100 h-100 bg-dark-gray3" v-if="inProgress">
+                    <div class="position-ab d-flex align-items-center justify-content-center z-index-7 w-100 h-100 create-channel-sidebar-bg-dark-gray3" v-if="inProgress">
                         <Spinner :isSpinner="true"/>
                     </div>
                     <div class="cch__card border-radius-8-px p-15px webkit-avilable">
                         <!-- CHANNEL NAME -->
                         <div class="d-flex align-items-center">
-                            <label class="text-nowrap mr-10px">{{$t('Channel.channel_name')}}<span class="red">*</span></label>
+                            <label class="text-nowrap mr-10px">{{$t('Channel.channel_name')}}<span class="create-channel-sidebar-red">*</span></label>
                             <div class="position-re w-100">
                                 <input type="text" v-model.trim="channelName.value" :placeholder="$t(`PlaceHolder.enter_channel_name`)" class="form-control webkit-avilable"
                                     @keyup="checkErrors({'field':channelName,
@@ -21,7 +21,7 @@
                                         'type':channelName.type,
                                         'event':$event.event})"
                                 >
-                                <div class="red position-ab font-size-11 error__text-channelname" v-if="channelName.error">{{channelName.error}}</div>
+                                <div class="create-channel-sidebar-red position-ab create-channel-sidebar-font-size-11 error__text-channelname" v-if="channelName.error">{{channelName.error}}</div>
                             </div>
                         </div>
 
@@ -34,8 +34,8 @@
                                     <FontAwesomeIcon v-if="icon?.iconName" :icon="icon" size="xl" class="cch__icon"/>
                                 </div>
                                 <div class="w-80">
-                                    <span class="font-weight-bold">{{$t('Channel.icons')}}</span>
-                                    <div class="d-flex flex-wrap overflow-y-scroll style-scroll" style="height: 150px;" >
+                                    <span class="create-channel-sidebar-font-weight-bold">{{$t('Channel.icons')}}</span>
+                                    <div class="d-flex flex-wrap overflow-y-scroll create-channel-sidebar-style-scroll" style="height: 150px;" >
                                     <div v-for="(item,index) in icons" :key="index" class="m-6px" :class="(icon && item?.iconName === icon?.iconName) ? ['icon_bg border-radius-5-px'] : null">
                                             <div class="d-flex justify-content-center align-items-center icon_wrapper" @click="setIcon(item)">
                                                 <FontAwesomeIcon :icon="item" size="lg" class="cch__icon"/>
@@ -58,8 +58,8 @@
                         <!-- PRIVATE CHANNEL -->
                         <div class="d-flex mt-2" :style="{'opacity': showWarning ? 0.5 : 1}">
                             <div class="w-95">
-                                <span class="font-weight-bold">{{$t('Channel.private_channel')}}</span>
-                                <span class="d-block font-size-13 mt-5px">{{$t('Channel.msg2')}}</span>
+                                <span class="create-channel-sidebar-font-weight-bold">{{$t('Channel.private_channel')}}</span>
+                                <span class="d-block create-channel-sidebar-font-size-13 mt-5px">{{$t('Channel.msg2')}}</span>
                             </div>
                             <Toggle v-model="privateChannel" width="30" activeColor="#3845B3" :disabled="isDisabled"/>
                         </div>
@@ -76,8 +76,8 @@
                         <!-- SEND MESSAGE -->
                         <div class="d-flex mt-2">
                             <div class="w-95">
-                                <span class="font-weight-bold">{{$t('Channel.send_messages')}}</span>
-                                <span class="d-block font-size-13 mt-5px">{{$t('Channel.allowmsg2')}}.</span>
+                                <span class="create-channel-sidebar-font-weight-bold">{{$t('Channel.send_messages')}}</span>
+                                <span class="d-block create-channel-sidebar-font-size-13 mt-5px">{{$t('Channel.allowmsg2')}}.</span>
                             </div>
                             <Toggle v-model="sendMessage" width="30" activeColor="#3845B3"/>
                         </div>
@@ -482,5 +482,36 @@ async function createChannelFun() {
 }
 .msg-color{
     color: var(--warn-ink);
+}
+</style>
+
+<style scoped>
+.create-channel-sidebar-red {
+    color: var(--danger-ink);
+}
+.create-channel-sidebar-bg-dark-gray3 {
+    background-color: color-mix(in srgb, var(--surface) 84%, transparent);
+}
+.create-channel-sidebar-font-weight-bold {
+    font-weight: bold;
+}
+.create-channel-sidebar-font-size-11 {
+    font-size: 11px;
+}
+.create-channel-sidebar-font-size-13 {
+    font-size: 13px;
+}
+.create-channel-sidebar-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.create-channel-sidebar-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.create-channel-sidebar-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
 }
 </style>

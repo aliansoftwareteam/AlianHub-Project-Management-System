@@ -241,7 +241,7 @@ describe('with AI_MODEL_ROUTER off', () => {
         expect(decided.routerEnabled).toBe(false);
         expect(decided.chosen).toEqual({ provider: null, model: null });
         expect(decided.skipped).toEqual([]);
-        expect(decided.reservation.state).toBe('off');
+        expect(decided.reservation.state).toBe('released');
     }, 30000);
 
     it('leaves the breaker unread: the window fills but the blackholed provider keeps taking the call', async () => {

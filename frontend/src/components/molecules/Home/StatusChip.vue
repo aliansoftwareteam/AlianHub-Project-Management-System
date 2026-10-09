@@ -23,6 +23,7 @@
 <script setup>
 import { computed, inject, onMounted, onUnmounted, ref } from "vue";
 import moment from "moment";
+import { clockText } from "@/utils/clockText";
 import { useI18n } from "vue-i18n";
 import { homeState, isDnd, setPresence } from "./homeState";
 
@@ -37,7 +38,7 @@ const dnd = computed(() => { void tick.value; return isDnd(); });
 const label = computed(() => {
     if (!dnd.value) return t("Home.status_available");
     const until = homeState.presence.until;
-    return until ? t("Home.status_dnd_until", { time: moment(until).format("HH:mm") }) : t("Home.status_dnd");
+    return until ? t("Home.status_dnd_until", { time: clockText(until) }) : t("Home.status_dnd");
 });
 
 function setDnd(amount, unit) {

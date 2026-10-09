@@ -1,7 +1,7 @@
 /* .drop-down-item {
 } */
 .project-mobile-desc {
-    color: #818181;
+    color: var(--ink-2);
     font-size: 12px;
 }
 .w-15px{
@@ -17,34 +17,34 @@
         margin-bottom: 10px !important;
         font-size: 16px;
         line-height: 30px;
-        color: #4B4B4B !important;
-        background: #F4F5F7 !important;
+        color: var(--ink-2) !important;
+        background: var(--surface-hover) !important;
         border-radius: 12px !important;
     }
    .drop-down-item.mobile-delete-status{
-        color: #FF0000 !important;
+        color: var(--danger) !important;
     }
 
     .drop-down-item .drop-down-options-image {
-        background-color: white !important;
+        background-color: var(--surface) !important;
         border-radius: 5px !important;
     }
     .project-list-mobiletitle {
         font-weight: 500;
         font-size: 20px;
         line-height: 23px;
-        color: #000000;
+        color: var(--ink);
         text-transform: capitalize;
     }
     .project-mobile-desc{
         font-weight: 400;
         font-size: 13px;
         line-height: 19px;
-        color: #4B4B4B;
+        color: var(--ink-2);
         padding: 3.5px 10px !important;
     }
     .mobile-deleteIcon{
-        color: #ff0000 !important;
+        color: var(--danger) !important;
     }
     .project-item {
         margin-right: 5px;

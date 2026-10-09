@@ -61,6 +61,11 @@
                 :task="task"
                 :canAssign="checkPermission('task.task_assignee',project?.isGlobalPermission) === true"
             />
+            <TaskRoleSuggestion
+                v-if="task?._id && checkPermission('task.task_assignee',project?.isGlobalPermission) !== null"
+                :task="task"
+                :canDecide="checkPermission('project.project_details',project?.isGlobalPermission) === true"
+            />
             <div class="d-flex task-detail-right-side-label">
                 <div class="task-detail-field-name">{{$t('Comment.created_by')}}</div>
                 <Skelaton v-if="!task?.Task_Leader && isMainSpinner" style="height: 30px;" class="w-30px border-radius-50-per"/>
@@ -83,8 +88,8 @@
                             :multiSelect="false"
                         />
                         <span
-                            class="black text-ellipsis task-created-by ml-5px"
-                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            class="task-detail-right-side-black text-ellipsis task-created-by ml-5px"
+                            :class="{'task-detail-right-side-font-size-13 task-detail-right-side-font-weight-400' : clientWidth > 767, 'task-detail-right-side-font-size-16' : clientWidth <=767}"
                             :title="taskLeaderData?.Employee_Name || 'N/A'">
                             {{ taskLeaderData?.Employee_Name || 'N/A' }}
                         </span>
@@ -101,8 +106,8 @@
                             :thumbnail="'30x30'"
                         />
                         <span
-                            class="black text-ellipsis task-created-by"
-                            :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                            class="task-detail-right-side-black text-ellipsis task-created-by"
+                            :class="{'task-detail-right-side-font-size-13 task-detail-right-side-font-weight-400' : clientWidth > 767, 'task-detail-right-side-font-size-16' : clientWidth <=767}"
                             :title="taskLeaderData?.Employee_Name || 'N/A'">
                             {{ taskLeaderData?.Employee_Name || 'N/A' }}
                         </span>
@@ -233,17 +238,17 @@
                 @close="cancelEstimateReason"
             >
                 <template #header>
-                    <h3 class="m-0 font-size-16 font-weight-600 black">{{ $t('TaskPanel.estimate_reason_title') }}</h3>
+                    <h3 class="m-0 task-detail-right-side-font-size-16 task-detail-right-side-font-weight-600 task-detail-right-side-black">{{ $t('TaskPanel.estimate_reason_title') }}</h3>
                 </template>
                 <template #body>
                     <textarea
                         v-model.trim="estimateReasonText"
-                        class="w-100 border border-radius-6-px font-size-14"
+                        class="w-100 border border-radius-6-px task-detail-right-side-font-size-14"
                         style="min-height:90px; resize:vertical; outline:none; padding:8px;"
                         :placeholder="$t('TaskPanel.estimate_reason_ph')"
                         @input="estimateReasonError = false"
                     ></textarea>
-                    <span v-if="estimateReasonError" class="red font-size-12">{{ $t('TaskPanel.estimate_reason_required') }}</span>
+                    <span v-if="estimateReasonError" class="task-detail-right-side-red task-detail-right-side-font-size-12">{{ $t('TaskPanel.estimate_reason_required') }}</span>
                 </template>
             </Modal>
             <div class="d-flex task-detail-right-side-label" v-if="checkApps('TimeEstimates') && checkPermission('task.task_estimated_hours',project?.isGlobalPermission) !== null">
@@ -292,11 +297,12 @@ import * as env from '@/config/env';
 import { permittedAssignees, scopedAssignees, selfAssignable } from '@/utils/assigneeOptions';
 import Modal from '@/components/atom/Modal/Modal.vue';
 import { showUndoToast } from '@/composable/useUndoToast';
-import { assignAgent, fetchRunnableAgents } from '@/views/Ai/useRunnableAgents';
+import { fetchOwnAi, fetchRunnableAgents, pickAgent } from '@/views/Ai/useRunnableAgents';
 import AiResultPreview from '@/components/molecules/AiPreview/AiResultPreview.vue';
 import { useEscapeLayer } from '@/composable/useEscapeLayer';
 import TaskRepeatControl from '@/components/organisms/TaskDetailOverlay/TaskRepeatControl.vue';
 import TaskAssignmentSuggestion from '@/components/organisms/TaskDetailOverlay/TaskAssignmentSuggestion.vue';
+import TaskRoleSuggestion from '@/components/organisms/TaskDetailOverlay/TaskRoleSuggestion.vue';
 import { canUseAi } from "@/composable/aiAvailability";
 
 const aiEstimateIcon = require("@/assets/images/svg/ai_image.svg");
@@ -351,21 +357,28 @@ const props = defineProps({
     clientWidth: Number,
 })
 
-const emit = defineEmits(["agent-run"]);
+const emit = defineEmits(["agent-run", "agent-handed"]);
 
 const runnableAgents = ref([]);
 watch(() => props.task?._id, async (taskId) => {
-    const agents = await fetchRunnableAgents(taskId);
+    const agents = (await Promise.all([fetchRunnableAgents(taskId), fetchOwnAi(taskId)])).flat();
     if (taskId === props.task?._id) runnableAgents.value = agents;
 }, { immediate: true });
 
 async function startAgent(option) {
+    const taskId = props.task._id;
     try {
-        await assignAgent(option.agentId, props.task._id);
-        $toast.success(t('TaskPanel.agent_assigned', { name: option.label }), { position: 'top-right' });
-        emit('agent-run');
+        const { handed } = await pickAgent(option, taskId);
+        if (!handed) {
+            $toast.success(t('TaskPanel.agent_assigned', { name: option.label }), { position: 'top-right' });
+            emit('agent-run');
+            return;
+        }
+        $toast.success(t('TaskPanel.agent_handed', { name: option.shownAs }), { position: 'top-right' });
+        if (taskId === props.task?._id) runnableAgents.value = runnableAgents.value.filter((agent) => !agent.connected);
+        emit('agent-handed');
     } catch (error) {
-        $toast.error(error?.response?.data?.statusText || error.message || t('TaskPanel.agent_assign_failed'), { position: 'top-right' });
+        $toast.error(error?.response?.data?.statusText || error.message || t(option.connected ? 'TaskPanel.agent_hand_failed' : 'TaskPanel.agent_assign_failed'), { position: 'top-right' });
     }
 }
 
@@ -952,4 +965,31 @@ const applyAiEstimate = async () => {
 }
 </script>
 <style scoped src='./style.css'>
+</style>
+
+<style scoped>
+.task-detail-right-side-black {
+    color: var(--ink);
+}
+.task-detail-right-side-red {
+    color: var(--danger-ink);
+}
+.task-detail-right-side-font-weight-400 {
+    font-weight: 400 !important;
+}
+.task-detail-right-side-font-weight-600 {
+    font-weight: 600 !important;
+}
+.task-detail-right-side-font-size-12 {
+    font-size: 12px;
+}
+.task-detail-right-side-font-size-13 {
+    font-size: 13px;
+}
+.task-detail-right-side-font-size-14 {
+    font-size: 14px;
+}
+.task-detail-right-side-font-size-16 {
+    font-size: 16px;
+}
 </style>

@@ -1,4 +1,5 @@
 const fs = require("fs");
+const { ownOrNotPersonal } = require('../PersonalList/ownership');
 const path = require("path");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
@@ -20,6 +21,7 @@ async function projectRows(companyId, job) {
     const filter = {
         ProjectID: new mongoose.Types.ObjectId(job.filters.projectId),
         deletedStatusKey: { $ne: 1 },
+        mainChat: { $ne: true },
     };
     if (job.filters.sprintId) {
         filter.sprintId = new mongoose.Types.ObjectId(job.filters.sprintId);
@@ -40,13 +42,13 @@ async function workspaceRows(companyId, userId) {
     if (!isPrivileged(await getRoleType(companyId, userId))) throw new Error('Only an owner or admin can export the workspace.');
     const projects = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
-        data: [{ deletedStatusKey: { $nin: [1] } }, 'ProjectName ProjectCode'],
+        data: [{ deletedStatusKey: { $nin: [1] }, ...ownOrNotPersonal(userId) }, 'ProjectName ProjectCode'],
     }, 'find');
     const byId = new Map((projects || []).map((project) => [String(project._id), project]));
     if (!byId.size) return [];
     const tasks = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.TASKS,
-        data: [{ ProjectID: { $in: [...byId.keys()].map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: 1 } }, `ProjectID ${TASK_FIELDS}`],
+        data: [{ ProjectID: { $in: [...byId.keys()].map((id) => new mongoose.Types.ObjectId(id)) }, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true } }, `ProjectID ${TASK_FIELDS}`],
     }, 'find');
     return treeRows(tasks || []).map(({ task, ...place }) => workspaceTaskRow(task, byId.get(String(task.ProjectID)), place));
 }
@@ -93,6 +95,8 @@ async function processJob(companyId, jobId) {
 const sessionUid = (req) => (req.uid ? String(req.uid) : '');
 const asksForAnotherUser = (req) => Boolean(req.query && req.query.uid) && String(req.query.uid) !== sessionUid(req);
 const stampNow = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+
+exports.workspaceRows = workspaceRows;
 
 exports.createExport = async (req, res) => {
     try {

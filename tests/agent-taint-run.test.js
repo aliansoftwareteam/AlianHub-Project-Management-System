@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -45,7 +46,7 @@ const auditRows = () => mockDb.store[SCHEMA_TYPE.AUDIT_LOGS] || [];
 const start = (over = {}) => runs.create(C, { agent: agent(), taskId: TASK._id, projectId: 'p1', skill: 'qa-review', startedBy: 'u1', ...over });
 const execute = (run) => runs.executeSkill(C, run, agent(), TASK, deps());
 
-const BETA_RUN_KEYS = ['_id', 'actions', 'agentId', 'agentName', 'agentRevision', 'createdAt', 'decisions', 'elapsedMs', 'episode', 'error', 'expiresAt', 'finishedAt', 'notifyMe', 'outcome', 'projectId', 'proposals', 'refusals', 'reservedUsd', 'skill', 'skillRevision', 'skillSource', 'spend', 'startedAt', 'startedBy', 'status', 'steps', 'taskId', 'threadId', 'traceId', 'trigger', 'triggerDepth', 'triggerEventId', 'viaAccount'];
+const BETA_RUN_KEYS = ['_id', 'actions', 'agentId', 'agentName', 'agentRevision', 'createdAt', 'decisions', 'elapsedMs', 'episode', 'error', 'expiresAt', 'finishedAt', 'notifyMe', 'outcome', 'projectId', 'proposals', 'refusals', 'reservedUsd', 'skill', 'skillRevision', 'skillSource', 'spend', 'startedAt', 'startedBy', 'startedUnder', 'status', 'steps', 'taskId', 'threadId', 'traceId', 'trigger', 'triggerDepth', 'triggerEventId', 'viaAccount'];
 const BETA_REPLAY_KEYS = ['_id', 'agentId', 'agentRevision', 'costUsd', 'createdAt', 'decision', 'durationMs', 'errorCode', 'expiresAt', 'feature', 'messages', 'model', 'params', 'promptHash', 'provider', 'response', 'retrievedChunkIds', 'runId', 'skillRevision', 'status', 'system', 'traceId', 'truncated', 'usage'];
 const BETA_ACTION_META_KEYS = ['action', 'actorType', 'agentId', 'agentName', 'cost', 'onBehalfOf', 'params', 'reason', 'runId', 'state', 'tokenId', 'traceId', 'undo', 'undoable', 'undoneAt', 'undoneBy', 'viaAccount'];
 const BETA_REFUSAL_META_KEYS = ['action', 'actorType', 'agentId', 'agentName', 'onBehalfOf', 'params', 'path', 'ran', 'reason', 'runId', 'tokenId', 'traceId', 'viaAccount'];
@@ -55,7 +56,7 @@ beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockDb.calls.length = 0;
     jest.clearAllMocks();
-    delete process.env.AGENT_TAINT_ROUTING;
+    process.env.AGENT_TAINT_ROUTING = 'off';
     delete process.env.AI_REPLAY;
     delete process.env.AUDIT_CHAIN;
     mem = persistence.useInMemory();
@@ -66,7 +67,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.AGENTS, agent());
     mockDb.seed(dbCollections.COMPANIES, { _id: C });
 });
-afterEach(() => { mem.reset(); persistence.useMongo(); delete process.env.AGENT_TAINT_ROUTING; });
+afterEach(() => { mem.reset(); persistence.useMongo(); process.env.AGENT_TAINT_ROUTING = 'off'; });
 
 describe('with AGENT_TAINT_ROUTING off, a run that fetched a page leaves beta\'s records', () => {
     it('the run document, its decisions and the replay row carry no taint and the same fields as before', async () => {

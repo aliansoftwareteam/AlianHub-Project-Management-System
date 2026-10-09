@@ -39,11 +39,16 @@ const MESSAGES = {
 const STATUS_OF = { [REASON.WINDOW_PASSED]: 410, [REASON.NOT_VISIBLE]: 403, [REASON.TARGET_NOT_VISIBLE]: 403, [REASON.UNRECORDABLE]: 503 };
 const AUDITED_REFUSALS = [REASON.WINDOW_PASSED, REASON.NOT_VISIBLE, REASON.TARGET_NOT_VISIBLE];
 
-const LIST_KINDS = Object.freeze(['list', 'listName', 'listFolder']);
+const LIST_KINDS = Object.freeze(['list', 'listName', 'listFolder', 'listSprint']);
 /* A goal belongs to no project: whoever can edit the goal may undo a change to it. */
 const GOAL_KINDS = Object.freeze(['goalValue', 'goalSource']);
-/* A field or a view is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
-const SETUP_KINDS = Object.freeze(['fields', 'view']);
+/* A field, a view, a whole setup, a folder, a project tag, or the project or the copy of one an agent asked for is the project's own: seeing the project is seeing it, and the route that takes it back asks the rest. */
+const SETUP_KINDS = Object.freeze(['fields', 'view', 'setup', 'project', 'projectCopy', 'folder', 'projectTag']);
+/* A rule is taken back by the Automations page's own delete, which asks whether the person undoing may. */
+const AUTOMATION_KIND = 'automation';
+/* A dashboard belongs to no project either, and its owner alone takes a card of it back. */
+const DASHBOARD_KIND = 'dashboardCard';
+const dashboards = () => require('./dashboardRequests');
 const work = () => require('./workRequests');
 const goalWork = () => require('./goalRequests');
 const setupWork = () => require('./setupRequests');
@@ -62,6 +67,25 @@ const setTask = async (companyId, taskId, set, unset, pull) => {
     return updated;
 };
 
+/* The first values a set of fields was given, newest first, each put back as undoing one field value puts it back.
+ * One on a task the person undoing cannot open stays, and so does the field that holds it. */
+const putBackValues = async (companyId, values, actor) => {
+    const kept = [];
+    let restored = 0;
+    for (const value of [...values].reverse()) {
+        const key = `customField.${value.fieldId}`;
+        if (!(await taskReadable(companyId, actor.userId, value.taskId))) {
+            const field = await findRow(companyId, SCHEMA_TYPE.CUSTOM_FIELDS, value.fieldId, { fieldTitle: 1 });
+            kept.push({ field: (field && field.fieldTitle) || '', reason: 'it is on a task you cannot open' });
+        } else {
+            const empty = value.previous === null || value.previous === undefined;
+            await setTask(companyId, value.taskId, empty ? {} : { [key]: value.previous }, empty ? { [key]: 1 } : undefined);
+            restored += 1;
+        }
+    }
+    return { restored, kept };
+};
+
 const inverses = {
     async comment(companyId, u) {
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(u.commentId) }, { $set: { isDeleted: true } }] }, 'updateOne');
@@ -76,11 +100,25 @@ const inverses = {
         await setTask(companyId, u.taskId, { AssigneeUserId: u.previous || [] });
         return { taskId: u.taskId, restored: u.previous };
     },
-    async update(companyId, u) {
+    async update(companyId, u, actor) {
         const set = {}; const unset = {};
         Object.entries(u.previous || {}).forEach(([k, v]) => { if (v === null) unset[k] = 1; else set[k] = v; });
         await setTask(companyId, u.taskId, set, Object.keys(unset).length ? unset : undefined);
-        return { taskId: u.taskId, restored: Object.keys(u.previous || {}) };
+        const shifted = Array.isArray(u.shifted) ? u.shifted : [];
+        const movedBack = [];
+        const leftAlone = [];
+        for (const row of shifted) {
+            if (!actor || !(await taskReadable(companyId, actor.userId, row.taskId))) continue;
+            const now = await findRow(companyId, SCHEMA_TYPE.TASKS, row.taskId, { startDate: 1, DueDate: 1 });
+            if (!now || !sameInstant(now.startDate, row.movedStart) || !sameInstant(now.DueDate, row.movedDue)) { leftAlone.push(row.taskId); continue; }
+            await setTask(companyId, row.taskId, { startDate: row.startDate, DueDate: row.DueDate });
+            movedBack.push(row.taskId);
+        }
+        return {
+            taskId: u.taskId, restored: Object.keys(u.previous || {}),
+            ...(movedBack.length ? { movedBack } : {}),
+            ...(leftAlone.length ? { leftAlone, note: 'Some waiting tasks were changed again since, so their dates were left as they are now.' } : {}),
+        };
     },
     async sprint(companyId, u) {
         const before = await findRow(companyId, SCHEMA_TYPE.TASKS, u.taskId, { ProjectID: 1, sprintId: 1 });
@@ -209,14 +247,22 @@ const inverses = {
     /* Fields and views are taken back through the field and project routes, as the person undoing. A field that
      * holds a value or is on another project now stays, and the answer names it. */
     async fields(companyId, u, actor) {
+        const values = Array.isArray(u.values) ? await putBackValues(companyId, u.values, actor) : null;
         const out = await setupWork().withdrawFields({ companyId, who: undoer(actor), projectId: u.projectId, fieldIds: u.fieldIds });
-        return { projectId: u.projectId, ...out };
+        return { projectId: u.projectId, ...out, ...(values ? { values } : {}) };
     },
     async view(companyId, u, actor) {
         const out = await setupWork().withdrawView({ companyId, who: undoer(actor), projectId: u.projectId, viewId: u.viewId });
         return { projectId: u.projectId, viewId: u.viewId, ...out };
     },
     ...require('./manager/workQueue').inverses,
+    ...require('./projectSetup').inverses,
+    ...require('./projectCreate').inverses,
+    ...require('./projectDuplicate').inverses,
+    ...require('./listSetup').inverses,
+    ...require('./tagRequests').inverses,
+    ...require('./automationRequests').inverses,
+    ...require('./dashboardRequests').inverses,
 };
 
 const isUndoable = (row) => Boolean(row && row.meta && row.meta.undo && inverses[row.meta.undo.kind] && !row.meta.undoneAt);
@@ -246,6 +292,8 @@ const projectIdOfRow = async (companyId, row, run) => {
     return '';
 };
 
+const sameInstant = (a, b) => Boolean(a) && Boolean(b) && new Date(a).getTime() === new Date(b).getTime();
+
 const findRow = (companyId, type, id, fields) => (oid(id)
     ? MongoDbCrudOpration(companyId, { type, data: [{ _id: oid(id) }, fields] }, 'findOne')
     : null);
@@ -266,6 +314,8 @@ const targetVisible = async (companyId, uid, u) => {
         return Boolean(comment) && (await canChangeComment(companyId, uid, comment)).allowed;
     }
     if (u.kind === 'batch' || SETUP_KINDS.includes(u.kind)) return true;
+    if (u.kind === AUTOMATION_KIND) return true;
+    if (u.kind === DASHBOARD_KIND) return dashboards().mayWithdraw(companyId, uid, u.dashboardId);
     if (u.kind === 'page' || u.kind === 'pageVersion') {
         const page = await findRow(companyId, SCHEMA_TYPE.PAGES, u.pageId, { visibility: 1, createdBy: 1, ProjectID: 1, sharedWith: 1, deletedStatusKey: 1 });
         /* Undoing a page takes it to the trash, which a person the doc is only shared with may not do; putting
@@ -309,7 +359,7 @@ const undoStateOf = async (companyId, row, actor, ctx = {}) => {
     const undoUntil = undoUntilOf(row, run, full.undoHours);
     const projectId = await projectIdOfRow(companyId, row, run);
     if (!isUndoable(row)) return state(REASON.NOT_UNDOABLE, undoUntil, projectId);
-    const inAProject = !GOAL_KINDS.includes(row.meta.undo.kind);
+    const inAProject = ![...GOAL_KINDS, DASHBOARD_KIND].includes(row.meta.undo.kind);
     if (inAProject && (!projectId || !full.visibleProjectIds.includes(projectId))) return state(REASON.NOT_VISIBLE, undoUntil, projectId);
     if (Date.now() >= undoUntil.getTime()) return state(REASON.WINDOW_PASSED, undoUntil, projectId);
     if (!(await targetVisible(companyId, actor.userId, row.meta.undo))) return state(REASON.TARGET_NOT_VISIBLE, undoUntil, projectId);

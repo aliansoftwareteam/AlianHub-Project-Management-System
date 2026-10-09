@@ -8,11 +8,12 @@ const feedsIntoProject = requireProjectAccess({
     projectIds: (req) => (req.body && req.body.scope === 'project' ? req.body.projectId : null),
     passMissing: () => true,
 });
+const { agentsRefused } = require('../Agents/guard');
 
 exports.init = (app) => {
-    app.post('/api/v1/calendar/feeds', feedsIntoProject, ctrl.createFeed);
+    app.post('/api/v1/calendar/feeds', agentsRefused('calendar.feed'), feedsIntoProject, ctrl.createFeed);
     app.get('/api/v1/calendar/feeds', ctrl.listFeeds);
-    app.post('/api/v1/calendar/feeds/:id/regenerate', ctrl.regenerateFeed);
+    app.post('/api/v1/calendar/feeds/:id/regenerate', agentsRefused('calendar.feed'), ctrl.regenerateFeed);
     app.delete('/api/v1/calendar/feeds/:id', ctrl.deleteFeed);
     // Deliberately outside the JWT prefixes in Config/setMiddleware.js: the token in the URL is the credential.
     app.get('/api/v1/calendar/ics/:token', icsLimiter, ctrl.getIcs);

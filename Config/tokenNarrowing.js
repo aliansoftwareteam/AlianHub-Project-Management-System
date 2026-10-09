@@ -23,9 +23,16 @@ const narrowingFor = (uid) => {
     return store && store.uid === String(uid || '') ? store.projectIds : null;
 };
 
+/* The whole of it, for the event a change sends: the list goes with the event, never with the work that follows it. */
+const current = () => storage.getStore() || null;
+const outside = (fn) => storage.exit(fn);
+
 const allowsProject = (uid, projectId) => {
     const list = narrowingFor(uid);
     return !list || list.includes(String(projectId || '').toLowerCase());
 };
 
-module.exports = { isNarrowed, runNarrowed, narrowingFor, allowsProject };
+/* The same asked of the token itself, for a handler that holds it and may be reached outside that list. */
+const tokenAllowsProject = (token, projectId) => !isNarrowed(token) || listOf(token).includes(String(projectId || '').toLowerCase());
+
+module.exports = { isNarrowed, runNarrowed, narrowingFor, current, outside, allowsProject, tokenAllowsProject };

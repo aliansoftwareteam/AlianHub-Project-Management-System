@@ -198,7 +198,7 @@ defineExpose({ closeInputs });
     position: sticky;
     top: 0;
     z-index: 3;
-    background: #fff;
+    background: var(--surface);
 }
 .tsf-back-btn {
     background: transparent;
@@ -210,7 +210,7 @@ defineExpose({ closeInputs });
     font-weight: 500;
     font-size: 16px;
     line-height: 21px;
-    color: #3845B3;
+    color: var(--brand);
     max-width: 60%;
 }
 /* Surfaced in the list sub-step header so a user who edited the list sees they must save it
@@ -218,9 +218,9 @@ defineExpose({ closeInputs });
 .tsf-save-template {
     margin-left: auto;
     flex: none;
-    border: 1px solid #3845B3;
-    background: #fff;
-    color: #3845B3;
+    border: 1px solid var(--brand);
+    background: var(--surface);
+    color: var(--brand);
     border-radius: 4px;
     padding: 4px 10px;
     font-size: 12px;

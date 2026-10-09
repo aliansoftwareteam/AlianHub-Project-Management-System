@@ -648,7 +648,7 @@ describe('ranking and origin', () => {
             const third = await recall(AGENT_A, STARTER, 'billing-new vendor address');
             expect(third.passages.find((p) => p.sourceId === next.memoryId)).toMatchObject({ origin: 'external' });
         } finally {
-            delete process.env.AGENT_TAINT_ROUTING;
+            process.env.AGENT_TAINT_ROUTING = 'off';
         }
     });
 });

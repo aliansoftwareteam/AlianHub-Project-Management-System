@@ -10,6 +10,9 @@ const { MAX_DEPTH } = require('../../event/domainEventBus');
 const telemetry = require('../../Config/telemetry');
 const { dailyRunLimitOf } = require('./dailyRunLimit');
 const { runClause } = require('./privateWork');
+const projectLimits = require('./projectLimits');
+const accounts = require('./accounts');
+const writerLimits = require('../../event/writerLimits');
 
 // Agent runs and spend. A run is the unit the rail footer counts ("2 running"),
 // the project header chip sums (elapsed, spend) and the audit log links to
@@ -47,12 +50,25 @@ const runsToday = (companyId, agentId) => MongoDbCrudOpration(companyId, {
 // The bus drops any envelope deeper than MAX_DEPTH, so a run whose actions would
 // emit past it is refused up front instead of running and losing its events.
 const LOOP_DEPTH_EXCEEDED = 'loop_depth_exceeded';
+const PROJECT_PAUSED = 'Agents are paused in this project. A person has to resume them first.';
 
-/* Can this agent start a run right now? Returns { ok, reason }. */
-const canStart = async (agent, { trigger, viaAccount, companyId, depth } = {}) => {
+const pausedIn = async (companyId, projectIds) => ((await projectLimits.pausedAmong(companyId, [].concat(projectIds || []))).length ? PROJECT_PAUSED : '');
+
+/* Can this agent start a run right now? Returns { ok, reason }. A run names the project it works in as `projectId`,
+ * or each of several as `projectIds`: where agents are paused in one of them, the start is refused. */
+/* The model a run asks for, as AICore/modelCall picks it: the skill's pin, then the agent's. A pin
+ * that validates is priced; one that does not is dropped at call time and the configured model runs. */
+const priceCheckFor = (agent, skill) => {
+    const pinned = (skill && skill.model) || (agent && agent.model) || null;
+    if (pinned && require('../AICore/modelPin').validatePin(pinned).ok) return { ok: true };
+    return usage.checkConfiguredModelPriced();
+};
+
+const canStart = async (agent, { trigger, viaAccount, companyId, depth, projectId, projectIds, skill } = {}) => {
     if (!agent) return { ok: false, reason: 'Agent not found.' };
     if (clampDepth(depth) >= MAX_DEPTH) return { ok: false, reason: LOOP_DEPTH_EXCEEDED, code: LOOP_DEPTH_EXCEEDED, depth: clampDepth(depth), maxDepth: MAX_DEPTH };
     if (agent.paused) return { ok: false, reason: `Agent is paused${agent.pausedReason ? ` (${agent.pausedReason})` : ''}.` };
+    if (companyId && await pausedIn(companyId, [projectId, ...(projectIds || [])].filter(Boolean))) return { ok: false, reason: PROJECT_PAUSED, code: 'project_paused' };
     try {
         await aiSwitch.assertAllowed(companyId);
     } catch (error) {
@@ -60,10 +76,8 @@ const canStart = async (agent, { trigger, viaAccount, companyId, depth } = {}) =
         return { ok: false, reason: error.message, code: aiSwitch.AI_OFF };
     }
     const via = viaAccount || agent.account || 'workspace';
-    if (via !== 'local') {
-        const price = usage.checkConfiguredModelPriced();
-        if (!price.ok) return { ok: false, reason: price.reason, code: price.code, model: price.model };
-    }
+    const price = priceCheckFor(agent, skill);
+    if (!price.ok) return { ok: false, reason: price.reason, code: price.code, model: price.model };
     const month = agent.spendMonth && agent.spendMonth.month === monthKey() ? agent.spendMonth : { usd: 0 };
     if (Number(agent.spendCapUsd) > 0 && Number(month.usd || 0) >= Number(agent.spendCapUsd)) {
         return { ok: false, reason: `Spend cap reached ($${Number(month.usd).toFixed(2)} of $${agent.spendCapUsd}).` };
@@ -123,8 +137,8 @@ const start = async (companyId, { agent, taskId, projectId, skill, trigger, star
                 agentId: String(agent._id), agentName: agent.name, taskId: taskId ? String(taskId) : null, projectId: projectId ? String(projectId) : null,
                 skill: skill || null, trigger: trigger || 'manual', status: STATUS.RUNNING, viaAccount: via,
                 triggerDepth: clampDepth(triggerDepth), triggerEventId: triggerEventId ? String(triggerEventId) : null,
-                startedBy: startedBy ? String(startedBy) : null, startedAt: new Date(), elapsedMs: 0,
-                spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: via === 'workspace' },
+                startedBy: startedBy ? String(startedBy) : null, startedUnder: writerLimits.ofStarter(startedBy), startedAt: new Date(), elapsedMs: 0,
+                spend: { tokens: 0, usd: 0, model: null, billedToWorkspace: true },
                 reservedUsd: 0,
                 actions: note ? [{ action: 'mention', note: String(note).slice(0, 2000), at: new Date() }] : [],
                 proposals: [], refusals: 0, decisions: [],
@@ -211,22 +225,21 @@ const stop = async (companyId, runId, byUserId) => {
 /* Record tokens/cost on the run and the agent's month. The ledger row the budget
  * reads was already booked by the core meter (AICore/spend) with this run's id;
  * this only keeps the run's own figures, the agent's cap and the run-context alert.
- * Personal-account spend is the developer's own and never billed to the workspace (27a). */
+ * A run's model calls go out on the server's key whatever account started it, so
+ * every run is billed to the workspace. */
 const recordSpend = async (companyId, run, tokens, model) => {
     const priced = usage.summarize(tokens || {}, model);
-    const billed = run.viaAccount !== 'personal' && run.viaAccount !== 'local';
-    if (priced.priced === false && priced.totalTokens > 0 && run.viaAccount !== 'local') {
+    if (priced.priced === false && priced.totalTokens > 0) {
         const message = `refusing to book ${priced.totalTokens} tokens as $0: ${usage.unpricedMessage(priced.model || model)}`;
         logger.error(`[agent-run] ${run._id}: ${message}`);
         const error = new Error(message);
         error.code = usage.UNPRICED_MODEL;
         throw error;
     }
-    const usd = billed && priced.costUsd ? priced.costUsd : 0;
+    const usd = priced.costUsd || 0;
     await patch(companyId, run._id, {
-        spend: { tokens: priced.totalTokens, usd, model: priced.model || model || null, billedToWorkspace: billed, personalUsd: !billed && priced.costUsd ? priced.costUsd : 0 },
+        spend: { tokens: priced.totalTokens, usd, model: priced.model || model || null, billedToWorkspace: true },
     });
-    if (!billed) return { usd: 0, tokens: priced.totalTokens, capReached: false };
     await require('./budget').alertIfCrossed(companyId, run).catch((e) => logger.error(`[agent-run] ${run._id}: budget alert failed: ${e.message}`));
     const agent = await getAgent(companyId, run.agentId);
     if (!agent) return { usd, tokens: priced.totalTokens, capReached: false };
@@ -301,10 +314,12 @@ const countsByStatus = async (companyId, { projectId, agentId, projectIds, hidde
     return counts;
 };
 
-/* A run waiting on a person is left alone: stopping it would strand its pending
- * proposal, and approving that later would mark the stopped run done anyway. */
-const pauseAll = async (companyId, reason) => {
+/* Every agent of the workspace stops: its own agents are paused one by one, and its connected agents by the
+ * workspace's own mark (accounts.setPolicy), which a person lifts. A run waiting on a person is left alone:
+ * stopping it would strand its pending proposal, and approving that later would mark the stopped run done anyway. */
+const pauseAll = async (companyId, reason, pausedBy = '') => {
     await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENTS, data: [{ deletedStatusKey: { $ne: 1 } }, { $set: { paused: true, pausedReason: reason || 'pause_all', pausedAt: new Date() } }] }, 'updateMany');
+    await accounts.setPolicy(companyId, { connectedPaused: true }, pausedBy);
     const active = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.AGENT_RUNS, data: [{ status: { $in: [STATUS.QUEUED, STATUS.RUNNING] } }, '_id status'] }, 'find');
     let stopped = 0;
     for (const r of active || []) {
@@ -312,6 +327,20 @@ const pauseAll = async (companyId, reason) => {
         if (await finish(companyId, r._id, { status: STATUS.STOPPED, outcome: 'pause all', onlyIf: r.status })) stopped += 1;
     }
     emit(companyId, 'agent', { pausedAll: true });
+    emit(companyId, 'policy', {});
+    return { stopped };
+};
+
+/* The same for one project, when a person pauses agents there. The agents themselves stay as they were. */
+const stopIn = async (companyId, projectId, outcome) => {
+    const active = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_RUNS, data: [{ projectId: { $in: idForms(String(projectId)) }, status: { $in: [STATUS.QUEUED, STATUS.RUNNING] } }, '_id status'],
+    }, 'find');
+    let stopped = 0;
+    for (const r of active || []) {
+        // eslint-disable-next-line no-await-in-loop
+        if (await finish(companyId, r._id, { status: STATUS.STOPPED, outcome, onlyIf: r.status })) stopped += 1;
+    }
     return { stopped };
 };
 
@@ -377,6 +406,9 @@ const notifyStarter = async (companyId, run, task, { status, outcome, error }) =
  * the run away mid-flight — then nothing more is written and nobody is told. */
 const executeSkill = async (companyId, run, agent, task, deps) => {
     const { runGraph } = require('./engine/graph');
+    if (task && task._id && task.updatedAt && deps && deps.actor) {
+        await require('./taskReads').saw(companyId, deps.actor, String(task._id), task.updatedAt).catch((e) => logger.error(`[agent-run] ${run._id}: the read of its task was not kept: ${e.message}`));
+    }
     const state = await runGraph({ companyId, run, agent, task, deps });
     if (state.status !== 'abandoned') await notifyStarter(companyId, run, task, state);
     return state;
@@ -391,4 +423,4 @@ const skillSlugOf = (agent, explicit) => {
     return first.key || first.slug || first.name || 'qa-review';
 };
 
-module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, idempotencyKeyFor, start, create, get, patch, appendAction, recordStep, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, getAgent, emitAgent, changesFor, executeSkill, monthKey };
+module.exports = { STATUS, OPEN, TERMINAL, RETENTION_SECONDS, LOOP_DEPTH_EXCEEDED, originDepth, terminalUpdate, canStart, runsToday, skillSlugOf, idempotencyKeyFor, start, create, get, patch, appendAction, recordStep, finish, isRunning, reapStale, stop, recordSpend, list, summary, countsByStatus, pauseAll, stopIn, pausedIn, getAgent, emitAgent, changesFor, executeSkill, monthKey };

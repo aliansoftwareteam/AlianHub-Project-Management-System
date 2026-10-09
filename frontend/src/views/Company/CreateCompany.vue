@@ -72,7 +72,7 @@
         <div v-else-if="stage === 'focus'" class="av2-auth-card">
             <h2 class="auth__h">{{ $t('Auth.focus_title') }}</h2>
             <p class="auth__p" style="margin-bottom:16px">{{ $t('Auth.focus_lead') }}</p>
-            <div v-if="banner" class="auth__banner auth__banner--danger"><ShellIcon name="alert" :size="15" /><span>{{ banner }}</span></div>
+            <div v-if="banner" class="auth__banner auth__banner--danger" role="alert"><ShellIcon name="alert" :size="15" /><span>{{ banner }}</span></div>
             <div class="av2-grid" role="radiogroup">
                 <button
                     v-for="f in FOCUSES"
@@ -94,7 +94,7 @@
 
         <div v-else class="av2-auth-card">
             <h2 class="auth__h">{{ form.name }}</h2>
-            <p class="auth__p" style="margin-bottom:0">{{ statusText }}</p>
+            <p class="auth__p" style="margin-bottom:0" role="status">{{ statusText }}</p>
             <div class="av2-progress"><div class="av2-progress__bar" :style="{ width: progress + '%' }"></div></div>
             <p class="av2-status ah-mono">{{ progress }}%</p>
         </div>
@@ -102,7 +102,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, reactive, ref } from "vue";
+import { computed, inject, nextTick, onMounted, reactive, ref } from "vue";
 
 defineOptions({ name: "CreateCompanyPage" });
 import { useRouter } from "vue-router";
@@ -112,11 +112,11 @@ import Cookies from "js-cookie";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { useCustomComposable, useGetterFunctions } from "@/composable";
-import { apiRequestWithoutCompnay, useAuth } from "@/services";
+import { apiRequestWithoutCompnay, getAuth, useAuth } from "@/services";
 import * as env from "@/config/env";
 import { connectAiWelcomePath } from "@/router/ai/connect";
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const router = useRouter();
 const { getters, commit } = useStore();
 const { logOut } = useAuth();
@@ -168,7 +168,7 @@ onMounted(async () => {
         userEmail.value = result?.data?.Employee_Email || "";
     } finally {
         mainSpinner.value = false;
-        setTimeout(() => nameInput.value?.focus(), 50);
+        nextTick(() => nameInput.value?.focus());
     }
 });
 
@@ -198,6 +198,19 @@ const fail = (message) => {
     progress.value = 0;
 };
 
+// The server names its reason by a code; its own sentence is English and stands in only for a code this build does not know.
+const reasonInWords = ({ code, reason }) => {
+    const key = `Auth.workspace_reason_${code}`;
+    if (typeof code === "string" && te(key)) return t(key);
+    return typeof reason === "string" ? reason : "";
+};
+
+const failureMessage = ({ freeLimit, code, reason } = {}) => {
+    if (freeLimit) return t("Auth.free_limit");
+    const why = reasonInWords({ code, reason });
+    return why ? t("Auth.workspace_failed_reason", { reason: why }) : t("Auth.workspace_failed");
+};
+
 const create = (withSample) => {
     banner.value = "";
     stage.value = "creating";
@@ -205,25 +218,35 @@ const create = (withSample) => {
     statusText.value = t("Auth.creating_workspace");
     const evId = `ev_${makeUniqueId(12)}`;
     const source = new EventSource(`${env.API_URI}/company-create/events/${evId}`);
-    let done = false;
+    let settled = false;
+    const settle = (outcome) => {
+        source.close();
+        if (settled) return;
+        settled = true;
+        outcome();
+    };
+    const refuse = (why) => settle(() => fail(failureMessage(why)));
+    const openWorkspace = (newCompanyId) => settle(() => {
+        progress.value = 100;
+        statusText.value = t("Auth.workspace_ready");
+        localStorage.setItem("selectedCompany", newCompanyId || "");
+        localStorage.removeItem("isLogging");
+        Cookies.remove("refferCode");
+        // The session was issued before this workspace existed: without a new one its first requests are refused.
+        const sessionRenewed = getAuth(userId.value).catch(() => null);
+        setTimeout(() => {
+            sessionRenewed.then(() => router.push(connectAiWelcomePath(newCompanyId))).then(() => window.location.reload());
+        }, 600);
+    });
     source.onmessage = (event) => {
         const data = JSON.parse(event.data)?.data;
         if (data?.step === 1) { progress.value = 35; statusText.value = t("Auth.creating_workspace"); return; }
         if (data?.step === 2) { progress.value = 70; statusText.value = t("Auth.seeding_sample"); return; }
-        source.close();
-        if (done) return;
-        done = true;
-        if (data?.error) { fail(data.freeCompanyLimitReached ? t("Auth.free_limit") : t("Auth.workspace_failed")); return; }
-        progress.value = 100;
-        statusText.value = t("Auth.workspace_ready");
-        localStorage.setItem("selectedCompany", data?.companyId || "");
-        localStorage.removeItem("isLogging");
-        Cookies.remove("refferCode");
-        setTimeout(() => {
-            router.push(connectAiWelcomePath(data?.companyId)).then(() => window.location.reload());
-        }, 600);
+        if (data?.error) refuse({ freeLimit: data.freeCompanyLimitReached, code: data.code, reason: data.error });
+        else openWorkspace(data?.companyId);
     };
-    source.onerror = () => { source.close(); if (!done) { done = true; fail(t("Auth.workspace_failed")); } };
+    // The stream only reports progress: the workspace may still be made, and the reply below says whether it was.
+    source.onerror = () => source.close();
 
     apiRequestWithoutCompnay("post", env.CREATE_COMPANY, {
         userId: userId.value,
@@ -248,13 +271,11 @@ const create = (withSample) => {
         Cst_countryCode: "",
         Cst_stateCode: ""
     }).then((res) => {
-        if (res.data.status === true) return;
-        source.close();
-        if (!done) { done = true; fail(res.data?.freeCompanyLimitReached ? t("Auth.free_limit") : t("Auth.workspace_failed")); }
+        if (res.data?.status === true) openWorkspace(res.data.companyId);
+        else refuse({ freeLimit: res.data?.freeCompanyLimitReached, code: res.data?.code, reason: res.data?.statusText });
     }).catch((err) => {
         console.error("ERROR IN CREATE COMPANY", err);
-        source.close();
-        if (!done) { done = true; fail(t("Auth.workspace_failed")); }
+        refuse();
     });
 };
 </script>

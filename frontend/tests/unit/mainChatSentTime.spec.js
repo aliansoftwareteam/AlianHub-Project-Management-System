@@ -35,6 +35,7 @@ vi.mock('@/components/organisms/MainChat/MainChatThreadFooter.vue', () => blank(
 
 import { useMainChatConversation } from '@/components/organisms/MainChat/useMainChatConversation';
 import MainChatMessage from '@/components/organisms/MainChat/MainChatMessage.vue';
+import { followClockPrefs } from '@/utils/clockText';
 
 const STORED_AT = '2026-10-01T09:30:00.000Z';
 
@@ -48,7 +49,7 @@ const thread = () => useMainChatConversation({
 
 const timeOf = (message) => {
     const wrapper = mount(MainChatMessage, {
-        props: { message, hour12: false },
+        props: { message },
         global: { mocks: { $t: (key) => key } },
     });
     const el = wrapper.find('.mc-msg-time');
@@ -80,7 +81,16 @@ describe('the time on a message that was just sent', () => {
     });
 
     it('shows as a time beside the name, and a message with no time shows no stray dot', () => {
+        followClockPrefs({ timeFormat: '24' });
         expect(timeOf({ _id: 'm1', userId: 'u1', type: 'text', message: 'Hello', createdAt: '2026-10-01T09:30:00' })).toBe('· 09:30');
         expect(timeOf({ _id: 'm2', userId: 'u1', type: 'text', message: 'Hello' })).toBe('');
+    });
+
+    it('is written the way the person chose in My Settings', () => {
+        const message = { _id: 'm1', userId: 'u1', type: 'text', message: 'Hello', createdAt: '2026-10-01T14:05:00' };
+        followClockPrefs({ timeFormat: '12' });
+        expect(timeOf(message)).toBe('· 2:05 PM');
+        followClockPrefs({ timeFormat: '24' });
+        expect(timeOf(message)).toBe('· 14:05');
     });
 });

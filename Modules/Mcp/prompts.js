@@ -1,9 +1,12 @@
 const tools = require('./tools');
+const rolesFlag = require('./rolesFlag');
+const rolePlaybooks = require('../Agents/rolePlaybooks');
+const playbookOverrides = require('../Agents/rolePlaybookOverrides');
 
 /* The ready-made prompts a person picks in their AI app. Fixed text shipped with the server: a prompt holds
  * no workspace data, takes what the person typed as its arguments, and tells the agent which tools to call.
  * A prompt is offered only to a connection that may run every tool in `needs`, and a step that names another
- * tool is kept only when the connection may run it. Tool names are written in backticks, which
+ * tool is kept only when the connection may run it. A role prompt is the exception: see roleOffered. Tool names are written in backticks, which
  * tests/conventions/mcp-prompts.test.js reads. */
 
 const ARGUMENT_MAX = 120;
@@ -29,6 +32,46 @@ const series = (parts) => {
     return kept.length > 1 ? `${kept.slice(0, -1).join(', ')} and ${kept[kept.length - 1]}` : kept[0] || '';
 };
 
+const tasksAfter = (has) => [
+    'tasks with `task.create`',
+    has('subtask.create') && 'subtasks with `subtask.create`',
+    has('task.assign') && 'owners with `task.assign`',
+    has('task.update') && 'dates with `task.update`',
+];
+
+/* The setup steps for a connection that can send a whole plan: one call, which waits for the person in AlianHub.
+ * The automations go in the plan where the connection may ask for one, and the first tasks where it may create a
+ * task with its details, which is the same connection that may assign one. */
+const planThroughOneCall = (has) => {
+    const withRules = has('automation.create');
+    const withTasks = has('task.assign');
+    const together = series(['the statuses, lists, fields and views', withRules && 'the automations', withTasks && 'the first tasks']);
+    return [
+        `Show me the whole setup as one plan before you make anything: the statuses, the lists, the fields, the views, ${withRules ? 'the automations, ' : ''}and the first tasks in each list. Leave out what the project already has. `
+            + (withRules ? 'Say that an automation starts switched off, and that only an owner or an admin can approve one.' : 'Say that automations are a part I have to make myself in AlianHub.'),
+        `Wait for my yes. Then send ${together} together in one call of \`project.setup\`. Nothing is made by that call: tell me the plan is waiting for my approval in AlianHub, where I see every part of it and can leave any part out before I approve, and wait until I say I have approved it.`,
+        withTasks
+            ? `Then tell me what was made and what was not, and why. Make whatever of the rest I still want: ${series(tasksAfter(has))}.`
+            : `Then make the rest of what I approved: ${series([listsTool(has) && `find the new lists with \`${listsTool(has)}\``, ...tasksAfter(has)])}.`,
+    ];
+};
+
+const planPartByPart = (has) => [
+    'Show me the whole setup as one plan before you make anything: the lists, and the first tasks in each. Say which parts you will make and which parts I have to make myself in AlianHub, such as statuses, fields, views and automations.',
+    `Wait for my yes. Then make only what I approved: ${series([has('list.create') && 'lists with `list.create`', ...tasksAfter(has)])}.${has('list.create') ? '' : ' You cannot make lists here: tell me which lists to make, and put the tasks in the lists that are there.'}`,
+];
+
+/* What to do when the project is not there yet: a connection that can ask for one sends it with its plan, and waits for the person. */
+const whenNoProject = (has) => (has('project.create')
+    ? 'If I have no project for it yet, skip step 2, and at step 4, after my yes, ask for the project with its statuses, lists, fields and views together in one call of `project.create` instead. '
+        + 'Nothing is made by that call: tell me the project is waiting for my approval in AlianHub, where I see every part of it, and that only I am on it at first. '
+        + `Wait until I say I have approved it, ${has('projects.list') ? 'find it with `projects.list`, ' : ''}then go on with its tasks.`
+    : sentence([
+        'You cannot make a project yourself. If it is not there yet, tell me to make it in AlianHub under Projects,',
+        has('screen.link') && 'give me the link to that screen from `screen.link`,',
+        'and wait until I say it is there.',
+    ]));
+
 const PROJECT = (description) => ({ name: 'project', description, required: false });
 const ASKED_PROJECT = PROJECT('The name of the project. Leave it empty and you are asked.');
 
@@ -42,12 +85,7 @@ const PROMPTS = Object.freeze([
         changes: true,
         text: (has, { project }) => [
             'Help me set up a project in AlianHub.',
-            sentence([
-                whichProject(has, project),
-                'You cannot make a project yourself. If it is not there yet, tell me to make it in AlianHub under Projects,',
-                has('screen.link') && 'give me the link to that screen from `screen.link`,',
-                'and wait until I say it is there.',
-            ]),
+            sentence([whichProject(has, project), whenNoProject(has)]),
             steps([
                 'Ask me a few short questions, one at a time: what the project is for, who works on it, when it has to be finished, and the main phases of the work. Stop asking as soon as you know enough.',
                 `Read what the project already has before you suggest anything: ${series([
@@ -57,14 +95,7 @@ const PROMPTS = Object.freeze([
                     has('members.list') && 'its people with `members.list`',
                     'its tasks with `tasks.search`',
                 ])}.`,
-                'Show me the whole setup as one plan before you make anything: the lists, and the first tasks in each. Say which parts you will make and which parts I have to make myself in AlianHub, such as statuses, fields, views and automations.',
-                `Wait for my yes. Then make only what I approved: ${series([
-                    has('list.create') && 'lists with `list.create`',
-                    'tasks with `task.create`',
-                    has('subtask.create') && 'subtasks with `subtask.create`',
-                    has('task.assign') && 'owners with `task.assign`',
-                    has('task.update') && 'dates with `task.update`',
-                ])}.${has('list.create') ? '' : ' You cannot make lists here: tell me which lists to make, and put the tasks in the lists that are there.'}`,
+                ...(has('project.setup') ? planThroughOneCall(has) : planPartByPart(has)),
                 has('screen.link')
                     ? 'Finish with a short list of what you made, what is left for me, and the link to the project from `screen.link`.'
                     : 'Finish with a short list of what you made and what is left for me.',
@@ -174,18 +205,84 @@ const PROMPTS = Object.freeze([
     },
 ]);
 
+const ROLE_REQUEST = { name: 'request', description: 'What to work on: a task, a project or a request in your own words. Leave it empty and you are asked.', required: false };
+
+const rolePromptName = (role) => `work_as_${role.slug.replace(/-/g, '_')}`;
+
+const QUEUE_TOOLS = ['queue.list', 'queue.claim', 'queue.release'];
+const MISSING_MARK = '(not on this connection)';
+
+let writeTools = null;
+const isWrite = (name) => {
+    if (!writeTools) writeTools = new Set(tools.registered().filter((tool) => !tool.run).map((tool) => tool.name));
+    return writeTools.has(name);
+};
+
+/* Taking and giving back queue items delivers nothing by itself, so it does not count as a write the role can do. */
+const roleOffered = (role, has) => {
+    const held = role.tools.filter(has);
+    return held.length * 2 >= role.tools.length && held.some((name) => isWrite(name) && !QUEUE_TOOLS.includes(name));
+};
+
+const quoted = (names) => names.map((name) => `\`${name}\``).join(', ');
+
+const missingLine = (role, has) => {
+    const needed = role.tools.filter((name) => !has(name));
+    const extras = (role.toolsOptional || []).filter((name) => !has(name));
+    if (!needed.length && !extras.length) return '';
+    return sentence([
+        needed.length && `This connection lacks tools the playbook needs: ${quoted(needed)}. Skip the steps that need them, ask me for what they would have given you, and say in your answer what you left out.`,
+        extras.length && `${needed.length ? 'It also lacks' : 'This connection lacks'} these extras: ${quoted(extras)}. Leave out what they add, and say so.`,
+        `They are marked "${MISSING_MARK}" below: do not call them.`,
+    ]);
+};
+
+/* An edited playbook may name any tool, so every tool the connection cannot run is marked, not only the listed ones. */
+const markMissing = (body, has) => {
+    const known = new Set(tools.registered().map((tool) => tool.name));
+    return body.replace(/`([^`]+)`/g, (all, name) => (known.has(name) && !has(name) ? `${all} ${MISSING_MARK}` : all));
+};
+
+const rolePrompt = (role) => Object.freeze({
+    name: rolePromptName(role),
+    title: `Work as the ${role.name}`,
+    description: `${role.department}: ${rolePlaybooks.summary(role, 300)}`,
+    arguments: [ROLE_REQUEST],
+    needs: role.tools,
+    optional: role.toolsOptional || [],
+    offered: (has) => roleOffered(role, has),
+    text: (has, { request }) => [
+        missingLine(role, has),
+        `Work as the ${role.name} of the ${role.department} team in AlianHub, following the playbook below.`,
+        request ? `What I want you to work on: "${request}".` : 'Ask me what to work on, unless I have just told you.',
+        'Ask me for anything the playbook needs that you do not have before you start, and show me what you will change before you change it.',
+        ...(has('queue.list') ? [`Your queue is \`queue.list\` with role "${role.blueprint}/${role.slug}": the tasks a lead routed to the ${role.name}.`] : []),
+        markMissing(role.body, has),
+        CONTENT_RULE,
+    ].filter(Boolean),
+});
+
+let rolePromptsCache = null;
+const rolePrompts = (edited) => {
+    if (edited && edited.size) return rolePlaybooks.all().map((role) => rolePrompt(playbookOverrides.apply(role, edited)));
+    if (!rolePromptsCache) rolePromptsCache = Object.freeze(rolePlaybooks.all().map(rolePrompt));
+    return rolePromptsCache;
+};
+
+const available = (edited) => (rolesFlag.enabled() ? [...PROMPTS, ...rolePrompts(edited)] : PROMPTS);
+
 const usableBy = (ctx) => {
     const offered = tools.usable(ctx);
     const names = new Set(offered.map((tool) => tool.name));
     return { has: (name) => names.has(name), changes: offered.some((tool) => tool.write) };
 };
 
-const offeredTo = (ctx) => {
+const offeredTo = (ctx, edited) => {
     const { has } = usableBy(ctx);
-    return PROMPTS.filter((prompt) => prompt.needs.every(has));
+    return available(edited).filter((prompt) => (prompt.offered ? prompt.offered(has) : prompt.needs.every(has)));
 };
 
-const list = (ctx) => offeredTo(ctx).map((prompt) => ({
+const list = (ctx, edited) => offeredTo(ctx, edited).map((prompt) => ({
     name: prompt.name,
     title: prompt.title,
     description: prompt.description,
@@ -193,8 +290,8 @@ const list = (ctx) => offeredTo(ctx).map((prompt) => ({
 }));
 
 /* null for a prompt that does not exist and for one this connection is not offered, so the two answer alike. */
-const get = (ctx, name, given = {}) => {
-    const prompt = offeredTo(ctx).find((offered) => offered.name === String(name));
+const get = (ctx, name, given = {}, edited = null) => {
+    const prompt = offeredTo(ctx, edited).find((offered) => offered.name === String(name));
     if (!prompt) return null;
     const { has, changes } = usableBy(ctx);
     const typed = given && typeof given === 'object' ? given : {};
@@ -205,4 +302,4 @@ const get = (ctx, name, given = {}) => {
     };
 };
 
-module.exports = { PROMPTS, ARGUMENT_MAX, list, get };
+module.exports = { PROMPTS, ARGUMENT_MAX, list, get, rolePrompts, rolePromptName };

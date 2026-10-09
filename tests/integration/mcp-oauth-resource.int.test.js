@@ -1,7 +1,7 @@
 const { createApiClient } = require('../../e2e/support/api');
 const { loginAs, readState, uniqueSuffix } = require('../../e2e/support/fixtures');
 
-/* The harness runs with MCP_OAUTH unset, so /mcp must answer exactly as it did before
+/* The harness runs with MCP_OAUTH off (tests/integration/globalSetup.js), so /mcp must answer exactly as it did before
  * the protected resource metadata and scope challenges existed. */
 
 const state = readState();

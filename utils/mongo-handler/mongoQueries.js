@@ -107,6 +107,7 @@ const {
     workflowDefinitionsSchema,
     agentFindingsSchema,
     projectFindingsSchema,
+    agentWorkMarksSchema,
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
@@ -117,9 +118,11 @@ const {
     aiAlertsSchema,
     agentProposalsSchema,
     agentStandingApprovalsSchema,
+    rolePlaybookOverridesSchema,
     agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,
+    appConnectionEventsSchema,
     cloudStorageConnectionsSchema,
     formsSchema,
     formSubmissionsSchema,
@@ -147,6 +150,7 @@ const {
     aiEvalRunsSchema,
     assignmentRulesSchema,
     assignmentDecisionsSchema,
+    dispatchDecisionsSchema,
     aiProfilesSchema,
     secretsSchema,
     oauthClientsSchema,
@@ -364,6 +368,8 @@ exports.checkType = (type) => {
             return agentFindingsSchema
         case SCHEMA_TYPE.PROJECT_FINDINGS:
             return projectFindingsSchema
+        case SCHEMA_TYPE.AGENT_WORK_MARKS:
+            return agentWorkMarksSchema
         case SCHEMA_TYPE.AGENTS:
             return agentsSchema
         case SCHEMA_TYPE.AGENT_RUNS:
@@ -386,10 +392,14 @@ exports.checkType = (type) => {
             return agentStandingApprovalsSchema
         case SCHEMA_TYPE.AGENT_SKILLS:
             return agentSkillsSchema
+        case SCHEMA_TYPE.ROLE_PLAYBOOK_OVERRIDES:
+            return rolePlaybookOverridesSchema
         case SCHEMA_TYPE.CALLS:
             return callsSchema
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
             return integrationConnectionsSchema
+        case SCHEMA_TYPE.APP_CONNECTION_EVENTS:
+            return appConnectionEventsSchema
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
             return cloudStorageConnectionsSchema
         case SCHEMA_TYPE.FORMS:
@@ -444,6 +454,8 @@ exports.checkType = (type) => {
             return assignmentRulesSchema
         case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
             return assignmentDecisionsSchema
+        case SCHEMA_TYPE.DISPATCH_DECISIONS:
+            return dispatchDecisionsSchema
         case SCHEMA_TYPE.AI_PROFILES:
             return aiProfilesSchema
         case SCHEMA_TYPE.SECRETS:
@@ -670,6 +682,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.AGENT_FINDINGS}`
         case SCHEMA_TYPE.PROJECT_FINDINGS:
                 return `${dbCollections.PROJECT_FINDINGS}`
+        case SCHEMA_TYPE.AGENT_WORK_MARKS:
+                return `${dbCollections.AGENT_WORK_MARKS}`
         case SCHEMA_TYPE.AGENTS:
                 return `${dbCollections.AGENTS}`
         case SCHEMA_TYPE.AGENT_RUNS:
@@ -692,10 +706,14 @@ exports.tableType = (type) => {
                 return `${dbCollections.AGENT_STANDING_APPROVALS}`
         case SCHEMA_TYPE.AGENT_SKILLS:
                 return `${dbCollections.AGENT_SKILLS}`
+        case SCHEMA_TYPE.ROLE_PLAYBOOK_OVERRIDES:
+                return `${dbCollections.ROLE_PLAYBOOK_OVERRIDES}`
         case SCHEMA_TYPE.CALLS:
                 return `${dbCollections.CALLS}`
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
                 return `${dbCollections.INTEGRATION_CONNECTIONS}`
+        case SCHEMA_TYPE.APP_CONNECTION_EVENTS:
+                return `${dbCollections.APP_CONNECTION_EVENTS}`
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
                 return `${dbCollections.CLOUD_STORAGE_CONNECTIONS}`
         case SCHEMA_TYPE.FORMS:
@@ -750,6 +768,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.ASSIGNMENT_RULES}`
         case SCHEMA_TYPE.ASSIGNMENT_DECISIONS:
                 return `${dbCollections.ASSIGNMENT_DECISIONS}`
+        case SCHEMA_TYPE.DISPATCH_DECISIONS:
+                return `${dbCollections.DISPATCH_DECISIONS}`
         case SCHEMA_TYPE.AI_PROFILES:
                 return `${dbCollections.AI_PROFILES}`
         case SCHEMA_TYPE.SECRETS:

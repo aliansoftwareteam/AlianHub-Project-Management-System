@@ -166,7 +166,7 @@
 <script setup>
 
 defineOptions({ name: "LoginPage" });
-import { computed, inject, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, inject, nextTick, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -271,7 +271,8 @@ const handleSubmit = async () => {
             twoFactor.tempToken = user.data.tempToken;
             twoFactor.expiresAt = Date.now() + 5 * 60 * 1000;
             step.value = "twofa";
-            setTimeout(() => codeInputs.value[0]?.focus(), 50);
+            await nextTick();
+            codeInputs.value[0]?.focus();
             return;
         }
         await proceedAfterAuth(user.data.uid);
@@ -313,17 +314,30 @@ const proceedAfterAuth = async (userId) => {
     localStorage.setItem("SubmenuScreen", "project");
     updateUserStatus(userId);
 
-    if (!uData.AssignCompany?.length) { router.push({ name: "Create_Company" }); return; }
+    const toInvitation = INVITATION_REDIRECT.test(String(route.query.redirect_url || ""));
+    if (!uData.AssignCompany?.length) {
+        // Registered first and invited afterwards: the invitation is what gives this person a workspace.
+        if (toInvitation) await backToInvitation();
+        else router.push({ name: "Create_Company" });
+        return;
+    }
     const cid = localStorage.getItem("selectedCompany") ?? companyID;
     if (cid && isCompanyFind === false) { router.push({ name: "Create_Company" }); return; }
 
-    if (!localStorage.getItem("selectedCompany") && !INVITATION_REDIRECT.test(String(route.query.redirect_url || "")) && Array.isArray(companies) && companies.length > 1) {
+    if (!localStorage.getItem("selectedCompany") && !toInvitation && Array.isArray(companies) && companies.length > 1) {
         workspaces.value = companies;
         pendingUserId.value = userId;
         step.value = "workspace";
         return;
     }
     finishLogin(cid);
+};
+
+const backToInvitation = async () => {
+    localStorage.setItem("isLogging", "true");
+    localStorage.removeItem("ForgotEmail");
+    await router.replace(route.query.redirect_url);
+    window.location.reload();
 };
 
 const finishLogin = async (cid) => {

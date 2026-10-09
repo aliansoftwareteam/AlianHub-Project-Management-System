@@ -83,6 +83,9 @@
                     <span class="agent-proposal__who">✦ {{ agentProposal.agentName }}:</span> {{ proposalTitle(t, agentProposal) }}
                     <button type="button" class="agent-proposal__review" @click.stop="openAiInbox()">{{ $t('Projects.review') }}</button>
                 </div>
+                <div v-if="!agentRun && heldByAgent" class="card-agent-mark">
+                    <TaskAgentMark :task-id="String(element._id)" />
+                </div>
                 <dl v-if="cardFieldValues.length" class="card-fields">
                     <div v-for="entry in cardFieldValues" :key="entry.id" class="card-field">
                         <dt class="card-field__name" :title="entry.label">{{ entry.label }}</dt>
@@ -196,7 +199,7 @@
             <ConfirmationSidebar
                 v-model="showSidebar"
                 :title="archive ? $t('Projects.archive_task') : $t('Projects.delete_task')"
-                :message="archive ? $t('conformationmsg.archive') : $t('conformationmsg.delete')"
+                :message="$t(taskRemovalMessageKey(props.data, archive))"
                 :confirmationString="archive ? $t('Projects.confirm_word_archive') : $t('Projects.confirm_word_delete')"
                 :acceptButtonClass="archive ? 'btn-primary': 'btn-danger'"
                 :acceptButton="`${archive ? $t('Projects.archive') : $t('Projects.delete')}`"
@@ -218,6 +221,8 @@
     import { fieldTypeUi, taskPropFor } from '@/plugins/customFieldView/fieldTypes';
     import { statusChipStyle } from '@/utils/statusChipColors';
     import { isAgentWork } from '@/components/molecules/Provenance/provenance';
+    import { agentWorkFor } from '@/views/Projects/composables/agentWork';
+    import TaskAgentMark from '@/views/Projects/components/TaskAgentMark.vue';
     import { useUpdateTasks } from "@/views/Projects/helper"
     import TagChip from '@/components/atom/TagChip/TagChip.vue'
     import Priority from "@/components/molecules/PriorityCompo/PriorityComp.vue"
@@ -231,6 +236,7 @@
     import CreateTagPopup from "@/components/molecules/TagList/CreateTagPopup.vue";
     import { taskTagChips } from "@/components/molecules/TagList/helper.js";
     import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
+    import { taskRemovalMessageKey } from "@/utils/taskRemovalWords";
     import TaskMenuSidebars from '@/views/Projects/components/taskMenu/TaskMenuSidebars.vue';
     import TaskMenuPopup from '@/views/Projects/components/taskMenu/TaskMenuPopup.vue';
     import { taskMenuItems } from '@/views/Projects/composables/taskMenu';
@@ -269,6 +275,7 @@
     const projectData = inject("selectedProject");
     const $toast = useToast()
     const element = ref(props.data)
+    const heldByAgent = computed(() => Boolean(agentWorkFor(element.value?._id)));
     const TAG_CHIP_LIMIT = 4
     const taskTags = computed(() => taskTagChips(projectData.value?.tagsArray, element.value?.tagsArray))
     // TagChip requires ids, and the row's tag picker only reports them after the chips first render.

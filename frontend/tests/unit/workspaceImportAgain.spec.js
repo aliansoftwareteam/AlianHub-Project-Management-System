@@ -119,6 +119,24 @@ describe('a file whose tasks are already in the project', () => {
         expect(wrapper.find('[data-test="wim-updated"]').text()).toBe('WorkspaceImport.summary_updated');
         expect(wrapper.find('[data-test="wim-undo"]').exists()).toBe(false);
     });
+
+    it('words the button for what it will do: update, or import and update', async () => {
+        answers.preview = previewOf({ alreadyImported: 3 });
+        const wrapper = await openInProject();
+        await toPreview(wrapper);
+        await wrapper.find('[data-test="wim-existing-update"]').setValue(true);
+        await flushPromises();
+        expect(wrapper.find('[data-test="wim-run"]').text()).toBe('WorkspaceImport.run_update');
+
+        answers.preview = previewOf({ alreadyImported: 2 });
+        await wrapper.find('[data-test="wim-existing-update"]').trigger('change');
+        await flushPromises();
+        expect(wrapper.find('[data-test="wim-run"]').text()).toBe('WorkspaceImport.run_and_update');
+
+        await wrapper.find('[data-test="wim-existing-skip"]').setValue(true);
+        await flushPromises();
+        expect(wrapper.find('[data-test="wim-run"]').text()).toBe('WorkspaceImport.run');
+    });
 });
 
 describe('a task counts as already here in one project only', () => {

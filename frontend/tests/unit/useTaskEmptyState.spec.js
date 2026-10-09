@@ -67,7 +67,7 @@ describe('useTaskEmptyState', () => {
     });
 
     it('resolves every key it can produce against en.js', () => {
-        ['no_tasks', 'no_match', 'no_visible_tasks', 'no_archived'].forEach((k) => {
+        ['no_tasks', 'no_match', 'no_visible_tasks', 'no_archived', 'empty_list', 'empty_lists'].forEach((k) => {
             expect(en.EmptyState[`${k}_title`]).toBeTruthy();
             expect(en.EmptyState[`${k}_msg`]).toBeTruthy();
         });

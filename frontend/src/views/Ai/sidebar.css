@@ -49,7 +49,7 @@
     .ai-side__group { width: 100%; }
     .ai-side__group-head { width: 40px; height: 40px; padding: 0; margin: 0 auto; justify-content: center; }
     .ai-side__item { width: 40px; height: 40px; padding: 0; justify-content: center; position: relative; }
-    .ai-side__count {
+    .ai-side__item .ai-side__count, .ai-side__item.router-link-active .ai-side__count {
         position: absolute; top: 2px; right: 2px; margin: 0;
         min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
         background: var(--brand); color: var(--on-brand);

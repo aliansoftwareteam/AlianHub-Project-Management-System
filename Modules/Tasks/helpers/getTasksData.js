@@ -6,7 +6,7 @@ const { tenantOf, TenantError } = require("../../../Config/tenant");
 const { removeCache } = require("../../../utils/commonFunctions.js");
 const socketEmitter = require("../../../event/socketEventEmitter");
 const logger = require("../../../Config/loggerConfig");
-const { QueryRefused, validatePipeline, visibilityStage, withExtraListRows } = require("./taskQueryGuard");
+const { QueryRefused, validatePipeline, visibilityStage, withExtraListRows, withScopedJoins } = require("./taskQueryGuard");
 const { WriteRefused, parseCascade, assertCanCascade, cascadeFilter } = require("./taskWriteGuard");
 const { canReadTask } = require("./taskReadAccess");
 const { extraListsOf, listsForViewer, opensList } = require("./taskExtraLists");
@@ -29,7 +29,8 @@ exports.getTaskByQyery = async (req, res) => {
         const converted = await withLinkConditions(companyId, req.uid, replaceObjectKey(replaceUndefined ? relapceUndefinedvals(stages) : stages, ["objId", "dbDate"]));
         const rows = inList && await opensList(companyId, req.uid, inList) ? withExtraListRows(converted, inList) : converted;
         const scope = await visibilityStage(companyId, req.uid);
-        const pipeline = scope ? [scope, ...rows] : rows;
+        const joined = await withScopedJoins(companyId, req.uid, rows);
+        const pipeline = scope ? [scope, ...joined] : joined;
 
         const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [pipeline] }, "aggregate");
         return res.status(200).json(response);

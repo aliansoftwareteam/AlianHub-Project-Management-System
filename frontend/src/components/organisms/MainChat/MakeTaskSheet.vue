@@ -45,6 +45,7 @@
 </template>
 
 <script setup>
+import { defaultStatus } from '@/components/organisms/QuickCreateTask/quickCreateTask';
 /**
  * Turn a message, a voice note or a meeting action item into a task. The task's
  * description carries the source text and a link back to where it came from.
@@ -57,6 +58,7 @@ import taskClass from '@/utils/TaskOperations';
 import { useGetterFunctions } from '@/composable';
 import { taskPlanPermission } from '@/composable/commonFunction';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import { preferredSprint, readCreated, rememberCreated } from '@/components/organisms/QuickCreateTask/placeInference';
 
 const props = defineProps({
     initialTitle: { type: String, default: '' },
@@ -121,7 +123,10 @@ async function onProjectChange() {
                 folderId: s.folderId || null,
                 folderName: s.folderId ? (folderName[s.folderId] || s.folderName || '') : '',
             }));
-        if (sprints.value.length === 1) sprintId.value = sprints.value[0].id;
+        const wanted = preferredSprint({ projectId: String(projectId.value), created: readCreated(companyId.value, userId.value) });
+        const pick = sprints.value.find((s) => String(s.id) === wanted);
+        if (pick) sprintId.value = pick.id;
+        else if (sprints.value.length === 1) sprintId.value = sprints.value[0].id;
     } catch (error) {
         console.error('MakeTaskSheet: sprints', error);
     } finally {
@@ -131,7 +136,9 @@ async function onProjectChange() {
 
 onMounted(() => {
     const preferred = projects.value.find((p) => String(p._id) === String(props.defaultProjectId));
+    const last = projects.value.find((p) => String(p._id) === String(readCreated(companyId.value, userId.value)?.projectId));
     if (preferred) projectId.value = preferred._id;
+    else if (last) projectId.value = last._id;
     else if (projects.value.length === 1) projectId.value = projects.value[0]._id;
     if (projectId.value) onProjectChange();
     nextTick(() => nameField.value && nameField.value.focus());
@@ -154,7 +161,7 @@ async function create() {
         errors.value.form = t('Chat.pick_both');
         return;
     }
-    const status = (project.taskStatusData || []).find((x) => x.type === 'default_active');
+    const status = defaultStatus(project);
     const taskType = (project.taskTypeCounts || [])[0];
     if (!status || !taskType) {
         errors.value.form = t('Chat.no_project_ready');
@@ -212,6 +219,7 @@ async function create() {
         });
 
         if (result && result.status && result.id) {
+            rememberCreated(companyId.value, userId.value, { projectId: project._id, sprintId: sprint.id });
             $toast.success(t('Chat.task_created'), { position: 'top-right' });
             emit('created', { id: result.id, name: name.value, url: taskUrl(project, sprint, result.id), project, sprint });
         } else if (result && result.isUpgrade) {

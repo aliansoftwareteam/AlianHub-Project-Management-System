@@ -18,7 +18,7 @@
                 <span v-if="decisionOf(e)" class="ah-chip" :class="CHIP[decisionOf(e)]" data-test="trace-decision">{{ $t(`Ai.trace_decision_${decisionOf(e)}`) }}</span>
                 <span class="ah-small run-trace__metrics">
                     <span v-if="isNumber(e.durationMs)" data-test="trace-duration">{{ duration(e.durationMs) }}</span>
-                    <span v-if="isNumber(e.tokens)" data-test="trace-tokens">{{ $t('Ai.trace_tokens', { n: e.tokens }) }}</span>
+                    <span v-if="isNumber(e.tokens)" data-test="trace-tokens">{{ $t('Ai.trace_tokens', { n: e.tokens }, e.tokens) }}</span>
                     <span v-if="isNumber(e.costUsd)" data-test="trace-cost">{{ $t('Ai.trace_cost', { usd: Number(e.costUsd).toFixed(4) }) }}</span>
                 </span>
             </li>

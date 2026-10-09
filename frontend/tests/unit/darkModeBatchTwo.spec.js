@@ -24,18 +24,20 @@ const composable = vi.hoisted(() => ({
 }));
 vi.mock('@/composable', () => composable);
 vi.mock('@/composable/index', () => composable);
-vi.mock('@formkit/vue', async () => {
-    const vue = await import('vue');
-    return {
-        FormKit: vue.defineComponent({
-            name: 'FormKit',
-            inheritAttrs: false,
-            props: ['type', 'label'],
-            setup: (props, { slots, attrs }) => () => (props.type === 'form'
-                ? vue.h('form', slots.default ? slots.default() : [])
-                : vue.h('button', { type: 'button', ...attrs }, props.label))
-        })
-    };
+const formKit = vi.hoisted(() => ({
+    stub: (vue) => vue.defineComponent({
+        name: 'FormKit',
+        inheritAttrs: false,
+        props: ['type', 'label'],
+        setup: (props, { slots, attrs }) => () => (props.type === 'form'
+            ? vue.h('form', slots.default ? slots.default() : [])
+            : vue.h('button', { type: 'button', ...attrs }, props.label))
+    })
+}));
+vi.mock('@formkit/vue', async () => ({ FormKit: formKit.stub(await import('vue')) }));
+vi.mock('@/plugins/customFieldView/lazyFormKit', async () => {
+    const library = { FormKit: formKit.stub(await import('vue')) };
+    return { ...library, ensureFormKit: () => Promise.resolve(library), bindFormKitApp: () => {} };
 });
 
 import customFieldPlugin from '@/plugins/customFieldView/customFieldPlugin';
@@ -128,7 +130,7 @@ describe('the project details page paints from tokens', () => {
     });
 
     test('the page body is the canvas of the theme, not the fixed light grey', () => {
-        expect(template('views/Projects/Projects.vue')).toMatch(/TOKEN_BODY_TABS\.includes\(activeTab\) \? 'list-view-body--detail' : 'bg-light-gray'/);
+        expect(template('views/Projects/Projects.vue')).toMatch(/bodyOnTokens \? 'list-view-body--detail' : 'bg-light-gray'/);
         expect(read('views/Projects/Projects.vue')).toMatch(/const TOKEN_BODY_TABS = \['ProjectDetail'/);
         const body = ruleBody(read('views/Projects/style.css'), '.list-view-body--detail');
         expect(body).toMatch(/background:\s*var\(--canvas\)/);

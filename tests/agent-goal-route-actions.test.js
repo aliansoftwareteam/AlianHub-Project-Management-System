@@ -78,7 +78,7 @@ beforeEach(async () => {
     goal = made._id;
     targetId = made.targets[0].id;
 });
-afterEach(() => { delete process.env.MCP_TOOLS_WORK; });
+afterEach(() => { process.env.MCP_TOOLS_WORK = 'off'; });
 
 describe('a token created for an agent, on the goal routes', () => {
     it.each(Object.keys(WRITES))('%s is refused and recorded, and nothing is written', async (name) => {
@@ -88,7 +88,7 @@ describe('a token created for an agent, on the goal routes', () => {
         const answer = await send(route, agentToken(INSIDER), body, params);
 
         expect(answer.code).toBe(403);
-        expect(answer.body).toMatchObject({ status: false, statusText: expect.stringMatching(/^Agents cannot perform /), auditId: expect.anything() });
+        expect(answer.body).toMatchObject({ status: false, statusText: expect.stringMatching(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/), auditId: expect.anything() });
         expect(JSON.stringify(goals())).toBe(before);
         expect(audits('agent.action')).toHaveLength(0);
         expect(audits('agent.action_refused')).toHaveLength(1);
@@ -169,7 +169,7 @@ describe('a person, on the goal routes', () => {
         for (const name of Object.keys(WRITES)) {
             const [route, body, params] = WRITES[name]();
             const answer = await send(route, caller(INSIDER), body, params);
-            expect(String(answer.body.statusText)).not.toMatch(/^Agents cannot perform /);
+            expect(String(answer.body.statusText)).not.toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/);
             if (COMPLETES.includes(name)) expect({ name, code: answer.code, status: answer.body.status }).toEqual({ name, code: 200, status: true });
         }
         expect(agentAudits()).toEqual([]);

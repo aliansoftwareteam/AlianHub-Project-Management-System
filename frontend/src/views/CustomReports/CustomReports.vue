@@ -66,7 +66,7 @@
                     </select>
                     <select v-model="tplPick" class="rp-select rp-select--wide" @change="applyTemplate">
                         <option value="">{{ $t('Reports.template_pick') }}</option>
-                        <option v-for="tp in templates" :key="tp.key" :value="tp.key">{{ tp.name }}</option>
+                        <option v-for="tp in templates" :key="tp.key" :value="tp.key">{{ templateName(tp) }}</option>
                     </select>
                 </div>
             </aside>
@@ -384,6 +384,8 @@ const loadTemplates = async () => {
     } catch (e) { templates.value = []; }
 };
 
+const templateName = (tpl) => (te(`Reports.template_name_${tpl.key}`) ? t(`Reports.template_name_${tpl.key}`) : tpl.name);
+
 const applyTemplate = () => {
     const tpl = templates.value.find((x) => x.key === tplPick.value);
     tplPick.value = '';
@@ -394,7 +396,7 @@ const applyTemplate = () => {
     cfg.metric = c.metric || METRICS[cfg.source][0];
     cfg.chartType = c.chartType || 'bar';
     cfg.filters = { ...(c.filters || {}) };
-    reportName.value = tpl.name;
+    reportName.value = templateName(tpl);
     currentSavedId.value = '';
     runPreview();
 };
@@ -434,7 +436,7 @@ const createSchedule = async () => {
         if (body && body.status === false) { scheduleError.value = body.statusText || t('Reports.save_failed'); return; }
         sched.recipients = '';
         await loadSchedules();
-    } catch (e) { scheduleError.value = t('Reports.save_failed'); }
+    } catch (e) { scheduleError.value = e?.response?.data?.statusText || t('Reports.save_failed'); }
 };
 
 const removeSchedule = async (sc) => {

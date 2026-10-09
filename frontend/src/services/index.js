@@ -107,7 +107,8 @@ axiosInstanceWithoutSecureWithFormData.interceptors.request.use((req) => {
 
 
 
-let pendingAuth = null;
+let renewal = null;
+let renewalAfter = null;
 
 const requestAuth = (id, retried = false) => new Promise((resolve, reject) => {
     const headers = {
@@ -138,11 +139,30 @@ const requestAuth = (id, retried = false) => new Promise((resolve, reject) => {
     });
 });
 
-export const getAuth = async (id, isFirst) => {
-    if (!pendingAuth) {
-        pendingAuth = requestAuth(id).finally(() => { pendingAuth = null; });
+const beginRenewal = (id) => {
+    renewal = requestAuth(id).finally(() => { renewal = null; });
+    return renewal;
+};
+
+/* A request refused because its token ran out needs any newer token: the renewal already on its way will do. */
+const renewExpired = (id) => renewal || beginRenewal(id);
+
+/* A page asks for a renewal after something a session carries has changed (a workspace joined or made). A renewal
+ * already on its way was issued without it, so the page gets one that begins once that has landed, shared by
+ * everyone who asked in the meantime. */
+const renewFromNow = (id) => {
+    if (!renewal) return beginRenewal(id);
+    if (!renewalAfter) {
+        renewalAfter = renewal.catch(() => null).then(() => {
+            renewalAfter = null;
+            return renewExpired(id);
+        });
     }
-    const data = await pendingAuth;
+    return renewalAfter;
+};
+
+export const getAuth = async (id, isFirst) => {
+    const data = await renewFromNow(id);
     if (isFirst) {
         // Clears the value earlier builds stored under this key.
         localStorage.removeItem('updateToken');
@@ -210,7 +230,7 @@ export const apiRequest = (type, endPoint, data, dataType, options) => {
                             logOut({ expired: true });
                         }else if (err?.response?.data?.isJwtError) {
                             const userId = localStorage.getItem('userId') || "";
-                            await getAuth(userId);
+                            await renewExpired(userId);
                             apiRequest(type, endPoint, data, dataType, options).then((sData)=>{
                                 resolve(sData);
                             }).catch((err) => {
@@ -265,7 +285,7 @@ export const apiRequestWithoutCompnay = (type, endPoint, data, dataType,options)
                         logOut({ expired: true });
                     } else if (err?.response?.data?.isJwtError) {
                         const userId = localStorage.getItem('userId') || "";
-                        await getAuth(userId);
+                        await renewExpired(userId);
                         apiRequestWithoutCompnay(type, endPoint, data, dataType, options).then((sData)=>{
                             resolve(sData);
                         }).catch((err) => {

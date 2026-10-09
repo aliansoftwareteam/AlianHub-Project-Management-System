@@ -1,30 +1,23 @@
 :root {
-    --home-soft: rgba(0, 0, 0, .06);
-    --home-soft-2: rgba(0, 0, 0, .04);
+    --home-soft: var(--fill);
+    --home-soft-2: var(--surface-hover);
     --home-check: rgba(0, 0, 0, .25);
     --home-label: rgba(0, 0, 0, .42);
-    --home-accent-tint: rgba(47, 57, 144, .08);
-    --home-accent-dash: rgba(47, 57, 144, .4);
-    --home-warn-tint: rgba(217, 131, 36, .12);
+    --home-accent-tint: var(--brand-tint);
+    --home-accent-dash: var(--brand-border);
+    --home-warn-tint: var(--warn-bg);
     --home-agent-border: rgba(107, 92, 231, .35);
-    --home-timer-btn: rgba(255, 255, 255, .12);
+    --home-timer-btn: var(--rail-active);
     --home-timer-btn-hover: rgba(255, 255, 255, .2);
-    --home-block-neutral: rgba(0, 0, 0, .05);
+    --home-block-neutral: var(--fill);
     --home-block-neutral-edge: rgba(0, 0, 0, .3);
-    --home-grid-line: rgba(0, 0, 0, .05);
+    --home-grid-line: var(--hairline);
 }
 :root[data-theme="dark"] {
-    --home-soft: rgba(255, 255, 255, .1);
-    --home-soft-2: rgba(255, 255, 255, .06);
     --home-check: rgba(255, 255, 255, .3);
     --home-label: rgba(255, 255, 255, .42);
-    --home-accent-tint: rgba(168, 146, 255, .14);
-    --home-accent-dash: rgba(168, 146, 255, .5);
-    --home-warn-tint: rgba(217, 131, 36, .16);
     --home-agent-border: rgba(168, 146, 255, .35);
-    --home-block-neutral: rgba(255, 255, 255, .07);
     --home-block-neutral-edge: rgba(255, 255, 255, .35);
-    --home-grid-line: rgba(255, 255, 255, .06);
 }
 
 /* ---------- page frame ---------- */
@@ -101,6 +94,9 @@
 .hs-row__link:focus-visible::after { box-shadow: var(--focus); }
 .hs-row .hs-item__action, .hs-row .hs-item__chev { position: relative; z-index: 1; }
 .hs-empty { padding: 4px 9px; font: 400 var(--fs-sm, 12px)/1.4 var(--font-ui); color: var(--ink-2); }
+.hs-empty__btn { display: block; min-height: var(--hit-min); margin-top: var(--sp-2, 4px); padding: 0; border: 0; background: transparent; color: var(--brand); font: 600 var(--fs-sm, 12px)/1.4 var(--font-ui); cursor: pointer; }
+.hs-empty__btn:hover { text-decoration: underline; }
+.hs-empty__btn:focus-visible { outline: none; box-shadow: var(--focus); }
 .hs-foot { margin-top: auto; padding: 0 9px; font: 400 var(--fs-sm, 12px)/1.3 var(--font-ui); color: var(--ink-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .hs-foot button { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
 .hs-foot button:hover { color: var(--brand); }

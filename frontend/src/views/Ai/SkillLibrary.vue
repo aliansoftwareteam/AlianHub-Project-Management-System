@@ -75,9 +75,9 @@
                             </thead>
                             <tbody>
                                 <tr v-for="action in actions" :key="action.key">
-                                    <td class="ah-mono">{{ action.key }}</td>
+                                    <td :title="action.key" data-test="action-name">{{ actionName(action) }}</td>
                                     <td>
-                                        {{ action.label }}
+                                        {{ actionLabel(t, action) }}
                                         <div v-if="action.constraint" class="ah-small">{{ action.constraint }}</div>
                                     </td>
                                     <td><span class="ah-chip" :class="riskChip(action.risk)">{{ action.risk }}</span></td>
@@ -132,6 +132,7 @@ import { useAgents, reasonOf } from "./useAgents";
 import { useAgentAccess } from "./agentAccess";
 import { mcpAddCommand } from "./mcpUrl";
 import { actionLabel, skillAbout, skillLabel } from "./plainLabels";
+import { agentActionLabel } from "./agentActionLabels";
 import { apiRequestWithoutCompnay } from "@/services";
 import * as env from "@/config/env";
 
@@ -161,6 +162,7 @@ const never = computed(() => registryManifest.value.never || []);
 const mcpTools = computed(() => (mcp.value.tools || []).map((t) => t.name).join(", "));
 const cliCommand = computed(() => mcpAddCommand(companyId.value));
 
+const actionName = (action) => agentActionLabel(t, action.key, actionLabel(t, action));
 const riskChip = (risk) => (risk === "high" ? "ah-chip--danger" : risk === "medium" ? "ah-chip--warn" : "ah-chip--ok");
 
 const load = async () => {

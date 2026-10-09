@@ -1,12 +1,12 @@
 <template lang="">
     <div class="d-flex">
         <div class="view__embed-right">
-        <div class="section bg-white d-flex justify-content-center align-items-center border-radius-10-px">
+        <div class="section embed-view-bg-white d-flex justify-content-center align-items-center border-radius-10-px">
             <img :src="boxes" alt="">
         </div>
         <div class="embed__text mb-20px mt-30px">
-            <h3 class="font-size-16 black m-0 mb-5px">{{$t('ViewList.Embed')}}</h3>
-            <p class="font-size-13 GunPowder m-0">
+            <h3 class="embed-view-font-size-16 embed-view-black m-0 mb-5px">{{$t('ViewList.Embed')}}</h3>
+            <p class="embed-view-font-size-13 embed-view-GunPowder m-0">
                 {{$t('ViewListdescription.add_msg1')}}
                 {{$t('ViewListdescription.add_msg2')}}
                 
@@ -15,36 +15,36 @@
         <div class="d-flex flex-wrap overflow-y-auto overflow-y-auto::-webkit-scrollbar select__embed-div">
             <div v-for="(item, index) in embeds" :key="index" class="embed-item cursor-pointer" @click="() => selectEmbed(item)" :class="{'selected__embed':selectedEmbed.id == item.id}">
                 <img :src="selectedEmbed.id == 1 && item.id == 1 ? activeAnything : item.image" :alt="item.image">
-                <span class="font-size-11 mt-10px">{{item.title}}</span>
+                <span class="embed-view-font-size-11 mt-10px">{{item.title}}</span>
             </div>
         </div>
 
         <div class="embed-inputs">
             <div class="radio__wrapper">
-                <label  for="name-1" class="font-size-13 dark-gray2">{{$t('ViewListdescription.view_name')}} </label>
+                <label  for="name-1" class="embed-view-font-size-13 embed-view-dark-gray2">{{$t('ViewListdescription.view_name')}} </label>
                     <div class="mt-10px">
                     <InputText inputId="name-1" class="urlText border-gray border-radius-3-px" :placeHolder="$t('PlaceHolder.Enter_View_Name')" @keyup="inputValues.name.error = ''" :modelValue="inputValues.name.value" @update:modelValue="(val)=>{inputValues.name.value  = val.trim() }" />
-                    <div class="red error font-size-11 position-ab mb-0" v-if="inputValues.name.error" >{{ inputValues.name.error }}</div>
+                    <div class="embed-view-red error embed-view-font-size-11 position-ab mb-0" v-if="inputValues.name.error" >{{ inputValues.name.error }}</div>
                 </div>
             </div>
             <div class="radio__wrapper">
                 <span>
                     <input type="radio" name="type" id="r1" value="url" class="mt-20px"  @change="(e)=> {radioValue = e.target.value,cleanUp()}"  checked>
-                    <label  for="r1" class="font-size-13 dark-gray2">{{$t('ViewListdescription.embed_URL')}} </label>
+                    <label  for="r1" class="embed-view-font-size-13 embed-view-dark-gray2">{{$t('ViewListdescription.embed_URL')}} </label>
                 </span>
                 <div class="mt-10px">
                     <InputText class="urlText border-gray border-radius-3-px" :class="{'disabled':radioValue == 'html'}" :placeHolder="$t('PlaceHolder.Enter_URL')" inputId="i1" @keyup="inputValues.url.error = ''" :modelValue="inputValues.url.value" @update:modelValue="(val)=>{inputValues.url.value  = val.trim() }" :isDisabled="radioValue == 'html'"/>
-                    <div class="red error font-size-11 position-ab mb-0" v-if="inputValues.url.error" >{{ inputValues.url.error }}</div>
+                    <div class="embed-view-red error embed-view-font-size-11 position-ab mb-0" v-if="inputValues.url.error" >{{ inputValues.url.error }}</div>
                 </div>
             </div>
             <div class="radio__wrapper">
                 <span v-if="selectedEmbed.id == 1" class="mt-10px">
                     <input  type="radio"  class="mt-15px" id="r2" name="type" value="html"  @change="(e)=> {radioValue = e.target.value,cleanUp()}">
-                    <label  for="r2" class="font-size-13 dark-gray2">{{$t('ViewListdescription.embed_HTML')}}</label>
+                    <label  for="r2" class="embed-view-font-size-13 embed-view-dark-gray2">{{$t('ViewListdescription.embed_HTML')}}</label>
                 </span>
                 <div class="mt-10px embed__text-area">
-                    <textarea class="textArea w-100 font-ui font-size-13 p-10px color94 border-gray border-radius-3-px " :class="{'disabled':radioValue == 'url'}" v-if="selectedEmbed.id == 1" @keyup="inputValues.html.error = ''"  :placeHolder="$t('PlaceHolder.Enter_HTML')" v-model="inputValues.html.value" :disabled="radioValue == 'url'"> </textarea>
-                    <div class="red error font-size-11 position-ab mb-0" v-if="inputValues.html.error">{{inputValues.html.error}}</div>
+                    <textarea class="textArea w-100 font-ui embed-view-font-size-13 p-10px embed-view-color94 border-gray border-radius-3-px " :class="{'disabled':radioValue == 'url'}" v-if="selectedEmbed.id == 1" @keyup="inputValues.html.error = ''"  :placeHolder="$t('PlaceHolder.Enter_HTML')" v-model="inputValues.html.value" :disabled="radioValue == 'url'"> </textarea>
+                    <div class="embed-view-red error embed-view-font-size-11 position-ab mb-0" v-if="inputValues.html.error">{{inputValues.html.error}}</div>
                 </div>
             </div>
         </div>
@@ -52,14 +52,14 @@
             <div class="d-flex justify-content-between private__pinview-wrapper">
                 <div class="private__pin-wrapper private__view d-flex align-items-center">
                      <input type="checkbox"  id="c1"  @change="isPrivate = !isPrivate">
-                     <label  for="c1" class="font-size-13 dark-gray2 m-0 pl-3px">{{$t('ViewListdescription.private_view')}}</label>
+                     <label  for="c1" class="embed-view-font-size-13 embed-view-dark-gray2 m-0 pl-3px">{{$t('ViewListdescription.private_view')}}</label>
                 </div>
                 <div class="private__pin-wrapper pin__view d-flex align-items-center">
                     <input type="checkbox"  id="c2" @change="isPin = !isPin" >
-                    <label   for="c2" class="font-size-13 pl-3px dark-gray2 m-0">{{$t('Projects.pin')}}{{$t('Projects.view')}}</label>
+                    <label   for="c2" class="embed-view-font-size-13 pl-3px embed-view-dark-gray2 m-0">{{$t('Projects.pin')}}{{$t('Projects.view')}}</label>
                 </div>
             </div>
-            <button class="btn-primary font-ui d-flex align-items-center justify-content-end font-size-16 ml-15px add__view-btn" @click="HandleSubmit">{{$t('Projects.add_view')}}</button>
+            <button class="btn-primary font-ui d-flex align-items-center justify-content-end embed-view-font-size-16 ml-15px add__view-btn" @click="HandleSubmit">{{$t('Projects.add_view')}}</button>
         </div>
        </div>
     </div>
@@ -266,4 +266,34 @@ const handleValidation = () =>{
 <style >
 @import './style.css'
 
+</style>
+
+<style scoped>
+.embed-view-black {
+    color: var(--ink);
+}
+.embed-view-red {
+    color: var(--danger-ink);
+}
+.embed-view-dark-gray2 {
+    color: var(--ink);
+}
+.embed-view-GunPowder {
+    color: var(--ink-2);
+}
+.embed-view-color94 {
+    color: var(--ink-2);
+}
+.embed-view-bg-white {
+    background-color: var(--surface);
+}
+.embed-view-font-size-11 {
+    font-size: 11px;
+}
+.embed-view-font-size-13 {
+    font-size: 13px;
+}
+.embed-view-font-size-16 {
+    font-size: 16px;
+}
 </style>

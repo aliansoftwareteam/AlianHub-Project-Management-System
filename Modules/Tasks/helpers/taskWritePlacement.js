@@ -5,7 +5,7 @@ const { canReadProject } = require('../../../Config/projectAccess');
 const { getRoleType, isPrivileged } = require('../../../Config/permissionGuard');
 const { canSeeSprintById } = require('../../Sprints/helpers/sprintVisibility');
 const { sprintPlacementOf } = require('./sprintPlacement');
-const { canReadTask } = require('./taskReadAccess');
+const { readableTasks } = require('./taskReadAccess');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const TASK_ACCESS_FIELDS = Object.freeze({ ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 });
@@ -23,6 +23,9 @@ const openProject = async (companyId, uid, projectId) => {
 /* Conversations are created through the task route into a chat space, which is a main_chats row and not a project. */
 const isChatSpace = async (companyId, id) => OBJECT_ID.test(idOf(id))
     && Boolean(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.MAIN_CHATS, data: [{ _id: oid(id) }, { _id: 1 }] }, 'findOne'));
+
+/* A conversation belongs to the people in it, so whoever starts one is among them. */
+const startsOwnConversation = (uid, data) => isPlainObject(data) && Array.isArray(data.AssigneeUserId) && data.AssigneeUserId.map(idOf).includes(idOf(uid));
 
 /* The list a write names, when it is a list of that project `uid` may see. */
 const listOf = async (companyId, uid, projectId, sprintId) => {
@@ -48,19 +51,7 @@ const readableTaskIds = async (companyId, uid, taskIds) => {
     const ids = [...new Set((taskIds || []).map(idOf))].filter((id) => OBJECT_ID.test(id));
     if (!ids.length) return [];
     const rows = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: ids.map(oid) } }, TASK_ACCESS_FIELDS] }, 'find') || [];
-    const verdicts = new Map();
-    const readable = (row) => {
-        const place = `${idOf(row.ProjectID)}|${idOf(row.sprintId)}`;
-        if (!verdicts.has(place)) {
-            verdicts.set(place, canReadProject(companyId, uid, idOf(row.ProjectID)).then((project) => project.allowed === true && canReadTask(companyId, uid, row)));
-        }
-        return verdicts.get(place);
-    };
-    const kept = [];
-    for (const row of rows) {
-        if (row.mainChat !== true && await readable(row)) kept.push(idOf(row._id));
-    }
-    return kept;
+    return (await readableTasks(companyId, uid, rows.filter((row) => row.mainChat !== true))).map((row) => idOf(row._id));
 };
 
 const flatStatus = (row) => (row && row.convertStatus ? row.convertStatus : row);
@@ -94,13 +85,76 @@ const moveMappingInto = (sent, destination) => {
     return named.includes(null) ? null : { taskStatusData, taskTypeCounts };
 };
 
+/* The list a stored row sits in, as the handlers name the list a task leaves. */
+const listLeftBy = (row) => ({
+    id: idOf(row.sprintId),
+    folderId: row.folderObjId ? idOf(row.folderObjId) : null,
+    name: (row.sprintArray && row.sprintArray.name) || '',
+    folderName: (row.sprintArray && row.sprintArray.folderName) || '',
+});
+
+const sameText = (a, b) => idOf(a).trim().toLowerCase() === idOf(b).trim().toLowerCase();
+const distinct = (values) => values.filter((value, at) => value !== undefined && value !== null && values.indexOf(value) === at);
+
+/* What each status and task type of `source`, and of the `rows` that leave it, becomes in `destination`, in the
+ * shape the copy and conversion handlers read. Both sides come from the stored projects. `sent` chooses among
+ * what the destination has; a status it leaves out keeps its name there or starts in the opening one, a task
+ * type keeps its value or its name or becomes the first one. Null when another project has no status or no type to give. */
+const conversionRules = (source, destination, sent, rows = []) => {
+    const from = source || {};
+    const sameProject = Boolean(source) && idOf(source._id) === idOf(destination._id);
+    const statuses = (Array.isArray(destination.taskStatusData) ? destination.taskStatusData : []).map(flatStatus).filter(Boolean);
+    const types = (Array.isArray(destination.taskTypeCounts) ? destination.taskTypeCounts : []).filter(Boolean);
+    const opening = statuses.find((status) => status.type === 'default_active') || statuses[0];
+    const named = { id: source ? idOf(source._id) : '', ProjectName: from.ProjectName || '' };
+    if (!opening || !types.length) return sameProject ? { ...named, taskStatusData: [], taskTypeCounts: [] } : null;
+
+    const sourceStatuses = (Array.isArray(from.taskStatusData) ? from.taskStatusData : []).map(flatStatus).filter(Boolean);
+    const sourceTypes = (Array.isArray(from.taskTypeCounts) ? from.taskTypeCounts : []).filter(Boolean);
+    const chosen = (list, field, becomes) => (key) => {
+        const row = (isPlainObject(sent) && Array.isArray(sent[list]) ? sent[list] : []).find((entry) => isPlainObject(entry) && entry[field] === key);
+        return row && isPlainObject(row[becomes]) ? row[becomes] : null;
+    };
+    const chosenStatus = chosen('taskStatusData', 'key', 'convertStatus');
+    const chosenType = chosen('taskTypeCounts', 'value', 'convertType');
+    const statusFor = (key) => {
+        const wanted = sameProject ? { key } : chosenStatus(key);
+        const held = sourceStatuses.find((status) => status.key === key);
+        return (wanted && statuses.find((status) => idOf(status.key) === idOf(wanted.key)))
+            || (held && statuses.find((status) => sameText(status.name, held.name)))
+            || opening;
+    };
+    const typeFor = (value) => {
+        const wanted = sameProject ? { value } : chosenType(value);
+        const held = sourceTypes.find((type) => type.value === value);
+        return (wanted && types.find((type) => idOf(type.value) === idOf(wanted.value)))
+            || types.find((type) => idOf(type.value) === idOf(value))
+            || (held && types.find((type) => sameText(type.name, held.name)))
+            || types[0];
+    };
+    return {
+        ...named,
+        taskStatusData: distinct([...sourceStatuses.map((status) => status.key), ...rows.map((row) => row.statusKey)]).map((key) => {
+            const to = statusFor(key);
+            return { key, convertStatus: { key: to.key, name: to.name, type: to.type } };
+        }),
+        taskTypeCounts: distinct([...sourceTypes.map((type) => type.value), ...rows.map((row) => row.TaskType)]).map((value) => {
+            const to = typeFor(value);
+            return { value, convertType: { value: to.value, key: to.key } };
+        }),
+    };
+};
+
 module.exports = {
     openProject,
     isChatSpace,
+    startsOwnConversation,
     listOf,
     listRef,
+    listLeftBy,
     readableTaskIds,
     flatStatus,
     coveredByMapping,
     moveMappingInto,
+    conversionRules,
 };

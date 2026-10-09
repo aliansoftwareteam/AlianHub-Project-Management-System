@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -14,7 +15,7 @@ jest.mock('../Modules/Agents/memory', () => ({
 }));
 jest.mock('../Modules/Agents/actions', () => {
     const actual = jest.requireActual('../Modules/Agents/actions');
-    return { rating: actual.rating, perform: jest.fn(async () => ({ auditId: 'aud1', result: { subtaskId: 'st1' } })) };
+    return { rating: actual.rating, perform: jest.fn(async () => ({ auditId: 'aud1', result: { subtaskId: 'st1' } })), personRefusal: jest.fn(async () => '') };
 });
 jest.mock('../Modules/Agents/agentAudit', () => ({ ACTION_DONE: 'agent.action', STATE: { PENDING: 'pending', APPLIED: 'applied', FAILED: 'failed' }, recordProposalDecision: jest.fn(async () => 'dec1'), recordRunReverted: jest.fn(async () => 'rev1'), findById: jest.fn() }));
 jest.mock('../Modules/Agents/undo', () => ({ undoAuditRow: jest.fn(async () => ({ ok: true })), REASON: {} }));
@@ -68,7 +69,7 @@ beforeEach(() => {
     orchestrator.gather.mockResolvedValue({ status: 'gathered', context: {} });
     mockDb.seed(SCHEMA_TYPE.AGENTS, agent());
 });
-afterEach(() => { mem.reset(); persistence.useMongo(); delete process.env.AGENT_TAINT_ROUTING; });
+afterEach(() => { mem.reset(); persistence.useMongo(); process.env.AGENT_TAINT_ROUTING = 'off'; });
 
 describe('taint sources — each kind marks the run once, with a reference and never the content', () => {
     const run = (over = {}) => ({ _id: '6f0000000000000000000e01', projectId: 'p1', ...over });
@@ -124,7 +125,7 @@ describe('taint sources — each kind marks the run once, with a reference and n
     });
 
     it('with the flag off nothing is written and the run is never tainted', async () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         const row = await seeded();
         mockDb.calls.length = 0;
         const out = await taint.mark(C, row, [taint.fetched('https://example.com/a')]);
@@ -139,7 +140,7 @@ describe('taint sources — each kind marks the run once, with a reference and n
         mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK._id, origin: { kind: 'form', ref: 'sub1' } });
         expect(await taint.originOf(C, { _id: TASK._id })).toEqual({ kind: 'form', ref: 'sub1' });
         expect(await taint.originOf(C, { _id: TASK._id, origin: { kind: 'email', ref: 'h1' } })).toEqual({ kind: 'email', ref: 'h1' });
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         mockDb.calls.length = 0;
         expect(await taint.originOf(C, { _id: TASK._id })).toBeNull();
         expect(mockDb.calls).toEqual([]);
@@ -167,7 +168,7 @@ describe('routing — a tainted run proposes its risky and out-of-project writes
 
     it('a low-risk write outside the run\'s own project is proposed, naming the taint', () => {
         const out = on({ params: { taskId: 't2', projectId: 'p2' }, task: { _id: 't2', ProjectID: 'p2' } });
-        expect(out).toEqual({ decision: 'propose', reason: 'task.comment writes outside the run\'s project; the run read external content (fetch example.com)', rating: safe });
+        expect(out).toEqual({ decision: 'propose', reason: 'task.comment changes something outside the project this run is for; the run read external content (fetch example.com)', rating: safe });
     });
 
     it('an untainted run is unchanged: the same actions act or propose with today\'s reasons', () => {
@@ -177,14 +178,14 @@ describe('routing — a tainted run proposes its risky and out-of-project writes
     });
 
     it('a refusal stays a refusal', () => {
-        expect(on({ action: 'project.delete' })).toMatchObject({ decision: 'refuse', reason: 'project.delete is on the never-list' });
-        expect(on({ agent: agent({ allowedActions: ['task.get'] }) })).toMatchObject({ decision: 'refuse', reason: 'task.comment is outside this agent\'s allowed actions' });
-        expect(on({ params: { taskId: 't3', projectId: 'p3' }, task: { _id: 't3', ProjectID: 'p3' } })).toMatchObject({ decision: 'refuse', reason: 'project p3 is outside this agent\'s projects' });
+        expect(on({ action: 'project.delete' })).toMatchObject({ decision: 'refuse', reason: 'An agent is never allowed to do this (project.delete). The person has to do it in AlianHub.' });
+        expect(on({ agent: agent({ allowedActions: ['task.get'] }) })).toMatchObject({ decision: 'refuse', reason: 'This connection is not allowed to use task.comment. Ask the person to allow it in AlianHub.' });
+        expect(on({ params: { taskId: 't3', projectId: 'p3' }, task: { _id: 't3', ProjectID: 'p3' } })).toMatchObject({ decision: 'refuse', reason: 'This connection is limited to some projects, and project p3 is not one of them. Ask the person to widen it in AlianHub.' });
         expect(on({ action: 'task.status.set', params: { taskId: 't1', status: { statusType: 'close', name: 'Done' } } })).toMatchObject({ decision: 'refuse' });
     });
 
     it('with the flag off a tainted run decides exactly as before', () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         expect(on()).toMatchObject({ decision: 'act' });
         expect(on({ params: { taskId: 't2', projectId: 'p2' }, task: { _id: 't2', ProjectID: 'p2' } })).toMatchObject({ decision: 'act' });
         expect(on({ action: 'task.create', params: { projectId: 'p1', title: 'x' }, rating: { write: true, reversible: true, scope: 'project', money: false } })).toEqual({ decision: 'propose', reason: 'task.create reaches the whole project', rating: expect.any(Object) });
@@ -280,7 +281,7 @@ describe('the run engine — taint enters at gather or at the fetch, persists to
     });
 
     it('with the flag off a fetch leaves the run, the decisions, the spend context, the proposal and perform exactly as before', async () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         fetchThen([subtask('One'), newTask('Risky')]);
         const run = await start(agent());
         const out = await execute(run);

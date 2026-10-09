@@ -28,8 +28,35 @@ export const pageUnavailable = ref(false);
 let replayer = null;
 let started = false;
 let ticker = null;
+/* A write being sent again goes through the same request path; if the server is still away it
+   must stay the row it is, not be added as a new one with a new time. */
+const beingReplayed = new WeakSet();
+const settledListeners = new Set();
 
 export const registerReplayer = (fn) => { replayer = fn; };
+
+/* Hears `{ id, outcome: 'sent' | 'refused', reason, item }` for every kept write the server has answered. */
+export const onQueuedWriteSettled = (listener) => {
+    settledListeners.add(listener);
+    return () => settledListeners.delete(listener);
+};
+
+const settle = (item, outcome, reason = '') => settledListeners.forEach((listener) => {
+    try { listener({ id: item.id, outcome, reason, item }); } catch (e) { /* a listener must not stop the queue */ }
+});
+
+const replay = async (item) => {
+    const body = item.data && typeof item.data === 'object' ? item.data : null;
+    if (body) beingReplayed.add(body);
+    try {
+        const answer = await replayer(item.type, item.endPoint, item.data, item.dataType);
+        if (answer?.data?.status === false) throw { response: answer };
+    } finally {
+        if (body) beingReplayed.delete(body);
+    }
+};
+
+const reasonOf = (error) => error?.response?.data?.statusText || error?.response?.data?.message || '';
 
 const describe = (item) => ({ ...item, ...rules.describeQueuedWrite(item), attempts: item.attempts || 0 });
 
@@ -66,9 +93,11 @@ export const handleOfflineFailure = async (type, endPoint, data, dataType, err) 
             return cached !== undefined ? rules.makeCachedResponse(cached) : null;
         }
         if (rules.isQueueableWrite(type, endPoint)) {
-            await db.queueAdd({ type, endPoint, data, dataType, attempts: 0 });
+            if (data && typeof data === 'object' && beingReplayed.has(data)) return null;
+            const queueId = await db.queueAdd({ type, endPoint, data, dataType, attempts: 0 });
+            if (queueId === undefined) return null;
             await refreshQueue();
-            return rules.makeQueuedResponse({ endPoint });
+            return rules.makeQueuedResponse({ endPoint, queueId });
         }
         return null;
     } catch (e) {
@@ -116,12 +145,14 @@ export const flushQueue = async () => {
             if (item.held) continue;
             try {
                 if (await checkConflict(item)) continue;
-                await replayer(item.type, item.endPoint, item.data, item.dataType);
+                await replay(item);
                 await db.queueDelete(item.id);
                 delivered++;
+                settle(item, 'sent');
             } catch (e) {
                 if (e && e.response) {
                     await db.queueDelete(item.id);
+                    settle(item, 'refused', reasonOf(e));
                 } else {
                     await db.queueUpdate(item.id, { attempts: (item.attempts || 0) + 1, lastTriedAt: Date.now() });
                     stalled = true;
@@ -161,10 +192,16 @@ export const resolveConflict = async (id, choice) => {
         const item = items.find((x) => x.id === id);
         if (item && replayer) {
             try {
-                await replayer(item.type, item.endPoint, item.data, item.dataType);
+                await replay(item);
                 await db.queueDelete(id);
+                settle(item, 'sent');
             } catch (e) {
-                await db.queueUpdate(id, { held: false });
+                if (e && e.response) {
+                    await db.queueDelete(id);
+                    settle(item, 'refused', reasonOf(e));
+                } else {
+                    await db.queueUpdate(id, { held: false });
+                }
             }
         }
     } else {

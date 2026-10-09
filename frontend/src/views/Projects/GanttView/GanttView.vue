@@ -51,9 +51,18 @@
                 </div>
                 <template v-else>
                     <div ref="ganttEl" class="gv__chart"></div>
-                    <div v-if="!scheduled.length && !loading" class="gv__empty ah-empty">
-                        {{ $t('Views.gantt_empty') }}
-                    </div>
+                    <EmptyState
+                        v-if="!scheduled.length && !loading"
+                        class="gv__empty"
+                        compact
+                        illustration="tasks"
+                        data-test="gantt-empty"
+                        :title="$t(noTasks ? 'Views.gantt_no_tasks_title' : 'Views.gantt_empty_title')"
+                        :message="$t(noTasks ? 'Views.gantt_no_tasks_msg' : 'Views.gantt_empty')"
+                        :actionLabel="noTasks ? $t('Views.add_a_task') : ''"
+                        :actionAllowed="canAddFirstTask"
+                        @action="goToList"
+                    />
                 </template>
 
                 <aside v-if="unscheduled.length" class="gv__tray ah-scroll">
@@ -142,10 +151,13 @@ import { readLookLength } from '@/utils/lookTokens';
 import { taskListHelper } from '@/views/Projects/helper.js';
 import { criticalPath } from '@/views/Projects/composables/criticalPath';
 import { fsCollisionLinks } from '@/views/Projects/composables/ganttCollisions';
-import { shiftDependants } from '@/views/Projects/composables/ganttShift';
+import { shiftDependants } from '@ganttShift';
 import { workingDaysFor, countsEveryDay } from '@workingDays';
 import { openTask } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { showUndoToast } from '@/composable/useUndoToast';
+import { snappedBack } from './dragSnap';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import { useAddFirstTask } from '@/views/Projects/composables/useAddFirstTask';
 import { useToast } from 'vue-toast-notification';
 
 defineOptions({ name: 'GanttView' });
@@ -162,6 +174,7 @@ const { getUser } = useGetterFunctions();
 const { groupBy } = taskListHelper();
 const toast = useToast();
 const selectedProject = inject('selectedProject', ref({}));
+const { canAddFirstTask, goToList } = useAddFirstTask(selectedProject);
 const companyId = inject('$companyId', ref(''));
 const clientWidth = inject('$clientWidth', ref(1440));
 
@@ -218,6 +231,7 @@ const tasks = computed(() => {
 
 // active = not deleted (0 active, 2 archived, undefined legacy)
 const activeTasks = computed(() => tasks.value.filter((task) => task && [0, 2, undefined, null].includes(task.deletedStatusKey)));
+const noTasks = computed(() => !activeTasks.value.length);
 const scheduled = computed(() => activeTasks.value.filter((task) => task.startDate && task.DueDate));
 const unscheduled = computed(() => activeTasks.value.filter((task) => !(task.startDate && task.DueDate)));
 
@@ -420,6 +434,10 @@ function onTaskDragged(id) {
     const g = gantt.getTask(id);
     const task = findTask(id);
     if (!g || !task) return;
+    if (zoom.value !== 'Day' && snappedBack(task, g)) {
+        toast.info(t('Views.drag_snapped_back'));
+        return;
+    }
     const to = { startDate: g.start_date, DueDate: g.end_date };
     const plan = shiftDependants(
         scheduled.value.map((row) => ({ id: String(row._id), startDate: row.startDate, DueDate: row.DueDate })),
@@ -557,11 +575,12 @@ const replanLines = computed(() => {
     const chain = path.map((id) => findTask(id)).filter(Boolean);
     const last = chain[chain.length - 1];
     const end = last ? new Date(last.DueDate) : null;
+    const span = critical.value.durationDays;
     const lines = [t(everyDayWorks.value ? 'Views.replan_chain' : 'Views.replan_chain_working', {
         n: chain.length,
-        days: critical.value.durationDays,
+        days: t(everyDayWorks.value ? 'Views.days_count' : 'Views.working_days_count', { n: span }, span),
         date: end ? end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '',
-    })];
+    }, chain.length)];
     const now = Date.now();
     const late = chain.find((task) => new Date(task.DueDate).getTime() < now && (task.status?.type || task.statusType) !== 'close');
     if (late) lines.push(t('Views.replan_late', { task: late.TaskName || late.TaskKey }));

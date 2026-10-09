@@ -1,0 +1,129 @@
+const fs = require('fs');
+const path = require('path');
+const logger = require('../../Config/loggerConfig');
+
+const ROOT = path.join(__dirname, 'roles');
+const KEYS = ['slug', 'name', 'blueprint', 'department', 'team', 'tools', 'hands_to', 'gates'];
+const LISTS = ['tools', 'hands_to', 'gates'];
+const OPTIONAL_LISTS = ['tools_optional', 'starter_rules', 'tags'];
+const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const STARTER_KINDS = Object.freeze(['type', 'tag', 'priority']);
+const STARTER_RULE = /^(type|tag|priority):\s*(\S.*)$/;
+const PRIORITIES = Object.freeze(['URGENT', 'HIGH', 'MEDIUM', 'LOW']);
+const MAX_STARTER = 5;
+const MAX_TAGS = 6;
+const TAG_MAX = 50;
+
+class PlaybookError extends Error {}
+
+const filesUnder = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return filesUnder(full);
+    return entry.name.endsWith('.md') ? [full] : [];
+});
+
+const parseFrontmatter = (block) => Object.fromEntries(block.split('\n').filter((line) => line.trim()).map((line) => {
+    const [, key, value] = line.match(/^([a-z_]+):\s*(.*)$/) || [];
+    if (!key) throw new PlaybookError(`cannot read the frontmatter line "${line.trim()}"`);
+    const list = value.match(/^\[(.*)\]$/);
+    return [key, list ? list[1].split(',').map((item) => item.trim()).filter(Boolean) : value.trim()];
+}));
+
+const optionalOf = (meta, fail) => {
+    const starterRules = (meta.starter_rules || []).map((entry) => {
+        const [, kind, value] = entry.match(STARTER_RULE) || [];
+        if (!kind) fail(`the starter rule "${entry}" must be written ${STARTER_KINDS.join(', ')} then a colon and a value`);
+        if (kind === 'priority' && !PRIORITIES.includes(value.trim())) fail(`the starter rule "${entry}" must name one of ${PRIORITIES.join(', ')}`);
+        return { kind, value: value.trim() };
+    });
+    if (starterRules.length > MAX_STARTER) fail(`starter_rules may list at most ${MAX_STARTER} rules`);
+    const tags = (meta.tags || []).map((name) => name.trim());
+    if (tags.length > MAX_TAGS) fail(`tags may list at most ${MAX_TAGS} tags`);
+    const long = tags.find((name) => name.length > TAG_MAX);
+    if (long) fail(`the tag "${long}" is longer than ${TAG_MAX} characters`);
+    if (new Set(tags.map((name) => name.toLowerCase())).size !== tags.length) fail('tags names a tag twice');
+    return { starterRules, tags };
+};
+
+const parse = (text, rel) => {
+    const fail = (why) => { throw new PlaybookError(`Role playbook ${rel}: ${why}`); };
+    const match = String(text).replace(/\r\n/g, '\n').match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!match) fail('it does not open with a --- frontmatter block');
+    let meta;
+    try { meta = parseFrontmatter(match[1]); } catch (error) { fail(error.message); }
+    const missing = KEYS.filter((key) => meta[key] === undefined || meta[key] === '');
+    if (missing.length) fail(`the frontmatter lacks ${missing.join(', ')}`);
+    const notLists = [...LISTS, ...OPTIONAL_LISTS.filter((key) => meta[key] !== undefined)].filter((key) => !Array.isArray(meta[key]));
+    if (notLists.length) fail(`${notLists.join(', ')} must be a [list]`);
+    if (![meta.slug, meta.blueprint, meta.team].every((value) => SLUG.test(value))) fail('the slug, the blueprint and the team must be lower-case words joined by hyphens');
+    if (rel !== undefined && rel !== path.join(meta.blueprint, `${meta.slug}.md`)) fail(`it must live at ${path.join(meta.blueprint, `${meta.slug}.md`)}`);
+    const body = match[2].trim();
+    if (!body) fail('the playbook text is empty');
+    const optional = optionalOf(meta, fail);
+    return {
+        slug: meta.slug,
+        name: meta.name,
+        blueprint: meta.blueprint,
+        department: meta.department,
+        team: meta.team,
+        tools: meta.tools,
+        toolsOptional: meta.tools_optional || [],
+        routed: meta.routed !== 'false',
+        handsTo: meta.hands_to,
+        gates: meta.gates,
+        starterRules: optional.starterRules,
+        tags: optional.tags,
+        body,
+    };
+};
+
+/* A broken playbook is left out and reported, so one bad file never takes the other roles or the prompt list down. */
+const readAll = (root = ROOT, report = (message) => logger.error(message)) => {
+    const seen = new Map();
+    const roles = filesUnder(root).sort().flatMap((file) => {
+        try {
+            const role = parse(fs.readFileSync(file, 'utf8'), path.relative(root, file));
+            if (seen.has(role.slug)) throw new PlaybookError(`Role playbook ${role.blueprint}/${role.slug}.md: the slug "${role.slug}" is also used by ${seen.get(role.slug)}/${role.slug}.md`);
+            seen.set(role.slug, role.blueprint);
+            return [Object.freeze(role)];
+        } catch (error) {
+            report(error instanceof PlaybookError ? error.message : `Role playbook ${path.relative(root, file)}: ${error.message}`);
+            return [];
+        }
+    });
+    return Object.freeze(roles);
+};
+
+let cached = null;
+const all = () => {
+    if (!cached) cached = readAll();
+    return cached;
+};
+
+const find = (blueprint, slug) => all().find((role) => role.blueprint === String(blueprint) && role.slug === String(slug)) || null;
+
+const summary = (role, max) => {
+    const who = ((role.body.split(/^## Who it is\s*$/m)[1] || '').split(/^## /m)[0].trim().split(/\n\s*\n/)[0] || '').replace(/\s+/g, ' ').trim();
+    const sentences = who.match(/[^.!?]+[.!?]+(?=\s|$)/g) || [who];
+    let kept = '';
+    for (const sentence of sentences) {
+        const next = `${kept} ${sentence.trim()}`.trim();
+        if (next.length > max) break;
+        kept = next;
+    }
+    return kept || who.slice(0, max).trim();
+};
+
+/* A workspace may edit a role's text, and ./rolePlaybookOverrides plugs that in here, so 'who it is' is read per company. */
+let bodyFor = async () => null;
+const useOverrides = (fn) => { bodyFor = typeof fn === 'function' ? fn : async () => null; };
+
+const whoFor = async (companyId, key, max = 300) => {
+    const [blueprint, slug, rest] = String(key || '').split('/');
+    const role = rest === undefined && blueprint && slug ? find(blueprint, slug) : null;
+    if (!role) return '';
+    const body = await Promise.resolve().then(() => bodyFor(companyId, role)).catch(() => null);
+    return summary(body ? { ...role, body } : role, max);
+};
+
+module.exports = { STARTER_KINDS, PRIORITIES, PlaybookError, parse, readAll, all, find, summary, useOverrides, whoFor };

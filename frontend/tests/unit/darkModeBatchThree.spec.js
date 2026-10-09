@@ -154,7 +154,7 @@ describe('the remaining white menus follow the theme', () => {
 describe('the project tabs that show the details column', () => {
     test('Comments and Activity sit on the canvas of the theme too', () => {
         const vue = read('views/Projects/Projects.vue');
-        expect(template('views/Projects/Projects.vue')).toMatch(/TOKEN_BODY_TABS\.includes\(activeTab\) \? 'list-view-body--detail' : 'bg-light-gray'/);
+        expect(template('views/Projects/Projects.vue')).toMatch(/bodyOnTokens \? 'list-view-body--detail' : 'bg-light-gray'/);
         expect(/const TOKEN_BODY_TABS = \[([^\]]+)\]/.exec(vue)[1].replace(/['\s]/g, '').split(',')).toEqual(['ProjectDetail', 'Comments', 'ActivityLog']);
     });
 

@@ -65,6 +65,8 @@ const notificationsSettingsSchema= new Schema(schema.notificationsSettings, {str
 const mentionsSchema= new Schema(schema.mentions, {strict: true, timestamps: true})
 notificationsSchema.index({ clearedAt: 1 }, { expireAfterSeconds: CLEARED_RETENTION_SECONDS, name: 'cleared_purge' });
 mentionsSchema.index({ purgeAt: 1 }, { expireAfterSeconds: 0, name: 'cleared_purge' });
+notificationsSchema.index({ receiverID: 1, taskId: 1 });
+mentionsSchema.index({ mentionIds: 1, taskId: 1 });
 const projectRulesSchema= new Schema(schema.projectRules, {strict: true, timestamps: true})
 const subscriptionPlanSchema = new Schema(schema.subscriptionPlan, {strict: true, timestamps: true});
 // `planFeature` / `planFeatureDisplay` intentionally hold an open-ended
@@ -284,6 +286,13 @@ const projectFindingsSchema = new Schema(schema.projectFindings, {strict: true, 
 // One row per project and cause. Unique, so two servers looking at once cannot file the same finding twice.
 projectFindingsSchema.index({ projectId: 1, key: 1 }, { unique: true, name: 'project_cause' });
 projectFindingsSchema.index({ projectId: 1, status: 1, openedAt: -1 });
+// The questions waiting for one person's AI (Modules/Agents/manager/chatQuestions.js), read on every look at the work queue.
+projectFindingsSchema.index({ userId: 1, status: 1, openedAt: 1 }, { name: 'asked_in_chat_by_person', partialFilterExpression: { rule: 'asked_in_chat' } });
+
+const agentWorkMarksSchema = new Schema(schema.agentWorkMarks, {strict: true, timestamps: true});
+// Unique, so of two agents reaching for one place, one turn or one item at the same moment, the insert of exactly one lands.
+agentWorkMarksSchema.index({ scope: 1, key: 1 }, { unique: true, name: 'one_mark' });
+agentWorkMarksSchema.index({ ref: 1 });
 
 const agentsSchema = new Schema(schema.agents, {strict: true, timestamps: true});
 agentsSchema.index({ paused: 1 });
@@ -344,6 +353,8 @@ agentProposalsSchema.index({ status: 1, createdAt: -1 });
 agentProposalsSchema.index({ createdAt: -1 });
 agentProposalsSchema.index({ agentId: 1, createdAt: -1 });
 agentProposalsSchema.index({ taskId: 1 });
+const rolePlaybookOverridesSchema = new Schema(schema.rolePlaybookOverrides, {strict: true, timestamps: true});
+rolePlaybookOverridesSchema.index({ key: 1 }, { unique: true });
 const agentStandingApprovalsSchema = new Schema(schema.agentStandingApprovals, {strict: true, timestamps: true});
 agentStandingApprovalsSchema.index({ projectId: 1, action: 1, status: 1 });
 const callsSchema = new Schema(schema.calls, {strict: true, timestamps: true});
@@ -351,6 +362,9 @@ callsSchema.index({ callId: 1 }, { unique: true });
 callsSchema.index({ chatId: 1, createdAt: -1 });
 const integrationConnectionsSchema = new Schema(schema.integrationConnections, {strict: true, timestamps: true});
 integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
+// One row per app event and task, kept for good: whoever inserts it first acts, so an old pull request updated again never acts twice.
+const appConnectionEventsSchema = new Schema(schema.appConnectionEvents, {strict: true, timestamps: true});
+appConnectionEventsSchema.index({ key: 1 }, { unique: true, name: 'event_task' });
 const cloudStorageConnectionsSchema = new Schema(schema.cloudStorageConnections, {strict: true, timestamps: true});
 // Every lookup is "this user's connection to this provider" — unique so a
 // double-tap on Connect can't leave two rows with divergent refresh tokens.
@@ -419,6 +433,9 @@ const assignmentDecisionsSchema = new Schema(schema.assignmentDecisions, {strict
 assignmentDecisionsSchema.index({ taskId: 1, inputHash: 1 }, { unique: true, name: 'task_revision' });
 assignmentDecisionsSchema.index({ taskId: 1, createdAt: -1 });
 assignmentDecisionsSchema.index({ createdAt: -1 });
+const dispatchDecisionsSchema = new Schema(schema.dispatchDecisions, {strict: true, timestamps: false});
+dispatchDecisionsSchema.index({ taskId: 1, inputHash: 1 }, { unique: true, name: 'task_revision' });
+dispatchDecisionsSchema.index({ projectId: 1, state: 1, createdAt: -1 });
 const aiProfilesSchema = new Schema(schema.aiProfiles, {strict: true, timestamps: true});
 aiProfilesSchema.index({ ownerId: 1 }, { unique: true, name: 'owner_id' });
 
@@ -580,6 +597,7 @@ module.exports = {
     workflowDefinitionsSchema,
     agentFindingsSchema,
     projectFindingsSchema,
+    agentWorkMarksSchema,
     agentsSchema,
     agentRunsSchema,
     agentRevisionsSchema,
@@ -591,8 +609,10 @@ module.exports = {
     agentProposalsSchema,
     agentStandingApprovalsSchema,
     agentSkillsSchema,
+    rolePlaybookOverridesSchema,
     callsSchema,
     integrationConnectionsSchema,
+    appConnectionEventsSchema,
     cloudStorageConnectionsSchema,
     formsSchema,
     formSubmissionsSchema,
@@ -620,6 +640,7 @@ module.exports = {
     aiEvalRunsSchema,
     assignmentRulesSchema,
     assignmentDecisionsSchema,
+    dispatchDecisionsSchema,
     aiProfilesSchema,
     secretsSchema,
     oauthClientsSchema,

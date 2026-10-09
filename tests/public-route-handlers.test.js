@@ -155,9 +155,9 @@ describe('importSettingsNotification only imports for the caller', () => {
 });
 
 describe('a session acts only on its own account', () => {
-    it("refuses changing another user's password", () => {
+    it("refuses changing another user's password", async () => {
         const res = response();
-        changePassword(request({ params: { id: OTHER_USER }, body: { oldPassword: 'a', newPassword: 'b' } }), res);
+        await changePassword(request({ params: { id: OTHER_USER }, body: { oldPassword: 'a', newPassword: 'b' } }), res);
         expect(res.statusCode).toBe(403);
         expect(MongoDbCrudOpration).not.toHaveBeenCalled();
     });

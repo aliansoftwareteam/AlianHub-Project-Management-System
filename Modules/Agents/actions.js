@@ -9,7 +9,9 @@ const groups = require('./registryGroups');
 const { SCOPE, read, write } = require('./registryKit');
 const permissions = require('./permissions');
 const projectPolicy = require('./projectPolicy');
+const taskReads = require('./taskReads');
 const audit = require('./agentAudit');
+const changeNotice = require('./changeNotice');
 const { attribution, isAgent } = require('./actor');
 const { shownAs } = require('./actingAgent');
 const stepCredential = require('../Workflows/stepCredential');
@@ -22,7 +24,9 @@ const { cleanPageContent } = require('../Tasks/helpers/cleanRichText');
 const { escapeCommentText } = require('../Comments/helpers/plainText');
 const { isPeriodLocked } = require('../TimesheetApproval/helpers/lockGuard');
 const { canPostToThread } = require('../Comments/helpers/threadWriteAccess');
+const commentReplies = require('./commentReplies');
 const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { cannotOpen, CANNOT_OPEN_PROJECT } = require('../../Config/projectPeople');
 const { canCreatePageIn } = require('../Pages/helpers/pageAccess');
 const { readableTaskIds, openProject, listOf } = require('../Tasks/helpers/taskWritePlacement');
 const logger = require('../../Config/loggerConfig');
@@ -124,17 +128,14 @@ const findRunningTimer = (companyId, taskId, userId) => MongoDbCrudOpration(comp
 
 /* ── the executors ─────────────────────────────────────────────────────────── */
 
-/* The people a comment names in the editor's own markup are told the way the comment route tells them.
+/* The people a comment names are told the way the comment route tells them.
  * A delivery that fails is logged: the comment is already written. */
-const announceMentions = async (companyId, commentId) => {
+const announceMentions = async (companyId, commentId, mentionIds = []) => {
+    if (!mentionIds.length) return [];
     try {
-        const { resolveMentionIds, deliverMentions } = require('../Comments/helpers/commentNotifications');
-        const { threadOf } = require('../Comments/helpers/threadWriteAccess');
+        const { deliverMentions } = require('../Comments/helpers/commentNotifications');
         const comment = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(commentId) }] }, 'findOne');
         if (!comment) return [];
-        const mentionIds = await resolveMentionIds(companyId, comment.userId, threadOf(comment), comment.message);
-        if (!mentionIds.length) return [];
-        await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(commentId) }, { $set: { mentionIds } }] }, 'updateOne');
         (await deliverMentions(companyId, comment, mentionIds)).forEach((error) => logger.error(`agent comment mention not delivered: ${(error && error.message) || error}`));
         return mentionIds;
     } catch (error) {
@@ -143,17 +144,44 @@ const announceMentions = async (companyId, commentId) => {
     }
 };
 
-const commentOn = async ({ companyId, actor, params, depth }, action, body) => {
-    const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth));
+/* An agent that comments on its own answers to the project for the agents its comment names; one whose comment a
+ * person approved starts them as that person's comment would. */
+const startsNamedAgents = (companyId, actor, { taskId, body, depth, approvedBy }) => require('./triggers').fromComment(companyId, {
+    authorId: actor.userId, taskId, message: body, depth: clampDepth(depth) + 1,
+    ...(isAgent(actor) && !approvedBy ? { postedBy: actor, asked: true } : {}),
+});
+
+const NOT_TOLD = Object.freeze({
+    self: 'is you, the person this comment is written for, so you were not notified',
+    noAccess: 'cannot open this task, so was not notified',
+});
+
+/* A person the comment names who is not told is listed with the reason, the commenter's own name included. */
+const mentionAnswer = (marked, notifiedIds, authorId) => {
+    const notified = new Set(notifiedIds.map(String));
+    const nameOf = new Map(marked.people.map((p) => [p.userId, p.name]));
+    const row = (userId) => ({ userId, name: nameOf.get(userId) || '' });
+    const notNotified = marked.named.map((p) => p.userId)
+        .filter((userId) => !notified.has(userId))
+        .map((userId) => ({ ...row(userId), reason: userId === String(authorId || '') ? NOT_TOLD.self : NOT_TOLD.noAccess }));
+    return { mentioned: [...notified].map(row), notNotified, notFound: marked.notFound };
+};
+
+const commentOn = async ({ companyId, actor, params, depth, approvedBy }, action, written) => {
+    const marked = params.notifyMentions ? await require('../Comments/helpers/namedMentions').markMentions(companyId, written) : null;
+    const body = marked ? marked.message : written;
+    const reply = params.replyTo ? await commentReplies.repliedTo(companyId, params.taskId, params.replyTo) : null;
+    const r = await tools.addComment(companyId, params.taskId, body, context(actor, action, depth), { replyTo: reply ? String(reply.comment._id) : '', resolveMentions: Boolean(params.notifyMentions) });
     const a = attribution(actor);
     await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
         data: [{ _id: oid(r.commentId) }, { $set: { userId: String(actor.userId || a.actorId), actorType: a.actorType, agentId: a.agentId || null, viaAccount: a.viaAccount || null } }],
     }, 'updateOne').catch(() => {});
-    if (!actor.runId) await require('./triggers').fromComment(companyId, { authorId: actor.userId, taskId: params.taskId, message: body, depth: clampDepth(depth) + 1 });
-    const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId) : null;
+    if (!actor.runId) await startsNamedAgents(companyId, actor, { taskId: params.taskId, body, depth, approvedBy });
+    const mentioned = params.notifyMentions ? await announceMentions(companyId, r.commentId, r.mentionIds || []) : null;
+    if (reply) await commentReplies.announceReply(companyId, r.commentId, reply.comment, mentioned);
     return {
-        result: { commentId: r.commentId, ...(mentioned ? { mentioned } : {}) },
+        result: { commentId: r.commentId, ...(reply ? { threadOf: reply.rootId } : {}), ...(mentioned ? mentionAnswer(marked, mentioned, actor.userId) : {}) },
         undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId,
     };
 };
@@ -165,13 +193,13 @@ const MAX_LOG_MINUTES = 24 * 60;
 /* The entry the manual log form writes (Modules/LogTime manualLogtime), for the person behind the agent only. */
 const timelogEntry = (params) => {
     const minutes = Number(params.minutes);
-    if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_LOG_MINUTES) throw new tools.DeterministicError(`minutes must be a whole number from 1 to ${MAX_LOG_MINUTES}`);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_LOG_MINUTES) throw new tools.DeterministicError(`The time must be a whole number of minutes from 1 to ${MAX_LOG_MINUTES}.`);
     const day = params.date ? String(params.date) : DateTime.utc().toISODate();
     const clock = params.startTime ? String(params.startTime) : '09:00';
-    if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('date must be YYYY-MM-DD and startTime HH:MM (UTC)');
+    if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('The date must be written YYYY-MM-DD and the start time HH:MM (UTC).');
     const start = DateTime.fromISO(`${day}T${clock}`, { zone: 'utc' });
-    if (!start.isValid || start.toISODate() !== day) throw new tools.DeterministicError(`${day} is not a date`);
-    if (start.startOf('day') > DateTime.utc().plus({ days: 1 }).startOf('day')) throw new tools.DeterministicError('time cannot be logged on a future day');
+    if (!start.isValid || start.toISODate() !== day) throw new tools.DeterministicError(`${day} is not a real date.`);
+    if (start.startOf('day') > DateTime.utc().plus({ days: 1 }).startOf('day')) throw new tools.DeterministicError('Time cannot be logged on a day that has not come yet.');
     return { start: Math.floor(start.toSeconds()), minutes };
 };
 
@@ -181,7 +209,7 @@ const contentOfText = (text) => {
     return { html: blocksToHtml(blocks), blocks };
 };
 
-const DRAFT_ELSEWHERE = 'a doc drafted for a task is saved in that task\'s project';
+const DRAFT_ELSEWHERE = 'a doc drafted for a task is saved in that task\'s project, so do not name another project';
 
 /* Where a draft is saved. One written for a task is filed in the task's project, and is its author's alone when the
  * task's list is private: a project doc is read by everyone on the project, a private list's tasks are not.
@@ -211,10 +239,10 @@ const executors = {
     async 'timelog.create'({ companyId, actor, params }) {
         const task = await tools.getTask(companyId, params.taskId);
         const userId = String(actor.userId || '');
-        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('time needs a person to log against');
+        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('Time can only be logged for a person. Ask the person to connect you again.');
         const { start, minutes } = timelogEntry(params);
         if (await isPeriodLocked({ companyId, userId, date: new Date(start * 1000) })) {
-            throw new tools.DeterministicError('that day is in an approved timesheet period, which is locked');
+            throw new tools.DeterministicError('That day is in a timesheet period a person already approved, so no time can be added to it. Ask the person to have it reopened.');
         }
         const a = attribution(actor);
         const saved = await MongoDbCrudOpration(companyId, {
@@ -265,7 +293,9 @@ const executors = {
         const ids = (Array.isArray(params.assigneeIds) ? params.assigneeIds : [params.assigneeId]).filter((v) => OBJECT_ID.test(String(v || ''))).map(String);
         if (!ids.length) throw new tools.DeterministicError('assigneeIds is required');
         const previous = (task.AssigneeUserId || []).map(String);
-        if ((await nonMembersOf(companyId, ids.filter((id) => !previous.includes(id)))).length) throw new tools.DeterministicError(`assigneeIds: ${NOT_A_MEMBER}`);
+        const added = ids.filter((id) => !previous.includes(id));
+        if ((await nonMembersOf(companyId, added)).length) throw new tools.DeterministicError(`assigneeIds: ${NOT_A_MEMBER}`);
+        if (await cannotOpen(companyId, String(task.ProjectID), added)) throw new tools.DeterministicError(`assigneeIds: ${CANNOT_OPEN_PROJECT}`);
         const next = params.replace ? ids : [...new Set([...previous, ...ids])];
         const r = await tools.updateTask(companyId, task._id, { AssigneeUserId: next }, context(actor, 'task.assign', depth));
         return { result: { assignees: next }, undo: { kind: 'assign', taskId: String(task._id), previous }, entityId: task._id, entityName: task.TaskName, task: r.task };
@@ -303,11 +333,11 @@ const executors = {
 
     async 'task.sprint.move'({ companyId, actor, params, depth }) {
         const task = await tools.getTask(companyId, params.taskId);
-        if (task.ParentTaskId) throw new tools.DeterministicError('a subtask moves with its parent');
+        if (task.ParentTaskId) throw new tools.DeterministicError('A subtask moves with its parent. Move the top-level task instead.');
         const target = oid(params.sprintId);
-        if (!target) throw new tools.DeterministicError('a valid sprintId is required');
+        if (!target) throw new tools.DeterministicError('a valid list id is required');
         const sprint = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: target, projectId: task.ProjectID }] }, 'findOne');
-        if (!sprint) throw new tools.DeterministicError('sprint not found in this project');
+        if (!sprint) throw new tools.DeterministicError('That list was not found in this project. Check sprints.list or ask the person which list they mean.');
         const previous = { sprintId: task.sprintId, sprintArray: task.sprintArray, folderObjId: task.folderObjId || null };
         const placement = await sprintPlacementOf(companyId, sprint);
         const r = await tools.updateTask(companyId, task._id, placement.set, context(actor, 'task.sprint.move', depth), placement.unset, pullOfLists([target]));
@@ -332,13 +362,13 @@ const executors = {
     async 'timelog.start'({ companyId, actor, params }) {
         const task = await tools.getTask(companyId, params.taskId);
         const userId = String(actor.userId || '');
-        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('timers need a person to log against');
+        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('A timer can only run for a person. Ask the person to connect you again.');
         const running = await findRunningTimer(companyId, task._id, userId);
         if (running) return { result: { timesheetId: String(running._id), alreadyRunning: true }, undo: null, entityId: task._id, entityName: task.TaskName };
         const a = attribution(actor);
         const now = Math.floor(DateTime.utc().toSeconds());
         if (await isPeriodLocked({ companyId, userId, date: new Date(now * 1000) })) {
-            throw new tools.DeterministicError('today is in an approved timesheet period, which is locked');
+            throw new tools.DeterministicError('Today is in a timesheet period a person already approved, so a timer cannot start. Ask the person to have it reopened.');
         }
         const saved = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
@@ -357,10 +387,10 @@ const executors = {
         const running = params.timesheetId && OBJECT_ID.test(String(params.timesheetId))
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [{ _id: oid(params.timesheetId), TicketID: String(task._id) }] }, 'findOne')
             : await findRunningTimer(companyId, task._id, actor.userId);
-        if (!running) throw new tools.DeterministicError('no running timer on this task');
+        if (!running) throw new tools.DeterministicError('No timer is running on this task, so there is nothing to stop.');
         const startedAt = new Date((Number(running.LogStartTime) || 0) * 1000);
         if (await isPeriodLocked({ companyId, userId: running.Loggeduser || actor.userId, date: startedAt })) {
-            throw new tools.DeterministicError('the timer started in an approved timesheet period, which is locked');
+            throw new tools.DeterministicError('The timer started in a timesheet period a person already approved, so it cannot be saved. Ask the person to have it reopened.');
         }
         const now = Math.floor(DateTime.utc().toSeconds());
         const minutes = Math.max(0, Math.round((now - Number(running.LogStartTime || now)) / 60));
@@ -394,6 +424,19 @@ const executors = {
         return require('./connectors/slackPost').post({ companyId, actor, params });
     },
 
+    /* For the person behind the agent, on the task named: the reminder the task screen sets. */
+    async 'reminder.create'({ companyId, actor, params }) {
+        const task = await tools.getTask(companyId, params.taskId);
+        const userId = String(actor.userId || '');
+        if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('a reminder needs a person to remind');
+        const reminderAt = new Date(params.reminderAt || NaN);
+        if (Number.isNaN(reminderAt.getTime())) throw new tools.DeterministicError('reminderAt is not a valid date');
+        const saved = await require('../Reminders/helper').createReminder(companyId, userId, {
+            taskId: task._id, projectId: task.ProjectID, reminderAt, reminderText: String(params.reminderText || '').slice(0, 500),
+        });
+        return { result: { reminderId: String(saved._id) }, undo: null, entityId: task._id, entityName: task.TaskName };
+    },
+
     async 'chat.post'({ companyId, actor, params, depth }) {
         const r = await tools.addComment(companyId, params.taskId, params.body, context(actor, 'chat.post', depth));
         return { result: { commentId: r.commentId }, undo: { kind: 'comment', commentId: r.commentId, taskId: String(params.taskId) }, entityId: params.taskId };
@@ -406,11 +449,11 @@ const executors = {
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(params.commentId), isDeleted: { $ne: true } }] }, 'findOne')
             : null;
         const own = comment && comment.actorType === 'agent' && String(comment.userId) === uid && String(comment.taskId) === String(params.taskId);
-        if (!own) throw new tools.DeterministicError('that comment is not one an agent wrote for you on this task');
+        if (!own) throw new tools.DeterministicError('You can change only a comment an agent wrote for the person on this task, and this is not one.');
         const body = String(params.body || '').trim();
-        if (!body) throw new tools.DeterministicError('comment body is empty');
+        if (!body) throw new tools.DeterministicError('The comment is empty. Write some text.');
         const answer = await require('./pageRequests').answerOf(require('../Comments/controller').update, { companyId, uid, body: { id: String(comment._id), data: { message: body } } });
-        if (!answer || answer.status !== true) throw new tools.DeterministicError((answer && answer.message) || 'the comment was not changed');
+        if (!answer || answer.status !== true) throw new tools.DeterministicError((answer && answer.message) || 'The comment was not changed. Try again, or tell the person.');
         return { result: { commentId: String(comment._id) }, undo: { kind: 'commentText', commentId: String(comment._id), taskId: String(params.taskId), previous: comment.message || '' }, entityId: params.taskId };
     },
 
@@ -437,14 +480,14 @@ const threadMay = async (companyId, actor, action, params) => {
     if (!task) return true;
     return (await canPostToThread(companyId, actor && actor.userId, tools.commentThreadOf(task))).allowed;
 };
-const THREAD_REFUSAL = 'not_visible: the task\'s comment thread is not one the person behind this agent can open';
-const TASK_REFUSAL = 'not_visible: the task is not one the person behind this agent can open';
-const PROJECT_REFUSAL = 'not_visible: the project is not one the person behind this agent can open';
-const LIST_REFUSAL = 'not_visible: the list is not one the person behind this agent can open in that project';
+const THREAD_REFUSAL = 'not_visible: that task was not found, or the person cannot open its comments. Ask the person which task they mean.';
+const TASK_REFUSAL = 'not_visible: that task was not found, or the person cannot open it. Ask the person which task they mean.';
+const PROJECT_REFUSAL = 'not_visible: that project was not found, or the person cannot open it. Ask the person which project they mean.';
+const LIST_REFUSAL = 'not_visible: that list was not found in that project, or the person cannot open it. Ask the person which list they mean.';
 
 /* These reach their task, project or list through the automation tool layer, which asks nothing about a person, so
  * the task routes' read rule is asked here. Every other executor runs a route's handler or a check of its own. */
-const TASK_WRITES = new Set(['task.status.set', 'task.link', 'task.assign', 'task.update', 'task.sprint.move', 'subtask.create', 'timelog.create', 'timelog.start', 'timelog.stop']);
+const TASK_WRITES = new Set(['task.status.set', 'task.link', 'task.assign', 'task.update', 'task.sprint.move', 'subtask.create', 'timelog.create', 'timelog.start', 'timelog.stop', 'reminder.create']);
 
 const targetRefusal = async (companyId, actor, action, params) => {
     const uid = String((actor && actor.userId) || '');
@@ -471,7 +514,16 @@ const draftRefusal = async (companyId, actor, action, params) => {
     if (!place) return `permission_denied: ${DRAFT_ELSEWHERE}`;
     const start = await canCreatePageIn(companyId, uid, place.projectId);
     if (start.allowed) return '';
-    return start.statusCode === 403 ? 'permission_denied: the person behind this agent cannot add a doc here' : PROJECT_REFUSAL;
+    return start.statusCode === 403 ? 'permission_denied: the person you act for is not allowed to add a doc here. Ask them to do it in AlianHub, or to name another place.' : PROJECT_REFUSAL;
+};
+
+/* Why the person behind `actor` may not make this change themselves, or '' when they may: the right, the thread,
+ * the task, project or list, and the place of a doc. An approval asks it of the approver before anything is claimed. */
+const personRefusal = async (companyId, actor, action, params = {}) => {
+    const holder = await permissions.holderMay(companyId, actor, action, params);
+    if (!holder.allowed) return holder.reason;
+    if (!(await threadMay(companyId, actor, action, params))) return THREAD_REFUSAL;
+    return await targetRefusal(companyId, actor, action, params) || draftRefusal(companyId, actor, action, params);
 };
 
 const refusal = async (companyId, actor, { action, params, reason, ip, entityType, entityId, taint }) => {
@@ -490,60 +542,78 @@ const liveStep = async (companyId, actor, { action, params, ip, taint }) => {
     if (!live.ok) throw await refusal(companyId, actor, { action, params, reason: live.reason, ip, taint });
 };
 
+/* A change that could only be proposed, in a project where agents are paused, could not be proposed either: the pause is the answer. */
+const pauseOverProposal = async (companyId, actor, { action, params, approved, check }) => {
+    if (check.code !== 'propose_only') return check.reason;
+    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved });
+    return rule.paused ? rule.reason : check.reason;
+};
+
 /* Run one action for an actor. Refusals are audited and thrown as RefusedError.
+ * This is the one place every agent's change passes, so "changed since you read it" (./taskReads) is asked here,
+ * last, with nothing written yet.
  * A policy `decision` of refuse is honoured before the registry check, so a
  * policy refusal leaves the same audit row as a registry one. `approved` is an
- * argument and never read from `params`, so only the approval of a proposal sets it. */
-const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false }) => {
+ * argument and never read from `params`, so only the approval of a proposal sets it; `approvedBy` is the person who
+ * approved, for an executor that holds each of its parts to that person's rights too. `within` is what this call was
+ * held to, for an executor that runs a part of its change as an action of its own. */
+const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false, approvedBy = '' }) => {
     await liveStep(companyId, actor, { action, params, ip, taint });
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip, taint });
     const check = registry.evaluate(action, params, { allowedActions });
-    if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip, taint });
-    const holder = await permissions.holderMay(companyId, actor, action, params);
-    if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip, taint });
-    if (!(await threadMay(companyId, actor, action, params))) throw await refusal(companyId, actor, { action, params, reason: THREAD_REFUSAL, ip, taint });
-    const closed = await targetRefusal(companyId, actor, action, params) || await draftRefusal(companyId, actor, action, params);
+    if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: await pauseOverProposal(companyId, actor, { action, params, approved, check }), ip, taint });
+    const closed = await personRefusal(companyId, actor, action, params);
     if (closed) throw await refusal(companyId, actor, { action, params, reason: closed, ip, taint });
-    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved, taint, standing: true });
+    const rule = await projectPolicy.ask({ companyId, actor, action, params, approved, taint, standing: true, applying: true });
     if (rule.decision !== projectPolicy.DECISION.ACT) {
         const held = rule.decision === projectPolicy.DECISION.PROPOSE ? `${rule.reason}, so it waits for a person's approval` : rule.reason;
         throw await refusal(companyId, actor, { action, params, reason: held, ip, taint });
     }
     if (!check.action.write) return { result: null, auditId: null, undo: null };
     const exec = executors[action];
-    if (!exec) throw new tools.DeterministicError(`${action} has no executor`);
+    if (!exec) throw new tools.DeterministicError(`${action} is not ready to be used yet, so nothing was changed.`);
 
-    const standing = rule.standing || null;
-    const auditId = await audit.openAction(companyId, actor, {
-        action, params, cost, ip, entityId: params.taskId, taint, standing,
-        reason: standing ? `${reason || action} (standing approval ${standing.id}, made by ${standing.madeBy})` : reason,
-    });
-    let out;
+    const turn = await taskReads.turnFor({ companyId, actor, action, params, approved });
+    if (turn.refusal) throw await refusal(companyId, actor, { action, params, reason: turn.refusal, ip, taint });
+    let changed = false;
     try {
-        out = await exec({ companyId, actor, params, depth: clampDepth(depth) });
-    } catch (e) {
-        await audit.failAction(companyId, auditId, e.message);
-        throw e;
+        const standing = rule.standing || null;
+        const auditId = await audit.openAction(companyId, actor, {
+            action, params, cost, ip, entityId: params.taskId, taint, standing,
+            reason: standing ? `${reason || action} (standing approval ${standing.id}, made by ${standing.madeBy})` : reason,
+        });
+        let out;
+        try {
+            out = await exec({ companyId, actor, params, depth: clampDepth(depth), approvedBy: approved ? String(approvedBy || '') : '', within: { allowedActions, ip, taint } });
+        } catch (e) {
+            await audit.failAction(companyId, auditId, e.message);
+            throw e;
+        }
+        changed = true;
+        if (isAgent(actor) && params.taskId && !WRITES_OWN_COMPLETION.has(action)) {
+            await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
+        }
+        await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });
+        if (standing) {
+            await require('./standingApprovals').recordUse(companyId, standing, { action, params, auditId, reason })
+                .catch((e) => logger.error(`[standing-approval] ${standing.id} applied ${action} (audit ${auditId}) but its use was not recorded: ${e.message}`));
+        }
+        if (!approved) changeNotice.announce(companyId, actor, auditId);
+        return { result: out.result, auditId, undo: out.undo, task: out.task || null, ...(standing ? { standing } : {}) };
+    } finally {
+        await turn.end(changed);
     }
-    if (isAgent(actor) && params.taskId && !WRITES_OWN_COMPLETION.has(action)) {
-        await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
-    }
-    await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });
-    if (standing) {
-        await require('./standingApprovals').recordUse(companyId, standing, { action, params, auditId, reason })
-            .catch((e) => logger.error(`[standing-approval] ${standing.id} applied ${action} (audit ${auditId}) but its use was not recorded: ${e.message}`));
-    }
-    return { result: out.result, auditId, undo: out.undo, task: out.task || null, ...(standing ? { standing } : {}) };
 };
 
 /* Reads still go through the registry so a refusal is logged the same way. */
-const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', allowedActions }) => {
+const authorizeRead = async ({ companyId, actor, action, params = {}, ip = '', allowedActions, opens = null }) => {
     await liveStep(companyId, actor, { action, params, ip });
     const check = registry.evaluate(action, params, { allowedActions });
     if (!check.allowed) throw await refusal(companyId, actor, { action, params, reason: check.reason, ip });
-    const holder = await permissions.holderMay(companyId, actor, action, params);
+    // `opens` says whether the caller can open what `params` names. What it cannot open is judged as an id that names nothing is.
+    const holder = await permissions.holderMay(companyId, actor, action, params, { byWorkspaceRules: Boolean(opens) && !(await opens()) });
     if (!holder.allowed) throw await refusal(companyId, actor, { action, params, reason: holder.reason, ip });
     return true;
 };
 
-module.exports = { perform, authorizeRead, refusal, RefusedError, executors, workEntry, SCOPE, RATING_KEYS, RATINGS, rating, ratings, unrated, isCompleteRating, manifest };
+module.exports = { perform, authorizeRead, personRefusal, refusal, RefusedError, executors, workEntry, SCOPE, RATING_KEYS, RATINGS, rating, ratings, unrated, isCompleteRating, manifest };

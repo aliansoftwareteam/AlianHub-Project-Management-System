@@ -10,6 +10,7 @@ const revokeMemberTokens = async (companyId, userId) => {
             type: SCHEMA_TYPE.API_TOKENS,
             data: [{ userId: String(userId), active: true }, { $set: { active: false } }],
         }, 'updateMany');
+        await require('../Agents/manager/chatQuestions').connectionEnded(String(companyId), String(userId));
         return (result && (result.modifiedCount || result.nModified)) || 0;
     } catch (error) {
         logger.error(`revokeMemberTokens ${companyId}/${userId}: ${error.message}`);

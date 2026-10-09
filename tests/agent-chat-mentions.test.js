@@ -89,7 +89,7 @@ jest.mock('../Modules/AICore/usage', () => ({
 }));
 jest.mock('../Modules/Agents/budget', () => ({
     check: jest.fn(async () => ({ ok: true, reason: '' })),
-    headroom: jest.fn(async () => ({ budgetUsd: 0, usedUsd: 0, reservedUsd: 0 })),
+    headroom: jest.fn(async () => ({ budgetUsd: 0, usedUsd: 0, reservedUsd: 0, daily: { budgetUsd: 0, usedUsd: 0, reservedUsd: 0 } })),
     alertIfCrossed: jest.fn(async () => null),
 }));
 jest.mock('../Modules/Knowledge/ingest/events', () => ({ publishCommentChanged: jest.fn(), publishGuideSaved: jest.fn() }));
@@ -266,6 +266,15 @@ describe('@agent in a chat channel', () => {
         expect(chatRuns()).toHaveLength(0);
         expect(mockChat).not.toHaveBeenCalled();
         expect(agentReplies()).toHaveLength(0);
+    });
+
+    it('does not start an agent in the channel of a project where agents are paused', async () => {
+        db().seed(SCHEMA_TYPE.PROJECTS, { _id: CHANNEL_PROJECT, agentLimits: { paused: true } });
+        const r = await post(ALICE, `${mention(HELPER)} when do we launch?`, channel);
+
+        expect(r.body.agents).toEqual([{ agentId: HELPER, started: false, code: 'project_paused' }]);
+        expect(chatRuns()).toHaveLength(0);
+        expect(mockChat).not.toHaveBeenCalled();
     });
 
     it('never answers for a guest or someone outside the channel', async () => {

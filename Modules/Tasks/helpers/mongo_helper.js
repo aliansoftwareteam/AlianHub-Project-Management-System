@@ -22,7 +22,7 @@ const SPRINT_PLAN_CHECK_TTL_SECONDS = 30;
 const { updateCommentCollection, addCommentCollection } = require('../../Comments/controller');
 // BUG-033 / #87 — self-healing reconciliation for sprint task counts.
 const { reconcileSprintTaskCount, scheduleReconciliation } = require('./reconcileTaskCount');
-const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED } = require('./taskTree');
+const { loadSubtree, rewriteDescendantAncestors, sprintCountChange, DELETED, LEFT_BECAUSE } = require('./taskTree');
 const { storableFieldValues } = require('../../CustomField/helpers/fieldValueWrite');
 const { withDescriptionBlock } = require('./descriptionBlock');
 const { withoutImportMark } = require('./importMark');
@@ -220,7 +220,7 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                 ]
             }
             MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate").then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId, leftBecause: LEFT_BECAUSE.SUBTASK });
                 let obj = {
                     isParentTask: false,
                     ParentTaskId: task._id,
@@ -309,8 +309,8 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                             ]
                         }
                         MongoDbCrudOpration(companyId, object, "updateOne").then((mainRes)=>{
-                            socketEmitter.emit('update', { type: "update", data: mainRes , updatedFields: {subTasks: mainRes.subTasks}, module: 'task', companyId });
-                        })
+                            if (mainRes) socketEmitter.emit('update', { type: "update", data: mainRes , updatedFields: {subTasks: mainRes.subTasks}, module: 'task', companyId });
+                        }).catch((error) => logger.error(`convert to subtask, the old parent's count: ${error && error.message}`));
                     }
                     /*When a task is converted into  asubtask, at that moment, if a subtask is added to the selected task, the count needs to be increased.*/
                     let object = {
@@ -322,8 +322,8 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                         ]
                     }
                     MongoDbCrudOpration(companyId, object, "findOneAndUpdate").then((taskres)=>{
-                        socketEmitter.emit('update', { type: "update", data: taskres , updatedFields: {subTasks: taskres.subTasks}, module: 'task', companyId });
-                    })
+                        if (taskres) socketEmitter.emit('update', { type: "update", data: taskres , updatedFields: {subTasks: taskres.subTasks}, module: 'task', companyId });
+                    }).catch((error) => logger.error(`convert to subtask, the parent's count: ${error && error.message}`));
                     // update comment count
                     exports.removeCommentCount(companyId,projectData.id,convertTask.sprintId,convertTask._id,convertTask.ParentTaskId).catch((error) => {
                         logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
@@ -387,8 +387,9 @@ exports.convertToSubTaskFunction = (companyId, projectData, sprintId, convertTas
                     // so `reject(error)` would be a no-op. Log instead so
                     // the failure is visible.
                     logger.error(`convertToSubTaskFunction inner update error: ${error && error.message ? error.message : error}`);
+                    reject(error);
                 })
-            })
+            }).catch(reject)
         } catch (error) {
             reject(error);
         }
@@ -420,7 +421,7 @@ exports.moveTaskFunction = (companyId, projectData, sprintObj, moveTask, oldSpri
                 MongoDbCrudOpration(companyId, deleteObj, "findOneAndUpdate"),
                 extraLists.afterHomeMove(companyId, moveTask, { projectId: projectData.id, sprintId: sprintObj.id }),
             ]).then(([result, extras]) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId });
+                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {deletedStatusKey : 1}, module: 'task', companyId, leftBecause: LEFT_BECAUSE.MOVED });
                 let obj = {};
                 let unsetObj = {}
                 if (JSON.parse(JSON.stringify(moveTask.ProjectID)) !== JSON.parse(JSON.stringify(projectData.id))) {
@@ -648,7 +649,7 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
                 ]
             }
             MongoDbCrudOpration(companyId, query, "updateOne").then(() => {
-                exports.removeCommentCount(companyId,projectData,oldSprintObj.id,parseSubTask._id).catch((error) => {
+                exports.removeCommentCount(companyId,projectData.id,oldSprintObj.id,parseSubTask._id).catch((error) => {
                     logger.error(`${error} ERROR IN REMOVE COMMENT COUNT`);
                 })
                 resolve();
@@ -682,6 +683,7 @@ exports.convertToListSubTask = (companyId, projectData, subTask, sprintObj, oldS
                 });
             }).catch((error) => {
                 logger.error(`ERROR: ${error}`);
+                reject(error);
             });
         } catch (error) {
             reject(error);
@@ -698,7 +700,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
             if (mergeTask.folderObjId) placedUnder.folderObjId = mergeTask.folderObjId;
             else unsetObj.folderObjId = '';
             let obj;
-            if (subTask.ProjectID !== mergeTask.ProjectID) {
+            if (String(subTask.ProjectID) !== String(mergeTask.ProjectID)) {
                 let Ind = oldProject.taskStatusData.findIndex((x) => { return x.key === subTask.statusKey });
                 let typeInd = oldProject.taskTypeCounts.findIndex((x) => { return x.value === subTask.TaskType });
                 const statusData = oldProject.taskStatusData[Ind];
@@ -752,7 +754,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
             }
             MongoDbCrudOpration(companyId,queryObj,"findOneAndUpdate").then((result) => {
                 socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj, module: 'task', companyId });
-                resolve({ status: true, statusText: "Sub Task merged Succesfully" });
+                resolve({ status: true, statusText: "Sub Task merged Successfully" });
                 let mergeId = slot.parent._id;
                 let incObj = {
                     type: SCHEMA_TYPE.TASKS,
@@ -787,7 +789,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
                     const decObj = {
                         body: {
                             companyId: companyId,
-                            projectId: oldProject.id,
+                            projectId: String(subTask.ProjectID),
                             folderId: subTask?.folderObjId || null,
                             updateObject :{$inc: { tasks: -1}},
                         },
@@ -806,6 +808,7 @@ exports.mergeSubTask = (companyId, subTask, mergeTask, projectData, oldProject, 
                 })
             }).catch((err) => {
                 logger.error(`ERROR in merge task ${err}`);
+                reject(err);
             })
         } catch (error) {
             reject(error);

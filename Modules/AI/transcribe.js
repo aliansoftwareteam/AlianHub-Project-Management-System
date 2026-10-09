@@ -3,7 +3,7 @@
 // answers chat (so a self-hosted instance uploads nothing to OpenAI), otherwise
 // OpenAI at OPENAI_BASE_URL with config.OPENAI_API_KEY or config.AI_API_KEY.
 // Each call is booked to the workspace's AI budget by the audio minute.
-const multer = require('multer');
+const multer = require('../../utils/contextMulter');
 const config = require('../../Config/config');
 const logger = require('../../Config/loggerConfig');
 const aiSwitch = require('../AICore/aiSwitch');
@@ -56,6 +56,8 @@ const formFor = (req, model) => {
 };
 
 const NOT_CONFIGURED = { status: 503, body: { status: false, statusText: 'Speech-to-text is not configured.' } };
+
+const NOT_AUDIO = { status: 400, body: { status: false, statusText: 'That file is not audio. Send a WebM, MP4, M4A, MP3, WAV, Ogg or FLAC recording.' } };
 
 const configured = (compatible) => (compatible
     ? !!String(process.env.OPENAI_COMPATIBLE_BASE_URL || '').trim()
@@ -114,6 +116,7 @@ exports.transcribe = [
             if (!req.file || !req.file.buffer || !req.file.buffer.length) {
                 return res.status(400).json({ status: false, statusText: 'No audio received (field name: file).' });
             }
+            if (!audioDuration.isAudioFile(req.file.buffer)) return res.status(NOT_AUDIO.status).json(NOT_AUDIO.body);
             const model = config.WHISPER_MODEL || process.env.WHISPER_MODEL || 'whisper-1';
             let answer;
             try {

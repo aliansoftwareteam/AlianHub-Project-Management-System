@@ -134,7 +134,7 @@
             <div v-else class="tv2__empty">
                 <EmptyState
                     v-if="project?.deletedStatusKey !== 2"
-                    :title="$t(emptyTitleKey)"
+                    :title="$t(emptyTitleKey, emptyTitleParams)"
                     :message="$t(emptyMessageKey)"
                     :actionLabel="canCreate ? $t('EmptyState.no_tasks_action') : ''"
                     :sentence="canCreate && emptySentenceKey ? $t(emptySentenceKey) : ''"
@@ -167,10 +167,12 @@ import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyStat
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useViewSettings } from '@/views/Projects/composables/viewSettingsContext';
 import { useListRowEdit } from '@/views/Projects/ListView/useListInlineEdit.js';
+import { useProjectAgents } from '@/views/Projects/Kanban/useProjectAgents';
 import { columnCatalogue, gridMinWidth, gridTracks, useViewColumns } from '@/views/Projects/composables/viewColumns';
 import { handleGridKey } from './gridKeyboard';
 import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
 import { isSortableField, valuePath } from '@/views/Projects/composables/customFieldQuery';
+import { useGroupSource } from '@/views/Projects/composables/groupSource';
 
 // PACKAGES
 import { useStore } from 'vuex';
@@ -204,11 +206,13 @@ const viewRoot = ref(null);
 useTaskSequenceSource(viewRoot);
 
 const project = inject('selectedProject');
+const { start: watchAgents } = useProjectAgents();
+watch(() => project.value?._id, (id) => { if (id) watchAgents(id); }, { immediate: true });
 const tagsOn = computed(() => checkApps('tags') && checkPermission('task.task_tag', project.value?.isGlobalPermission) !== null);
 const companyId = inject('$companyId');
 const searchedTask = inject('searchedTask');
 const showArchiveVar = inject("showArchived");
-const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyTitleParams, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project, () => props.sprints);
 
 const rowEdit = useListRowEdit(project, showArchiveVar);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { table: true, searched: Boolean(searchedTask?.value) }));
@@ -306,6 +310,12 @@ function load(refetch) {
 
 watch([() => props.grouped, () => props.sprints, taskData], ([newGroup, newSprints], [oldGroup, oldSprints]) => {
     load(!isEqual(newGroup, oldGroup) || JSON.stringify(newSprints) !== JSON.stringify(oldSprints));
+});
+
+/* A group that is new reads its own rows as it is drawn (TableViewTable). */
+useGroupSource(project, () => props.grouped, () => {
+    load(false);
+    scheduleGroupCounts();
 });
 
 onMounted(() => {

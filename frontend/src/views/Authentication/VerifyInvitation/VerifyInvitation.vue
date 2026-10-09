@@ -29,11 +29,13 @@ import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import AuthShell from "@/components/templates/AuthShell/AuthShell.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import { getAuth } from "@/services";
 import * as env from "@/config/env";
 
 const { t } = useI18n();
 const axios = inject("$axios");
 const userId = inject("$userId");
+const openCompany = inject("$companyId", null);
 const route = useRoute();
 const router = useRouter();
 
@@ -49,10 +51,17 @@ onMounted(async () => {
             stage.value = "invalid";
             return;
         }
+        // A signed-in person goes straight in, on a session issued before they were in this workspace: it is
+        // renewed before the workspace is selected, so nothing asks for the workspace with the old one.
+        const signedInUserId = userId.value || localStorage.getItem("userId") || "";
+        if (signedInUserId) await getAuth(signedInUserId).catch(() => null);
         localStorage.setItem("selectedCompany", result.data.companyId);
+        // A person who had no workspace: told which company is open, the app does not look it up in the empty list it
+        // loaded before this one was joined and send them to name a workspace.
+        if (signedInUserId && openCompany && !openCompany.value) openCompany.value = result.data.companyId;
         stage.value = "accepted";
         setTimeout(() => {
-            router.replace({ name: "Log-in" }).then(() => { if (userId.value !== "") window.location.reload(); });
+            router.replace({ name: "Log-in" }).then(() => { if (signedInUserId) window.location.reload(); });
         }, 1200);
     } catch (error) {
         console.error("ERROR in validate invitation: ", error);

@@ -6,6 +6,7 @@ const { verifyCompanyMembership } = require('../../Config/jwt');
 const { externalClientActor } = require('../Agents/actor');
 const taint = require('../Agents/taint');
 const approvalsHook = require('./approvalsHook');
+const { appLabel, hostOfClient } = require('../OAuthServer/clientLabel');
 const logger = require('../../Config/loggerConfig');
 
 const isAccessToken = (raw) => typeof raw === 'string' && raw.startsWith(tokenHash.PREFIX.access);
@@ -13,17 +14,21 @@ const isAccessToken = (raw) => typeof raw === 'string' && raw.startsWith(tokenHa
 const OAUTH_PREFIXES = [tokenHash.PREFIX.access, tokenHash.PREFIX.refresh, tokenHash.PREFIX.code];
 const looksLikeOAuthSecret = (value) => OAUTH_PREFIXES.some((prefix) => String(value).startsWith(prefix));
 
-const nameOfDocumentClient = (clientId) => {
-    try { return new URL(clientId).hostname; } catch (error) { return String(clientId); }
-};
-
 /* A client ID metadata document client has no row to revoke; its grants are still revoked one by one,
  * and slice S3's workspace approval covers it. */
 const clientStanding = async (clientId) => {
-    if (!tokenHash.CLIENT_ID.test(String(clientId))) return { ok: true, name: nameOfDocumentClient(clientId) };
+    if (!tokenHash.CLIENT_ID.test(String(clientId))) return { ok: true, name: hostOfClient(clientId) || String(clientId), host: hostOfClient(clientId) };
     const row = await store.clients.find(clientId);
     if (!row || row.revokedAt) return { ok: false };
-    return { ok: true, name: row.name || String(clientId) };
+    return { ok: true, name: row.name || String(clientId), host: hostOfClient(clientId, row) };
+};
+
+/* The name the workspace approved the client under, which a metadata document client takes from its own
+ * client_name, as the Members page names it; the registered name or the publisher's host otherwise. */
+const nameInWorkspace = async (companyId, clientId, fallback) => {
+    const rows = await store.approvals.namesFor([{ companyId, clientId }]).catch(() => []);
+    const approved = (rows || []).find((row) => row && row.clientName);
+    return approved ? String(approved.clientName) : fallback;
 };
 
 const refuseApproval = (clientId, why) => {
@@ -60,7 +65,7 @@ const approvalCeiling = async (companyId, clientId) => {
     } catch (error) {
         return refuseApproval(clientId, `the approval module failed to load (${error.message})`) || null;
     }
-    if (!approvals) return mcpOAuth.SCOPES.filter((scope) => !mcpOAuth.MANAGE_SCOPES.includes(scope));
+    if (!approvals) return mcpOAuth.SCOPES.filter((scope) => !mcpOAuth.OPT_IN_SCOPES.includes(scope));
     if (typeof approvals.approvedScopes !== 'function') return refuseApproval(clientId, 'the approval module has no approvedScopes') || null;
     try {
         const ceiling = await approvals.approvedScopes(companyId, clientId);
@@ -110,7 +115,7 @@ const authenticate = async (req, raw, { namedCompanies = [], now = new Date() } 
     return {
         companyId: String(token.companyId),
         userId,
-        actor: await externalClientActor({ userId, clientId: token.clientId, clientName: client.name, grantId: token.grantId }),
+        actor: await externalClientActor({ userId, clientId: token.clientId, clientName: appLabel(await nameInWorkspace(String(token.companyId), token.clientId, client.name), client.host), grantId: token.grantId }),
         token: { oauth: true, scopes },
         oauth: { clientId: token.clientId, grantId: token.grantId, scopes },
         canWrite: scopes.some((scope) => mcpOAuth.WRITE_SCOPES.includes(scope)),
@@ -120,4 +125,4 @@ const authenticate = async (req, raw, { namedCompanies = [], now = new Date() } 
     };
 };
 
-module.exports = { isAccessToken, looksLikeOAuthSecret, authenticate, clientStanding, clientApprovedInWorkspace, standingOfGrant };
+module.exports = { isAccessToken, looksLikeOAuthSecret, authenticate, clientStanding, nameInWorkspace, clientApprovedInWorkspace, standingOfGrant };

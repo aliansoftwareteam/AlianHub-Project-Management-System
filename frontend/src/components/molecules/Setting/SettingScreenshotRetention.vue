@@ -21,6 +21,7 @@
             <label class="screenshot-retention-switch" :class="{ disabled: isBusy }">
                 <input
                     type="checkbox"
+                    :aria-label="$t('ScreenshotRetention.toggle_label')"
                     :checked="policy.enabled"
                     :disabled="isBusy"
                     @change="onToggle($event.target.checked)"
@@ -36,12 +37,13 @@
             </div>
             <select
                 class="screenshot-retention-select"
+                :aria-label="$t('ScreenshotRetention.window_label')"
                 :value="policy.maxAgeMonths"
                 :disabled="!policy.enabled || isBusy"
                 @change="onWindowChange(Number($event.target.value))"
             >
                 <option v-for="n in validMaxAgeMonths" :key="n" :value="n">
-                    {{ $t('ScreenshotRetention.months_option', { n }) }}
+                    {{ $t('ScreenshotRetention.months_option', { n }, n) }}
                 </option>
             </select>
         </div>
@@ -65,7 +67,7 @@ import { ref, computed, watch, inject } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 
 import { apiRequest } from '@/services';
 import { isOwnerOrAdmin } from "@/utils/roles";
@@ -192,9 +194,9 @@ function formatRelative(dateLike) {
     const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
     if (days <= 0) return t('ScreenshotRetention.today');
     if (days === 1) return t('ScreenshotRetention.yesterday');
-    if (days < 30) return t('ScreenshotRetention.days_ago', { n: days });
+    if (days < 30) return t('ScreenshotRetention.days_ago', { n: days }, days);
     const months = Math.floor(days / 30);
-    return t('ScreenshotRetention.months_ago', { n: months });
+    return t('ScreenshotRetention.months_ago', { n: months }, months);
 }
 
 // Watch isOwner rather than firing once on mount: the Vuex store may
@@ -224,12 +226,12 @@ watch(
     padding: 20px;
     background: var(--surface);
     color: var(--ink);
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 10px;
 }
 .screenshot-retention-subtitle {
     margin: 4px 0 16px 0;
-    color: #6b7280;
+    color: var(--ink-2);
     font-size: 13px;
     line-height: 1.5;
 }
@@ -238,7 +240,7 @@ watch(
     justify-content: space-between;
     align-items: center;
     padding: 12px 0;
-    border-top: 1px solid #f3f4f6;
+    border-top: 1px solid var(--hairline);
 }
 .screenshot-retention-row-label {
     display: flex;
@@ -247,16 +249,16 @@ watch(
     max-width: 70%;
 }
 .screenshot-retention-row-hint {
-    color: #6b7280;
+    color: var(--ink-2);
     font-size: 12px;
 }
 .screenshot-retention-select {
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 6px 10px;
     font-size: 13px;
-    background: #fff;
-    color: #111827;
+    background: var(--surface);
+    color: var(--ink);
     cursor: pointer;
 }
 .screenshot-retention-select:disabled {
@@ -266,10 +268,10 @@ watch(
 .screenshot-retention-stats {
     margin-top: 12px;
     padding: 10px 12px;
-    background: #f9fafb;
+    background: var(--surface-2);
     border-radius: 8px;
     font-size: 12px;
-    color: #4b5563;
+    color: var(--ink-2);
 }
 
 /* Toggle switch */
@@ -292,7 +294,7 @@ watch(
 .screenshot-retention-slider {
     position: absolute;
     inset: 0;
-    background: #d1d5db;
+    background: var(--border);
     border-radius: 24px;
     transition: background 0.15s ease;
 }
@@ -303,12 +305,12 @@ watch(
     height: 18px;
     left: 3px;
     bottom: 3px;
-    background: #fff;
+    background: var(--knob);
     border-radius: 50%;
     transition: transform 0.15s ease;
 }
 .screenshot-retention-switch input:checked + .screenshot-retention-slider {
-    background: #4f46e5;
+    background: var(--brand);
 }
 .screenshot-retention-switch input:checked + .screenshot-retention-slider::before {
     transform: translateX(20px);

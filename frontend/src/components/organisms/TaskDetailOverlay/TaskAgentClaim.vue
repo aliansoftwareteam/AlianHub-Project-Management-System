@@ -1,7 +1,7 @@
 <template>
     <div v-if="items.length || canHandOver || error" class="tac" data-test="task-agent-claim">
         <p v-for="item in items" :key="item.id" class="tac__line" data-test="claim-line" role="status">
-            <span class="tac__text">{{ item.claim ? $t('ProjectManager.claimed_by', { name: item.claim.name }) : $t('ProjectManager.waiting_for_agent') }}</span>
+            <span class="tac__text">{{ lineOf(item) }}</span>
             <span class="ah-chip">{{ $t(`ProjectManager.rule_${item.rule}`) }}</span>
             <button
                 v-if="item.canTakeBack"
@@ -25,23 +25,33 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { inject, onBeforeUnmount, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { AGENTS_CHANGED_EVENT } from "@/views/Ai/agentFeed";
 
 defineOptions({ name: "TaskAgentClaim" });
 
 const props = defineProps({
-    taskId: { type: String, required: true }
+    taskId: { type: String, required: true },
+    round: { type: Number, default: 0 }
 });
 
+const QUEUE_CHANGE = "claim";
+
 const { t } = useI18n();
+const socket = inject("$socket", null);
 const items = ref([]);
 const canHandOver = ref(false);
 const busy = ref(false);
 const error = ref("");
 let asked = 0;
+
+function lineOf(item) {
+    if (item.claim) return t("ProjectManager.claimed_by", { name: item.claim.name });
+    return item.to ? t("ProjectManager.handed_to", { name: item.to }) : t("ProjectManager.waiting_for_agent");
+}
 
 function take(data) {
     items.value = Array.isArray(data?.items) ? data.items : [];
@@ -49,10 +59,10 @@ function take(data) {
 }
 
 /* A task this person cannot open and a project that does not use the queue answer alike, with nothing to show. */
-async function load(taskId) {
+async function load(taskId, { keepShown = false } = {}) {
     asked += 1;
     const mine = asked;
-    take(null);
+    if (!keepShown) take(null);
     error.value = "";
     if (!taskId) return;
     try {
@@ -81,7 +91,15 @@ async function send(path, fallback) {
 const takeBack = (item) => send(`${env.AGENT_WORK_QUEUE}/${encodeURIComponent(item.id)}/take-back`, "ProjectManager.take_back_failed");
 const handOver = () => send(`${env.AGENT_WORK_QUEUE}/task/${encodeURIComponent(props.taskId)}/hand-over`, "ProjectManager.hand_over_failed");
 
-watch(() => props.taskId, load, { immediate: true });
+watch(() => [props.taskId, props.round], () => load(props.taskId), { immediate: true });
+
+/* A claim, a hand-over and the project's switch all change what this line may offer, on any device. */
+const onAgentsChanged = (change) => { if (change?.kind === QUEUE_CHANGE && !busy.value) load(props.taskId, { keepShown: true }); };
+watch(() => socket?.value, (next, previous) => {
+    previous?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
+    next?.on?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
+}, { immediate: true });
+onBeforeUnmount(() => socket?.value?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged));
 </script>
 
 <style scoped>

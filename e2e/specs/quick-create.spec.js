@@ -12,6 +12,9 @@ const rememberProject = (page, companyId, projectId) => page.addInitScript(([cid
     if (uid) localStorage.setItem(`ah.quickCreate.lastProject.${cid}.${uid}`, pid);
 }, [companyId, projectId]);
 
+/* Both workers sign in as the same owner, so the server's list of visits changes under a running test. */
+const lastOpened = (page, visits) => page.route(/\/api\/v2\/recent-visits\?types=project,sprint/, (route) => route.fulfill({ json: { status: true, data: visits } }));
+
 async function tasksNamed(api, projectId, name) {
     const res = await api.post('/api/v1/task/find', {
         findQuery: { $match: { $or: [{ objId: { ProjectID: projectId } }, { ProjectID: projectId }], TaskName: name, deletedStatusKey: 0 } },
@@ -28,6 +31,7 @@ test.describe('create a task from anywhere', () => {
         const project = await createProject(owner.api, { name: `QC Last ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
         await firstSprint(owner.api, project._id);
         await rememberProject(page, state.companyId, String(project._id));
+        await lastOpened(page, []);
 
         await page.goto(`/#/${state.companyId}/inbox`);
         const heading = page.getByRole('heading', { level: 1, name: 'Inbox' });
@@ -46,6 +50,25 @@ test.describe('create a task from anywhere', () => {
         await expect(dialog).toBeHidden();
         await expect(page.getByRole('status').filter({ hasText: 'Task created' })).toBeVisible();
         await expect.poll(async () => (await tasksNamed(owner.api, String(project._id), name)).length, { timeout: 15000 }).toBe(1);
+    });
+
+    test('c on the Inbox starts in the project the person last had open, before the last used one', async ({ page, state, loginAs }) => {
+        const owner = await loginAs('owner');
+        const used = await createProject(owner.api, { name: `QC Used ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
+        const opened = await createProject(owner.api, { name: `QC Opened ${uniqueSuffix()}`, assigneeIds: [owner.uid], createdBy: owner.uid });
+        await firstSprint(owner.api, opened._id);
+        await rememberProject(page, state.companyId, String(used._id));
+        await lastOpened(page, [{ type: 'project', route: { projectId: String(opened._id) } }]);
+
+        await page.goto(`/#/${state.companyId}/inbox`);
+        const heading = page.getByRole('heading', { level: 1, name: 'Inbox' });
+        await expect(heading).toBeVisible();
+        await heading.click();
+
+        await page.keyboard.press('c');
+        const dialog = page.getByRole('dialog', { name: 'New task' });
+        await expect(dialog).toBeVisible();
+        await expect(dialog.getByRole('combobox', { name: 'Project' })).toHaveValue(String(opened._id));
     });
 
     test('the palette runs "new task" on Enter instead of asking AI', async ({ page, state }) => {

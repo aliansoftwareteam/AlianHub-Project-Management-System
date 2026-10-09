@@ -109,6 +109,7 @@ import { bulkReport, convertTargets, moveTargets, parentTargets, placementAction
 import { priorityAppOn, projectHasApp } from "./listRowEdit.js";
 import { PHONE_INLINE_LIMIT, fitInline } from "./bulkBarFit.js";
 import { placedSprint } from "@/views/Projects/composables/taskPlacement";
+import { holdOwnBulkLeave } from "@/utils/taskUpdateMarker";
 import { MAX_EXTRA_LISTS, addTargets, offersAnyTask, refusalCodeOf, refusalKey } from "@/components/organisms/TaskDetailOverlay/taskLists";
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue";
 import CalenderCompo from "@/components/atom/CalenderCompo/CalenderCompo.vue";
@@ -224,7 +225,7 @@ const aiOptions = computed(() => [
     { id: "summarise", label: t("List.ai_summarise"), action: summarise },
     ...aiFields.value.map((field) => ({
         id: field._id,
-        label: t("AiFields.bulk_fill", { field: field.fieldTitle, n: selection.count.value }),
+        label: t("AiFields.bulk_fill", { field: field.fieldTitle, n: selection.count.value }, selection.count.value),
         attrs: { "data-ai-field-fill": field._id },
         action: () => fillAiField(field)
     }))
@@ -358,6 +359,7 @@ async function run(action, payload) {
     open.value = "";
     const taskIds = [...selection.selectedTaskIds.value];
     const before = snapshotTasks(store.state.projectData, taskIds);
+    const answered = holdOwnBulkLeave(action, taskIds);
     try {
         const response = await apiRequest("post", env.V2_TASKS_BULK, {
             action,
@@ -375,13 +377,14 @@ async function run(action, payload) {
         if (report) $toast.warning(report);
         if (updatedIds.length) {
             const requests = undoRequests({ action, payload, before, updatedIds, project: props.project, priorities: priorities.value, nameOf });
-            showUndo(t("List.bulk_done", { n: result.totals?.updated ?? updatedIds.length }), requests);
+            showUndo(t("List.bulk_done", { n: result.totals?.updated ?? updatedIds.length }, result.totals?.updated ?? updatedIds.length), requests);
         }
         selection.clear();
         if (RELOCATING.has(action)) refreshSprintCounts();
     } catch (error) {
         $toast.error(error?.response?.data?.statusText || error?.message || t("List.bulk_failed"));
     } finally {
+        answered();
         working.value = false;
     }
 }
@@ -394,7 +397,8 @@ async function runUndo() {
     working.value = true;
     try {
         for (const request of requests) {
-            const response = await apiRequest("post", env.V2_TASKS_BULK, { ...request, userData: userData() });
+            const answered = holdOwnBulkLeave(request.action, request.taskIds);
+            const response = await apiRequest("post", env.V2_TASKS_BULK, { ...request, userData: userData() }).finally(answered);
             if (response?.data?.status === false) throw new Error(response.data.statusText);
         }
         $toast.success(t("List.bulk_undone"));
@@ -505,7 +509,7 @@ async function summarise() {
     const ids = [...selection.selectedTaskIds.value];
     const result = await summaries.generateMany(ids);
     if (result.failed && !result.done) $toast.error(t("List.ai_unavailable"));
-    else $toast.success(t("List.ai_summarised", { n: result.done }));
+    else $toast.success(t("List.ai_summarised", { n: result.done }, result.done));
 }
 
 // Pickers and menus close themselves on Esc; the selection stays.

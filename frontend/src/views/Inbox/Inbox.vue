@@ -83,7 +83,7 @@
 
                 <div v-else-if="loadError" class="ibx__state ibx__state--error">
                     {{ loadError }}
-                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="reload">{{ $t('Inbox.retry') }}</button>
+                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="retry">{{ $t('Inbox.retry') }}</button>
                 </div>
 
                 <EmptyState
@@ -100,7 +100,7 @@
                 />
 
                 <template v-else>
-                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" />
+                    <ApprovalQueue v-if="queue.length || applied.length" :proposals="queue" :applied="applied" :stamp="stamp" @decided="onQueueDecided" @undone="onQueueUndone" @open-task="openQueueTask" />
                     <article
                         v-for="(it, i) in rows"
                         :key="rowKey(it)"
@@ -138,7 +138,7 @@
                                 </template>
                             </span>
                             <span v-if="it.agent" class="ah-chip ah-chip--agent ibx__agent">{{ $t('Inbox.agent_tag') }}</span>
-                            <time class="ibx__when" :title="it.createdAt">{{ stamp(it.createdAt) }}</time>
+                            <time class="ibx__when" :datetime="it.createdAt" :title="fullText(it.createdAt)">{{ stamp(it.createdAt) }}</time>
                         </div>
 
                         <div class="ibx__body">
@@ -287,6 +287,7 @@ import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
 import { sendProposalDecision } from '@/composable/agentProposals';
+import { dropProjects, showProjects } from '@/composable/approvedProjects';
 import { decideOne } from './approvalQueue';
 import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
@@ -297,13 +298,16 @@ import { shortcutPrefs } from '@/composable/shortcuts';
 import { onTaskClosed, openTask, overlayState } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { noticeTextOf } from '@/views/Ai/rateAlerts';
 import { escapeHtml } from '@/utils/notificationHtml';
+import { clockText, dayText, fullText } from '@/utils/clockText';
 import { renderNotice } from './renderNotice';
 import { SNOOZE_PRESETS, formatWhen, resolveTimeZone, snoozeTarget, toZonedInput } from './snoozePresets';
 import { laterStorageKey, migrateLegacyLater } from './laterMigration';
 import { wakeTimer } from './snoozeWake';
+import { holdInView, refreshLimit, rowInView, stitchRows } from './refreshInPlace';
 import { loadInboxDensity, saveInboxDensity } from './inboxDensity';
 import ViewDensityControl from '@/views/Projects/components/columns/ViewDensityControl.vue';
 import ApprovalQueue from './ApprovalQueue.vue';
+import { AGENTS_CHANGED_EVENT, PROPOSAL_CHANGE } from '@/views/Ai/agentFeed';
 
 defineOptions({ name: 'InboxPage' });
 
@@ -327,7 +331,8 @@ const route = useRoute();
 const router = useRouter();
 const { t, locale } = useI18n();
 const $toast = useToast();
-const { getters } = useStore();
+const store = useStore();
+const { getters } = store;
 const { changeText } = useCustomComposable();
 const { getUser } = useGetterFunctions();
 const { openRoute } = useHelper();
@@ -404,13 +409,12 @@ const stamp = (iso) => {
     const now = new Date();
     const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
     const days = Math.round((startOf(now) - startOf(d)) / 86400000);
-    if (days <= 0) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    if (days <= 0) return clockText(d);
     if (days < 7) return `${days}d`;
-    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return dayText(d);
 };
 const dateRange = (it) => {
-    const f = (v) => { const d = new Date(v); return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString([], { month: 'short', day: 'numeric' }); };
-    const a = f(it.startDate); const b = f(it.endDate);
+    const a = dayText(it.startDate); const b = dayText(it.endDate);
     return a === b || !b ? a : `${a}–${b}`;
 };
 const ptoLabel = (type) => t(`Pto.types.${type}`, type);
@@ -425,37 +429,81 @@ const loadCounts = async () => {
     } catch (e) { /* badges are decoration */ }
 };
 
-const load = async (append = false) => {
-    if (!append) { loading.value = true; loadError.value = ''; }
+const blank = () => { items.value = []; approvals.value = []; queue.value = []; applied.value = []; };
+
+/* The list read again while it is on screen: the rows, the cursor, the focused row and the scroll stay where they are. */
+const showRefreshed = async (d) => {
+    const onRow = rows.value[cursor.value] ? rowKey(rows.value[cursor.value]) : '';
+    const focusInList = Boolean(listEl.value?.contains(document.activeElement));
+    const anchor = rowInView(listEl.value, '.ibx__card');
+    const fresh = d.items || [];
+    const next = stitchRows(items.value, fresh, rowKey, !!d.hasMore);
+    const keptPastRead = next.length > fresh.length;
+    items.value = next;
+    approvals.value = d.approvals || [];
+    queue.value = d.proposals || [];
+    applied.value = d.applied || [];
+    if (!keptPastRead) hasMore.value = !!d.hasMore;
+    nextSkip.value = keptPastRead ? next.length : (d.nextSkip || 0);
+    const at = onRow ? rows.value.findIndex((row) => rowKey(row) === onRow) : -1;
+    cursor.value = at >= 0 ? at : Math.min(cursor.value, Math.max(0, rows.value.length - 1));
+    await nextTick();
+    holdInView(listEl.value, anchor);
+    if (focusInList && !listEl.value?.contains(document.activeElement) && !overlayState.open) focusCursor();
+};
+
+/* Only the latest read is drawn: one that lands after the person moved to another tab, or after a newer read, is dropped. */
+let loadTurn = 0;
+const load = async (append = false, { inPlace = false, quiet = false } = {}) => {
+    const turn = ++loadTurn;
+    const refreshing = inPlace && !append;
+    if (!append && !refreshing) { loading.value = true; loadError.value = ''; }
     busy.value = true;
+    const refused = (text) => {
+        if (refreshing) {
+            if (!quiet) $toast.error(text, { position: 'top-right' });
+            return;
+        }
+        loadError.value = text;
+        if (!append) blank();
+    };
     try {
         const skip = append ? nextSkip.value : 0;
         const q = new URLSearchParams({ tab: tab.value, kind: tab.value === APPROVAL ? 'all' : kind.value, skip: String(skip), sort: 'newest' });
+        if (refreshing) q.set('limit', String(refreshLimit(items.value.length)));
         const res = await apiRequest('get', `${env.INBOX}?${q.toString()}`);
+        if (turn !== loadTurn) return;
         if (!res?.data?.status) {
-            loadError.value = res?.data?.statusText || t('Inbox.load_failed');
-            if (!append) { items.value = []; approvals.value = []; queue.value = []; applied.value = []; }
+            refused(res?.data?.statusText || t('Inbox.load_failed'));
             return;
         }
         const d = res.data.data || {};
+        if (refreshing) {
+            loadError.value = '';
+            await showRefreshed(d);
+            return;
+        }
         items.value = append ? [...items.value, ...(d.items || [])] : (d.items || []);
         if (!append) { approvals.value = d.approvals || []; queue.value = d.proposals || []; applied.value = d.applied || []; }
         hasMore.value = !!d.hasMore;
         nextSkip.value = d.nextSkip || 0;
         if (!append) cursor.value = 0;
     } catch (e) {
-        loadError.value = e?.message || t('Inbox.load_failed');
-        if (!append) { items.value = []; approvals.value = []; queue.value = []; applied.value = []; }
+        if (turn === loadTurn) refused(e?.message || t('Inbox.load_failed'));
     } finally {
-        loading.value = false;
-        busy.value = false;
+        if (turn === loadTurn) {
+            loading.value = false;
+            busy.value = false;
+        }
     }
 };
 
-const reload = async () => { await Promise.all([load(false), loadCounts()]); };
+/* "Loading…" is for the first read of a tab. Every later read of the same tab is drawn in place. */
+const reload = async ({ quiet = false } = {}) => { await Promise.all([load(false, { inPlace: true, quiet }), loadCounts()]); };
+const retry = async () => { await Promise.all([load(false), loadCounts()]); };
 const loadMore = () => load(true);
-// A reload redraws the list, which would drop a half-made decision in the approval tab; nothing that arrives here changes that tab's rows.
-const refresh = () => (busy.value || tab.value === APPROVAL ? loadCounts() : reload());
+// Nothing that arrives here changes the approval tab's rows, so there only the counts are read.
+const refresh = () => (busy.value || tab.value === APPROVAL ? loadCounts() : reload({ quiet: true }));
 const snoozeWake = wakeTimer(refresh);
 
 // A new arrival moves the per-user counters document; only a rise means a new row.
@@ -472,6 +520,25 @@ watch(liveCounts, (next) => {
     clearTimeout(liveTimer);
     liveTimer = setTimeout(() => { if (!busy.value) refresh(); }, 400);
 }, { immediate: true });
+
+/* A proposal filed or decided moves no counter of the person's, and it changes the approval rows as well as the counts. */
+let proposalTimer = null;
+const onAgentsChanged = (change) => {
+    if (change?.kind !== PROPOSAL_CHANGE) return;
+    clearTimeout(proposalTimer);
+    const readWhenFree = () => {
+        if (busy.value) proposalTimer = setTimeout(readWhenFree, 400);
+        else reload({ quiet: true });
+    };
+    proposalTimer = setTimeout(readWhenFree, 400);
+};
+let agentSocket = null;
+const listenToAgents = (socket) => {
+    agentSocket?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
+    agentSocket = socket && typeof socket.on === 'function' ? socket : null;
+    agentSocket?.on(AGENTS_CHANGED_EVENT, onAgentsChanged);
+};
+watch(() => getters['settings/getSocketInstance'], listenToAgents, { immediate: true });
 
 const syncQuery = () => router.replace({ query: { ...route.query, tab: tab.value, kind: kind.value } }).catch(() => {});
 const switchTab = (next) => {
@@ -823,15 +890,20 @@ const undoApprovals = async (ids) => {
         // eslint-disable-next-line no-await-in-loop
         const result = await decideOne(sendProposalDecision, id, 'undo', {}, t('Inbox.action_failed'));
         if (!result.ok) refused.push(result.error);
+        else if (result.left.length) refused.push(t('Inbox.queue_undo_left', { why: result.left[0] }));
+        if (result.ok) dropProjects(store, result.trashedProjects);
     }
     busy.value = false;
     if (refused.length) $toast.error(refused[0], { position: 'top-right' });
     else $toast.success(t('Inbox.queue_undone'), { position: 'top-right' });
     loadCounts();
 };
-const onQueueDecided = ({ id, verb, undo: canUndo }) => {
+const onQueueDecided = ({ id, verb, undo: canUndo, madeProjects, more }) => {
     queue.value = queue.value.filter((p) => p.proposalId !== id);
     loadCounts();
+    // What an approval left to be made later is back in the queue as rows of its own.
+    if (more) load(false, { inPlace: true, quiet: true });
+    showProjects(store, madeProjects);
     if (verb !== 'approve') { showUndo(t('Inbox.queue_declined')); return; }
     // Approvals made while the bar is still up share one Undo, so approving several is undone together.
     const approved = [...(undo.value?.approved || []), id];
@@ -839,6 +911,7 @@ const onQueueDecided = ({ id, verb, undo: canUndo }) => {
     showUndo(t('Inbox.queue_approved', { n: approved.length }, approved.length), undoIds.length ? () => undoApprovals(undoIds) : null);
     Object.assign(undo.value, { approved, undoIds });
 };
+const openQueueTask = (task) => openTask({ companyId: companyId?.value, projectId: task.projectId, sprintId: task.sprintId, folderId: task.folderId || '', taskId: task.taskId });
 const onQueueUndone = ({ id }) => {
     applied.value = applied.value.filter((p) => p.proposalId !== id);
     $toast.success(t('Inbox.always_undone'), { position: 'top-right' });
@@ -928,6 +1001,8 @@ onUnmounted(() => {
     document.removeEventListener('keydown', onDocumentKey);
     stopOnTaskClosed();
     clearTimeout(liveTimer);
+    clearTimeout(proposalTimer);
+    listenToAgents(null);
     clearTimeout(undoTimer);
     snoozeWake.clear();
 });

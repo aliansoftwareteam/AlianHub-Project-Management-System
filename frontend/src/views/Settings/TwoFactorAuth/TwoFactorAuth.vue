@@ -113,7 +113,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, onMounted } from "vue";
+import { ref, computed, inject, nextTick, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import * as env from "@/config/env";
@@ -188,7 +188,8 @@ async function startEnroll() {
         const res = await apiRequest("post", env.TWO_FA_SETUP, {});
         setupData.value = res?.data?.data || { otpauthUrl: "", qrDataUrl: "", secret: "" };
         step.value = "enrolling";
-        setTimeout(() => focusDigit(0));
+        await nextTick();
+        focusDigit(0);
     } catch (error) {
         $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: "top-right" });
     } finally {

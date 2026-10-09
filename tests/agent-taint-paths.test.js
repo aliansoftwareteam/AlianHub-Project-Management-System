@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -81,7 +82,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.AGENTS, agent());
     mockDb.seed(dbCollections.COMPANIES, { _id: C });
 });
-afterEach(() => { mem.reset(); persistence.useMongo(); delete process.env.AGENT_TAINT_ROUTING; });
+afterEach(() => { mem.reset(); persistence.useMongo(); process.env.AGENT_TAINT_ROUTING = 'off'; });
 
 describe('1. a generic skill that fetches marks the run through fetchPage', () => {
     let listed;
@@ -105,7 +106,7 @@ describe('1. a generic skill that fetches marks the run through fetchPage', () =
     });
 
     it('with the flag off the same run is untouched', async () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         const run = await start();
         await execute(run);
         expect(JSON.stringify(runRow(run._id))).not.toMatch(/taint/i);
@@ -198,7 +199,7 @@ describe('2. a rule-triggered form run', () => {
     });
 
     it('with the flag off the task reaches the run exactly as the event sent it', async () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         const executeSkill = jest.spyOn(runs, 'executeSkill');
         const data = { taskId: TASK._id, ProjectID: 'p1', TaskName: 'Request', submissionId: 'sub1', formId: 'f1' };
         await runAgent.run({ companyId: C, entity: { kind: 'task', id: TASK._id }, config: { agent: 'Reviewer', skill: 'plan' }, context: { runId: 'auto3', ruleId: RULE_ID, ruleName: 'On submit', depth: 0, eventId: 'evt3', eventType: 'form.submitted', task: data } });
@@ -221,13 +222,13 @@ describe('3. an action on a task in another project is outside the run\'s projec
 
     it('the policy compares the target task\'s project, not the run\'s own task', () => {
         const out = policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: OTHER_TASK }, rating: safe, run: tainted, task: TASK, targetProjectId: 'p2' });
-        expect(out).toMatchObject({ decision: 'propose', reason: 'task.comment writes outside the run\'s project; the run read external content (fetch example.com)' });
+        expect(out).toMatchObject({ decision: 'propose', reason: 'task.comment changes something outside the project this run is for; the run read external content (fetch example.com)' });
         expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: TASK._id }, rating: safe, run: tainted, task: TASK, targetProjectId: 'p1' })).toMatchObject({ decision: 'act' });
         expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: OTHER_TASK }, rating: safe, run: { _id: 'r2', projectId: 'p1' }, task: TASK, targetProjectId: 'p2' })).toMatchObject({ decision: 'act' });
     });
 
     it('a target task whose project could not be read counts as outside', () => {
-        expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: OTHER_TASK }, rating: safe, run: tainted, task: TASK, targetProjectId: '' })).toMatchObject({ decision: 'propose', reason: expect.stringContaining('writes outside the run\'s project') });
+        expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: OTHER_TASK }, rating: safe, run: tainted, task: TASK, targetProjectId: '' })).toMatchObject({ decision: 'propose', reason: expect.stringContaining('changes something outside the project this run is for') });
         expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: TASK._id }, rating: safe, run: tainted, task: TASK, targetProjectId: null })).toMatchObject({ decision: 'act' });
         expect(policy.decide({ agent: agent(), action: 'task.comment', params: { taskId: TASK._id }, rating: safe, run: tainted, task: TASK })).toMatchObject({ decision: 'act' });
     });
@@ -240,7 +241,7 @@ describe('3. an action on a task in another project is outside the run\'s projec
         const out = await execute(run);
         expect(out).toMatchObject({ status: 'waiting_approval', outcome: '1 change(s) applied, 2 proposed' });
         expect(runRow(run._id).decisions.map((d) => [d.action, d.decision])).toEqual([['task.comment', 'act'], ['task.comment', 'propose'], ['subtask.create', 'propose']]);
-        expect(runRow(run._id).decisions[1].reason).toBe('task.comment writes outside the run\'s project; the run read external content (file f1)');
+        expect(runRow(run._id).decisions[1].reason).toBe('task.comment changes something outside the project this run is for; the run read external content (file f1)');
         expect(proposals.create).toHaveBeenCalledWith(C, expect.objectContaining({ changes: [expect.objectContaining({ params: expect.objectContaining({ taskId: OTHER_TASK }) }), expect.objectContaining({ action: 'subtask.create' })] }));
     });
 
@@ -256,7 +257,7 @@ describe('3. an action on a task in another project is outside the run\'s projec
     });
 
     it('with the flag off no task is looked up and the change acts as before', async () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         mockDb.seed(SCHEMA_TYPE.TASKS, { _id: oid(OTHER_TASK), ProjectID: 'p2', TaskName: 'Elsewhere' });
         orchestrator.gather.mockResolvedValue({ status: 'gathered', context: { taint: [{ kind: 'file', ref: 'f1' }] } });
         planned([commentOn(OTHER_TASK)]);

@@ -72,6 +72,7 @@ async function setWipLimit(req, res) {
         removeCache('UserProjectData:', true);
         socketEmitter.emit('update', {
             type: 'update',
+            companyId: String(companyId),
             data: updated,
             updatedFields: { taskStatusData: statuses },
             module: 'project',

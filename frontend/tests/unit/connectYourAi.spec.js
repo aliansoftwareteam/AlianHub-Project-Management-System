@@ -103,6 +103,16 @@ describe('the Connect your AI page', () => {
         expect(find(wrapper, 'connect-ai-limit').text()).toContain('ConnectAi.limit');
     });
 
+    it('marks the waiting line with a waiting icon, not an empty gap, and the connected one with the green dot', async () => {
+        const waiting = find(await openPage(), 'connect-ai-sign');
+        expect(waiting.findComponent({ name: 'ShellIcon' }).vm.$attrs.name).toBe('clock');
+        expect(waiting.find('.ah-dot').exists()).toBe(false);
+
+        const connected = find(await openPage({ connected: true, lastSeenAt: '2026-10-01T09:00:00.000Z', via: 'app' }), 'connect-ai-sign');
+        expect(connected.find('.ah-dot--ok').exists()).toBe(true);
+        expect(connected.findComponent({ name: 'ShellIcon' }).exists()).toBe(false);
+    });
+
     it('says connected and offers the first sentence once the person\'s AI has called', async () => {
         const wrapper = await openPage({ connected: true, lastSeenAt: '2026-10-01T09:00:00.000Z', via: 'app' });
         const sign = find(wrapper, 'connect-ai-sign');
@@ -206,6 +216,18 @@ describe('the step at the end of sign-up', () => {
         await find(wrapper, 'connect-ai-skip').trigger('click');
         expect(apiRequestWithoutCompnay).toHaveBeenCalledWith('put', USER_ONBOARDING, { connectAiSkipped: true });
         expect(replace).toHaveBeenCalledWith({ name: 'Home', params: { cid: 'company-1' } });
+    });
+
+    it('offers the team set-up only while the dispatcher is on', async () => {
+        const off = await openPage({}, { welcome: true });
+        expect(find(off, 'connect-ai-blueprint').exists()).toBe(false);
+        off.unmount();
+        route.name = CONNECT_AI_WELCOME_ROUTE;
+        route.meta = { welcome: true, hideHeader: true };
+        apiRequest.mockImplementation((type, url) => answer(String(url).endsWith('/team-packs') ? { on: true, packs: [], companyBlueprints: [] } : STATUS));
+        const on = mount(ConnectYourAi, { global: { components: { RouterLink: LinkStub } } });
+        await flushPromises();
+        expect(find(on, 'connect-ai-blueprint').exists()).toBe(true);
     });
 
     it('offers Skip for now whatever this install has switched on', async () => {

@@ -36,7 +36,6 @@ const COMMENT_EVENTS = ['commentInsert', 'commentUpdate'];
 const OWN_EVENTS = ['userIdNoticationUpdate', 'generalReminderUpdate'];
 const PINGS = {
     goals: 'goalsChanged',
-    folders: 'foldersChanged',
     customFields: 'customFieldsChanged',
     viewTemplates: 'viewTemplatesChanged',
     projectSnapshots: 'projectTemplatesChanged',
@@ -87,6 +86,7 @@ const seedHome = () => {
         privateTask: task(db, project, privateList, { AssigneeUserId: [OWNER] }),
         personalTask: task(db, personal, personalList, { AssigneeUserId: [MEMBER] }),
         conversation: task(db, directSpace, directList, { mainChat: true, AssigneeUserId: [OWNER, ADMIN] }),
+        proposal: db.seed(SCHEMA_TYPE.AGENT_PROPOSALS, { projectId: String(project._id), source: 'mcp', requestedBy: OWNER, status: 'pending', changes: [] }),
     };
 };
 
@@ -193,7 +193,7 @@ const countChanged = (companyId, userId) => socketEmitter.emit('update', { type:
 const reminderChanged = (companyId, userId) => socketEmitter.emit('update', { type: 'update', module: 'generalReminder', companyId, data: { _id: NOTHING, userId, title: 'Call back' } });
 const companyChanged = (companyId) => socketEmitter.emit('update', { type: 'update', module: 'companies', data: { data: { _id: companyId, Cst_CompanyName: 'Renamed' } }, updatedFields: {} });
 const pinged = (companyId, userId) => Object.keys(PINGS).forEach((module) => socketEmitter.emit('update', {
-    type: 'update', module, companyId, data: { kind: 'proposal', userId },
+    type: 'update', module, companyId, data: { kind: 'proposal', userId, proposal: home.proposal },
 }));
 const typing = (socket, prefix) => socket.emit('commentTyping', { roomPrefix: prefix, typing: true });
 const loseSeat = (db, userId) => {
@@ -457,6 +457,19 @@ describe('typing in a thread', () => {
         home.project.AssigneeUserId = [];
         forgetAccess();
         expect(await received(member, 'commentTyping', () => typing(owner, thread))).toEqual([]);
+    });
+
+    it('is carried only from a person who can still open the thread', async () => {
+        const member = await connect({ uid: MEMBER });
+        const owner = await connect({ uid: OWNER });
+        const thread = threadOf(home.project, home.openList, home.openTask);
+        expect(await commentRoom(member, thread)).toBe(true);
+        expect(await commentRoom(owner, thread)).toBe(true);
+        expect(await received(owner, 'commentTyping', () => typing(member, thread))).toEqual([{ roomPrefix: thread, userId: MEMBER, typing: true }]);
+
+        home.project.AssigneeUserId = [];
+        forgetAccess();
+        expect(await received(owner, 'commentTyping', () => typing(member, thread))).toEqual([]);
     });
 
     it('is not carried by a room that is not a thread', async () => {

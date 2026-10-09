@@ -49,6 +49,7 @@
                 </li>
             </ul>
             <div v-if="agentAskNote" class="mc-agent-note" :data-test="`agent-ask-${agentAskState}`">{{ agentAskNote }}</div>
+            <div v-if="askedOwnAi" class="mc-agent-note" data-test="own-ai-asked" :title="$t('AgentChat.asked_own_ai_hint')">{{ askedOwnAiNote }}</div>
 
             <div v-if="actionable" class="mc-msg-acts">
                 <button type="button" class="mc-act" @click="$emit('reply', message)">{{ $t('Chat.reply') }}</button>
@@ -70,7 +71,6 @@
             <MainChatThreadFooter
                 v-if="hasThread"
                 :message="message"
-                :hour12="hour12"
                 @open="$emit('thread', message)"
             />
 
@@ -140,7 +140,7 @@
  */
 import { computed, defineProps, defineEmits, inject, onBeforeUnmount, ref, unref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import moment from 'moment';
+import { clockText } from '@/utils/clockText';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue';
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
 import ReactionBar from '@/components/atom/ReactionBar/ReactionBar.vue';
@@ -150,6 +150,7 @@ import MainChatMessageBody from './MainChatMessageBody.vue';
 import MainChatThreadFooter from './MainChatThreadFooter.vue';
 import { isAgentComment } from '@/utils/commentSide';
 import { AI_MENTION_NAME, aiAuthorOf } from '@/utils/aiMention';
+import { connectedAiNameOf, loadConnectedAiNames } from '@/views/Ai/connectedAiNames';
 
 const props = defineProps({
     message: { type: Object, required: true },
@@ -160,7 +161,6 @@ const props = defineProps({
     senderName: { type: String, default: '' },
     senderSrc: { type: String, default: '' },
     askerName: { type: String, default: '' },
-    hour12: { type: Boolean, default: true },
     // Shown in a thread panel: no thread of its own, and an id that cannot clash with the same message in the conversation.
     inThread: { type: Boolean, default: false },
 });
@@ -216,6 +216,15 @@ const agentAskNote = computed(() => {
     return '';
 });
 
+/* The server sets the mark and takes it off; it names nobody. A member reads the AI's name from the member list;
+ * a guest is given no colleague's AI, so a guest reads that an AI was asked and not whose or which. */
+const askedOwnAi = computed(() => Boolean(props.message.ownAiAsk));
+const askedOwnAiNote = computed(() => {
+    const name = connectedAiNameOf(companyId.value, String(props.message.userId || ''));
+    return name ? t('AgentChat.asked_own_ai', { name }) : t('AgentChat.asked_their_ai');
+});
+watch(askedOwnAi, (asked) => { if (asked) loadConnectedAiNames(companyId.value); }, { immediate: true });
+
 const isAi = computed(() => !!aiAuthorOf(props.message));
 const isAgent = computed(() => isAgentComment(props.message) || !!props.message.agentName || isAi.value);
 const onMySide = computed(() => props.message.sent && !isAgent.value);
@@ -240,11 +249,5 @@ const isEdited = computed(() => {
     return new Date(createdAt).getTime() !== new Date(updatedAt).getTime();
 });
 
-const shortTime = computed(() => {
-    const raw = props.message.createdAt;
-    if (!raw) return '';
-    const date = moment(raw.seconds ? raw.seconds * 1000 : raw);
-    if (!date.isValid()) return '';
-    return date.format(props.hour12 ? 'h:mm A' : 'HH:mm');
-});
+const shortTime = computed(() => clockText(props.message.createdAt));
 </script>

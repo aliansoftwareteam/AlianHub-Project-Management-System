@@ -4,8 +4,10 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const logger = require('../../Config/loggerConfig');
 const HandleHistoryref = require('../Tasks/helpers/helper');
 const { addSprintFun } = require('./controller');
+const { announceList } = require('./helpers/listEvents');
 const rules = require('./scrumRules');
 const { actingUser } = require('./helpers/actingUser');
+const { backlogsIn } = require('./helpers/backlogs');
 
 /**
  * Scrum sprint lifecycle — opt in, start, complete.
@@ -36,7 +38,7 @@ const BACKLOG_NAME = 'Backlog';
 
 // Sprint scope, defined exactly as Modules/Sprints/burndown.js defines it, so
 // the commitment snapshot and the chart can never disagree about what was in.
-const SCOPE_FILTER = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true };
+const SCOPE_FILTER = { deletedStatusKey: { $in: [0, 2, undefined] }, isParentTask: true, mainChat: { $ne: true } };
 const SCOPE_FIELDS = '_id TaskKey TaskName statusType points totalEstimatedTime ProjectID sprintId folderObjId';
 
 const fail = (res, statusText) => res.send({ status: false, statusText });
@@ -57,10 +59,14 @@ const scopeTasks = (companyId, sprintObjId) => MongoDbCrudOpration(companyId, {
     data: [{ sprintId: sprintObjId, ...SCOPE_FILTER }, SCOPE_FIELDS],
 }, 'find');
 
-const patchSprint = (companyId, filter, set) => MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.SPRINTS,
-    data: [filter, { $set: set }, { returnDocument: 'after' }],
-}, 'findOneAndUpdate');
+const patchSprint = async (companyId, filter, set) => {
+    const saved = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS,
+        data: [filter, { $set: set }, { returnDocument: 'after' }],
+    }, 'findOneAndUpdate');
+    if (saved) announceList('update', companyId, saved);
+    return saved;
+};
 
 /* Resolve and vet the sprint every handler operates on. Returns { sprint } or
    { error } with a sentence the UI can show as-is. */
@@ -100,15 +106,6 @@ const totals = (tasks) => {
     return { tasks: snap.tasks, points: snap.points, minutes: snap.minutes };
 };
 
-const backlogsIn = (companyId, projectId) => MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.SPRINTS,
-    data: [{
-        projectId: new mongoose.Types.ObjectId(String(projectId)),
-        isBacklog: true,
-        deletedStatusKey: { $ne: 1 },
-    }, '_id name folderId tasks'],
-}, 'find').catch(() => []);
-
 // An ObjectId leads with its creation time, so the smallest one is the original.
 const oldest = (rows) => (rows || []).slice().sort((a, b) => String(a._id).localeCompare(String(b._id)))[0] || null;
 
@@ -120,11 +117,12 @@ const oldest = (rows) => (rows || []).slice().sort((a, b) => String(a._id).local
 
    Not a Scrum sprint itself (isScrum stays false): it has no time box, so it can
    never be started, completed, or counted in velocity. */
-async function ensureBacklog(companyId, projectId, userData) {
+async function ensureBacklog(companyId, projectId, userData, { readsAlone = false } = {}) {
     if (!OBJECT_ID_PATTERN.test(String(projectId || ''))) return { error: 'A valid projectId is required.' };
 
     const found = oldest(await backlogsIn(companyId, projectId));
     if (found) return { backlog: found };
+    if (readsAlone) return {};
 
     const project = await projectOf(companyId, projectId).catch(() => null);
     if (!project) return { error: 'Project not found.' };
@@ -166,8 +164,9 @@ exports.getBacklog = async (req, res) => {
         const companyId = req.headers['companyid'] || '';
         if (!companyId) return fail(res, 'companyId is required.');
         const body = req.body || {};
-        const { backlog, error } = await ensureBacklog(companyId, body.projectId, await actingUser(req));
+        const { backlog, error } = await ensureBacklog(companyId, body.projectId, await actingUser(req), { readsAlone: Boolean(req.refuseMaking) });
         if (error) return fail(res, error);
+        if (!backlog) return await req.refuseMaking();
         return res.send({ status: true, statusText: 'Backlog ready.', data: backlog });
     } catch (err) {
         logger.error(`getBacklog: ${err.message}`);
@@ -313,6 +312,7 @@ async function planCompletion(companyId, sprint) {
                 ancestors: { $in: doneParentIds.map(String) },
                 statusType: { $ne: rules.DONE_STATUS_TYPE },
                 deletedStatusKey: { $in: [0, 2, undefined] },
+                mainChat: { $ne: true },
             }, `${SCOPE_FIELDS} ParentTaskId`],
         }, 'find').catch(() => []);
     }
@@ -411,7 +411,7 @@ exports.sprintReport = async (req, res) => {
                 .map((id) => new mongoose.Types.ObjectId(id));
             committedTasks = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
-                data: [{ _id: { $in: objectIds }, deletedStatusKey: { $in: [0, 2, undefined] } }, SCOPE_FIELDS],
+                data: [{ _id: { $in: objectIds }, deletedStatusKey: { $in: [0, 2, undefined] }, mainChat: { $ne: true } }, SCOPE_FIELDS],
             }, 'find').catch(() => []);
         } else {
             // Never started, or started before the snapshot existed. The best

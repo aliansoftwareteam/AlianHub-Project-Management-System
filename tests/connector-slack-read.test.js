@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const crypto = require('crypto');
 const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
@@ -542,7 +543,7 @@ describe('with the connector off', () => {
 
     it('named but without taint routing, it stays off', async () => {
         await connect();
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         expect(registry.has(READ)).toBe(false);
         await expect(read()).rejects.toMatchObject({ code: 'connector_off' });
         expect(mockSlack.calls).toHaveLength(0);

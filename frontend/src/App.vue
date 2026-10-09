@@ -73,12 +73,8 @@ import TaskDetailOverlay from '@/components/organisms/TaskDetailOverlay/TaskDeta
 import AgentLiveStrip from '@/views/Ai/AgentLiveStrip.vue'
 import '@/components/organisms/Shell/style.css'
 import CallOverlay from '@/components/organisms/CallOverlay/CallOverlay.vue'
-import CommandPalette from '@/components/molecules/AdvanceSearch/CommandPalette.vue'
-import QuickCreateTask from '@/components/organisms/QuickCreateTask/QuickCreateTask.vue'
 import KeyboardShortcuts from '@/components/organisms/KeyboardShortcuts/KeyboardShortcuts.vue'
 import SkipLink from '@/components/atom/SkipLink/SkipLink.vue'
-import TaskTemplateDialogHost from '@/components/molecules/TaskTemplates/TaskTemplateDialogHost.vue'
-import AiFieldFillDialog from '@/components/molecules/AiFieldFill/AiFieldFillDialog.vue'
 import { PALETTE_OPEN_EVENT, isPaletteShortcut } from '@/components/molecules/AdvanceSearch/paletteKeys'
 import { recordRouteVisit } from '@/components/molecules/RecentVisits/routeVisits'
 import { useStore } from 'vuex';
@@ -100,6 +96,9 @@ import { applyStoredLocale } from '@/locales/main';
 import { warmWorkspaceChunks } from '@/config/warmChunks';
 import {socketHelper} from './composable/socketHelper';
 import { useFieldDefinitionsSync } from '@/plugins/customFieldView/fieldDefinitionsSync';
+import { useAgentChangeNotice } from '@/views/Ai/agentChangeNotice';
+import { useLiveProjects } from '@/views/Projects/liveProjects';
+import { useLiveLists } from '@/views/Projects/liveLists';
 import { apiRequest,apiRequestWithoutCompnay } from './services';
 import OfflineBanner from '@/components/offline/OfflineBanner.vue';
 import OfflineStart from '@/components/offline/OfflineStart.vue';
@@ -109,9 +108,12 @@ import { dropWorkerRuntimeCaches } from '@/serviceWorker/registration';
 import * as env from '@/config/env';
 import {tabSyncHelper} from '@/utils/tabSyncs.js';
 import { adoptAccountPrefs } from '@/views/Settings/Language/localePrefs';
+import { followClockPrefs } from '@/utils/clockText';
+import { CommandPalette, QuickCreateTask, TaskTemplateDialogHost, AiFieldFillDialog } from '@/config/shellParts';
 const AiOffPage = defineAsyncComponent(() => import(/* webpackChunkName: "ai" */ '@/views/Ai/AiOffPage.vue'));
 import { aiAvailability, loadAiAvailability, trackAiPlan } from '@/composable/aiAvailability';
 import { AI_GATE, aiGateFor } from '@/router/ai/gate';
+import { opensWithoutWorkspace } from '@/router/withoutWorkspace';
 const {tabSync} = tabSyncHelper();
 const mainTour = ref();
 
@@ -151,6 +153,10 @@ watch(() => [logged.value, currentCompany.value?._id], ([isLogged, cid]) => {
 
 watch(() => currentCompany.value?.planFeature, trackAiPlan, { immediate: true, deep: true });
 
+watch(() => [currentUser.value?.Time_Format, getters['settings/companyDateFormat']?.dateFormat], ([timeFormat, dateFormat]) => {
+    followClockPrefs({ timeFormat, dateFormat });
+}, { immediate: true });
+
 watch(() => currentUser.value, (val) => {
     if(val?.isVesionUpdate){
         openReleaseNoteModel.value = true;
@@ -161,8 +167,15 @@ watch(() => currentUser.value, (val) => {
 watch(() => getters['settings/rules'], (val) => {
 	rules.value = val;
 })
+// A mail's link opens with no workspace; from any other page a person without one is sent to name it.
+const askForWorkspace = async () => {
+    await router.isReady().catch(() => {});
+    if (!opensWithoutWorkspace(router.currentRoute.value)) router.push({name : 'Create_Company'});
+};
+
 watch(route, (newVal) => {
 	const hasSession = !!localStorage.getItem("userId");
+    if(opensWithoutWorkspace(newVal)) return;
     if(newVal?.name === 'Support'){
         if(hasSession && !companyId.value){
             return router.push({name : 'Create_Company'});
@@ -188,7 +201,7 @@ function checkUserCompany (uid,forDisable = false) {
                         localStorage.removeItem("selectedCompany");
                         commit("settings/mutateSelectedCompany", companyId.value);
                         companyId.value = '';
-                        router.push('/business');
+                        askForWorkspace();
                         return;
                     }else{
                         if(forDisable){
@@ -317,11 +330,11 @@ async function getFirebaseData() {
                         if(findCompany.length > 0){
                             await changeCompany(findCompany[0]._id)
                         }else{
-                            router.push('/business');
+                            askForWorkspace();
                         }
                     }
                 }else{
-                    router.push('/business');
+                    askForWorkspace();
                 }
 
 
@@ -337,13 +350,6 @@ async function getFirebaseData() {
                     logged.value = true;
                     console.error("ERROR in setUsers: ", error);
                 }); 
-                if (getters['ToursData/Tours'] && !(getters['ToursData/Tours'])?.length) {
-                      dispatch('ToursData/getTours',userData.tour)
-                         .catch((error) => {
-                         console.error('ERROR in getTours:', error);
-                         });
-                      } 
-
 
                 if(getters['settings/rules'] && !getters['settings/rules'].length) {
                     dispatch("settings/setRules", companyId.value).then(() => {
@@ -714,6 +720,9 @@ provide("$currentLoggedInUserDetails", '');
 provide("$mainTour", mainTour);
 provide("$socket",socket);
 useFieldDefinitionsSync(socket);
+useAgentChangeNotice(socket, companyId);
+useLiveProjects(socket, companyId);
+useLiveLists(socket, companyId);
 
 </script>
 

@@ -8,7 +8,7 @@
         </DragAndDropDivCompo>
         <div class="d-flex justify-content-between">
             <h3 class="task-details-subtitle m-0"
-                :class="{ 'font-size-16 font-weight-600': clientWidth <= 767, 'font-size-14 font-weight-700': clientWidth > 767 }">
+                :class="{ 'attachments-font-size-16 attachments-font-weight-600': clientWidth <= 767, 'attachments-font-size-14 attachments-font-weight-700': clientWidth > 767 }">
                 {{ $t('Attachments.attachments') }}({{ attachments.length }})
                 <span class="custom-popover position-re pl-5px" v-if="permission === true && clientWidth > 767">
                     <img src="@/assets/images/help_icon.png" alt="">
@@ -17,7 +17,7 @@
             </h3>
             <div class="d-flex align-items-center">
                 <span v-if="props.isMainSpinner === true || isLoadingAttachments"
-                    class="d-block text-right p-1 blue text-decoration-underline font-weight-500 font-size-14 cursor-pointer">
+                    class="d-block text-right p-1 attachments-blue text-decoration-underline attachments-font-weight-500 attachments-font-size-14 cursor-pointer">
                     <Skelaton style="height: 30px;width: 114px;" class="border-radius-6-px mb-5px" />
                 </span>
                 <template v-else>
@@ -30,7 +30,7 @@
                     <button
                         v-if="visibleAttachments.length > 0"
                         type="button"
-                        class="download-all-btn d-block text-right p-1 blue text-decoration-underline font-weight-500 font-size-14 cursor-pointer"
+                        class="download-all-btn d-block text-right p-1 attachments-blue text-decoration-underline attachments-font-weight-500 attachments-font-size-14 cursor-pointer"
                         @click="downloadAllImages()"
                     >{{ $t('Attachments.download_all') }}</button>
                 </template>
@@ -47,7 +47,7 @@
                         <Skelaton style="height: 30px;width: 25px;" class="border-radius-6-px mb-5px" />
                     </div>
                     <label v-else-if="!cloudProviders.length" for="UploadedFile">
-                        <img class="cursor-link cursor-pointer" src="@/assets/images/black_plus.png" />
+                        <img class="cursor-link cursor-pointer" src="@/assets/images/black_plus.png" :alt="$t('Attachments.upload_from_computer')" />
                     </label>
                     <template v-else>
                         <img
@@ -100,7 +100,7 @@
         <div v-else>
             <div class="drag-and-drop-attchement" v-if="visibleAttachments.length === 0">
                 <img :src="draganddropImg" alt="draganddropImg" />{{ $t('Attachments.drop_file') }}
-                <span class="text-decoration-underline blue">{{ $t('Attachments.browse') }}</span>
+                <span class="text-decoration-underline attachments-blue">{{ $t('Attachments.browse') }}</span>
             </div>
             <div class="slider-main p-0" ref="sliderMain" @click="attchmentDivClick">
                 <Attchment v-for="(attachment, index) in visibleAttachments" :key="attachment.id" :data="attachment"
@@ -110,7 +110,7 @@
                 <SpinnerComp is-spinner="isSpinner" v-if="isSpinner && visibleAttachments.length === 0" />
                 <div ref="loadMoreTrigger" class="load-more-trigger"></div>
             </div>
-            <div class="d-block text-right p-1 blue text-decoration-underline font-weight-500 font-size-14 see__all"
+            <div class="d-block text-right p-1 attachments-blue text-decoration-underline attachments-font-weight-500 attachments-font-size-14 see__all"
                 :class="{ 'pt-40px': visibleAttachments.length === 0 }"
                 @click="$emit('seAll', selectedData.ProjectID ? 'task' : 'project')">{{ $t('Attachments.see_all') }}
             </div>
@@ -742,5 +742,26 @@ defineExpose({ pickFromComputer });
     outline: 2px solid #2f3990;
     outline-offset: 2px;
     border-radius: 2px;
+}
+</style>
+
+<style scoped>
+.attachments-blue {
+    color: var(--brand) !important;
+}
+.attachments-font-weight-500 {
+    font-weight: 500 !important;
+}
+.attachments-font-weight-600 {
+    font-weight: 600 !important;
+}
+.attachments-font-weight-700 {
+    font-weight: 700 !important;
+}
+.attachments-font-size-14 {
+    font-size: 14px;
+}
+.attachments-font-size-16 {
+    font-size: 16px;
 }
 </style>

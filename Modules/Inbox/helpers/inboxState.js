@@ -4,6 +4,10 @@ const { SCHEMA_TYPE } = require('../../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../../utils/mongo-handler/mongoQueries');
 const logger = require('../../../Config/loggerConfig');
 const counter = require('../../notification-count/controller');
+const { withoutKept } = require('../../Comments/helpers/agentChatRows');
+
+/* `kept` is what an agent's request leaves alone among the person's rows; nothing for the person's own request. */
+const NOTHING_KEPT = Object.freeze({ notification: {}, mention: {} });
 
 const LOG_PREFIX = '[inbox]';
 const COUNT_FIELD = { notification: 'notification_counts', mention: 'mention_counts' };
@@ -24,6 +28,20 @@ const moveCounter = (companyId, userId, sourceType, delta) => new Promise((resol
         resolve();
     }
 });
+
+/* Lowers the person's stored unread counters to `counts` where they are higher, and tells their open screens. A
+ * counter is never raised here: a row that arrives between the count and this write has already raised it. */
+const settleCounters = async (companyId, userId, counts) => {
+    try {
+        const stored = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.USERID, data: [{ userId }, { notification_counts: 1, mention_counts: 1 }] }, 'findOne');
+        const wanted = Object.fromEntries(Object.entries(COUNT_FIELD).map(([sourceType, field]) => [field, Math.max(0, Number(counts[sourceType]) || 0)]));
+        const moved = Object.entries(wanted).filter(([field, value]) => Math.max(0, Number(stored && stored[field]) || 0) > value);
+        if (!moved.length) return;
+        await new Promise((resolve) => { counter.updateCount(companyId, [userId], { $set: Object.fromEntries(moved) }, resolve); });
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} unread counters not settled: ${e.message}`);
+    }
+};
 
 const write = (companyId, type, method, filter, update) => MongoDbCrudOpration(companyId, { type, data: [filter, update] }, method)
     .then(matchedOf)
@@ -55,11 +73,11 @@ const wakeMentions = async (companyId, userId, filter) => {
 };
 
 /** Brings back the reader's snoozes whose time has come. Run before every Inbox read, so no cron is needed. */
-const wakeDue = async (companyId, userId, now = new Date()) => {
+const wakeDue = async (companyId, userId, now = new Date(), kept = NOTHING_KEPT) => {
     if (!companyId || !userId) return 0;
     const [notifications, mentions] = await Promise.all([
-        wakeNotifications(companyId, userId, { receiverID: userId, snoozedUntil: { $lte: now }, snoozeUntilChange: { $ne: true } }),
-        wakeMentions(companyId, userId, { snoozes: { $elemMatch: { userId, untilChange: { $ne: true }, until: { $lte: now } } } }),
+        wakeNotifications(companyId, userId, withoutKept({ receiverID: userId, snoozedUntil: { $lte: now }, snoozeUntilChange: { $ne: true } }, kept.notification)),
+        wakeMentions(companyId, userId, withoutKept({ snoozes: { $elemMatch: { userId, untilChange: { $ne: true }, until: { $lte: now } } } }, kept.mention)),
     ]);
     return notifications + mentions;
 };
@@ -79,7 +97,7 @@ const earliest = (dates) => dates.filter(Boolean).map((d) => new Date(d)).filter
     .reduce((min, d) => (!min || d < min ? d : min), null);
 
 /** When the reader's next timed snooze falls due, so a client can re-check then instead of polling. */
-const nextWakeAt = async (companyId, userId, now = new Date()) => {
+const nextWakeAt = async (companyId, userId, now = new Date(), kept = NOTHING_KEPT) => {
     if (!companyId || !userId) return null;
     const read = (type, method, data) => MongoDbCrudOpration(companyId, { type, data }, method).catch((e) => {
         logger.error(`${LOG_PREFIX} next wake read on ${type} failed: ${e.message}`);
@@ -88,14 +106,14 @@ const nextWakeAt = async (companyId, userId, now = new Date()) => {
     const due = { $gt: now };
     const [notifications, mentions] = await Promise.all([
         read(SCHEMA_TYPE.NOTIFICATIONS, 'find', [
-            { receiverID: userId, clearedAt: null, snoozeUntilChange: { $ne: true }, snoozedUntil: due },
+            withoutKept({ receiverID: userId, clearedAt: null, snoozeUntilChange: { $ne: true }, snoozedUntil: due }, kept.notification),
             { snoozedUntil: 1 },
             { sort: { snoozedUntil: 1 }, limit: 1 },
         ]),
         // Sorting the documents on snoozes.until would order by any reader's entry, so the
         // reader's own entries are unwound and the earliest taken from those.
         read(SCHEMA_TYPE.MENTIONS, 'aggregate', [[
-            { $match: { mentionIds: userId, snoozes: { $elemMatch: { userId, untilChange: { $ne: true }, until: due } } } },
+            { $match: withoutKept({ mentionIds: userId, snoozes: { $elemMatch: { userId, untilChange: { $ne: true }, until: due } } }, kept.mention) },
             { $unwind: '$snoozes' },
             { $match: { 'snoozes.userId': userId, 'snoozes.untilChange': { $ne: true }, 'snoozes.until': due } },
             { $group: { _id: null, at: { $min: '$snoozes.until' } } },
@@ -107,4 +125,4 @@ const nextWakeAt = async (companyId, userId, now = new Date()) => {
     ]);
 };
 
-module.exports = { matchedOf, moveCounter, write, wakeDue, wakeOnActivity, nextWakeAt };
+module.exports = { matchedOf, moveCounter, settleCounters, write, wakeDue, wakeOnActivity, nextWakeAt };

@@ -23,7 +23,7 @@
                 <article v-for="d in visible" :key="d._id" class="dash__tile" @click="open(d)">
                     <div class="dash__tile-head">
                         <button type="button" class="dash__tile-title dash__tile-open" :title="d.title" @click.stop="open(d)">{{ d.title }}</button>
-                        <span class="dash__tile-count">{{ $t('Dash.n_cards', { n: d.cardCount }) }}</span>
+                        <span class="dash__tile-count">{{ $t('Dash.n_cards', { n: d.cardCount }, d.cardCount) }}</span>
                         <div class="dash__pop-anchor" @click.stop>
                             <button type="button" class="dash__tile-menu" :aria-expanded="menuFor === d._id" :title="$t('Dash.more')" @click="menuFor = menuFor === d._id ? '' : d._id">
                                 <ShellIcon name="dots" :size="14" />
@@ -34,7 +34,7 @@
                                     <button type="button" class="ah-pop__item" role="menuitem" @click="duplicate(d)">{{ $t('Dash.duplicate') }}</button>
                                     <template v-if="d.canEdit">
                                         <div class="ah-pop__sep"></div>
-                                        <button type="button" class="ah-pop__item" role="menuitem" @click="destroy(d)">{{ $t('Dash.delete') }}</button>
+                                        <button type="button" class="ah-pop__item" role="menuitem" @click="askDelete(d)">{{ $t('Dash.delete') }}</button>
                                     </template>
                                 </div>
                             </transition>
@@ -60,12 +60,33 @@
                     </div>
                 </article>
 
+                <EmptyState
+                    v-if="loaded && activeTab === 'shared' && !visible.length"
+                    class="dash__empty"
+                    data-test="dash-empty-shared"
+                    :heading-level="2"
+                    :title="$t('Dash.shared_empty_title')"
+                    :message="$t('Dash.shared_empty_msg')"
+                    :action-label="$t('Dash.shared_empty_action')"
+                    @action="activeTab = 'all'"
+                />
+
                 <button type="button" class="dash__tile dash__tile--template" @click="openCreate('team')">
                     <span class="dash__template-title">{{ $t('Dash.start_from_template') }}</span>
                     <span class="dash__template-text">{{ $t('Dash.template_lede') }}</span>
                 </button>
             </div>
         </div>
+
+        <ConfirmDelete
+            v-if="deleting"
+            :title="$t('Dash.delete_title', { name: deleting.title })"
+            :description="$t('Dash.delete_text')"
+            :confirmLabel="$t('Dash.delete')"
+            :busy="deleteBusy"
+            @confirm="destroy"
+            @cancel="deleting = null"
+        />
 
         <div v-if="createOpen" class="dash__modal" @click.self="createOpen = false">
             <div class="dash__modal-panel">
@@ -107,6 +128,9 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, inject } from 'vue
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import ConfirmDelete from '@/components/atom/ConfirmDelete/ConfirmDelete.vue';
+import { useToast } from 'vue-toast-notification';
 import { CARD_CATALOG, catalogEntry } from '@/plugins/dashboard/cardCatalog';
 import { fetchDashboards, createDashboard, duplicateDashboard, removeDashboard, makeCardUid } from '@/plugins/dashboard/dashboardsApi';
 
@@ -114,6 +138,7 @@ defineOptions({ name: 'DashboardsHub' });
 
 const router = useRouter();
 const { t } = useI18n();
+const $toast = useToast();
 const companyId = inject('$companyId', ref(''));
 
 const tabs = [
@@ -129,6 +154,7 @@ const TEMPLATES = [
 
 const dashboards = ref([]);
 const activeTab = ref('all');
+const loaded = ref(false);
 const error = ref('');
 const menuFor = ref('');
 const createOpen = ref(false);
@@ -242,13 +268,28 @@ const duplicate = async (d) => {
     }
 };
 
-const destroy = async (d) => {
+const deleting = ref(null);
+const deleteBusy = ref(false);
+
+const askDelete = (d) => {
     menuFor.value = '';
+    deleting.value = d;
+};
+
+const destroy = async () => {
+    const d = deleting.value;
+    if (!d || deleteBusy.value) return;
+    deleteBusy.value = true;
     try {
         await removeDashboard(d._id);
         dashboards.value = dashboards.value.filter((x) => x._id !== d._id);
+        deleting.value = null;
+        $toast.success(t('Dash.deleted', { name: d.title }), { position: 'top-right' });
     } catch (e) {
-        error.value = t('Dash.save_failed');
+        deleting.value = null;
+        $toast.error(t('Dash.delete_failed'), { position: 'top-right' });
+    } finally {
+        deleteBusy.value = false;
     }
 };
 
@@ -260,6 +301,8 @@ onMounted(async () => {
         dashboards.value = await fetchDashboards();
     } catch (e) {
         error.value = t('Dash.load_failed');
+    } finally {
+        loaded.value = true;
     }
 });
 onBeforeUnmount(() => document.removeEventListener('click', closeMenus));

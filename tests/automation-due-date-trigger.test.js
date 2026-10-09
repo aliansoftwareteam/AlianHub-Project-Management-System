@@ -84,6 +84,16 @@ describe('a due date that passes while the task is open', () => {
         expect(new Date(stored(task).dueDatePassedFor).getTime()).toBe(task.DueDate.getTime());
     });
 
+    it('names no limits of a token, whatever request the scan happens to run in', async () => {
+        seedRule();
+        const task = seedTask();
+        const token = { userId: '6f0000000000000000000011', projectIds: [PROJECT] };
+        await require('../Config/tokenNarrowing').runNarrowed(token, () => tick());
+
+        expect(firedFor(task)).toHaveLength(1);
+        expect('narrowing' in firedFor(task)[0]).toBe(false);
+    });
+
     it('matches a rule on that trigger', async () => {
         const rule = seedRule();
         seedTask();

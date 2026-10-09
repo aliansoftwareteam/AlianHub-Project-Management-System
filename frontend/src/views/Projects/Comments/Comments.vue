@@ -62,7 +62,7 @@
                         :showDay="data.showDifference"
                         :showUser="showUserInfo(data, messages[index - 1])"
                         :showMessageTime="showMessageTime(data, messages[index - 1])"
-                        :showUnread="unreadMessages !== 0 && index === (messages.length - (unreadMessages)) ? unreadMessages : 0"
+                        :showUnread="unreadDivider !== 0 && index === (messages.length - (unreadDivider)) ? unreadDivider : 0"
                         :class="{'mb-1': (index === messages.length - 1)}"
 
                         :mainChat="mainChat"
@@ -220,6 +220,7 @@
 </template>
 
 <script setup>
+import { defaultStatus } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 // PACKAGES
 import { defineComponent, nextTick, onMounted, ref, defineProps, inject, watch, computed, onBeforeUnmount } from "vue";
 import { dbCollections } from "@/utils/Collections";
@@ -253,7 +254,9 @@ import { ROLE_ADMIN } from "@/utils/roles";
 import { isOnViewerSide } from "@/utils/commentSide";
 import CommentThread from "@/components/molecules/CommentThread/CommentThread.vue";
 import { applyCommentEvent, isTaskThread } from "@/composable/commentThreads";
-import { fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
+import { placeOfIncoming } from "./incomingComment";
+import { readsOnOpen, dividerAfterCount } from "./unreadOnOpen";
+import { fetchOwnAi, fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
 import { maskOf } from "@/utils/iconMask";
 
 const { t } = useI18n();
@@ -461,16 +464,17 @@ const mentionAgents = ref([]);
 /* Only a task's own thread gives an agent something to work on; chat and project threads do not. */
 watch(() => [props.taskId, props.mainChat, props.newChat], async ([taskId]) => {
     const onTask = !props.mainChat && !props.newChat && /^[0-9a-fA-F]{24}$/.test(String(taskId || ""));
-    const agents = onTask ? await fetchRunnableAgents(taskId) : [];
+    const agents = onTask ? (await Promise.all([fetchRunnableAgents(taskId), fetchOwnAi(taskId)])).flat() : [];
     if (taskId === props.taskId) mentionAgents.value = agents;
 }, { immediate: true });
 const unreadMessages = ref(0);
+const unreadDivider = ref(0);
 let debounceTimeout;
-const countGetter = computed(() => {
-    return getters["users/myCounts"]?.data?.[`${props.taskId ? "task" : "project"}_${projectData.value._id}${props.taskId ? `_${props.sprintId}_${props.taskId}` : ``}_comments`] || 0
-})
-watch(countGetter, (val) => {
+const countKey = computed(() => `${props.taskId ? "task" : "project"}_${projectData.value._id}${props.taskId ? `_${props.sprintId}_${props.taskId}` : ``}_comments`)
+const countGetter = computed(() => getters["users/myCounts"]?.data?.[countKey.value] || 0)
+watch([countKey, countGetter], ([key, val], [oldKey] = []) => {
     unreadMessages.value = val;
+    unreadDivider.value = dividerAfterCount({ divider: unreadDivider.value, count: val, threadChanged: key !== oldKey });
 }, {immediate: true})
 const userCommentCount = computed(() => {
     return  getters["users/myCounts"]?.data || {}
@@ -718,6 +722,15 @@ watch([loadingChat, clientWidth], ([loading]) => {
     }
 })
 
+watch([loadingChat, countKey], ([loading]) => {
+    if(loading) return;
+    setTimeout(() => {
+        if(readsOnOpen({ taskId: props.taskId, mainChat: props.mainChat, newChat: props.newChat, unread: unreadMessages.value })) {
+            updateCount(true, 0);
+        }
+    })
+}, {immediate: true})
+
 watch(() => props.userIds, () => {
     setUsers();
 })
@@ -813,6 +826,7 @@ function watchScroll(e) {
 }
 
 function watchClick(e) {
+    if(!unreadMessages.value) unreadDivider.value = 0;
     if(unreadMessages.value && document.hasFocus()) {
         e.preventDefault();
 
@@ -1032,7 +1046,7 @@ function addToCheckList(msg) {
         }
         let localUpdateArray = [...new Set([...JSON.parse(JSON.stringify(props.checklistArray)) || [], ...updateObj])];
 
-        taskClass.updateChecklistsv2({localUpdateArray:localUpdateArray,data:updateObj, projectId:projectData.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: {folderObjId:props.folderId,sprintId:props.sprintId}}).then(()=>{
+        taskClass.updateChecklistsv2({localUpdateArray:localUpdateArray,data:updateObj, projectId:projectData.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: {folderObjId:props.folderId,sprintId:props.sprintId,checklistArray:props.checklistArray}}).then(()=>{
             $toast.success(t('Toast.Item_added_to_checklist'), {position: 'top-right'})
         }).catch((error) => {
             console.error("ERROR in delete: ", error.message);
@@ -1149,7 +1163,7 @@ function saveTask() {
                                 sprintObj.folderName = formData.value.selectedSprint.value.folderName;
                             }
         
-                            let status = projectData.value.taskStatusData.find((x) => x.type === "default_active");
+                            let status = defaultStatus(projectData.value);
         
                             const obj = {
                                 'TaskName': name,
@@ -1294,19 +1308,6 @@ function getMessages() {
     handleSocketData();
 }
 
-function getMessageId(data = {}) {
-    return data?._id ? String(data._id) : (data?.id ? String(data.id) : "");
-}
-
-function findMessageIndexById(data = {}) {
-    const messageId = getMessageId(data);
-    if(!messageId) return -1;
-
-    return messages.value.findIndex((message) => {
-        return getMessageId(message) === messageId || (message._id && String(message._id) === messageId);
-    });
-}
-
 function decorateIncomingMessage(docData) {
     const obj = {...docData, sent: isOnViewerSide(docData, userId.value)};
     const messageText = obj.message || "";
@@ -1326,24 +1327,14 @@ function upsertIncomingComment(docData, {replaceSending = false, incrementTotal 
     if(!docData) return false;
 
     const obj = decorateIncomingMessage(docData);
-    const existingIndex = findMessageIndexById(obj);
-    if(existingIndex > -1) {
-        messages.value[existingIndex] = {...messages.value[existingIndex], ...obj};
+    const place = placeOfIncoming(messages.value, obj, {replaceSending});
+    if(place.kind === "existing") {
+        messages.value[place.index] = {...messages.value[place.index], ...obj};
         return false;
     }
-
-    if(replaceSending) {
-        let type = "";
-        let name = "";
-        if(docData.mediaURL && docData.mediaURL.length) {
-            type = docData.type;
-            name = docData.mediaName;
-        }
-        const sendingIndex = messages.value.findIndex((x) => (x.isSending && x.type === type && x.mediaName === name));
-        if(sendingIndex > -1){
-            messages.value[sendingIndex] = obj;
-            return false;
-        }
+    if(place.kind === "pending") {
+        messages.value[place.index] = obj;
+        return false;
     }
 
     if(shouldShowDateDivider(obj)) {
@@ -2054,8 +2045,8 @@ async function sendMessageFun(messageData,isReset = true) {
                         getMessages();
                     }
 
-                    // SET COUNT TO ZERO
                     resetUnread.value = true;
+                    unreadDivider.value = 0;
                     updateCount(true, 0);
 
                     if (edited) {

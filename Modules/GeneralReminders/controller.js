@@ -10,10 +10,14 @@ const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { normalizeNotifyBefore, computeNotifyAt, DONT_NOTIFY } = require('./generalReminderRules');
 const queue = require('./queue');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { nonMembersOf } = require('../../Config/companyMembers');
+const { visibleProjectIds } = require('../Agents/scope');
 
 const LOG_PREFIX = '[general-reminders]';
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
-const ACTIVE_MEMBER_STATUS = 2;
+const NOT_A_MEMBER = 'A reminder can only be assigned to an active member of this company';
+const NO_SHARED_PROJECT = 'You can set a reminder for someone you share a project with. An owner or admin can set one for anyone.';
 
 const isObjectId = (value) => OBJECT_ID_PATTERN.test(String(value || ''));
 const fail = (res, code, statusText) => res.status(code).send({ status: false, statusText });
@@ -28,13 +32,15 @@ function emitReminderChange(companyId, type, data) {
     }
 }
 
-async function isActiveMember(companyId, userId) {
-    if (!isObjectId(userId)) return false;
-    const member = await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.COMPANY_USERS,
-        data: [{ userId: String(userId), status: ACTIVE_MEMBER_STATUS }],
-    }, 'findOne');
-    return Boolean(member);
+/* A reminder for someone else is mailed to them, so it is set by an owner or admin, or by someone who can
+ * open a project the named person can open too. Answers the refusal, or null when `uid` may name `otherId`. */
+async function refusalToRemind(companyId, uid, otherId) {
+    if (String(otherId) === String(uid)) return null;
+    if ((await nonMembersOf(companyId, [otherId])).length) return { code: 400, statusText: NOT_A_MEMBER };
+    if (isPrivileged(await getRoleType(companyId, uid))) return null;
+    const [mine, theirs] = await Promise.all([visibleProjectIds(companyId, uid), visibleProjectIds(companyId, otherId)]);
+    const shared = new Set(mine);
+    return theirs.some((id) => shared.has(id)) ? null : { code: 403, statusText: NO_SHARED_PROJECT };
 }
 
 // The author still sees a reminder raised for someone else under ?filter=assigned,
@@ -61,16 +67,25 @@ async function loadOwnReminder(req, res) {
     return reminder;
 }
 
+/* A reminder mails its files, so a file is one its person uploaded for a reminder (the upload names the folder
+ * Reminders/<company>/<person>/), or one the reminder already holds. A key of anything kept elsewhere is left out. */
+const uploadedBy = (companyId, uid) => {
+    const folder = `Reminders/${companyId}/${uid}/`;
+    return (key) => key.startsWith(folder) && !key.slice(folder.length).includes('/') && !key.includes('..');
+};
+
 // Keep only the attachment fields we understand, so an arbitrary payload can't
 // be persisted wholesale into the document.
-function sanitizeAttachments(list) {
+function sanitizeAttachments(list, { companyId, uid, held = [] }) {
     if (!Array.isArray(list)) return [];
+    const own = uploadedBy(String(companyId), String(uid));
+    const kept = new Set(held.map((a) => String((a && a.url) || '')).filter(Boolean));
     return list.slice(0, 20).map((a) => ({
         name: a && a.name ? String(a.name) : '',
         url: a && a.url ? String(a.url) : '',
         extension: a && a.extension ? String(a.extension) : '',
         size: a && Number.isFinite(Number(a.size)) ? Number(a.size) : 0,
-    })).filter((a) => a.name || a.url);
+    })).filter((a) => a.url && (own(a.url) || kept.has(a.url)));
 }
 
 exports.createReminder = async (req, res) => {
@@ -92,9 +107,8 @@ exports.createReminder = async (req, res) => {
         if (Number.isNaN(when.getTime())) {
             return fail(res, 400, 'remindAt is not a valid date');
         }
-        if (b.assignedTo && !(await isActiveMember(companyId, b.assignedTo))) {
-            return fail(res, 400, 'A reminder can only be assigned to an active member of this company');
-        }
+        const refusal = b.assignedTo ? await refusalToRemind(companyId, userId, b.assignedTo) : null;
+        if (refusal) return fail(res, refusal.code, refusal.statusText);
         const notifyBefore = normalizeNotifyBefore(b.notifyBefore);
         const doc = {
             _id: new mongoose.Types.ObjectId(),
@@ -106,7 +120,7 @@ exports.createReminder = async (req, res) => {
             remindAt: when,
             notifyBefore,
             notifyAt: computeNotifyAt(when, notifyBefore),
-            attachments: sanitizeAttachments(b.attachments),
+            attachments: sanitizeAttachments(b.attachments, { companyId, uid: userId }),
             fired: false,
             isDone: false,
             deletedStatusKey: 0,
@@ -166,11 +180,10 @@ exports.updateReminder = async (req, res) => {
             patch.title = title;
         }
         if (b.description !== undefined) patch.description = String(b.description);
-        if (b.attachments !== undefined) patch.attachments = sanitizeAttachments(b.attachments);
+        if (b.attachments !== undefined) patch.attachments = sanitizeAttachments(b.attachments, { companyId, uid: userId, held: existing.attachments || [] });
         if (b.assignedTo) {
-            if (!(await isActiveMember(companyId, b.assignedTo))) {
-                return fail(res, 400, 'A reminder can only be assigned to an active member of this company');
-            }
+            const refusal = await refusalToRemind(companyId, userId, b.assignedTo);
+            if (refusal) return fail(res, refusal.code, refusal.statusText);
             patch.userId = String(b.assignedTo);
         }
         if (b.isDone !== undefined) {

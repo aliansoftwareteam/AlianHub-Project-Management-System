@@ -2,7 +2,9 @@ const runs = require('../Agents/runs');
 const proposals = require('../Agents/proposals');
 const actions = require('../Agents/actions');
 const tools = require('../Automations/engine/tools');
+const writerLimits = require('../../event/writerLimits');
 const store = require('./store');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 
 // The agent runner behind the `agent_run` step type.
 //
@@ -69,10 +71,18 @@ const agentFor = async (companyId, run, step) => {
     return { agentId: String(agentId), agent: (await runs.getAgent(companyId, agentId)) || null };
 };
 
+/* A new run is started on a task its starter can open, and never on a conversation; either reads like a task
+ * that is not there. A run with no person behind it, a rule's, is held by the agent's own scope below. */
+const openTaskFor = async (companyId, taskId, startedBy) => {
+    const task = await taskFor(companyId, taskId);
+    if (task.mainChat === true || (startedBy && !(await canReadTask(companyId, String(startedBy), task)))) throw permanent(`task ${taskId} was not found`);
+    return task;
+};
+
 const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, skill, note, spendCapUsd, budgetUsd, startedBy, traceId, depth }) => {
     const agent = await runs.getAgent(companyId, agentId);
     if (!agent) throw permanent(`agent ${agentId} was not found`);
-    const task = await taskFor(companyId, taskId);
+    const task = await openTaskFor(companyId, taskId, startedBy);
     if (agent.projectIds && agent.projectIds.length && !agent.projectIds.includes(String(task.ProjectID))) {
         throw permanent(`agent ${agent.name} is not scoped to project ${task.ProjectID}`);
     }
@@ -80,7 +90,7 @@ const startFor = async (companyId, { workflowRunId, stepId, agentId, taskId, ski
     // so the step fails with the reason rather than spending its attempts on it.
     // `depth` is the workflow's own re-entry count, checked by the same guard a
     // rule-started run is checked by — one counter, not a second one.
-    const check = await runs.canStart(agent, { trigger: TRIGGER, companyId, depth });
+    const check = await runs.canStart(agent, { trigger: TRIGGER, companyId, depth, projectId: task.ProjectID });
     if (!check.ok) throw permanent(check.reason);
     const { run } = await runs.start(companyId, {
         agent,
@@ -125,7 +135,7 @@ const executeAgentRun = async (companyId, agentRun, { stepCredential = null } = 
     if (!agent) throw permanent(`agent ${agentRun.agentId} was not found`);
     const task = await taskFor(companyId, agentRun.taskId);
     const actor = actorFor(agentRun, agent, stepCredential);
-    const state = await runs.executeSkill(companyId, agentRun, agent, task, { proposals, actions, actor });
+    const state = await writerLimits.underItsStartersLimits(agentRun, () => runs.executeSkill(companyId, agentRun, agent, task, { proposals, actions, actor }));
     const finished = (await runs.get(companyId, agentRun._id)) || agentRun;
     if (state.status === runs.STATUS.FAILED) throw permanent(`agent run ${agentRun._id} failed: ${state.error || state.outcome || 'no reason given'}`);
     if (state.status === runs.STATUS.STOPPED || state.status === 'abandoned') throw permanent(`agent run ${agentRun._id} was stopped`);

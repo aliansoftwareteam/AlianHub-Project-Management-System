@@ -4,7 +4,7 @@
             <template v-if="projects?.length && projectData && !isFilterHasData">
                 <template v-if="isRuleData === false ? checkPermission('task.task_list',projectData.isGlobalPermission) !== null && !projectData.isRestrict : !projectData.isRestrict">
                     <ProjectTreePanel />
-                    <div class="section-right bg-white position-re">
+                    <div class="section-right projects-bg-white position-re">
                         <ProjectHeader
                             ref="projectHeader"
                             :project="projectData"
@@ -12,6 +12,9 @@
                             :sprint="headerSprint"
                             :folders="headerFolders"
                             :agentSummary="agentSummary"
+                            :agentsAtWork="agentWorkCountIn(projectData?._id)"
+                            :agentsPaused="projectData?.agentLimits?.paused === true"
+                            @show-agent-work="setAgentWorking(true)"
                             :showAiAssist="canAiAssist"
                             :showAddTask="canAddTask"
                             @select-project="selectProject({ _id: $event }, true)"
@@ -47,7 +50,7 @@
                                                 'type':projectName.type,
                                                 'event':$event.event})"
                                             />
-                                            <div class="red position-ab z-index-1 font-size-11 text-nowrap project__name-error">{{ projectName.error }}</div>
+                                            <div class="projects-red position-ab z-index-1 projects-font-size-11 text-nowrap project__name-error">{{ projectName.error }}</div>
                                         </div>
 
                                         <div v-if="clientWidth <= 767" class="d-flex align-items-center">
@@ -65,7 +68,7 @@
                                                         :ref="projectView"
                                                     >
                                                         <img :src="publicIcon" v-if="!projectData.isPrivateSpace" class="pr-10px vertical-middle" alt="public-folder"/>
-                                                        <span class="font-size-14 text-ellipsis d-inline-block gray81 project__requirement">
+                                                        <span class="projects-font-size-14 text-ellipsis d-inline-block project__requirement">
                                                             <span v-if="activeTab !== 'EmbedView' && projectComponentsIcons(activeTab)?.icon" class="ah-mask-icon phone-view__icon mr-5px" :style="maskOf(projectComponentsIcons(activeTab).icon)" aria-hidden="true"></span>
                                                             <img v-else-if="activeTab === 'EmbedView' && icons[selectedEmbedView?.type]" :src="icons[selectedEmbedView.type]" alt="" class="mr-5px">
                                                             {{activeTab !== 'EmbedView' ? (shownView?.title || viewLabel(shownView?.name)) : embedViewName || "N/A"}}
@@ -86,12 +89,12 @@
                                                                     <span v-if="projectComponentsIcons(view?.keyName)?.icon" class="ah-mask-icon" :style="maskOf(projectComponentsIcons(view.keyName).icon)" aria-hidden="true"></span>
                                                                     <img v-else-if="icons?.[view?.type]" :src="icons[view.type]" alt="" class="mr-0">
                                                                 </span>
-                                                                <span class="font-size-16 font-weight-500 text-ellipsis d-inline-block mw-66" @click="handleViewName(view.name)">{{ view.title || viewLabel(view.name) }}</span>
+                                                                <span class="projects-font-size-16 projects-font-weight-500 text-ellipsis d-inline-block mw-66" @click="handleViewName(view.name)">{{ view.title || viewLabel(view.name) }}</span>
                                                                 <span v-if="view.isPrivate" class="phone-view__mark" role="img" :aria-label="$t('Projects.private_view')" :title="$t('Projects.private_view')">
                                                                     <ShellIcon name="lock" :size="13" />
                                                                 </span>
                                                             </div>
-                                                            <span v-if="view.setAsDefault" class="mobile-defaultview-text font-size-12 font-weight-400">
+                                                            <span v-if="view.setAsDefault" class="mobile-defaultview-text projects-font-size-12 projects-font-weight-400">
                                                                 <ShellIcon name="home" :size="12" />
                                                                 {{ $t('Projects.default_view') }}
                                                             </span>
@@ -99,7 +102,7 @@
                                                         </div>
                                                     </DropDownOption>
                                                     <DropDownOption class="position-sti border d-flex justify-content-center addview__dropdown" @click="$refs[projectView].click(), $refs.bottomModals.openAllViews()">
-                                                        <div class="addview__label font-size-18 font-weight-700">
+                                                        <div class="addview__label projects-font-size-18 projects-font-weight-700">
                                                             + {{ $t('Projects.add_view') }}
                                                         </div>
                                                     </DropDownOption>
@@ -108,7 +111,7 @@
                                         </div>
                                     </div>
                                     <div class="key-wapper" v-if="clientWidth > 767">
-                                        <span class="text-ellipsis border-left font-size-13 text-uppercase key-text pl-11px pr-10px GunPowder" :title="projectData.ProjectCode">
+                                        <span class="text-ellipsis border-left projects-font-size-13 text-uppercase key-text pl-11px pr-10px GunPowder" :title="projectData.ProjectCode">
                                             {{ projectData?.ProjectCode }}
                                         </span>
                                     </div>
@@ -134,7 +137,7 @@
                                                     <template #button>
                                                         <div class="d-flex p9x-13px" ref="project_tabs_components" :class="{'bg-light-gray':activeTab == 'EmbedView'}">
                                                             <img :src="!selectedEmbedView ? icons[embedViews[0].type] : icons[selectedEmbedView.type]" alt="" class="list_make_as_defaultimg">
-                                                            <span class="font-size-14 text-ellipsis gray81 mw-50 ml-10px">{{!selectedEmbedView ? embedViews[0].name : selectedEmbedView.name}}</span>
+                                                            <span class="projects-font-size-14 text-ellipsis gray81 mw-50 ml-10px">{{!selectedEmbedView ? embedViews[0].name : selectedEmbedView.name}}</span>
                                                             <div class="view-count">
                                                                 {{ (embedViews).length }}
                                                                 <img :src="whiteDownArrow" alt="" class="ml-2px">
@@ -153,7 +156,7 @@
                                                                 </div>
                                                                 <div v-if="element.id != renameValue.id" class="d-flex align-items-center p5x-0px" @click.stop="">
                                                                     <img :src="require('@/assets/images/svg/active-pin.svg')" v-if="element?.isPin && element.isPin" class="ml-10px active__pin-img">
-                                                                    <span class="notification-tick blinking position-sti ml-7px" v-if="element?.isPrivate"></span>
+                                                                    <span class="projects-notification-tick blinking position-sti ml-7px" v-if="element?.isPrivate"></span>
                                                                     <DropDown mode="menu" :id="`${Uid}_${index}`">
                                                                         <template #button>
                                                                             <img :src="threedots" :ref="Uid" :alt="$t('Projects.embed_view_actions')" class="vertical-middle"/>
@@ -171,7 +174,7 @@
                                                                                     </li>
                                                                                     <li class="embed-edit-options cursor-pointer" role="menuitem" tabindex="-1" @click.stop="openDelete = {flag:true,data:element},$refs[Uid][index].click(),$refs.project_tabs_components.click()">
                                                                                         <img :src="deleteImage" alt="" class="inner-tagedit-list-item embed__options"/>
-                                                                                        <span class="red">{{ $t('Projects.delete') }}</span>
+                                                                                        <span class="projects-red">{{ $t('Projects.delete') }}</span>
                                                                                     </li>
                                                                                 </ul>
                                                                             </div>
@@ -224,7 +227,7 @@
                             />
                             </template>
                         </ProjectHeader>
-                        <div v-if="showLoader" class="d-flex box-shadow-6 position-fi z-index-10 right-22px bottom-22px bg-white p-10px border-radius-5-px align-items-center">
+                        <div v-if="showLoader" class="d-flex box-shadow-6 position-fi z-index-10 right-22px bottom-22px projects-bg-white p-10px border-radius-5-px align-items-center">
                             <div class="progress-container d-flex align-items-center position-re">
                                 <div class="progress-circle" :style="circleStyle">
                                     <span class="progress-text">{{ currentProgress }}%</span>
@@ -234,7 +237,7 @@
                                 <span>{{ $t('importTaskButton.import_processing') }}</span>
                             </div>
                         </div>
-                        <div :class="['list-view-body', TOKEN_BODY_TABS.includes(activeTab) ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
+                        <div :class="['list-view-body', bodyOnTokens ? 'list-view-body--detail' : 'bg-light-gray', (clientWidth <= 767 && activeTab === 'ProjectDetail') ? 'overflow-auto' : '',
                                 {
                                 'd-flex': activeTab !== 'ProjectListView' &&
                                             activeTab !== 'Calendar' &&
@@ -269,6 +272,7 @@
                                 v-model:taskDescriptionSearch="taskDescriptionSearch"
                                 :filterUsers="filterUsers"
                                 :doneBy="doneBy"
+                                :agentWorking="agentWorking"
                                 v-model:userSidebar="userSidebar"
                                 v-model:collapsed="collapsed"
                                 :groupBy="shownGroupBy"
@@ -287,6 +291,7 @@
                                 @toggleSearch="toggleSearch"
                                 @manageFilterUsers="manageFilterUsers"
                                 @update:doneBy="setDoneBy"
+                                @update:agentWorking="setAgentWorking"
                                 @changeAssignee="(type, $event) => changeAssignee(type, $event)"
                                 @openAi="openAiSidebar = true"
                                 @openAiAssist="openAiTaskCreator()"
@@ -309,12 +314,22 @@
                             />
                             <!-- AI Assist (AHE-3777): project-level AI task generation, opened from the toolbar. -->
                             <AiTaskCreator v-if="projectData && projectData._id" v-model="showAiTaskCreator" :projectId="String(projectData._id)" :sprints="aiSprints" :activeSprintId="aiActiveSprintId" @done="onAiTasksCreated" />
+                            <ArchivedLists v-if="showArchived && archivedLists.length" :project="projectData" :lists="archivedLists" />
+                            <FolderGoneState v-if="folderGone" :project="projectData" @open="openProjectOfGoneFolder" />
                             <FolderEmptyState
-                                v-if="folderWithNoLists"
+                                v-else-if="folderWithNoLists"
                                 :project="projectData"
                                 :folders="projectData.sprintsfolders"
                                 :folder="folderWithNoLists"
                                 @create="newInProject?.start('sprint')"
+                            />
+                            <EmptyState
+                                v-else-if="searchFailed"
+                                role="alert"
+                                :title="$t('Projects.search_failed_title')"
+                                :message="$t('Projects.search_failed_msg')"
+                                :actionLabel="$t('Projects.search_try_again')"
+                                @action="searchMongoDB"
                             />
                             <component
                                 v-else-if="(clientWidth <= 767 && isVisible == true && isRuleData == false) || (clientWidth > 767 && isRuleData == false)"
@@ -346,7 +361,7 @@
                             <div>
                                 <div>
                                     <img src="@/assets/images/Frame.png" alt="fram_img"/>
-                                    <h3 class="font-size-22 font-weight-700 text-center line-height-33 black">
+                                    <h3 class="projects-font-size-22 projects-font-weight-700 text-center projects-line-height-33 black">
                                         {{ $t('Projects.archived_notice') }}
                                     </h3>
                                 </div>
@@ -375,7 +390,7 @@
                 </template>
                 <template v-else>
                     <template v-if="projectData?.isRestrict === true">
-                        <div class="section-right bg-white" :class="[{'position-re': projectData?.isRestrict === true}]">
+                        <div class="section-right projects-bg-white" :class="[{'position-re': projectData?.isRestrict === true}]">
                             <UpgradYourPlanComponent
                                 v-if="projectData?.isRestrict === true"
                                 :buttonText="$t('Upgrades.upgrade_your_plan')"
@@ -491,6 +506,7 @@ import ProjectTreePanel from './components/ProjectTreePanel.vue';
 import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
 import NewInProjectMenu from './components/NewInProjectMenu.vue';
 import ProjectFiltersToolbar from './components/ProjectFiltersToolbar.vue';
+import { agentWorkCountIn } from './composables/agentWork';
 import SavedViewBar from './components/SavedViewBar.vue';
 import { useProjectAgents } from './Kanban/useProjectAgents';
 import AiTaskCreator from '@/components/organisms/AiTaskCreator/AiTaskCreator.vue';
@@ -498,9 +514,12 @@ import ProjectSidebars from './components/ProjectSidebars.vue';
 import ProjectBottomModals from './components/ProjectBottomModals.vue';
 import ProjectEmptyState from './components/ProjectEmptyState.vue';
 import FolderEmptyState from './components/FolderEmptyState.vue';
+import ArchivedLists from './components/ArchivedLists.vue';
+import FolderGoneState from './components/FolderGoneState.vue';
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
 import { useProjectCalendar } from './composables/useProjectCalendar';
 import { useProjectRules } from './composables/useProjectRules';
-import { folderSprintList, folderWithoutLists, headerLocation, projectSprintList } from './folderSprints';
+import { archivedListsIn, folderIsGone, folderSprintList, folderWithoutLists, headerLocation, movedListRoute, projectSprintList } from './folderSprints';
 import { folderPathLabel, isLiveFolder } from '@/utils/folderTree';
 import { useProjectNameEdit } from './composables/useProjectNameEdit';
 import { useProjectAssignee } from './composables/useProjectAssignee';
@@ -509,6 +528,7 @@ import { useProjectLifecycle } from './composables/useProjectLifecycle';
 import { useProjectAvatar } from './composables/useProjectAvatar';
 import { useProjectSearch } from './composables/useProjectSearch';
 import { useProjectTree } from './composables/useProjectTree';
+import { useStoredProjectViews } from './liveProjects';
 import { splitProjectViews } from './composables/projectViewBar';
 import { useSavedViews } from './composables/useSavedViews';
 import { viewKeyOf } from './composables/savedViewSettings';
@@ -516,8 +536,7 @@ import { maskOf } from '@/utils/iconMask';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { provideViewSettings } from './composables/viewSettingsContext';
 import { VIEW_FILTER_ROWS } from './composables/taskFilterSignal';
-import { useProjectCustomFields } from './composables/projectCustomFields';
-import { customGroupOptions } from './composables/customFieldQuery';
+import { useGroupByOptions } from './composables/groupByOptions';
 
 import { useProjectsHelper } from './helper';
 import { isOwnerOrAdmin } from "@/utils/roles";
@@ -702,8 +721,9 @@ const { changeAssignee } = useProjectAssignee(projectData);
 const { archive, showSidebar, showSpinner, updateProject } = useProjectLifecycle(projectData);
 const { showColorAvatar, savingAvatar, formData, resetFormData, assignAvatarData, updateImageValue, saveProjectAvatar } = useProjectAvatar(projectData);
 const projectSearch = useProjectSearch(projectData, showArchived, { buildFilterQuery });
-const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy } = projectSearch;
+const { taskSearch, taskNameSearch, taskKeySearch, taskDescriptionSearch, filterUsers, filterRows, searchTask, searchFailed, collapsed, groupBy, userSidebar, clearAllFilters, toggleSearch, searchMongoDB, manageFilterUsers, applyFilter, clearFilter, doneBy, setDoneBy, agentWorking, setAgentWorking } = projectSearch;
 const { sprintLoading, loadSprintFolderData, selectProject } = useProjectTree(projectData);
+useStoredProjectViews(projectData);
 
 const Uid = ref('embed' + makeUniqueId(6));
 const renameValue = ref('');
@@ -782,12 +802,12 @@ const icons = ref({
     Youtube: require('@/assets/images/svg/Youtube.svg'),
     Figma: require('@/assets/images/svg/figma.svg'),
 });
-const BUILT_IN_GROUPS = [
-    { label: 'status', image: require('@/assets/images/groupbySattus.png'), id: 0 },
-    { label: 'assignee', image: require('@/assets/images/svg/person.svg'), id: 1 },
-    { label: 'priority', image: require('@/assets/images/groupbyFlag.png'), id: 2 },
-    { label: 'due_date', image: require('@/assets/images/calendar_month.png'), id: 3 },
-];
+const BUILT_IN_GROUP_ICONS = {
+    status: require('@/assets/images/groupbySattus.png'),
+    assignee: require('@/assets/images/svg/person.svg'),
+    priority: require('@/assets/images/groupbyFlag.png'),
+    due_date: require('@/assets/images/calendar_month.png'),
+};
 const CUSTOM_GROUP_ICONS = {
     dropdown: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
     checkbox: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldCheckboxGrey.svg'),
@@ -800,13 +820,9 @@ const CUSTOM_GROUP_ICONS = {
     voting: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldNumberGrey.svg'),
     relationship: require('@/assets/images/svg/CustomFieldsIcons/CustomFieldDropdownGrey.svg'),
 };
-const { defs: projectFieldDefs } = useProjectCustomFields(projectData);
-const groupByOptions = computed(() => [
-    ...BUILT_IN_GROUPS,
-    ...customGroupOptions(projectFieldDefs.value).map((option) => ({ ...option, image: CUSTOM_GROUP_ICONS[option.fieldType] })),
-]);
-/* A view saved on a field that was deleted, or that this person cannot see, groups by status. */
-const shownGroupBy = computed(() => (groupByOptions.value.some((option) => option.id === groupBy.value) ? groupBy.value : 0));
+const groupChoices = useGroupByOptions(projectData);
+const groupByOptions = computed(() => groupChoices.options.value.map((option) => ({ ...option, image: BUILT_IN_GROUP_ICONS[option.label] || CUSTOM_GROUP_ICONS[option.fieldType] })));
+const shownGroupBy = computed(() => groupChoices.shown(groupBy.value));
 
 const projectDetailPermission = computed(() => checkPermission('project.project_details', projectData.value.isGlobalPermission, { gettersVal: getters }));
 
@@ -1084,9 +1100,15 @@ const headerFolders = computed(() => headerPlace.value.folders);
 /* The task views can only say that no task shows; on the page of a folder that holds no list, the missing thing is a list. */
 const TASK_VIEWS = ['ProjectListView', 'ProjectKanban', 'TableView'];
 const newInProject = ref(null);
+const archivedLists = computed(() => archivedListsIn(getters['projectData/projects']?.data, projectData.value?._id)
+    .filter((list) => isOwnerOrAdmin(companyUserDetail.value?.roleType) || !list.private || list.AssigneeUserId?.includes(userId.value)));
+const folderGone = computed(() => !sprintLoading.value && folderIsGone(getters['projectData/folders']?.[projectData.value?._id], route.params?.folderId));
+const openProjectOfGoneFolder = () => router.replace({ name: 'Project', params: { cid: route.params?.cid, id: projectData.value?._id }, query: { tab: route.query?.tab } });
 const folderWithNoLists = computed(() => (route.params?.folderId && !route.params?.sprintId && !showArchived.value && !sprintLoading.value && TASK_VIEWS.includes(activeTab.value)
     ? folderWithoutLists(projectData.value?.sprintsfolders, route.params.folderId)
     : null));
+/* An empty state is drawn in theme ink, and it replaces the view: a legacy view still needs the light body. */
+const bodyOnTokens = computed(() => TOKEN_BODY_TABS.includes(activeTab.value) || Boolean(folderGone.value || folderWithNoLists.value || searchFailed.value));
 const canAiAssist = computed(() => canUseAi({ project: projectData.value, permitted: checkPermission('task.task_create', projectData.value?.isGlobalPermission) === true }));
 // Only shown where a view actually answers the request (the board injects
 // `addTaskRequest`); other views opt in by injecting it too.
@@ -1115,6 +1137,12 @@ watch([projectData, route, () => getters['projectData/searchedTasks']], () => {
     }
 
     if (!project) return;
+
+    const moved = movedListRoute({ route, project });
+    if (moved) {
+        router.replace(moved);
+        return;
+    }
 
     try {
         if (route.name === 'Projects' || route.name === 'Project') {
@@ -1376,6 +1404,7 @@ function closeModal() {
     height: 28px;
 }
 .project__requirement{
+    color: var(--ink-2);
     padding: 0px 10px 0 2px;
 }
 .project__requirement img{
@@ -1520,5 +1549,56 @@ function closeModal() {
 .progress-text {
   position: absolute;
   font-size: 1.3em;
+}
+</style>
+
+<style scoped>
+.projects-red {
+    color: var(--danger-ink);
+}
+.projects-bg-white {
+    background-color: var(--surface);
+}
+.projects-font-weight-400 {
+    font-weight: 400 !important;
+}
+.projects-font-weight-500 {
+    font-weight: 500 !important;
+}
+.projects-font-weight-700 {
+    font-weight: 700 !important;
+}
+.projects-font-size-11 {
+    font-size: 11px;
+}
+.projects-font-size-12 {
+    font-size: 12px;
+}
+.projects-font-size-13 {
+    font-size: 13px;
+}
+.projects-font-size-14 {
+    font-size: 14px;
+}
+.projects-font-size-16 {
+    font-size: 16px;
+}
+.projects-font-size-18 {
+    font-size: 18px !important;
+}
+.projects-font-size-22 {
+    font-size: 22px;
+}
+.projects-notification-tick {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background-color: var(--danger);
+    border-radius: 6px;
+    left: 14px;
+    top: -6px;
+}
+.projects-line-height-33 {
+    line-height: 33px;
 }
 </style>

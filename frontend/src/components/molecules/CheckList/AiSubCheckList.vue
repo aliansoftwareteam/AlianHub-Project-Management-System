@@ -10,8 +10,8 @@
                     <img src="@/assets/images/table_arrow.png" alt="" class="cursor-pointer mr-10-px" :style="`transform: rotateZ(${item.isExpand ? '90' : '0'}deg); opacity: ${item.level <= 4 && item.subItems && item.subItems.length ? '1' : '0'}`" @click="handleCollapseExpand(item), item.isExpand=!item.isExpand"/>
                     <input type="checkbox" :id="'checkbox_sub_'+item.id" @click="$emit('check', item)" v-model="item.isChecked"/>
                     <img :src="aiIcon" class="ml-8px" />
-                    <label class="font-weight-normal font-size-15 ml-10-px checklist__label-main text-ellipsis" :class="[{'w-90': item.name.length > 200}]">
-                        <span class="label-item-name text-ellipsis font-size-14 d-block" :title="item.name">{{ item.name }}</span>
+                    <label class="ai-sub-check-list-font-weight-normal ai-sub-check-list-font-size-15 ml-10-px checklist__label-main text-ellipsis" :class="[{'w-90': item.name.length > 200}]">
+                        <span class="label-item-name text-ellipsis ai-sub-check-list-font-size-14 d-block" :title="item.name">{{ item.name }}</span>
                     </label>
                 </div>
             </div>
@@ -71,3 +71,15 @@ const handleCollapseExpand = (obj) => {
 }
 </script>
 <style> @import "./style.css"; </style>
+
+<style scoped>
+.ai-sub-check-list-font-weight-normal {
+    font-weight: normal;
+}
+.ai-sub-check-list-font-size-15 {
+    font-size: 15px;
+}
+.ai-sub-check-list-font-size-14 {
+    font-size: 14px;
+}
+</style>

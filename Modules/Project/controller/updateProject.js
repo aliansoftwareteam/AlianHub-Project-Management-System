@@ -156,7 +156,7 @@ const guardWorkingDays = (updateObject, key) => {
     const paths = Object.keys(updateObject).filter((path) => path.split('.')[0] === 'workingDays');
     if (!paths.length) return {};
     if (paths.some((path) => path !== 'workingDays') || (key && key !== '$set')) {
-        return { error: 'Working days must be sent as a full list with $set, or as null to use the company\'s.' };
+        return { error: 'Working days must be sent as a full list, or left empty to use the company\'s.' };
     }
     if (updateObject.workingDays === null) return { touched: true };
     const week = checkWorkingDays(updateObject.workingDays);
@@ -166,6 +166,12 @@ const guardWorkingDays = (updateObject, key) => {
 };
 
 const plain = (document) => (document && typeof document.toObject === 'function' ? document.toObject() : document);
+
+/* The write answers the project as it was. A plain set says what it holds now; any other operator names the fields it touched. */
+const savedChange = (project, updateObject, key) => {
+    if (!key || key === '$set') return { data: { ...plain(project), ...updateObject }, updatedFields: updateObject };
+    return { data: plain(project), updatedFields: Object.fromEntries(Object.keys(updateObject).map((field) => [field, key])) };
+};
 
 exports.updateProject = async (req, res) => {
     try {
@@ -199,10 +205,7 @@ exports.updateProject = async (req, res) => {
         const week = guardWorkingDays(updateObject, key);
         if (week.error) return res.status(400).json({ status: false, statusText: week.error, message: week.error });
         exports.updateProjectInternal(companyId, projectId, updateObject, key, arrayFilters).then((project) => {
-            if (week.touched && project) {
-                const updatedFields = { workingDays: updateObject.workingDays };
-                socketEmitter.emit('update', { type: 'update', data: { ...plain(project), ...updatedFields }, updatedFields, module: 'project' });
-            }
+            if (project) socketEmitter.emit('update', { type: 'update', companyId: String(companyId), ...savedChange(project, updateObject, key), module: 'project' });
             recordProjectChanges({ companyId, projectId, actorId: req.uid, previous: project, updateObject, key, arrayFilters, timeZone: req.body.timeZone })
                 .catch((error) => logger.error(`project history after update failed: ${(error && error.message) || error}`));
             return res.status(200).json(project);

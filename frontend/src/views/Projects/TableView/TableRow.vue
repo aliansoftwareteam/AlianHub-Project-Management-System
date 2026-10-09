@@ -24,6 +24,7 @@
             <span v-else class="tv2__disclose tv2__disclose--none" aria-hidden="true"></span>
             <button type="button" class="tv2__name" data-cell-primary :title="data.TaskName" @click.stop="$emit('open', data)">{{ data.TaskName }}</button>
             <TaskHomeMark v-if="!depth" :task="data" :list="viewedList" />
+            <TaskAgentMark :task-id="String(data._id)" />
             <span v-if="progress" class="tv2__sub-count">{{ progress.done }}/{{ progress.total }}</span>
         </span>
 
@@ -114,7 +115,7 @@
 <script setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import moment from "moment";
+import { recentClockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import ProvenanceBadge from "@/components/molecules/Provenance/ProvenanceBadge.vue";
 import TaskTagCell from "@/components/molecules/TagList/TaskTagCell.vue";
@@ -129,6 +130,7 @@ import TaskColumnCell from "@/views/Projects/components/columns/TaskColumnCell.v
 import { defaultColumns } from "@/views/Projects/composables/viewColumns";
 import { MAX_DEPTH } from "@taskTreeRules";
 import TaskHomeMark from "@/views/Projects/components/TaskHomeMark.vue";
+import TaskAgentMark from "@/views/Projects/components/TaskAgentMark.vue";
 
 defineOptions({ name: "TableRow" });
 
@@ -164,9 +166,7 @@ const statusStyle = computed(() => (status.value.bgColor ? statusChipStyle(statu
 
 /* A kept value can be days old: the time alone for one made today, the day with it otherwise. */
 const madeAt = (entry) => {
-    if (!entry.updatedAt) return "--:--";
-    const made = moment(entry.updatedAt);
-    return made.format(made.isSame(moment(), "day") ? "HH:mm" : "D MMM, HH:mm");
+    return recentClockText(entry.updatedAt) || "--:--";
 };
 
 const summary = computed(() => summaries.get(props.data._id));
@@ -193,7 +193,7 @@ const riskTitle = computed(() => {
         pct: top.overPct || 0,
         done: top.done || 0,
         total: top.total || 0
-    });
+    }, top.total || 0);
 });
 
 function generate() {

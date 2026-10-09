@@ -22,10 +22,11 @@
                     autocomplete="off"
                     :aria-label="$t('QuickCreate.name_label')"
                     :placeholder="$t('QuickCreate.name_placeholder')"
-                    :aria-invalid="error ? 'true' : 'false'"
-                    :aria-describedby="error ? ids.error : undefined"
-                    @input="error = ''"
+                    :aria-invalid="nameError ? 'true' : 'false'"
+                    :aria-describedby="nameError ? ids.nameError : undefined"
+                    @input="nameError = ''; error = ''"
                 />
+                <p v-if="nameError" :id="ids.nameError" class="qct__error" role="alert">{{ nameError }}</p>
 
                 <div class="qct__where">
                     <label class="qct__field">
@@ -80,7 +81,7 @@
                     </label>
                 </div>
 
-                <p v-if="error" :id="ids.error" class="qct__error" role="alert">{{ error }}</p>
+                <p v-if="error" class="qct__error" role="alert">{{ error }}</p>
 
                 <div class="qct__foot">
                     <label class="qct__another">
@@ -108,7 +109,7 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, inject, nextTick, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -119,7 +120,6 @@ import taskClass from "@/utils/TaskOperations";
 import { useGetterFunctions } from "@/composable";
 import { taskPlanPermission } from "@/composable/commonFunction";
 import { useFocusTrap } from "@/composable/useFocusTrap";
-import { bindShortcut } from "@/composable/shortcuts";
 import { useOtherProjectRules } from "@/composable/otherProjectRules";
 import { usePersonalList } from "@/components/molecules/Home/usePersonalList";
 import { openTask } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
@@ -127,6 +127,7 @@ import { isMacPlatform } from "@/components/molecules/AdvanceSearch/paletteKeys"
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { listLabel } from "@/utils/folderTree";
 import { applyContext, applyTemplate, defaultTemplateOf, dayFromOffset, listTemplates, localDay, renderTitle } from "@/components/molecules/TaskTemplates/taskTemplates";
+import { inferAssignee, inferDue, placeOfVisits, preferredSprint, readCreated, rememberCreated } from "./placeInference";
 import {
     assigneeIdsFor,
     closeQuickCreate,
@@ -134,7 +135,6 @@ import {
     defaultStatus,
     hasPriorityApp,
     listsOf,
-    openQuickCreate,
     pickDefaultProject,
     pickDefaultSprint,
     quickCreate,
@@ -160,7 +160,7 @@ const userId = inject("$userId");
 const personalList = usePersonalList({ companyId, userId });
 
 const uid = `qct-${Math.random().toString(36).slice(2, 8)}`;
-const ids = { heading: `${uid}-heading`, error: `${uid}-error` };
+const ids = { heading: `${uid}-heading`, nameError: `${uid}-name-error` };
 
 const dialogEl = ref(null);
 const nameEl = ref(null);
@@ -175,12 +175,15 @@ const priority = ref("MEDIUM");
 const keepOpen = ref(false);
 const busy = ref(false);
 const error = ref("");
+const nameError = ref("");
 const preparing = ref(false);
 const created = ref(null);
 const personalSprint = ref(null);
 const templates = ref([]);
 const templateId = ref("");
 const prefilled = reactive({ name: "", due: "", priority: "" });
+
+const visitedPlace = ref(null);
 
 let prepared = Promise.resolve();
 let listsLoaded = Promise.resolve();
@@ -232,13 +235,19 @@ function prepare() {
     const personal = personalList.ensure()
         .then((res) => { personalSprint.value = res?.sprint || null; })
         .catch((e) => console.error("ERROR in quick create personal list: ", e));
-    return Promise.all([personal, loadProjectRules(allProjects.value)]).finally(() => {
+    const visited = routeProjectId() || quickCreate.projectId
+        ? Promise.resolve()
+        : apiRequest("get", `${env.RECENT_VISITS}?types=project,sprint&limit=5`)
+            .then((res) => { visitedPlace.value = res?.data?.status ? placeOfVisits(res.data.data) : null; })
+            .catch(() => {});
+    return Promise.all([personal, visited, loadProjectRules(allProjects.value)]).finally(() => {
         preparing.value = false;
         if (!quickCreate.open) return;
         projectId.value = pickDefaultProject({
             requestedId: quickCreate.projectId,
             routeProjectId: routeProjectId(),
-            lastUsedId: readLastProject(cid.value, me.value),
+            recentId: visitedPlace.value?.projectId,
+            lastUsedId: readCreated(cid.value, me.value)?.projectId || readLastProject(cid.value, me.value),
             projects: options.value
         });
     });
@@ -260,7 +269,12 @@ function loadLists(p) {
 function resetFields(p) {
     const s = defaultStatus(p);
     statusKey.value = s ? String(s.key) : "";
-    assigneeId.value = members.value.some((m) => m.id === me.value) ? me.value : "";
+    assigneeId.value = inferAssignee({
+        created: readCreated(cid.value, me.value),
+        projectId: String(p._id),
+        memberIds: members.value.map((m) => m.id),
+        me: me.value
+    });
     if (!priorities.value.some((x) => x.value === priority.value)) priority.value = priorities.value[0]?.value || "MEDIUM";
 }
 
@@ -306,8 +320,18 @@ watch(project, (p, was) => {
     listsLoaded = loadLists(p).then((found) => {
         if (String(projectId.value) !== pid) return;
         lists.value = found;
-        const preferred = quickCreate.sprintId || (String(route?.params?.id || "") === pid ? String(route?.params?.sprintId || "") : "");
+        const preferred = preferredSprint({
+            requestedId: quickCreate.sprintId,
+            routeSprintId: String(route?.params?.id || "") === pid ? String(route?.params?.sprintId || "") : "",
+            projectId: pid,
+            visit: visitedPlace.value,
+            created: readCreated(cid.value, me.value)
+        });
         sprintId.value = pickDefaultSprint(found, preferred);
+        if (!due.value) {
+            due.value = inferDue({ created: readCreated(cid.value, me.value), projectId: pid, today: localDay() });
+            prefilled.due = due.value;
+        }
     });
 });
 
@@ -316,8 +340,10 @@ const focusTitle = () => nextTick(() => nameEl.value?.focus());
 watch(() => quickCreate.open, (on) => {
     if (!on) return;
     error.value = "";
-    name.value = readDraft();
+    nameError.value = "";
+    name.value = quickCreate.name || readDraft();
     due.value = "";
+    visitedPlace.value = null;
     priority.value = "MEDIUM";
     Object.assign(prefilled, { name: "", due: "", priority: "" });
     projectId.value = "";
@@ -388,11 +414,13 @@ async function submit(intent) {
     if (busy.value || !intent) return;
     const title = name.value.trim();
     if (title.length < 3) {
-        error.value = t("QuickCreate.name_too_short");
+        nameError.value = t("QuickCreate.name_too_short");
+        error.value = "";
         focusTitle();
         return;
     }
     busy.value = true;
+    nameError.value = "";
     error.value = "";
     try {
         await prepared;
@@ -429,6 +457,7 @@ async function submit(intent) {
                 .catch((e) => console.error("ERROR in quick create template: ", e));
         }
         rememberLastProject(cid.value, me.value, p._id);
+        rememberCreated(cid.value, me.value, { projectId: p._id, sprintId: list.id, assigneeId: assigneeId.value, due: due.value });
         bumpListCount(p, list);
         const task = { companyId: cid.value, projectId: String(p._id), sprintId: list.id, folderId: list.folderId, taskId: String(result.id) };
         name.value = "";
@@ -465,17 +494,7 @@ function onKey(e) {
     submit(intent);
 }
 
-let unbindShortcut = () => {};
-onMounted(() => {
-    unbindShortcut = bindShortcut("create-task", () => {
-        if (quickCreate.open) return false;
-        openQuickCreate();
-    });
-});
-onBeforeUnmount(() => {
-    unbindShortcut();
-    clearTimeout(doneTimer);
-});
+onBeforeUnmount(() => clearTimeout(doneTimer));
 </script>
 
 <style scoped>

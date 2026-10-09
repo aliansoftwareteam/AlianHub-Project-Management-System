@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 046, MCP parity part 3: an outside agent reads, adds and removes the links between tasks through the
    relations route's own preparation and handlers, as the person behind its token and no further. */
 process.env.STORAGE_TYPE = 'server';
@@ -60,7 +61,7 @@ const T_HUB = '6f0000000000000000000d0b';
 const T_HIDDEN_LINKS_ONLY = '6f0000000000000000000d0c';
 const T_NO_LINKS = '6f0000000000000000000d0d';
 const LINKED = [T_OPEN_2, T_SECRET, T_PRIVATE, T_PERSONAL];
-const NOT_OPEN = 'not_visible: the task is not one the person behind this token can open';
+const NOT_OPEN = 'not_visible: that task was not found, or the person cannot open it. Ask the person which task they mean.';
 const PEOPLE = [['an owner', OWNER], ['an admin', ADMIN], ['a member on the private work', INSIDER], ['a member outside it', OUTSIDER], ['a guest', GUEST]];
 
 const link = (taskId, type) => ({ taskId, type, createdBy: INSIDER, createdAt: new Date('2026-09-01T00:00:00.000Z') });
@@ -83,7 +84,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tools exist', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         NAMES.forEach((name) => { expect(registry.has(name)).toBe(false); expect(actions.rating(name)).toBeNull(); });
         expect((await rpc(ctx(OWNER), 'task.relations.list', { taskId: T_HUB })).rpcError).toMatchObject({ code: -32601 });
@@ -116,7 +117,7 @@ describe('task.relations.list', () => {
 
     it('answers a task in a private list, a private project or someone else\'s personal list as it answers a missing id', async () => {
         const missing = await rpc(ctx(OWNER), 'task.relations.list', { taskId: MISSING });
-        expect(missing).toEqual({ error: 'task not found' });
+        expect(missing).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         for (const uid of [OUTSIDER, GUEST]) {
             for (const taskId of [T_SECRET, T_PRIVATE, T_PERSONAL]) expect(await rpc(ctx(uid), 'task.relations.list', { taskId })).toEqual(missing);
         }
@@ -128,7 +129,7 @@ describe('task.relations.list', () => {
         const out = await rpc(narrowed(INSIDER, [P_OPEN]), 'task.relations.list', { taskId: T_HUB });
         expect(out.relations.map((row) => row.task.taskId).sort()).toEqual([T_OPEN_2, T_SECRET].sort());
         expect(JSON.stringify(out)).not.toMatch(`${T_PRIVATE}|${T_PERSONAL}`);
-        expect(await rpc(narrowed(INSIDER, [P_PRIVATE]), 'task.relations.list', { taskId: T_HUB })).toEqual({ error: 'task not found' });
+        expect(await rpc(narrowed(INSIDER, [P_PRIVATE]), 'task.relations.list', { taskId: T_HUB })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
     });
 });
 
@@ -185,9 +186,9 @@ describe('task.relation.add', () => {
 
     it('needs the write scope', async () => {
         const before = tasksNow();
-        expect(await rpc(readOnly(OWNER), 'task.relation.add', { taskId: T_OPEN, relatedTaskId: T_NO_LINKS, type: 'blocks' })).toMatchObject({ isError: true, error: 'This token is read-only.' });
-        expect(await rpc(outside(OWNER, ['tasks:read']), 'task.relation.add', { taskId: T_OPEN, relatedTaskId: T_NO_LINKS, type: 'blocks' })).toMatchObject({ isError: true, error: 'This token lacks the tasks:write scope.' });
-        expect(await rpc(outside(OWNER, ['tasks:write']), 'task.relations.list', { taskId: T_HUB })).toMatchObject({ isError: true, error: 'This token lacks the tasks:read scope.' });
+        expect(await rpc(readOnly(OWNER), 'task.relation.add', { taskId: T_OPEN, relatedTaskId: T_NO_LINKS, type: 'blocks' })).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
+        expect(await rpc(outside(OWNER, ['tasks:read']), 'task.relation.add', { taskId: T_OPEN, relatedTaskId: T_NO_LINKS, type: 'blocks' })).toMatchObject({ isError: true, error: 'This connection was not given the tasks:write permission. Ask the person to connect you again and allow it.' });
+        expect(await rpc(outside(OWNER, ['tasks:write']), 'task.relations.list', { taskId: T_HUB })).toMatchObject({ isError: true, error: 'This connection was not given the tasks:read permission. Ask the person to connect you again and allow it.' });
         expect(tasksNow()).toBe(before);
     });
 

@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 process.env.STORAGE_TYPE = 'server';
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -54,6 +55,8 @@ const run = (handlers) => (route, caller, body = {}, params = {}) => new Promise
 const send = run((handlers) => handlers);
 const through = run((handlers) => handlers.slice(0, -1));
 
+const REVIEW = 'PUT /api/v2/pages/:id/review';
+
 /* [route, body, params]: the doc writes no registry action covers on a route. */
 const NO_ACTION = {
     'changing a doc': ['PUT /api/v2/pages/:id', { title: 'Renamed' }, { id: PAGE }],
@@ -61,7 +64,7 @@ const NO_ACTION = {
     'keeping a version of a doc': ['POST /api/v2/pages/:id/versions', {}, { id: PAGE }],
     'putting a version of a doc back': ['POST /api/v2/pages/:id/versions/:versionId/restore', {}, { id: PAGE, versionId: VERSION }],
     'naming a version of a doc': ['PUT /api/v2/pages/:id/versions/:versionId', { name: 'First' }, { id: PAGE, versionId: VERSION }],
-    'marking a doc reviewed': ['PUT /api/v2/pages/:id/review', {}, { id: PAGE }],
+    'marking a doc reviewed': [REVIEW, {}, { id: PAGE }],
     'taking a doc out of the trash': ['PUT /api/v2/pages/:id/restore', {}, { id: PAGE }],
     'adding an image to a doc': ['POST /api/v2/pages/:id/images', {}, { id: PAGE }],
     'composing a doc with the assistant': [COMPOSE, { action: 'draft', title: 'Plan' }, {}],
@@ -99,7 +102,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.PAGES, { _id: PAGE, title: 'Existing doc', ProjectID: P_OPEN, visibility: 'project', createdBy: OWNER, updatedBy: OWNER, deletedStatusKey: 0, order: 1 });
 });
 afterEach(() => {
-    delete process.env.MCP_TOOLS_MANAGE;
+    process.env.MCP_TOOLS_MANAGE = 'off';
     composePage.mockReset();
 });
 
@@ -110,7 +113,7 @@ describe('a token created for an agent, on the doc write routes', () => {
         const answer = await send(route, agentToken(uid), body, params);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform /);
+        expect(answer.body.statusText).toMatch(/^(An agent is not allowed to do this|An agent is never allowed to do this|That action is not available to agents)/);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: route, onBehalfOf: uid });
         expect(audits('agent.action')).toHaveLength(0);
@@ -171,7 +174,7 @@ describe('a doc created by an agent through the create route', () => {
         const answer = await send(CREATE, agentToken(uid), BEYOND_A_DRAFT[name]);
 
         expect(answer.code).toBe(403);
-        expect(answer.body.statusText).toMatch(/^Agents cannot perform page\.create/);
+        expect(answer.body.statusText).toMatch(/^That action is not available to agents \(page\.create\)/);
         expect(pages()).toEqual([]);
         expect(audits('agent.action_refused')).toHaveLength(1);
         expect(audits('agent.action_refused')[0].meta).toMatchObject({ ran: false, path: CREATE, onBehalfOf: uid });
@@ -289,6 +292,39 @@ describe('the draft mark of a doc', () => {
 
         expect(stored(DRAFT)).toMatchObject({ agentStatus: 'approved', approvedBy: OWNER });
     });
+
+    it.each([
+        ['a personal token of an owner', personalToken(OWNER)],
+        ['a personal token of a member', personalToken(INSIDER)],
+        ['an agent\'s token', agentToken(OWNER)],
+        ['a connected app\'s token', { uid: OWNER, mcp: true }],
+    ])('is not signed off by %s', async (label, caller) => {
+        seedDraft();
+
+        expect(await send('PUT /api/v2/pages/:id/approve', caller, {}, { id: DRAFT })).toMatchObject({ code: 403, body: { status: false } });
+
+        expect(stored(DRAFT).agentStatus).toBe('draft');
+        expect(stored(DRAFT).approvedBy).toBeUndefined();
+    });
+});
+
+describe('the review mark of a doc', () => {
+    it('is set by a person signed in', async () => {
+        expect((await send(REVIEW, session(OWNER), {}, { id: PAGE })).body.status).toBe(true);
+
+        expect(stored(PAGE)).toMatchObject({ reviewedBy: OWNER });
+    });
+
+    it.each([
+        ['a personal token of an owner', personalToken(OWNER)],
+        ['a personal token of a member', personalToken(INSIDER)],
+        ['an agent\'s token', agentToken(OWNER)],
+        ['a connected app\'s token', { uid: OWNER, mcp: true }],
+    ])('is not set by %s', async (label, caller) => {
+        expect(await send(REVIEW, caller, {}, { id: PAGE })).toMatchObject({ code: 403, body: { status: false } });
+
+        expect(stored(PAGE).reviewedBy).toBeUndefined();
+    });
 });
 
 describe('everyone else on the doc routes', () => {
@@ -299,7 +335,7 @@ describe('everyone else on the doc routes', () => {
         ['a personal token of an owner', personalToken(OWNER)],
         ['a personal token of a member', personalToken(INSIDER)],
     ])('%s reaches every one of them, and nothing is recorded as an agent\'s', async (label, caller) => {
-        for (const [route, body, params] of Object.values(NO_ACTION)) {
+        for (const [route, body, params] of Object.values(NO_ACTION).filter(([path]) => !(caller.apiToken && path === REVIEW))) {
             expect([route, await through(route, caller, body, params)]).toEqual([route, REACHED]);
         }
         for (const body of [...Object.values(BEYOND_A_DRAFT), ...Object.values(DRAFTED)]) {

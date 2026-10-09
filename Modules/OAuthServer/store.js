@@ -31,12 +31,22 @@ const grants = {
     liveForClient: async (clientId, companyId) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
         { clientId: String(clientId), companyId: String(companyId), revokedAt: null },
     ], 'find')) || []).map(plain),
+    // The grants revokeForClient is about to end: with no company named, the client's in every workspace.
+    endingForClient: async (clientId, companyId) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
+        { clientId: String(clientId), ...(companyId ? { companyId: String(companyId) } : {}), revokedAt: null },
+        { companyId: 1, userId: 1 },
+    ], 'find')) || []).map(plain),
     setScopes: (grantId, scopes) => db(SCHEMA_TYPE.OAUTH_GRANTS, [{ grantId: String(grantId), revokedAt: null }, { $set: { scopes } }], 'updateOne'),
     touch: (grantId, at) => db(SCHEMA_TYPE.OAUTH_GRANTS, [{ grantId: String(grantId) }, { $set: { lastUsedAt: at } }], 'updateOne'),
     liveForUser: async (userId, now) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
         { userId: String(userId), revokedAt: null, expiresAt: { $gt: now } },
         {},
         { sort: { createdAt: -1 }, limit: 200 },
+    ], 'find')) || []).map(plain),
+    usedIn: async (companyId, now) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
+        { companyId: String(companyId), revokedAt: null, expiresAt: { $gt: now }, lastUsedAt: { $ne: null } },
+        {},
+        { sort: { lastUsedAt: -1 }, limit: 500 },
     ], 'find')) || []).map(plain),
     endingFor: async (companyId, after, by) => ((await db(SCHEMA_TYPE.OAUTH_GRANTS, [
         { companyId: String(companyId), revokedAt: null, expiryNoticeAt: null, expiresAt: { $gt: after, $lte: by } },

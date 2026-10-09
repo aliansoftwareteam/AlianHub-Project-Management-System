@@ -7,10 +7,10 @@
 <template>
 <div class="statusHeader statusHeader_two">
     <h3 v-if="fromWhich == ''" class="heading_text bg-light-gray mt-0px"
-    :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px  task-heading-mobile': clientWidth <= 767}"
+    :class="{'border-radius-5-px  task-status-form-task-heading-desktop': clientWidth > 767 , 'border-radius-8-px  task-heading-mobile': clientWidth <= 767}"
     >{{$t('Templates.setup_status')}}</h3>
     <h3 v-else class="heading_text bg-light-gray mt-0px"
-    :class="{'border-radius-5-px  task-heading-desktop': clientWidth > 767 , 'border-radius-8-px  task-heading-mobile': clientWidth <= 767}"
+    :class="{'border-radius-5-px  task-status-form-task-heading-desktop': clientWidth > 767 , 'border-radius-8-px  task-heading-mobile': clientWidth <= 767}"
     >{{$t('Templates.what_task')}}?</h3>
     <div class="taskStatusSection style-scroll">
         <TemplateSelectForm
@@ -28,15 +28,15 @@
             @left-focus="onLeftFocus"
         >
             <template #list>
-                <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}"
+                <h3 :class="{'task-status-form-taskstatustitle-desktop': clientWidth > 767 , 'task-status-form-taskstatustitle-mobile': clientWidth <= 767}"
                 >{{$t('Projects.active_status')}}</h3>
                 <div class="statuInputwrapper activeStatus" v-if="theModel.taskStatusField.value.defaultActive && Object.keys(theModel.taskStatusField.value.defaultActive).length > 0">
                     <ul class="status_ul">
                         <li class="d-flex align-items-center justify-content-between">
-                            <span class="taskInnerData w-100" :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}">
+                            <span class="taskInnerData w-100" :class="{'task-status-form-taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}">
                                 <div class="d-flex align-items-center ml-15px">
                                     <input type="color" :id="`activeTaskStatus${98}`" v-model.trim="theModel.taskStatusField.value.defaultActive.textColor" @input="theModel.taskStatusField.value.defaultActive.bgColor = theModel.taskStatusField.value.defaultActive.textColor+'35',inputColor()"  class="p-0 mr-8px d-inline-block border-radius-2-px border-0 bg-transparent cursor-pointer project__status-icon" disabled>
-                                    <span class="style_changes_value"   :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" v-if="!theModel.taskStatusField.value.defaultActive.isEditable" :style="[{'color': theModel.taskStatusField.value.defaultActive.textColor}]">{{theModel.taskStatusField.value.defaultActive.statusName ? theModel.taskStatusField.value.defaultActive.statusName : theModel.taskStatusField.value.defaultActive.name}}</span>
+                                    <span class="style_changes_value"   :class="{'task-status-form-taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" v-if="!theModel.taskStatusField.value.defaultActive.isEditable" :style="[{'color': theModel.taskStatusField.value.defaultActive.textColor}]">{{theModel.taskStatusField.value.defaultActive.statusName ? theModel.taskStatusField.value.defaultActive.statusName : theModel.taskStatusField.value.defaultActive.name}}</span>
                                     <input v-if="theModel.taskStatusField.value.defaultActive.isEditable" class="addStatusInput form-control" type="text"  v-model.trim="theModel.taskStatusField.value.defaultActive.statusName" @keypress.enter.prevent="saveTaskStatus('editType',theModel.taskStatusField.value.defaultActive)" @input="errorMsgTask = ''"/>
                                     <span class="position-ab" :style="[{top : clientWidth > 767 ? '8px' : '8px', right : clientWidth > 767 ? '10px' : '15px'}]">
                                         <img :src="saveData" class="cursor-pointer" v-if="theModel.taskStatusField.value.defaultActive.isEditable" @click="saveTaskStatus('editType',theModel.taskStatusField.value.defaultActive)">
@@ -62,10 +62,10 @@
                     :projectData="projectData"
                 />
                 <button class="cursor-pointer btn btn-primary addstatus-btn ml-0 mb-20px" type="button" @click="openTaskStatusSidebar()">+ {{$t('Projects.add_status')}}</button>
-                <div class="red">
-                    <span v-if="errorMsgTask" class="font-size-11">{{errorMsgTask}}</span>
+                <div class="task-status-form-red">
+                    <span v-if="errorMsgTask" class="task-status-form-font-size-11">{{errorMsgTask}}</span>
                 </div>
-                <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile': clientWidth <= 767}"
+                <h3 :class="{'task-status-form-taskstatustitle-desktop': clientWidth > 767 , 'task-status-form-taskstatustitle-mobile': clientWidth <= 767}"
                 >{{$t('Projects.done_status')}}</h3>
                 <DragDropField
                     :group="{ name: 'task_status_group' }"
@@ -85,14 +85,14 @@
                     :projectData="projectData"
                 />
                 <div>
-                    <h3 :class="{'taskstatustitle-desktop': clientWidth > 767 , 'taskstatustitle-mobile mt-030': clientWidth <= 767}"
+                    <h3 :class="{'task-status-form-taskstatustitle-desktop': clientWidth > 767 , 'task-status-form-taskstatustitle-mobile mt-030': clientWidth <= 767}"
                     >{{$t('Projects.close_status')}}</h3>
                     <div class="statuInputwrapper activeStatus" v-if="theModel.taskStatusField.value.defaultComplete && Object.keys(theModel.taskStatusField.value.defaultComplete).length > 0">
                         <ul class="status_ul">
                             <li class="d-flex align-items-center justify-content-between">
                             <div class="d-flex align-items-center w-100 ml-16px">
                                 <input type="color" :id="`CloseTaskStatus${98}`" v-model.trim="theModel.taskStatusField.value.defaultComplete.textColor" @input="theModel.taskStatusField.value.defaultComplete.bgColor = theModel.taskStatusField.value.defaultComplete.textColor+'35'" class="p-0 mr-8px d-inline-block border-radius-2-px border-0 bg-transparent cursor-pointer project__status-icon" disabled>
-                                <span class="style_changes_value" :class="{'taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" v-if="!theModel.taskStatusField.value.defaultComplete.isEditable" :style="[{'color': theModel.taskStatusField.value.defaultComplete.textColor}]">{{theModel.taskStatusField.value.defaultComplete.name ? theModel.taskStatusField.value.defaultComplete.name : theModel.taskStatusField.value.defaultComplete.name}}</span>
+                                <span class="style_changes_value" :class="{'task-status-form-taskInnerData-desktop': clientWidth > 767 , 'taskInnerData-mobile': clientWidth <= 767}" v-if="!theModel.taskStatusField.value.defaultComplete.isEditable" :style="[{'color': theModel.taskStatusField.value.defaultComplete.textColor}]">{{theModel.taskStatusField.value.defaultComplete.name ? theModel.taskStatusField.value.defaultComplete.name : theModel.taskStatusField.value.defaultComplete.name}}</span>
                                 <input v-if="theModel.taskStatusField.value.defaultComplete.isEditable"  class="addStatusInput form-control" type="text" v-model.trim="theModel.taskStatusField.value.defaultComplete.name" @keypress.enter.prevent="saveTaskStatus('editType',theModel.taskStatusField.value.defaultComplete)" @input="errorMsgTask = ''" />
                                 <span class="position-ab save__delete-wrappper" :style="[{top : clientWidth > 767 ? '6px' : '10px'}]">
                                     <img :src="saveData" class="cursor-pointer"  v-if="theModel.taskStatusField.value.defaultComplete.isEditable" @click="saveTaskStatus('editType',theModel.taskStatusField.value.defaultComplete)">
@@ -565,5 +565,41 @@ const { t } = useI18n();
     }
 </script>
 <style scoped>
+.task-status-form-font-size-11 {
+    font-size: 11px;
+}
+.task-status-form-taskInnerData-desktop {
+    font-size: 13px !important;
+    line-height: 19px !important;
+    font-weight: 400 !important;
+}
+</style>
+
+<style scoped>
 @import './style.css';
+</style>
+
+<style scoped>
+.task-status-form-red {
+    color: var(--danger-ink);
+}
+.task-status-form-taskstatustitle-desktop {
+    font-weight: 500 !important;
+    font-size: 14px !important;
+    line-height: 21px !important;
+    color: var(--ink) !important;
+}
+.task-status-form-task-heading-desktop {
+    font-weight: 700 !important;
+    font-size: 18px !important;
+    line-height: 27px !important;
+    color: var(--ink) !important;
+    text-align: center !important;
+}
+.task-status-form-taskstatustitle-mobile {
+    font-size: 16px !important;
+    line-height: 21px !important;
+    font-weight: 500 !important;
+    color: var(--ink) !important;
+}
 </style>

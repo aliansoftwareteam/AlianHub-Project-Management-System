@@ -3,18 +3,23 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { QueryRefused, validatePipeline, visibilityStage, matchWithExtraListRows } = require("../helpers/taskQueryGuard");
 const { opensList } = require("../helpers/taskExtraLists");
+const { replaceObjectKey } = require("../../Auth/helper");
+const { withLinkConditions } = require("../../CustomField/helpers/fieldLinks");
 
 const LEAVE_PROJECT_ID = "6571e7195470e64b1203295c";
 
 const firstOf = (list) => (Array.isArray(list) && list.length ? list[0] : null);
 
-/* The group the client is refreshing, as it sent it. It joins the list's own clauses under $and,
- * so a key it names can narrow the list and never replace the project or sprint. */
-const groupConditions = (body) => {
+/* The group the client is refreshing, read as the task query reads the same clause: checked, its ids and dates
+ * converted, and a question about linked tasks answered for this caller. The project is named beside it so that
+ * question reads this project's links only. It joins the list's own clauses under $and, so a key it names can
+ * narrow the list and never replace the project or sprint. */
+const groupConditions = async (companyId, uid, body) => {
     const item = body.item || {};
-    const conditions = firstOf(item.mongoConditions) || firstOf(item.conditions) || {};
-    validatePipeline([{ $match: conditions }]);
-    return conditions;
+    const sent = firstOf(item.mongoConditions) || firstOf(item.conditions) || {};
+    const [{ $match: clause }] = replaceObjectKey(validatePipeline([{ $match: sent }]), ["objId", "dbDate"]);
+    const [{ $match: answered }] = await withLinkConditions(companyId, uid, [{ $match: { ProjectID: new mongoose.Types.ObjectId(body.pid), $and: [clause] } }]);
+    return answered.$and[0];
 };
 
 const ownTasksOnly = (body) => !(body.showAllTasks === undefined || body.showAllTasks === true || body.showAllTasks === 2);
@@ -99,7 +104,7 @@ exports.getTabSyncTasks = async (req, res) => {
             return res.status(400).json({ message: 'istableTask ID is required' });
         }
         const companyId = req.headers['companyid'];
-        const conditions = groupConditions(body);
+        const conditions = await groupConditions(companyId, req.uid, body);
         const scope = await visibilityStage(companyId, req.uid);
         const inList = await opensList(companyId, req.uid, String(body.sprintId));
         const pipeline = body.istableTask === false ? listPipeline(body, conditions, inList) : tablePipeline(body, conditions, inList);

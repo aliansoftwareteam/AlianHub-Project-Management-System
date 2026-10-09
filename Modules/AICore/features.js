@@ -28,6 +28,7 @@ const FEATURES = Object.freeze({
     AUTOMATION_DRAFT: 'automation_draft',
     AI_FIELD: 'ai_field',
     AGENT_BUILDER: 'agent_builder',
+    PROJECT_TRIAGE: 'project_triage',
 });
 
 /* Priced by the audio minute, so outside the token features and the task classes that route them. */

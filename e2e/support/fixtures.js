@@ -1,8 +1,9 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const { MongoClient, ObjectId } = require('mongodb');
 const { createApiClient } = require('./api');
-const { STATE_DIR } = require('./env');
+const { STATE_DIR, resolveMongoUrl } = require('./env');
 
 const PASSWORD = 'E2e-Passw0rd!';
 const STATE_FILE = path.join(STATE_DIR, 'run.json');
@@ -44,6 +45,57 @@ async function setupOwner(baseURL) {
     return { role: 'owner', roleType: ROLES.owner.roleType, email, userId: String(data.userId), companyId: String(data.companyId) };
 }
 
+/* The stored invitation, with the link token the Members screen puts in the address it copies. */
+async function sendInvitation({ ownerApi, companyId, role, email }) {
+    const invite = await ownerApi.post('/api/v2/sendInvitationEmail', {
+        email, companyId, companyName: COMPANY_NAME, role: ROLES[role].roleType, designation: 0,
+    });
+    const inviteRow = invite.body && invite.body.data;
+    if (invite.status !== 200 || !inviteRow || !inviteRow._id) {
+        throw new Error(`invite ${email} failed (${invite.status}): ${JSON.stringify(invite.body).slice(0, 500)}`);
+    }
+    return inviteRow;
+}
+
+const invitationPath = (companyId, inviteRow) => `/#/invitation?companyId=${companyId}-${inviteRow._id}&token=${encodeURIComponent(inviteRow.linkId)}`;
+
+/* The link mailed to an invited address that already has an account (Modules/Auth/controller/sendInvitation.js). */
+const mailedInvitationPath = ({ userId, companyId, invitation }) => {
+    const blob = Buffer.from(`userId=${userId}&companyId=${companyId}&docId=${invitation._id}&linkId=${invitation.linkId}`).toString('base64');
+    return `/#/verify-invitation?id=${encodeURIComponent(blob)}`;
+};
+
+async function inGlobalDatabase(read) {
+    const client = new MongoClient(resolveMongoUrl(), { serverSelectionTimeoutMS: 5000 });
+    await client.connect();
+    try {
+        return await read(client.db('global'));
+    } finally {
+        await client.close();
+    }
+}
+
+/* The workspace's own row, which the rest of the app reads its name, plan and details from. */
+const readCompanyRow = (companyId) => inGlobalDatabase((global) => global.collection('companies').findOne({ _id: new ObjectId(String(companyId)) }));
+
+/* An account made outside any invitation. Mail is not delivered in the suite, so the address is marked
+ * verified the way tests/integration/invitation-signed-in-accept.int.test.js does. */
+async function registerVerifiedAccount(baseURL, { firstName, lastName, email }) {
+    const created = assertOk(await createApiClient({ baseURL }).post('/api/v2/createUser', { firstName, lastName, email, password: PASSWORD }), `register ${email}`);
+    const userId = String(created.statusText._id);
+    await inGlobalDatabase((global) => global.collection('users').updateOne({ _id: new ObjectId(userId) }, { $set: { isEmailVerified: true } }));
+    return userId;
+}
+
+/* A workspace of the account's own, made the way the last sign-up step makes one. */
+async function createWorkspace(baseURL, { email, name }) {
+    const session = await login(baseURL, email);
+    const made = assertOk(await createApiClient({ baseURL, accessToken: session.accessToken }).post('/api/v2/company/create', {
+        companyName: name, teamSize: '2-15', teamFocus: '', seedSampleProject: false, logtimeDays: 8, eventId: `ev_${uniqueSuffix()}`,
+    }), `workspace for ${email}`);
+    return String(made.companyId);
+}
+
 /* Invite acceptance without mail, through the same calls the /invitation page makes
  * (frontend/src/views/Authentication/Invitation/Invitation.vue): the owner sends the
  * invite, which stores the company_users row even when the mail cannot be delivered and
@@ -51,13 +103,7 @@ async function setupOwner(baseURL) {
  * then, signed in as the invitee, the row is linked and activated (status 2). */
 async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstName, lastName, navMode = 'full' }) {
     const { roleType } = ROLES[role];
-    const invite = await ownerApi.post('/api/v2/sendInvitationEmail', {
-        email, companyId, companyName: COMPANY_NAME, role: roleType, designation: 0,
-    });
-    const inviteRow = invite.body && invite.body.data;
-    if (invite.status !== 200 || !inviteRow || !inviteRow._id) {
-        throw new Error(`invite ${email} failed (${invite.status}): ${JSON.stringify(invite.body).slice(0, 500)}`);
-    }
+    const inviteRow = await sendInvitation({ ownerApi, companyId, role, email });
 
     const anon = createApiClient({ baseURL });
     const created = await anon.post('/api/v2/createUser', {
@@ -72,7 +118,7 @@ async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstNa
     assertOk(await api.put('/api/v1/root-members', { id: inviteRow._id, data: { userId, status: 2 }, companyId, linkId: inviteRow.linkId }), `accept invite for ${email}`);
     assertOk(await api.post('/api/v1/importSettingsNotification', { companyId, userId }), `notification settings for ${email}`);
     assertOk(await api.post('/api/v1/removeUserNotification', { companyId, userId, type: 'Add' }), `notification counter for ${email}`);
-    // A new account starts in Simple, with five places on the rail. The suite walks the whole app, so its
+    // A new account starts in Simple, with six places on the rail. The suite walks the whole app, so its
     // people get the full rail unless a spec asks for the newcomer's (navMode: null).
     if (navMode) assertOk(await api.put(NAV_PREFERENCES, { mode: navMode }), `${navMode} rail for ${email}`);
 
@@ -121,6 +167,33 @@ async function listSprints(api, projectId) {
     return Array.isArray(res.body) ? res.body : (res.body && res.body.data) || [];
 }
 
+async function listFolders(api, projectId) {
+    const res = await api.get(`/api/v1/project/sprintFolder/${projectId}`, { query: { collection: 'folders' } });
+    if (res.status !== 200) throw new Error(`list folders for ${projectId} failed (${res.status}): ${JSON.stringify(res.body).slice(0, 500)}`);
+    return Array.isArray(res.body) ? res.body : (res.body && res.body.data) || [];
+}
+
+const actingUser = (user) => ({ id: user.uid || user.userId, Employee_Name: `${ROLES[user.role]?.firstName || ''} ${ROLES[user.role]?.lastName || ''}`.trim() });
+
+/* Same payloads the "New list" and "New folder" forms send. */
+async function createFolder(api, { project, name, user, parentFolderId }) {
+    const res = await api.post('/api/v1/folder', {
+        companyId: api.companyId, projectId: project._id, folderName: name, userData: actingUser(user), projectName: project.ProjectName, mainChat: true,
+        ...(parentFolderId ? { parentFolderId } : {}),
+    });
+    const body = assertOk(res, `create folder ${name}`);
+    return { _id: String(body.data._id), name };
+}
+
+async function createList(api, { project, name, user, folder }) {
+    const res = await api.post('/api/v1/sprint', {
+        companyId: api.companyId, projectId: project._id, sprintName: name, userData: actingUser(user), projectName: project.ProjectName,
+        folder: folder ? { folderId: folder._id, folderName: folder.name } : {}, private: false,
+    });
+    const body = assertOk(res, `create list ${name}`);
+    return { _id: String(body.data._id), name };
+}
+
 /* POST /createproject answers before it adds the default "List" sprint, so a
  * task created straight after a project can find no sprint yet. */
 async function firstSprint(api, projectId, { timeoutMs = 15000, intervalMs = 100 } = {}) {
@@ -133,8 +206,8 @@ async function firstSprint(api, projectId, { timeoutMs = 15000, intervalMs = 100
 }
 
 /* Same payload the create-task forms send (see ConvertNoteToTask.vue). */
-async function createTask(api, { project, name, user, companyOwnerId, assigneeIds = [] }) {
-    const sprint = await firstSprint(api, project._id);
+async function createTask(api, { project, name, user, companyOwnerId, assigneeIds = [], sprint: inSprint }) {
+    const sprint = inSprint || await firstSprint(api, project._id);
     if (!sprint) throw new Error(`project ${project._id} has no sprint to hold a task`);
     const sprintId = String(sprint._id || sprint.id);
     const status = project.taskStatusData.find((x) => x.type === 'default_active');
@@ -251,17 +324,26 @@ module.exports = {
     STATE_FILE,
     assertOk,
     createFixtures,
+    createFolder,
+    createList,
     createProject,
     createTask,
+    createWorkspace,
     emailFor,
     findTasksByName,
     firstSprint,
+    invitationPath,
     inviteMember,
+    listFolders,
     listSprints,
     login,
     loginAs,
+    mailedInvitationPath,
+    readCompanyRow,
     readState,
     readTask,
+    registerVerifiedAccount,
+    sendInvitation,
     storageStatePath,
     uniqueSuffix,
     writeState,

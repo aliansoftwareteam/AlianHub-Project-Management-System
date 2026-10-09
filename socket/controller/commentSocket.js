@@ -7,8 +7,9 @@ const {
 } = require('../helper');
 const socketEmitter = require('../../event/socketEventEmitter');
 const logger = require('../../Config/loggerConfig');
-const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments, pageCommentRoomOf, readablePage, mayReceiveComments, inOrder } = require('../roomAccess');
+const { onJoin, roomFor, prefixOfOwnRoom, canOpenComments, pageCommentRoomOf, readablePage, mayReceiveComments, forTheViewer, inOrder } = require('../roomAccess');
 const { THREAD_MODULE } = require('../../Modules/Comments/helpers/chatThreads');
+const { liveModuleOf } = require('../../Modules/Comments/helpers/threadWriteAccess');
 
 exports.commentSocketHandler = ({ socket, namespace }) => {
     onJoin(socket, 'joinCommentRoom',
@@ -40,7 +41,7 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
      */
     socket.on('commentTyping', (data) => {
         const { identity } = socket;
-        if (!identity || !data || !data.roomPrefix || !socket.rooms.has(roomFor(socket, data.roomPrefix))) return;
+        if (!identity || !data || typeof data.roomPrefix !== 'string' || !data.roomPrefix || !socket.rooms.has(roomFor(socket, data.roomPrefix))) return;
 
         const payload = {
             roomPrefix: data.roomPrefix,
@@ -52,6 +53,8 @@ exports.commentSocketHandler = ({ socket, namespace }) => {
         const others = findRoomsByPrefix(data.roomPrefix).filter((entry) => entry.socket && entry.socket !== socket);
         if (!others.length) return;
         inOrder(async () => {
+            // The sender's room outlives their access too, so they are asked the same question as each receiver.
+            if (!(await mayReceiveComments(identity, identity, data.roomPrefix))) return;
             for (const entry of others) {
                 // eslint-disable-next-line no-await-in-loop
                 if (!(await mayReceiveComments(entry.socket.identity, identity, data.roomPrefix))) continue;
@@ -70,9 +73,11 @@ function setEventName(type) {
     }
 }
 
+/* The project's own room hears only a comment stored on the project itself. */
 const prefixOf = ({ module, data }) => {
-    if (module === 'comments' || module === THREAD_MODULE) return `comments_${data.projectId}_${data.sprintId}_${data.taskId}`;
-    if (module === 'comments_project') return `comments_project_${data.projectId}`;
+    const ofThread = `comments_${data.projectId}_${data.sprintId}_${data.taskId}`;
+    if (module === 'comments' || module === THREAD_MODULE) return ofThread;
+    if (module === 'comments_project') return liveModuleOf(data) === 'comments_project' ? `comments_project_${data.projectId}` : ofThread;
     return null;
 };
 
@@ -112,7 +117,7 @@ exports.relayPageComment = async (changeData) => {
         if (!identity || identity.companyId !== companyId || !entry.socket.rooms.has(entry.roomName)) continue;
         if (!decisions.has(identity.uid)) {
             // eslint-disable-next-line no-await-in-loop
-            decisions.set(identity.uid, Boolean(await readablePage(identity, comment.pageId).catch(() => null)));
+            decisions.set(identity.uid, Boolean(await forTheViewer(() => readablePage(identity, comment.pageId)).catch(() => null)));
         }
         if (decisions.get(identity.uid)) entry.namespace.to(entry.roomName).emit(eventName, { fullDocument: comment });
     }

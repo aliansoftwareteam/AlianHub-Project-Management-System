@@ -14,7 +14,7 @@
                                     :addUser="false"
                                     class="mr-5px"
                                 />
-                                <h5 v-if="containerWidth > 767" class="text-ellipse item-title font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
+                                <h5 v-if="containerWidth > 767" class="text-ellipse item-title task-item-list-font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
                                     <span v-for="(user, userIndex) in item.users" :key="userIndex">
                                         {{userIndex !== 0 ? ", " : "" }}{{user.Employee_Name}}
                                     </span>
@@ -25,16 +25,16 @@
                                 <h5 class="text-ellipse item-title" :style="`color: ${item.textColor ? item.textColor : '#818181'}; background-color: ${item.backColor ? item.backColor : 'transparent'}; margin-left: 5px;`">{{$t('general.unassigned')}}</h5>
                             </div>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
+                            <span class="task-item-list-font-size-14 ml-6px task-item-list-dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
                         </template>
                         <template v-else>
                             <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
-                            <span class="text-ellipse status-sprint font-weight-500 ah-status-ink" :style="item.bgColor ? statusChipStyle(item) : { color: item.textColor || '' }">
+                            <span class="text-ellipse status-sprint task-item-list-font-weight-500 ah-status-ink" :style="item.bgColor ? statusChipStyle(item) : { color: item.textColor || '' }">
                                 <WasabiImage v-if="item.image" :data="{url: item.image, title: item.name}" class="mr-5px"/>
                                 {{item.name}}
                             </span>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
+                            <span class="task-item-list-dark-gray task-item-list-font-size-13 task-item-list-font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
                         </template>
                     </div>
                 </div>
@@ -43,7 +43,7 @@
                         <div v-for="(head,i) in headers.filter((x) => cardData.includes(x.id))" :key="i" class="span_wrapper">
                             <span
                                 :title="head.label"
-                                class="task_right dark-gray font-weight-500 font-size-12 text-ellipse"
+                                class="task_right task-item-list-dark-gray task-item-list-font-weight-500 task-item-list-font-size-12 text-ellipse"
                                 :class="{
                                     'item-head-draggable-div' : false,
                                     'custom__field_list_view':head.key !== 'AssigneeUserId' && head.key !== 'commentCounts' && head.key !== 'DueDate' && head.key !== 'Task_Priority' && head.key !== 'TaskKey' && head.key !== 'created_date' && head.key !== 'created_by'
@@ -110,7 +110,7 @@
                                 :addUser="false"
                                 class="mr-5px"
                             />
-                            <h5 v-if="containerWidth > 767" class="text-ellipse item-title font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
+                            <h5 v-if="containerWidth > 767" class="text-ellipse item-title task-item-list-font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
                                 <span v-for="(user, userIndex) in item.users" :key="userIndex">
                                     {{userIndex !== 0 ? ", " : "" }}{{user.Employee_Name}}
                                 </span>
@@ -121,16 +121,16 @@
                             <h5 class="text-ellipse item-title" :style="`color: ${item.textColor ? item.textColor : '#818181'}; background-color: ${item.backColor ? item.backColor : 'transparent'}; margin-left: 5px;`">{{$t('general.unassigned')}}</h5>
                         </div>
                         <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                        <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
+                        <span class="task-item-list-font-size-14 ml-6px task-item-list-dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
                     </template>
                     <template v-else>
                         <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
-                        <span class="text-ellipse status-sprint font-weight-500 ah-status-ink" :style="item.bgColor ? statusChipStyle(item) : { color: item.textColor || '' }">
+                        <span class="text-ellipse status-sprint task-item-list-font-weight-500 ah-status-ink" :style="item.bgColor ? statusChipStyle(item) : { color: item.textColor || '' }">
                             <WasabiImage v-if="item.image" :data="{url: item.image, title: item.name}" class="mr-5px"/>
                             {{item.name}}
                         </span>
                         <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                        <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
+                        <span class="task-item-list-dark-gray task-item-list-font-size-13 task-item-list-font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
                     </template>
                 </div>
             </div>
@@ -139,7 +139,7 @@
                     <div v-for="(head,i) in headers.filter((x) => cardData.includes(x.id))" :key="i" class="span_wrapper">
                         <span
                             :title="head.label"
-                            class="task_right dark-gray font-weight-500 font-size-12 text-ellipse"
+                            class="task_right task-item-list-dark-gray task-item-list-font-weight-500 task-item-list-font-size-12 text-ellipse"
                             :class="{
                                 'item-head-draggable-div' : false,
                                 'custom__field_list_view':head.key !== 'AssigneeUserId' && head.key !== 'commentCounts' && head.key !== 'DueDate' && head.key !== 'Task_Priority' && head.key !== 'TaskKey' && head.key !== 'created_date' && head.key !== 'created_by'
@@ -155,11 +155,11 @@
                                 <img :src="addCustomField" :alt="$t('Projects.show_hide_columns')" />
                             </template>
                             <template #options>
-                                <div class="d-flex align-items-center hover-bg-lighter-gray-dropdown hover-purple cursor-pointer text-nowrap drop-down-item gray81 p-7px border-radius-4-px">
+                                <div class="d-flex align-items-center task-item-list-hover-bg-lighter-gray-dropdown task-item-list-hover-purple cursor-pointer text-nowrap drop-down-item task-item-list-gray81 p-7px border-radius-4-px">
                                     <input type="text" class="customfield__form-control" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
                                 </div>
                                 <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')" @click="isCustomField = true">
-                                    <span class="font-weight-500 line-height-19 font-ui blue">+ {{$t('CustomField.custom_field')}}</span>
+                                    <span class="task-item-list-font-weight-500 task-item-list-line-height-19 font-ui task-item-list-blue">+ {{$t('CustomField.custom_field')}}</span>
                                 </DropDownOption>
                                 <template v-if="headerHideShow && headerHideShow.length">
                                     <DropDownOption
@@ -169,7 +169,7 @@
                                         @click="obj.show = !obj.show; toggleButton(obj.show,obj.key,obj)"
                                     >
                                         <div class="d-flex align-items-center justify-content-between w-100">
-                                            <span class="font-weight-400 line-height-19 font-ui">
+                                            <span class="task-item-list-font-weight-400 task-item-list-line-height-19 font-ui">
                                                 {{obj.label}}
                                             </span>
                                             <span>
@@ -721,5 +721,41 @@ function prepareIndexData () {
     container-type: inline-size; /* Enables container queries */
     container-name: tasksList; /* This name is referenced in @container */
     box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
+}
+</style>
+
+<style scoped>
+.task-item-list-blue {
+    color: var(--brand) !important;
+}
+.task-item-list-dark-gray {
+    color: var(--ink);
+}
+.task-item-list-gray81 {
+    color: var(--ink-2);
+}
+.task-item-list-hover-purple:hover {
+    color: var(--brand) !important;
+}
+.task-item-list-hover-bg-lighter-gray-dropdown:hover {
+    background-color: var(--surface-hover) !important;
+}
+.task-item-list-font-weight-400 {
+    font-weight: 400 !important;
+}
+.task-item-list-font-weight-500 {
+    font-weight: 500 !important;
+}
+.task-item-list-font-size-12 {
+    font-size: 12px;
+}
+.task-item-list-font-size-13 {
+    font-size: 13px;
+}
+.task-item-list-font-size-14 {
+    font-size: 14px;
+}
+.task-item-list-line-height-19 {
+    line-height: 19px;
 }
 </style>

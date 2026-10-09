@@ -30,11 +30,13 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from "vue";
+import { inject, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
+import { AGENTS_CHANGED_EVENT, POLICY_CHANGE } from "@/views/Ai/agentFeed";
+import { useStoredProjectPart } from "@/views/Projects/liveProjects";
 
 defineOptions({ name: "ProjectAgentPolicyCard" });
 
@@ -64,6 +66,7 @@ const GROUPS = [
 
 const { t } = useI18n();
 const $toast = useToast();
+const socket = inject("$socket", null);
 
 const uid = `pap-${Math.random().toString(36).slice(2, 8)}`;
 const ids = { heading: `${uid}-heading` };
@@ -116,6 +119,25 @@ async function load(pid) {
 
 watch(() => props.projectId, (pid) => { if (pid) load(pid); }, { immediate: true });
 
+async function follow() {
+    const pid = props.projectId;
+    if (!loaded.value || busy.value) return;
+    try {
+        const data = await request("get", pid, undefined, "AgentPolicy.load_failed");
+        if (pid === props.projectId && !busy.value) take(data);
+    } catch (e) {
+        // The card keeps what it shows; the next open reads it again.
+    }
+}
+
+const onAgentsChanged = (change) => { if (change?.kind === POLICY_CHANGE) follow(); };
+watch(() => socket?.value, (next, previous) => {
+    previous?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
+    next?.on?.(AGENTS_CHANGED_EVENT, onAgentsChanged);
+}, { immediate: true });
+onBeforeUnmount(() => socket?.value?.off?.(AGENTS_CHANGED_EVENT, onAgentsChanged));
+useStoredProjectPart(() => props.projectId, "agentPolicy", saved, follow);
+
 async function save(key) {
     busy.value = true;
     error.value = "";
@@ -149,5 +171,5 @@ async function save(key) {
 .pap__radio:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .pap__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .pap__name { color: var(--ink); font: 500 12.5px/1.35 var(--font-ui); overflow-wrap: anywhere; }
-.pap__about { color: var(--ink-2); font: 400 12px/1.4 var(--font-ui); overflow-wrap: anywhere; }
+.pap__about { color: var(--ink-label); font: 400 12px/1.4 var(--font-ui); overflow-wrap: anywhere; }
 </style>

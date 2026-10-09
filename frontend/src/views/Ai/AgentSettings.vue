@@ -64,6 +64,19 @@
                         <p v-else class="ai-ladder__rule">{{ $t('Ai.scope_no_projects') }}</p>
                     </section>
 
+                    <section v-if="roles.length" class="ah-card ai-agent" data-test="role">
+                        <div class="ah-field">
+                            <div class="ah-label">{{ $t('Ai.role') }}</div>
+                            <span class="ah-small">{{ $t('Ai.role_lead') }}</span>
+                            <label class="ah-field__label" for="agent-role">{{ $t('Ai.role') }}</label>
+                            <select id="agent-role" v-model="form.role" class="ah-input" :disabled="!canManage" data-test="role-pick">
+                                <option value="">{{ $t('Ai.role_none') }}</option>
+                                <option v-for="role in roles" :key="role.id" :value="role.id">{{ $t('Ai.role_option', { name: role.name, department: role.department }) }}</option>
+                            </select>
+                            <span class="ah-field__hint">{{ $t('Ai.role_hint') }}</span>
+                        </div>
+                    </section>
+
                     <section class="ah-card ai-agent">
                         <div class="ah-label">{{ $t('Ai.autonomy') }}</div>
                         <div class="ai-radios">
@@ -183,7 +196,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
-import moment from "moment";
+import { clockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import AiSidebar from "./AiSidebar.vue";
 import AgentRunDetail from "./AgentRunDetail.vue";
@@ -220,6 +233,7 @@ const form = reactive(formFromAgent({}));
 const saved = ref({});
 const projects = computed(() => (getters["projectData/projects"]?.data || []).filter((p) => !p.deletedStatusKey));
 const pinnableModels = ref([]);
+const roles = ref([]);
 const openRunCount = computed(() => (activeRuns.value[String(route.params.id)] || []).length);
 
 const AUTONOMY_LEVELS = computed(() => (registryManifest.value.autonomy || []).map((a) => a.level).slice(0, 4));
@@ -247,7 +261,7 @@ const allowedKeys = computed(() => {
 });
 const preview = computed(() => splitPreview(allowedKeys.value, registryManifest.value.actions));
 
-const time = (at) => (at ? moment(at).format("HH:mm") : "");
+const time = clockText;
 const runStatus = (run) => (te(`Ai.run_status_${run.status}`) ? t(`Ai.run_status_${run.status}`) : run.status);
 const runChip = (run) => (run.status === "failed" ? "ah-chip--danger" : run.status === "running" ? "ah-chip--brand" : run.status === "skipped" ? "ah-chip--warn" : "ah-chip--ok");
 const toggleRun = (id) => { expandedRun.value = expandedRun.value === id ? "" : id; };
@@ -255,6 +269,13 @@ const toggleRun = (id) => { expandedRun.value = expandedRun.value === id ? "" : 
 const loadPinnableModels = async () => {
     const res = await apiRequest("get", `${env.AGENT_MODELS}?configured=true`).catch(() => null);
     pinnableModels.value = res?.data?.status ? (res.data.data?.models || []) : [];
+};
+
+const loadRoles = async () => {
+    const res = await apiRequest("get", env.AGENT_ROLES).catch(() => null);
+    roles.value = res?.data?.status && res.data.data?.on !== false
+        ? (res.data.data?.roles || []).map((role) => ({ id: `${role.blueprint}/${role.slug}`, name: role.name, department: role.department }))
+        : [];
 };
 
 const reloadRuns = async () => {
@@ -291,7 +312,7 @@ const load = async () => {
     skills.value = [...chosen, ...offered];
     saved.value = currentSettings();
 
-    await Promise.all([reloadRuns(), loadPinnableModels()]);
+    await Promise.all([reloadRuns(), loadPinnableModels(), loadRoles()]);
     loadingAgent.value = false;
 };
 

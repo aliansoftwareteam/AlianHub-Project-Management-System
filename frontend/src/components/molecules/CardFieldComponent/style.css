@@ -11,14 +11,14 @@
     display: block;
     font-weight: 500;
     text-transform: capitalize;
-    color: #202020;
+    color: var(--ink);
     font-size: 14px;
     
 }
 
 .custom-form .custom-field .custom-field-input {
     padding: 6px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 4px;
     font-size: 14px;
     height: 30px;
@@ -26,8 +26,8 @@
 
 .custom-form .custom-field .custom-field-input:focus {
     outline: none;
-    border-color: #2f3990;
-    box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.2);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 1px var(--brand-ring);
 }
 
 .custom-dropdown {
@@ -37,23 +37,23 @@
 .dropdown-selected {
     width: 100%;
     min-height: 38px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--hairline);
     border-radius: 4px;
     padding: 0.5rem;
     cursor: pointer;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    background-color: #fff;
+    background-color: var(--surface);
 }
 
 .dropdown-selected.disabled {
-    background-color: #f3f4f6;
+    background-color: var(--fill);
     cursor: not-allowed;
 }
 
 .placeholder {
-    color: #9ca3af;
+    color: var(--ink-2);
 }
 
 .dropdown-options {
@@ -62,8 +62,8 @@
     max-height: 250px;
     overflow-y: auto;
     margin-top: 2px;
-    background-color: #fff;
-    border: 1px solid #e0e0e0;
+    background-color: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 4px;
     z-index: 10;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
@@ -73,7 +73,7 @@
     width: 100%;
     padding: 0.5rem;
     border: none;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--hairline);
     font-size: 14px;
 }
 
@@ -91,7 +91,7 @@
 }
 
 .option:hover {
-    background-color: #f3f4f6;
+    background-color: var(--fill);
 }
 
 .selection-tags {
@@ -101,7 +101,7 @@
 }
 
 .tag {
-    background-color: #f3f4f6;
+    background-color: var(--fill);
     border-radius: 4px;
     padding: 2px 8px;
     display: inline-flex;
@@ -124,7 +124,7 @@
     border: none;
     padding: 0;
     cursor: pointer;
-    color: #6b7280;
+    color: var(--ink-2);
 }
 
 .toggle-wrapper {
@@ -151,7 +151,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
+    background-color: var(--track);
     border-radius: 34px;
     transition: .4s;
 }
@@ -165,13 +165,13 @@ input:checked+.toggle-slider:before{
     width: 12px;
     left: 5px;
     bottom: 4px;
-    background-color: white;
+    background-color: var(--surface);
     border-radius: 50%;
     transition: .4s;
 }
 
 input:checked+.toggle-slider {
-    background-color: #2f3990;
+    background-color: var(--brand);
 }
 
 input:checked+.toggle-slider:before {
@@ -181,9 +181,9 @@ input:checked+.toggle-slider:before {
 .card-component-btn {
     position: sticky;
     bottom: 0;
-    background-color: white;
+    background-color: var(--surface);
     padding: 15px;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--hairline);
     display: flex;
     justify-content: flex-end;
     gap: 10px;
@@ -199,15 +199,15 @@ button {
 }
 
 .cancel-btn {
-    background-color: #f3f4f6;
-    border: 1px solid #e0e0e0;
-    color: #374151;
+    background-color: var(--fill);
+    border: 1px solid var(--hairline);
+    color: var(--ink-label);
 }
 
 .submit-btn {
-    background-color: #2F3990;
-    border: 1px solid #2F3990;
-    color: white;
+    background-color: var(--brand);
+    border: 1px solid var(--brand);
+    color: var(--on-brand);
 }
 
 .submit-btn:disabled {
@@ -217,7 +217,7 @@ button {
 }
 
 .error-message {
-    color: #ef4444;
+    color: var(--danger);
     font-size: 12px;
     display: block;
     position: absolute;
@@ -288,11 +288,11 @@ button {
     text-align: end;
 }
 .additional-users-count {
-    background: #2f3990;
+    background: var(--brand);
     padding: 1px 8px;
     border-radius: 10px;
     margin-left: 5px;
-    color: white;
+    color: var(--on-brand);
     height: 17px;
     width: fit-content;
 }
@@ -303,7 +303,7 @@ button {
     margin-bottom: 0;
 }
 .group_by_card {
-    color: #8d8d8d;
+    color: var(--ink-2);
     font-size: 16px;
     margin: 0;
     padding-bottom: 10px;
@@ -334,19 +334,19 @@ button {
     right: 0;
     height: 14px;
     width: 14px;
-    background-color: #eee;
-    border: 2px solid #333;
+    background-color: var(--fill);
+    border: 2px solid var(--ink);
     border-radius: 4px;
     transition: all 0.2s ease;
   }
   
   .project-custom-checkbox:hover .project-checkbox-mark {
-    background-color: #ccc;
+    background-color: var(--border);
   }
   
   .project-custom-checkbox input:checked ~ .project-checkbox-mark {
-    background-color: #2F3990;
-    border-color: #2F3990;
+    background-color: var(--brand);
+    border-color: var(--brand);
   }
   
   .project-custom-checkbox .project-checkbox-mark:after {
@@ -364,7 +364,7 @@ button {
     top: -1px;
     width: 3px;
     height: 8px;
-    border: solid white;
+    border: solid var(--surface);
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
   }
@@ -408,12 +408,12 @@ button {
 .cf-scope-select {
   width: 65%;
   height: 36px;
-  border: 1px solid #DFE1E6;
+  border: 1px solid var(--hairline);
   border-radius: 5px;
   padding: 0 8px;
   font-size: 13px;
-  color: #374151;
-  background: #fff;
+  color: var(--ink-label);
+  background: var(--surface);
   cursor: pointer;
 }
 .cf-scope-list {

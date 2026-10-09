@@ -336,6 +336,7 @@ function evaluateFormula(expression, scope) {
 
 function aggregate(fn, rawValues) {
     const values = (Array.isArray(rawValues) ? rawValues : [])
+        .filter((raw) => raw !== null && raw !== undefined && !(typeof raw === 'string' && raw.trim() === ''))
         .map((raw) => Number(typeof raw === 'string' ? raw.replace(/,/g, '').trim() : raw))
         .filter((value) => Number.isFinite(value));
     const name = ROLLUP_FUNCTIONS.includes(fn) ? fn : 'sum';

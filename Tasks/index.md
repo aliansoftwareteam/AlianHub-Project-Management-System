@@ -53,3 +53,4 @@ Auto-maintained registry of all tasks. Reflects YAML frontmatter from each `task
 | 045 | Medium gaps from the ClickUp re-check | active | high | 044 | active/045-clickup-medium-gaps |
 | 046 | The plan to be great next to ClickUp | active | high | 045 | active/046-better-than-clickup |
 | 047 | AI-run — a teammate that already knows the software | active | high | 046 | active/047-ai-run |
+| 048 | Team agent packs — role agents per team, workflows, a dispatcher and company blueprints | active | medium | 047 | active/048-team-agent-packs |

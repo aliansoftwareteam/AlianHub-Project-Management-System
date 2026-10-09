@@ -5,6 +5,7 @@ const { buildTemplateFromBody } = require('./controller');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { actingUser } = require('../Sprints/helpers/actingUser');
+const { keptOnProject } = require('../../Config/projectPeople');
 const logger = require('../../Config/loggerConfig');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -49,7 +50,7 @@ async function newRule(companyId, task, fields, user) {
         lastInstanceTaskId: String(task._id),
         templateSnapshot: buildTemplateFromBody({
             taskName: task.TaskName,
-            assignees: task.AssigneeUserId,
+            assignees: await keptOnProject(companyId, String(task.ProjectID))(task.AssigneeUserId || []),
             taskType: task.TaskType,
             taskTypeKey: task.TaskTypeKey,
             priority: task.Task_Priority,

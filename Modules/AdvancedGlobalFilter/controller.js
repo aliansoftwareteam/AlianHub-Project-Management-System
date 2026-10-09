@@ -11,6 +11,8 @@ const savedFilters = require("./helpers/savedFilters");
 const { keepVisibleProjectIds } = require('../../Config/projectAccess');
 const { visibleProjectIds } = require('../Agents/scope');
 const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
+const { keptFromCaller } = require('../Comments/helpers/conversationRows');
+const { withoutConversationsOfOthers } = require('../Comments/helpers/conversationReaders');
 
 /* The files and links searches name their projects in the saved filter when there is one, so those ids
  * are kept to the projects the caller can open and may list tasks in, as the route does for `pids`. */
@@ -28,6 +30,15 @@ const visibleSprintStages = async (req, projectIds) => {
     const hidden = await hiddenSprintIds(companyId, req.uid, projectIds.map(String));
     return hidden.length ? [{ $match: { sprintId: { $nin: idForms(hidden.map(String)) } } }] : [];
 };
+
+/* The same joins of comments leave out the rows of a conversation the caller does not read. */
+const chatKeptStages = async (req) => {
+    const kept = await keptFromCaller(String(req.headers['companyid'] || ''), req.uid);
+    return Object.keys(kept).length ? [{ $match: kept }] : [];
+};
+
+/* And the joins of tasks leave out the conversation itself, which is stored as a task. */
+const ownConversationsStage = (req) => ({ $match: withoutConversationsOfOthers(req.uid) });
 
 /**
  * Helper functions
@@ -115,6 +126,7 @@ exports.searchTasks = async (req, res) => {
                     { ...additionalFilter },
                     { ProjectID: { $in: convertedProjectIds } },
                     { deletedStatusKey: { $in: [undefined, 0] } },
+                    withoutConversationsOfOthers(req.uid),
                     ...(searchStr ? [{ TaskName: { $regex: escapeRegex(searchStr), $options: "i" } }] : []),
                 ],
             },
@@ -321,6 +333,7 @@ exports.searchFiles = async (req, res) => {
             ? { $and: [{ _id: { $in: additionalFilter } }] }
             : { $and: [{ _id: { $in: convertedProjectIds } }] };
         const visibleSprints = await visibleSprintStages(req, defaultFilterParams.$and[0]._id.$in);
+        const chatKept = await chatKeptStages(req);
 
         const query = [
             { $match: defaultFilterParams },
@@ -330,7 +343,7 @@ exports.searchFiles = async (req, res) => {
                     localField: "_id",
                     foreignField: "ProjectID",
                     as: "taskData",
-                    pipeline: [...visibleSprints, { $match: { $expr: { $ne: ["$attachments", []] } } }],
+                    pipeline: [...visibleSprints, ownConversationsStage(req), { $match: { $expr: { $ne: ["$attachments", []] } } }],
                 },
             },
             {
@@ -339,7 +352,7 @@ exports.searchFiles = async (req, res) => {
                     localField: "_id",
                     foreignField: "projectId",
                     as: "commentData",
-                    pipeline: [...visibleSprints, { $match: { type: { $nin: ["text", "link"] } } }],
+                    pipeline: [...visibleSprints, ...chatKept, { $match: { type: { $nin: ["text", "link"] } } }],
                 },
             },
             {
@@ -446,6 +459,7 @@ exports.searchLinks = async (req, res) => {
             ? { $and: [{ _id: { $in: additionalFilter } }] }
             : { $and: [{ _id: { $in: convertedProjectIds } }] };
         const visibleSprints = await visibleSprintStages(req, defaultFilterParams.$and[0]._id.$in);
+        const chatKept = await chatKeptStages(req);
 
         const query = [
             {
@@ -458,6 +472,7 @@ exports.searchLinks = async (req, res) => {
                     foreignField: "ProjectID",
                     pipeline: [
                         ...visibleSprints,
+                        ownConversationsStage(req),
                         {
                             $match: {
                                 rawDescription: { $exists: true, $ne: null }
@@ -483,6 +498,7 @@ exports.searchLinks = async (req, res) => {
                     foreignField: "projectId",
                     pipeline: [
                         ...visibleSprints,
+                        ...chatKept,
                         {
                             $match: {
                                 type: "link"

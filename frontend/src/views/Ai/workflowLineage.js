@@ -104,8 +104,9 @@ export const accountableOf = (step, run) => {
  * run view draws it — `groupSteps` is the same grouping, so a fan of fifty is
  * still one row until somebody asks for the rest. */
 export const chainOf = (steps = [], run = null, { expanded = [] } = {}) => {
-    const byId = new Map((steps || []).map((step) => [String(step.stepId), step]));
-    return groupSteps(steps, { expanded }).map((node) => ({
+    const rows = steps || [];
+    const byId = new Map(rows.map((step) => [String(step.stepId), step]));
+    return groupSteps(rows, { expanded }).map((node) => ({
         ...node,
         edges: edgesOf(node.step, byId),
         accountable: accountableOf(node.step, run),

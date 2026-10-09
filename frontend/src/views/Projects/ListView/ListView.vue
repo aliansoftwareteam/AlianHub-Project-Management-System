@@ -77,8 +77,8 @@
                         </span>
                     </div>
 
-                    <section v-for="sprint in groupedTasks" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
-                        <div v-if="groupedTasks.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__sprint-bar">
+                    <section v-for="sprint in shownSprints" :key="sprint?.id" class="lv2__sprint" role="presentation" :id="`sprint_${sprint?.id}`">
+                        <div v-if="shownSprints.length > 1 || !sprint.isExpanded" role="row" class="lv2__aria-row"><div role="cell" class="lv2__sprint-bar">
                         <button type="button" class="lv2__sprint-head" :aria-expanded="!!sprint.isExpanded" @click="toggleSprints(sprint?.id)">
                             <span class="lv2__caret lv2__caret--sprint" aria-hidden="true">{{ sprint.isExpanded ? '▼' : '►' }}</span>
                             <span class="lv2__sprint-name">{{ sprint.name }}</span>
@@ -88,7 +88,7 @@
                         </div></div>
 
                         <template v-if="sprint.isExpanded">
-                            <template v-for="item in (sprint.items || [])" :key="item.key">
+                            <template v-for="item in drawnGroups(sprint)" :key="item.key">
                                 <ListGroup
                                     v-if="isGroupOpen(sprint, item)"
                                     :item="item"
@@ -142,7 +142,7 @@
                     v-else-if="project?.deletedStatusKey !== 2"
                     :image="noSearchResult"
                     :illustration="emptyTitleKey === 'EmptyState.no_match_title' ? 'search' : 'tasks'"
-                    :title="showArchived ? $t('ProjectSlider.no_archived') : $t(emptyTitleKey)"
+                    :title="$t(emptyTitleKey, emptyTitleParams)"
                     :message="showArchived ? '' : $t(emptyMessageKey)"
                     :actionLabel="emptyActionLabel"
                     :sentence="!showArchived && emptySentenceKey ? $t(emptySentenceKey) : ''"
@@ -179,7 +179,7 @@ import { useCustomComposable } from '@/composable';
 import { useTaskSelection } from '@/composable/useTaskSelection.js';
 import { useProjectAgentActivity } from './useProjectAgentActivity.js';
 import * as listGroups from './listGroups.js';
-import { groupCountsFor, groupLabel, listSourceTasks } from './listFilter.js';
+import { archiveViewLists, groupCountsFor, groupLabel, listSourceTasks } from './listFilter.js';
 import { useTaskEmptyState } from '@/views/Projects/composables/useTaskEmptyState.js';
 import { openTask, useTaskSequenceSource } from '@/components/organisms/TaskDetailOverlay/useTaskOverlay';
 import { useListRowEdit } from './useListInlineEdit.js';
@@ -199,6 +199,8 @@ import { columnCatalogue, listColumnClass, listColumnsAt, listGridVars, useViewC
 import { totalColumnsOf } from '@/views/Projects/composables/groupTotals';
 import OtherProjectRows from '@/views/Projects/components/OtherProjectRows.vue';
 import { useOtherProjectRows } from '@/views/Projects/composables/otherProjectRows';
+import { useGroupSource } from '@/views/Projects/composables/groupSource';
+import { drawsGroup } from '@/views/Projects/composables/agentWorkQuery';
 
 // UTILS
 const {getters} = useStore();
@@ -220,7 +222,7 @@ const {
 const { checkApps, checkPermission } = useCustomComposable();
 const tagsOn = computed(() => checkApps("tags") && checkPermission("task.task_tag", project.value?.isGlobalPermission) !== null);
 const agents = useProjectAgentActivity();
-const { emptyTitleKey, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project);
+const { emptyTitleKey, emptyTitleParams, emptyMessageKey, emptySentenceKey } = useTaskEmptyState(project, () => props.sprints);
 const rowEdit = useListRowEdit(project, showArchived);
 provide('listRowEdit', rowEdit);
 const aiColumnTasks = computed(() => loadedViewTasks(getters, project.value?._id, { searched: Boolean(searchedTask?.value) }));
@@ -333,8 +335,14 @@ function sprintCount(sprint) {
     return searchedTask.value ? searchedRows(sprint).length : (sprint.tasks || 0);
 }
 
+const shownSprints = computed(() => archiveViewLists(groupedTasks.value, { archiveView: Boolean(showArchived.value), rowsOf: sprintCount }));
+
 function groupCount(sprint, item) {
     return listGroups.groupCount(groupCounts(sprint), item);
+}
+
+function drawnGroups(sprint) {
+    return (sprint.items || []).filter((item) => drawsGroup(item, groupCount(sprint, item)));
 }
 
 function isGroupOpen(sprint, item) {
@@ -393,17 +401,22 @@ let initStarted = false;
 let refetchWanted = false;
 let fetchedFor = '';
 
+/* Groups the List already read answer at once (`firstPageOnly` below), so only a new one is asked for. */
+const groupSource = useGroupSource(project, () => props.grouped, () => {
+    init(props.grouped, true, project.value, props.sprints, groupedTasks, false, false);
+});
+
 /* The first call, and the first one that has sprints to fetch, load at once. The page then
  * calls again several times while the sprint list and the props settle, so later calls wait
- * for the last of a burst, and a fetch is skipped when the same project, grouping and sprints
- * were fetched already. */
+ * for the last of a burst, and a fetch is skipped when the same project, grouping, sprints
+ * and groups were fetched already. */
 function init (group,refetch,projects,sprints,groupedTasksData,isBoard,isInitial) {
     if(isInitial == true){
         isLoading.value = true;
     }
     refetchWanted = refetchWanted || refetch === true;
     const run = () => {
-        const signature = JSON.stringify([projects?._id, group, (sprints || []).map((sprint) => sprint?.id)]);
+        const signature = JSON.stringify([projects?._id, group, (sprints || []).map((sprint) => sprint?.id), groupSource.value]);
         const fetch = refetchWanted && signature !== fetchedFor;
         refetchWanted = false;
         if(fetch && sprints?.length) fetchedFor = signature;

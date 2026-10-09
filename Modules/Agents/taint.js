@@ -38,7 +38,13 @@ const EVENT_ORIGINS = Object.freeze({
 
 const collector = new AsyncLocalStorage();
 
-const enabled = () => /^(true|on|1)$/i.test(String(process.env.AGENT_TAINT_ROUTING || '').trim());
+/* Unset, it follows the outside-agent surface: on while any MCP tool flag or MCP_OAUTH is on, so an outside
+ * client's risky write waits for a person. An explicit value always wins. */
+const enabled = (env = process.env) => {
+    const { isSet, anyToolOn } = require('../Mcp/defaultOn');
+    if (isSet(env.AGENT_TAINT_ROUTING)) return /^(true|on|1|yes)$/i.test(String(env.AGENT_TAINT_ROUTING).trim());
+    return anyToolOn(env) || require('../OAuthServer/config').isOn(env);
+};
 
 const oid = (id) => { try { return new mongoose.Types.ObjectId(String(id)); } catch (e) { return null; } };
 const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);

@@ -3,9 +3,10 @@ const mongoose = require('mongoose');
 const logger = require('../../Config/loggerConfig');
 const { myCache } = require('../../Config/config');
 const { dbCollections } = require('../../Config/collections');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 
-const multer = require('multer');
+const multer = require('../../utils/contextMulter');
 
 const { getProvider, isAnyProviderConfigured } = require('../AICore/llmProvider');
 const { isProviderError } = require('../AICore/providerError');
@@ -101,10 +102,10 @@ async function loadActiveMembers(companyId) {
     try {
         const result = await MongoDbCrudOpration(companyId, {
             type: dbCollections.COMPANY_USERS,
-            data: [{ status: { $ne: 'inactive' } }, { _id: 1, userId: 1, Employee_Name: 1, email: 1, role: 1, designation: 1 }],
+            data: [{ ...ACTIVE_SEAT }, { _id: 1, userId: 1, Employee_Name: 1, email: 1, role: 1, designation: 1 }],
         }, 'find');
-        return Array.isArray(result) ? result.map((m) => ({
-            id: String(m.userId || m._id),
+        return Array.isArray(result) ? result.filter((m) => m.userId).map((m) => ({
+            id: String(m.userId),
             name: m.Employee_Name || m.email || 'Unknown',
             role: m.role || m.designation || '',
         })) : [];
@@ -337,16 +338,24 @@ function briefUploadMiddleware(req, res, next) {
     });
 }
 
+/* What needs no file is asked before one is read. The company is asked again once the fields of the request are in. */
+function briefAsked(req, res, next) {
+    if (!isAnyProviderConfigured()) return sendError(res, 503, 'AI provider is not configured');
+    if (!req.uid) return sendError(res, 401, 'Unauthorized');
+    if (!resolveCompanyId(req)) return sendError(res, 403, 'Company access denied');
+    return next();
+}
+
 exports.uploadBrief = [
+    briefAsked,
     briefUploadMiddleware,
     async (req, res) => {
-        if (!isAnyProviderConfigured()) {
-            return sendError(res, 503, 'AI provider is not configured');
-        }
         const uid = req.uid;
-        if (!uid) return sendError(res, 401, 'Unauthorized');
         const companyId = resolveCompanyId(req);
-        if (!companyId) return sendError(res, 403, 'Company access denied');
+        if (!companyId) {
+            if (req.file) safeUnlink(req.file.path);
+            return sendError(res, 403, 'Company access denied');
+        }
         if (!req.file) return sendError(res, 400, 'No file uploaded (field name: file)');
 
         try {
@@ -682,14 +691,14 @@ exports.execute = async (req, res) => {
         // attributed to the real person who triggered the run — matching the
         // manual flow — instead of a generic label.
         let currentUserName = '';
+        let allowed = new Set();
         try {
             const members = await loadActiveMembers(companyId);
-            const allowed = new Set(members.map((m) => String(m.id)));
+            allowed = new Set(members.map((m) => String(m.id)));
             const me = members.find((m) => String(m.id) === String(uid));
             if (me && me.name) currentUserName = me.name;
-            const sanitized = sanitizeMemberIds(plan, allowed);
-            plan = sanitized.plan;
-        } catch (_e) { /* leave as-is */ }
+        } catch (_e) { /* a roster that cannot be read names nobody */ }
+        plan = sanitizeMemberIds(plan, allowed).plan;
 
         const userData = {
             id: String(uid),
@@ -849,7 +858,7 @@ async function generateTasksPlanForJob({ jobId, uid, companyId, projectId, addit
             description: projectDoc.description || '',
             taskStatusNames: (projectDoc.taskStatusData || []).map((s) => s.name).filter(Boolean),
             taskTypes: (projectDoc.taskTypeCounts || []).map((t) => ({ key: t.key, name: t.name })),
-            sprintNames: await orchestrator.loadSprintNamesForProject(companyId, projectId),
+            sprintNames: await orchestrator.loadSprintNamesForProject(companyId, projectId, uid),
         };
         const members = await loadActiveMembers(companyId);
         const memory = await memoryStore.contextFor({ companyId, userId: String(uid), projectId });
@@ -992,13 +1001,14 @@ exports.tasksExecute = async (req, res) => {
         if (!(await guardTaskTarget(res, { companyId, uid, projectId, mode }))) return;
 
         let currentUserName = '';
+        let allowed = new Set();
         try {
             const members = await loadActiveMembers(companyId);
-            const allowed = new Set(members.map((m) => String(m.id)));
+            allowed = new Set(members.map((m) => String(m.id)));
             const me = members.find((m) => String(m.id) === String(uid));
             if (me && me.name) currentUserName = me.name;
-            plan = sanitizeTaskPlanMemberIds(plan, allowed).plan;
-        } catch (_e) { /* leave as-is */ }
+        } catch (_e) { /* a roster that cannot be read names nobody */ }
+        plan = sanitizeTaskPlanMemberIds(plan, allowed).plan;
 
         const userData = {
             id: String(uid),
@@ -1022,3 +1032,4 @@ exports.tasksExecute = async (req, res) => {
 };
 
 exports.events = (req, res) => sseEmitter.handleEvents(req, res);
+exports.loadActiveMembers = loadActiveMembers;

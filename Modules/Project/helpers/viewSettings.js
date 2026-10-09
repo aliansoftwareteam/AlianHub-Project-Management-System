@@ -2,7 +2,9 @@
  * web app (through the @viewSettings alias) compares the screen against it, so a value the
  * server would drop never shows up as an unsaved change. */
 
-const GROUP_BY = [0, 1, 2, 3];
+/* "Who is working": the groups come from the agents at work when the view is open, so only the choice is stored. */
+const AGENT_WORK_GROUP = 'agentWork';
+const GROUP_BY = [0, 1, 2, 3, AGENT_WORK_GROUP];
 const CUSTOM_GROUP = /^cf:[a-f0-9]{24}$/i;
 const DONE_BY = ['all', 'human', 'agent', 'mixed', 'unchecked'];
 const SUBTASKS = ['collapsed', 'expanded'];
@@ -116,4 +118,4 @@ const printable = (value) => [...value].filter((char) => char.charCodeAt(0) >= 3
 
 const cleanViewTitle = (raw) => printable(text(raw, LIMITS.title * 4)).trim().slice(0, LIMITS.title);
 
-module.exports = { DEFAULT_VIEW_SETTINGS, VIEW_DENSITIES, LIMITS, isPlainObject, cleanViewSettings, cleanViewTitle, cleanFilterRow };
+module.exports = { DEFAULT_VIEW_SETTINGS, VIEW_DENSITIES, AGENT_WORK_GROUP, LIMITS, isPlainObject, cleanViewSettings, cleanViewTitle, cleanFilterRow };

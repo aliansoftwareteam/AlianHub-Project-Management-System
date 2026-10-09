@@ -120,12 +120,60 @@ API validates a definition with `stepTypes.validateSteps()`.
 | `timer` | `at` or `atFrom` | `waitedMs`, `until` |
 | `loop` | `body`, `maxIterations`, `budgetUsd`, `while`, `maxRunsPerHour` | `iterations`, `stoppedBy`, `budgetUsedUsd`, `runLimit` |
 
+| `role_handoff` | `role` (`blueprint/slug`), `taskId`, `deadlineMs`, `onRelease` | `role`, `taskId`, `outcome`, `finishedBy`, `finishedAt`, `skipped` |
+
 A step reads an earlier step's output as `$<stepId>.field`, which the expression
 language only recognises when the id begins with `s`; `validateSteps` refuses a
 reference that would otherwise read nothing at all.
 
 `agent_run` is the type and its contract; the runner it calls through
 `context.runAgent` is `agentRun.js`, below.
+
+## Role hand-overs and the team workflows
+
+`role_handoff` exists only with `WORKFLOW_ENGINE` and `DISPATCHER` both on; off, it
+is not registered, offered or accepted in a definition. It puts the step's task in
+a named role's queue by the dispatcher's own write (`dispatcher/queue.put`, the
+row `accept` writes: a handed-over `project_findings` row with `facts.role`), then
+waits without holding a worker, polling the same row every 30 seconds and woken
+sooner by its `recheck`:
+
+- the role finishes it (`queue.release` with `finished`): the step succeeds with
+  `outcome: finished` and the next step runs, so an `human_approval` gate can sit
+  between two hand-overs;
+- the task leaves the queue another way (taken back, withdrawn, moved to another
+  role): `outcome: released`; the steps after it are skipped, or run anyway with
+  `onRelease: continue`;
+- the deadline passes (`deadlineMs`, seven days by default): the task is withdrawn
+  from the role's queue and the step fails without a retry. The deadline counts
+  from the hand-over and is cut to a minute before the run's, so the step can
+  still withdraw; the hop guard measures a waiting step's `deadlineMs` from its
+  hand-over too. A person's retry, or resume of a failed step, hands it over again;
+- the role does not exist, is not on for the task's project, or the task is gone
+  or done: the step fails at once, naming the cause, and withdraws the task if it
+  had handed it over. A closed or deleted task wakes a waiting step. While agents
+  are paused it waits instead of queueing, looking again every 30 seconds;
+- the step ends any other way (refused by the hop guard, skipped by a person, its
+  executor gone after `DISPATCHER` was switched off, its run ended): the engine
+  calls the type's ending (`executors.onEnd`), which withdraws the task and writes
+  `workflow.role_handoff.withdrawn`.
+
+A finish counts only for the role this step handed to; a task moved to another
+role and finished there is `released` for this step.
+
+Queueing and every end of the wait write an audit row (`workflow.role_handoff.*`),
+announce on the agent socket and clear the task-list cache. A task sits in one
+role's queue at a time, so a chain the design runs in parallel is a line here.
+
+`templates.js` holds the ready-made team workflows: marketing campaign launch,
+design request to handoff, engineering design to release, support to engineering
+(a customer bug), sales onboarding, and the three manufacturing ones. `GET
+/templates` lists them (each `installable: false`, with the reason, while either
+switch is off) and `POST /templates/:key/install` saves one as an ordinary
+definition, disabled; a person enables it and starts a run on a task. Roles in the
+design but absent from `Modules/Agents/roles` are left out: Design Ops (design),
+Customer Success Manager (sales) and the wait for the launch date before the
+Marketing Analyst. The breakdown workflow has no gate, as in the design.
 
 ## Waiting, without holding a worker
 

@@ -26,7 +26,7 @@
     content: '';
     width: 37px;
     height: 3px;
-    background-color: #3845B3;
+    background-color: var(--brand);
     position: absolute;
     bottom: 0px;
     left: 0px;
@@ -53,7 +53,7 @@
     top: 1px;
 }
 .priority__component--wrapper .priority__component {
-    border: 1px solid #dfe1e6;
+    border: 1px solid var(--hairline);
     width: 24px;
     height: 24px;
     display: flex;
@@ -90,7 +90,7 @@
     overflow: auto;
 }
 .calendar__detail--wrapper1{
-    border: 1px solid #CFCFCF;
+    border: 1px solid var(--hairline);
     box-shadow: 0px 1px 8px 0px rgba(0, 0, 0, 0.05);
     height: 100%;
     width: 100%;
@@ -99,7 +99,7 @@
     width: 100%;
 }
 .queue__list-task {
-    background:  #DFE1E6;
+    background: var(--fill);
     filter: drop-shadow(0px 1px 8px rgba(0, 0, 0, 0.10));
     /* max-width: 750px; */
     padding-right: 5px;
@@ -115,7 +115,7 @@
 }
 .queue__list-taskdetail {
     padding: 11.5px 10px 11.5px 20px;
-    background: #fff;
+    background: var(--surface);
     margin: 5px 0px 5px 5px;
     /* min-width: 272px; */
     /* width: 250px; */
@@ -124,7 +124,7 @@
 }
 .trending__comp-taskdetail {
     padding: 11.5px 20px;
-    background: #fff;
+    background: var(--surface);
     filter: drop-shadow(0px 1px 8px rgba(0, 0, 0, 0.10));
     min-width: 313px;
     width: 100%;
@@ -133,7 +133,7 @@
 .status__color {
     width: 10px;
     height: 10px;
-    background: #3845B3;
+    background: var(--brand);
     border-radius: 1px;
     margin-right: 10px;
 }
@@ -155,13 +155,13 @@
 }
 .calendar__taskdisplay--wrapper{
     border-radius: 4px;
-    border: 0.5px solid #FFBD10;
-    background: rgba(255, 189, 16, 0.10);
+    border: 0.5px solid var(--warn);
+    background: var(--warn-bg);
     padding: 10px;
 }
 .calendar__taskdisplay--wrapper-skelaton{
     border-radius: 4px;
-    border: 0.5px solid #cfcfcf;
+    border: 0.5px solid var(--hairline);
     padding: 10px 44px 10px 20px;
 }
 .calendar__taskdisplay--wrapper:last-child{
@@ -176,9 +176,9 @@
 }
 .calnedar__projectstatus--timecomponent::-webkit-scrollbar{display: none;}
 .due-date-home-calender-wrapper{
-    border:1px solid #DFE1E6;
+    border:1px solid var(--hairline);
     height: 30px;
-    background-color: #FFFFFF;
+    background-color: var(--surface);
     width: 143px;
     min-width: 143px;
     z-index: 0;
@@ -188,10 +188,10 @@
 .due-date-home-calender-wrapper .due-date-home-cal {
     margin: 3px 10px 0;
 }
-.due-date-home-calender-wrapper .due-date-home-cal .date_format_cal.calendar-comp::placeholder{font-size: 16px !important;color: #000 !important;}
-.due-date-home-calender-wrapper .due-date-home-cal .date_format_cal.calendar-comp{font-size: 16px !important;color: #000 !important;}
+.due-date-home-calender-wrapper .due-date-home-cal .date_format_cal.calendar-comp::placeholder{font-size: 16px !important;color: var(--ink) !important;}
+.due-date-home-calender-wrapper .due-date-home-cal .date_format_cal.calendar-comp{font-size: 16px !important;color: var(--ink) !important;}
 .lable-status-hover:hover {
-    color: #2F3990;
+    color: var(--brand);
     font-weight: 500;
 }
 .day__status {
@@ -252,11 +252,11 @@
     margin-left: 6.5px;
 }
 .bg-off-white {
-    background-color: #f5f3f3;
+    background-color: var(--fill);
 }
 .driver-popover.driverjs-theme {
-  background-color: white;
-  color: #000;
+  background-color: var(--surface);
+  color: var(--ink);
 }
 
 .driver-popover.driverjs-theme .driver-popover-title {
@@ -266,15 +266,15 @@
 .driver-popover.driverjs-theme .driver-popover-title,
 .driver-popover.driverjs-theme .driver-popover-description,
 .driver-popover.driverjs-theme .driver-popover-progress-text {
-  color: #000;
+  color: var(--ink);
 }
 
 .driver-popover.driverjs-theme button {
   flex: 1;
   text-align: center;
-  background-color: #000;
-  color: #ffffff;
-  border: 2px solid #000;
+  background-color: var(--ink);
+  color: var(--surface);
+  border: 2px solid var(--ink);
   text-shadow: none;
   font-size: 12px;
   padding: 3px 4px;
@@ -282,8 +282,8 @@
 }
 
 .driver-popover.driverjs-theme button:hover {
-  background-color: #000;
-  color: #ffffff;
+  background-color: var(--ink);
+  color: var(--surface);
 }
 
 .driver-popover.driverjs-theme .driver-popover-navigation-btns {
@@ -292,27 +292,27 @@
 }
 
 .driver-popover.driverjs-theme .driver-popover-close-btn {
-  color: #9b9b9b;
+  color: var(--ink-2);
 }
 
 .driver-popover.driverjs-theme .driver-popover-close-btn:hover {
-  color: #000;
+  color: var(--ink);
 }
 
 .driver-popover.driverjs-theme .driver-popover-arrow-side-left.driver-popover-arrow {
-  border-left-color: white;
+  border-left-color: var(--surface);
 }
 
 .driver-popover.driverjs-theme .driver-popover-arrow-side-right.driver-popover-arrow {
-  border-right-color: white;
+  border-right-color: var(--surface);
 }
 
 .driver-popover.driverjs-theme .driver-popover-arrow-side-top.driver-popover-arrow {
-  border-top-color: white;
+  border-top-color: var(--surface);
 }
 
 .driver-popover.driverjs-theme .driver-popover-arrow-side-bottom.driver-popover-arrow {
-  border-bottom-color: white;
+  border-bottom-color: var(--surface);
 }
 .driver-popover-content {
     margin: 0 !important;
@@ -323,25 +323,25 @@
 }
 .driver-popover-prev-btn {
     cursor: pointer !important;
-    background: #FFFFFF !important;
-    border: 1px solid #2F3990 !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--brand) !important;
     border-radius: 4px !important;
-    color: #2F3990 !important;
+    color: var(--brand) !important;
     height: 30px !important;
     font-family: var(--font-ui) !important;
 }
 .driver-popover-next-btn {
-    background: #2F3990 !important;
+    background: var(--brand) !important;
     border-radius: 4px !important;
-    color: white !important;
+    color: var(--on-brand) !important;
     border: none !important;
     height: 30px !important;
     font-family: var(--font-ui) !important;
 }
 .driver-popover-close-btn {
-    background: #2F3990 !important;
+    background: var(--brand) !important;
     border-radius: 4px !important;
-    color: white !important;
+    color: var(--on-brand) !important;
     border: none !important;
     height: 13px !important;
     width: 12px !important;

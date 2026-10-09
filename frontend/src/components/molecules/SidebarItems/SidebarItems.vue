@@ -1,6 +1,6 @@
 <template>
     <div
-        :class="themed ? ['sb-item', {'is-selected': selected, 'is-highlight': highlight}] : ['hover-bg-blue hover-white', {'bg-light-blue black': selected && highlight, 'bg-light-gray black': selected && !highlight, 'bg-white': !selected, 'bg-blue white': !selected && highlight}]"
+        :class="themed ? ['sb-item', {'is-selected': selected, 'is-highlight': highlight}] : ['sidebar-items-hover-bg-blue sidebar-items-hover-white', {'sidebar-items-bg-light-blue sidebar-items-black': selected && highlight, 'sidebar-items-bg-light-gray sidebar-items-black': selected && !highlight, 'sidebar-items-bg-white': !selected, 'sidebar-items-bg-blue sidebar-items-white': !selected && highlight}]"
         class="sidebar_item_main cursor-pointer d-flex align-items-center justify-content-between mobile-listuser"
         role="option"
         tabindex="0"
@@ -36,8 +36,8 @@
                 <template v-if="item.taskImage && isDisable === true">
                     <TaskTypeIcon :taskType="item" class="sidebar__task-image" />
                 </template>
-                <span class="d-block emp_label" :class="[{'font-weight-400' : isDisable === true , 'font-weight-500 font-size-13' : isDisable === false, 'pl-5px': imageDisplayForPriority,'pl-10px' : taskType}]" :style="[{'font-size-13' : clientWidth > 767 &&  isDisable === true , 'font-size-16' : clientWidth <= 767 &&  isDisable === true }]">{{item.label}}</span>
-                <span v-if="item.designation" class="font-size-12 d-block designationAssignee emp_label">{{item.designation ? item.designation : ''}}</span>
+                <span class="d-block emp_label" :class="[{'sidebar-items-font-weight-400' : isDisable === true , 'sidebar-items-font-weight-500 sidebar-items-font-size-13' : isDisable === false, 'pl-5px': imageDisplayForPriority,'pl-10px' : taskType}]" :style="[{'font-size-13' : clientWidth > 767 &&  isDisable === true , 'font-size-16' : clientWidth <= 767 &&  isDisable === true }]">{{item.label}}</span>
+                <span v-if="item.designation" class="sidebar-items-font-size-12 d-block designationAssignee emp_label">{{item.designation ? item.designation : ''}}</span>
             </div>
             <span v-if="item.tag" class="ah-chip ah-chip--agent ah-chip--mono ml-10px">{{ item.tag }}</span>
         </div>
@@ -133,4 +133,43 @@ const deleteIcon = require("@/assets/images/svg/redDelete_Icon.svg");
 </script>
 
 <style src="./style.css">
+</style>
+
+<style scoped>
+.sidebar-items-white {
+    color: var(--on-brand) !important;
+}
+.sidebar-items-black {
+    color: var(--ink);
+}
+.sidebar-items-hover-white:hover {
+    color: var(--on-brand) !important;
+}
+.sidebar-items-bg-white {
+    background-color: var(--surface);
+}
+.sidebar-items-bg-blue {
+    background-color: var(--brand);
+}
+.sidebar-items-bg-light-blue {
+    background-color: var(--brand-tint);
+}
+.sidebar-items-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.sidebar-items-hover-bg-blue:hover {
+    background-color: var(--brand) !important;
+}
+.sidebar-items-font-weight-400 {
+    font-weight: 400 !important;
+}
+.sidebar-items-font-weight-500 {
+    font-weight: 500 !important;
+}
+.sidebar-items-font-size-12 {
+    font-size: 12px;
+}
+.sidebar-items-font-size-13 {
+    font-size: 13px;
+}
 </style>

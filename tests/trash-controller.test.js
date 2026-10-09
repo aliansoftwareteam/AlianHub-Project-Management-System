@@ -8,7 +8,6 @@ jest.mock('../Modules/Project/controller/updateProject', () => ({ updateProjectI
 jest.mock('../Modules/Sprints/controller', () => ({
     updateSprintFun: jest.fn(async () => ({ status: true })),
     updateFolderFun: jest.fn(async () => ({ answer: { status: true }, cascade: Promise.resolve() })),
-    announceFolders: jest.fn(),
 }));
 jest.mock('../Modules/Tasks/helpers/task_class_Mongo', () => ({
     taskMongo: { bulkRestore: jest.fn(async () => ({ totals: { updated: 1 } })) },
@@ -102,6 +101,14 @@ describe('PUT /api/v2/trash/:kind/:id/restore', () => {
         expect(query.data[0]).toEqual({ ProjectID: ID, deletedStatusKey: { $in: [1, 7] } });
         expect(query.data[1]).toEqual({ $set: { deletedStatusKey: 0 } });
         expect(res.send).toHaveBeenCalledWith({ status: true, statusText: 'Restored.', data: { kind: 'projects', id: String(ID) } });
+    });
+
+    test('projects: the people who may open it are told it is back', async () => {
+        const emit = require('../event/socketEventEmitter');
+        const spy = jest.spyOn(emit, 'emit').mockImplementation(() => true);
+        await ctrl.restore(req({ params: { kind: 'projects', id: String(ID) } }), mockRes());
+        expect(spy).toHaveBeenCalledWith('update', { type: 'update', companyId: COMPANY, data: { _id: String(ID) }, updatedFields: { deletedStatusKey: 0 }, module: 'project' });
+        spy.mockRestore();
     });
 
     test('lists: delegates to the sprint update with the restore key', async () => {
@@ -275,6 +282,18 @@ describe('DELETE /api/v2/sample-data', () => {
             statusText: 'Sample data removed.',
             data: { projects: 0, tasks: 0, folders: 0, lists: 0, docs: 0, fields: 0, goals: 0 },
         });
+    });
+
+    test('tells the people who may open the sample project that it went to the trash', async () => {
+        const emit = require('../event/socketEventEmitter');
+        const spy = jest.spyOn(emit, 'emit').mockImplementation(() => true);
+        seedWorld();
+        await ctrl.removeSampleData(req(), mockRes());
+        const projects = spy.mock.calls.map(([, payload]) => payload).filter((payload) => payload.module === 'project');
+        expect(projects).toHaveLength(1);
+        expect(projects[0]).toMatchObject({ type: 'update', companyId: COMPANY, updatedFields: { deletedStatusKey: rules.TRASHED } });
+        expect(projects[0].data._id).toEqual(expect.any(String));
+        spy.mockRestore();
     });
 
     test('tells other tabs the goals changed only when a goal went', async () => {

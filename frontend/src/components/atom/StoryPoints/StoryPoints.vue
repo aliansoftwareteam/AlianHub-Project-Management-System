@@ -84,7 +84,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick, true));
 .sp-disabled .sp-trigger { cursor: default; opacity: 0.7; }
 .sp-chip { font-weight: 600; color: var(--brand, #2f3990); }
 .sp-empty { color: var(--ink-2, #6b6b6b); }
-.sp-menu { position: absolute; z-index: 50; top: 115%; left: 0; background: var(--surface, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12); padding: 6px; display: flex; flex-wrap: wrap; gap: 4px; width: max-content; max-width: 210px; }
+.sp-menu { position: absolute; z-index: 50; top: 115%; left: 0; background: var(--surface, #fff); border: 1px solid var(--border, #e0e0e0); border-radius: 8px; box-shadow: var(--shadow-pop); padding: 6px; display: flex; flex-wrap: wrap; gap: 4px; width: max-content; max-width: 210px; }
 .sp-option { cursor: pointer; padding: 3px 8px; border: 0; border-radius: 6px; background: var(--fill, #f4f6fb); color: inherit; font: inherit; min-width: 26px; text-align: center; }
 .sp-option:hover { background: var(--surface-hover, #e8ecf7); }
 .sp-active, .sp-active:hover { background: var(--brand, #2f3990); color: var(--on-brand, #fff); }

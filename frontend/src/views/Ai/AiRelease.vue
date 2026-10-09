@@ -31,7 +31,7 @@
                         <div class="rel-stat">
                             <div class="ah-label">{{ $t('Pipeline.stat_agents') }}</div>
                             <div class="rel-stat__n">{{ counts.agents }}</div>
-                            <div class="ah-small">{{ $t('Pipeline.stat_agents_sub', { n: counts.projects }) }}</div>
+                            <div class="ah-small">{{ $t('Pipeline.stat_agents_sub', { n: counts.projects }, counts.projects) }}</div>
                         </div>
                         <div class="rel-stat">
                             <div class="ah-label">{{ $t('Pipeline.stat_ci') }}</div>
@@ -164,6 +164,7 @@ import AiModelNotice from '@/components/molecules/AiUnavailable/AiModelNotice.vu
 import { computed, inject, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import moment from "moment";
+import { dayClockText } from "@/utils/clockText";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import AiSidebar from "./AiSidebar.vue";
@@ -201,7 +202,7 @@ const notesDraft = computed(() => (staging.value.proposals || []).find((p) => (p
 const stagingAge = computed(() => (staging.value.last?.decidedAt ? moment(staging.value.last.decidedAt).fromNow(true) : t("Pipeline.none")));
 const stagingWho = computed(() => (staging.value.last ? t("Pipeline.staging_by", { agent: staging.value.last.agentName }) : t("Pipeline.staging_never")));
 const stagingLine = computed(() => (staging.value.last
-    ? `${moment(staging.value.last.decidedAt).format("D MMM HH:mm")} · ${staging.value.last.status}`
+    ? `${dayClockText(staging.value.last.decidedAt)} · ${staging.value.last.status}`
     : t("Pipeline.env_none")));
 const productionLine = computed(() => (changelog.value?.currentVersion
     ? t("Pipeline.env_prod_meta", { version: changelog.value.currentVersion })
@@ -222,7 +223,7 @@ const stagingRule = computed(() => {
 const neverLine = computed(() => t("Pipeline.never_line", { keys: (production.value.never || []).filter((k) => /deploy|merge|git/i.test(k)).join(", ") || "—" }));
 
 const checks = computed(() => [
-    { key: "done", state: counts.value.done ? "ok" : "todo", label: t("Pipeline.check_done", { n: counts.value.done }) },
+    { key: "done", state: counts.value.done ? "ok" : "todo", label: t("Pipeline.check_done", { n: counts.value.done }, counts.value.done) },
     { key: "human", state: "ok", label: t("Pipeline.check_human") },
     { key: "staging", state: staging.value.last ? "ok" : "todo", label: staging.value.last ? t("Pipeline.check_staging_ok", { at: moment(staging.value.last.decidedAt).fromNow() }) : t("Pipeline.check_staging_todo") },
     { key: "ci", state: "unknown", label: t("Pipeline.check_ci") }

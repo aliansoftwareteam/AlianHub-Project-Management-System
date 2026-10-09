@@ -14,7 +14,7 @@
                     <span class="font-size-14 font-weight-500 ai-color ai-border-bottom">{{ $t('AI.ai_write_description') }}</span>
                 </div>
             </div>
-            <div v-show="contentLoaded" id="editorjs" ref="editorHolder" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
+            <div v-show="contentLoaded" id="editorjs" ref="editorHolder" role="group" :aria-label="$t('Description.description')" :class="{'ml-10px mr-10-px': clientWidth < 767, 'show_hide_class': !isShow}" @click="isShow = true"></div>
             <Transition>
                 <span v-if="showMessage" class="saved_message">{{$t('Description.saved')}}</span>
             </Transition>
@@ -46,7 +46,7 @@
 <script setup>
 import { computed, defineComponent, inject, onMounted, provide, ref, watch } from 'vue';
 import { useStore } from 'vuex';
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 import { useRoute, useRouter } from "vue-router";
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from "vue-i18n";

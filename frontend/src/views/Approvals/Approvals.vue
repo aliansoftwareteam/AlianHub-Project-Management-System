@@ -74,8 +74,7 @@
                         />
                         <span v-if="card.kind === 'agent'" class="ah-avatar ah-avatar--agent">◉</span>
                         <span v-else class="ah-avatar" :style="{ background: card.color }">
-                            <img v-if="card.avatar" :src="card.avatar" :alt="card.name" />
-                            <template v-else>{{ initial(card.name) }}</template>
+                            <AvatarImage :src="card.avatar" :alt="card.name">{{ initial(card.name) }}</AvatarImage>
                         </span>
                         <div class="ap__who-text">
                             <div class="ap__title">{{ card.title }}</div>
@@ -93,6 +92,19 @@
                     <div v-if="card.kind === 'leave' && card.overlap" class="ap__warn">{{ card.overlap }}</div>
                     <div v-if="card.kind === 'leave' && card.row.reason" class="ap__reason">{{ card.row.reason }}</div>
                     <div v-if="card.kind === 'agent'" class="ap__reason">{{ card.row.detail }}</div>
+                    <div v-if="card.kind === 'agent' && card.row.plan" class="ap__plan" data-test="proposal-plan">
+                        <template v-for="(change, i) in card.row.plan" :key="i">
+                            <IntentPreview
+                                v-if="change.preview"
+                                :preview="change.preview"
+                                :choosable="!card.row.locked"
+                                :left-out="plans.leftOutOf(card.row.id, i)"
+                                :disabled="!!busy"
+                                @update:left-out="plans.setLeftOut(card.row.id, i, $event)"
+                            />
+                            <span v-else class="ap__change">{{ changeLabel(t, change) }}</span>
+                        </template>
+                    </div>
 
                     <div v-if="rejecting === card.key" class="ap__reject">
                         <input v-model="rejectReason" class="ah-input" :class="{ 'ah-input--error': rejectError }" :placeholder="$t('Time.reject_reason_ph')" @keyup.enter="confirmReject(card)" />
@@ -103,7 +115,7 @@
                         </div>
                     </div>
                     <div v-else class="tv-row-actions">
-                        <button type="button" class="ah-btn ah-btn--primary ah-btn--grow" :disabled="!!busy" @click="approve(card)">
+                        <button v-if="!card.row.locked" type="button" class="ah-btn ah-btn--primary ah-btn--grow" :disabled="!!busy" @click="approve(card)">
                             {{ busy === card.key ? $t('Time.approving') : $t('Time.approve') }}
                         </button>
                         <button v-if="card.kind === 'timesheet'" type="button" class="ah-btn ah-btn--secondary" @click="openDetail(card.row)">{{ $t('Time.detail') }}</button>
@@ -121,14 +133,22 @@
                     </div>
                 </article>
 
-                <div v-if="filter === 'agent' && !agentProposals.length && !proposalsFailed" class="tv-empty">
-                    <strong>{{ $t('Time.agent_section') }}</strong>
-                    <span>{{ $t('Time.agent_empty') }}</span>
-                </div>
-                <div v-else-if="!visibleCards.length && !loading" class="tv-empty">
-                    <strong>{{ $t('Time.queue_empty_title') }}</strong>
-                    <span>{{ $t('Time.queue_empty') }}</span>
-                </div>
+                <EmptyState
+                    v-if="filter === 'agent' && !agentProposals.length && !proposalsFailed"
+                    illustration="inbox"
+                    data-test="approvals-empty-agent"
+                    :title="$t('Time.agent_section')"
+                    :message="$t('Time.agent_empty')"
+                />
+                <EmptyState
+                    v-else-if="!visibleCards.length && !loading"
+                    illustration="inbox"
+                    data-test="approvals-empty"
+                    :title="$t('Time.queue_empty_title')"
+                    :message="$t('Time.queue_empty')"
+                    :action-label="filter === 'all' ? '' : $t('Time.show_all_approvals')"
+                    @action="filter = 'all'"
+                />
                 <div v-else-if="loading && !visibleCards.length" class="ah-small">{{ $t('Time.loading') }}</div>
             </div>
         </template>
@@ -137,6 +157,8 @@
 </template>
 
 <script setup>
+import EmptyState from '@/components/atom/EmptyState/EmptyState.vue';
+import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import { ref, computed, inject, nextTick, onMounted, watch } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
@@ -149,8 +171,15 @@ import { formatHm } from '@/composable/useTimer';
 import { canApprove } from './approvalAccess';
 import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
 import { fetchPendingProposals, sendProposalDecision } from '@/composable/agentProposals';
+import { showProjects } from '@/composable/approvedProjects';
+import { madeProjectIds } from '@/composable/approvedProjectIds';
 import ProposalWhyDialog from './ProposalWhyDialog.vue';
+import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
+import { hasParts } from '@/components/molecules/IntentPreview/planPicks';
+import { usePlanChoices } from '@/components/molecules/IntentPreview/planChoices';
+import { laterLine, unappliedOf } from '@/views/Inbox/approvalQueue';
 import { proposalTitle } from '@/views/Ai/plainLabels';
+import { changeLabel } from '@/views/Ai/agentActionLabels';
 
 /**
  * @typedef {Object} AgentProposal
@@ -165,7 +194,8 @@ import { proposalTitle } from '@/views/Ai/plainLabels';
 
 defineOptions({ name: 'ApprovalsQueue' });
 
-const { getters } = useStore();
+const store = useStore();
+const { getters } = store;
 const router = useRouter();
 const { t } = useI18n();
 const { getUser } = useGetterFunctions();
@@ -256,7 +286,9 @@ const toAgentProposal = (p) => {
     return {
         id: String(p._id), agentName: p.agentName || '', summary: proposalTitle(t, p), detail: p.why || '',
         reversible: changes.length > 0 && changes.every((c) => c && c.reversible), createdAt: p.createdAt,
-        changes: changes.filter(Boolean).map((c) => ({ label: c.label || c.action || '', reversible: Boolean(c.reversible) })),
+        changes: changes.filter(Boolean).map((c) => ({ label: changeLabel(t, c) || c.action || '', reversible: Boolean(c.reversible) })),
+        plan: !p.batch && hasParts(changes) ? changes : null,
+        locked: p.locked === true,
     };
 };
 const loadProposals = async () => {
@@ -293,6 +325,9 @@ const load = async () => {
 const flash = (msg, ms = 3000) => { notice.value = msg; setTimeout(() => { if (notice.value === msg) notice.value = ''; }, ms); };
 const me = () => ({ id: uid.value, name: nameOf(uid.value) });
 
+const plans = usePlanChoices();
+const approvalBody = (row) => (row.plan && !row.locked ? plans.bodyFor(row.id, row.plan) : {});
+
 const decide = async (card, action, reason) => {
     if (card.kind === 'timesheet') {
         const body = bodyOf(await apiRequest('post', `${env.TIMESHEET_APPROVAL}/${card.row._id}/review`, { action, reason, userData: me() }));
@@ -303,18 +338,27 @@ const decide = async (card, action, reason) => {
         if (!body.status) throw new Error(body.statusText);
         leave.value = leave.value.filter((r) => r._id !== card.row._id);
     } else {
-        const body = bodyOf(await sendProposalDecision(card.row.id, action === 'approve' ? 'approve' : 'decline', reason ? { reason } : {}));
+        const approving = action === 'approve';
+        const body = bodyOf(await sendProposalDecision(card.row.id, approving ? 'approve' : 'decline', approving ? approvalBody(card.row) : reason ? { reason } : {}));
         if (!body.status) throw new Error(body.statusText);
+        showProjects(store, madeProjectIds(body.data));
+        plans.forget(card.row.id);
         agentProposals.value = agentProposals.value.filter((r) => r.id !== card.row.id);
+        const later = laterLine(t, body.data);
+        if (later) await loadProposals();
+        const unapplied = unappliedOf(body.data);
+        return { later, failed: unapplied.length ? t('Ai.applied_with_failures', { n: unapplied.length, error: unapplied[0].error }) : '' };
     }
+    return {};
 };
 const approve = async (card) => {
     if (busy.value) return;
     busy.value = card.key;
     error.value = '';
     try {
-        await decide(card, 'approve');
-        flash(t('Time.approved_ok'));
+        const { later = '', failed = '' } = await decide(card, 'approve');
+        if (failed) error.value = [failed, later].filter(Boolean).join(' ');
+        else flash([t('Time.approved_ok'), later].filter(Boolean).join(' '), later ? 6000 : 3000);
     } catch (e) {
         error.value = t('Time.action_failed');
     } finally {
@@ -454,6 +498,8 @@ onMounted(() => { if (isManager.value) load(); });
 .ap__facts .is-warn { color: var(--warn-ink); }
 .ap__warn { padding: 9px 11px; background: var(--warn-bg); border-radius: 8px; font-size: 12px; line-height: 1.45; color: var(--warn-ink); }
 .ap__reason { font-size: 12px; color: var(--ink-2); line-height: 1.45; }
+.ap__plan { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ap__change { font-size: 12px; color: var(--ink); line-height: 1.45; overflow-wrap: anywhere; }
 .ap__reject { display: flex; flex-direction: column; gap: 6px; }
 .ap__bulk { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 6px 14px; border-radius: 14px; }
 .ap__bulk-pick { display: flex; align-items: center; gap: 8px; min-height: 40px; }

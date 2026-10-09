@@ -37,7 +37,6 @@
                     :sender-name="senderName(row.message)"
                     :sender-src="senderSrc(row.message)"
                     :asker-name="askerName(row.message)"
-                    :hour12="use12Hour"
                     :in-thread="inThread"
                     @reply="$emit('reply', $event)"
                     @thread="$emit('thread', $event)"
@@ -234,7 +233,6 @@ const rows = computed(() => {
     return out;
 });
 
-const use12Hour = computed(() => String((getUser(userId.value) || {}).timeFormat || '12') !== '24');
 const usersLoaded = computed(() => ((getters['users/users'] || []).length > 0));
 
 function isFormerMember(user) {

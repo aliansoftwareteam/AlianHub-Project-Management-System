@@ -13,7 +13,7 @@
             </div>
             <div v-if="!sections.length && !isSpinner" class="nt__empty ah-empty">{{ $t('Settings.notifications_empty') }}</div>
             <template v-for="section in sections" :key="section.key">
-                <div class="nt__section ah-label" role="rowgroup">{{ sectionName(section) }} · {{ section.items.length }}</div>
+                <div class="nt__section ah-label" role="row"><span role="cell">{{ sectionName(section) }} · {{ section.items.length }}</span></div>
                 <div v-for="item in section.items" :key="item.key" class="nt__row" role="row">
                     <span class="nt__event" role="cell">
                         <span class="nt__event-name">{{ itemName(item) }}</span>
@@ -212,7 +212,7 @@ const itemName = (item) => {
 function durationLabel(value) {
     const [n, unit] = String(value).split("_");
     const key = unit === "m" ? "Settings.minutes_before" : unit === "h" ? "Settings.hours_before" : "Settings.days_before";
-    return t(key, { n });
+    return t(key, { n }, Number(n));
 }
 
 async function updateField(section, item, field, value) {

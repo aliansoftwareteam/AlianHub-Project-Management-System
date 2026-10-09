@@ -2,6 +2,7 @@ const mockCrud = jest.fn(async (companyId, mongoObj) => ({ _id: 'row', TaskId: m
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockCrud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ ...jest.requireActual('../Modules/Sprints/helpers/sprintVisibility'), hiddenSprintIds: jest.fn(async () => []) }));
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(),
     evaluatePermission: jest.fn(),
@@ -12,6 +13,7 @@ jest.mock('../Modules/PersonalList/ownership', () => ({ ...jest.requireActual('.
 jest.mock('../Modules/EstimatedTime/aiTaskEstimator', () => ({ estimateAndPersist: jest.fn(), _internal: {} }));
 jest.mock('../Modules/LogTime/controllerV2/helpers', () => ({ updateRemainingTime: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
+jest.mock('../Config/projectPeople', () => ({ namedPeopleRefusal: jest.fn(async () => '') }));
 jest.mock('../Modules/EstimatedTime/helpers/planHistory', () => ({ previousPlanOf: jest.fn(async () => null), recordPlanChange: jest.fn(async () => undefined) }));
 
 const { getRoleType, evaluatePermission } = require('../Config/permissionGuard');

@@ -3,6 +3,7 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { myCache } = require('../../Config/config');
 const { removeCache } = require("../../utils/commonFunctions");
 const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
+const { isObjectIdText } = require("../Company/helpers/callerQueryRules");
 
 exports.getProjectRules = async(req,res) => {
     try {
@@ -56,6 +57,9 @@ exports.updateProjectRules = async(req,res) => {
         const update = rolesUpdateOf(req.body);
         if (!update) {
             return res.status(400).json({ message: "Only a rule's roles can be changed." });
+        }
+        if (!isObjectIdText(ruleId)) {
+            return res.status(400).json({ message: "id must be the id of a project rule." });
         }
         let data =  [
             { _id: ruleId, projectId: { $in: idForms(String(projectId)) } },

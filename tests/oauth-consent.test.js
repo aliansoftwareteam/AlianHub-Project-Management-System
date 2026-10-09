@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -61,7 +62,7 @@ const GUEST = '6f0000000000000000000a04';
 const REDIRECT = 'http://127.0.0.1:33418/callback';
 const HTTPS_REDIRECT = 'https://agent.s10s3.test/oauth/callback';
 const CIMD_ID = 'https://agent.s10s3.test/oauth/client.json';
-const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_TOKEN_SECRET', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_DCR', 'CSP_MODE', 'NODE_ENV', 'MCP_TOOLS_MANAGE'];
+const ENV_KEYS = ['MCP_OAUTH', 'MCP_OAUTH_ISSUER', 'MCP_OAUTH_TOKEN_SECRET', 'MCP_OAUTH_RATE_LIMIT_PER_MIN', 'MCP_OAUTH_DCR', 'CSP_MODE', 'NODE_ENV', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_DATA'];
 const savedEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
 
 const INDEX_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 's10s3-consent-'));
@@ -107,7 +108,8 @@ beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.CSP_MODE;
     delete process.env.MCP_OAUTH_DCR;
-    delete process.env.MCP_TOOLS_MANAGE;
+    process.env.MCP_TOOLS_MANAGE = 'off';
+    process.env.MCP_TOOLS_DATA = 'off';
 });
 
 afterEach(stop);
@@ -974,5 +976,106 @@ describe('the manage scopes', () => {
         expect(done.status).toBe(303);
         expect(done.location.searchParams.get('error')).toBe('access_denied');
         expect(grantRows()).toHaveLength(0);
+    });
+});
+
+describe('the chat scope', () => {
+    const TOOLS_ON = { MCP_TOOLS_DATA: 'on' };
+    const CHAT = 'chat:read';
+    const PLAIN = ['tasks:read', 'tasks:write'];
+    const EVERY_READ = ['tasks:read', 'projects:read', 'docs:read', 'time:read'];
+    const ASKED = `tasks:read tasks:write ${CHAT}`;
+    const grantRows = () => rows(SCHEMA_TYPE.OAUTH_GRANTS);
+    const metadata = async () => (await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json()).scopes_supported;
+    const opened = async (clientId, { scope = ASKED, verifier = newVerifier() } = {}) => ({ ...(await flow.startAuthorization(authorizeUrl(clientId, { scope }, verifier))), verifier });
+    const shown = async (clientId, over = {}) => {
+        const { consent } = await opened(clientId, over);
+        return (await flow.details(consent, { session: session(MEMBER) })).body.data;
+    };
+    const connected = async (clientId, { scope = ASKED, grant = [] } = {}) => {
+        const { consent, verifier } = await opened(clientId, { scope });
+        const done = await flow.answer(consent, { session: session(MEMBER), workspace: ALPHA, grant });
+        expect(done.status).toBe(303);
+        return exchange(clientId, done.location.searchParams.get('code'), verifier);
+    };
+    const withdraw = (uid, grantId, scopes) => fetch(`${base}/api/v2/oauth-grants/${grantId}/withdraw`, { method: 'POST', headers: bearer(uid), body: JSON.stringify({ scopes }) });
+
+    it('is listed by the server only while the read tools are on, and never among the scopes a client gets without asking', async () => {
+        await start();
+        expect(await metadata()).not.toContain(CHAT);
+        process.env.MCP_TOOLS_DATA = 'on';
+        expect(await metadata()).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read', 'time:write', CHAT]);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...EVERY_READ, CHAT] });
+        const verifier = newVerifier();
+        const { consent } = await flow.startAuthorization(authorizeUrl(client.clientId, { scope: undefined }, verifier));
+        const done = await flow.answer(consent, { session: session(MEMBER), workspace: ALPHA, grant: [CHAT] });
+        expect((await exchange(client.clientId, done.location.searchParams.get('code'), verifier)).scope).toBe(EVERY_READ.join(' '));
+    });
+
+    it('is shown apart from what is granted together, and is left out unless the person ticks it', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, CHAT] });
+        const data = await shown(client.clientId);
+        expect(data.scopes).toEqual(PLAIN);
+        expect(data.manageScopes).toEqual([CHAT]);
+        expect(data.workspaces.find((w) => w.id === ALPHA)).toMatchObject({ eligible: true, manageScopes: [CHAT] });
+        expect((await connected(client.clientId)).scope).toBe('tasks:read tasks:write');
+        expect(grantRows()).toEqual([expect.objectContaining({ scopes: PLAIN })]);
+    });
+
+    it('is granted when the client asked, the person ticked and the workspace approved it by name', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, CHAT] });
+        const tokens = await connected(client.clientId, { grant: [CHAT] });
+        expect(tokens.scope).toBe(`tasks:read tasks:write ${CHAT}`);
+        expect(await grants.introspect(tokens.access_token)).toMatchObject({ active: true, scopes: [...PLAIN, CHAT] });
+    });
+
+    it('is not granted to a client that did not ask, whatever the form carries, nor with a manage scope', async () => {
+        await start({ ...TOOLS_ON, MCP_TOOLS_MANAGE: 'on' });
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, 'tasks:manage', CHAT] });
+        expect((await connected(client.clientId, { scope: 'tasks:read tasks:write', grant: [CHAT] })).scope).toBe('tasks:read tasks:write');
+        expect((await connected(client.clientId, { scope: 'tasks:read tasks:write tasks:manage', grant: ['tasks:manage', CHAT] })).scope).toBe('tasks:read tasks:write tasks:manage');
+    });
+
+    it('is refused when ticked without the workspace approving it by name, and is never part of an approval that names no scopes', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        const first = await opened(client.clientId);
+        await flow.requestApproval(first.consent, { session: session(MEMBER), workspace: ALPHA });
+        expect(rows(SCHEMA_TYPE.OAUTH_CLIENT_APPROVALS)[0].requestedScopes).toEqual([...PLAIN, CHAT]);
+        expect((await approve(client.clientId)).scopes).toEqual(['tasks:read', 'tasks:write', 'projects:read', 'docs:read', 'time:read']);
+        expect((await shown(client.clientId)).workspaces.find((w) => w.id === ALPHA)).toMatchObject({ eligible: true, manageScopes: [] });
+        const { consent } = await opened(client.clientId);
+        const res = await flow.answer(consent, { session: session(MEMBER), workspace: ALPHA, grant: [CHAT] });
+        expect(res.status).toBe(403);
+        expect(grantRows()).toHaveLength(0);
+    });
+
+    it('is left out of what any client asks for while the read tools are off', async () => {
+        await start();
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, CHAT] });
+        const data = await shown(client.clientId);
+        expect([data.scopes, data.manageScopes]).toEqual([PLAIN, []]);
+        expect((await connected(client.clientId, { grant: [CHAT] })).scope).toBe('tasks:read tasks:write');
+        const only = await flow.startAuthorization(authorizeUrl(client.clientId, { scope: CHAT }));
+        expect(only.location.searchParams.get('error')).toBe('invalid_scope');
+    });
+
+    it('can be withdrawn by the person who gave it, who keeps the rest of the connection', async () => {
+        await start(TOOLS_ON);
+        const client = await registerPublicClient();
+        await approve(client.clientId, { scopes: [...PLAIN, CHAT] });
+        const tokens = await connected(client.clientId, { grant: [CHAT] });
+        const [grant] = grantRows();
+        expect((await withdraw(OWNER, grant.grantId, [CHAT])).status).toBe(404);
+        expect((await withdraw(MEMBER, grant.grantId, [CHAT])).status).toBe(200);
+        expect(grantRows()[0]).toMatchObject({ scopes: PLAIN, revokedAt: null });
+        expect(await grants.introspect(tokens.access_token)).toMatchObject({ active: true, scopes: PLAIN });
     });
 });

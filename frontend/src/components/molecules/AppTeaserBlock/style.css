@@ -9,14 +9,14 @@
     width: 100%;
     margin: 16px 0;
     padding: 10px 12px;
-    border: 1px dashed #C9CDE0;
+    border: 1px dashed var(--border);
     border-radius: 10px;
     background: transparent;
     transition: border-color 0.12s ease, background 0.12s ease;
 }
 .app-teaser-banner:hover {
-    border-color: #4B5DEE;
-    background: #F7F8FF;
+    border-color: var(--brand-border);
+    background: var(--brand-tint);
 }
 .app-teaser-banner__ic {
     display: inline-flex;
@@ -26,8 +26,8 @@
     height: 28px;
     flex: none;
     border-radius: 8px;
-    background: #EEF0FF;
-    color: #2B37A8;
+    background: var(--brand-tint);
+    color: var(--brand);
 }
 .app-teaser-banner__text {
     display: flex;
@@ -38,12 +38,12 @@
 .app-teaser-banner__title {
     font-size: 13px;
     font-weight: 600;
-    color: #191A2B;
+    color: var(--ink);
 }
 .app-teaser-banner__desc {
     font-size: 12px;
     line-height: 1.4;
-    color: #6B6B70;
+    color: var(--ink-2);
 }
 .app-teaser-banner__hint {
     display: inline-flex;
@@ -51,7 +51,7 @@
     gap: 5px;
     margin-top: 4px;
     font-size: 11px;
-    color: #9092AC;
+    color: var(--ink-2);
 }
 .app-teaser-banner__hint svg {
     flex: none;
@@ -63,6 +63,6 @@
     margin-left: auto;
     font-size: 12.5px;
     font-weight: 600;
-    color: #4B5DEE;
+    color: var(--brand);
     white-space: nowrap;
 }

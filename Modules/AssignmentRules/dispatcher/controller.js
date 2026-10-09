@@ -1,0 +1,154 @@
+const logger = require('../../../Config/loggerConfig');
+const socketEmitter = require('../../../event/socketEventEmitter');
+const { actingUser } = require('../../Sprints/helpers/actingUser');
+const { RuleError } = require('../rules');
+const flag = require('./flag');
+const settings = require('./settings');
+const decisions = require('./decisions');
+const audit = require('./audit');
+const packs = require('./packs');
+const companyBlueprints = require('../../Agents/companyBlueprints');
+const company = require('./company');
+
+const companyOf = (req) => String(req.headers['companyid'] || '');
+
+const refuse = (res, statusCode, statusText) => res.status(statusCode).json({ status: false, statusText, message: statusText });
+
+const fail = (res, what) => (error) => {
+    if (error instanceof RuleError) return refuse(res, error.statusCode, error.message);
+    logger.error(`[dispatcher] ${what}: ${(error && error.message) || error}`);
+    return refuse(res, 500, 'Something went wrong. Please try again.');
+};
+
+const signedIn = async (req, res) => {
+    const actor = await actingUser(req);
+    if (!actor) refuse(res, 401, 'A signed-in user is required.');
+    return actor;
+};
+
+/* Off, the routes that change something answer as if they did not exist. */
+exports.whenOn = (req, res, next) => (flag.enabled() ? next() : refuse(res, 404, 'Not found.'));
+
+/* The packs route answers why it cannot act rather than pretending it is not there. */
+exports.whenOnForPacks = (req, res, next) => (flag.enabled() ? next() : refuse(res, 409, 'The dispatcher is off on this server.'));
+
+exports.getPacks = (req, res) => {
+    try {
+        return res.json({ status: true, statusText: 'Team packs', data: { on: flag.enabled(), packs: packs.packs(), companyBlueprints: companyBlueprints.view() } });
+    } catch (error) {
+        return fail(res, 'read packs')(error);
+    }
+};
+
+exports.normaliseProjectIds = packs.normaliseProjectIds;
+
+exports.applyPack = async (req, res) => {
+    try {
+        const actor = await signedIn(req, res);
+        if (!actor) return undefined;
+        const companyId = companyOf(req);
+        const body = req.body || {};
+        const undone = body.undo === true;
+        const agentAccess = require('../../Agents/access');
+        const managesAgents = agentAccess.canManageAgents(await agentAccess.callerOf(req, companyId));
+        const result = undone ? await packs.undo(companyId, body, actor, { managesAgents }) : await packs.apply(companyId, body, actor.id, { managesAgents });
+        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length));
+        const agentsChanged = undone ? result.agents.removed : result.agents.made;
+        const agentsTouched = agentsChanged.length || (undone ? result.agents.narrowed : result.agents.widened).length;
+        if (agentsTouched) {
+            socketEmitter.emit('update', { type: 'update', module: 'dispatcherAgents', companyId: String(companyId), data: { blueprint: result.blueprint } });
+        }
+        if (changed.length || agentsTouched) {
+            audit.packChanged(companyId, actor, undone, {
+                blueprint: result.blueprint,
+                teams: result.teams,
+                projects: changed.map((project) => ({
+                    projectId: project.projectId,
+                    roles: undone ? project.removed : project.added,
+                    rules: project.rules.length,
+                    ...(undone ? {} : { tags: project.tags }),
+                })),
+                agents: { [undone ? 'removed' : 'created']: agentsChanged.map((agent) => agent.agentId), kept: result.agents.kept.map((agent) => agent.agentId), ...(undone ? { narrowed: result.agents.narrowed.map((agent) => agent.agentId) } : { widened: result.agents.widened.map((agent) => agent.agentId) }) },
+            });
+        }
+        return res.json({ status: true, statusText: undone ? 'Team pack undone' : 'Team pack applied', data: result });
+    } catch (error) {
+        return fail(res, 'apply pack')(error);
+    }
+};
+
+exports.getSettings = async (req, res) => {
+    try {
+        const on = flag.enabled();
+        const data = on ? { on, settings: await settings.load(companyOf(req), req.params.projectId), roles: settings.roleChoices() } : { on, settings: null, roles: [] };
+        return res.json({ status: true, statusText: 'Dispatcher settings', data });
+    } catch (error) {
+        return fail(res, 'read settings')(error);
+    }
+};
+
+const saved = (add) => async (req, res) => {
+    try {
+        const actor = await signedIn(req, res);
+        if (!actor) return undefined;
+        const companyId = companyOf(req);
+        const { projectId } = req.params;
+        const result = add
+            ? await settings.addRule(companyId, projectId, req.body || {}, actor.id)
+            : await settings.save(companyId, projectId, req.body || {}, actor.id);
+        audit.settingsChanged(companyId, actor, projectId, { mode: result.mode, threshold: result.threshold, modelGuess: result.modelGuess, roles: result.roles.length, rules: result.rules.length, revision: result.revision }, add);
+        return res.json({ status: true, statusText: 'Dispatcher settings saved', data: result });
+    } catch (error) {
+        return fail(res, 'save settings')(error);
+    }
+};
+
+exports.saveSettings = saved(false);
+exports.addRule = saved(true);
+
+exports.getNeedsRouting = async (req, res) => {
+    try {
+        const data = await decisions.needsRouting(companyOf(req), req.uid, req.params.projectId);
+        return res.json({ status: true, statusText: 'Needs routing', data });
+    } catch (error) {
+        return fail(res, 'read needs routing')(error);
+    }
+};
+
+const companyPanel = (read, what) => async (req, res) => {
+    try {
+        const data = await read(companyOf(req), req.uid);
+        return res.json({ status: true, statusText: what, data });
+    } catch (error) {
+        return fail(res, `read ${what}`)(error);
+    }
+};
+
+exports.getOrgChart = companyPanel(company.orgChart, 'Company org chart');
+exports.getFlowBoard = companyPanel(company.flowBoard, 'Company flow board');
+
+exports.getTaskDecision = async (req, res) => {
+    try {
+        const data = await decisions.forTask(companyOf(req), req.uid, req.params.taskId);
+        return res.json({ status: true, statusText: 'Routing suggestion', data });
+    } catch (error) {
+        return fail(res, 'read suggestion')(error);
+    }
+};
+
+const ACTIONS = {
+    accept: (companyId, actor, req) => decisions.accept(companyId, actor, req.params.taskId, req.params.decisionId),
+    dismiss: (companyId, actor, req) => decisions.dismiss(companyId, actor, req.params.taskId, req.params.decisionId),
+    route: (companyId, actor, req) => decisions.route(companyId, actor, req.params.taskId, req.params.decisionId, String((req.body || {}).role || '')),
+};
+
+exports.actOnDecision = (action) => async (req, res) => {
+    try {
+        const actor = await signedIn(req, res);
+        if (!actor) return undefined;
+        const data = await ACTIONS[action](companyOf(req), actor, req);
+        return res.json({ status: true, statusText: 'Routing suggestion updated', data });
+    } catch (error) {
+        return fail(res, `${action} suggestion`)(error);
+    }
+};

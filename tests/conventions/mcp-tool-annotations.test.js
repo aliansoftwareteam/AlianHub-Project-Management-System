@@ -29,9 +29,9 @@ describe('every MCP tool is rated and its annotations agree with the rating', ()
     afterAll(() => {
         if (saved.v2 === undefined) delete process.env.MCP_TOOLS_V2; else process.env.MCP_TOOLS_V2 = saved.v2;
         if (saved.perf === undefined) delete process.env.AGENT_PERFORMANCE_READ; else process.env.AGENT_PERFORMANCE_READ = saved.perf;
-        if (saved.data === undefined) delete process.env.MCP_TOOLS_DATA; else process.env.MCP_TOOLS_DATA = saved.data;
-        if (saved.manage === undefined) delete process.env.MCP_TOOLS_MANAGE; else process.env.MCP_TOOLS_MANAGE = saved.manage;
-        if (saved.work === undefined) delete process.env.MCP_TOOLS_WORK; else process.env.MCP_TOOLS_WORK = saved.work;
+        if (saved.data === undefined) process.env.MCP_TOOLS_DATA = 'off'; else process.env.MCP_TOOLS_DATA = saved.data;
+        if (saved.manage === undefined) process.env.MCP_TOOLS_MANAGE = 'off'; else process.env.MCP_TOOLS_MANAGE = saved.manage;
+        if (saved.work === undefined) process.env.MCP_TOOLS_WORK = 'off'; else process.env.MCP_TOOLS_WORK = saved.work;
     });
 
     it('offers every tool, flagged ones included', () => {

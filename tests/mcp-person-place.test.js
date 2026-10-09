@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-2: "where is the person". A connected agent asks which project, list or task the person behind it
    last had open, from the visits the web app already records, and is told to ask when that is old or unknown. */
 process.env.STORAGE_TYPE = 'server';
@@ -59,7 +60,7 @@ const kinds = (answer) => [answer.place, ...answer.earlier].filter(Boolean).map(
 
 beforeEach(() => {
     seed();
-    delete process.env.MCP_TOOLS_WORK;
+    process.env.MCP_TOOLS_WORK = 'off';
     process.env.MCP_TOOLS_DATA = 'on';
 });
 afterEach(settle);
@@ -67,7 +68,7 @@ afterAll(() => FLAGS.forEach((flag) => { delete process.env[flag]; }));
 
 describe('the tool exists with the read tools', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_DATA;
+        process.env.MCP_TOOLS_DATA = 'off';
         expect(tools.names()).toEqual(BEFORE);
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
@@ -93,7 +94,7 @@ describe('the tool exists with the read tools', () => {
     it('answers a connection that only reads, and refuses one that may not read projects', async () => {
         visit(OWNER, 'project', P_OPEN, 2);
         expect((await where(readOnly(OWNER))).place).toMatchObject({ kind: 'project' });
-        expect(await where(outside(OWNER, ['tasks:read']))).toMatchObject({ isError: true, error: expect.stringMatching(/projects:read scope/) });
+        expect(await where(outside(OWNER, ['tasks:read']))).toMatchObject({ isError: true, error: expect.stringMatching(/projects:read permission/) });
         expect((await where(ctx(OWNER, { allowedActions: ['tasks.next'] }))).refused).toBe(true);
     });
 });

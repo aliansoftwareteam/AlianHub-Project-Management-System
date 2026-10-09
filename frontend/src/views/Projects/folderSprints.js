@@ -1,5 +1,6 @@
-import { folderIdOf, folderTrail, isLiveFolder, isOrphanFolder, subfoldersOf } from '@/utils/folderTree';
+import { folderIdOf, folderPathLabel, folderTrail, isLiveFolder, isOrphanFolder, listLabel, subfoldersOf } from '@/utils/folderTree';
 
+const DELETED = 1;
 const ARCHIVED = 2;
 const ARCHIVED_WITH_PARENT = 6;
 
@@ -12,6 +13,15 @@ export function folderWithoutLists(folders, folderId) {
     if (!folder || !isLiveFolder(folders, folder)) return null;
     const inside = [folder, ...subfoldersOf(folders, folderIdOf(folder)).filter((sub) => isLiveFolder(folders, sub))];
     return inside.flatMap(sprintsOf).some(isLiveSprint) ? null : folder;
+}
+
+/* `rows` are the folders the project's own read answers, which the live follower replaces (liveLists.js). The folded
+   copy on the project can keep a folder that read no longer lists, so the page asks here whether its folder is gone:
+   not listed, in the trash, or under a folder that is. Before the read has landed nothing is said. */
+export function folderIsGone(rows, folderId) {
+    if (!folderId || !Array.isArray(rows)) return false;
+    const folder = rows.find((row) => folderIdOf(row) === String(folderId));
+    return !folder || Number(folder.deletedStatusKey) === DELETED || isOrphanFolder(rows, folder);
 }
 
 /* What the project header names after the project: the folder in view with its parent and, when one list is shown, that list. */
@@ -65,4 +75,49 @@ export function projectSprintList({ project, showArchived, includeSprint = () =>
         }
     });
     return list;
+}
+
+/* The archived lists of a project, each with the path it is found under. The lists of an archived folder come
+   back with that folder, so they are not named one by one. */
+export function archivedListsOf(project) {
+    const folders = project?.sprintsfolders || {};
+    const archivedIn = (holder, folderId, folderPath) => sprintsOf(holder)
+        .filter((sprint) => Number(sprint?.deletedStatusKey) === ARCHIVED)
+        .map((sprint) => ({ ...sprint, id: String(sprint.id || sprint._id), folderId, path: listLabel({ folderPath, name: sprint.name }) }));
+    return [
+        ...archivedIn(project, '', ''),
+        ...Object.values(folders)
+            .filter((folder) => folder && isLiveFolder(folders, folder))
+            .flatMap((folder) => archivedIn(folder, folderIdOf(folder), folderPathLabel(folders, folder)))
+    ];
+}
+
+/* The page's own copy of a project keeps only the live lists at its top level (helper.js, filterSprints), so the
+   archived ones are read from the stored projects. */
+export const archivedListsIn = (projects, projectId) => archivedListsOf((projects || []).find((project) => project?._id === projectId));
+
+const LIST_ROUTE = /^Project(Folder)?Sprint(Task)?$/;
+
+/* The id of the folder a list sits in, '' at the top level of the project, null when the project does not hold it. */
+function folderOfList(project, sprintId) {
+    const holds = (holder) => sprintsOf(holder).some((sprint) => sprint.id === sprintId);
+    if (holds(project)) return '';
+    const folder = Object.values(project?.sprintsfolders || {}).find(holds);
+    return folder ? folderIdOf(folder) : null;
+}
+
+/* A list keeps its id when it moves between folders, so an address made before the move names a place that no
+   longer holds it. The address of where it is now, or null when the address is right or the list is nowhere. */
+export function movedListRoute({ route, project }) {
+    const { cid, id, sprintId, taskId, folderId = '' } = route?.params || {};
+    if (!sprintId || !LIST_ROUTE.test(route.name)) return null;
+    const home = folderOfList(project, sprintId);
+    if (home === null || home === folderId) return null;
+    const task = taskId ? 'Task' : '';
+    return {
+        name: home ? `ProjectFolderSprint${task}` : `ProjectSprint${task}`,
+        params: { cid, id, ...(home ? { folderId: home } : {}), sprintId, ...(taskId ? { taskId } : {}) },
+        query: route.query,
+        hash: route.hash,
+    };
 }

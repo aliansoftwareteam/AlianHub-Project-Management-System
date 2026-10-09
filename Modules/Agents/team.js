@@ -4,6 +4,7 @@ const { dbCollections } = require('../../Config/collections');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
 const runs = require('./runs');
+const accounts = require('./accounts');
 const { agentProjectsFor } = require('./access');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { privateWorkOf, readsRun } = require('./privateWork');
@@ -234,10 +235,14 @@ const board = async (companyId, { hoursPerWeek = 40, viewerId } = {}) => {
     }));
 
     const loads = sheetScope.everyone ? people.map((p) => p.load) : [];
+    /* Every screen that shows agents at work reads this board, so the workspace pause comes with it. A read that
+     * fails leaves it out, and the screens keep what they last showed. */
+    const connectedPaused = await accounts.connectedPaused(companyId).catch(() => undefined);
     return {
         people,
         agents: agentRows,
         activity,
+        ...(connectedPaused === undefined ? {} : { connectedPaused }),
         totals: {
             people: people.length,
             agents: agentRows.length,

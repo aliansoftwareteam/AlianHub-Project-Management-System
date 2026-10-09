@@ -23,13 +23,16 @@ import team from './team';
 import trash from './trash';
 
 import { useCustomComposable } from '@/composable'
+import { i18n } from '@/locales/main'
 import dashboard from "../plugins/dashboard/router";
 import { apiRequestWithoutCompnay } from '@/services'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
+import { loginReturnPath } from '@/views/Integrations/githubReturn'
 import { readSetupStatus, isKnownInstalled } from './setupStatus';
 import { readSessionUser } from './sessionCheck';
 import { markAway } from '@/offline';
+import { opensWithoutWorkspace } from './withoutWorkspace';
 
 
 const routes = [
@@ -152,7 +155,7 @@ router.beforeEach(async(to, _, next) => {
 	const { user, unreachable } = await readSessionUser(localUserId, (id) => apiRequestWithoutCompnay('get',`${env.USER_UPATE}/${id}`));
 	// Opened with no connection: App.vue draws the offline screen, or the sign-in page says it is offline.
 	if (unreachable) {
-		setTitle({title: to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
+		setTitle({title: to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
 		markAway();
 		next();
 		return;
@@ -163,15 +166,15 @@ router.beforeEach(async(to, _, next) => {
 		// const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 		const requiresAuth = to.meta.requiresAuth;
 		// SET PAGE TITLE
-		setTitle({title: to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
+		setTitle({title: to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
 
 		if(user === null && requiresAuth === true) {
 			// IF USER IS NOT LOGGED IN AND REQUESTS AUTH REQUIRED PAGE
-			next({name: 'Log-in', query: {redirect_url: fullPath}});
+			next({name: 'Log-in', query: {redirect_url: to.query.github ? loginReturnPath(to) : fullPath}});
 			return;
 		} else if(user !== null && requiresAuth === false) {
 			// IF USER IS LOGGED IN AND REQUESTS NO AUTH REQUIRED PAGE
-			if(to.meta.title === 'Support'){
+			if(to.meta.title === 'Support' || opensWithoutWorkspace(to)){
 				next();
 			}else if(!user?.AssignCompany?.length){
 				next({name: "Create_Company", query: query});

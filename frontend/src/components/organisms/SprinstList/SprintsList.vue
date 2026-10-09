@@ -1089,7 +1089,7 @@ function startTaskTour(key) {
     max-width: 100%;
     padding: 2px 10px;
     border-radius: 11px;
-    background: #f0f2f7;
+    background: var(--fill);
     font-size: 12px;
     line-height: 1.5;
     white-space: nowrap;
@@ -1098,10 +1098,10 @@ function startTaskTour(key) {
 .sprint-hours__item { display: inline-flex; align-items: baseline; gap: 5px; }
 /* Label recedes, number carries — so each pair scans as "Planned 43h" rather than as two
    competing pieces of text. */
-.sprint-hours__label { color: #8a909c; font-weight: 500; }
-.sprint-hours__value { color: #5b6472; font-weight: 600; font-variant-numeric: tabular-nums; }
+.sprint-hours__label { color: var(--ink-2); font-weight: 500; }
+.sprint-hours__value { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 /* An overrun is the one figure here worth colouring — same amber the task list uses. */
-.sprint-hours__value--over { color: #b45309; }
+.sprint-hours__value--over { color: var(--warn-ink); }
 
 /* Narrow screens keep the numbers and drop the words. Each item already has a
    title attribute, so nothing becomes unexplainable — and three labelled pairs
@@ -1130,10 +1130,10 @@ function startTaskTour(key) {
     width: 30px; 
     height: 30px;
     border-radius: 30px;
-    border: 2px solid #fff;
+    border: 2px solid var(--surface);
 }
 .ai-generated-task-div{
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
 }
 /* Hide the per-sprint "Suggest Tasks" AI CTA in the list view.
    !important is required: the element also carries the `d-flex` utility

@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 046, MCP parity part 2: an agent whose token was created for it finishes, creates and batches work,
    reads a task's history and writes docs, as the person behind its token and no further. */
 process.env.STORAGE_TYPE = 'server';
@@ -82,7 +83,7 @@ beforeEach(() => {
     fx.pagePersonal = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Mine alone', ProjectID: PL_OTHER, visibility: 'project', createdBy: OTHER, content: { html: '<p>x</p>' }, deletedStatusKey: 0 });
 });
 afterEach(settle);
-afterAll(() => { delete process.env.MCP_TOOLS_MANAGE; delete process.env.MCP_TOOLS_V2; delete process.env.AGENT_TAINT_ROUTING; });
+afterAll(() => { process.env.MCP_TOOLS_MANAGE = 'off'; delete process.env.MCP_TOOLS_V2; process.env.AGENT_TAINT_ROUTING = 'off'; });
 
 describe('which tools a token lists', () => {
     it('a token created to manage tasks lists the task tools and not the doc tools', async () => {
@@ -169,18 +170,18 @@ describe('every new tool keeps to what the person behind the token can open', ()
 
     it('the reads answer "not found" outside it', async () => {
         for (const name of ['task.history', 'task.links.list']) {
-            expect(await rpc(ctx(MEMBER), name, { taskId: fx.private._id })).toEqual({ error: 'task not found' });
-            expect(await rpc(ctx(MEMBER), name, { taskId: fx.secret._id })).toEqual({ error: 'task not found' });
-            expect(await rpc(ctx(OWNER), name, { taskId: fx.personal._id })).toEqual({ error: 'task not found' });
-            expect(await rpc(ctx(OWNER), name, { taskId: fx.chat._id })).toEqual({ error: 'task not found' });
-            expect(await rpc(ctx(OWNER, { projectIds: [P_DEST] }), name, { taskId: fx.top._id })).toEqual({ error: 'task not found' });
+            expect(await rpc(ctx(MEMBER), name, { taskId: fx.private._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+            expect(await rpc(ctx(MEMBER), name, { taskId: fx.secret._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+            expect(await rpc(ctx(OWNER), name, { taskId: fx.personal._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+            expect(await rpc(ctx(OWNER), name, { taskId: fx.chat._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
+            expect(await rpc(ctx(OWNER, { projectIds: [P_DEST] }), name, { taskId: fx.top._id })).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         }
     });
 
     it.each([['a token without the grant', olderToken], ['a docs-only token', docsOnly], ['a read-only token', readOnly], ['an OAuth token without the scope', oauth]])('%s runs none of the task tools', async (_who, as) => {
         const before = snapshot();
         for (const name of TASK_TOOLS) {
-            expect(await rpc(as(OWNER), name, { taskId: fx.top._id })).toMatchObject({ isError: true, error: expect.stringMatching(/grant|read-only/) });
+            expect(await rpc(as(OWNER), name, { taskId: fx.top._id })).toMatchObject({ isError: true, error: expect.stringMatching(/permission|only read/) });
         }
         expect(snapshot()).toBe(before);
     });
@@ -195,7 +196,7 @@ describe('every new tool keeps to what the person behind the token can open', ()
         ['comment.update', (id) => ({ taskId: id, commentId: 'abc', text: 'x' }), /commentId is not in the form/],
         ['task.history', (id) => ({ taskId: id, since: 'yesterday' }), /since is not an argument/],
         ['tasks.batch', () => ({ operations: [] }), /operations must have at least 1 item/],
-        ['tasks.batch', () => ({ operations: Array.from({ length: 26 }, () => ({ tool: 'task.archive', arguments: {} })) }), /at most 25 items/],
+        ['tasks.batch', () => ({ operations: Array.from({ length: 51 }, () => ({ tool: 'task.archive', arguments: {} })) }), /at most 50 changes, and this one has 51/],
         ['tasks.batch', () => ({ operations: [{ tool: 'task.archive' }] }), /operations\[0\]\.arguments is required/],
         ['page.create', () => ({ title: 'x', visibility: 'private' }), /visibility is not an argument/],
         ['page.update', () => ({ pageId: '6f00000000000000000000ff' }), /name a title or a text/],
@@ -275,7 +276,7 @@ describe('task.status.set for a token created to manage tasks', () => {
 
     it('without the grant behaves as before: in progress and in review only, and closing stays on the never-list', async () => {
         const closed = await rpc(olderToken(OWNER), 'task.status.set', { taskId: fx.top._id, status: 'Done' });
-        expect(closed).toMatchObject({ isError: true, refused: true, reason: 'Agents cannot perform task.status.set("Done")' });
+        expect(closed).toMatchObject({ isError: true, refused: true, reason: 'You cannot set a task to "Done". Use In progress or In review, and a person closes the task.' });
         expect(closed.neverAvailable).toContain('status.set("Done")');
         expect(stored(fx.top._id).statusKey).toBe(2);
         expect(await rpc(docsOnly(OWNER), 'task.status.set', { taskId: fx.top._id, status: 'Done' })).toMatchObject({ refused: true });
@@ -329,11 +330,11 @@ describe('task.create and subtask.create in one call', () => {
     it('refuses a fourth level, an assignee who cannot open the project, a task type or status the project lacks and a link that is not one', async () => {
         const before = snapshot();
         expect((await rpc(ctx(OWNER), 'subtask.create', { taskId: fx.grandchild._id, title: 'Too deep' })).error).toMatch(/three levels deep/);
-        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_PRIVATE, title: 'x', assigneeIds: [MEMBER] })).error).toBe('A person named here cannot open this project.');
+        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_PRIVATE, title: 'x', assigneeIds: [MEMBER] })).error).toBe('Someone named here cannot open this project. Pick people who are on the project, or ask the person to add them first.');
         expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', assigneeIds: [OUTSIDER] })).error).toMatch(/active members/);
-        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', taskType: 'Epic' })).error).toMatch(/taskType needs one of Task, Bug/);
+        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', taskType: 'Epic' })).error).toMatch(/task type must be one of Task, Bug/);
         expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', status: 'Shipped' })).error).toMatch(/does not exist in this project/);
-        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', links: [{ url: 'javascript:alert(1)' }] })).error).toMatch(/valid http\(s\) url/);
+        expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, title: 'x', links: [{ url: 'javascript:alert(1)' }] })).error).toMatch(/web address starting with http/);
         expect((await rpc(ctx(OWNER), 'task.create', { projectId: P_OPEN, sprintId: world.S_DEST, title: 'x' })).reason).toMatch(/^not_visible/);
         expect(snapshot()).toBe(before);
     });
@@ -404,7 +405,7 @@ describe('comments', () => {
         expect(comment(posted.result.commentId).message).toBe('Second &lt;b&gt;try&lt;/b&gt;');
 
         for (const row of [theirs, elsewhere, othersAgent]) {
-            expect(await rpc(ctx(OWNER), 'comment.update', { taskId: fx.top._id, commentId: row._id, text: 'Rewritten' })).toMatchObject({ isError: true, error: expect.stringMatching(/not one an agent wrote for you/) });
+            expect(await rpc(ctx(OWNER), 'comment.update', { taskId: fx.top._id, commentId: row._id, text: 'Rewritten' })).toMatchObject({ isError: true, error: expect.stringMatching(/You can change only a comment an agent wrote/) });
         }
         expect([theirs, elsewhere, othersAgent].map((row) => comment(row._id).message)).toEqual(['Typed by hand', 'Other task', 'Someone else\'s agent']);
 
@@ -417,67 +418,109 @@ describe('comments', () => {
     it('tells the members a comment names in the editor\'s markup, for a token created to manage tasks only', async () => {
         const body = `Ready for you @[Priya Other](${OTHER}) and @[Otto Outsider](${OUTSIDER})`;
         const told = await rpc(ctx(OWNER), 'task.comment', { taskId: fx.top._id, body });
-        expect(told.result.mentioned).toEqual([OTHER]);
+        expect(told.result).toMatchObject({ mentioned: [{ userId: OTHER, name: 'Priya Other' }], notNotified: [], notFound: [OUTSIDER] });
         expect(comment(told.result.commentId)).toMatchObject({ mentionIds: [OTHER], message: body, actorType: 'agent' });
         expect(rows(SCHEMA_TYPE.MENTIONS)).toEqual([expect.objectContaining({ comment_id: told.result.commentId, mentionIds: [OTHER], taskId: fx.top._id, userId: OWNER })]);
+    });
 
-        const quiet = await rpc(olderToken(OWNER), 'task.comment', { taskId: fx.top._id, body });
-        expect(quiet.result.mentioned).toBeUndefined();
-        expect(comment(quiet.result.commentId).mentionIds).toBeUndefined();
-        expect(rows(SCHEMA_TYPE.MENTIONS)).toHaveLength(1);
+    const PRIYA = { userId: OTHER, name: 'Priya Other' };
+    const byName = '@Priya Other please add the steps to reproduce.';
+    const replyTo = async () => (await rpc(ctx(OWNER), 'task.comment', { taskId: fx.top._id, body: 'Thread start' })).result.commentId;
+    const told = (result) => result.result || (result.items && result.items[0].result);
+    const withData = async (post) => {
+        process.env.MCP_TOOLS_DATA = 'on';
+        try { return await post(); } finally { process.env.MCP_TOOLS_DATA = 'off'; }
+    };
+
+    it.each([
+        ['task.comment, as a token created to manage tasks', () => rpc(ctx(OWNER), 'task.comment', { taskId: fx.top._id, body: byName })],
+        ['comment.create, as a token created to manage tasks', () => withData(() => rpc(ctx(OWNER), 'comment.create', { taskId: fx.top._id, text: byName }))],
+        ['task.comment, as an older token', () => rpc(olderToken(OWNER), 'task.comment', { taskId: fx.top._id, body: byName })],
+        ['comment.create, as an older token', () => withData(() => rpc(olderToken(OWNER), 'comment.create', { taskId: fx.top._id, text: byName }))],
+        ['task.comment, over OAuth', () => rpc(oauth(OWNER), 'task.comment', { taskId: fx.top._id, body: byName })],
+        ['a reply in a thread', async () => rpc(ctx(OWNER), 'task.comment', { taskId: fx.top._id, body: byName, replyTo: await replyTo() })],
+        ['a step of tasks.batch', () => rpc(ctx(OWNER), 'tasks.batch', { operations: [{ tool: 'task.comment', arguments: { taskId: fx.top._id, body: byName } }] })],
+    ])('%s tells the person named and lists who was told', async (path, post) => {
+        const out = told(await post());
+        expect(out).toMatchObject({ mentioned: [PRIYA], notNotified: [], notFound: [] });
+        expect(comment(out.commentId)).toMatchObject({ mentionIds: [OTHER], message: `@[Priya Other](${OTHER}) please add the steps to reproduce.` });
+        expect(rows(SCHEMA_TYPE.MENTIONS).filter((row) => row.comment_id === out.commentId)).toHaveLength(1);
+    });
+
+    it.each([
+        ['by name', '@Adam Admin please add the steps to reproduce.'],
+        ['by member id', `@[Adam Admin](${ADMIN}) please add the steps to reproduce.`],
+    ])('a comment that names the person it is written for, %s, says that no one was told', async (form, body) => {
+        const { result } = await rpc(ctx(ADMIN), 'task.comment', { taskId: fx.top._id, body });
+        expect(result).toMatchObject({ mentioned: [], notNotified: [{ userId: ADMIN, name: 'Adam Admin', reason: expect.stringMatching(/is you/) }], notFound: [] });
+        expect(rows(SCHEMA_TYPE.MENTIONS)).toHaveLength(0);
     });
 });
 
 describe('tasks.batch', () => {
-    it('runs each operation on its own, reports each, and records the ones that applied as one group a person can undo', async () => {
+    it('on one task, runs each operation on its own, reports each, and records the ones that applied as one group a person can undo', async () => {
         const out = await rpc(ctx(MEMBER), 'tasks.batch', { reason: 'weekly tidy', operations: [
-            { tool: 'task.status.set', arguments: { taskId: fx.top._id, status: 'Done' } },
-            { tool: 'task.update', arguments: { taskId: fx.private._id, title: 'Not mine' } },
+            { tool: 'task.status.set', arguments: { taskId: fx.bug._id, status: 'Done' } },
             { tool: 'task.assign', arguments: { taskId: fx.bug._id, mode: 'add', userIds: [MEMBER] } },
             { tool: 'task.update', arguments: { taskId: fx.bug._id, colour: 'red' } },
             { tool: 'tasks.search', arguments: {} },
             { tool: 'tasks.batch', arguments: { operations: [] } },
             { tool: 'page.create', arguments: { title: 'Notes' } },
-            { tool: 'subtask.create', arguments: { taskId: fx.bug._id, title: 'Follow up' } },
+            { tool: 'task.update', arguments: { taskId: fx.bug._id, title: 'Renamed' } },
         ] });
-        expect(out).toMatchObject({ ok: false, applied: 3, notApplied: 5, undoable: true });
+        expect(out).toMatchObject({ ok: false, applied: 3, notApplied: 4, undoable: true });
         expect(out.items.map((item) => [item.index, item.tool, item.ok])).toEqual([
-            [0, 'task.status.set', true], [1, 'task.update', false], [2, 'task.assign', true], [3, 'task.update', false],
-            [4, 'tasks.search', false], [5, 'tasks.batch', false], [6, 'page.create', false], [7, 'subtask.create', true],
+            [0, 'task.status.set', true], [1, 'task.assign', true], [2, 'task.update', false],
+            [3, 'tasks.search', false], [4, 'tasks.batch', false], [5, 'page.create', false], [6, 'task.update', true],
         ]);
-        expect(out.items[1]).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible/) });
-        expect(out.items[3].error).toMatch(/colour is not an argument/);
-        expect(out.items[4].error).toMatch(/not a write tool a batch can run/);
-        expect(out.items[6].error).toMatch(/not a write tool a batch can run/);
-        expect(stored(fx.top._id).statusType).toBe('close');
+        expect(out.items[2].error).toMatch(/colour is not an argument/);
+        expect(out.items[3].error).toMatch(/not a write tool a batch can run/);
+        expect(out.items[5].error).toMatch(/not a write tool a batch can run/);
+        expect(stored(fx.bug._id).statusType).toBe('close');
         expect(stored(fx.bug._id).AssigneeUserId).toEqual([OTHER, MEMBER]);
-        expect(stored(fx.private._id).TaskName).toBe('Task PRV-1');
         expect(rows(SCHEMA_TYPE.PAGES).map((row) => row.title)).not.toContain('Notes');
+        expect(proposals.create).not.toHaveBeenCalled();
 
         const [group] = audits('tasks.batch');
-        const applied = [out.items[0].auditId, out.items[2].auditId, out.items[7].auditId];
-        expect(group).toMatchObject({ action: 'agent.action', meta: { state: 'applied', reason: 'weekly tidy', undo: { kind: 'batch', auditIds: applied }, params: { tools: ['task.status.set', 'task.assign', 'subtask.create'] } } });
+        const applied = [out.items[0].auditId, out.items[1].auditId, out.items[6].auditId];
+        expect(group).toMatchObject({ action: 'agent.action', meta: { state: 'applied', reason: 'weekly tidy', undo: { kind: 'batch', auditIds: applied }, params: { tools: ['task.status.set', 'task.assign', 'task.update'] } } });
         expect(String(group._id)).toBe(String(out.auditId));
 
         const undone = await inverses.batch(CID, group.meta.undo, person(OWNER));
         await settle();
         expect(undone).toMatchObject({ undone: 3 });
-        expect(stored(fx.top._id).statusType).toBe('active');
+        expect(stored(fx.bug._id).statusType).toBe('active');
         expect(stored(fx.bug._id).AssigneeUserId).toEqual([OTHER]);
-        expect(stored(out.items[7].result.subtaskId).deletedStatusKey).toBe(1);
+        expect(stored(fx.bug._id).TaskName).toBe('Task OPN-4');
     });
 
-    it('records no group when nothing applied, and each item is undone only by someone who can open it', async () => {
+    it('on more than one task, runs nothing and files the operations a call could make as one proposal', async () => {
+        const before = snapshot();
+        const out = await rpc(ctx(MEMBER), 'tasks.batch', { reason: 'weekly tidy', operations: [
+            { tool: 'task.status.set', arguments: { taskId: fx.top._id, status: 'Done' } },
+            { tool: 'task.update', arguments: { taskId: fx.private._id, title: 'Not mine' } },
+            { tool: 'task.assign', arguments: { taskId: fx.bug._id, mode: 'add', userIds: [MEMBER] } },
+        ] });
+        expect(out).toMatchObject({ ok: false, pending: true, proposalId: 'proposal-1', applied: 0, notApplied: 3, waiting: 2, undoable: false });
+        expect(out.items.map((item) => [item.index, item.pending === true])).toEqual([[0, true], [1, false], [2, true]]);
+        expect(out.items[1]).toMatchObject({ refused: true, reason: expect.stringMatching(/^not_visible/) });
+        expect(snapshot()).toBe(before);
+        expect(audits('tasks.batch')).toHaveLength(0);
+        expect(proposals.create).toHaveBeenCalledTimes(1);
+        expect(proposals.create.mock.calls[0][1]).toMatchObject({
+            source: 'mcp', requestedBy: MEMBER, projectId: P_OPEN, taskId: null, taskIds: [String(fx.top._id), String(fx.bug._id)],
+            changes: [{ action: 'task.status.change', params: { taskId: String(fx.top._id) } }, { action: 'task.assignees.set', params: { taskId: String(fx.bug._id) } }],
+        });
+    });
+
+    it('records no group when nothing applied, and each item of a group is undone only by someone who can open it', async () => {
         const none = await rpc(ctx(MEMBER), 'tasks.batch', { operations: [{ tool: 'task.update', arguments: { taskId: fx.private._id, title: 'x' } }] });
         expect(none).toMatchObject({ ok: false, applied: 0, auditId: null, undoable: false });
         expect(audits('tasks.batch')).toHaveLength(0);
 
-        const out = await rpc(ctx(OWNER), 'tasks.batch', { operations: [
-            { tool: 'task.update', arguments: { taskId: fx.private._id, priority: 'HIGH' } },
-            { tool: 'task.update', arguments: { taskId: fx.top._id, priority: 'HIGH' } },
-        ] });
-        expect(out).toMatchObject({ ok: true, applied: 2 });
-        const undone = await inverses.batch(CID, audits('tasks.batch')[0].meta.undo, person(MEMBER));
+        const hidden = await rpc(ctx(OWNER), 'task.update', { taskId: fx.private._id, priority: 'HIGH' });
+        const open = await rpc(ctx(OWNER), 'task.update', { taskId: fx.top._id, priority: 'HIGH' });
+        const undone = await inverses.batch(CID, { kind: 'batch', auditIds: [hidden.auditId, open.auditId] }, person(MEMBER));
         expect(undone.items.map((item) => item.ok)).toEqual([true, false]);
         expect([stored(fx.top._id).Task_Priority, stored(fx.private._id).Task_Priority]).toEqual(['MEDIUM', 'HIGH']);
     });
@@ -562,16 +605,22 @@ describe('page.create and page.update for a token created to write docs', () => 
         expect(snapshot()).toBe(before);
     });
 
+    it('page.create is asked again at approval for its parent doc, and for the workspace when it names no project', () => {
+        const approval = require('../Modules/Mcp/approval');
+        expect(approval.targetOf({ title: 'x', projectId: P_OPEN, parentPageId: fx.pageTheirs._id }, 'page.create')).toEqual({ projectId: P_OPEN, pageId: fx.pageTheirs._id });
+        expect(approval.targetOf({ title: 'x' }, 'page.create')).toEqual({ companyWide: true });
+    });
+
     it('a token created to manage tasks writes no doc, and one created to write docs changes no task', async () => {
         const before = snapshot();
         for (const name of DOC_TOOLS) {
-            expect(await rpc(ctx(OWNER), name, { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/docs:manage grant/) });
+            expect(await rpc(ctx(OWNER), name, { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/docs:manage permission/) });
         }
         for (const [name, args] of [['task.update', { taskId: fx.top._id, title: 'x' }], ['task.archive', { taskId: fx.top._id }], ['tasks.batch', { operations: [{ tool: 'task.archive', arguments: { taskId: fx.top._id } }] }]]) {
-            expect(await rpc(docsOnly(OWNER), name, args)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
+            expect(await rpc(docsOnly(OWNER), name, args)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
         }
         for (const as of [olderToken, readOnly, oauth]) {
-            expect(await rpc(as(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/grant|read-only/) });
+            expect(await rpc(as(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/permission|only read/) });
         }
         expect(snapshot()).toBe(before);
     });
@@ -581,7 +630,7 @@ describe('an outside client whose grant holds a manage scope', () => {
     const forTasks = (uid) => outside(uid, [...PLAIN_SCOPES, TASKS_GRANT]);
     const forDocs = (uid) => outside(uid, [...PLAIN_SCOPES, DOCS_GRANT]);
 
-    afterEach(() => { delete process.env.AGENT_TAINT_ROUTING; });
+    afterEach(() => { process.env.AGENT_TAINT_ROUTING = 'off'; });
 
     it('lists the tools of the scope it holds and of no other', async () => {
         const names = await listed(forTasks(OWNER));
@@ -603,8 +652,8 @@ describe('an outside client whose grant holds a manage scope', () => {
         expect(await rpc(forDocs(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'Runbook, revised', text: 'New body' })).toMatchObject({ ok: true });
         expect(page(fx.pageOpen._id).title).toBe('Runbook, revised');
         const before = snapshot();
-        expect(await rpc(forDocs(OWNER), 'task.update', { taskId: fx.top._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage grant/) });
-        expect(await rpc(forTasks(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/docs:manage grant/) });
+        expect(await rpc(forDocs(OWNER), 'task.update', { taskId: fx.top._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
+        expect(await rpc(forTasks(OWNER), 'page.update', { pageId: fx.pageOpen._id, title: 'x' })).toMatchObject({ isError: true, error: expect.stringMatching(/docs:manage permission/) });
         expect(await rpc(forDocs(MEMBER), 'page.update', { pageId: fx.pagePrivate._id, title: 'x' })).toMatchObject({ isError: true });
         expect(snapshot()).toBe(before);
     });

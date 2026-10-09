@@ -9,7 +9,7 @@
         </fieldset>
         <fieldset class="acs__set acs__set--stacked" data-test="manage-scopes">
             <legend class="ah-small">{{ $t('AgentClients.manage_legend') }}</legend>
-            <label v-for="scope in MANAGE_SCOPES" :key="scope" class="acs__scope acs__scope--top">
+            <label v-for="scope in OPT_IN_SCOPES" :key="scope" class="acs__scope acs__scope--top">
                 <input v-model="scopes" type="checkbox" :value="scope" :data-test="`scope-${scope}`" />
                 <span class="acs__text">
                     <span>{{ $t(scopeNameKey(scope)) }} <span v-if="asked.includes(scope)" class="ah-chip" :data-test="`asked-${scope}`">{{ $t('AgentClients.asked_for') }}</span></span>
@@ -25,7 +25,7 @@
 </template>
 
 <script setup>
-import { PLAIN_SCOPES, MANAGE_SCOPES, scopeNameKey, scopeSentenceKey } from "@/views/OAuth/oauthShared";
+import { PLAIN_SCOPES, OPT_IN_SCOPES, scopeNameKey, scopeSentenceKey } from "@/views/OAuth/oauthShared";
 
 defineOptions({ name: "AgentClientScopes" });
 

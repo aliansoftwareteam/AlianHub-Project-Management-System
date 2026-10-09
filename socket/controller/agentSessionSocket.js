@@ -1,4 +1,5 @@
 const { findRoomsByPrefixes } = require('../helper');
+const { forTheViewer } = require('../roomAccess');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { verifyCompanyMembership } = require('../../Config/jwt');
 const logger = require('../../Config/loggerConfig');
@@ -22,7 +23,7 @@ const mayReceive = async (companyId, uid, task, now = Date.now()) => {
     const hit = cached(key, now);
     if (hit !== undefined) return hit;
     const { canOpenTask } = require('../../Modules/AgentSessions/access');
-    const allowed = Boolean(await verifyCompanyMembership(String(uid), String(companyId))) && await canOpenTask(companyId, uid, task);
+    const allowed = await forTheViewer(async () => Boolean(await verifyCompanyMembership(String(uid), String(companyId))) && canOpenTask(companyId, uid, task));
     decisions.set(key, { allowed, until: now + DECISION_TTL_MS });
     return allowed;
 };

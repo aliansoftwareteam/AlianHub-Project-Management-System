@@ -320,6 +320,13 @@ describe('CommandPalette', () => {
         expect(recent.text()).toContain('Budget ops / Sprint 2');
     });
 
+    it.each(['', '   ', 'a', ' a '])('sends no record search for %j', async (typed) => {
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, typed);
+        expect(apiRequest).not.toHaveBeenCalledWith('post', '/api/v2/search', expect.anything());
+        expect(wrapper.find('.pal__spin').exists()).toBe(false);
+    });
+
     it('keeps navigation open to everyone but runs the record search only with the advanced-search permission', async () => {
         perms['task.advance_search'] = null;
         const wrapper = await mountPalette();
@@ -341,6 +348,17 @@ describe('CommandPalette', () => {
         expect(quickCreate.open).toBe(true);
         expect(router.push).not.toHaveBeenCalled();
         expect(wrapper.emitted('close')).toBeTruthy();
+        closeQuickCreate();
+    });
+
+    it('hands the words after "new task" to the create dialog as the task name', async () => {
+        closeQuickCreate();
+        const wrapper = await mountPalette();
+        await typeQuery(wrapper, 'new task Call supplier');
+        expect(activeOption(wrapper).attributes('data-kind')).toBe('command');
+        await key(wrapper, { key: 'Enter' });
+        expect(quickCreate.open).toBe(true);
+        expect(quickCreate.name).toBe('Call supplier');
         closeQuickCreate();
     });
 

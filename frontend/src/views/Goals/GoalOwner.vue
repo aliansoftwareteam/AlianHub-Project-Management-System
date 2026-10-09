@@ -2,8 +2,7 @@
     <div class="glo">
         <div class="glo__now">
             <span class="ah-avatar ah-avatar--sm" aria-hidden="true">
-                <img v-if="owner.image" :src="owner.image" alt="" />
-                <template v-else>{{ owner.initial }}</template>
+                <AvatarImage :src="owner.image">{{ owner.initial }}</AvatarImage>
             </span>
             <span class="glo__name" data-test="glp-owner">{{ owner.name }}</span>
             <button v-if="editable && !changing" ref="changeButton" type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-test="glp-owner-change" @click="start">
@@ -40,6 +39,7 @@
 </template>
 
 <script setup>
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import { computed, inject, nextTick, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { afterHandover } from "./goalRequest";

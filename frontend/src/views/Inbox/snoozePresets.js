@@ -1,3 +1,5 @@
+import { hourCycleOption } from '@/utils/clockText';
+
 export const SNOOZE_PRESETS = Object.freeze(['later_today', 'tomorrow', 'next_week', 'until_change']);
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -86,6 +88,6 @@ export const formatWhen = (iso, timeZone, locale) => {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleString(locale || [], {
-        timeZone: resolveTimeZone(timeZone), weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        timeZone: resolveTimeZone(timeZone), weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', ...hourCycleOption(),
     });
 };

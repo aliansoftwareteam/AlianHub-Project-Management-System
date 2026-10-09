@@ -7,8 +7,12 @@ const registry = require('../Agents/registry');
 const tools = require('./tools');
 const scopes = require('./scopes');
 const manageFlag = require('./manageFlag');
+const dataFlag = require('./dataFlag');
+const writerLimits = require('../../event/writerLimits');
+const { clientMessage } = require('./clientError');
 const instructions = require('./instructions');
 const prompts = require('./prompts');
+const rolePlaybookOverrides = require('../Agents/rolePlaybookOverrides');
 const oauthAuth = require('./oauthAuth');
 const mcpOAuth = require('../../Config/mcpOAuth');
 const { TOKEN_PREFIX } = require('../ApiTokens/helpers/apiTokenRules');
@@ -182,6 +186,12 @@ const negotiatedVersion = (requested) => {
     return SUPPORTED_PROTOCOL_VERSIONS.includes(requested) ? requested : LATEST_PROTOCOL_VERSION;
 };
 
+/* What the connection is held to, from its verified token and never from a message: the events of its writes say so
+ * (event/writerLimits). */
+const heldTo = (ctx) => (Array.isArray(ctx.projectIds) && ctx.projectIds.length
+    ? { userId: ctx.userId, projectIds: ctx.projectIds, chat: dataFlag.enabled() && manageFlag.holdsGrant(ctx.token, mcpOAuth.CHAT_SCOPE) }
+    : null);
+
 const handleRpc = async (ctx, message) => {
     const { id, method, params = {} } = message || {};
 
@@ -208,17 +218,17 @@ const handleRpc = async (ctx, message) => {
             return rpcResult(id, { resources: [] });
 
         case 'prompts/list':
-            return rpcResult(id, { prompts: prompts.list(ctx) });
+            return rpcResult(id, { prompts: prompts.list(ctx, await rolePlaybookOverrides.forCompany(ctx.companyId)) });
 
         case 'prompts/get': {
-            const prompt = prompts.get(ctx, params.name, params.arguments);
+            const prompt = prompts.get(ctx, params.name, params.arguments, await rolePlaybookOverrides.forCompany(ctx.companyId));
             return prompt ? rpcResult(id, prompt) : rpcError(id, -32602, `Unknown prompt "${String(params.name === undefined ? '' : params.name).slice(0, 100)}"`);
         }
 
         case 'tools/call': {
             const name = String(params.name || '');
             try {
-                const out = await tools.call(ctx, name, params.arguments || {});
+                const out = await writerLimits.duringCall(heldTo(ctx), () => tools.call(ctx, name, params.arguments || {}));
                 return rpcResult(id, contentResult(out));
             } catch (error) {
                 if (error instanceof RefusedError) {
@@ -234,8 +244,7 @@ const handleRpc = async (ctx, message) => {
                     });
                 }
                 if (error && (error.code === -32601 || error.code === -32602)) return rpcError(id, error.code, error.message);
-                logger.error(`mcp tools/call ${name}: ${error.message}`);
-                return rpcResult(id, { ...contentResult({ error: error.message }), isError: true });
+                return rpcResult(id, { ...contentResult({ error: clientMessage(error, `tools/call ${name}`) }), isError: true });
             }
         }
 
@@ -274,8 +283,8 @@ const post = async (req, res) => {
         if (!replies.length) return res.status(202).end();
         return res.json(batch ? replies : replies[0]);
     } catch (error) {
-        logger.error(`mcp post: ${error.message}`);
-        return res.status(500).json(rpcError(null, -32603, error.message));
+        logger.error(`mcp post: ${error && error.stack ? error.stack : error}`);
+        return res.status(500).json(rpcError(null, -32603, 'Internal error'));
     }
 };
 

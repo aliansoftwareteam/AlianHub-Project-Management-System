@@ -15,6 +15,7 @@ const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite'
 const access = require('./access');
 const rules = require('./templateRules');
 const { canNest } = require('../Tasks/helpers/taskTree');
+const { canReadTask } = require('../Tasks/helpers/taskReadAccess');
 
 const { OBJECT_ID } = access;
 const oid = (id) => new mongoose.Types.ObjectId(String(id));
@@ -37,9 +38,12 @@ const liveTemplate = (companyId, id) => (OBJECT_ID.test(String(id || ''))
     ? crud(companyId, SCHEMA_TYPE.TASK_TEMPLATES, [{ _id: oid(id), deletedStatusKey: 0 }], 'findOne')
     : Promise.resolve(null));
 
-const storedTask = (companyId, id) => (OBJECT_ID.test(String(id || ''))
-    ? crud(companyId, SCHEMA_TYPE.TASKS, [{ _id: oid(id) }], 'findOne')
-    : Promise.resolve(null));
+/* The task a template is saved from or applied to, when `uid` can open it. */
+const openTask = async (companyId, uid, id) => {
+    if (!OBJECT_ID.test(String(id || ''))) return null;
+    const task = await crud(companyId, SCHEMA_TYPE.TASKS, [{ _id: oid(id), mainChat: { $ne: true } }], 'findOne');
+    return task && task.deletedStatusKey !== 1 && await canReadTask(companyId, String(uid), task) ? task : null;
+};
 
 const present = (row, { projectId = '', canManage = false, projectName = '' } = {}) => ({
     _id: String(row._id),
@@ -121,11 +125,9 @@ exports.saveTemplate = async (req, res) => {
         const body = req.body || {};
         if (!rules.cleanName(body.name)) return refuse(res, 400, 'A template name is required.');
         if (body.scope !== undefined && !['project', 'workspace'].includes(body.scope)) return refuse(res, 400, 'The scope must be project or workspace.');
-        const task = await storedTask(companyId, body.taskId);
-        if (!task || task.deletedStatusKey === 1) return refuse(res, 404, 'Task not found.');
+        const task = await openTask(companyId, req.uid, body.taskId);
+        if (!task) return refuse(res, 404, 'Task not found.');
         const projectId = String(task.ProjectID);
-        const visible = await access.canReadProject(companyId, req.uid, projectId);
-        if (!visible.allowed) return refuse(res, 404, 'Task not found.');
         const scope = body.scope === 'workspace' ? 'workspace' : 'project';
         const allowed = await access.canSaveIn(companyId, req.uid, { scope, projectId });
         if (!allowed.allowed) return refuseDecision(res, allowed, 'Task not found.');
@@ -262,8 +264,8 @@ exports.applyTemplate = async (req, res) => {
         const companyId = access.companyOf(req);
         if (!companyId) return refuse(res, 403, 'You do not have access to this company.');
         const body = req.body || {};
-        const task = await storedTask(companyId, body.taskId);
-        if (!task || task.deletedStatusKey === 1) return refuse(res, 404, 'Task not found.');
+        const task = await openTask(companyId, req.uid, body.taskId);
+        if (!task) return refuse(res, 404, 'Task not found.');
         const projectId = String(task.ProjectID);
         const decision = await access.canEditProject(companyId, req.uid, projectId, [access.CREATE_TASKS]);
         if (!decision.allowed) return refuseDecision(res, decision, 'Task not found.');

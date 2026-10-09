@@ -43,8 +43,7 @@
             <div v-for="u in users" :key="u.userId" class="wl__row">
                 <div class="wl__person">
                     <span class="ah-avatar" :style="{ background: colorFor(u.userId) }">
-                        <img v-if="u.avatar" :src="u.avatar" :alt="u.name" />
-                        <template v-else>{{ initial(u.name) }}</template>
+                        <AvatarImage :src="u.avatar" :alt="u.name">{{ initial(u.name) }}</AvatarImage>
                     </span>
                     <div class="wl__person-text">
                         <div class="wl__name">{{ u.name }}</div>
@@ -70,12 +69,12 @@
                                 v-for="c in d.chips.slice(0, 2)"
                                 :key="c.estimateId"
                                 class="wl__chip"
-                                draggable="true"
-                                :title="`${c.name} · ${formatHm(c.minutes)}`"
+                                :draggable="Boolean(c.name)"
+                                :title="`${c.name || $t('Time.task_not_open')} · ${formatHm(c.minutes)}`"
                                 @dragstart="onDragStart($event, u, d, c)"
                                 @dragend="onDragEnd"
-                            >{{ c.name || c.taskId }}</span>
-                            <span v-if="d.chips.length > 2" class="wl__chip wl__chip--more" :title="d.chips.slice(2).map((c) => c.name).join(', ')">+{{ d.chips.length - 2 }}</span>
+                            >{{ c.name || $t('Time.task_not_open') }}</span>
+                            <span v-if="d.chips.length > 2" class="wl__chip wl__chip--more" :title="d.chips.slice(2).map((c) => c.name || $t('Time.task_not_open')).join(', ')">+{{ d.chips.length - 2 }}</span>
                         </div>
                     </template>
                 </div>
@@ -104,6 +103,7 @@
 </template>
 
 <script setup>
+import AvatarImage from '@/components/atom/AvatarImage/AvatarImage.vue';
 import { ref, computed, inject, onMounted, watch } from 'vue';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import { useStore } from 'vuex';

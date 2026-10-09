@@ -1,3 +1,4 @@
+const { AsyncResource } = require('async_hooks');
 const logger = require('../../../Config/loggerConfig');
 const domainEventBus = require('../../../event/domainEventBus');
 const matcher = require('./matcher');
@@ -39,10 +40,11 @@ const enqueueWorkflowRun = async (data, opts) => {
     return true;
 };
 
+// Bound where it is scheduled, as the one-off handler is at start: a repeated job is under none of the request it is picked up in.
 const scheduleRecurring = async (name, intervalMs, handler) => {
-    driver.define(name, async (job) => {
+    driver.define(name, AsyncResource.bind(async (job) => {
         try { await handler(job); } catch (error) { logger.error(`${LOG_PREFIX} ${name} failed: ${error.message}`); }
-    });
+    }));
     await driver.every(intervalMs, name);
     logger.info(`${LOG_PREFIX} ${name} every ${Math.round(intervalMs / 1000)}s`);
 };
@@ -111,7 +113,9 @@ async function start() {
         return;
     }
     driver = selectDriver();
-    driver.define(JOB_NAME, async (job) => {
+    // A queue runs a job in whichever chain picks it up: the one that saved it, its own timer, or another request's.
+    // Bound here, at start, a run is under no bystander's project list, agent rule, mark or request.
+    driver.define(JOB_NAME, AsyncResource.bind(async (job) => {
         const { companyId, runId, ruleId, workflowRunId } = job.attrs.data || {};
         const keepAlive = typeof job.touch === 'function' ? () => job.touch() : null;
         await providerContext.run({ companyId }, async () => {
@@ -121,7 +125,7 @@ async function start() {
             }
             await runner.execute({ companyId, runId, ruleId, enqueue: enqueueRun, keepAlive });
         });
-    });
+    }));
     await driver.start();
     domainEventBus.bus.on('domain.event', dispatch);
     domainEventBus.bus.on('domain.event', subtaskTrigger.onEnvelope);

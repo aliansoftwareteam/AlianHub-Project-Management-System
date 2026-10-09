@@ -18,7 +18,7 @@
 
             <div class="d-flex align-items-center aimport__controls" v-if="asana && taskCount">
                 <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
-                <select v-model="selectedSprintId" class="aimport__select font-size-13">
+                <select v-model="selectedSprintId" class="ah-input aimport__select">
                     <option v-for="sprint in sprintOptions" :key="'as-'+sprint.id" :value="sprint.id">
                         {{ listLabel(sprint) }}
                     </option>
@@ -174,17 +174,17 @@ function startImport() {
 </script>
 
 <style scoped>
-.aimport__overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.aimport__card { background: #fff; border-radius: 10px; width: min(520px, 92vw); padding: 16px 20px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18); }
+.aimport__overlay { position: fixed; inset: 0; background: var(--scrim); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.aimport__card { background: var(--surface); color: var(--ink); color-scheme: var(--scheme); border-radius: 10px; width: min(520px, 92vw); padding: 16px 20px; box-shadow: var(--shadow-modal); }
 .aimport__head { margin-bottom: 8px; }
-.aimport__close { color: #9a9a9a; }
-.aimport__close:hover { color: #e84a4a; }
+.aimport__close { color: var(--ink-2); }
+.aimport__close:hover { color: var(--danger); }
 .aimport__hint { margin-bottom: 12px; }
-.aimport__sample { display: inline-block; margin-bottom: 12px; color: #2f3990; text-decoration: underline; cursor: pointer; }
+.aimport__sample { display: inline-block; margin-bottom: 12px; color: var(--brand); text-decoration: underline; cursor: pointer; }
 .aimport__sample:hover { opacity: 0.8; }
 .aimport__file { margin-bottom: 12px; }
 .aimport__preview { margin-bottom: 10px; }
 .aimport__controls { margin-top: 4px; }
-.aimport__select { border: 1px solid #e0e0e0; border-radius: 6px; padding: 6px 8px; background: #fff; min-width: 200px; }
-.aimport__result { margin-top: 12px; padding: 8px 10px; background: #f7f9fc; border-radius: 6px; }
+.ah-input.aimport__select { width: auto; min-width: 200px; }
+.aimport__result { margin-top: 12px; padding: 8px 10px; background: var(--surface-2); border-radius: 6px; }
 </style>

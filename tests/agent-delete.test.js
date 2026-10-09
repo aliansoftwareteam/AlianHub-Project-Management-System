@@ -30,8 +30,8 @@ describe('#15 DELETE /api/v2/agents/:id', () => {
     it('is registered under the JWT+company prefix', () => {
         const app = { use: jest.fn(), get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() };
         routes.init(app);
-        expect(app.delete).toHaveBeenCalledWith('/api/v2/agents/:id', ctrl.deleteAgent);
-        expect(app.delete.mock.calls.map(([p]) => p)).toEqual(['/api/v2/agents/skills/:key', '/api/v2/agents/account', '/api/v2/agents/standing-approvals/:projectId/:id', '/api/v2/agents/:id', '/api/v2/agents/:id/schedules/:scheduleId']);
+        expect(app.delete).toHaveBeenCalledWith('/api/v2/agents/:id', expect.any(Function), ctrl.deleteAgent);
+        expect(app.delete.mock.calls.map(([p]) => p)).toEqual(['/api/v2/agents/roles/:blueprint/:slug/playbook', '/api/v2/agents/skills/:key', '/api/v2/agents/account', '/api/v2/agents/standing-approvals/:projectId/:id', '/api/v2/agents/:id', '/api/v2/agents/:id/schedules/:scheduleId']);
         expect(require('fs').readFileSync(require('path').join(__dirname, '../Config/setMiddleware.js'), 'utf8')).toMatch(/'\/api\/v2\/agents'/);
     });
 

@@ -30,6 +30,9 @@ jest.mock('../utils/commonFunctions.js', () => mockStub());
 jest.mock('../common-storage/common-server.js', () => mockStub());
 jest.mock('../Modules/Knowledge/ingest/events', () => ({ publishCommentChanged: jest.fn(), publish: jest.fn() }));
 jest.mock('../Modules/Agents/triggers', () => ({ fromComment: jest.fn(async () => null) }));
+const mockChat = jest.fn(async () => ({ content: JSON.stringify({ value: 'Again' }), usage: { prompt_tokens: 1, completion_tokens: 1 } }));
+jest.mock('../Modules/AICore/llmProvider', () => ({ ...jest.requireActual('../Modules/AICore/llmProvider'), isAnyProviderConfigured: () => true, getProvider: () => ({ chat: (...args) => mockChat(...args) }) }));
+jest.mock('../Modules/Agents/budget', () => ({ ...jest.requireActual('../Modules/Agents/budget'), check: jest.fn(async () => ({ ok: true, reason: '' })) }));
 
 const logger = require('../Config/loggerConfig');
 const world = require('./fixtures/mcpManageWorld');
@@ -153,5 +156,68 @@ describe('a change an agent makes on the older path', () => {
         await afterWindow();
         expect(published.filter((entry) => entry.type === 'task.priority_changed')).toHaveLength(0);
         expect(logger.error).toHaveBeenCalledWith(expect.stringMatching(/exceeds 3/));
+    });
+});
+
+describe('a field written again after someone\'s change', () => {
+    const FIELD = '6f00000000000000000f1e1d';
+    const write = (eventOrigin) => {
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: FIELD, fieldTitle: 'Notes', fieldType: 'text', type: 'task', global: true });
+        const { taskMongo } = require('../Modules/Tasks/helpers/task_class_Mongo');
+        return taskMongo.updateTaskCustomField({
+            companyId: CID, taskId: String(fx.top._id), customFieldId: FIELD, updateDetail: { fieldValue: 'Again', _id: FIELD },
+            userData: { id: OWNER, Employee_Name: 'Olivia Owner' }, storedTask: fx.top, filledByAi: true, eventOrigin,
+        });
+    };
+    const ofTheField = () => published.filter((envelope) => envelope.entity.id === String(fx.top._id) && envelope.changedFields.some((name) => name.startsWith('customField')));
+
+    it('after an agent\'s, is published as the agent\'s at that change\'s depth, and wakes no rule that did not opt in', async () => {
+        await write({ actor: { kind: 'agent', userId: OWNER }, depth: 3 });
+        await afterWindow();
+        expect(ofTheField()).toHaveLength(1);
+        expect(ofTheField()[0]).toMatchObject({ actor: { kind: 'agent', userId: OWNER }, depth: 3 });
+        expect(matcher.acceptsActor(plainRule, ofTheField()[0])).toBe(false);
+        expect(matcher.acceptsActor(optedIn, ofTheField()[0])).toBe(true);
+    });
+
+    it('after a person\'s, is published as it always was', async () => {
+        await write(null);
+        await afterWindow();
+        expect(ofTheField()).toHaveLength(1);
+        expect(ofTheField()[0]).toMatchObject({ actor: { kind: 'system', userId: null }, depth: 0 });
+        expect(matcher.acceptsActor(plainRule, ofTheField()[0])).toBe(true);
+    });
+});
+
+describe('an AI field filled again after a change that counts in a chain', () => {
+    const FIELD = '6f00000000000000000f1e1e';
+    const automationTools = require('../Modules/Automations/engine/tools');
+    const autoRefill = require('../Modules/CustomField/aiFields/autoRefill');
+    const fills = () => published.filter((envelope) => envelope.entity.id === String(fx.top._id) && envelope.changedFields.some((name) => name.startsWith('customField')));
+
+    beforeEach(() => {
+        mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, {
+            _id: FIELD, fieldTitle: 'Summary', fieldType: 'textarea', type: 'task', isDelete: true, global: true, projectId: [],
+            fieldAi: { enabled: true, template: 'summary', reads: ['title'], autoRefill: true, language: '', prompt: '' },
+        });
+        const stored = rows(SCHEMA_TYPE.TASKS).find((task) => String(task._id) === String(fx.top._id));
+        stored.customField = { [FIELD]: { fieldValue: 'First' } };
+        stored.aiFieldFills = { [FIELD]: { by: OWNER, hash: 'of-the-old-title', template: 'summary', trigger: 'manual', at: new Date() } };
+        autoRefill.start({ debounceMs: 60 * 1000 });
+    });
+    afterEach(() => autoRefill.stop());
+
+    it('after a rule\'s write at depth 2, is published as an automated change at depth 3, and wakes no rule that did not opt in', async () => {
+        await automationTools.updateTask(CID, fx.top._id, { TaskName: 'Renamed by a rule' }, { depth: 2, ruleId: null, ruleName: 'Rename' });
+        // The refill comes a minute after the edit, long after the bus has sent the edit's own event on.
+        await afterWindow();
+        await autoRefill.flush();
+        await afterWindow();
+
+        expect(mockChat).toHaveBeenCalledTimes(1);
+        expect(fills()).toHaveLength(1);
+        expect(fills()[0]).toMatchObject({ actor: { kind: 'automation' }, depth: 3 });
+        expect(matcher.acceptsActor(plainRule, fills()[0])).toBe(false);
+        expect(matcher.acceptsActor(optedIn, fills()[0])).toBe(true);
     });
 });

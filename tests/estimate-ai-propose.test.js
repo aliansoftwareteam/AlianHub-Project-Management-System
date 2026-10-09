@@ -18,6 +18,8 @@ const mockChat = jest.fn(async () => ({ content: JSON.stringify({ minutes: 210, 
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockCrud(...a) }));
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Sprints/helpers/sprintVisibility', () => ({ ...jest.requireActual('../Modules/Sprints/helpers/sprintVisibility'), hiddenSprintIds: jest.fn(async () => []) }));
+jest.mock('../Modules/Tasks/helpers/taskReadAccess', () => require('./fixtures/taskReadByProject').taskReadByProject());
 jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
 jest.mock('../Config/permissionGuard', () => ({
     getRoleType: jest.fn(async () => 3),
@@ -77,8 +79,8 @@ describe('POST /api/v1/estimatedTime/ai/:tid/propose', () => {
         routes.init(app);
         const paths = app.post.mock.calls.map(([path]) => path);
         expect(paths).toEqual(expect.arrayContaining(['/api/v1/estimatedTime/ai/:tid', '/api/v1/estimatedTime/ai/:tid/propose']));
-        const [, handler] = app.post.mock.calls.find(([path]) => path === '/api/v1/estimatedTime/ai/:tid/propose');
-        expect(handler).toBe(estimates.proposeAiEstimate);
+        const handlers = app.post.mock.calls.find(([path]) => path === '/api/v1/estimatedTime/ai/:tid/propose');
+        expect(handlers[handlers.length - 1]).toBe(estimates.proposeAiEstimate);
     });
 
     it('returns the suggested minutes and reasoning without writing anything', async () => {

@@ -7,11 +7,12 @@
                 <li v-for="p in reviewRows" :key="p.proposalId" class="aq__review-item" data-test="queue-review-item">
                     <div class="aq__what"><strong>{{ whoOf(p) }}</strong> {{ t('Inbox.wants_to') }} {{ titleOf(p) }}</div>
                     <ul class="aq__changes">
-                        <li v-for="(change, i) in p.changes" :key="i" class="aq__change">
+                        <li v-for="(change, i) in readChanges(p)" :key="i" class="aq__change">
                             <span class="aq__change-label">{{ changeText(change) }}</span>
                             <span v-if="!change.reversible" class="ah-chip ah-chip--warn">{{ t('Ai.not_reversible') }}</span>
                         </li>
                     </ul>
+                    <p v-if="keptOf(p)" class="aq__lead" data-test="queue-review-parts">{{ t('Inbox.queue_parts_kept', { parts: keptOf(p) }) }}</p>
                 </li>
             </ol>
             <div class="aq__actions">
@@ -56,18 +57,28 @@
                     />
                     <span class="ah-avatar ah-avatar--agent" aria-hidden="true"><ShellIcon name="agent" :size="12" /></span>
                     <span class="aq__what"><strong>{{ whoOf(p) }}</strong> {{ t('Inbox.wants_to') }} {{ titleOf(p) }}</span>
-                    <span v-if="p.locked" class="ah-chip ah-chip--warn" data-test="queue-locked">{{ t('Inbox.queue_locked') }}</span>
+                    <span v-if="p.locked" class="ah-chip ah-chip--warn" data-test="queue-locked">{{ t(LOCKED_CHIPS[p.lockedWhy] || 'Inbox.queue_locked') }}</span>
                     <span v-if="p.tainted" class="ah-chip ah-chip--warn">{{ t('Audit.tainted') }}</span>
                     <time v-if="stamp(p.createdAt)" class="aq__when" :title="p.createdAt">{{ stamp(p.createdAt) }}</time>
                 </div>
 
                 <p class="aq__why"><span class="aq__label">{{ t('Ai.why') }}</span> {{ whyOf(p) || t('Time.why_no_reason') }}</p>
+                <p v-if="p.retry && !p.locked" class="aq__locked-note" data-test="queue-retry-note">{{ t('Inbox.queue_retry_note', { why: p.retry.why || t('Time.why_no_reason') }) }}</p>
 
                 <div class="aq__label">{{ t('Inbox.queue_changes_label') }}</div>
                 <ul class="aq__changes">
-                    <li v-for="(change, i) in changesOf(p)" :key="i" class="aq__change">
-                        <IntentPreview v-if="change.preview" class="aq__intent" :preview="change.preview" />
-                        <span v-else class="aq__change-label">{{ change.label }}</span>
+                    <li v-for="(change, i) in shownChanges(p)" :key="i" class="aq__change">
+                        <IntentPreview
+                            v-if="change.preview"
+                            class="aq__intent"
+                            :preview="change.preview"
+                            :choosable="canPick(p)"
+                            :left-out="leftOut[pickKey(p, i)] || []"
+                            :disabled="busy || reviewing"
+                            @update:left-out="leftOut[pickKey(p, i)] = $event"
+                            @open-task="emit('open-task', $event)"
+                        />
+                        <span v-else class="aq__change-label">{{ changeLabel(t, change) }}</span>
                         <span v-if="!change.reversible" class="ah-chip ah-chip--warn" data-test="queue-permanent">{{ t('Ai.not_reversible') }}</span>
                         <button
                             v-if="isEditing(p)"
@@ -83,8 +94,8 @@
 
                 <p v-if="errors[p.proposalId]" class="ah-field__error aq__error" role="alert" data-test="queue-row-error">{{ errors[p.proposalId] }}</p>
 
-                <p v-if="p.locked" class="aq__locked-note">{{ t('Ai.gate_locked') }}</p>
-                <div v-else-if="declining === p.proposalId" class="aq__decline">
+                <p v-if="p.locked" class="aq__locked-note" data-test="queue-locked-note">{{ t(LOCKED_NOTES[p.lockedWhy] || 'Ai.gate_locked') }}</p>
+                <div v-if="declining === p.proposalId && mayDecline(p)" class="aq__decline">
                     <div class="aq__label">{{ t('Ai.decline_reason_title') }}</div>
                     <div class="aq__chips" role="group" :aria-label="t('Ai.decline_reason_title')">
                         <button
@@ -114,6 +125,17 @@
                         <button type="button" class="aq__skip" :disabled="busy" data-test="queue-decline-skip" @click="decline(p, '')">{{ t('Ai.decline_no_reason') }}</button>
                     </div>
                 </div>
+                <div v-else-if="p.locked" class="aq__actions">
+                    <button
+                        v-if="mayDecline(p)"
+                        type="button"
+                        class="ah-btn ah-btn--secondary ah-btn--sm"
+                        :disabled="busy || reviewing"
+                        data-test="queue-decline"
+                        :aria-label="t('Inbox.queue_decline_named', { what: titleOf(p) })"
+                        @click="openDecline(p)"
+                    >{{ t('Inbox.decline') }}</button>
+                </div>
                 <div
                     v-else-if="alwaysFor === p.proposalId"
                     :ref="holdAlwaysPanel"
@@ -124,7 +146,7 @@
                     data-test="queue-always-panel"
                 >
                     <div class="aq__label">{{ t('Inbox.always_title') }}</div>
-                    <p class="aq__lead">{{ t('Inbox.always_body', { agent: whoOf(p), kind: p.alwaysKind }) }}</p>
+                    <p class="aq__lead">{{ t('Inbox.always_body', { agent: whoOf(p), kind: alwaysKindOf(p) }) }}</p>
                     <p class="aq__lead">{{ t('Inbox.always_limits', { days: STANDING_DAYS }) }}</p>
                     <div class="aq__actions">
                         <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" data-test="queue-always-confirm" @click="approveAlways(p)">{{ t('Inbox.always_confirm') }}</button>
@@ -204,10 +226,13 @@ import { sendProposalDecision } from '@/composable/agentProposals';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import IntentPreview from '@/components/molecules/IntentPreview/IntentPreview.vue';
 import { intentSummary, intentTitle } from '@/components/molecules/IntentPreview/intentLines';
+import { keptSummary, partsChoice } from '@/components/molecules/IntentPreview/planPicks';
 import SlackPostPreview from '@/views/Ai/SlackPostPreview.vue';
 import { DECLINE_REASONS } from '@/views/Ai/episodeText';
 import { proposalTitle } from '@/views/Ai/plainLabels';
+import { agentActionLabel, changeLabel } from '@/views/Ai/agentActionLabels';
 import { findingFix, findingReasons } from '@/views/Projects/ProjectDetail/findingText';
+import { plainReason } from '@/views/Ai/auditWords';
 import { decideEach, decideOne } from './approvalQueue';
 
 defineOptions({ name: 'ApprovalQueue' });
@@ -217,7 +242,7 @@ const props = defineProps({
     applied: { type: Array, default: () => [] },
     stamp: { type: Function, default: () => '' },
 });
-const emit = defineEmits(['decided', 'undone']);
+const emit = defineEmits(['decided', 'undone', 'open-task']);
 
 const SLACK_POST = 'slack.message.post';
 const SOURCE_MCP = 'mcp';
@@ -227,7 +252,7 @@ const STANDING_DAYS = 90;
 const REVIEW_TITLE_ID = 'aq-review-title';
 const SELECT_ALL_ID = 'aq-select-all';
 
-const { t } = useI18n();
+const { t, te } = useI18n();
 const { getUser } = useGetterFunctions();
 
 const busy = ref(false);
@@ -250,9 +275,10 @@ const holdAlwaysPanel = (el) => { alwaysPanel = el; };
 // A connected agent's proposal is filed under its tool's name and description, which is no sentence for a person.
 const onlyPreview = (p) => (p.source === SOURCE_MCP && (p.changes || []).length === 1 ? p.changes[0].preview : null);
 /* A change the project's rules filed is worded here from the facts it carries; its stored text is the fallback. */
-const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || intentTitle(t, onlyPreview(p)) || proposalTitle(t, p);
-const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || p.why;
-const changeText = (change) => intentSummary(t, change.preview) || change.label;
+const titleOf = (p) => (p.finding && findingFix(t, p.finding)) || intentTitle(t, p.batch || onlyPreview(p)) || proposalTitle(t, p);
+const whyOf = (p) => (p.finding && findingReasons(t, p.finding).join(' · ')) || plainReason(t, te, p.why);
+const changeText = (change) => intentSummary(t, change.preview) || changeLabel(t, change);
+const alwaysKindOf = (p) => agentActionLabel(t, p.changes?.[0]?.action, p.alwaysKind);
 // The preview is the server's reading of a change for this viewer, never part of the change sent back.
 const asFiled = (change) => Object.fromEntries(Object.entries(change).filter(([key]) => key !== 'preview'));
 const whoOf = (p) => {
@@ -261,6 +287,10 @@ const whoOf = (p) => {
     return person ? t('Inbox.queue_for', { agent: p.agentName, person }) : p.agentName;
 };
 
+const LOCKED_CHIPS = Object.freeze({ own_rights: 'Inbox.queue_locked_rights', first_approver: 'Inbox.queue_locked_retry', not_this_plan: 'Inbox.queue_locked_plan' });
+const LOCKED_NOTES = Object.freeze({ own_rights: 'Ai.rights_locked', first_approver: 'Inbox.queue_retry_locked', not_this_plan: 'Inbox.queue_plan_locked' });
+// A row that is not the reader's to approve can still be theirs to decline: one their own agent asked for.
+const mayDecline = (p) => !p.locked || p.mayDecline === true;
 const selectable = computed(() => props.proposals.filter((p) => !p.locked));
 const pickedIds = computed(() => selectable.value.map((p) => p.proposalId).filter((id) => picked.value.includes(id)));
 const allPicked = computed(() => selectable.value.length > 0 && pickedIds.value.length === selectable.value.length);
@@ -272,28 +302,48 @@ const toggleAll = (on) => { picked.value = on ? selectable.value.map((p) => p.pr
 
 const isEditing = (p) => editing.value === p.proposalId;
 const changesOf = (p) => (isEditing(p) ? kept.value : p.changes || []);
+// A batch is read as one card: how many tasks, what changes on them and which tasks, not a line for each change.
+const readChanges = (p) => (p.batch ? [{ preview: p.batch, label: '', reversible: (p.changes || []).every((change) => change.reversible) }] : p.changes || []);
+const shownChanges = (p) => (isEditing(p) ? kept.value : readChanges(p));
+// The parts of a plan the person unticked, by proposal and change. Only their places in the stored plan are sent back.
+const leftOut = reactive({});
+const pickKey = (p, i) => `${p.proposalId}:${i}`;
+const forgetPicks = (p) => Object.keys(leftOut).filter((key) => key.startsWith(`${p.proposalId}:`)).forEach((key) => { delete leftOut[key]; });
+const canPick = (p) => !p.locked && !p.batch && !isEditing(p);
+const leftOutAt = (p) => (i) => leftOut[pickKey(p, i)];
+const choiceOf = (p) => (p.batch || isEditing(p) ? null : partsChoice(p.changes, leftOutAt(p)));
+const keptOf = (p) => (choiceOf(p) ? keptSummary(t, p.changes, leftOutAt(p)) : '');
 const toggleEdit = (p) => {
     if (isEditing(p)) { editing.value = ''; return; }
+    forgetPicks(p);
     editing.value = p.proposalId;
     kept.value = (p.changes || []).map((change) => ({ ...change }));
 };
 
 const send = (id, verb, body) => decideOne(sendProposalDecision, id, verb, body, t('Inbox.action_failed'));
 const failuresLine = (unapplied) => (unapplied.length ? t('Ai.applied_with_failures', { n: unapplied.length, error: unapplied[0].error || '' }) : '');
+/* What the approvals left to be made later, said once: it is back in the queue as rows of its own. */
+const laterLine = (results) => [
+    results.some((r) => r.later?.waiting) ? t('Inbox.queue_left_waiting') : '',
+    results.some((r) => r.later?.retry) ? t('Inbox.queue_left_retry') : '',
+].filter(Boolean).join(' ');
+const outcomeLine = (results) => [failuresLine(results.flatMap((r) => r.unapplied || [])), laterLine(results)].filter(Boolean).join(' ');
 const settle = (p, verb, result) => {
     if (!result.ok) { errors[p.proposalId] = result.error; return; }
     delete errors[p.proposalId];
+    forgetPicks(p);
     picked.value = picked.value.filter((id) => id !== p.proposalId);
-    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo) });
+    const more = Boolean(result.later?.waiting || result.later?.retry);
+    emit('decided', { id: p.proposalId, verb, undo: Boolean(result.undo), ...(result.madeProjects?.length ? { madeProjects: result.madeProjects } : {}), ...(more ? { more } : {}) });
 };
 
 const approve = async (p) => {
     const edited = isEditing(p) && kept.value.length !== (p.changes || []).length;
     busy.value = true;
     summary.value = '';
-    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map(asFiled) } : {});
+    const result = await send(p.proposalId, 'approve', edited ? { changes: kept.value.map(asFiled) } : choiceOf(p) || {});
     busy.value = false;
-    if (result.ok) { editing.value = ''; summary.value = failuresLine(result.unapplied); }
+    if (result.ok) { editing.value = ''; summary.value = outcomeLine([result]); }
     settle(p, 'approve', result);
 };
 
@@ -330,7 +380,7 @@ const approveAlways = async (p) => {
     busy.value = false;
     if (result.ok) {
         alwaysFor.value = '';
-        summary.value = result.standing ? t('Inbox.always_made', { agent: whoOf(p) }) : failuresLine(result.unapplied);
+        summary.value = result.standing ? t('Inbox.always_made', { agent: whoOf(p) }) : outcomeLine([result]);
     }
     settle(p, 'approve', result);
 };
@@ -340,6 +390,7 @@ const undoApplied = async (p) => {
     busy.value = false;
     if (!result.ok) { errors[p.proposalId] = result.error; return; }
     delete errors[p.proposalId];
+    summary.value = result.left.length ? t('Inbox.queue_undo_left', { why: result.left[0] }) : '';
     emit('undone', { id: p.proposalId });
 };
 
@@ -364,14 +415,14 @@ const approveReviewed = async () => {
     busy.value = true;
     summary.value = '';
     const byId = new Map(rows.map((p) => [p.proposalId, p]));
-    const results = await decideEach(rows.map((p) => p.proposalId), (id) => send(id, 'approve', {}), (result) => settle(byId.get(result.id), 'approve', result));
+    const results = await decideEach(rows.map((p) => p.proposalId), (id) => send(id, 'approve', choiceOf(byId.get(id)) || {}), (result) => settle(byId.get(result.id), 'approve', result));
     busy.value = false;
     const approved = results.filter((r) => r.ok);
     const failed = results.length - approved.length;
     summary.value = [
         t('Inbox.queue_bulk_done', { ok: approved.length, n: results.length }),
         failed ? t('Inbox.queue_bulk_failed', { n: failed }, failed) : '',
-        failuresLine(approved.flatMap((r) => r.unapplied)),
+        outcomeLine(approved),
     ].filter(Boolean).join(' ');
     await closeReview();
 };
@@ -403,6 +454,8 @@ const approveReviewed = async () => {
 .aq__head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .aq__what { flex: 1 1 12ch; min-width: 0; overflow-wrap: anywhere; color: var(--ink); }
 .aq__what strong { font-weight: 600; }
+/* In this column the 12ch basis .aq__what has for a row would be its height. */
+.aq__review-item .aq__what { flex: none; }
 .aq__when { margin-left: auto; font: 400 var(--fs-sm, 10px)/1 var(--font-ui); color: var(--ink-2); flex: none; }
 .aq__label { font: var(--text-label); color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }
 .aq__why { margin: 0; color: var(--ink); line-height: 1.45; overflow-wrap: anywhere; white-space: pre-line; }

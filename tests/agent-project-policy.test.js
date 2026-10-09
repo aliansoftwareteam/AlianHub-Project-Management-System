@@ -155,7 +155,7 @@ describe('a close, by project, by workspace and by who asks', () => {
 
     it('never loosens a verdict it is handed', async () => {
         setProject(P_OPEN, { done: YES });
-        const refused = { decision: DECISION.REFUSE, reason: 'task.status.change is outside this agent\'s allowed actions', rating: null };
+        const refused = { decision: DECISION.REFUSE, reason: 'This connection is not allowed to use task.status.change. Ask the person to allow it in AlianHub.', rating: null };
         expect(await projectPolicy.review({ companyId: CID, actor: inProduct(OWNER), action: 'task.status.change', params: { taskId: String(fx.top._id), status: { name: 'Done' } }, verdict: refused })).toBe(refused);
         expect(await reviewed(1, 'task.comment', { taskId: String(fx.top._id), body: 'x' })).toBe(DECISION.PROPOSE);
     });
@@ -285,7 +285,7 @@ describe('where every agent write asks', () => {
         const out = await rpc(outside(OWNER, [...PLAIN_SCOPES, TASKS_GRANT]), 'task.archive', { taskId: fx.bug._id });
         expect(out).toMatchObject({ pending: true });
         expect(proposals.create.mock.calls[0][1].why).toMatch(/outside client/);
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
     });
 });
 
@@ -319,7 +319,7 @@ describe('who may change a project\'s policy', () => {
         expect(project(P_OPEN).agentPolicy).toMatchObject({ ...STRICT, updatedBy: uid });
         expect(changes()).toHaveLength(1);
         expect(changes()[0]).toMatchObject({ actorId: uid, entityType: 'project', entityId: P_OPEN, meta: { from: { done: APPROVAL, connected: CONNECTED.SINGLE_TASK }, to: STRICT } });
-        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', updatedFields: { agentPolicy: expect.objectContaining(STRICT) } }));
+        expect(socketEmitter.emit).toHaveBeenCalledWith('update', expect.objectContaining({ module: 'project', companyId: CID, updatedFields: { agentPolicy: expect.objectContaining(STRICT) } }));
     });
 
     it.each([['a member', MEMBER], ['a guest', GUEST]])('%s is refused, and reads it without being offered the change', async (_who, uid) => {

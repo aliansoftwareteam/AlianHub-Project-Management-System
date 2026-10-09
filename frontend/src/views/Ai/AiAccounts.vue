@@ -75,6 +75,12 @@
                         </div>
                     </section>
 
+                    <WorkspaceDoneCheck :privileged="privileged" />
+
+                    <WorkspaceConnectedPause :privileged="privileged" />
+
+                    <RolePlaybookEditor />
+
                     <div class="acct-callout acct-callout--ok">
                         <strong>{{ $t('Accounts.recommended_label') }}</strong> {{ $t('Accounts.recommended_body') }}
                     </div>
@@ -280,7 +286,7 @@
                                         <div class="ah-field">
                                             <label class="ah-field__label" for="tok-expiry">{{ $t('Accounts.field_expiry') }}</label>
                                             <select id="tok-expiry" v-model.number="tokenForm.expiresInDays" class="ah-input" :class="{ 'ah-input--error': Boolean(expiryError) }" data-test="token-expiry">
-                                                <option v-for="days in expiryChoices" :key="days" :value="days">{{ $t('Accounts.expiry_days', { n: days }) }}</option>
+                                                <option v-for="days in expiryChoices" :key="days" :value="days">{{ $t('Accounts.expiry_days', { n: days }, days) }}</option>
                                             </select>
                                             <p v-if="expiryError" class="ah-field__error">{{ expiryError }}</p>
                                             <p class="acct-note" data-test="token-expiry-hint">{{ $t('Accounts.expiry_hint') }}</p>
@@ -300,7 +306,7 @@
                                                 <p v-if="scopeError" class="ah-field__error">{{ scopeError }}</p>
                                             </div>
                                         </template>
-                                        <div v-if="taskGrantOffered || docsGrantOffered" class="ah-field">
+                                        <div v-if="taskGrantOffered || docsGrantOffered || chatGrantOffered" class="ah-field">
                                             <div class="acct-policy">
                                                 <label v-if="taskGrantOffered" class="acct-policy__row">
                                                     <input v-model="tokenForm.manageTasks" class="ah-check" type="checkbox" data-test="token-grant-tasks" />
@@ -314,6 +320,13 @@
                                                     <span>
                                                         {{ $t('Accounts.token_grant_docs') }}
                                                         <small>{{ $t('Accounts.token_grant_docs_effect') }}</small>
+                                                    </span>
+                                                </label>
+                                                <label v-if="chatGrantOffered" class="acct-policy__row">
+                                                    <input v-model="tokenForm.readChat" class="ah-check" type="checkbox" data-test="token-grant-chat" />
+                                                    <span>
+                                                        {{ $t('Accounts.token_grant_chat') }}
+                                                        <small>{{ $t('Accounts.token_grant_chat_effect') }}</small>
                                                     </span>
                                                 </label>
                                             </div>
@@ -514,7 +527,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, reactive, ref } from "vue";
+import { computed, inject, onMounted, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { routeLocationKey } from "vue-router";
 import { useStore } from "vuex";
@@ -524,9 +537,12 @@ import { useGetterFunctions } from "@/composable/index.js";
 import AiSidebar from "./AiSidebar.vue";
 import AccountAttribution from "./AccountAttribution.vue";
 import ConnectedApps from "./ConnectedApps.vue";
+import WorkspaceDoneCheck from "./WorkspaceDoneCheck.vue";
+import WorkspaceConnectedPause from "./WorkspaceConnectedPause.vue";
+import RolePlaybookEditor from "./RolePlaybookEditor.vue";
 import { oauthAvailable } from "@/views/OAuth/oauthShared";
 import { useAccounts, MODES, PROVIDERS } from "./useAccounts";
-import { DOCS_GRANT, EXPIRY_OVER_MAX, TASKS_GRANT, TOKEN_SCOPES, canGrantDocs, canGrantTasks, defaultExpiryFor, expiryChoicesFor, grantsOf, tokenFormProblem } from "./tokenPolicy";
+import { CHAT_GRANT, DOCS_GRANT, EXPIRY_OVER_MAX, TASKS_GRANT, TOKEN_SCOPES, canGrantChat, canGrantDocs, canGrantTasks, defaultExpiryFor, expiryChoicesFor, grantsOf, tokenFormProblem } from "./tokenPolicy";
 import { reasonOf } from "./useAgents";
 import { skillLabel } from "./plainLabels";
 import { mcpUrlFor } from "./mcpUrl";
@@ -565,6 +581,8 @@ const TABS = ["modes", "link", "attribution", "rules", "connected"];
 const askedTab = String(inject(routeLocationKey, null)?.query?.tab || "");
 const tab = ref(TABS.includes(askedTab) ? askedTab : "modes");
 const draftModes = ref([...MODES]);
+// The stored modes can change under an open page; a draft of the old ones would save them back.
+watch(() => (policy.value.allowedModes || MODES).join(), () => { draftModes.value = [...(policy.value.allowedModes || MODES)]; });
 const savingPolicy = ref(false);
 const policySaved = ref(false);
 const policyError = ref("");
@@ -586,7 +604,7 @@ const loadError = ref("");
 const copied = ref("");
 
 const form = reactive({ mode: "personal", provider: "claude-code", label: "", email: "" });
-const tokenForm = reactive({ name: "", mode: "personal", provider: "claude-code", projectId: "", expiresInDays: defaultExpiryFor(tokenPolicy.value), scopes: [...TOKEN_SCOPES], manageTasks: false, manageDocs: false });
+const tokenForm = reactive({ name: "", mode: "personal", provider: "claude-code", projectId: "", expiresInDays: defaultExpiryFor(tokenPolicy.value), scopes: [...TOKEN_SCOPES], manageTasks: false, manageDocs: false, readChat: false });
 
 const companyUser = computed(() => getters["settings/companyUserDetail"] || {});
 const privileged = computed(() => isOwnerOrAdmin(companyUser.value.roleType));
@@ -633,6 +651,7 @@ const expiryChoices = computed(() => expiryChoicesFor(tokenPolicy.value));
 
 const taskGrantOffered = computed(() => canGrantTasks(tokenForm, tokenPolicy.value));
 const docsGrantOffered = computed(() => canGrantDocs(tokenForm, tokenPolicy.value));
+const chatGrantOffered = computed(() => canGrantChat(tokenForm, tokenPolicy.value));
 
 const isOverMax = (tk) => tk.reason === "over-max-lifetime";
 
@@ -650,9 +669,10 @@ const tokenMeta = (tk) => [
     tokenPolicy.value.strict ? scopesOf(tk) : "",
     (tk.grants || []).includes(TASKS_GRANT) ? t("Accounts.token_grant_tasks_short") : "",
     (tk.grants || []).includes(DOCS_GRANT) ? t("Accounts.token_grant_docs_short") : "",
+    (tk.grants || []).includes(CHAT_GRANT) ? t("Accounts.token_grant_chat_short") : "",
     tk.lastUsedAt ? t("Accounts.used_on", { d: new Date(tk.lastUsedAt).toLocaleString() }) : t("Accounts.never_used"),
     tk.agentAccount && tk.agentAccount.mode ? t(`Accounts.mode_${tk.agentAccount.mode}`) : "",
-    tk.projectIds && tk.projectIds.length ? t("Accounts.scoped_projects", { n: tk.projectIds.length }) : ""
+    tk.projectIds && tk.projectIds.length ? t("Accounts.scoped_projects", { n: tk.projectIds.length }, tk.projectIds.length) : ""
 ].filter(Boolean).join(" · ");
 
 const expiryRowMeta = (tk) => [
@@ -816,6 +836,7 @@ const onMint = async () => {
         tokenForm.scopes = [...TOKEN_SCOPES];
         tokenForm.manageTasks = false;
         tokenForm.manageDocs = false;
+        tokenForm.readChat = false;
     } catch (error) {
         if (error.code === EXPIRY_OVER_MAX) expiryError.value = t("Accounts.token_expiry_over_max", { n: error.maxExpiryDays || tokenPolicy.value.maxExpiryDays });
         else mintError.value = error.message;

@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, T-3: what the MCP server tells a connecting agent about the product, and the ready-made prompts
    it offers. Both are fixed text fitted to the tools that connection may use; neither reads the database. */
 process.env.STORAGE_TYPE = 'server';
@@ -40,7 +41,7 @@ const { OWNER, GUEST, P_OPEN, T_OPEN, CID, ctx, readOnly, narrowed, outside, set
 const { seed } = world.create(mockDb);
 
 const FLAGS = ['MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2', 'AGENT_PERFORMANCE_READ', 'MCP_OAUTH', 'MCP_OAUTH_ISSUER'];
-const flags = (...on) => { FLAGS.forEach((flag) => { delete process.env[flag]; }); on.forEach((flag) => { process.env[flag] = 'on'; }); };
+const flags = (...on) => { FLAGS.forEach((flag) => { process.env[flag] = 'off'; }); delete process.env.MCP_OAUTH_ISSUER; on.forEach((flag) => { process.env[flag] = 'on'; }); };
 
 const READ_SCOPES = ['tasks:read', 'projects:read', 'docs:read', 'time:read'];
 const WRITE_SCOPES = ['tasks:write', 'time:write'];
@@ -169,6 +170,15 @@ describe('what a connecting agent is told', () => {
         expect(await told(ctx(OWNER))).toMatch(/A person closes the task/);
     });
 
+    it('tells a caller that may close a task that the close can wait for a person, and to say so and go on', async () => {
+        flags('MCP_TOOLS_MANAGE');
+        const text = await told(managing(OWNER));
+        expect(text).toMatch(/Closing a task may wait for a person's approval/);
+        expect(text).toMatch(/tell the person it is waiting and go on with the rest/);
+        expect(text).toMatch(/do not try to close it again/);
+        expect(await told(ctx(OWNER))).not.toMatch(/Closing a task may wait/);
+    });
+
     it.each(EVERY_MIX)('stays under the set length and in plain words for %s', async (label, mix, caller) => {
         flags(...mix);
         const text = await told(caller());
@@ -259,9 +269,15 @@ describe('the ready-made prompts', () => {
 });
 
 describe('neither reads the workspace', () => {
-    it.each(EVERY_MIX)('no workspace data and no database read for %s', async (label, mix, caller) => {
+    it.each(EVERY_MIX)('no workspace data, and no database read but one of the edited role playbooks cached up to 60 s, for %s', async (label, mix, caller) => {
         flags(...mix);
+        const { myCache } = require('../Config/config');
+        const cached = new Map();
+        const { get, set } = myCache;
+        myCache.get = (key) => cached.get(key);
+        myCache.set = (key, value, ttl) => { expect(ttl).toBeLessThanOrEqual(60); cached.set(key, value); return true; };
         const reads = jest.spyOn(mockDb, 'crud');
+        reads.mockClear();
         const who = caller();
         const texts = [await told(who)];
         for (const prompt of await promptList(who)) {
@@ -269,8 +285,11 @@ describe('neither reads the workspace', () => {
             texts.push((await promptText(who, prompt.name)).text);
             texts.push((await promptText(who, prompt.name, { project: 'Website relaunch', period: 'this week' })).text);
         }
-        expect(reads).not.toHaveBeenCalled();
+        const [overrideReads, others] = [true, false].map((wanted) => reads.mock.calls.filter(([, query]) => (query.type === 'role_playbook_overrides') === wanted));
+        expect(others).toEqual([]);
+        expect(overrideReads.length).toBeLessThanOrEqual(1);
         reads.mockRestore();
+        Object.assign(myCache, { get, set });
         const all = texts.join('\n');
         ['Olive Owner', 'Gus Guest', 'Open task', 'Private list', 'List of the private project', CID, OWNER, P_OPEN, T_OPEN].forEach((stored) => expect(all).not.toContain(stored));
     });

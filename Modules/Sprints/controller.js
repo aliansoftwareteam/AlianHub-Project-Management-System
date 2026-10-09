@@ -14,7 +14,7 @@ const { escapeHtml } = require("../../utils/escapeHtml");
 const { storedNames, notifySprintCreated, notifyFolderCreated } = require("./helpers/sprintHistory");
 const { ListWriteError, prepareSprintUpdate, prepareFolderUpdate } = require("./helpers/listWrites");
 const { folderForList, parentForNewFolder, prepareFolderMove } = require("./helpers/folderTree");
-const socketEmitter = require("../../event/socketEventEmitter");
+const { announceList, announceFolder } = require("./helpers/listEvents");
 
 const namedFolderId = (folder) => (folder && typeof folder === 'object' && folder.folderId ? folder.folderId : '');
 
@@ -139,7 +139,8 @@ exports.addSprintFun = (req) => {
             }
             if (isPreCompany) {
                 MongoQ.MongoDbCrudOpration(companyId, obj, "save").then((responsee) => {
-                    resolve({ status: true, statusText: "Sprint added successfully",data: responsee});
+                    resolve({ status: true, statusText: "List added successfully",data: responsee});
+                    announceList('insert', companyId, responsee);
                 }).catch((error) => {
                     logger.error(`ERROR in add sprint function : ${error.message}`);
                     reject({ status: false, statusText: error });
@@ -151,8 +152,8 @@ exports.addSprintFun = (req) => {
                 exports.updateChannelsCounts(companyId, isPrivate, 'inc').then((result) => {
                     if(result) {
                         MongoQ.MongoDbCrudOpration(companyId, obj, "save").then((responsee) => {
-                            resolve({ status: true, statusText: "Sprint added successfully",data: responsee});
-                            if(mainChat) return
+                            resolve({ status: true, statusText: "List added successfully",data: responsee});
+                            announceList('insert', companyId, responsee);
                         }).catch((error) => {
                             logger.error(`ERROR in add sprint function : ${error.message}`);
                             reject({ status: false, statusText: error });
@@ -166,8 +167,8 @@ exports.addSprintFun = (req) => {
                 const hasPermission = await exports.getPerProjectCount(companyId,projectId,dbCollections.SPRINTS);
                 if(hasPermission) {
                     MongoQ.MongoDbCrudOpration(companyId, obj, "save").then(async (responsee) => {
-                        resolve({ status: true, statusText: "Sprint added successfully",data: responsee});
-                        if(mainChat) return
+                        resolve({ status: true, statusText: "List added successfully",data: responsee});
+                        announceList('insert', companyId, responsee);
 
                         const stored = await storedNames(companyId, { projectId, folderId: folder && folder.folderId });
                         let historyObj = {};
@@ -239,6 +240,7 @@ exports.editSprintName = (req, res) => {
             }
 
             res.send({status: true, statusText: "Sprint_updated_successfully", data: response});
+            announceList('update', companyId, response);
             if (mainChat) return;
 
             const folderId = previous && previous.folderId ? String(previous.folderId) : '';
@@ -316,6 +318,7 @@ exports.deleteChannel = (req, res) => {
             }
 
             res.send({ status: true, statusText: "Sprint_deleted_successfully", data: response });
+            announceList('update', companyId, response);
 
             if (!(await isCountedChannel(companyId, response))) return;
 
@@ -335,7 +338,7 @@ exports.deleteChannel = (req, res) => {
     }
 };
 
-const SPRINT_UPDATE_FAILED = 'The sprint could not be updated.';
+const SPRINT_UPDATE_FAILED = 'The list could not be updated.';
 
 const refuseListWrite = (res, error) => {
     if (!(error instanceof ListWriteError)) return false;
@@ -351,17 +354,21 @@ exports.updateSprint = async (req, res) => {
             res.json({ status: false, statusText: "Sprint not found" });
             return;
         }
-        const { update, projectId } = prepared;
+        const { update, projectId, sharedBefore } = prepared;
         res.json(await exports.updateSprintFun({
             params: req.params,
             body: { ...req.body, companyId, projectId, projectData: { ...(req.body.projectData || {}), id: projectId }, updateObject: update },
-        }));
+        }, { sharedBefore }));
     } catch (error) {
         if (!refuseListWrite(res, error)) res.status(500).json({ status: false, statusText: SPRINT_UPDATE_FAILED });
     }
 };
 
-exports.updateSprintFun = (req) => {
+/* A list's task count moves with every task write and is read again by the lists that show it; only a change
+   to the list itself is announced. */
+const changesTheList = (updateObject) => Object.keys(updateObject || {}).some((operator) => operator !== '$inc');
+
+exports.updateSprintFun = (req, { sharedBefore } = {}) => {
     return new Promise((resolve, reject) => {
         try {
             const { companyId, projectId, folderId = null, updateObject, userData, sprintName = null, folderName = "", projectData = null, mainChat = false, historyData } = req.body;
@@ -422,6 +429,7 @@ exports.updateSprintFun = (req) => {
                 }
 
                 resolve({ status: true, statusText: "Sprint_updated_successfully",data:response });
+                if (changesTheList(updateObject)) announceList('update', companyId, response, sharedBefore);
                 if(mainChat) return;
 
                 // CASCADE A FOLDER MOVE ONTO THIS SPRINT'S TASKS.
@@ -570,10 +578,6 @@ exports.updateSprintFun = (req) => {
     });
 };
 
-/* Other tabs learn only that the company's folders changed, and read them again: see socket/controller/folderSocket.js. */
-const announceFolders = (type, companyId) => socketEmitter.emit(type, { type, companyId, module: 'folders' });
-exports.announceFolders = announceFolders;
-
 const recordFolderHistory = (companyId, projectId, message, userData) => HandleHistoryref
     .HandleHistory('project', companyId, projectId, null, { message, key: 'Create_Folder' }, userData)
     .catch((error) => {
@@ -591,7 +595,7 @@ exports.addFolderFun = async ({ companyId, projectId, folderName, parentFolderId
             ...(parent ? { parentFolderId: parent._id } : {}),
         },
     }, "save");
-    announceFolders('insert', companyId);
+    announceFolder('insert', companyId, doc);
     return { doc, parent };
 };
 
@@ -633,7 +637,7 @@ exports.moveFolder = async (req, res) => {
             return;
         }
         res.send({ status: true, statusText: "Folder moved successfully", data: moved });
-        announceFolders('update', companyId);
+        announceFolder('update', companyId, moved);
 
         const { folder, parent, previousParentId } = prepared;
         const parentId = parent ? String(parent._id) : '';
@@ -683,7 +687,7 @@ exports.editFolderName = (req, res) => {
             }
 
             res.send({status: true, statusText: "Folder renamed successfully",data:response});
-            announceFolders('update', companyId);
+            announceFolder('update', companyId, response);
             renameFolderOnTasks(companyId, response)
                 .catch((error) => logger.error(`ERROR in renaming the folder on its tasks: ${error.message}`));
             if(mainChat) return;
@@ -755,7 +759,7 @@ exports.updateFolderFun = async ({ companyId, id, updateObject, folderName = "",
             ],
         }, "updateMany");
     }
-    announceFolders('update', companyId);
+    announceFolder('update', companyId, folder);
 
     const answer = {
         status: true,

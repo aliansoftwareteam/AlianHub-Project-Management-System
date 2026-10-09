@@ -6,7 +6,8 @@ const MESSAGE_KEYS = Object.freeze({
 
 /* The server's refusal code as a sentence; anything unrecognised reads as a plain failure. */
 export function aiErrorKey(payload, fallback = "TaskAi.failed") {
-    return MESSAGE_KEYS[payload?.code] || fallback;
+    const code = payload?.code;
+    return Object.hasOwn(MESSAGE_KEYS, code) ? MESSAGE_KEYS[code] : fallback;
 }
 
 export function payloadOf(error) {

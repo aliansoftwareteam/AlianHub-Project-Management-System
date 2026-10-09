@@ -6,6 +6,8 @@ jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), 
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
 jest.mock('../Config/permissionGuard', () => ({ getRoleType: jest.fn(async (c, uid) => ({ owner1: 1, admin1: 2, member1: 3, member2: 3, guest1: 0 })[uid]), isPrivileged: (r) => r === 1 || r === 2 }));
 jest.mock('../Modules/Agents/scope', () => ({ visibleProjectIds: jest.fn(async () => ['p1']) }));
+jest.mock('../Modules/Agents/actions', () => ({ ...jest.requireActual('../Modules/Agents/actions'), personRefusal: jest.fn(async () => '') }));
+jest.mock('../Modules/Tasks/helpers/taskWritePlacement', () => ({ readableTaskIds: jest.fn(async (companyId, uid, ids) => ids) }));
 jest.mock('../Modules/Agents/actor', () => {
     const isAgent = (a) => Boolean(a && a.kind === 'agent');
     return {
@@ -26,6 +28,7 @@ const C = '6f0000000000000000000c01';
 const AGENT_ID = '6f0000000000000000000a01';
 const OTHER_AGENT_ID = '6f0000000000000000000a02';
 const TASK_ID = '6f0000000000000000000701';
+const TASK_PROJECT = '6f0000000000000000000b01';
 const MISSING_ID = '0123456789abcdef01234567';
 
 const rows = (type) => mockDb.store[type] || [];
@@ -39,7 +42,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: AGENT_ID, name: 'Reviewer', ownerId: 'owner1', autonomy: 1, spendCapUsd: 1, paused: false, deletedStatusKey: 0 });
     mockDb.seed(SCHEMA_TYPE.AGENTS, { _id: OTHER_AGENT_ID, name: 'Reporter', ownerId: 'owner1', autonomy: 1, spendCapUsd: 1, paused: false, deletedStatusKey: 0 });
-    mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK_ID, ProjectID: 'p1' });
+    mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK_ID, ProjectID: TASK_PROJECT });
 });
 
 describe('AGT-01 creating an agent', () => {
@@ -146,7 +149,7 @@ describe('AGT-05 filing a proposal', () => {
 
     it('lets the agent file in its own name and takes the project from the task', async () => {
         const r = await call(ctrl.createProposal, req('owner1', { agentToken: { agentId: AGENT_ID }, body: body() }));
-        expect(r.body).toMatchObject({ status: true, data: { agentId: AGENT_ID, agentName: 'Reviewer', projectId: 'p1', what: 'Comment on the task' } });
+        expect(r.body).toMatchObject({ status: true, data: { agentId: AGENT_ID, agentName: 'Reviewer', projectId: TASK_PROJECT, what: 'Comment on the task' } });
     });
 });
 
@@ -217,6 +220,13 @@ describe('AGT-08, AGT-09 and AGT-10 status codes and validation', () => {
 
     it('refuses a proposal without a summary instead of saving "undefined"', async () => {
         const r = await call(ctrl.createProposal, req('owner1', { agentToken: { agentId: AGENT_ID }, body: { agentId: AGENT_ID, taskId: TASK_ID, changes: comment('x') } }));
+        expect(r.code).toBe(400);
+        expect(r.body.statusText).toMatch(/^what is required/);
+        expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toHaveLength(0);
+    });
+
+    it.each(['undefined', 'null', '[object Object]', '   '])('refuses a proposal whose summary is %p', async (what) => {
+        const r = await call(ctrl.createProposal, req('owner1', { agentToken: { agentId: AGENT_ID }, body: { agentId: AGENT_ID, taskId: TASK_ID, what, changes: comment('x') } }));
         expect(r.code).toBe(400);
         expect(r.body.statusText).toMatch(/^what is required/);
         expect(rows(SCHEMA_TYPE.AGENT_PROPOSALS)).toHaveLength(0);

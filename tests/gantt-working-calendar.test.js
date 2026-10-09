@@ -1,4 +1,4 @@
-const calendar = require('../frontend/src/views/Projects/composables/workingCalendar');
+const calendar = require('../Modules/Tasks/helpers/workingCalendar');
 const R = require('../frontend/src/views/Projects/composables/criticalPath');
 const { workingDaysFor } = require('../Modules/Company/helpers/workingDays');
 
@@ -76,9 +76,9 @@ describe('criticalPath in working days', () => {
 
 describe('the Gantt shift counts through the same calendar', () => {
     test('exports nothing of its own to step over days off', () => {
-        const shift = require('../frontend/src/views/Projects/composables/ganttShift');
+        const shift = require('../Modules/Tasks/helpers/ganttShift');
         expect(Object.keys(shift)).toEqual(['shiftDependants']);
-        const source = require('fs').readFileSync(require.resolve('../frontend/src/views/Projects/composables/ganttShift'), 'utf8');
+        const source = require('fs').readFileSync(require.resolve('../Modules/Tasks/helpers/ganttShift'), 'utf8');
         expect(source).toContain("require('./workingCalendar')");
         expect(source).not.toMatch(/const nextWorkingDay\s*=/);
     });

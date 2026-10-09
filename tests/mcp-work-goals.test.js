@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 046 M3, G7: an outside agent reads the goals the person behind its token can read, reports a
    target's value and changes what a target counts, through the goal routes' own handlers and no further.
    A token kept to some projects is given a goal only through the work it counts, and changes none. */
@@ -51,8 +52,10 @@ const goalTokens = require('../Modules/Goals/goalTokens');
 
 const {
     CID, OWNER, ADMIN, INSIDER, OUTSIDER, GUEST, P_OPEN, P_PRIVATE, L_OPEN, L_SECRET, L_PRIVATE, T_OPEN, T_PRIVATE,
-    MISSING, T_OPEN_2, BEFORE, FLAGS, EVERYONE, ctx, narrowed, readOnly, outside, routeTable, asPerson, settle,
+    MISSING, T_OPEN_2, BEFORE, FLAGS, EVERYONE, ctx: plainCtx, narrowed: plainNarrowed, readOnly, outside, routeTable, asPerson, settle,
 } = world;
+const ctx = (uid, over) => world.managing(plainCtx(uid, over));
+const narrowed = (uid, projectIds) => world.managing(plainNarrowed(uid, projectIds));
 const { seed, audits, setRule, rpcThrough, listedThrough } = world.create(mockDb);
 const rpc = rpcThrough(server);
 const listed = listedThrough(server);
@@ -61,8 +64,8 @@ const web = asPerson(routeTable(require('../Modules/Goals/routes').init));
 const READS = ['goals.list', 'goal.get'];
 const WRITES = ['goal.target.set', 'goal.target.sources.add', 'goal.target.sources.remove'];
 const NAMES = [...READS, ...WRITES];
-const NO_GOAL = { error: 'goal not found' };
-const OUTSIDE_TOKEN = 'not_visible: a token kept to some projects cannot write outside them';
+const NO_GOAL = { error: 'That goal was not found. Ask the person which goal they mean.' };
+const OUTSIDE_TOKEN = 'not_visible: this connection is limited to some projects, so it cannot make changes outside them. Ask the person to widen it in AlianHub.';
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const goalsNow = () => JSON.stringify(mockDb.store[SCHEMA_TYPE.GOALS]);
 const storedGoal = (id) => mockDb.store[SCHEMA_TYPE.GOALS].find((row) => String(row._id) === String(id));
@@ -102,7 +105,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tools exist', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(tools.names()).toEqual(BEFORE);
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         NAMES.forEach((name) => {
@@ -114,13 +117,13 @@ describe('the flag decides whether the tools exist', () => {
         expect((await rpc(ctx(INSIDER), 'goal.target.set', { goalId: quiet._id, targetId: quiet.targets[0].id, value: 5 })).rpcError).toMatchObject({ code: -32601 });
     });
 
-    it('on, each tool is a rated registry action with a plain scope, and needs no grant', async () => {
+    it('on, each tool is a rated registry action under the manage grant', async () => {
         expect(await listed(ctx(OWNER))).toEqual(expect.arrayContaining(NAMES));
         NAMES.forEach((name) => expect(registry.permissionsFor(name)).toEqual([{ key: 'task.task_list', write: false }]));
         READS.forEach((name) => expect(actions.rating(name)).toEqual({ write: false, reversible: true, scope: 'workspace', money: false }));
         WRITES.forEach((name) => expect(actions.rating(name)).toEqual({ write: true, reversible: true, scope: 'workspace', money: false }));
-        expect(NAMES.map((name) => scopes.scopeForTool(name))).toEqual(['projects:read', 'projects:read', 'tasks:write', 'tasks:write', 'tasks:write']);
-        expect(tools.registered().filter((tool) => NAMES.includes(tool.name)).map((tool) => tool.grant)).toEqual([undefined, undefined, undefined, undefined, undefined]);
+        expect(NAMES.map((name) => scopes.scopeForTool(name))).toEqual(['projects:read', 'projects:read', 'tasks:manage', 'tasks:manage', 'tasks:manage']);
+        expect(tools.registered().filter((tool) => NAMES.includes(tool.name)).map((tool) => tool.grant)).toEqual([undefined, undefined, 'tasks:manage', 'tasks:manage', 'tasks:manage']);
         expect(WRITES.map((name) => workTools.filedUnder(name))).toEqual(['tasks:manage', 'tasks:manage', 'tasks:manage']);
     });
 
@@ -176,9 +179,9 @@ describe('goals.list', () => {
 
     it('needs the read scope, and stays inside the actions an agent was given', async () => {
         expect(namesOf(await rpc(readOnly(OUTSIDER), 'goals.list', {}))).toEqual(['Company goal', 'Ship the open work']);
-        expect(await rpc(outside(OUTSIDER, ['tasks:read', 'tasks:write']), 'goals.list', {})).toMatchObject({ isError: true, error: 'This token lacks the projects:read scope.' });
+        expect(await rpc(outside(OUTSIDER, ['tasks:read', 'tasks:write']), 'goals.list', {})).toMatchObject({ isError: true, error: 'This connection was not given the projects:read permission. Ask the person to connect you again and allow it.' });
         expect(namesOf(await rpc(outside(OUTSIDER, ['projects:read']), 'goals.list', {}))).toEqual(['Company goal', 'Ship the open work']);
-        expect(await rpc(ctx(OUTSIDER, { allowedActions: ['tasks.search'] }), 'goals.list', {})).toMatchObject({ refused: true, reason: expect.stringMatching(/not in this agent's skills/) });
+        expect(await rpc(ctx(OUTSIDER, { allowedActions: ['tasks.search'] }), 'goals.list', {})).toMatchObject({ refused: true, reason: expect.stringMatching(/is not switched on for this connection/) });
     });
 });
 
@@ -313,21 +316,18 @@ describe('goal.target.set', () => {
 
     it('needs the write scope: a read-only token and an OAuth token without it are refused', async () => {
         const before = goalsNow();
-        expect(await rpc(readOnly(INSIDER), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This token is read-only.' });
-        expect(await rpc(outside(INSIDER, ['projects:read']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This token lacks the tasks:write scope.' });
-        expect(await rpc(ctx(INSIDER, { allowedActions: ['goals.list'] }), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ refused: true, reason: expect.stringMatching(/not in this agent's skills/) });
+        expect(await rpc(readOnly(INSIDER), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This connection can only read. Ask the person to connect you again and allow changes.' });
+        expect(await rpc(outside(INSIDER, ['projects:read']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ isError: true, error: 'This connection was not given the tasks:manage permission, which goal.target.set needs. Ask the person to connect you again and allow it.' });
+        expect(await rpc(ctx(INSIDER, { allowedActions: ['goals.list'] }), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 })).toMatchObject({ refused: true, reason: expect.stringMatching(/is not switched on for this connection/) });
         expect(goalsNow()).toBe(before);
     });
 
-    it('runs for an outside client, and under taint routing waits for a person or is refused', async () => {
-        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 2 })).toMatchObject({ ok: true });
+    it('runs for an outside client holding the manage scope, and under taint routing waits for a person', async () => {
+        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 2 })).toMatchObject({ isError: true });
+        expect(await rpc(outside(INSIDER, ['tasks:write', 'tasks:manage']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 2 })).toMatchObject({ ok: true });
 
         process.env.AGENT_TAINT_ROUTING = 'on';
         const before = goalsNow();
-        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 }))
-            .toMatchObject({ refused: true, reason: expect.stringMatching(/reaches the whole workspace.*needs a person's approval/) });
-        expect(proposals.create).not.toHaveBeenCalled();
-
         expect(await rpc(outside(INSIDER, ['tasks:write', 'tasks:manage']), 'goal.target.set', { goalId: quiet._id, targetId: number(quiet), value: 5 }))
             .toMatchObject({ ok: false, pending: true, proposalId: 'proposal-1' });
         expect(proposals.create.mock.calls[0][1]).toMatchObject({ requestedBy: INSIDER, changes: [{ action: 'goal.target.set', params: { goalId: quiet._id, targetId: number(quiet), value: 5 } }] });
@@ -450,7 +450,7 @@ describe('goal.target.sources.add and goal.target.sources.remove', () => {
         process.env.AGENT_TAINT_ROUTING = 'on';
         const before = goalsNow();
         const args = { goalId: shared._id, targetId: counted(shared), kind: 'task', sourceId: T_OPEN };
-        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.sources.add', args)).toMatchObject({ refused: true, reason: expect.stringMatching(/needs a person's approval/) });
+        expect(await rpc(outside(INSIDER, ['tasks:write']), 'goal.target.sources.add', args)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
         expect(await rpc(outside(INSIDER, ['tasks:write', 'tasks:manage']), 'goal.target.sources.add', args)).toMatchObject({ ok: false, pending: true });
         expect(proposals.create).toHaveBeenCalledTimes(1);
         expect(goalsNow()).toBe(before);

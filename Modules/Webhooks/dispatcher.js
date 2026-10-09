@@ -1,13 +1,15 @@
+const { AsyncResource } = require('async_hooks');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const { memberProfiles } = require('../../utils/companyMembers');
 const logger = require('../../Config/loggerConfig');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { supersedesPending } = require('../../event/domainEventBus');
-const { createSnapshotStore } = require('../../utils/entityEvents');
+const { createSnapshotStore, isNotAnEdit } = require('../../utils/entityEvents');
 const { safeFetch } = require('../Agents/engine/safeFetch');
 const { webhookAllowlist } = require('./helpers/privateHostAllowlist');
 const { signingSecretOf, NEEDS_ATTENTION } = require('./helpers/signingSecret');
+const { hooksThatMayCarry } = require('./helpers/hookAudience');
 const { subscribesTo, classifyTaskEvent, shouldDeliverTask, normalizeChangedFields, trimTaskForDelivery, signPayload, formatForTarget } = require('./helpers/webhookRules');
 
 // Webhook dispatcher. Piggybacks on the namespaced socketEmitter events that
@@ -163,8 +165,8 @@ async function resolveUserNames(companyId, ids) {
 
 async function flush(companyId, event, doc, changedKeys) {
     const hooks = await getCompanyWebhooks(companyId);
-    const targets = hooks.filter((hook) => subscribesTo(hook, event));
-    if (!targets.length) return;
+    const subscribed = hooks.filter((hook) => subscribesTo(hook, event));
+    if (!subscribed.length) return;
 
     // Task socket payloads can be partial (only the changed fields), which would
     // deliver a payload missing the key/name/priority and a status with no
@@ -175,10 +177,8 @@ async function flush(companyId, event, doc, changedKeys) {
     // NON-task document under module:'task' (the project counter bump fires
     // { data: <project>, updatedFields: {} }). Its _id is a project id, so the
     // task lookup finds nothing — and we must not deliver a project as a phantom
-    // task.updated. shouldDeliverTask drops that case; a transient read error
-    // still falls back to best-effort delivery with the socket doc.
+    // task.updated. shouldDeliverTask drops that case, and a read that failed.
     let fullDoc = null;
-    let readErrored = false;
     try {
         const fresh = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -186,12 +186,13 @@ async function flush(companyId, event, doc, changedKeys) {
         }, 'findOne');
         if (fresh && fresh._id) fullDoc = fresh;
     } catch (error) {
-        readErrored = true;
         logger.error(`${LOG_PREFIX} could not re-read task ${doc._id}: ${error.message}`);
     }
 
-    if (!shouldDeliverTask(fullDoc, readErrored)) return;
-    if (!fullDoc) fullDoc = doc; // transient read error → best-effort with the socket payload
+    if (!shouldDeliverTask(fullDoc)) return;
+
+    const targets = await hooksThatMayCarry(companyId, subscribed, fullDoc);
+    if (!targets.length) return;
 
     const data = trimTaskForDelivery(fullDoc);
 
@@ -229,11 +230,16 @@ function deliverPending(key, entry) {
     });
 }
 
+/* A delivery is made for the hook's owner, and a window is opened by whichever request wrote first: bound here, where
+ * no request is running, the delivery and its retry run under no token's project list, no agent's mark and no request. */
+const deliverOutsideAnyRequest = AsyncResource.bind(deliverPending);
+
 function onTaskEvent(type) {
     return (payload) => {
         try {
             const doc = payload?.data;
-            if (!doc || !doc.CompanyId || !doc._id) return;
+            // A conversation is kept in the tasks collection and sends the same emits; it is never posted to a webhook.
+            if (!doc || !doc.CompanyId || !doc._id || doc.mainChat === true || isNotAnEdit(payload)) return;
             const companyId = String(doc.CompanyId);
             const event = classifyTaskEvent({ type, doc, updatedFields: payload?.updatedFields });
             if (!event) return;
@@ -244,7 +250,7 @@ function onTaskEvent(type) {
             if (supersedesPending(existing, doc, changedNow)) {
                 clearTimeout(existing.timer);
                 pending.delete(key);
-                deliverPending(key, existing);
+                deliverOutsideAnyRequest(key, existing);
             }
             const open = pending.get(key);
             if (open) {
@@ -258,7 +264,7 @@ function onTaskEvent(type) {
             entry.timer = setTimeout(() => {
                 if (pending.get(key) !== entry) return;
                 pending.delete(key);
-                deliverPending(key, entry);
+                deliverOutsideAnyRequest(key, entry);
             }, DEBOUNCE_MS);
             pending.set(key, entry);
         } catch (error) {

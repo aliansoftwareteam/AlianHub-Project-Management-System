@@ -13,7 +13,7 @@ const { strictSince } = require('./helpers/strictSince');
 const { maxLifetimeSince } = require('./helpers/maxLifetimeSince');
 const { stepCredentialsEnabled } = require('../Agents/serviceIdentity');
 const { isKnownCompany } = require('../../Config/knownCompany');
-const manageFlag = require('../Mcp/manageFlag');
+const tokenGrants = require('./helpers/tokenGrants');
 
 // Resolve the acting user. These routes now sit behind the JWT middleware
 // (Config/setMiddleware.js) which populates req.uid; the body userData
@@ -100,22 +100,6 @@ exports.createToken = async (req, res) => {
     }
 };
 
-const GRANT_REFUSALS = Object.freeze({
-    unknown: 'grants must be a list drawn from: ',
-    off: 'The management tools are not switched on for this server (MCP_TOOLS_MANAGE).',
-    readOnly: 'A token can be given a grant only when it has the write scope.',
-});
-
-/* The grants a new agent token is created with, or why the request is refused. */
-const grantsFor = (asked, scopes) => {
-    if (asked === undefined || asked === null) return { grants: [] };
-    if (!Array.isArray(asked) || asked.some((grant) => !manageFlag.GRANTS.includes(grant))) return { refusal: `${GRANT_REFUSALS.unknown}${manageFlag.GRANTS.join(', ')}.` };
-    if (!asked.length) return { grants: [] };
-    if (!manageFlag.enabled()) return { refusal: GRANT_REFUSALS.off };
-    if (!scopes.includes('write')) return { refusal: GRANT_REFUSALS.readOnly };
-    return { grants: manageFlag.GRANTS.filter((grant) => asked.includes(grant)) };
-};
-
 /* POST /api/v2/api-tokens/mcp  body: { name, mode?, provider?, projectIds?, expiresInDays?, grants?, scopes? (strict mode only) }
  * Mints a token for a CLI/coding agent: kind 'agent', read+write scopes, and the
  * account mode the run is attributed to. Returns the MCP URL to paste. Outside strict
@@ -130,7 +114,7 @@ exports.createMcpToken = async (req, res) => {
         const scopes = isStrict() && askedScopes !== undefined ? askedScopes : ['read', 'write'];
         const check = validateCreateInput({ name: name || 'CLI agent', scopes, expiresInDays });
         if (!check.valid) return refuseInput(res, check);
-        const { grants, refusal } = grantsFor(askedGrants, scopes);
+        const { grants, refusal } = tokenGrants.grantsFor(askedGrants, scopes);
         if (refusal) return res.send({ status: false, statusText: refusal });
         const accounts = require('../Agents/accounts');
         const policy = await accounts.getPolicy(companyId);
@@ -182,7 +166,7 @@ exports.listTokens = async (req, res) => {
             strict, minExpiryDays: MIN_EXPIRY_DAYS, maxExpiryDays: maxExpiryDaysFor({ strict }), defaultExpiryDays: defaultExpiryDays({ strict }), scopes: [...SCOPES], graceDays: STRICT_GRACE_DAYS,
             strictSince: since,
             ...(stepCredentialsEnabled() ? { stepCredentials: true } : {}),
-            ...(manageFlag.enabled() ? { grants: [...manageFlag.GRANTS] } : {}),
+            ...(tokenGrants.offered().length ? { grants: tokenGrants.offered() } : {}),
         };
         const lifetimes = await lifetimeStandings(tokens || [], { strict, now });
         const data = (tokens || []).map((doc, i) => maskToken(doc, graceStanding(doc, { strict, strictSince: since, now }), lifetimes[i]));
@@ -330,6 +314,7 @@ exports.updateToken = async (req, res) => {
         if (!updated) {
             return res.send({ status: false, statusText: 'Token not found.' });
         }
+        if (update.active === false) await require('../Agents/manager/chatQuestions').connectionEnded(companyId, userId);
         return res.send({ status: true, statusText: 'Token updated.', data: maskToken(updated) });
     } catch (error) {
         logger.error(`ERROR in update api token: ${error.message}`);
@@ -405,6 +390,7 @@ exports.deleteToken = async (req, res) => {
         }
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_TOKENS, data: [{ _id: tokenObjId }] }, 'deleteOne');
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.API_ACTIVITY_LOGS, data: [{ tokenId: tokenObjId }] }, 'deleteMany').catch(() => {});
+        await require('../Agents/manager/chatQuestions').connectionEnded(companyId, userId);
         return res.send({ status: true, statusText: 'Token deleted.' });
     } catch (error) {
         logger.error(`ERROR in delete api token: ${error.message}`);

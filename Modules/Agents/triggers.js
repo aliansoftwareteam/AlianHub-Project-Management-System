@@ -9,6 +9,7 @@ const { commentThreadAccess } = require('../Comments/helpers/threadAccess');
 const { parseAgentMentionIds, mentionsAsNames } = require('../Comments/helpers/parseMentions');
 const registry = require('./registry');
 const runs = require('./runs');
+const writerLimits = require('../../event/writerLimits');
 
 // Where people start agents from the task itself: choosing one in the assignee
 // picker, or @naming one in a comment. Guests never start one here, and neither
@@ -21,10 +22,12 @@ const NOTE_MAX = 2000;
 const plainOf = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : { ...doc });
 
 /* A chat conversation is stored as a task row with mainChat set; no skill works on one. */
+const isWorkTask = (task) => Boolean(task) && task.mainChat !== true && task.deletedStatusKey !== 1;
+
 const workTask = async (companyId, taskId) => {
     if (!OBJECT_ID.test(String(taskId || ''))) return null;
     const task = await tools.getTask(companyId, taskId).catch(() => null);
-    return task && task.mainChat !== true && task.deletedStatusKey !== 1 ? task : null;
+    return isWorkTask(task) ? task : null;
 };
 
 const threadOfTask = (task) => ({ projectId: String(task.ProjectID || ''), sprintId: task.sprintId ? String(task.sprintId) : '', taskId: String(task._id) });
@@ -63,12 +66,12 @@ const dispatch = (companyId, run, agent, task, { userId, note } = {}) => {
     const actor = { kind: 'agent', userId: String(userId || ''), agentId: String(agent._id), agentName: agent.name, runId: String(run._id), viaAccount: run.viaAccount, tokenId: null };
     const execute = () => (workflows.enabled()
         ? workflows.enqueueForAgentRun(companyId, plain, { note })
-        : runs.executeSkill(companyId, run, agent, task, { proposals: require('./proposals'), actions: require('./actions'), actor }));
+        : writerLimits.underItsStartersLimits(plain, () => runs.executeSkill(companyId, run, agent, task, { proposals: require('./proposals'), actions: require('./actions'), actor })));
     setImmediate(() => Promise.resolve(execute()).catch((e) => logger.error(`agent run ${run._id} was not dispatched: ${e.message}`)));
 };
 
 const launch = async (companyId, { agent, task, trigger, startedBy, note, depth }) => {
-    const check = await runs.canStart(agent, { trigger, companyId, depth });
+    const check = await runs.canStart(agent, { trigger, companyId, depth, projectId: task.ProjectID });
     if (!check.ok) return { agentId: String(agent._id), started: false, reason: check.reason };
     const { run, deduplicated } = await runs.start(companyId, {
         agent, taskId: String(task._id), projectId: task.ProjectID, skill: runs.skillSlugOf(agent), trigger,
@@ -79,14 +82,17 @@ const launch = async (companyId, { agent, task, trigger, startedBy, note, depth 
 };
 
 /* A saved comment that @names agents starts each one its author may run on that task,
- * with the comment as the brief. Never throws: the comment is already posted. */
-const fromComment = async (companyId, { authorId, taskId, message, depth = 0 }) => {
+ * with the comment as the brief. Never throws: the comment is already posted.
+ * `postedBy` is the agent that posted it, which the task's project then answers for (./runStart); `asked` says the
+ * project's rule for the comment itself was asked already, as it is for one made through an agent's MCP tool. */
+const fromComment = async (companyId, { authorId, taskId, message, depth = 0, postedBy = null, asked = false, path = '', ip = '' }) => {
     const mentioned = parseAgentMentionIds(message);
     if (!mentioned.length) return [];
     try {
         const task = await workTask(companyId, taskId);
         if (!task) return [];
         const agents = (await runnableAgents(companyId, authorId, task)).filter((agent) => mentioned.includes(String(agent._id)));
+        if (agents.length && postedBy && !(await require('./runStart').admits(companyId, postedBy, task, { path, ip, asked }))) return [];
         const note = mentionsAsNames(message).trim();
         const out = [];
         for (const agent of agents) {
@@ -100,4 +106,4 @@ const fromComment = async (companyId, { authorId, taskId, message, depth = 0 }) 
     }
 };
 
-module.exports = { TRIGGER, workTask, mayRunOn, runnableAgents, listed, dispatch, launch, fromComment };
+module.exports = { TRIGGER, isWorkTask, workTask, mayRunOn, runnableAgents, listed, dispatch, launch, fromComment };

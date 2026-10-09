@@ -107,6 +107,22 @@ describe('the Needs your approval tab', () => {
         expect(sendProposalDecision).toHaveBeenLastCalledWith('p1', 'undo', {});
     });
 
+    it('offers that undo after a task a connected agent asked to create is approved from its card', async () => {
+        const preview = { kind: 'task', title: 'Fix the login bug', lines: [{ kind: 'place', project: 'Website', list: 'Sprint 4' }] };
+        server.proposals = [proposal('p9', { source: 'mcp', agentName: 'Claude', editable: false, changes: [{ action: 'task.add', params: { projectId: 'p-web', title: 'Fix the login bug' }, label: 'task.create via MCP', reversible: true, preview }] })];
+        await open();
+        const row = wrapper.find('[data-test="queue-row"][data-id="p9"]');
+        expect(row.find('[data-test="intent-preview"]').exists()).toBe(true);
+        await row.find('[data-test="queue-approve"]').trigger('click');
+        await flushPromises();
+        expect(sendProposalDecision).toHaveBeenCalledWith('p9', 'approve', {});
+        expect(wrapper.find('.ibx__undo').attributes('role')).toBe('status');
+        await wrapper.find('.ibx__undo-btn').trigger('click');
+        await flushPromises();
+        expect(sendProposalDecision).toHaveBeenLastCalledWith('p9', 'undo', {});
+        expect(wrapper.find('.ibx__undo').exists()).toBe(false);
+    });
+
     it('says the queue is clear when nothing waits in it', async () => {
         server.proposals = [];
         server.approvals = [];

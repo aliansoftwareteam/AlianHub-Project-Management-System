@@ -1,4 +1,5 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
+const { canReadProject } = require('../../Config/projectAccess');
 const { dbCollections, settingsCollectionDocs } = require("../../Config/collections");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
@@ -20,6 +21,7 @@ const { undoImportJob } = require('./helpers/undoImport');
 const { UPDATE, SKIP } = require('./helpers/clickupPlan');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
 const { findCompanyMembers, activeMemberIdSet } = require('./helpers/companyMembers');
+const { peopleWhoOpen } = require('../../Config/projectPeople');
 const { sessionActor } = require('../Tasks/helpers/taskWriteFields');
 const { sprintPlacementOf } = require('../Tasks/helpers/sprintPlacement');
 const { pinSessionTenant } = require('../../Config/tenant');
@@ -72,7 +74,10 @@ exports.undoImport = async (req, res) => {
         const job = OBJECT_ID.test(id)
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.IMPORT_JOBS, data: [{ _id: new mongoose.Types.ObjectId(id), source: { $ne: DUPLICATE } }] }, 'findOne')
             : null;
-        if (!job) return res.status(404).send({ status: false, statusText: 'Import not found.' });
+        /* An import is undone in a project the person can still open: a job in any other reads like none. */
+        if (!job || (job.projectId && !(await canReadProject(companyId, String(req.uid), String(job.projectId))).allowed)) {
+            return res.status(404).send({ status: false, statusText: 'Import not found.' });
+        }
 
         const out = await undoImportJob(companyId, { job, actor: await sessionActor(req), keepEdited: Boolean(req.body && req.body.keepEdited) });
         if (out.refused) {
@@ -146,13 +151,14 @@ const loadImportContext = async (companyId, projectId) => {
     return { project, statusArray };
 };
 
-// A CSV person mapping carries user ids chosen by the client.
-const keepMemberAssignees = async (companyId, tasks) => {
+/* A CSV person mapping carries user ids chosen by the client: each is kept when they hold a live seat and can
+ * open the project the tasks land in. */
+const keepMemberAssignees = async (companyId, projectId, tasks) => {
     const assigned = tasks.flatMap((task) => (Array.isArray(task.AssigneeUserId) ? task.AssigneeUserId : []));
     if (!assigned.length) return;
     let members = new Set();
     try {
-        members = await activeMemberIdSet(companyId, assigned);
+        members = new Set(await peopleWhoOpen(companyId, String(projectId), [...await activeMemberIdSet(companyId, assigned)]));
     } catch (error) {
         logger.error(`[importers] assignee membership check failed: ${error.message}`);
     }
@@ -175,7 +181,7 @@ const checklistRows = (checklists) => checklists.flatMap((checklist) => {
  * checklistArray + attachment link-references, and fold Trello labels into the
  * description (there is no programmatic tag-create path). Mutates `tasks`.
  * Every assignee, whatever the source, must hold an active seat in the company. */
-const enrichImportTasks = async (companyId, tasks) => {
+const enrichImportTasks = async (companyId, projectId, tasks) => {
     const emails = Array.from(new Set(
         tasks.flatMap((t) => (Array.isArray(t.memberEmails) ? t.memberEmails : [])).filter(Boolean),
     ));
@@ -197,7 +203,7 @@ const enrichImportTasks = async (companyId, tasks) => {
             if (ids.length) task.AssigneeUserId = Array.from(new Set([...(task.AssigneeUserId || []), ...ids]));
         }
     });
-    await keepMemberAssignees(companyId, tasks);
+    await keepMemberAssignees(companyId, projectId, tasks);
     const unmatchedEmails = emails.filter((email) => !emailToId[String(email).toLowerCase()]);
 
     tasks.forEach((task) => {
@@ -261,7 +267,7 @@ const finishImport = async (companyId, { source, project, sprint, actor, statusA
     };
     // S3-01: fold Trello rich data (checklists, attachments, members, labels)
     // onto each task before creation; comments are added after (they need ids).
-    const { unmatchedEmails } = await enrichImportTasks(companyId, tasks);
+    const { unmatchedEmails } = await enrichImportTasks(companyId, project._id, tasks);
     await applyImportTags(companyId, project, [...tasks, ...updates], { create: addsTags });
     const tasksWithSprint = tasks.map((task) => ({ ...task, sprintId, sprintArray: sprint }));
 

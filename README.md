@@ -95,6 +95,15 @@ AI and sign-in providers are configured afterwards from **Settings → Instance*
 [docs/ENV.md](docs/ENV.md) for every variable and
 [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) for the operator walkthrough.
 
+On a new install each person can connect their own AI (Claude, ChatGPT, Claude
+Code) out of the box: the MCP tools and sign-in by address are on by default,
+and an outside app's risky writes wait for a person. The AI acts only as that
+person, with the permissions they grant it. Set `MCP_OAUTH=off`,
+`MCP_TOOLS_DATA=off`, `MCP_TOOLS_MANAGE=off` or `MCP_TOOLS_WORK=off` in `.env`,
+or switch them under **Settings → Instance → AI**, to turn any of it off. An
+upgraded install keeps them off until an owner turns them on there; see
+[docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md).
+
 **Prerequisite:** MongoDB running locally on `mongodb://localhost:27017`. If you don't have it: `docker run -d -p 27017:27017 mongo:7` or download from [mongodb.com](https://www.mongodb.com/try/download/community).
 
 ### Available commands
@@ -332,7 +341,13 @@ A quick tour of AlianHub. [Try the live demo](https://demo.alianhub.com) to expl
 
 📘 **Full user guide & API reference:** [help.alianhub.com](https://help.alianhub.com)
 
+New to project tools? [docs/guide/first-hour/](docs/guide/first-hour/README.md) walks through your first hour, one short page at a time.
+
+Going deeper? [docs/guide/](docs/guide/README.md) is the guide's index. It links [views, filters and saved views](docs/guide/views.md), [custom fields](docs/guide/custom-fields.md) and [rules](docs/guide/rules.md).
+
 Coming from ClickUp? [docs/MOVING-FROM-CLICKUP.md](docs/MOVING-FROM-CLICKUP.md) says what to export, what comes across and what does not.
+
+Using Claude or ChatGPT with AlianHub? [docs/guide/agents/](docs/guide/agents/README.md) says how to connect it, what it can do, what waits for your approval, how to undo a change and how to pause it.
 
 For development:
 

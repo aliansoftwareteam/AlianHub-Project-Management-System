@@ -72,8 +72,9 @@ export function bucketForStatus(statusName, statusType) {
 export function formatMinutes(min) {
     const n = Number(min) || 0;
     if (n <= 0) return '0h';
-    const h = Math.floor(n / 60);
-    const m = Math.round(n % 60);
+    const total = Math.round(n);
+    const h = Math.floor(total / 60);
+    const m = total % 60;
     if (h === 0) return `${m}m`;
     return m === 0 ? `${h}h` : `${h}h ${String(m).padStart(2, '0')}m`;
 }

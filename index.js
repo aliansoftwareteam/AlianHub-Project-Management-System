@@ -209,6 +209,11 @@ async function applySavedSettings() {
     if (!db.ok) { console.error(`instance settings: skipped, ${db.error}`); return; }
     try {
         await require('./Config/instanceSettings.js').loadInstanceSettings(require('./Config/loggerConfig'));
+        const { MongoDbCrudOpration } = require('./utils/mongo-handler/mongoQueries');
+        const { SCHEMA_TYPE } = require('./Config/schemaType');
+        await require('./migrations/074-mcp-old-defaults-for-existing-installs').holdUntilApplied({
+            global: (data, method) => MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, data, method), SCHEMA_TYPE,
+        });
     } catch (error) {
         console.error(`instance settings: could not load, ${error.message}`);
     }

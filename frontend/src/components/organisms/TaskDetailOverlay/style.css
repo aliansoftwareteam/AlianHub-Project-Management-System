@@ -171,7 +171,8 @@
 .ah-summary__text--muted { color: var(--ink-2); }
 
 /* ---------- tabs ---------- */
-.ah-detail__tabs { display: flex; gap: 2px; font-size: var(--fs-md, 12.5px); border-bottom: 1px solid var(--hairline); overflow-x: auto; }
+/* A row that scrolls sideways has no minimum height of its own, so in the scrolling column it must be told not to shrink. */
+.ah-detail__tabs { display: flex; flex: none; gap: 2px; font-size: var(--fs-md, 12.5px); border-bottom: 1px solid var(--hairline); overflow-x: auto; }
 .ah-detail__tab {
     padding: 6px 10px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer;
     border-bottom: 2px solid transparent; margin-bottom: -1px; font: inherit; white-space: nowrap;
@@ -226,10 +227,9 @@
 .ah-detail__relations .linked-tasks__type-label {
     display: inline-block; min-width: 66px; text-align: center; padding: 2px 6px; border-radius: var(--r-sm, 4px);
     font: 600 var(--fs-2xs, 9.5px) var(--font-mono); text-transform: uppercase; letter-spacing: .04em;
-    background: rgba(0, 0, 0, .07); color: var(--ink-label); margin-right: 8px;
+    background: var(--track); color: var(--ink-label); margin-right: 8px;
 }
-:root[data-theme="dark"] .ah-detail__relations .linked-tasks__type-label { background: rgba(255, 255, 255, .1); }
-.ah-detail__relations .linked-tasks__status-chip { padding: 2px 7px; border-radius: var(--r-sm, 5px); background: rgba(0, 0, 0, .06); color: var(--ink-label); }
+.ah-detail__relations .linked-tasks__status-chip { padding: 2px 7px; border-radius: var(--r-sm, 5px); background: var(--fill); color: var(--ink-label); }
 .ah-detail__relations .linked-tasks__blocked-banner { padding: 8px 10px; border-radius: var(--r-md, 8px); background: var(--danger-bg); color: var(--danger-ink); }
 /* The panel turns dark in dark mode but still hosts legacy blocks that hard-code black ink,
    brand-navy links and white fills (checklist heading, "created by", linked docs, description). */
@@ -254,8 +254,7 @@
 .ah-subtasks__head { display: flex; align-items: center; gap: 8px; min-height: 24px; }
 .ah-subtasks__title { font-weight: var(--fw-strong, 600); font-size: var(--fs-md, 12.5px); }
 .ah-subtasks__rollup { font: 500 var(--fs-xs, 10.5px) var(--font-mono); color: var(--ink-2); text-transform: uppercase; }
-.ah-subtasks__bar { flex: 1; max-width: 120px; height: 5px; border-radius: 99px; background: rgba(0, 0, 0, .08); margin-left: 6px; overflow: hidden; }
-:root[data-theme="dark"] .ah-subtasks__bar { background: rgba(255, 255, 255, .12); }
+.ah-subtasks__bar { flex: 1; max-width: 120px; height: 5px; border-radius: 99px; background: var(--track); margin-left: 6px; overflow: hidden; }
 .ah-subtasks__bar-fill { height: 100%; border-radius: 99px; background: var(--brand); transition: width var(--t-state) var(--ease); }
 .ah-subtasks__add { margin-left: auto; border: 0; background: transparent; color: var(--brand); font: 600 var(--fs-sm, 11.5px) var(--font-ui); cursor: pointer; padding: 4px 0; }
 .ah-subtasks__row { display: flex; align-items: center; gap: 9px; font-size: var(--fs-md, 12.5px); min-height: 26px; }
@@ -433,38 +432,38 @@
 .ah-detail__props .task-esitmate-hours { font-family: var(--font-mono); }
 
 /* ---------- timer chip ---------- */
-.ah-timer { display: flex; align-items: center; gap: 8px; padding: 9px 11px; background: var(--rail); color: #fff; border-radius: var(--r-md, 9px); min-height: var(--control-h-lg, 38px); }
+.ah-timer { display: flex; align-items: center; gap: 8px; padding: 9px 11px; background: var(--rail); color: var(--rail-ink-strong); border-radius: var(--r-md, 9px); min-height: var(--control-h-lg, 38px); }
 .ah-timer.is-idle { padding: 0; background: transparent; }
 .ah-timer__clock-wrap { display: flex; flex-direction: column; line-height: 1.1; }
-.ah-timer__label { font: 500 var(--fs-2xs, 9.5px) var(--font-mono); color: rgba(255, 255, 255, .5); letter-spacing: .04em; }
+.ah-timer__label { font: 500 var(--fs-2xs, 9.5px) var(--font-mono); color: var(--rail-ink-2); letter-spacing: .04em; }
 .ah-timer__clock { font: 500 calc(var(--fs-xl, 20px) - 4px) var(--font-mono); letter-spacing: -.5px; }
-.ah-timer.is-paused .ah-timer__clock { color: rgba(255, 255, 255, .6); }
+.ah-timer.is-paused .ah-timer__clock { color: var(--rail-ink); }
 .ah-timer__btn {
     margin-left: auto; padding: 4px 9px; border: 0; border-radius: var(--r-sm, 6px); cursor: pointer;
-    background: rgba(255, 255, 255, .14); color: #fff; font: 600 var(--fs-sm, 11.5px) var(--font-ui);
+    background: var(--rail-active); color: var(--rail-ink-strong); font: 600 var(--fs-sm, 11.5px) var(--font-ui);
 }
 .ah-timer__btn + .ah-timer__btn { margin-left: 0; }
 .ah-timer__btn:hover { background: rgba(255, 255, 255, .24); }
 .ah-timer__btn--stop { padding: 4px 7px; display: inline-flex; }
 .ah-timer__start {
     display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 11px; min-height: var(--control-h-lg, 38px);
-    background: var(--rail); color: #fff; border: 0; border-radius: var(--r-md, 9px); cursor: pointer; font: 600 var(--fs-sm, 12px) var(--font-ui); text-align: left;
+    background: var(--rail); color: var(--rail-ink-strong); border: 1px solid var(--border); border-radius: var(--r-md, 9px); cursor: pointer; font: 600 var(--fs-sm, 12px) var(--font-ui); text-align: left;
 }
 .ah-timer__start:disabled { opacity: .55; cursor: not-allowed; }
-.ah-timer__elsewhere { margin-left: auto; color: rgba(255, 255, 255, .6); font-size: var(--fs-xs, 10.5px); }
+.ah-timer__elsewhere { margin-left: auto; color: var(--rail-ink); font-size: var(--fs-xs, 10.5px); }
 
 /* ---------- minimized tray ---------- */
 .ah-tray { position: absolute; right: 16px; bottom: 12px; z-index: 39; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .ah-tray__chip {
     height: 40px; display: flex; align-items: center; gap: 2px; padding: 0 6px 0 0;
-    background: var(--rail); color: #fff; border-radius: var(--r-lg, 10px); box-shadow: var(--shadow-pop);
+    background: var(--rail); color: var(--rail-ink-strong); border-radius: var(--r-lg, 10px); box-shadow: var(--shadow-pop);
 }
 .ah-tray__open { display: flex; align-items: center; gap: 8px; height: 100%; padding: 0 8px 0 12px; border: 0; background: transparent; color: inherit; font: 500 var(--fs-sm, 12px) var(--font-ui); cursor: pointer; }
-.ah-tray__open .ah-mono { color: rgba(255, 255, 255, .7); }
+.ah-tray__open .ah-mono { color: var(--rail-ink); }
 .ah-tray__name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ah-tray__caret { transform: rotate(-90deg); opacity: .7; }
-.ah-tray__dismiss { width: 24px; height: 24px; border: 0; background: transparent; color: rgba(255, 255, 255, .6); border-radius: var(--r-sm, 6px); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
-.ah-tray__dismiss:hover { background: rgba(255, 255, 255, .14); color: #fff; }
+.ah-tray__dismiss { width: 24px; height: 24px; border: 0; background: transparent; color: var(--rail-ink); border-radius: var(--r-sm, 6px); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.ah-tray__dismiss:hover { background: var(--rail-active); color: var(--rail-ink-strong); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1279px) {
@@ -500,7 +499,7 @@
     .ah-detail__sheet-head { display: flex; align-items: center; gap: 10px; padding-bottom: 6px; position: relative; }
     .ah-detail__sheet-head .ah-h3 { flex: 1; }
     .ah-detail__sheet-grip { position: absolute; top: -2px; left: 50%; transform: translateX(-50%); width: 36px; height: 4px; border-radius: 99px; background: var(--border); }
-    .ah-detail__sheet-scrim { position: fixed; inset: 0; z-index: 45; background: rgba(0, 0, 0, .35); }
+    .ah-detail__sheet-scrim { position: fixed; inset: 0; z-index: 45; background: var(--scrim); }
     .ah-detail__props .task-detail-right-side-label, .ah-detail__prop { min-height: 44px; }
     .ah-detail__list-chip, .ah-detail__list-add { min-height: 32px; }
     .ah-detail__list-remove { width: 28px; height: 28px; }

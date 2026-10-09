@@ -192,6 +192,7 @@ const matchValue = (values, want) => {
 
 const matches = (doc, query) => Object.entries(query).every(([field, want]) => {
     if (field === '$or') return want.some((q) => matches(doc, q));
+    if (field === '$nor') return !want.some((q) => matches(doc, q));
     if (field === '$and') return want.every((q) => matches(doc, q));
     const values = flat(doc, field.split('.'));
     if (want && typeof want === 'object' && want.$elemMatch) return values.some((item) => item && typeof item === 'object' && matches(item, want.$elemMatch));

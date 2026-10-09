@@ -113,6 +113,8 @@ ul.imageUplaod li span {
 
 }
 
+.companyWrapper .company-name { color: var(--ink); overflow-wrap: anywhere; }
+
 span:has(img.companyimg) {
     height: 180px;
     width: 180px;

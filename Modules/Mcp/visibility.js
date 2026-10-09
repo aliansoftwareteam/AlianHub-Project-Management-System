@@ -14,6 +14,8 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 // What an MCP caller may read or act on: exactly what the person behind the token
 // could open in the web app (Modules/Tasks/helpers/taskQueryGuard visibilityStage),
 // narrowed further by the token's own project list. It never widens either.
+// A conversation is stored as a task row marked mainChat. It is chat, not a task: no caller's filter lets one
+// through, its own people included, so every task read and write answers for it as for a task that is not there.
 
 /* What a task read must carry for allowsTask to judge it. */
 const TASK_ACCESS_FIELDS = Object.freeze({ ProjectID: 1, sprintId: 1, mainChat: 1, AssigneeUserId: 1 });
@@ -42,7 +44,7 @@ const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarr
     const allowsProject = (id) => isId(id) && !excluded.has(String(id)) && (projectSet === null || projectSet.has(String(id)));
     const listsTasksIn = (id) => allowsProject(id) && (taskProjectSet === null || taskProjectSet.has(String(id)));
     const allowsSprint = (id) => !id || !hiddenSet.has(String(id));
-    const allowsTask = (task) => Boolean(task) && listsTasksIn(task.ProjectID) && allowsSprint(task.sprintId)
+    const allowsTask = (task) => Boolean(task) && task.mainChat !== true && listsTasksIn(task.ProjectID) && allowsSprint(task.sprintId)
         && readsCompanyWide(task, uid, [...excluded]);
     // A page outside every project is company-wide; a project-restricted token was never granted those.
     const allowsPage = (page) => pageReachedBy(page, {
@@ -55,6 +57,7 @@ const build = ({ uid, projectIds, taskProjectIds = projectIds, hidden, tokenNarr
         let ids = taskProjectIds;
         if (isId(narrowTo)) ids = listsTasksIn(narrowTo) ? [String(narrowTo)] : [];
         return {
+            mainChat: { $ne: true },
             ...(ids === null ? {} : { ProjectID: { $in: ids.map(toOid) } }),
             ...(hiddenSet.size ? { sprintId: { $nin: [...hiddenSet].map(toOid) } } : {}),
             ...(companyWide ? companyWideMatch(uid, [...excluded]) : {}),
@@ -99,6 +102,12 @@ const forCaller = async (ctx) => {
 
 const refuse = (reason) => Object.assign(new Error(`${NOT_VISIBLE}: ${reason}`), { notVisible: true });
 
+/* Whether the task and the project a read is addressed by are inside `vis`. A task that is deleted or not there is not. */
+const opensNamed = async (companyId, vis, { taskId, projectId } = {}) => {
+    if (taskId !== undefined && !vis.allowsTask(await storedTask(companyId, taskId))) return false;
+    return projectId === undefined || vis.allowsProject(projectId);
+};
+
 const storedTask = (companyId, taskId) => (isId(taskId)
     ? MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: toOid(taskId), deletedStatusKey: { $ne: 1 } }, TASK_ACCESS_FIELDS] }, 'findOne')
     : null);
@@ -113,24 +122,24 @@ const assertWritable = async (companyId, vis, { taskId, relatedTaskId, projectId
         const page = isId(pageId)
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PAGES, data: [{ _id: toOid(pageId), deletedStatusKey: { $ne: 1 } }, { ProjectID: 1, visibility: 1, createdBy: 1, sharedWith: 1 }] }, 'findOne')
             : null;
-        if (!page || !vis.allowsPage(page)) throw refuse('the page is not one the person behind this token can open');
+        if (!page || !vis.allowsPage(page)) throw refuse('that doc was not found, or the person cannot open it. Ask the person which doc they mean.');
     }
-    if (companyWide && !vis.allowsPage({ visibility: 'project' })) throw refuse('a token kept to some projects cannot write outside them');
+    if (companyWide && !vis.allowsPage({ visibility: 'project' })) throw refuse('this connection is limited to some projects, so it cannot make changes outside them. Ask the person to widen it in AlianHub.');
     for (const id of [taskId, relatedTaskId]) {
-        if (id !== undefined && !vis.allowsTask(await storedTask(companyId, id))) throw refuse('the task is not one the person behind this token can open');
+        if (id !== undefined && !vis.allowsTask(await storedTask(companyId, id))) throw refuse('that task was not found, or the person cannot open it. Ask the person which task they mean.');
     }
     // Someone who reads company-wide is allowed every id that is not closed to them, a missing one included, so the project is read.
     if (projectId !== undefined && !(vis.allowsProject(projectId) && await liveProject(companyId, projectId))) {
-        throw refuse('the project is not one the person behind this token can open');
+        throw refuse('that project was not found, or the person cannot open it. Ask the person which project they mean.');
     }
     if (sprintId) {
         const sprint = isId(sprintId)
             ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.SPRINTS, data: [{ _id: toOid(sprintId) }, { projectId: 1 }] }, 'findOne')
             : null;
         if (!sprint || String(sprint.projectId) !== String(projectId) || !vis.allowsSprint(sprintId)) {
-            throw refuse('the sprint is not one the person behind this token can open in that project');
+            throw refuse('that list was not found in that project, or the person cannot open it. Ask the person which list they mean.');
         }
     }
 };
 
-module.exports = { forCaller, assertWritable, NOT_VISIBLE, TASK_ACCESS_FIELDS };
+module.exports = { forCaller, assertWritable, opensNamed, NOT_VISIBLE, TASK_ACCESS_FIELDS };

@@ -10,27 +10,55 @@ const { escapeCommentFields } = require("./helpers/plainText");
 const { getRoleType, isPrivileged } = require("../../Config/permissionGuard");
 const { sprintIdentities, visibleSprintExpr } = require("../Sprints/helpers/sprintVisibility");
 const { commentThreadAccess, refuseThread } = require("./helpers/threadAccess");
-const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor } = require("./helpers/threadWriteAccess");
+const { threadOf, canPostToThread, canChangeComment, changesThreadOrAuthor, liveModuleOf } = require("./helpers/threadWriteAccess");
 const { resolveMentionIds, deliverMentions } = require("./helpers/commentNotifications");
 const { taskIdMatch } = require("./helpers/taskIdMatch");
 const { isThreadFile, mayCarryMedia, refuseMedia } = require("./helpers/commentFileKeys");
 const { judge: judgeDownload } = require("../storage/downloadScope");
 const { withoutAssignment, withoutThreadState, placeReply } = require("./helpers/commentThreads");
 const { notifyReply } = require("./helpers/threadNotices");
-const { parseAgentMentionIds } = require("./helpers/parseMentions");
+const { parseAgentMentionIds, parseOwnAiMentionIds } = require("./helpers/parseMentions");
 const { withoutAiFields } = require("./helpers/aiActor");
 const { withoutImportFields } = require("./helpers/importFields");
 const { bumpUnreadCounts } = require("./helpers/unreadBumps");
 const { isChatMessage, holdsThreads, replyLookup, withThreadSummary, readable, keptRootIds, announceThread } = require("./helpers/chatThreads");
 const { withoutServerOwnedFields } = require("./helpers/serverOwnedFields");
+const { keptFromCaller } = require("./helpers/conversationRows");
 
 /* A comment an agent run writes never starts agents, so agents cannot start each other.
  * Required on use: the agent modules are only needed by a comment that names an agent. */
 const startMentionedAgents = async (req, companyId, comment) => {
     if (!parseAgentMentionIds(comment.message).length) return;
-    const actor = await require("../Agents/actor").resolveActor(req);
+    const { resolveActor, isAgent } = require("../Agents/actor");
+    const actor = await resolveActor(req);
     if (actor.runId) return;
-    await require("../Agents/triggers").fromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
+    const mark = require("../Agents/actingAgent").current();
+    await require("../Agents/triggers").fromComment(companyId, {
+        authorId: comment.userId, taskId: comment.taskId, message: comment.message, depth: mark ? mark.depth + 1 : 0,
+        ...(isAgent(actor) ? { postedBy: actor, path: `${req.method} ${String(req.originalUrl || '').split('?')[0]}`, ip: req.ip || '' } : {}),
+    });
+};
+
+/* Only a signed-in person names their own connected AI: a comment written through a token or by an agent hands nothing over. */
+const namesOwnAi = (req, message) => !req.apiToken && !req.mcp && !req.agentRun && parseOwnAiMentionIds(message).length > 0;
+
+const handToOwnAi = async (req, companyId, comment) => {
+    if (!namesOwnAi(req, comment.message)) return;
+    await require("../Agents/manager/workQueue").handOverFromComment(companyId, { authorId: comment.userId, taskId: comment.taskId, message: comment.message });
+};
+
+const askOwnAi = async (req, companyId, saved) => {
+    if (!namesOwnAi(req, saved.message)) return;
+    await require("../Agents/manager/chatQuestions").fromChatMessage(companyId, saved);
+};
+
+/* A question for a person's own AI is what its author last wrote as a signed-in person: any other change of a
+ * message that asked one, an owner's or an admin's included, takes the question back. */
+const ownAiFollowsChange = async (req, companyId, before, after) => {
+    const concerned = Boolean(before.ownAiAsk) || [before.message, after.message].some((message) => parseOwnAiMentionIds(message).length > 0);
+    if (!concerned) return;
+    const byAuthor = String(before.userId) === String(req.uid) && !req.apiToken && !req.mcp && !req.agentRun;
+    await require("../Agents/manager/chatQuestions").afterMessageChange(companyId, { before, after, byAuthor });
 };
 
 /* A summary kept for a task was made from its comments: it goes when one of them is deleted, and is marked as
@@ -80,16 +108,14 @@ exports.save = async (req, res) => {
         if (response && response._id) {
             await startMentionedAgents(req, companyId, { ...thread, userId: convertData.userId, message: convertData.message })
                 .catch((err) => logger.error(`[mentions] agents not started: ${err.message}`));
+            await handToOwnAi(req, companyId, { ...thread, userId: convertData.userId, message: convertData.message })
+                .catch((err) => logger.error(`[mentions] task not handed over: ${err.message}`));
         }
-        if (placement.parent || (data?.objId?.projectId && data?.objId?.taskId && data?.objId?.sprintId)) {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
-        } else if(data?.taskId === "default"){
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments', companyId });
-        }
-        else {
-            socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: 'comments_project', companyId });
-        }
+        socketEmitter.emit('insert', { type: "insert", data: response , updatedFields: {}, module: placement.parent ? 'comments' : liveModuleOf(response || convertData), companyId });
         const saved = response && response._id && (typeof response.toObject === "function" ? response.toObject() : response);
+        if (saved) {
+            await askOwnAi(req, companyId, saved).catch((err) => logger.error(`[mentions] own AI not asked: ${err.message}`));
+        }
         if (saved && !placement.parent) {
             bumpUnreadCounts(companyId, saved, mentionIds)
                 .catch((err) => logger.error(`[comments] unread counts not raised: ${err.message}`));
@@ -131,7 +157,7 @@ exports.save = async (req, res) => {
 
 exports.update = async (req, res) => {
     try {
-        const { id, isProjectComment } = req.body;
+        const { id } = req.body;
         const data = withoutImportFields(withoutAiFields(withoutThreadState(escapeCommentFields(req.body.data))));
 
         if (!id) {
@@ -199,12 +225,11 @@ exports.update = async (req, res) => {
 
         const companyId = req.headers['companyid'];
         const response = await MongoDbCrudOpration(companyId, params, 'findOneAndUpdate');
-        if(!isProjectComment){
-            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments', companyId });
-        }else{
-            socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: 'comments_project', companyId });
-        }
+        socketEmitter.emit('update', { type: "update", data: response , updatedFields: {}, module: liveModuleOf(existingComment), companyId });
         const deletionChanged = changedKeys.includes('isDeleted') && Boolean(data.isDeleted) !== Boolean(existingComment.isDeleted);
+        if (response && (deletionChanged || changes.message !== undefined)) {
+            await ownAiFollowsChange(req, companyId, existingComment, response).catch((err) => logger.error(`[mentions] own AI did not follow the change: ${err.message}`));
+        }
         if (response) await keptSummaryFollows(companyId, existingComment, { deleted: deletionChanged && Boolean(data.isDeleted), edited: changes.message !== undefined });
         if (response && existingComment.parentId && deletionChanged && await isChatMessage(companyId, existingComment)) {
             await announceThread(companyId, existingComment.parentId)
@@ -391,15 +416,15 @@ exports.searchComments = async (req, res) => {
         const convertedProjectIds = projectIds.map(id => new mongoose.Types.ObjectId(id));
         const skipValue = parseInt(skip);
         const batchSizeValue = parseInt(batchSize);
+        const chatKeptFromCaller = await keptFromCaller(req.headers['companyid'], req.uid);
 
-
-        // Aggregation stages
         const searchResultMatch = {
             $match: {
                 $and: [
                     { ...additionalFilter },
                     { projectId: { $in: convertedProjectIds } },
                     { isDeleted: { $ne: true } },
+                    chatKeptFromCaller,
                     ...(searchStr
                         ? [
                             {

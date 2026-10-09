@@ -20,14 +20,13 @@
                     <div v-for="row in root.rows" :key="row.id" class="org__row" :style="{ paddingLeft: row.indent }">
                         <span v-if="row.depth" class="org__branch"></span>
                         <span class="ah-avatar">
-                            <img v-if="row.person.image" :src="row.person.image" :alt="row.person.name" />
-                            <template v-else>{{ row.person.initial }}</template>
+                            <AvatarImage :src="row.person.image" :alt="row.person.name">{{ row.person.initial }}</AvatarImage>
                         </span>
                         <span class="org__who">
                             <span class="org__name">{{ row.person.name }}</span>
                             <span class="ah-small">{{ row.person.subtitle }}</span>
                         </span>
-                        <span v-if="row.reports" class="ah-chip ah-chip--mono">{{ $t('Org.reports_count', { count: row.reports }) }}</span>
+                        <span v-if="row.reports" class="ah-chip ah-chip--mono">{{ $t('Org.reports_count', { count: row.reports }, row.reports) }}</span>
                     </div>
                 </div>
             </section>
@@ -59,8 +58,7 @@
                     <div class="ah-card__body pd__focus-body">
                         <div class="pd__focus-head">
                             <span class="ah-avatar pd__avatar-lg">
-                                <img v-if="selected.image" :src="selected.image" :alt="selected.name" />
-                                <template v-else>{{ selected.initial }}</template>
+                                <AvatarImage :src="selected.image" :alt="selected.name">{{ selected.initial }}</AvatarImage>
                             </span>
                             <div class="pd__focus-who">
                                 <div class="pd__focus-name">{{ selected.name }}</div>
@@ -123,8 +121,7 @@
                         @click="selectedId = person.id"
                     >
                         <span class="ah-avatar ah-avatar--lg">
-                            <img v-if="person.image" :src="person.image" :alt="person.name" />
-                            <template v-else>{{ person.initial }}</template>
+                            <AvatarImage :src="person.image" :alt="person.name">{{ person.initial }}</AvatarImage>
                         </span>
                         <span class="pd__row-who">
                             <span class="pd__row-name">{{ person.name }}</span>
@@ -180,6 +177,7 @@
 </template>
 
 <script setup>
+import AvatarImage from "@/components/atom/AvatarImage/AvatarImage.vue";
 import { computed, inject, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";

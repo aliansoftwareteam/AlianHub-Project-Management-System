@@ -1,3 +1,4 @@
+const { AsyncResource } = require('async_hooks');
 const domainEventBus = require('../../event/domainEventBus');
 const logger = require('../../Config/loggerConfig');
 const { TASKS } = require('./helpers/goalRules');
@@ -66,6 +67,10 @@ const flush = (companyId) => {
     return write;
 };
 
+/* A window holds the events of several requests and its timer is started by the first: bound here, where no
+ * request is running, the write runs under no token's project list, no agent's mark and no request. */
+const flushOutsideAnyRequest = AsyncResource.bind(flush);
+
 /* Everything that happens in a company within the window is folded into one read of its goals. */
 const onEnvelope = (envelope) => {
     try {
@@ -73,7 +78,7 @@ const onEnvelope = (envelope) => {
         const companyId = String(envelope.companyId);
         let entry = pending.get(companyId);
         if (!entry) {
-            entry = { sprintIds: new Set(), taskIds: new Set(), timer: setTimeout(() => flush(companyId), FOLD_MS) };
+            entry = { sprintIds: new Set(), taskIds: new Set(), timer: setTimeout(() => flushOutsideAnyRequest(companyId), FOLD_MS) };
             if (typeof entry.timer.unref === 'function') entry.timer.unref();
             pending.set(companyId, entry);
         }
@@ -85,7 +90,7 @@ const onEnvelope = (envelope) => {
 };
 
 const flushAll = async () => {
-    await Promise.all([...pending.keys()].map(flush));
+    await Promise.all([...pending.keys()].map((companyId) => flushOutsideAnyRequest(companyId)));
     await Promise.all([...writing]);
 };
 

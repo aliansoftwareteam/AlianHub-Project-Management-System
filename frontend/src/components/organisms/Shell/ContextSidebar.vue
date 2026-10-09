@@ -48,7 +48,7 @@ defineEmits(["close"]);
         box-shadow: none;
     }
     .ah-sidebar.is-open { display: flex; transform: none; box-shadow: var(--shadow-pop); }
-    .ah-sidebar__scrim { display: block; position: absolute; inset: 0; z-index: 29; background: rgba(0, 0, 0, .28); }
+    .ah-sidebar__scrim { display: block; position: absolute; inset: 0; z-index: 29; background: var(--scrim); }
 }
 @media (max-width: 767px) {
     .ah-sidebar { width: min(320px, 88vw); }

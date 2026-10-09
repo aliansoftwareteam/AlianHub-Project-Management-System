@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
+import { ref } from 'vue';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const { apiRequest, toast } = vi.hoisted(() => ({ apiRequest: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('@/composable/index.js', () => ({ useCustomComposable: () => ({ checkPermission: () => 0 }) }));
 vi.mock('vue-toast-notification', () => ({ useToast: () => toast }));
 vi.mock('vue-i18n', async (importOriginal) => ({ ...(await importOriginal()), useI18n: () => ({ t: (key) => key }) }));
 
 import ProjectAgentPolicyCard from '@/views/Projects/ProjectDetail/ProjectAgentPolicyCard.vue';
+import { createStore } from 'vuex';
+import { replaceProject } from '@/store/ProjectData/mutations';
 import en from '@/locales/en';
 
 const URL = '/api/v2/agents/project-policy/p1';
@@ -85,6 +89,59 @@ describe('ProjectAgentPolicyCard', () => {
     it('says so when the workspace switch decides the close', async () => {
         const wrapper = await mountCard(answer({ workspaceChecksBeforeDone: true, effective: { done: 'never', connected: 'single_task' } }));
         expect(wrapper.find('[data-test="workspace-wins"]').text()).toBe('AgentPolicy.workspace_wins');
+    });
+
+    it('follows the workspace switch when it is changed elsewhere, and stops listening when it closes', async () => {
+        const listeners = {};
+        const socket = { on: vi.fn((event, handler) => { listeners[event] = handler; }), off: vi.fn((event, handler) => { if (listeners[event] === handler) delete listeners[event]; }) };
+        let data = answer();
+        apiRequest.mockImplementation(() => ok(data));
+        const wrapper = mount(ProjectAgentPolicyCard, { props: { projectId: 'p1' }, global: { mocks: { $t: (key) => key }, provide: { $socket: ref(socket) } } });
+        await flushPromises();
+        expect(wrapper.find('[data-test="workspace-wins"]').exists()).toBe(false);
+
+        listeners.agentsChanged({ kind: 'run' });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(1);
+
+        data = answer({ workspaceChecksBeforeDone: true, effective: { done: 'never', connected: 'single_task' } });
+        listeners.agentsChanged({ kind: 'policy' });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(2);
+        expect(apiRequest).toHaveBeenLastCalledWith('get', URL, undefined);
+        expect(wrapper.find('[data-test="workspace-wins"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="loading"]').exists()).toBe(false);
+
+        wrapper.unmount();
+        expect(listeners.agentsChanged).toBeUndefined();
+    });
+
+    it('follows a choice made for this project in another tab or by another person, and its own save costs no second read', async () => {
+        const held = { done: 'approval', connected: 'single_task' };
+        apiRequest.mockImplementation((type, url, body) => ok(answer({ project: Object.assign(held, body || {}) })));
+        const store = createStore({
+            modules: { projectData: { namespaced: true, state: () => ({ allProjects: { data: [{ _id: 'p1' }, { _id: 'p2' }] } }), getters: { allProjects: (state) => state.allProjects }, mutations: { replaceProject } } }
+        });
+        const wrapper = mount(ProjectAgentPolicyCard, { props: { projectId: 'p1' }, global: { plugins: [store], mocks: { $t: (key) => key } } });
+        await flushPromises();
+        expect(checked(wrapper)).toEqual(['done-approval', 'connected-single_task']);
+
+        store.commit('projectData/replaceProject', { _id: 'p2', agentPolicy: { done: 'never', connected: 'propose_all' } });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(1);
+
+        Object.assign(held, { done: 'never', connected: 'propose_all' });
+        store.commit('projectData/replaceProject', { _id: 'p1', agentPolicy: { done: 'never', connected: 'propose_all', updatedBy: 'u2' } });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(2);
+        expect(checked(wrapper)).toEqual(['done-never', 'connected-propose_all']);
+
+        await radio(wrapper, 'done-yes').setValue(true);
+        await flushPromises();
+        const asked = apiRequest.mock.calls.length;
+        store.commit('projectData/replaceProject', { _id: 'p1', agentPolicy: { done: 'yes', connected: 'propose_all', updatedBy: 'u1' } });
+        await flushPromises();
+        expect(apiRequest).toHaveBeenCalledTimes(asked);
     });
 
     it('shows the reason when the settings cannot be read, and no choices', async () => {

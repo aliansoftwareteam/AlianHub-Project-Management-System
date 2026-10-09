@@ -79,7 +79,7 @@ describe('MCP tools answer only for what the caller can open in the web app', ()
         for (const { taskId } of Object.values(fx)) {
             expect(found.has(taskId)).toBe(web.has(taskId));
             const brief = await mcpCall(client, 'task.get', { taskId });
-            if (web.has(taskId)) expect(brief.taskId).toBe(taskId); else expect(brief).toEqual({ error: 'task not found' });
+            if (web.has(taskId)) expect(brief.taskId).toBe(taskId); else expect(brief).toEqual({ error: 'That task was not found. Ask the person which task they mean.' });
         }
         expect(found.has(fx.open.taskId)).toBe(true);
         expect(found.has(fx.privateSprint.taskId)).toBe(false);

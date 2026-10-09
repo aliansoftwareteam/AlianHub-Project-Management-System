@@ -29,7 +29,7 @@
             </span>
             <span v-else-if="liveSession" class="ah-chip ah-chip--ok ut2-timer" :title="$t('Time.running_desktop')">
                 <span class="ah-dot ah-dot--ok"></span>
-                <span class="ut2-timer__task">{{ liveSession.taskName }}</span>
+                <span class="ut2-timer__task">{{ liveSession.taskName || $t('Time.task_not_open') }}</span>
             </span>
             <select v-if="isEveryone" v-model="personId" class="tv-select" :title="$t('Time.me')">
                 <option value="">{{ $t('Time.me') }}</option>
@@ -77,7 +77,7 @@
             <div v-for="row in displayRows" :key="row.taskId" class="ut2-row">
                 <div class="ut2-task">
                     <span class="tv-sq" :style="{ background: row.projectColor || 'var(--brand)' }"></span>
-                    <span class="ut2-task__name" :title="row.projectName || ''">{{ row.taskName || row.taskId }}</span>
+                    <span class="ut2-task__name" :title="row.projectName || ''">{{ row.taskName || $t('Time.task_not_open') }}</span>
                     <button
                         type="button"
                         class="ut2-bill"
@@ -113,7 +113,7 @@
         </div>
         <div v-if="reopening" class="tv-card" data-test="reopen-note">
             <span class="ah-dot ah-dot--warn"></span>
-            <span>{{ $t('Time.reopened_by', { name: reopening.byName || $t('Time.someone'), date: moment(reopening.at).format('MMM D, HH:mm') }) }}</span>
+            <span>{{ $t('Time.reopened_by', { name: reopening.byName || $t('Time.someone'), date: dayClockText(reopening.at) }) }}</span>
         </div>
         <div v-if="underHint" class="tv-card">
             <ShellIcon name="info" :size="13" class="tv-spark" />
@@ -138,6 +138,7 @@ import { useStore } from 'vuex';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import moment from 'moment';
+import { dayClockText } from '@/utils/clockText';
 import { apiRequest } from '@/services';
 import * as env from '@/config/env';
 import { useCustomComposable, useGetterFunctions } from '@/composable';
@@ -263,7 +264,7 @@ const underHint = computed(() => {
         : t('Time.under_capacity_many', { days: `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`, h: formatHm(gap) });
     return { text, day: list[list.length - 1].date, minutes: list[list.length - 1].gapMinutes };
 });
-const recentTasks = computed(() => rows.value.map((r) => ({ taskId: r.taskId, taskName: r.taskName, projectId: r.projectId, projectName: r.projectName, sprintId: r.sprintId, projectColor: r.projectColor })));
+const recentTasks = computed(() => rows.value.filter((r) => r.taskName).map((r) => ({ taskId: r.taskId, taskName: r.taskName, projectId: r.projectId, projectName: r.projectName, sprintId: r.sprintId, projectColor: r.projectColor })));
 
 const load = async () => {
     loading.value = true;
@@ -408,7 +409,7 @@ onMounted(() => {
 .ut2-row--total .ut2-task { font: 600 var(--row-font, 12.5px)/1.2 var(--font-ui); }
 .ut2-row--total .is-today { color: var(--brand); }
 .ut2-row .is-empty { color: var(--ink-2); }
-.ut2-row .is-off { opacity: .7; }
+.ut2-row .is-off { color: var(--ink-2); }
 .ut2-task { text-align: left; font: 400 var(--row-font, 12.5px)/1.3 var(--font-ui); display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ut2-task__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ut2-bill { margin-left: auto; flex: none; height: 20px; padding: 0 7px; border-radius: var(--r-chip); border: 1px solid var(--border); background: transparent; color: var(--ink-2); font: 600 10.5px/1 var(--font-ui); cursor: pointer; transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }

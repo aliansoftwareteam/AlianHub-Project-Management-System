@@ -10,6 +10,9 @@ const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
 const { PAGE_TEXT_MAX, pageText } = require('./pageText');
+const { MENTIONS, REPLY_TO, replyParams } = require('./commentReply');
+const pageVersions = require('../Pages/helpers/pageVersions');
+const versionRules = require('../Pages/helpers/pageVersionRules');
 const { taskIdMatch } = require('../Comments/helpers/taskIdMatch');
 const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
@@ -47,9 +50,10 @@ const loadProject = async (ctx, vis, projectId) => {
     return project;
 };
 
-const NO_PROJECT = Object.freeze({ error: 'project not found' });
-const NO_TASK = Object.freeze({ error: 'task not found' });
-const NO_PAGE = Object.freeze({ error: 'page not found' });
+const NO_PROJECT = Object.freeze({ error: 'That project was not found. Ask the person which project they mean.' });
+const NO_TASK = Object.freeze({ error: 'That task was not found. Ask the person which task they mean.' });
+const NO_PAGE = Object.freeze({ error: 'That doc was not found. Ask the person which doc they mean.' });
+const NO_VERSION = Object.freeze({ error: 'That version of the doc was not found. List the doc\'s versions and pick one of those.' });
 
 const projectRow = (p) => ({
     projectId: String(p._id),
@@ -80,6 +84,7 @@ const commentRow = (c) => ({
     text: c.message || '',
     type: c.type || 'text',
     authorId: idOf(c.userId),
+    ...(c.parentId ? { replyTo: idOf(c.parentId) } : {}),
     ...(c.actorType ? { actorType: c.actorType } : {}),
     createdAt: c.createdAt || null,
 });
@@ -91,6 +96,21 @@ const pageRow = (p) => ({
     private: p.visibility === 'private',
     updatedAt: p.updatedAt || null,
 });
+
+const versionRow = (v, named, projectId) => ({
+    versionId: v._id,
+    title: v.title,
+    name: v.name,
+    reason: v.reason,
+    savedAt: v.savedAt,
+    savedBy: isId(v.savedBy) ? named.person(v.savedBy, projectId) : { id: v.savedBy, name: null },
+});
+
+/* A doc the person can open, as page.get reads it. */
+const openPage = async (ctx, vis, pageId) => {
+    const page = isId(pageId) ? await findOne(ctx, SCHEMA_TYPE.PAGES, { _id: oid(String(pageId)), deletedStatusKey: { $ne: 1 } }) : null;
+    return page && vis.allowsPage(page) ? page : null;
+};
 
 const entryRow = (e) => ({
     timesheetId: String(e._id),
@@ -111,7 +131,8 @@ const PROJECT_ARG = { projectId: { type: 'string' } };
 const entryProjects = (ctx, vis, args, sheetVisible) => {
     let allowed = sheetVisible ? sheetVisible.map(String) : null;
     const narrow = (ids) => { allowed = allowed === null ? ids : allowed.filter((id) => ids.includes(id)); };
-    if (Array.isArray(ctx.projectIds) && ctx.projectIds.length) narrow((vis.projectIds || ctx.projectIds).map(String));
+    if (vis.projectIds) narrow(vis.projectIds.map(String));
+    else if (Array.isArray(ctx.projectIds) && ctx.projectIds.length) narrow(ctx.projectIds.map(String));
     if (args.projectId !== undefined && args.projectId !== '') narrow(vis.allowsProject(args.projectId) ? [String(args.projectId)] : []);
     return allowed;
 };
@@ -119,11 +140,11 @@ const entryProjects = (ctx, vis, args, sheetVisible) => {
 const dayRange = (args) => {
     const from = args.from ? String(args.from) : '';
     const to = args.to ? String(args.to) : '';
-    if ((from && !DAY.test(from)) || (to && !DAY.test(to))) return { error: 'from and to must be YYYY-MM-DD' };
+    if ((from && !DAY.test(from)) || (to && !DAY.test(to))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     const range = {};
     if (from) range.$gte = Date.parse(`${from}T00:00:00Z`) / 1000;
     if (to) range.$lte = Date.parse(`${to}T00:00:00Z`) / 1000 + DAY_SECONDS - 1;
-    if (Object.values(range).some((v) => !Number.isFinite(v))) return { error: 'from and to must be YYYY-MM-DD' };
+    if (Object.values(range).some((v) => !Number.isFinite(v))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     return { range: Object.keys(range).length ? range : null };
 };
 
@@ -133,7 +154,7 @@ const TOOLS = [
     {
         name: 'projects.list',
         action: 'projects.list',
-        description: 'Projects you can open, by name. Use a projectId from here with the other tools.',
+        description: 'Lists the projects the person can open, by name. Use a projectId from here with the other tools. Changes nothing.',
         input: { type: 'object', properties: { query: { type: 'string', description: 'Part of the project name' }, ...LIMIT } },
         visibility: 'filtered',
         paginated: true,
@@ -149,7 +170,7 @@ const TOOLS = [
     {
         name: 'project.get',
         action: 'project.get',
-        description: 'One project: its name, key, whether it is private, its members and how many statuses it has.',
+        description: 'Shows one project: its name, key, whether it is private, its members and how many statuses it has. Changes nothing.',
         input: { type: 'object', properties: PROJECT_ARG, required: ['projectId'] },
         visibility: 'filtered',
         readParams: projectParams,
@@ -166,7 +187,7 @@ const TOOLS = [
     {
         name: 'sprints.list',
         action: 'sprints.list',
-        description: 'The sprints of one project. A private sprint is listed only for the people on it, and for owners and admins.',
+        description: 'Shows the lists of one project. A private list is shown only to the people on it, and to owners and admins. Changes nothing.',
         input: { type: 'object', properties: { ...PROJECT_ARG, ...LIMIT }, required: ['projectId'] },
         visibility: 'filtered',
         paginated: true,
@@ -185,7 +206,7 @@ const TOOLS = [
     {
         name: 'statuses.list',
         action: 'statuses.list',
-        description: 'The statuses a project defines, in board order, with their type (a "close" type means done).',
+        description: 'Shows the statuses a project uses, in board order, with the type of each. A "close" type means the task is done. Changes nothing.',
         input: { type: 'object', properties: PROJECT_ARG, required: ['projectId'] },
         visibility: 'filtered',
         readParams: projectParams,
@@ -200,7 +221,7 @@ const TOOLS = [
     {
         name: 'comments.list',
         action: 'comments.list',
-        description: 'The comment thread of a task you can open, newest first.',
+        description: 'Shows the comments on a task the person can open, newest first. Changes nothing.',
         input: { type: 'object', properties: { taskId: { type: 'string' }, ...LIMIT }, required: ['taskId'] },
         visibility: 'filtered',
         paginated: true,
@@ -220,8 +241,8 @@ const TOOLS = [
     {
         name: 'pages.search',
         action: 'pages.search',
-        description: 'Pages you can open, by title, most recently updated first. Read one with page.get.',
-        input: { type: 'object', properties: { query: { type: 'string', description: 'Part of the page title' }, ...PROJECT_ARG, ...LIMIT } },
+        description: 'Finds docs the person can open, by title, most recently updated first. Read one with page.get. Changes nothing.',
+        input: { type: 'object', properties: { query: { type: 'string', description: 'Part of the doc title' }, ...PROJECT_ARG, ...LIMIT } },
         visibility: 'filtered',
         paginated: true,
         readParams: projectParams,
@@ -242,7 +263,7 @@ const TOOLS = [
     {
         name: 'page.get',
         action: 'page.get',
-        description: 'Read a page you can open, by page id: its title, project and full text.',
+        description: 'Shows one doc the person can open, given its id: its title, project and full text. Changes nothing.',
         input: { type: 'object', properties: { pageId: { type: 'string' } }, required: ['pageId'] },
         visibility: 'filtered',
         readParams: () => ({}),
@@ -254,13 +275,50 @@ const TOOLS = [
         },
     },
     {
+        name: 'page.versions.list',
+        action: 'page.versions.list',
+        description: 'Lists the saved versions of a doc the person can open, newest first: who saved each one, when, why, and its name if it has one. When nextCursor comes back, pass it as cursor for older versions. Read one with page.version.get. Changes nothing. Putting an earlier version back is for the person to do in AlianHub.',
+        input: { type: 'object', properties: { pageId: { type: 'string' }, cursor: { type: 'string', description: 'The nextCursor of the previous page, for older versions' }, ...LIMIT }, required: ['pageId'] },
+        visibility: 'filtered',
+        readParams: () => ({}),
+        run: async (ctx, args, vis) => {
+            const page = await openPage(ctx, vis, args.pageId);
+            if (!page) return { ...NO_PAGE };
+            // A doc keeps far fewer versions than rowsOf reads, so every one the person may see is paged here.
+            const visible = (await pageVersions.rowsOf(ctx.companyId, page._id)).filter((v) => versionRules.versionVisibleTo(v, page, ctx.userId));
+            const { rows, nextCursor } = await cursor.page(ctx, 'page.versions.list', args, ({ skip, limit }) => visible.slice(skip, skip + limit));
+            const projectId = idOf(page.ProjectID);
+            const named = await names.resolver(ctx, { projectIds: projectId ? [projectId] : [], userIds: rows.map((v) => String(v.savedBy || '')).filter(isId) });
+            const versions = rows.map((v) => versionRow(versionRules.versionRow(v), named, projectId));
+            return nextCursor ? { pageId: String(page._id), versions, nextCursor } : { pageId: String(page._id), versions };
+        },
+    },
+    {
+        name: 'page.version.get',
+        action: 'page.version.get',
+        description: 'Shows one saved version of a doc the person can open: who saved it, when, and its full text as it was then. Changes nothing.',
+        input: { type: 'object', properties: { pageId: { type: 'string' }, versionId: { type: 'string' } }, required: ['pageId', 'versionId'] },
+        visibility: 'filtered',
+        readParams: () => ({}),
+        run: async (ctx, args, vis) => {
+            const page = await openPage(ctx, vis, args.pageId);
+            if (!page) return { ...NO_PAGE };
+            const version = await pageVersions.versionOf(ctx.companyId, page._id, str(args.versionId, 40));
+            if (!versionRules.versionVisibleTo(version, page, ctx.userId)) return { ...NO_VERSION };
+            const body = versionRules.versionBody(version);
+            const projectId = idOf(page.ProjectID);
+            const named = await names.resolver(ctx, { projectIds: projectId ? [projectId] : [], userIds: isId(body.savedBy) ? [body.savedBy] : [] });
+            return { pageId: String(page._id), ...versionRow(body, named, projectId), text: str(body.rawText, PAGE_TEXT_MAX) };
+        },
+    },
+    {
         name: 'timesheet.read',
         action: 'timesheet.read',
-        description: 'Time entries, newest first: your own by default. Another person\'s only where the timesheet screens would show them to you.',
+        description: 'Shows time entries, newest first: the person\'s own by default. Someone else\'s are shown only where the web app\'s timesheet screens would show them to the person. Changes nothing.',
         input: {
             type: 'object',
             properties: {
-                userId: { type: 'string', description: 'Whose entries; yours when left out' },
+                userId: { type: 'string', description: 'Whose entries; the person\'s own when left out' },
                 from: { type: 'string', description: 'First day, YYYY-MM-DD (UTC)' },
                 to: { type: 'string', description: 'Last day, YYYY-MM-DD (UTC)' },
                 ...PROJECT_ARG,
@@ -274,15 +332,17 @@ const TOOLS = [
             const uid = String(ctx.userId);
             const target = args.userId ? str(args.userId, 40) : uid;
             let sheetVisible = null;
+            let closedTasks = [];
             if (target !== uid) {
                 const sheet = await resolveSheetScope(ctx.companyId, uid, SHEET_PERMISSION.user);
                 if (!sheet.everyone || !isId(target)) {
                     throw await actions.refusal(ctx.companyId, ctx.actor, {
                         action: 'timesheet.read', params: { userId: target }, ip: ctx.ip, entityType: 'user', entityId: target,
-                        reason: `${NOT_VISIBLE}: another person's time entries are not ones the person behind this token can open`,
+                        reason: `${NOT_VISIBLE}: you can read only the person's own time entries here. Ask the person to open the timesheet in AlianHub for someone else's.`,
                     });
                 }
                 sheetVisible = sheet.visible;
+                closedTasks = sheet.closedTasks || [];
             }
             const { range, error } = dayRange(args);
             if (error) return { error };
@@ -291,6 +351,7 @@ const TOOLS = [
             if (projects !== null) filter.ProjectId = { $in: idForms(projects) };
             else if (vis.excludedProjectIds.length) filter.ProjectId = { $nin: idForms(vis.excludedProjectIds) };
             if (range) filter.LogStartTime = range;
+            if (closedTasks.length) filter.TicketID = { $nin: idForms(closedTasks) };
             const out = await listOf(ctx, 'timesheet.read', args, 'entries', { type: SCHEMA_TYPE.TIMESHEET, filter, sort: { LogStartTime: -1, _id: -1 } }, entryRow, async (rows) => {
                 const named = await names.resolver(ctx, { projectIds: rows.map((e) => idOf(e.ProjectId)), userIds: [target] });
                 return rows.map((e) => ({ ref: `timesheet:${e._id}`, ...entryRow(e), project: named.project(idOf(e.ProjectId)), person: named.person(target, idOf(e.ProjectId)) }));
@@ -303,16 +364,16 @@ const TOOLS = [
         action: 'comment.create',
         visibility: 'filtered',
         target: (args) => ({ taskId: str(args.taskId, 40) }),
-        description: 'Comment on a task you can open. The text is stored as plain text, as the web app stores it.',
-        input: { type: 'object', properties: { taskId: { type: 'string' }, text: { type: 'string' } }, required: ['taskId', 'text'] },
-        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000) }),
+        description: `Adds a comment to a task the person can open, at once, and the person can undo it. The text is saved as plain text. ${MENTIONS} ${REPLY_TO}`,
+        input: { type: 'object', properties: { taskId: { type: 'string' }, text: { type: 'string' }, replyTo: { type: 'string' } }, required: ['taskId', 'text'] },
+        params: (args) => ({ taskId: str(args.taskId, 40), body: str(args.text, 20000), notifyMentions: true, ...replyParams(args) }),
     },
     {
         name: 'timelog.create',
         action: 'timelog.create',
         visibility: 'filtered',
         target: (args) => ({ taskId: str(args.taskId, 40) }),
-        description: 'Log time you spent on a task you can open, as a finished entry. It is always your own time; a day in an approved timesheet period is refused.',
+        description: 'Logs time the person spent on a task they can open, as a finished entry, at once. It is always the person\'s own time, and time cannot be logged on a day in an approved timesheet period.',
         input: {
             type: 'object',
             properties: {
@@ -344,6 +405,8 @@ const SCOPES = Object.freeze({
     'comments.list': 'tasks:read',
     'pages.search': 'docs:read',
     'page.get': 'docs:read',
+    'page.versions.list': 'docs:read',
+    'page.version.get': 'docs:read',
     'timesheet.read': 'time:read',
     'comment.create': 'tasks:write',
     'timelog.create': 'time:write',

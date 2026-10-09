@@ -74,7 +74,7 @@ describe('POST /api/v1/dashboard/at-risk', () => {
 
     it('is registered with the other dashboard cards', () => {
         const routes = fs.readFileSync(path.join(__dirname, '..', 'Modules', 'UserDashboard', 'routes.js'), 'utf8');
-        expect(routes).toContain("app.post('/api/v1/dashboard/at-risk', atRisk.getAtRisk)");
+        expect(routes).toContain("app.post('/api/v1/dashboard/at-risk', limitCallerBody, atRisk.getAtRisk)");
     });
 
     it('needs a company and a session', async () => {

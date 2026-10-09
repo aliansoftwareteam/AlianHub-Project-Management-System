@@ -516,6 +516,51 @@ describe('assignment rules: acting on a suggestion', () => {
     });
 });
 
+describe('assignment rules: who decides a suggestion', () => {
+    const GUEST = 'a00000000000000000000007';
+    const TOKEN = 'a000000000000000000000f1';
+    const personalToken = { apiToken: { _id: TOKEN, userId: OWNER, name: 'A script', scopes: ['read', 'write'] } };
+    const agentToken = { apiToken: { _id: TOKEN, kind: 'agent', userId: OWNER, name: 'Claude', scopes: ['read', 'write'] } };
+    const refusals = () => store(SCHEMA_TYPE.AUDIT_LOGS).filter((row) => row.action === 'agent.action_refused');
+
+    /* [the decision, the mode that leaves one waiting, the state it starts in, the state a person leaves] */
+    const DECISIONS = [['accept', 'suggest', 'suggested', 'accepted'], ['dismiss', 'suggest', 'suggested', 'dismissed'], ['undo', 'apply', 'applied', 'undone']];
+    /* [who, the request's identity, the answer, whether an agent's attempt is recorded] */
+    const CALLERS = [
+        ['an owner signed in', { uid: OWNER }, 200, false],
+        ['a member signed in who may change assignees', { uid: SAM }, 200, false],
+        ['a guest signed in who may not change assignees', { uid: GUEST }, 403, false],
+        ['an owner\'s own API token', { uid: OWNER, ...personalToken }, 403, false],
+        ['an agent\'s token', { uid: OWNER, ...agentToken }, 403, true],
+    ];
+
+    const waiting = async (mode) => {
+        seedRules(GRANTS);
+        store(SCHEMA_TYPE.RULES).find((rule) => rule.key === 'task_list').roles.push({ key: 0, permission: false });
+        mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GUEST, roleType: 0, status: 2, isDelete: false });
+        mockDb.seed(SCHEMA_TYPE.USERS, { _id: GUEST, Employee_Name: 'Gia' });
+        const project = seedProject({ AssigneeUserId: [OWNER, EDITOR, PRIYA, SAM, GUEST] });
+        await saveRules(project, { mode });
+        const task = seedTask(project);
+        await engine.decide({ companyId: C, taskId: String(task._id), trigger: 'create' });
+        return { task, params: { taskId: String(task._id), decisionId: String(decisions()[0]._id) } };
+    };
+
+    it.each(DECISIONS.flatMap(([action, mode, from, to]) => CALLERS.map(([who, caller, code, recorded]) => [action, who, mode, from, to, caller, code, recorded])))(
+        '%s: %s',
+        async (action, _who, mode, from, to, caller, code, recorded) => {
+            const { task, params } = await waiting(mode);
+            const assignees = [...taskRow(task).AssigneeUserId];
+            const path = decisionRoute(action);
+            const res = await run(routes()[`POST ${path}`], verified({ ...caller, method: 'POST', originalUrl: path, params, body: {}, query: {}, headers: { companyid: C } }));
+            expect(res.statusCode).toBe(code);
+            expect(decisions()[0].state).toBe(code === 200 ? to : from);
+            if (code !== 200) expect(taskRow(task).AssigneeUserId).toEqual(assignees);
+            expect(refusals()).toHaveLength(recorded ? 1 : 0);
+        },
+    );
+});
+
 describe('assignment rules: the task events that wake the engine', () => {
     const envelope = (task, type, changedFields = []) => ({
         id: oid(), companyId: C, type, actor: { kind: 'user', userId: EDITOR }, depth: 0,
@@ -570,6 +615,20 @@ describe('assignment rules: the task events that wake the engine', () => {
         domainEventBus.bus.emit('domain.event', envelope(task, 'task.priority_changed', ['Task_Priority']));
         await engine.idle();
         expect(adapter.chat).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes on the limits of the change it answers', async () => {
+        seedRules(GRANTS);
+        const project = seedProject();
+        await saveRules(project, { mode: 'apply', onChange: true });
+        const limits = { userId: SAM, projectIds: [String(project._id)], chat: false };
+
+        domainEventBus.bus.emit('domain.event', { ...envelope(seedTask(project), 'task.created'), narrowing: limits });
+        await engine.idle();
+        domainEventBus.bus.emit('domain.event', envelope(seedTask(project), 'task.created'));
+        await engine.idle();
+
+        expect(mockUpdateAssignee.mock.calls.map(([sent]) => sent.eventNarrowing)).toEqual([limits, null]);
     });
 
     it('writes one level deeper than the event it answers, and never wakes on its own assignee write', async () => {

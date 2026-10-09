@@ -106,6 +106,22 @@ export const mutateProjects = (state, payload) => {
     })
 }
 
+/* For a project read again from the server, which has already answered that this person may open it. The lists
+   and folders the tree folded into the stored copy stay: the row's own are a legacy copy no list write keeps up. */
+export const replaceProject = (state, project) => {
+    const projects = state.allProjects?.data || [];
+    const index = projects.findIndex((x) => String(x._id) === String(project._id));
+    if(index === -1) return;
+    const { id, isExpanded, sprintsObj, sprintsfolders } = projects[index];
+    projects[index] = { ...project, id: id ?? project._id, isExpanded, sprintsObj, sprintsfolders };
+}
+
+/* What the limits route answered for a project, so the header chip does not wait for `projectChanged` after a save here. */
+export const noteAgentLimits = (state, { projectId, limits }) => {
+    const project = (state.allProjects?.data || []).find((x) => String(x._id) === String(projectId));
+    if(project) project.agentLimits = { ...project.agentLimits, ...limits };
+}
+
 export const mutateCurrentProjectTasks = (state, payload) => {
     if(JSON.stringify(state.currentProjectTasks) !== JSON.stringify(payload)) {
         state.currentProjectTasks = payload;
@@ -458,7 +474,9 @@ export const mutateUpdateFirebaseTableTasks = (state, payload) => {
                     const taskIndex = state.tableTasks[pid][sprintId].tasks.findIndex((x) => x.id === data.ParentTaskId);
                     if(taskIndex !== -1) {
                         const subTaskIndex = state.tableTasks[pid][sprintId].tasks[taskIndex].subtaskArray.findIndex((x) => x.id === data.id);
-                        state.tableTasks[pid][sprintId].tasks[taskIndex].subtaskArray.splice(subTaskIndex, 1);
+                        if(subTaskIndex !== -1) {
+                            state.tableTasks[pid][sprintId].tasks[taskIndex].subtaskArray.splice(subTaskIndex, 1);
+                        }
                     }
                 } else {
                     const taskIndex = state.tableTasks[pid][sprintId].tasks.findIndex((x) => x.id === data.id);
@@ -668,8 +686,8 @@ export const mutateTypesenseTableTasks = (state, payload) => {
     const {pid, sprintId, data, nextPage, total = 0, op } = payload;
     const keys = Object.keys(state.tableTasks);
     const projectFound = keys.includes(pid);
-    /* An event, unlike a page the Table asked for, can be about a task this list does not show (any more). */
-    if(op && data && !shownInList(data, pid, sprintId)) {
+    /* An event, unlike a page the Table asked for, can be about a task this list does not show (any more), or a deleted one. */
+    if(op && data && (op === "removed" || !shownInList(data, pid, sprintId))) {
         const held = projectFound ? state.tableTasks[pid][sprintId]?.tasks : null;
         const at = held ? held.findIndex((x) => x._id === data._id) : -1;
         if(at !== -1) held.splice(at, 1);
@@ -799,7 +817,7 @@ export const mutateSprints = (state,payload) => {
                 state.sprints[pId].push(data);
             }
         }else{
-            state.sprints = {[pId]:[data]}
+            state.sprints = {...state.sprints, [pId]:[data]}
         }
     }else if(op === "modified"){
         const sprintIndex = state.sprints[pId] && state.sprints[pId].length > 0 && state.sprints[pId]?.findIndex((x) => x._id === data._id);
@@ -929,7 +947,7 @@ export const mutateFolders = (state,payload) => {
                 state.folders[pId].push(data);
             }
         }else{
-            state.folders = {[pId]:[data]}
+            state.folders = {...state.folders, [pId]:[data]}
         }
     }else if(op === "modified"){
         const sprintIndex = state.folders[pId] && state.folders[pId].length > 0 && state.folders[pId]?.findIndex((x) => x._id === data._id);
@@ -937,7 +955,7 @@ export const mutateFolders = (state,payload) => {
             state.folders[pId][sprintIndex] = {...data};
         }
     }else if(op === "removed"){
-        const sprintIndex = state.folders[pId] && state.folders[pId].length > 0 && state.folders[pId]?.findIndex((x) => x._id === data._id);
+        const sprintIndex = state.folders[pId]?.findIndex((x) => x._id === data._id) ?? -1;
         if(sprintIndex !== -1) {
             state.folders[pId].splice(sprintIndex, 1);
         }
@@ -946,6 +964,10 @@ export const mutateFolders = (state,payload) => {
 
 export const replaceFolders = (state, { projectId, folders }) => {
     state.folders = { ...state.folders, [projectId]: folders };
+}
+
+export const replaceSprints = (state, { projectId, sprints }) => {
+    state.sprints = { ...state.sprints, [projectId]: sprints };
 }
 
 export const mutateSearchedProjects = (state,payload) => {
@@ -1042,6 +1064,19 @@ export const setGetTableTaskPayload = (state, payload) =>{
             !(ele.data.pid === payload.data.pid && ele.data.sprintId === payload.data.sprintId)
         );
     }
+}
+
+/* Every stored page request is sent again when the tab comes back (utils/tabSyncs.js). Groups come and go, an
+   agent's with each task it takes or lets go, and the request of a group no longer drawn would be sent for as long
+   as the page lives. `groups` names, for each list of the project just grouped, the keys of the groups it draws. */
+export const keepRequestsOfGroups = (state, {pid, groups}) => {
+    const drawn = (ele) => {
+        const keys = ele.data?.pid === pid ? groups[String(ele.data.sprintId)] : null;
+        return !keys || keys.includes(ele.data.item?.key);
+    };
+    ['getPaginatedTaskPayload', 'getTableTaskPayload'].forEach((list) => {
+        if(!state[list].every(drawn)) state[list] = state[list].filter(drawn);
+    });
 }
 
 export const setTaskDetailData = (state, payload) =>{

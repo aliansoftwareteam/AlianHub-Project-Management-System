@@ -1,13 +1,17 @@
+import { changeLabel, labelSlug } from "./agentActionLabels";
+
 // Built-in skills carry persona names ("Reviewer") in their records, which say
 // who rather than what; these keys are named from the i18n map instead.
 const BUILT_IN_SKILLS = Object.freeze(["brief.parse", "project.plan", "pr.summary", "risk.flags", "digest.ceo", "risk.today", "project.guide", "qa-review", "fields.fill", "prd.draft", "wiki.upkeep", "slack.summary"]);
+// The server names these for the data model, where every list is a "sprint"; the page says what a person sees.
+const REWORDED_ACTIONS = Object.freeze(["task.sprint.move"]);
 const NEVER_ACTIONS = Object.freeze(["project.delete", "task.delete", "billing.*", "deploy.production", "git.merge", "member.remove", "permissions.edit", "status.set(\"Done\")"]);
 const AUTONOMY_LEVELS = Object.freeze([0, 1, 2, 3]);
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const WAITING_MARK_DAYS = 3;
 
-export const labelSlug = (key) => String(key || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+export { labelSlug };
 
 export const humaniseKey = (key) => {
     const words = String(key || "").replace(/[^A-Za-z0-9]+/g, " ").trim().toLowerCase();
@@ -37,6 +41,7 @@ export const skillAbout = (t, skill) => {
 
 export const actionLabel = (t, action, actions = []) => {
     const key = keyOf(action);
+    if (REWORDED_ACTIONS.includes(key)) return t(`Ai.action_label_${labelSlug(key)}`);
     const label = fieldOf(action, "label") || fieldOf((actions || []).find((a) => a && a.key === key), "label");
     if (label) return label;
     if (NEVER_ACTIONS.includes(key)) return t(`Ai.never_label_${labelSlug(key)}`);
@@ -57,8 +62,24 @@ export const autonomyTip = (t, level) => t("Ai.autonomy_tip", { code: `L${levelO
 const CHANGES_ON = /^(\S+): (\d+) change(?:\(s\)|s)? on (.+)$/;
 const FINDINGS_ON = /^File (\d+) QA finding(?:\(s\)|s)? on (.+)$/;
 
+// A proposal filed by a caller that had no title to give was stored with the text of that nothing.
+const NO_WORDS = Object.freeze(["", "undefined", "null"]);
+const wordsOf = (value) => {
+    const words = String(value ?? "").trim();
+    return NO_WORDS.includes(words) ? "" : words;
+};
+
+const titleFromChanges = (t, proposal) => {
+    const changes = Array.isArray(proposal && proposal.changes) ? proposal.changes : [];
+    const first = wordsOf(changeLabel(t, changes[0]));
+    if (!first) return t("Ai.proposal_untitled");
+    const more = changes.length - 1;
+    return more ? t("Ai.proposal_first_and_more", { label: first, n: more }, more) : first;
+};
+
 export const proposalTitle = (t, proposal) => {
-    const what = String((proposal && proposal.what) || "");
+    const what = wordsOf(proposal && proposal.what);
+    if (!what) return titleFromChanges(t, proposal);
     const changes = CHANGES_ON.exec(what);
     if (changes) {
         const n = Number(changes[2]);

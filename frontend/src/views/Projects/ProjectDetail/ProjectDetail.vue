@@ -31,6 +31,10 @@
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
                 :projectId="String(projectData._id)"
             />
+            <ProjectAgentLimitsCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
             <ProjectStandingApprovalsCard
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
                 :projectId="String(projectData._id)"
@@ -38,6 +42,12 @@
             <ProjectManagerCard
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
                 :projectId="String(projectData._id)"
+            />
+            <ProjectDispatcherCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+                :canEdit="checkPermission('project.project_details',projectData.isGlobalPermission) === true"
+                :choices="dispatcherChoices"
             />
             <AssignmentRulesCard
                 v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
@@ -111,9 +121,12 @@
     import ProjectMemoryCard from './ProjectMemoryCard.vue';
     import ProjectDefaultTemplateCard from './ProjectDefaultTemplateCard.vue';
     import ProjectAgentPolicyCard from './ProjectAgentPolicyCard.vue';
+    import ProjectAgentLimitsCard from './ProjectAgentLimitsCard.vue';
     import ProjectStandingApprovalsCard from './ProjectStandingApprovalsCard.vue';
     import ProjectManagerCard from './ProjectManagerCard.vue';
     import AssignmentRulesCard from './AssignmentRulesCard.vue';
+    import ProjectDispatcherCard from './ProjectDispatcherCard.vue';
+    import { priorityChoices } from '@/utils/dispatcher';
     import Attachments from '@/components/atom/Attachments/Attachments.vue';
     import FixMilestone from '@/components/organisms/FixMilestone/FixMilestone.vue';
     import HourlyMilestone from '@/components/organisms/HourlyMilestone/HourlyMilestone.vue';
@@ -122,7 +135,7 @@
     import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
     import * as env from '@/config/env';
     import { apiRequest, apiRequestWithoutCompnay } from '../../../services'
-    import Swal from 'sweetalert2';
+    import Swal from '@/utils/lazySwal';
     import { useCustomComposable, useGetterFunctions } from '@/composable';
     import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
     import { buildCloudAttachment, isCloudAttachment, cloudTypeOf, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
@@ -157,6 +170,14 @@
             .filter((person) => person.name)
             .sort((a, b) => a.name.localeCompare(b.name));
     });
+    const choicesOf = (list, value, label) => (Array.isArray(list) ? list : []).filter(Boolean)
+        .map((item) => ({ value: item[value], label: item[label] || '' })).filter((item) => item.value !== undefined && item.value !== null && item.label);
+    const dispatcherChoices = computed(() => ({
+        type: choicesOf(projectData.value?.taskTypeCounts, 'key', 'name'),
+        tag: choicesOf(projectData.value?.tagsArray, 'uid', 'name'),
+        status: choicesOf(projectData.value?.taskStatusData, 'key', 'name'),
+        priority: priorityChoices(getters["settings/companyPriority"]),
+    }));
     const currentCompany = computed(() => getters["settings/selectedCompany"])
     const clientWidth = inject("$clientWidth");
     const emit = defineEmits(["openSeeAllProject","rightSideBarEmit","description"])
