@@ -1,6 +1,5 @@
 const logger = require('../../../Config/loggerConfig');
 const socketEmitter = require('../../../event/socketEventEmitter');
-const { removeCache } = require('../../../utils/commonFunctions');
 const { actingUser } = require('../../Sprints/helpers/actingUser');
 const { RuleError } = require('../rules');
 const flag = require('./flag');
@@ -54,7 +53,6 @@ exports.applyPack = async (req, res) => {
         const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length));
         const agentsChanged = undone ? result.agents.removed : result.agents.made;
         if (agentsChanged.length) {
-            removeCache(`agents:${companyId}`);
             socketEmitter.emit('update', { type: 'update', module: 'dispatcherAgents', companyId: String(companyId), data: { blueprint: result.blueprint } });
         }
         if (changed.length || agentsChanged.length) {

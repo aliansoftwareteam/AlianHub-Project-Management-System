@@ -133,7 +133,7 @@ describe('team packs make one agent per role', () => {
         expect(audited()).toEqual([expect.objectContaining({ action: 'dispatcher.pack_applied', meta: expect.objectContaining({ agents: expect.objectContaining({ created: res.body.data.agents.made.map((a) => a.agentId) }) }) })]);
         expect(emitted.filter((e) => e.module === 'dispatcherAgents' && e.companyId === C)).toHaveLength(1);
         expect(emitted.filter((e) => e.module === 'agent' && e.companyId === C).length).toBeGreaterThanOrEqual(engineering.length);
-        expect(removeCache).toHaveBeenCalledWith(`agents:${C}`);
+        expect(removeCache.mock.calls.map(([key]) => key).filter((key) => key.startsWith('agents:'))).toEqual([]);
         expect(store(SCHEMA_TYPE.AGENT_REVISIONS).length).toBeGreaterThanOrEqual(engineering.length);
     });
 
