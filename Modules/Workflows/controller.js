@@ -17,6 +17,7 @@ const executors = require('./executors');
 const queue = require('./queue');
 const stepTypes = require('./stepTypes');
 const definitions = require('./definitions');
+const templates = require('./templates');
 const dryRun = require('./dryRun');
 const { canReadProject } = require('../../Config/projectAccess');
 const { canReadTask, TASK_READ_FIELDS } = require('../Tasks/helpers/taskReadAccess');
@@ -537,6 +538,39 @@ exports.createDefinition = async (req, res) => {
         return ok(res, 'Workflow saved.', saved);
     } catch (error) {
         logger.error(`[workflow-api] createDefinition: ${error.message}`);
+        return fail(res, error.message, error.status || 500);
+    }
+};
+
+const templateView = (template) => ({ key: template.key, name: template.name, description: template.description, roles: templates.roleKeysOf(template), steps: template.steps.length });
+
+exports.listTemplates = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        return ok(res, 'Workflow templates fetched.', templates.all().map(templateView));
+    } catch (error) {
+        logger.error(`[workflow-api] listTemplates: ${error.message}`);
+        return fail(res, error.message, 500);
+    }
+};
+
+/* POST /api/v2/workflows/templates/:key/install
+ * A template becomes an ordinary saved definition, disabled; a person enables it and starts a run on a task. */
+exports.installTemplate = async (req, res) => {
+    try {
+        const ctx = await context(req, res);
+        if (!ctx) return undefined;
+        if (!requireManager(res, ctx.caller)) return undefined;
+        const template = templates.find(req.params.key);
+        if (!template) return fail(res, 'That workflow template does not exist.', 404);
+        const { errors, value } = definitionFrom(templates.copyOf(template));
+        if (errors.length) return failFields(res, errors);
+        const saved = await definitions.create(ctx.companyId, { ...value, by: ctx.caller.actor.userId });
+        return ok(res, 'Workflow saved.', saved);
+    } catch (error) {
+        logger.error(`[workflow-api] installTemplate: ${error.message}`);
         return fail(res, error.message, error.status || 500);
     }
 };
