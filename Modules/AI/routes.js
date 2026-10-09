@@ -14,6 +14,7 @@ const quality = require('./quality');
 const aiProfile = require('./aiProfile');
 const aiProfileImport = require('./aiProfileImport');
 const askBuild = require('./askBuild');
+const askPlan = require('./askPlan');
 const { requireTaskWritePermission } = require('../../Config/permissionGuard');
 const { TASK_WRITE_ROUTES } = require('../../Config/taskWritePermissions');
 const { chatSummaryHandler } = require('./chatSummary');
@@ -57,6 +58,7 @@ exports.init = (app) => {
     app.get('/api/v1/ai/ask/sources', askController.sources);
     app.post('/api/v1/ai/ask', askedByPeople, askController.ask);
     app.post('/api/v1/ai/ask/stream', askedByPeople, askStream.askStream);
+    app.post('/api/v1/ai/ask/plan', askedByPeople, askPlan.plan);
     app.get('/api/v1/ai/ask/threads', askThreads.listThreads);
     app.get('/api/v1/ai/ask/threads/:id', askThreads.getThread);
     app.put('/api/v1/ai/ask/threads/:id', askThreads.renameThread);
