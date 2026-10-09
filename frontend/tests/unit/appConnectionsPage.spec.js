@@ -54,6 +54,54 @@ describe('the App connections page', () => {
         expect(labels).toEqual([en.AppConnections.field_gitlab_token, en.AppConnections.field_gitlab_project]);
     });
 
+    describe('Connect on GitHub', () => {
+        const openWith = async (oneClick, connections = []) => {
+            const app = { ...github, oneClick, connections };
+            apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage: true, apps: [app], projects: [] } } });
+            const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
+            await flushPromises();
+            return wrapper;
+        };
+        const connectButton = (wrapper) => wrapper.findAll('[data-app="github"] button').find((b) => b.text() === en.AppConnections.connect);
+
+        it('sends the person to GitHub sign-in when the server has a GitHub app', async () => {
+            const assign = vi.fn();
+            vi.stubGlobal('location', { ...window.location, assign, search: '' });
+            const wrapper = await openWith(true);
+            apiRequest.mockResolvedValueOnce({ data: { status: true, data: { url: 'https://github.com/login/oauth/authorize?state=s' } } });
+            await connectButton(wrapper).trigger('click');
+            await flushPromises();
+            expect(apiRequest).toHaveBeenLastCalledWith('get', expect.stringMatching(/\/github\/authorize$/));
+            expect(assign).toHaveBeenCalledWith('https://github.com/login/oauth/authorize?state=s');
+            expect(wrapper.find('[data-app="github"] form').exists()).toBe(false);
+            vi.unstubAllGlobals();
+        });
+
+        it('asks for a token and the repository, with a note on one-click, when the server has none', async () => {
+            const wrapper = await openWith(false);
+            const calls = apiRequest.mock.calls.length;
+            await connectButton(wrapper).trigger('click');
+            expect(apiRequest.mock.calls.length).toBe(calls);
+            const labels = wrapper.findAll('[data-app="github"] .ah-field .ah-label').map((l) => l.text());
+            expect(labels).toEqual([en.AppConnections.field_github_token, en.AppConnections.field_github_repo]);
+            expect(wrapper.find('[data-one-click-off]').text()).toBe(en.AppConnections.one_click_off);
+        });
+
+        it('offers a repository picker on a connection made through sign-in', async () => {
+            const wrapper = await openWith(true, [{ ...github.connections[0], target: '', viaOAuth: true }]);
+            expect(wrapper.text()).toContain(en.AppConnections.repo_needed);
+            apiRequest.mockResolvedValueOnce({ data: { status: true, data: { repos: [{ fullName: 'acme/web', private: true }], page: 1, hasMore: false } } });
+            await wrapper.findAll('button').find((b) => b.text() === en.AppConnections.pick_repo).trigger('click');
+            await flushPromises();
+            expect(apiRequest).toHaveBeenLastCalledWith('get', expect.stringMatching(/\/connections\/c1\/github-repos\?page=1$/));
+            await wrapper.find('input[type="radio"][value="acme/web"]').setValue(true);
+            apiRequest.mockResolvedValueOnce({ data: { status: true, data: { id: 'c1', repo: 'acme/web' } } });
+            await wrapper.findAll('.apc__repos button').find((b) => b.text() === en.AppConnections.save).trigger('click');
+            await flushPromises();
+            expect(apiRequest).toHaveBeenCalledWith('put', expect.stringMatching(/\/connections\/c1\/repo$/), { repo: 'acme/web' });
+        });
+    });
+
     it('has a title that goes through the locale', () => {
         const route = integrationRoutes.find((r) => r.name === 'AppConnections');
         expect(route.meta.titleKey).toBe('AppConnections.title');

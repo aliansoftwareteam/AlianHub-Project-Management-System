@@ -8,6 +8,7 @@
             <p class="ah-small">{{ $t('AppConnections.lead') }}</p>
             <p v-if="enabled && !canManage" class="ah-small">{{ $t('AppConnections.read_only') }}</p>
             <p v-if="error" class="ah-field__error" role="alert">{{ error }}</p>
+            <p v-if="notice" class="ah-small" role="status" data-notice>{{ notice }}</p>
             <p v-if="loaded && !enabled" class="ah-card apc__off">{{ $t('AppConnections.off') }}</p>
 
             <div v-if="enabled" class="apc__list">
@@ -24,6 +25,7 @@
                     </header>
 
                     <form v-if="canManage && connecting === app.key" class="apc__form" @submit.prevent="connect(app)">
+                        <p v-if="app.key === 'github'" class="ah-small" data-one-click-off>{{ $t('AppConnections.one_click_off') }}</p>
                         <label v-for="field in app.fields" :key="field.key" class="ah-field">
                             <span class="ah-label">{{ $t(`AppConnections.field_${app.key}_${field.key}`) }}</span>
                             <input v-model="values[field.key]" class="ah-input" :type="field.secret ? 'password' : 'text'" :required="field.required" autocomplete="off" />
@@ -47,6 +49,26 @@
                                     {{ confirming === conn.id ? $t('AppConnections.confirm_disconnect') : $t('AppConnections.disconnect') }}
                                 </button>
                             </template>
+                        </div>
+
+                        <div v-if="canManage && pickable(app, conn)" class="apc__projects">
+                            <span v-if="!conn.target" class="ah-small">{{ $t('AppConnections.repo_needed') }}</span>
+                            <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="openRepos(conn)">
+                                {{ conn.target ? $t('AppConnections.change_repo') : $t('AppConnections.pick_repo') }}
+                            </button>
+                            <div v-if="choosingRepo === conn.id" class="apc__picker apc__repos">
+                                <span class="ah-label">{{ $t('AppConnections.repo_label') }}</span>
+                                <label v-for="r in repos" :key="r.fullName" class="apc__pick">
+                                    <input v-model="pickedRepo" type="radio" name="apc-repo" :value="r.fullName" />
+                                    <span>{{ r.fullName }}</span>
+                                </label>
+                                <span v-if="reposLoaded && !repos.length" class="ah-small">{{ $t('AppConnections.no_repos') }}</span>
+                                <div class="apc__actions">
+                                    <button v-if="reposMore" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" :disabled="busy" @click="loadRepos(conn, reposPage + 1)">{{ $t('AppConnections.more_repos') }}</button>
+                                    <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy || !pickedRepo" @click="saveRepo(conn)">{{ $t('AppConnections.save') }}</button>
+                                    <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="choosingRepo = ''">{{ $t('AppConnections.cancel') }}</button>
+                                </div>
+                            </div>
                         </div>
 
                         <dl v-if="app.syncs" class="apc__facts">
@@ -112,6 +134,15 @@ const values = ref({});
 const editing = ref("");
 const picked = ref([]);
 const confirming = ref("");
+const notice = ref("");
+const choosingRepo = ref("");
+const repos = ref([]);
+const reposPage = ref(1);
+const reposMore = ref(false);
+const reposLoaded = ref(false);
+const pickedRepo = ref("");
+
+const GITHUB_OUTCOMES = ["connected", "expired", "denied", "rights", "off", "failed"];
 
 const when = (value) => new Date(value).toLocaleString();
 const stateOf = (conn) => {
@@ -152,9 +183,69 @@ const act = async (run) => {
     }
 };
 
-const openConnect = (app) => {
+const openConnect = async (app) => {
+    if (app.oneClick) {
+        busy.value = true;
+        error.value = "";
+        try {
+            const res = await apiRequest("get", `${env.INTEGRATIONS}/github/authorize`);
+            if (res?.data?.status && res.data.data?.url) window.location.assign(res.data.data.url);
+            else error.value = res?.data?.statusText || t("AppConnections.failed");
+        } catch (e) {
+            error.value = failure(e);
+        } finally {
+            busy.value = false;
+        }
+        return;
+    }
     values.value = {};
     connecting.value = app.key;
+};
+
+const pickable = (app, conn) => app.key === "github" && (app.oneClick || conn.viaOAuth);
+
+const loadRepos = async (conn, page) => {
+    busy.value = true;
+    error.value = "";
+    try {
+        const res = await apiRequest("get", `${env.INTEGRATIONS}/connections/${conn.id}/github-repos?page=${page}`);
+        if (!res?.data?.status) { error.value = res?.data?.statusText || t("AppConnections.failed"); return; }
+        const data = res.data.data || {};
+        repos.value = page === 1 ? data.repos || [] : [...repos.value, ...(data.repos || [])];
+        reposPage.value = data.page || page;
+        reposMore.value = !!data.hasMore;
+        reposLoaded.value = true;
+    } catch (e) {
+        error.value = failure(e);
+    } finally {
+        busy.value = false;
+    }
+};
+
+const openRepos = async (conn) => {
+    if (choosingRepo.value === conn.id) { choosingRepo.value = ""; return; }
+    choosingRepo.value = conn.id;
+    pickedRepo.value = conn.target || "";
+    repos.value = [];
+    reposLoaded.value = false;
+    await loadRepos(conn, 1);
+};
+
+const saveRepo = async (conn) => {
+    await act(() => apiRequest("put", `${env.INTEGRATIONS}/connections/${conn.id}/repo`, { repo: pickedRepo.value }));
+    if (!error.value) choosingRepo.value = "";
+};
+
+const readGithubOutcome = () => {
+    const params = new URLSearchParams(window.location.search);
+    const outcome = params.get("github");
+    if (!outcome) return;
+    params.delete("github");
+    const rest = params.toString();
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
+    if (!GITHUB_OUTCOMES.includes(outcome)) return;
+    if (outcome === "connected") notice.value = t("AppConnections.github_connected");
+    else error.value = t(`AppConnections.github_${outcome}`);
 };
 
 const connect = async (app) => {
@@ -180,7 +271,10 @@ const saveProjects = async (conn) => {
     if (!error.value) editing.value = "";
 };
 
-onMounted(load);
+onMounted(async () => {
+    await load();
+    readGithubOutcome();
+});
 </script>
 
 <style>

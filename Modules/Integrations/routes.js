@@ -3,7 +3,10 @@ const rateLimit = require('express-rate-limit');
 const ctrl = require('./controller');
 const { agentsRefused } = require('../Agents/guard');
 const hub = require('./appConnections/controller');
+const github = require('./appConnections/githubConnect');
+const { CALLBACK_PATH } = require('./appConnections/github/oauth');
 
+const githubCallbackLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false });
 const slackLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
 
 exports.init = (app) => {
@@ -15,6 +18,11 @@ exports.init = (app) => {
     app.delete('/api/v1/integrations/connections/:id', agentsRefused('integration.disconnect'), ctrl.disconnect);
     app.get('/api/v1/integrations/app-connections', hub.hub);
     app.put('/api/v1/integrations/connections/:id/projects', agentsRefused('integration.update'), hub.setProjects);
+    app.get('/api/v1/integrations/github/authorize', agentsRefused('integration.connect'), github.authorize);
+    app.get('/api/v1/integrations/connections/:id/github-repos', github.repos);
+    app.put('/api/v1/integrations/connections/:id/repo', agentsRefused('integration.update'), github.setRepo);
+    // Outside /api/v1/integrations: GitHub's redirect carries no JWT, and the signed state authenticates it.
+    app.get(CALLBACK_PATH, githubCallbackLimiter, github.callback);
 
     // AUTO-06 — PUBLIC Slack slash-command webhook (NOT under /api/v1/integrations,
     // so it bypasses JWT; the verification token authenticates it). companyId in
