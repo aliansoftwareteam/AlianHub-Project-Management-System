@@ -162,20 +162,34 @@ describe('the MCP instructions and prompts name only tools the connection is off
             expect(prompts.list(CALLERS['personal, manages both']()).filter((prompt) => isRole(prompt.name)).length).toBeGreaterThan(20);
         });
 
-        /* A playbook also puts tag names and labels in backticks; only a dotted name can be a tool. */
-        it('names only tools the connection may run, each in backticks', () => {
+        /* A playbook also puts tag names and labels in backticks; only a dotted name can be a tool. A role offered with
+         * tools missing may name them only in its opening line and where each is marked as missing. */
+        const MISSING = /`([^`]+)` \(not on this connection\)/g;
+        const missingPart = (text) => {
+            const top = text.split('\n\n')[0];
+            return { top: top.startsWith('This connection lacks') ? top : '', rest: top.startsWith('This connection lacks') ? text.slice(top.length) : text };
+        };
+
+        it('names only tools the connection may run, each in backticks, or marks them as missing', () => {
             const all = tools.registered().map((tool) => tool.name);
             const bareName = new RegExp(`(^|[^\\w.])(${all.map(escaped).join('|')})($|[^\\w])`, 'g');
             const wrong = [];
-            everyRoleText(({ where, ctx, text }) => {
+            let marked = 0;
+            everyRoleText(({ where, ctx, text: whole }) => {
                 const usable = new Set(tools.usable(ctx).map((tool) => tool.name));
+                const { top, rest } = missingPart(whole);
+                const flagged = [...named(top), ...[...rest.matchAll(MISSING)].map((match) => match[1])];
+                marked += flagged.length;
+                flagged.filter((name) => usable.has(name)).forEach((name) => wrong.push(`${name} marked missing in ${where}`));
+                const text = rest.replace(MISSING, ' ');
                 named(text).filter((name) => /^[a-z_]+(\.[a-z_]+)+$/.test(name) && !usable.has(name)).forEach((name) => wrong.push(`${name} in ${where}`));
                 [...outsideBackticks(text).matchAll(bareName)].forEach((match) => wrong.push(`bare ${match[2]} in ${where}`));
             });
             expect(wrong).toEqual([]);
+            expect(marked).toBeGreaterThan(0);
         });
 
-        it('offers a role only when the connection may run every tool its playbook names', () => {
+        it('offers a role when the connection holds half its required tools and a write it delivers with', () => {
             const short = [];
             ROLE_MIXES.forEach((mix) => {
                 set(mix);
@@ -183,8 +197,11 @@ describe('the MCP instructions and prompts name only tools the connection is off
                     const ctx = caller();
                     const usable = new Set(tools.usable(ctx).map((tool) => tool.name));
                     const listed = new Set(prompts.list(ctx).map((prompt) => prompt.name));
+                    const writes = new Set(tools.usable(ctx).filter((tool) => tool.write).map((tool) => tool.name));
                     prompts.rolePrompts().forEach((prompt) => {
-                        if (listed.has(prompt.name) !== prompt.needs.every((name) => usable.has(name))) short.push(`${prompt.name} for ${who}, with ${mix.join(' + ')}`);
+                        const held = prompt.needs.filter((name) => usable.has(name));
+                        const may = held.length * 2 >= prompt.needs.length && held.some((name) => writes.has(name) && !name.startsWith('queue.'));
+                        if (listed.has(prompt.name) !== may) short.push(`${prompt.name} for ${who}, with ${mix.join(' + ')}`);
                     });
                 });
             });

@@ -6,7 +6,7 @@ const playbookOverrides = require('../Agents/rolePlaybookOverrides');
 /* The ready-made prompts a person picks in their AI app. Fixed text shipped with the server: a prompt holds
  * no workspace data, takes what the person typed as its arguments, and tells the agent which tools to call.
  * A prompt is offered only to a connection that may run every tool in `needs`, and a step that names another
- * tool is kept only when the connection may run it. Tool names are written in backticks, which
+ * tool is kept only when the connection may run it. A role prompt is the exception: see roleOffered. Tool names are written in backticks, which
  * tests/conventions/mcp-prompts.test.js reads. */
 
 const ARGUMENT_MAX = 120;
@@ -209,22 +209,57 @@ const ROLE_REQUEST = { name: 'request', description: 'What to work on: a task, a
 
 const rolePromptName = (role) => `work_as_${role.slug.replace(/-/g, '_')}`;
 
-/* A role's prompt carries its playbook, which names only the tools in `needs`; the role is offered only to a
- * connection that may run all of them. */
+const QUEUE_TOOLS = ['queue.list', 'queue.claim', 'queue.release'];
+const MISSING_MARK = '(not on this connection)';
+
+let writeTools = null;
+const isWrite = (name) => {
+    if (!writeTools) writeTools = new Set(tools.registered().filter((tool) => !tool.run).map((tool) => tool.name));
+    return writeTools.has(name);
+};
+
+/* Taking and giving back queue items delivers nothing by itself, so it does not count as a write the role can do. */
+const roleOffered = (role, has) => {
+    const held = role.tools.filter(has);
+    return held.length * 2 >= role.tools.length && held.some((name) => isWrite(name) && !QUEUE_TOOLS.includes(name));
+};
+
+const quoted = (names) => names.map((name) => `\`${name}\``).join(', ');
+
+const missingLine = (role, has) => {
+    const needed = role.tools.filter((name) => !has(name));
+    const extras = (role.toolsOptional || []).filter((name) => !has(name));
+    if (!needed.length && !extras.length) return '';
+    return sentence([
+        needed.length && `This connection lacks tools the playbook needs: ${quoted(needed)}. Skip the steps that need them, ask me for what they would have given you, and say in your answer what you left out.`,
+        extras.length && `${needed.length ? 'It also lacks' : 'This connection lacks'} these extras: ${quoted(extras)}. Leave out what they add, and say so.`,
+        `They are marked "${MISSING_MARK}" below: do not call them.`,
+    ]);
+};
+
+/* An edited playbook may name any tool, so every tool the connection cannot run is marked, not only the listed ones. */
+const markMissing = (body, has) => {
+    const known = new Set(tools.registered().map((tool) => tool.name));
+    return body.replace(/`([^`]+)`/g, (all, name) => (known.has(name) && !has(name) ? `${all} ${MISSING_MARK}` : all));
+};
+
 const rolePrompt = (role) => Object.freeze({
     name: rolePromptName(role),
     title: `Work as the ${role.name}`,
     description: `${role.department}: ${rolePlaybooks.summary(role, 300)}`,
     arguments: [ROLE_REQUEST],
     needs: role.tools,
+    optional: role.toolsOptional || [],
+    offered: (has) => roleOffered(role, has),
     text: (has, { request }) => [
+        missingLine(role, has),
         `Work as the ${role.name} of the ${role.department} team in AlianHub, following the playbook below.`,
         request ? `What I want you to work on: "${request}".` : 'Ask me what to work on, unless I have just told you.',
         'Ask me for anything the playbook needs that you do not have before you start, and show me what you will change before you change it.',
         ...(has('queue.list') ? [`Your queue is \`queue.list\` with role "${role.blueprint}/${role.slug}": the tasks a lead routed to the ${role.name}.`] : []),
-        role.body,
+        markMissing(role.body, has),
         CONTENT_RULE,
-    ],
+    ].filter(Boolean),
 });
 
 let rolePromptsCache = null;
@@ -244,7 +279,7 @@ const usableBy = (ctx) => {
 
 const offeredTo = (ctx, edited) => {
     const { has } = usableBy(ctx);
-    return available(edited).filter((prompt) => prompt.needs.every(has));
+    return available(edited).filter((prompt) => (prompt.offered ? prompt.offered(has) : prompt.needs.every(has)));
 };
 
 const list = (ctx, edited) => offeredTo(ctx, edited).map((prompt) => ({
