@@ -66,11 +66,19 @@ describe('the estimate a reservation is sized from', () => {
 });
 
 describe('with the router flag off', () => {
-    it('holds nothing and refuses nothing, however small the budget', async () => {
-        seedCompany({ agentMonthlyBudgetUsd: 0.0001 });
+    it('holds nothing when the workspace has no budget', async () => {
+        seedCompany();
         await expect(call()).resolves.toMatchObject({ content: '{"ok":true}' });
         expect(holds()).toHaveLength(0);
         expect(ledger()).toHaveLength(1);
+    });
+
+    it('still refuses a call the monthly budget cannot take, before the vendor is reached', async () => {
+        seedCompany({ agentMonthlyBudgetUsd: 0.0001 });
+        await expect(call()).rejects.toMatchObject({ code: reservation.BUDGET_EXHAUSTED, period: 'monthly' });
+        expect(adapter.chat).not.toHaveBeenCalled();
+        expect(holds()[0]).toMatchObject({ state: 'released' });
+        expect(ledger()).toHaveLength(0);
     });
 });
 

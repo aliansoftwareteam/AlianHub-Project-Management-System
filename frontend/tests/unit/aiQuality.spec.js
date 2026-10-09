@@ -94,6 +94,12 @@ describe('the AI quality page', () => {
         expect(wrapper.findAll('[data-test="cost"] tbody tr').map((r) => r.attributes('data-feature'))).toEqual(['ask', 'task_estimate']);
     });
 
+    it('says the cost could not be read when the server marks it unavailable', async () => {
+        const wrapper = await mountAs(1, payload({ cost: { month: '2026-09', unavailable: true, usedUsd: null, features: [] } }));
+        expect(wrapper.find('[data-test="cost-unavailable"]').exists()).toBe(true);
+        expect(wrapper.find('[data-test="cost"]').exists()).toBe(false);
+    });
+
     it('switches the window with keyboard-reachable tabs', async () => {
         const wrapper = await mountAs(1);
         const tabs = wrapper.findAll('[role="tab"]');

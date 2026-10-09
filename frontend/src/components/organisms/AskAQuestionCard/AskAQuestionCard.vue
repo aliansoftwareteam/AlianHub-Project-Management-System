@@ -121,7 +121,8 @@ const showAnswer = (answer, { stale = false } = {}) => {
 const showReply = (body) => {
     if (!body.status) {
         if (body.code === 'ai_off') return showEmpty(availabilityText(offState()));
-        return showError(body.code === 'ai_budget_exhausted' ? t('Dash.ask_budget_exhausted') : '');
+        if (body.code === 'ai_budget_exhausted') return showError(t('Dash.ask_budget_exhausted'));
+        return showError(body.code === 'budget_unavailable' ? t('Dash.ask_budget_unavailable') : '');
     }
     const data = body.data || {};
     if (data.configured === false) return showEmpty(t('ConnectAi.card_no_model'));

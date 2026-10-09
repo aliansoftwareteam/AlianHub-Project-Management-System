@@ -105,6 +105,7 @@ const agentsCannot = (t, what) => {
 const CODED_REASONS = Object.freeze({
     not_visible: notVisible,
     spend_cap_exceeded: spendCap,
+    budget_unavailable: (t) => t("AuditReasons.budget_unavailable"),
     permission_denied: (t) => t("AuditReasons.permission_denied"),
 });
 

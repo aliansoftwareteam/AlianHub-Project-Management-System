@@ -197,9 +197,26 @@ describe('cost_forecast', () => {
         expect(incidents()).toEqual([]);
     });
 
+    it('a spend ledger that cannot be read leaves the check failed and its incidents as they are', async () => {
+        company().agentMonthlyBudgetUsd = 100;
+        usage(50);
+        await evaluate();
+        expect(openIncidents()).toHaveLength(1);
+        const real = mockDb.crud.getMockImplementation();
+        mockDb.crud.mockImplementation(async (...a) => {
+            if (a[1] && a[1].type === SCHEMA_TYPE.AI_USAGE) throw new Error('mongo down');
+            return real(...a);
+        });
+        let summary;
+        try { summary = await evaluate(); } finally { mockDb.crud.mockImplementation(real); }
+        expect(summary.failed).toContain('cost_forecast');
+        expect(summary.resolved).toEqual([]);
+        expect(openIncidents()).toHaveLength(1);
+    });
+
     it('never alerts without a budget', async () => {
         usage(5000);
-        const monthly = jest.spyOn(spend, 'monthly');
+        const monthly = jest.spyOn(spend, 'monthlyTotal');
         await evaluate();
         expect(incidents()).toEqual([]);
         expect(monthly).not.toHaveBeenCalled();

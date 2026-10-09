@@ -36,7 +36,7 @@ const lastMonth = () => { const d = new Date(); d.setUTCDate(1); d.setUTCHours(1
 const spend = async (usd, over = {}) => {
     summarize.mockReturnValueOnce({ costUsd: usd, totalTokens: 100, model: 'm' });
     const run = await runs.create(C, { agent: agent(), taskId: TASK_ID, projectId: 'p1', skill: 'qa-review', ...over });
-    if (run.viaAccount === 'workspace') seedSpend(usd, { runId: String(run._id) });
+    seedSpend(usd, { runId: String(run._id) });
     return runs.recordSpend(C, run, { totalTokens: 100 }, 'm');
 };
 
@@ -62,6 +62,7 @@ describe('budget.status', () => {
         expect(await budget.status(C)).toEqual({
             month: runs.monthKey(), usedUsd: 5.5, budgetUsd: 10, percent: 55, alerts: { 80: null, 100: null },
             features: [{ feature: 'project_plan', usd: 3, calls: 1, tokens: 10 }, { feature: 'agent_run', usd: 2.5, calls: 1, tokens: 10 }],
+            daily: { day: new Date().toISOString().slice(0, 10), usedUsd: 5.5, budgetUsd: 0, percent: 0, alerts: { 80: null, 100: null } },
         });
     });
 
@@ -76,7 +77,7 @@ describe('budget.status', () => {
         seedSpend(17, { feature: 'ask' });
         const r = { code: 200, body: null }; r.status = (c) => { r.code = c; return r; }; r.send = (b) => { r.body = b; return r; };
         await ctrl.getBudget({ headers: { companyid: C }, query: {}, uid: 'owner1' }, r);
-        expect(r.body).toEqual({ status: true, statusText: 'Budget fetched.', data: { month: runs.monthKey(), usedUsd: 17, budgetUsd: 20, percent: 85, alerts: { 80: '2026-09-01T10:00:00.000Z', 100: null }, features: [{ feature: 'ask', usd: 17, calls: 1, tokens: 10 }] } });
+        expect(r.body).toEqual({ status: true, statusText: 'Budget fetched.', data: { month: runs.monthKey(), usedUsd: 17, budgetUsd: 20, percent: 85, alerts: { 80: '2026-09-01T10:00:00.000Z', 100: null }, features: [{ feature: 'ask', usd: 17, calls: 1, tokens: 10 }], daily: { day: new Date().toISOString().slice(0, 10), usedUsd: 17, budgetUsd: 0, percent: 0, alerts: { 80: null, 100: null } } } });
     });
 
     it('forgets last month\'s alert stamps', async () => {
@@ -154,18 +155,16 @@ describe('80% and 100% alerts fire once each', () => {
         expect(handleNotificationtFun).toHaveBeenCalledTimes(1);
     });
 
-    it('stays silent without a budget, for personal-account runs, and survives a failed notification', async () => {
+    it('stays silent without a budget, counts a personal-account run, and survives a failed notification', async () => {
         await spend(50);
         expect(handleNotificationtFun).not.toHaveBeenCalled();
 
-        seedCompany({ agentMonthlyBudgetUsd: 10 });
-        await spend(30, { viaAccount: 'personal' });
-        expect(handleNotificationtFun).not.toHaveBeenCalled();
-
+        seedCompany({ agentMonthlyBudgetUsd: 100 });
         handleNotificationtFun.mockRejectedValueOnce(new Error('smtp down'));
-        const out = await spend(9);
-        expect(out.usd).toBe(9);
+        const out = await spend(35, { viaAccount: 'personal' });
+        expect(out.usd).toBe(35);
         expect(handleNotificationtFun).toHaveBeenCalledTimes(1);
         expect(company().agentBudgetAlerts[80]).toEqual(expect.any(Date));
+        expect(company().agentBudgetAlerts[100]).toBeNull();
     });
 });

@@ -15,6 +15,7 @@ const EVENTS = Object.freeze({
     'agent.revision_rolled_back': 'Went back to an earlier version of an agent',
     'agent.project_policy_changed': 'Changed what agents may do in a project',
     'agent.workspace_policy_changed': 'Changed what agents may do in the workspace',
+    'agent.budget_changed': 'Changed the AI budget',
     'agent.role_playbook_changed': 'Changed the playbook of an agent role',
     'agent.standing_approval_made': 'Turned on "Always do this" for an agent',
     'agent.standing_approval_ended': 'Ended an "Always do this" approval',

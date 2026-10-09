@@ -33,6 +33,7 @@ const IS_ARCHIVED = 'This goal is archived. Restore it to change it.';
 const BUSY = 'This goal was changed at the same moment. Try again.';
 const FAILED = 'Something went wrong with the goal.';
 const BUDGET_EXHAUSTED = 'ai_budget_exhausted';
+const { BUDGET_UNAVAILABLE } = require('../AICore/budgetRead');
 
 const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
 const stop = (statusCode, statusText) => Object.assign(new Error(statusText), { statusCode, stopped: true });
@@ -413,6 +414,7 @@ exports.summariseGoal = handled('summarise', async (req, res, caller) => {
         const reason = made.reason || FAILED;
         if (made.aiState) return refuse(res, 409, 'AI unavailable', reason, { code: 'ai_unavailable', aiState: made.aiState });
         if (reason.startsWith(BUDGET_EXHAUSTED)) return refuse(res, 402, 'AI budget spent', reason, { code: BUDGET_EXHAUSTED });
+        if (reason.startsWith(BUDGET_UNAVAILABLE)) return refuse(res, 503, 'AI budget unavailable', reason, { code: BUDGET_UNAVAILABLE });
         return refuse(res, 502, 'Summary failed', reason, { code: 'summary_failed' });
     }
     announce('update', caller.companyId);
