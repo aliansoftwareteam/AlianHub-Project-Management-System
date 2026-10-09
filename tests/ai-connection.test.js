@@ -109,7 +109,15 @@ describe('whether a person\'s own AI has called', () => {
 });
 
 describe('what this install has switched on', () => {
-    it('says apps are off, tokens work and the extra tools are off by default', async () => {
+    it('says tokens work and the extra tools are on by default, and apps wait for an issuer the server can use', async () => {
+        expect(await statusOf()).toMatchObject({ apps: false, tokens: true, address: '', tools: { data: true, manage: true, work: true } });
+        process.env.MCP_OAUTH_ISSUER = 'https://hub.example.com';
+        expect(await statusOf()).toMatchObject({ apps: true, tokens: true, address: 'https://hub.example.com/mcp' });
+    });
+
+    it('says apps and the extra tools are off once each is set off', async () => {
+        process.env.MCP_OAUTH_ISSUER = 'https://hub.example.com';
+        ['MCP_OAUTH', 'MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK'].forEach((name) => { process.env[name] = 'off'; });
         expect(await statusOf()).toMatchObject({ apps: false, tokens: true, address: '', tools: { data: false, manage: false, work: false } });
     });
 
@@ -120,6 +128,7 @@ describe('what this install has switched on', () => {
     });
 
     it.each([['MCP_TOOLS_DATA', 'data'], ['MCP_TOOLS_MANAGE', 'manage'], ['MCP_TOOLS_WORK', 'work']])('reports %s on its own', async (name, key) => {
+        ['MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK'].forEach((flag) => { process.env[flag] = 'off'; });
         process.env[name] = 'on';
         const { tools } = await statusOf();
         expect(tools).toEqual({ data: false, manage: false, work: false, [key]: true });

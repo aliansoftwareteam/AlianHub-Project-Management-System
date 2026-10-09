@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, S-2b: a connected agent asks for a new project, with or without a plan for it (statuses, lists, fields,
    views). The call makes nothing: it waits as one proposal with one preview. Approved, the project is made by the web
    app's own create route as the person who approved, each part of the plan then runs as it does for a project that
@@ -128,7 +129,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tool exists', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect(actions.rating(TOOL)).toBeNull();
@@ -507,7 +508,7 @@ describe('the "Set up my project" prompt', () => {
         expect(promptText(as(OWNER))).not.toMatch(/You cannot make a project yourself/);
         expect(promptText({ ...as(OWNER), allowedActions: ['tasks.search', 'task.create', 'project.setup'] })).not.toContain('`project.create`');
         expect(promptText({ ...as(OWNER), allowedActions: ['tasks.search', 'task.create', 'project.setup'] })).toMatch(/You cannot make a project yourself/);
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(promptText(as(OWNER))).not.toContain('`project.create`');
         expect(promptText(as(OWNER))).toMatch(/You cannot make a project yourself/);
     });

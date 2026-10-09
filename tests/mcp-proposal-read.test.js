@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-1 gaps: what became of a change that waits for a person. A connected agent asks about a proposal
    it filed itself, so it can go on after an approval and stop after a refusal. It is told about no other proposal. */
 process.env.STORAGE_TYPE = 'server';
@@ -107,8 +108,8 @@ afterAll(() => FLAGS.forEach((flag) => { delete process.env[flag]; }));
 
 describe('the tool exists with the read tools', () => {
     it('off, it is not offered and answers as an unknown tool', async () => {
-        delete process.env.MCP_TOOLS_DATA;
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_DATA = 'off';
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect(actions.rating(TOOL)).toBeNull();

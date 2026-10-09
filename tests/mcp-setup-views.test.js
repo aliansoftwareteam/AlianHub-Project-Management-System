@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-3 (views): a connected agent adds a saved view to a project. Every call waits for a person, and
    once approved it runs the project's own "add view" route as the person behind the token and no further. */
 process.env.STORAGE_TYPE = 'server';
@@ -117,7 +118,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tool exists', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect(actions.rating(TOOL)).toBeNull();

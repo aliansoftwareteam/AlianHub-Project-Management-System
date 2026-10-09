@@ -95,6 +95,8 @@ beforeAll(async () => {
         logFile: path.join(STATE_DIR, 'mcp-authorization-server.log'),
         env: {
             MCP_OAUTH: 'both',
+            // Unset it would follow MCP_OAUTH on, and the step-up write here is a project-scope task.create.
+            AGENT_TAINT_ROUTING: 'off',
             NODE_ENV: 'development',
             MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000',
             MCP_TEST_CLIENT_METADATA_HOSTS: `${DOCUMENT_HOST}=127.0.0.1:${documentServer.address().port}`,

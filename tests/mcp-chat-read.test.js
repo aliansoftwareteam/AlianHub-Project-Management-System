@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-1 gaps: reading chat. A connected agent lists the chat channels the person behind it can open and
    reads the recent messages of one, or of a task's thread, with their ids, so "make a task from that message" can
    find the message. It reads what the web chat would show that person, and never a direct message. */
@@ -103,7 +104,7 @@ const seedChat = () => {
 
 beforeEach(() => {
     seed();
-    delete process.env.MCP_TOOLS_WORK;
+    process.env.MCP_TOOLS_WORK = 'off';
     process.env.MCP_TOOLS_DATA = 'on';
     seedChat();
     Object.keys(mockElsewhere.store).forEach((type) => { mockElsewhere.store[type].length = 0; });
@@ -114,7 +115,7 @@ afterAll(() => FLAGS.forEach((flag) => { delete process.env[flag]; }));
 
 describe('the tools exist with the read tools', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_DATA;
+        process.env.MCP_TOOLS_DATA = 'off';
         expect(tools.names()).toEqual(BEFORE);
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         BOTH.forEach((name) => {

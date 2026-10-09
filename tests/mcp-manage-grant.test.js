@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* The grant an agent token is created with: chosen by the person creating it, stored on the token, never added later. */
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -29,9 +30,9 @@ beforeEach(() => {
     Object.keys(mockDb.store).forEach((type) => { mockDb.store[type].length = 0; });
     delete process.env.API_TOKEN_STRICT;
     process.env.MCP_TOOLS_MANAGE = 'on';
-    delete process.env.MCP_TOOLS_DATA;
+    process.env.MCP_TOOLS_DATA = 'off';
 });
-afterAll(() => { delete process.env.MCP_TOOLS_MANAGE; delete process.env.MCP_TOOLS_DATA; });
+afterAll(() => { process.env.MCP_TOOLS_MANAGE = 'off'; process.env.MCP_TOOLS_DATA = 'off'; });
 
 describe('creating an agent token', () => {
     it('stores no grant unless it is asked for, so the token lists none of the write tools', async () => {
@@ -196,7 +197,7 @@ describe('a token created to read chat', () => {
         expect((await policy()).grants).toEqual([GRANT, DOCS_GRANT, CHAT]);
         process.env.MCP_TOOLS_MANAGE = 'off';
         expect((await policy()).grants).toEqual([CHAT]);
-        delete process.env.MCP_TOOLS_DATA;
+        process.env.MCP_TOOLS_DATA = 'off';
         expect(await policy()).not.toHaveProperty('grants');
         expect((await mint({ grants: [CHAT] })).body).toMatchObject({ status: false, statusText: expect.stringMatching(/MCP_TOOLS_DATA/) });
         expect(tokens()).toHaveLength(0);

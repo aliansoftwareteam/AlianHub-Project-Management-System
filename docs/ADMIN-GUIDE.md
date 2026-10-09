@@ -88,6 +88,8 @@ Either SMTP (`NODEMAILER_HOST`, `NODEMAILER_PORT` 587 or 465, `NODEMAILER_EMAIL`
 ### AI
 `LLM_PROVIDER` (openai, anthropic, deepseek) plus the matching key and model. Test asks the provider to list models with the key. Nothing in the product requires AI; the AI pages simply stay empty without a key.
 
+On a new install, people can connect their own AI (Claude, ChatGPT, Claude Code) out of the box, with no server key: `MCP_OAUTH` (connecting by address, with a consent screen), `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` are on unless `.env` names them, and `AGENT_TAINT_ROUTING` is on with them so an outside app's risky writes wait for a person. An install upgraded from before this change keeps the four off: the upgrade records off for each one `.env` does not name, and you turn them on here, under AI ("Connect an AI app by address" takes a restart). Connecting by address needs `APIURL` (or `MCP_OAUTH_ISSUER`) to be an `https` origin; until it is, `MCP_OAUTH` stays off and the server log says why, and people connect with a personal token instead. Every write still needs the person's own access in the web app and, for an app, the permissions that person granted it on the consent screen; the manage and chat permissions also need an owner or admin to approve them for that app under Settings, Agent clients, and dynamic client registration (`MCP_OAUTH_DCR`) stays off. To turn any of it off, switch it off here or set it to `off` in `.env` and restart, for example `MCP_OAUTH=off` or `MCP_TOOLS_MANAGE=off`; a value in `.env` always wins. "Hold risky AI writes for approval" under Security shows `AGENT_TAINT_ROUTING`. See [MCP-AGENT-GUIDE.md](MCP-AGENT-GUIDE.md).
+
 ### Sign-in
 Google, GitHub and GitLab each have an enable switch, a client id and a client secret. The login page learns which buttons to show from `GET /api/v2/instance/public-config`, so nothing needs a rebuild. Set the provider's callback URL to your `WEBURL`. The "Continue with SSO" button shows only once a workspace has an enabled SAML/OIDC connection with a verified domain (checked at most once a minute, and again whenever a connection is saved or a domain verified); `SSO_LOGIN_ENABLED=false` hides it regardless.
 
@@ -98,6 +100,8 @@ Push notifications (Firebase) are the one exception: the browser service worker 
 
 ### Security
 `TRUST_PROXY` (`loopback` by default; a hop count or `true` behind a hosted proxy), `GLOBAL_RATE_LIMIT_PER_MIN` (1000 API requests per minute per IP; `0` turns it off), `HELMET_ENABLED` (security response headers, on). All three are read at boot.
+
+`AGENT_TAINT_ROUTING` (Hold risky AI writes for approval) is on by default while the AI tools or `MCP_OAUTH` are on: a risky change by an AI that read outside content, or by an outside AI app, waits for a person in the AI Inbox. The console only shows it: set `AGENT_TAINT_ROUTING=off` in `.env` and restart to turn it off, which lets those changes apply at once.
 
 `WEBHOOK_ALLOWED_PRIVATE_HOSTS` (Private webhook hosts) is empty by default, so webhooks refuse loopback, private, link-local and `.local`/`.internal` hosts. To post to a receiver on your own network, list its exact hostname (`hooks.lan`) or a CIDR range (`192.168.10.0/24`, `fd12:3456::/32`), separated by commas or new lines. It applies on save: a webhook is checked against it when it is saved and again before every delivery, so removing an entry stops deliveries to that host. Hostnames are still resolved and the connection is pinned to the checked address.
 

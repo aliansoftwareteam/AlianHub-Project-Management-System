@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, T-3: "show me". An outside agent asks for the web address of a place in AlianHub and gets it only
    for a thing the person behind the connection can open, built from the address this server is set up with. */
 process.env.STORAGE_TYPE = 'server';
@@ -62,7 +63,7 @@ const link = (caller, args) => rpc(caller, TOOL, args);
 
 beforeEach(() => {
     seed();
-    delete process.env.MCP_TOOLS_WORK;
+    process.env.MCP_TOOLS_WORK = 'off';
     process.env.MCP_TOOLS_DATA = 'on';
     process.env.WEBURL = `${BASE}/`;
     delete process.env.APIURL;
@@ -83,7 +84,7 @@ afterAll(() => {
 
 describe('the tool exists with the read tools', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_DATA;
+        process.env.MCP_TOOLS_DATA = 'off';
         expect(tools.names()).toEqual(BEFORE);
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);

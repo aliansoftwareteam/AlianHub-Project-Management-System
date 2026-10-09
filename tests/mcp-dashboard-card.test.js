@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, job 22: a connected agent asks for a card on a dashboard. It waits for the person who owns the
    dashboard, is added by the dashboard editor's own routes as that person, and they alone can take it back. */
 process.env.STORAGE_TYPE = 'server';
@@ -102,7 +103,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tool exists', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(INSIDER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect((await rpc(as(INSIDER), TOOL, BOARD)).rpcError).toMatchObject({ code: -32601 });

@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 process.env.STORAGE_TYPE = 'server';
 const mockDb = require('./fixtures/fakeMongo').create();
 
@@ -101,7 +102,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.PAGES, { _id: PAGE, title: 'Existing doc', ProjectID: P_OPEN, visibility: 'project', createdBy: OWNER, updatedBy: OWNER, deletedStatusKey: 0, order: 1 });
 });
 afterEach(() => {
-    delete process.env.MCP_TOOLS_MANAGE;
+    process.env.MCP_TOOLS_MANAGE = 'off';
     composePage.mockReset();
 });
 

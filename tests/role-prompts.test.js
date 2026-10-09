@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 
 const fs = require('fs');
@@ -6,7 +7,7 @@ const path = require('path');
 
 const FLAGS = ['MCP_ROLE_PROMPTS', 'MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2', 'AGENT_PERFORMANCE_READ'];
 const saved = Object.fromEntries(FLAGS.map((flag) => [flag, process.env[flag]]));
-const set = (on) => FLAGS.forEach((flag) => { if (on.includes(flag)) process.env[flag] = 'on'; else delete process.env[flag]; });
+const set = (on) => FLAGS.forEach((flag) => { process.env[flag] = on.includes(flag) ? 'on' : 'off'; });
 afterAll(() => FLAGS.forEach((flag) => { if (saved[flag] === undefined) delete process.env[flag]; else process.env[flag] = saved[flag]; }));
 
 const rolePlaybooks = require('../Modules/Agents/rolePlaybooks');

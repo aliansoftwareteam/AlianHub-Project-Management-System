@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 process.env.STORAGE_TYPE = 'server';
 jest.setTimeout(30000);
 const mockDb = require('./fixtures/fakeMongo').create();
@@ -131,7 +132,7 @@ const CALLERS = [
 ];
 
 beforeEach(seedRows);
-afterEach(() => { delete process.env.MCP_TOOLS_DATA; });
+afterEach(() => { process.env.MCP_TOOLS_DATA = 'off'; });
 
 describe('what an inbox write changes of the rows of the person', () => {
     it.each(CALLERS)('marking everything read as %s', async (label, caller, acted, isAgent) => {

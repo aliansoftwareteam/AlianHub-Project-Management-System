@@ -43,7 +43,7 @@ const boot = () => {
 
 const clock = (ms) => jest.setSystemTime(ms);
 const oauth = (value) => {
-    if (value === undefined) delete process.env.MCP_OAUTH;
+    if (value === undefined) process.env.MCP_OAUTH = 'off';
     else process.env.MCP_OAUTH = value;
 };
 

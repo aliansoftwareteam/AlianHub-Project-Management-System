@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, T-3: what the MCP server tells a connecting agent about the product, and the ready-made prompts
    it offers. Both are fixed text fitted to the tools that connection may use; neither reads the database. */
 process.env.STORAGE_TYPE = 'server';
@@ -40,7 +41,7 @@ const { OWNER, GUEST, P_OPEN, T_OPEN, CID, ctx, readOnly, narrowed, outside, set
 const { seed } = world.create(mockDb);
 
 const FLAGS = ['MCP_TOOLS_DATA', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK', 'MCP_TOOLS_V2', 'AGENT_PERFORMANCE_READ', 'MCP_OAUTH', 'MCP_OAUTH_ISSUER'];
-const flags = (...on) => { FLAGS.forEach((flag) => { delete process.env[flag]; }); on.forEach((flag) => { process.env[flag] = 'on'; }); };
+const flags = (...on) => { FLAGS.forEach((flag) => { process.env[flag] = 'off'; }); delete process.env.MCP_OAUTH_ISSUER; on.forEach((flag) => { process.env[flag] = 'on'; }); };
 
 const READ_SCOPES = ['tasks:read', 'projects:read', 'docs:read', 'time:read'];
 const WRITE_SCOPES = ['tasks:write', 'time:write'];

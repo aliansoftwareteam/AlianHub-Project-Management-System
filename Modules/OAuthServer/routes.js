@@ -23,7 +23,11 @@ const limiter = (env) => rateLimit({
  * workspace themselves; the /api/v2 routes are the workspace's or the person's own and check the session inline.
  * With MCP_OAUTH off nothing here exists at all and every one of these paths answers as it does on beta. */
 exports.init = (app, env = process.env, { indexFile = INDEX_FILE } = {}) => {
-    if (!config.isOn(env)) return;
+    if (!config.isOn(env)) {
+        const skipped = config.unsetIssuerProblem(env);
+        if (skipped) require('../../Config/loggerConfig').warn(`[mcp-oauth] MCP_OAUTH is unset and stays off: ${skipped}. Set MCP_OAUTH_ISSUER, or MCP_OAUTH=off to silence this.`);
+        return;
+    }
     config.assertIssuer(env);
     const { verifyJWTTokenWithCV2, verifyJWTTokenV2 } = require('../../Config/jwt');
     const authorizeLimit = limiter(env);

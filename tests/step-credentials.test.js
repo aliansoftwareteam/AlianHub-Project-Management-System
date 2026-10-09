@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'step-credential-test-secret';
 process.env.JWT_ALGORITHM = 'HS256';
 process.env.JWT_EXP = '24h';

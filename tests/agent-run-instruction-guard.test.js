@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -88,7 +89,7 @@ beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockDb.calls.length = 0;
     jest.clearAllMocks();
-    delete process.env.AGENT_TAINT_ROUTING;
+    process.env.AGENT_TAINT_ROUTING = 'off';
     patterns.invalidate();
     mem = persistence.useInMemory();
     getProvider.mockReturnValue(metered(vendor));
@@ -97,7 +98,7 @@ beforeEach(() => {
     mockDb.seed(dbCollections.COMPANIES, { _id: C });
     mockDb.seed(SCHEMA_TYPE.AGENT_SKILLS, skill());
 });
-afterEach(() => { mem.reset(); persistence.useMongo(); delete process.env.AGENT_TAINT_ROUTING; patterns.invalidate(); });
+afterEach(() => { mem.reset(); persistence.useMongo(); process.env.AGENT_TAINT_ROUTING = 'off'; patterns.invalidate(); });
 
 describe('with AGENT_TAINT_ROUTING on, a guard hit in what reaches the model taints the run', () => {
     beforeEach(() => { process.env.AGENT_TAINT_ROUTING = 'on'; });

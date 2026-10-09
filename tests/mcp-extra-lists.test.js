@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 046 M3, slice L6: an outside agent adds a task to another list, takes it out again, reads the lists it
    was added to and searches one list's rows, through the task routes' own handlers and as the person behind
    its token. The task's home alone decides who reads it: a list it was added to never does. */
@@ -98,7 +99,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tools exist', () => {
     it('off, the tool list, the registry and the search are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         place(T_PRIVATE, [L_OPEN]);
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         NAMES.forEach((name) => { expect(registry.has(name)).toBe(false); expect(actions.rating(name)).toBeNull(); });

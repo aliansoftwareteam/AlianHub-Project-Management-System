@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, S-2: a connected agent sends one plan for a project it can open (statuses, lists, fields, views).
    The plan waits as one proposal with one preview; approved, each part runs the web app's own route, a part that
    fails does not hide the others, and undo takes back what the plan made and nothing a person has used since. */
@@ -126,7 +127,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tool exists', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect(actions.rating(TOOL)).toBeNull();
@@ -406,7 +407,7 @@ describe('the "Set up my project" prompt', () => {
         expect(promptText(as(OWNER))).toContain('`project.setup`');
         expect(promptText(as(OWNER))).not.toMatch(/I have to make myself in AlianHub, such as statuses/);
         expect(promptText({ ...as(OWNER), allowedActions: ['tasks.search', 'task.create', 'list.create'] })).not.toContain('`project.setup`');
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(promptText(as(OWNER))).not.toContain('`project.setup`');
         expect(promptText(as(OWNER))).toMatch(/statuses, fields, views and automations/);
         expect(promptText(readOnly(OWNER))).toBeNull();

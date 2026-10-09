@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-3 (automations): a connected agent proposes one automation for one project, in the catalogue's own
    terms. Every call waits for a person; approved by an owner or an admin, the rule is saved by the Automations
    page's own create route as the person who approved it, and it can be taken back while nobody has changed it. */
@@ -112,7 +113,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tools exist', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect(registry.has(READ)).toBe(false);

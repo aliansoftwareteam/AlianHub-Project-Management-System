@@ -285,7 +285,7 @@ describe('where every agent write asks', () => {
         const out = await rpc(outside(OWNER, [...PLAIN_SCOPES, TASKS_GRANT]), 'task.archive', { taskId: fx.bug._id });
         expect(out).toMatchObject({ pending: true });
         expect(proposals.create.mock.calls[0][1].why).toMatch(/outside client/);
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
     });
 });
 

@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 046, MCP parity part 2: an agent whose token was created for it finishes, creates and batches work,
    reads a task's history and writes docs, as the person behind its token and no further. */
 process.env.STORAGE_TYPE = 'server';
@@ -82,7 +83,7 @@ beforeEach(() => {
     fx.pagePersonal = mockDb.seed(SCHEMA_TYPE.PAGES, { title: 'Mine alone', ProjectID: PL_OTHER, visibility: 'project', createdBy: OTHER, content: { html: '<p>x</p>' }, deletedStatusKey: 0 });
 });
 afterEach(settle);
-afterAll(() => { delete process.env.MCP_TOOLS_MANAGE; delete process.env.MCP_TOOLS_V2; delete process.env.AGENT_TAINT_ROUTING; });
+afterAll(() => { process.env.MCP_TOOLS_MANAGE = 'off'; delete process.env.MCP_TOOLS_V2; process.env.AGENT_TAINT_ROUTING = 'off'; });
 
 describe('which tools a token lists', () => {
     it('a token created to manage tasks lists the task tools and not the doc tools', async () => {
@@ -428,7 +429,7 @@ describe('comments', () => {
     const told = (result) => result.result || (result.items && result.items[0].result);
     const withData = async (post) => {
         process.env.MCP_TOOLS_DATA = 'on';
-        try { return await post(); } finally { delete process.env.MCP_TOOLS_DATA; }
+        try { return await post(); } finally { process.env.MCP_TOOLS_DATA = 'off'; }
     };
 
     it.each([
@@ -629,7 +630,7 @@ describe('an outside client whose grant holds a manage scope', () => {
     const forTasks = (uid) => outside(uid, [...PLAIN_SCOPES, TASKS_GRANT]);
     const forDocs = (uid) => outside(uid, [...PLAIN_SCOPES, DOCS_GRANT]);
 
-    afterEach(() => { delete process.env.AGENT_TAINT_ROUTING; });
+    afterEach(() => { process.env.AGENT_TAINT_ROUTING = 'off'; });
 
     it('lists the tools of the scope it holds and of no other', async () => {
         const names = await listed(forTasks(OWNER));

@@ -40,7 +40,7 @@ function lockedKeys() {
 
 function applyInstanceSettings(values) {
     const lockedSet = new Set(lockedKeys());
-    const applicable = Object.fromEntries(Object.entries(values).filter(([key]) => byKey.has(key) && !lockedSet.has(key)));
+    const applicable = Object.fromEntries(Object.entries(values).filter(([key]) => byKey.has(key) && !byKey.get(key).readOnly && !lockedSet.has(key)));
     applyEnvMap(applicable, { override: true });
     return Object.keys(applicable);
 }
@@ -86,6 +86,12 @@ async function saveInstanceSettings(values, updatedBy = '') {
     const applied = applyInstanceSettings(values);
     const restartRequired = applied.filter((key) => byKey.get(key).restart);
     return { applied, restartRequired };
+}
+
+/* Values a migration wrote straight to the stored document, taken into this process as if loaded. */
+function adoptStored(values) {
+    saved = { ...saved, ...values };
+    return applyInstanceSettings(values);
 }
 
 /* A moment stored beside the settings rather than in `values`, which every save
@@ -139,7 +145,7 @@ function publicConfig() {
 
 module.exports = {
     DOC_ID, ENC_PREFIX, encrypt, decrypt, isEncrypted, decodeStored, lockedKeys, applyInstanceSettings,
-    loadInstanceSettings, saveInstanceSettings, markFirstSeen, describe, publicConfig,
+    loadInstanceSettings, saveInstanceSettings, adoptStored, markFirstSeen, describe, publicConfig,
     isLoaded: () => loaded,
     savedValues: () => ({ ...saved }),
     _resetForTests: () => { locked = null; saved = {}; loaded = false; },

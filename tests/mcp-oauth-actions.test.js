@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const crypto = require('crypto');
 const { approveInWorkspace, ALL_SCOPES } = require('./fixtures/oauthApproval');
 const http = require('http');
@@ -111,8 +112,8 @@ beforeEach(() => {
     process.env.JWT_SECRET = 's10s4-actions-secret';
     delete process.env.AUDIT_CHAIN;
     delete process.env.AUDIT_CHAIN_KEY;
-    delete process.env.AGENT_TAINT_ROUTING;
-    delete process.env.MCP_TOOLS_MANAGE;
+    process.env.AGENT_TAINT_ROUTING = 'off';
+    process.env.MCP_TOOLS_MANAGE = 'off';
     mockDb.seed(dbCollections.USERS, { _id: USER, Employee_Name: 'Priya', AssignCompany: C });
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: USER, roleType: 2, status: 2, isDelete: false });
     seedTaskListRules(mockDb);

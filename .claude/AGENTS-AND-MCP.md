@@ -78,7 +78,7 @@ Tests that must pass: `tests/agent-registry-groups.test.js`, `tests/agent-action
 
 ### 2. The flag
 
-Put the new group behind a flag, and keep it off by default. Reuse a flag that fits: `Modules/Mcp/dataFlag.js`, `manageFlag.js`, `workFlag.js`, or `Modules/Agents/performanceFlag.js`. A new flag is a file that reads one variable on every call and defaults to `off`, like `workFlag.js`.
+Put the new group behind a flag. Reuse a flag that fits: `Modules/Mcp/dataFlag.js`, `manageFlag.js`, `workFlag.js`, or `Modules/Agents/performanceFlag.js`. The first three are on by default, so a tool added to them ships switched on and needs an access review first. A new flag is a file that reads one variable on every call and defaults to `off`, like `performanceFlag.js`.
 
 For a new variable, describe it in `scripts/env-doc.meta.json` and run `node scripts/env-doc.js`. To check: whether a new flag needs a line in the `FLAGS` list of `tests/agent-registry-groups.test.js`.
 
@@ -172,7 +172,7 @@ These are the rules in `Tasks/active/047-ai-run/task.md`, as the code keeps them
 
 ## Flags
 
-All are off by default. Each is read on every call, so a flag that is off leaves the registry, the ratings and the tool list as they were.
+`MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE`, `MCP_TOOLS_WORK` and `MCP_OAUTH` are on when unset (`Modules/Mcp/defaultOn.js`); an install that existed before that change has off recorded in its instance settings by `migrations/074-mcp-old-defaults-for-existing-installs.js`. And `AGENT_TAINT_ROUTING` is on when unset while any of them is; an explicit off in `.env` always wins. The rest are off by default. Each is read on every call, so a flag that is off leaves the registry, the ratings and the tool list as they were. A test that needs one of the default-on flags off sets it to `off`; deleting it from `process.env` turns it on.
 
 | Variable | Where it is read | What it turns on |
 |---|---|---|

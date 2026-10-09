@@ -20,7 +20,7 @@ You connect the AI app you already use. After that, you can ask it in everyday w
 - Change a task's status to In progress or In review.
 - Show you where something is, with a link.
 
-With the extra permissions on the consent screen, and when your admin has switched the matching tools on, it can also:
+With the extra permissions on the consent screen, and unless your admin has switched the matching tools off, it can also:
 
 - Change, assign, move, archive and close tasks, several at a time, and write docs.
 - Read chat messages in the channels you are in.
@@ -43,10 +43,10 @@ With the extra permissions on the consent screen, and when your admin has switch
 
 1. In AlianHub, open AI in the left menu, then **Connect your AI**. When you sign up for the first time, this is the last step, called "One last step". You can choose **Skip for now** and come back later.
 2. Pick your app and follow its steps. The page shows an address to paste. Copy it with the **Copy** button.
-   - If the page says connecting by address is switched off, the person who runs your server has to switch it on. Use a token (below) until then.
+   - Connecting by address is on for a new server, and an owner can switch it on under Settings, Instance, AI on a server set up earlier. If the page says it is off, ask them to switch it on, and use a token (below) until then.
 3. The line at the top of the page changes by itself when your AI app makes its first call. It then says "Connected" and when the app was last seen.
 4. A first sentence appears: "Set up my project". It asks you a few questions and shows a plan. Nothing is made until you say yes.
-5. Under "What your AI can do here", the page lists what this server allows. Under "Switched off on this install" it names what your admin has not switched on.
+5. Under "What your AI can do here", the page lists what this server allows. Under "Switched off on this install" it names what your admin has switched off.
 
 ### In Claude
 
@@ -117,10 +117,11 @@ These always wait:
 - A batch of changes that names more than one task. It waits as one request.
 - Closing a task, when the project's rule is "With approval". This is the default. The project's "Agents and Done" rule has three choices: "Never" (a person closes), "With approval" and "Yes, marked unchecked". If your workspace has a person check an agent's work before Done, a person always closes the task.
 
+- A change by an app connected by address that reaches past one task, such as a new task, a move or a link. It waits when you gave the app the matching extra permission, and is refused when you did not. This is on by default (the server setting `AGENT_TAINT_ROUTING`); the person who runs your server can switch it off.
+
 Your admin can make more things wait:
 
 - A project set to "Propose everything" holds every change a connected AI makes there.
-- With the server setting `AGENT_TAINT_ROUTING` on, a connected AI's change that reaches past one task waits.
 - With `MCP_TOOLS_V2` on, a change that cannot be undone, such as moving a task to another list, waits.
 
 Where you approve: open AI, then **AI Inbox**. Each waiting change shows exactly what will be made. Choose **Approve** or **Decline**. Whoever approves must be able to open the same task and hold the same permission. When you decline, the AI is told and does not try another way.
@@ -156,7 +157,7 @@ The left menu under AI also has a **Pause all agents** button. `to check`: wheth
 
 These are 15 sentences taken from the AI benchmark sheet (`Tasks/active/047-ai-run/ai-benchmark.md`). Each one works with the code as it is today. Open the screen you mean in AlianHub first, because "here" and "this list" mean the screen you last opened.
 
-"Applied at once with Undo" and "waits for approval" assume the default settings: a project on "Act on single tasks, propose anything wider", and `MCP_TOOLS_V2` and `AGENT_TAINT_ROUTING` off.
+"Applied at once with Undo" and "waits for approval" assume a connection by token and the default settings: a project on "Act on single tasks, propose anything wider", and `MCP_TOOLS_V2` off. An app connected by address also waits, or is refused, on a change that reaches past one task (see "What waits for your approval").
 
 | # | Say this | What happens |
 |---|---|---|

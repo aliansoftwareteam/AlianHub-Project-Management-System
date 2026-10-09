@@ -133,7 +133,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GUEST, roleType: 0, status: 2, isDelete: false });
 });
 afterEach(settle);
-afterAll(() => { delete process.env.MCP_TOOLS_WORK; });
+afterAll(() => { process.env.MCP_TOOLS_WORK = 'off'; });
 
 describe('the tasks an agent holds, for the rows of a list', () => {
     it('say who holds each and since when, to the people who can open the task', async () => {

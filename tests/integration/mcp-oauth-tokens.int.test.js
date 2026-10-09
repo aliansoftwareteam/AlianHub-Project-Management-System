@@ -91,7 +91,7 @@ beforeAll(async () => {
     server = await startServer({
         mongoUrl: resolveMongoUrl(),
         logFile: path.join(STATE_DIR, 'mcp-oauth-tokens-server.log'),
-        env: { MCP_OAUTH: 'both', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000', MCP_TOOLS_MANAGE: 'on' },
+        env: { MCP_OAUTH: 'both', MCP_OAUTH_DCR: 'on', NODE_ENV: 'test', MCP_OAUTH_RATE_LIMIT_PER_MIN: '1000', MCP_TOOLS_MANAGE: 'on', AGENT_TAINT_ROUTING: 'off' },
     });
     owner = await login(server.baseURL, emailFor('owner'));
 }, BOOT_TIMEOUT_MS);

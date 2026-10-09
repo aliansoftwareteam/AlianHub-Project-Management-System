@@ -116,7 +116,7 @@ beforeEach(() => {
         .filter((action) => typeof taskMongo[action] === 'function')
         .map((action) => [action, jest.spyOn(taskMongo, action).mockResolvedValue({ status: true })]));
 });
-afterEach(() => { jest.restoreAllMocks(); delete process.env.MCP_TOOLS_MANAGE; });
+afterEach(() => { jest.restoreAllMocks(); process.env.MCP_TOOLS_MANAGE = 'off'; });
 
 const reached = () => Object.values(handlers).some((handler) => handler.mock.calls.length > 0);
 

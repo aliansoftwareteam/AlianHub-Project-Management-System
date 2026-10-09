@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -107,8 +108,8 @@ beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.CSP_MODE;
     delete process.env.MCP_OAUTH_DCR;
-    delete process.env.MCP_TOOLS_MANAGE;
-    delete process.env.MCP_TOOLS_DATA;
+    process.env.MCP_TOOLS_MANAGE = 'off';
+    process.env.MCP_TOOLS_DATA = 'off';
 });
 
 afterEach(stop);

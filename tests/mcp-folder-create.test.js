@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-run: a connected agent asks for a folder (or a subfolder) with lists made in it or moved into it.
    It waits as one proposal with one preview; approved, each part runs the web app's own route as the approver, a part
    that fails does not hide the others, and undo puts moved lists back and removes only what nobody has used since. */
@@ -114,7 +115,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tool exists', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect((await rpc(as(OWNER), TOOL, PLAN)).rpcError).toMatchObject({ code: -32601 });

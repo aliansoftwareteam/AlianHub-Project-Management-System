@@ -476,6 +476,7 @@ describe('team pack starter rules and tags', () => {
 
     it('proposes no tags where agents cannot add them', async () => {
         seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'off';
         const project = seedProject({ taskTypeCounts: BUGS });
         const res = await withStarter([project], { proposeTags: true });
         expect(res.body.data.projects[0]).toMatchObject({ tags: [], proposalId: null });

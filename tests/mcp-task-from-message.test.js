@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-2: message to task. A connected agent turns a message its person can read into a task that holds the
    message's text, through the same create the other task tools use, so the project's rule, approval and undo apply.
    A comment on a task is read under the grant that creates tasks; a channel message also needs the chat scope, and
@@ -92,7 +93,7 @@ beforeEach(() => {
     jest.clearAllMocks();
     fx = seed();
     ADDRESS_KEYS.forEach((key) => { delete process.env[key]; });
-    delete process.env.AGENT_TAINT_ROUTING;
+    process.env.AGENT_TAINT_ROUTING = 'off';
     mockDb.seed(SCHEMA_TYPE.MAIN_CHATS, { _id: TEAM_SPACE, default: false, ProjectName: 'Team chat' });
     const channel = (_id, name, projectId, extra = {}) => mockDb.seed(SCHEMA_TYPE.SPRINTS, { _id, name, projectId, deletedStatusKey: 0, ...extra });
     channel(C_OPEN, 'scratch', TEAM_SPACE);
@@ -109,7 +110,7 @@ afterAll(() => {
 
 describe('the tool exists with the tools that manage tasks', () => {
     it('off, it is not offered and answers as an unknown tool', async () => {
-        delete process.env.MCP_TOOLS_MANAGE;
+        process.env.MCP_TOOLS_MANAGE = 'off';
         expect(await listed(ctx(OWNER))).not.toContain(TOOL);
         expect(await make(ctx(OWNER), { messageId: idOf(message()) })).toEqual({ rpcError: { code: -32601, message: `Unknown tool "${TOOL}"` } });
         expect(scopes.scopeForTool(TOOL)).toBeNull();

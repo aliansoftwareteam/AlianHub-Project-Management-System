@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const crypto = require('crypto');
 const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();

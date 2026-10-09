@@ -7,6 +7,13 @@ const { baseUrlError } = require('../AICore/llmProvider/compatibleClient');
 
 const GROUPS = ['general', 'mail', 'storage', 'ai', 'auth', 'calling', 'security'];
 
+const taintDefaultOn = (env) => {
+    const { anyToolOn } = require('../Mcp/defaultOn');
+    return anyToolOn(env) || require('../OAuthServer/config').isOn(env);
+};
+
+const onOff = (value) => (require('../Mcp/defaultOn').isOn(value) ? 'true' : 'false');
+
 const field = (key, group, type, extra = {}) => ({ key, group, type, secret: type === 'secret', default: '', ...extra });
 
 const CATALOG = [
@@ -65,6 +72,20 @@ const CATALOG = [
         validate: (value) => (require('../AICore/usage').parsePricing(value).errors.length ? 'json' : null),
     }),
 
+    field('MCP_OAUTH', 'ai', 'select', {
+        default: (env) => require('../OAuthServer/config').mode(env),
+        options: ['both', 'only', 'off'],
+        normalise: (value) => require('../OAuthServer/config').mode({ MCP_OAUTH: value }),
+        restart: true,
+        label: 'Connect an AI app by address',
+        help: 'Lets people connect Claude or ChatGPT by address, with a consent screen. "only" refuses personal tokens. Needs an https APIURL or MCP_OAUTH_ISSUER.',
+        // A value the issuer cannot serve would stop the next boot, with no console left to undo it.
+        validate: (value) => (value !== 'off' && require('../OAuthServer/config').issuerProblem(process.env) ? 'mcp_issuer' : null),
+    }),
+    field('MCP_TOOLS_DATA', 'ai', 'boolean', { default: 'true', normalise: onOff, label: 'AI data tools', help: 'Projects, lists, docs, comments and time for a connected AI.' }),
+    field('MCP_TOOLS_MANAGE', 'ai', 'boolean', { default: 'true', normalise: onOff, label: 'AI management tools', help: 'Changing, moving and archiving tasks and writing docs, for a connection given the manage permission.' }),
+    field('MCP_TOOLS_WORK', 'ai', 'boolean', { default: 'true', normalise: onOff, label: 'AI everyday work tools', help: 'Tags, links, lists, doc comments, goals and project setup for a connected AI.' }),
+
     field('GOOGLE_LOGIN_ENABLED', 'auth', 'boolean', { default: 'false', label: 'Google sign-in' }),
     field('GOOGLE_CLIENT_ID', 'auth', 'text', { label: 'Google client id', public: true }),
     field('GOOGLE_CLIENT_SECRET', 'auth', 'secret', { label: 'Google client secret' }),
@@ -92,6 +113,13 @@ const CATALOG = [
         validate: allowlistError,
     }),
     field('HELMET_ENABLED', 'security', 'boolean', { default: 'true', label: 'Security response headers', restart: true }),
+    field('AGENT_TAINT_ROUTING', 'security', 'boolean', {
+        default: (env) => (taintDefaultOn(env) ? 'true' : 'false'),
+        normalise: onOff,
+        readOnly: true,
+        label: 'Hold risky AI writes for approval',
+        help: 'A risky write by an agent that read outside content, or by an outside AI app, waits for a person to approve it. On by default while the MCP tools or MCP_OAUTH are on. Shown here only: set AGENT_TAINT_ROUTING in .env and restart to change it.',
+    }),
     field('PERMISSION_ENFORCEMENT_MODE', 'security', 'select', {
         default: 'off',
         options: ['off', 'report', 'enforce'],
@@ -113,6 +141,7 @@ function validateSettings(patch = {}) {
     for (const [key, raw] of Object.entries(patch)) {
         const def = byKey.get(key);
         if (!def) { errors[key] = 'unknown'; continue; }
+        if (def.readOnly) { errors[key] = 'readonly'; continue; }
         if (raw && typeof raw === 'object' && raw.set === true) continue;
         if (raw === null || raw === undefined) { values[key] = ''; continue; }
         const value = String(raw).trim();
@@ -134,15 +163,17 @@ function describeSettings({ saved = {}, env = {}, locked = [] }) {
     return CATALOG.map((def) => {
         const fromEnv = lockedSet.has(def.key) ? env[def.key] : undefined;
         const fromSaved = saved[def.key];
+        const fallback = typeof def.default === 'function' ? def.default(env) : def.default;
         const source = fromEnv !== undefined && fromEnv !== '' ? 'env'
             : fromSaved !== undefined && fromSaved !== '' ? 'saved'
-                : def.default !== '' ? 'default' : 'unset';
-        const effective = source === 'env' ? fromEnv : source === 'saved' ? fromSaved : def.default;
+                : fallback !== '' ? 'default' : 'unset';
+        const raw = source === 'env' ? fromEnv : source === 'saved' ? fromSaved : fallback;
+        const effective = def.normalise && source !== 'unset' ? def.normalise(raw) : raw;
         const value = def.secret ? (source === 'unset' ? { set: false } : { set: true }) : effective;
         return {
             key: def.key, group: def.group, type: def.type, secret: def.secret, label: def.label, help: def.help || '',
-            options: def.options || null, default: def.default, restart: Boolean(def.restart), public: Boolean(def.public),
-            value, source, locked: source === 'env',
+            options: def.options || null, default: fallback, restart: Boolean(def.restart), public: Boolean(def.public),
+            value, source, locked: source === 'env' || Boolean(def.readOnly), readOnly: Boolean(def.readOnly),
         };
     });
 }

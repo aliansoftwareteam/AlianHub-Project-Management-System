@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 process.env.STORAGE_TYPE = 'server';
 process.env.EXTERNAL_AGENT_SESSIONS = 'on';
 jest.setTimeout(30000);
@@ -197,7 +198,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'task_create', name: 'task_create', isParent: false, parentId: String(taskRules._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
     mockDb.seed(SCHEMA_TYPE.RULES, { key: 'sub_task_create', name: 'sub_task_create', isParent: false, parentId: String(taskRules._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
 });
-afterEach(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK'].forEach((flag) => { delete process.env[flag]; }); });
+afterEach(() => { ['MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK'].forEach((flag) => { process.env[flag] = 'off'; }); });
 
 describe('a token created for an agent, on the write routes beside the task route', () => {
     it.each(Object.keys(NO_ACTION).flatMap((name) => AGENTS_OF.map(([label, uid]) => [name, label, uid])))('%s is refused for the agent of %s, and recorded', async (name, label, uid) => {
@@ -973,7 +974,7 @@ const seedChat = () => {
 
 describe('chat on the web app\'s own routes', () => {
     beforeEach(seedChat);
-    afterEach(() => { delete process.env.MCP_TOOLS_DATA; });
+    afterEach(() => { process.env.MCP_TOOLS_DATA = 'off'; });
 
     it.each(on(DIRECT_MESSAGES))('%s is refused for an agent, whatever its token was given, and recorded', async (name, route, body, query) => {
         process.env.MCP_TOOLS_DATA = 'on';
@@ -1049,7 +1050,7 @@ describe('chat on the web app\'s own routes', () => {
 
 describe('the chat rule where a thread is judged, for what an agent\'s request reaches by another road', () => {
     beforeEach(seedChat);
-    afterEach(() => { delete process.env.MCP_TOOLS_DATA; });
+    afterEach(() => { process.env.MCP_TOOLS_DATA = 'off'; });
 
     const dm = () => rows(SCHEMA_TYPE.TASKS).find((row) => String(row._id) === DM);
     const allowed = async (uid, thread) => (await commentThreadAccess(CID, uid, thread)).allowed;

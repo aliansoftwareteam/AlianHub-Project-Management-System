@@ -78,7 +78,7 @@ beforeEach(async () => {
     goal = made._id;
     targetId = made.targets[0].id;
 });
-afterEach(() => { delete process.env.MCP_TOOLS_WORK; });
+afterEach(() => { process.env.MCP_TOOLS_WORK = 'off'; });
 
 describe('a token created for an agent, on the goal routes', () => {
     it.each(Object.keys(WRITES))('%s is refused and recorded, and nothing is written', async (name) => {
