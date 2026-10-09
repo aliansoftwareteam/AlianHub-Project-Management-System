@@ -45,7 +45,7 @@ const serve = ({ on = true, refuse = null } = {}) => apiRequest.mockImplementati
         if (refuse) return Promise.reject({ response: { status: refuse, data: { statusText: 'refused' } } });
         if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: body.roles[projectId], mode: 'off' })) });
         applied = body;
-        return ok({ blueprint: body.blueprint, teams: body.teams, projects: [{ projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest' }, { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off' }] });
+        return ok({ blueprint: body.blueprint, teams: body.teams, agents: { made: [], kept: [] }, projects: [{ projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest' }, { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off' }] });
     }
     return ok([]);
 });
@@ -113,7 +113,7 @@ describe('Team packs', () => {
         for (const input of wrapper.findAll('[data-test="tp-project"] input')) await input.setValue(true);
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
         await flushPromises();
-        expect(applied).toEqual({ blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'] });
+        expect(applied).toEqual({ blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], createAgents: true });
         const result = wrapper.find('[data-test="tp-result"]');
         expect(result.text()).toContain('Turned on 4 roles.');
         expect(result.text()).toContain('Mobile app: the dispatcher is in suggest mode.');
@@ -122,9 +122,37 @@ describe('Team packs', () => {
         await wrapper.find('[data-test="tp-undo"]').trigger('click');
         await flushPromises();
         const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);
-        expect(undo[2]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], roles: { p1: [TRIAGER.key, REVIEWER.key], p2: [TRIAGER.key, REVIEWER.key] } });
+        expect(undo[2]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], roles: { p1: [TRIAGER.key, REVIEWER.key], p2: [TRIAGER.key, REVIEWER.key] }, agents: [] });
         expect(wrapper.find('[data-test="tp-result"]').text()).toContain('The pack\'s roles are off again.');
         expect(wrapper.find('[data-test="tp-undo"]').exists()).toBe(false);
+    });
+
+    it('offers the team\'s agents on by default, can leave them off, and sends the made agents back on undo', async () => {
+        route.query = { blueprint: 'it-company', team: 'engineering' };
+        const wrapper = await mountWith(AiTeamPacks);
+        const box = wrapper.find('[data-test="tp-create-agents"] input');
+        expect(box.element.checked).toBe(true);
+        expect(wrapper.find('[data-test="tp-create-agents"]').text()).toContain('Create the team\'s agents');
+        await box.setValue(false);
+        await wrapper.find('[data-test="tp-project"] input').setValue(true);
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        expect(applied.createAgents).toBe(false);
+
+        apiRequest.mockImplementation((type, url, body) => {
+            if (type === 'get') return ok({ on: true, packs: PACKS });
+            if (body.undo) return ok({ projects: [], agents: { removed: [{ agentId: 'g1', name: 'Bug Triager · IT company' }], kept: [{ agentId: 'g2', name: 'Code Reviewer · IT company', why: 'has_worked' }] } });
+            return ok({ blueprint: 'it-company', teams: ['engineering'], projects: [{ projectId: 'p1', added: [TRIAGER.key], mode: 'off' }], agents: { made: [{ agentId: 'g1', roleKey: TRIAGER.key, name: 'Bug Triager · IT company' }, { agentId: 'g2', roleKey: REVIEWER.key, name: 'Code Reviewer · IT company' }], kept: [] } });
+        });
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        expect(wrapper.find('[data-test="tp-agents"]').text()).toContain('Created 2 agents.');
+        await wrapper.find('[data-test="tp-undo"]').trigger('click');
+        await flushPromises();
+        const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);
+        expect(undo[2].agents).toEqual(['g1', 'g2']);
+        expect(wrapper.find('[data-test="tp-agents"]').text()).toContain('One agent stays because it has done work.');
+        expect(wrapper.find('[data-test="tp-kept"]').text()).toContain('Code Reviewer · IT company stays');
     });
 
     it('says the dispatcher is off and keeps the button shut', async () => {

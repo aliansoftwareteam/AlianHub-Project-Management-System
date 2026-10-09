@@ -37,13 +37,14 @@ export const fetchTeamPacks = () => apiRequest("get", `${BASE}/team-packs`, unde
 
 export const applyTeamPack = (body) => apiRequest("post", `${BASE}/team-packs`, body).then(dataOf);
 
-/* Turns off only what `applied` (the answer of applyTeamPack) turned on. */
+/* Turns off only what `applied` (the answer of applyTeamPack) turned on, and removes the agents it made that have done no work. */
 export const undoTeamPack = (applied) => apiRequest("post", `${BASE}/team-packs`, {
     undo: true,
     blueprint: applied.blueprint,
     teams: applied.teams,
     projectIds: applied.projects.map((project) => project.projectId),
-    roles: Object.fromEntries(applied.projects.map((project) => [project.projectId, project.added]))
+    roles: Object.fromEntries(applied.projects.map((project) => [project.projectId, project.added])),
+    agents: (applied.agents?.made || []).map((agent) => agent.agentId)
 }).then(dataOf);
 
 export const DISPATCHER_CHANGED_EVENT = "dispatcherChanged";

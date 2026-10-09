@@ -1,10 +1,12 @@
 const playbooks = require('../../Agents/rolePlaybooks');
 const { RuleError } = require('../rules');
 const settings = require('./settings');
+const packAgents = require('./packAgents');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const MAX_PROJECTS = 50;
 const SUMMARY_MAX = 280;
+const MAX_AGENTS = 200;
 
 const packs = () => {
     const byBlueprint = new Map();
@@ -88,11 +90,20 @@ async function apply(companyId, body, actorId) {
         plans.push({ projectId, added, mode: current.mode, body: added.length ? bodyWith(current, [...kept, ...added]) : null });
     }
     await writeAll(companyId, plans, actorId);
-    return { blueprint: pack.blueprint, teams: pack.teams, projects: plans.map(({ projectId, added, mode }) => ({ projectId, added, mode })) };
+    const agents = body.createAgents === false ? { made: [], kept: [] } : await packAgents.create(companyId, pack.roles, projectIds, actorId);
+    return { blueprint: pack.blueprint, teams: pack.teams, projects: plans.map(({ projectId, added, mode }) => ({ projectId, added, mode })), agents };
 }
 
-/* Turns off the roles a pack turned on, as its answer listed them, and never a role outside that pack. */
-async function undo(companyId, body, actorId) {
+const agentIdsOf = (body) => {
+    const given = Array.isArray(body.agents) ? body.agents.map((id) => String(id).trim().toLowerCase()) : [];
+    if (given.length > MAX_AGENTS || !given.every((id) => OBJECT_ID.test(id))) throw new RuleError(`agents must list at most ${MAX_AGENTS} agent ids.`);
+    return [...new Set(given)];
+};
+
+/* Turns off the roles a pack turned on, as its answer listed them, and never a role outside that pack. The agents it
+ * made go too, unless one has done work; that one stays, and the answer says so. */
+async function undo(companyId, body, actor) {
+    const actorId = actor.id;
     const projectIds = projectIdsOf(body);
     const pack = rolesOfPack(body);
     const given = body.roles && typeof body.roles === 'object' && !Array.isArray(body.roles) ? body.roles : {};
@@ -106,7 +117,8 @@ async function undo(companyId, body, actorId) {
         plans.push({ projectId, removed, mode: current.mode, body });
     }
     await writeAll(companyId, plans, actorId);
-    return { blueprint: pack.blueprint, teams: pack.teams, projects: plans.map(({ projectId, removed, mode }) => ({ projectId, removed, mode })) };
+    const agents = await packAgents.remove(companyId, pack.blueprint, agentIdsOf(body), projectIds, actor);
+    return { blueprint: pack.blueprint, teams: pack.teams, projects: plans.map(({ projectId, removed, mode }) => ({ projectId, removed, mode })), agents };
 }
 
 module.exports = { MAX_PROJECTS, packs, normaliseProjectIds, apply, undo };
