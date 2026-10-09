@@ -26,7 +26,8 @@ const ctx = (uid, over = {}) => ({
     ...over,
 });
 const narrowed = (uid, projectIds) => ctx(uid, { projectIds });
-const readOnly = (uid) => ctx(uid, { canWrite: false, token: { _id: TOKEN, userId: uid, scopes: ['read'], active: true } });
+const managing = (caller) => ({ ...caller, token: { ...caller.token, grants: ['tasks:manage'] } });
+const readOnly = (uid) => ctx(uid, { canWrite: false, token: { _id: TOKEN, userId: uid, scopes: ['read'], grants: ['tasks:manage'], active: true } });
 
 /* An outside client's call as the server builds it from a verified grant. */
 const outside = (uid, scopes) => ctx(uid, {
@@ -111,6 +112,6 @@ const create = (mockDb) => {
 
 module.exports = {
     ...access, TOKEN, MISSING, T_OPEN_2, T_TWIN, CLIENT, GRANT_ID, ISSUER, TAGS, PRIVATE_TAGS, BEFORE, FLAGS,
-    ctx, narrowed, readOnly, outside, routeTable, asPerson, create,
+    ctx, narrowed, managing, readOnly, outside, routeTable, asPerson, create,
     EVERYONE: [['an owner', OWNER], ['a member on the private work', INSIDER], ['a member outside it', access.OUTSIDER], ['a guest', GUEST]],
 };

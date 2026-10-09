@@ -90,7 +90,7 @@ const undo = (id, uid = OWNER) => proposals.undoApproval(CID, id, { decider: hum
 const tokenOf = (uid) => TOKEN.replace(/.$/, String(PEOPLE.indexOf(uid) + 1));
 const as = (uid, over = {}) => {
     const base = ctx(uid, over);
-    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid) } };
+    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid), grants: ['tasks:manage'] } };
 };
 const filed = async (caller, args) => {
     const out = await rpc(caller, TOOL, args);
@@ -108,7 +108,7 @@ beforeEach(() => {
     project(P_PRIVATE).ProjectRequiredComponent = [view(V_PRIVATE, 'ProjectListView', 'Secret list')];
     mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: F_REGION, fieldTitle: 'Region', fieldType: 'dropdown', type: 'task', isDelete: true, global: false, projectId: [P_OPEN] });
     mockDb.seed(SCHEMA_TYPE.CUSTOM_FIELDS, { _id: F_ELSEWHERE, fieldTitle: 'Secret score', fieldType: 'number', type: 'task', isDelete: true, global: false, projectId: [P_PRIVATE] });
-    PEOPLE.forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, { _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], projectIds: [], expiresAt: new Date(Date.now() + 86400000) }));
+    PEOPLE.forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, { _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], grants: ['tasks:manage'], projectIds: [], expiresAt: new Date(Date.now() + 86400000) }));
     jest.spyOn(memory, 'rememberApprovedChanges').mockResolvedValue([]);
     socketEmitter.emit.mockClear();
 });
@@ -124,13 +124,13 @@ describe('the flag decides whether the tool exists', () => {
         expect((await rpc(as(OWNER), TOOL, { projectId: P_OPEN, name: 'Later' })).rpcError).toMatchObject({ code: -32601 });
     });
 
-    it('on, it is a rated registry action held to the keys the view route asks for, with a plain scope and no grant', async () => {
+    it('on, it is a rated registry action held to the keys the view route asks for, under the manage grant', async () => {
         expect(await listed(as(OWNER))).toContain(TOOL);
         expect(registry.permissionsFor(TOOL)).toEqual([{ key: KEYS[0], anyOf: KEYS, write: true }]);
         expect(registry.get(TOOL)).toMatchObject({ risk: 'low', undoable: true, write: true, proposeOnly: true });
         expect(actions.rating(TOOL)).toEqual({ write: true, reversible: true, scope: 'project', money: false });
-        expect(scopes.scopeForTool(TOOL)).toBe('tasks:write');
-        expect(tools.registered().find((tool) => tool.name === TOOL).grant).toBeUndefined();
+        expect(scopes.scopeForTool(TOOL)).toBe('tasks:manage');
+        expect(tools.registered().find((tool) => tool.name === TOOL).grant).toBe('tasks:manage');
     });
 });
 

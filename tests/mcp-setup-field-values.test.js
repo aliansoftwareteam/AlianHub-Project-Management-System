@@ -119,7 +119,7 @@ describe('fields and their first values are one proposal', () => {
     });
 
     it('a call that names no value is filed as it was before', async () => {
-        await filed(as(INSIDER, []), { projectId: P_OPEN, fields: FIELDS });
+        await filed(as(INSIDER), { projectId: P_OPEN, fields: FIELDS });
         expect(Object.keys(waiting()[0].changes[0].params)).toEqual(['projectId', 'definitions']);
     });
 
@@ -178,7 +178,7 @@ describe('a value that cannot be set is refused before anybody is asked', () => 
     });
 
     it('a connection that may not set a field on a task: without the manage grant, with the tool off, or a person without the right', async () => {
-        await refusedAtOnce(as(INSIDER, []), one({ taskId: T_OPEN, field: 'Note', value: 'x' }), /task\.field\.set/);
+        await refusedAtOnce(as(INSIDER, []), one({ taskId: T_OPEN, field: 'Note', value: 'x' }), /tasks:manage permission/);
         process.env.MCP_TOOLS_MANAGE = 'off';
         await refusedAtOnce(as(INSIDER), one({ taskId: T_OPEN, field: 'Note', value: 'x' }), /task\.field\.set/);
         process.env.MCP_TOOLS_MANAGE = 'on';

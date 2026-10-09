@@ -85,7 +85,7 @@ const undo = (id, uid = OWNER) => proposals.undoApproval(CID, id, { decider: hum
 const tokenOf = (uid) => TOKEN.replace(/.$/, String(PEOPLE.indexOf(uid) + 1));
 const as = (uid) => {
     const base = ctx(uid);
-    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid) } };
+    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid), grants: ['tasks:manage'] } };
 };
 const filed = async (args = PLAN, caller = as(INSIDER)) => {
     const out = await rpc(caller, TOOL, args);
@@ -105,7 +105,7 @@ beforeEach(() => {
     project().ProjectRequiredComponent = [view(V_LIST, 'ProjectListView', 'List'), view(V_BOARD, 'ProjectKanban', 'Board')];
     mockDb.seed(SCHEMA_TYPE.SETTINGS, { name: 'task_status', totalStatus: 5, settings: CATALOGUE.map((status) => ({ ...status })) });
     PEOPLE.forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, {
-        _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
+        _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], grants: ['tasks:manage'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
     }));
     jest.spyOn(memory, 'rememberApprovedChanges').mockResolvedValue([]);
 });

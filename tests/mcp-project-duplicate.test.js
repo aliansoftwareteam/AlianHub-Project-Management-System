@@ -85,7 +85,7 @@ const undo = (id, uid = INSIDER) => proposals.undoApproval(CID, id, { decider: h
 const tokenOf = (uid) => TOKEN.replace(/.$/, String(PEOPLE.indexOf(uid) + 1));
 const as = (uid, over = {}) => {
     const base = ctx(uid, over);
-    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid) } };
+    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid), grants: ['tasks:manage'] } };
 };
 const elsewhere = (uid) => as(uid, { companyId: mockOtherCompany });
 const filed = async (caller, args = ASK) => {
@@ -107,7 +107,7 @@ beforeEach(() => {
     stored(SCHEMA_TYPE.PROJECTS, P_OPEN).LeadUserId = [OWNER];
     stored(SCHEMA_TYPE.PROJECTS, P_PRIVATE).AssigneeUserId = [INSIDER, OWNER];
     PEOPLE.forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, {
-        _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
+        _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], grants: ['tasks:manage'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
     }));
     Object.keys(mockElsewhere.store).forEach((type) => { mockElsewhere.store[type].length = 0; });
     mockElsewhere.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OUTSIDER, roleType: 1, status: 2, isDelete: false });
@@ -131,7 +131,7 @@ describe('the flag decides whether the tool exists', () => {
         expect(registry.get(TOOL)).toMatchObject({ risk: 'medium', undoable: true, write: true, proposeOnly: true });
         expect(registry.permissionsFor(TOOL)).toEqual([{ key: 'project.project_create', write: true }]);
         expect(actions.rating(TOOL)).toEqual({ write: true, reversible: true, scope: 'workspace', money: false });
-        expect(scopes.scopeForTool(TOOL)).toBe('tasks:write');
+        expect(scopes.scopeForTool(TOOL)).toBe('tasks:manage');
     });
 });
 

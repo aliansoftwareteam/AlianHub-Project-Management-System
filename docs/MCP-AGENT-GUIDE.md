@@ -150,7 +150,7 @@ The grant also gives fuller forms of tools in the first group, which are the sam
 
 ### Work tools, `MCP_TOOLS_WORK` (34 tools)
 
-None of these needs a grant. A read takes the read scope and a write takes the write scope.
+A read takes the read scope and a write takes the write scope. A write that changes how a project is laid out or set up (lists, fields, views, a project, an automation) or a goal also needs the `tasks:manage` grant, as `tag.create` does.
 
 | Tool | Permission | What it does | Limits |
 |---|---|---|---|
@@ -170,22 +170,22 @@ None of these needs a grant. A read takes the read scope and a write takes the w
 | `task.relation.remove` | `tasks:write` | At once. Removes the link on both tasks | |
 | `task.lists.add` | `tasks:write` | At once. Adds a top-level task to another list | Not a Scrum sprint, backlog or personal list; at most 10 lists per task |
 | `task.lists.remove` | `tasks:write` | At once. Takes a task out of an added list | The home list never changes |
-| `list.create` | `tasks:write` | At once. A list at the top level or in a folder | Name at most 100 characters |
-| `list.rename` | `tasks:write` | At once. Renames a list | An archived list is refused |
-| `list.move` | `tasks:write` | At once. Moves a list into a folder or to the top level | Its own project only |
+| `list.create` | `tasks:manage` | At once. A list at the top level or in a folder | Name at most 100 characters |
+| `list.rename` | `tasks:manage` | At once. Renames a list | An archived list is refused |
+| `list.move` | `tasks:manage` | At once. Moves a list into a folder or to the top level | Its own project only |
 | `page.comment.create` | `tasks:write` | At once. A comment on a doc | At most 10000 characters |
 | `page.comment.reply` | `tasks:write` | At once. A reply in a doc comment thread | |
 | `page.comment.assign` | `tasks:write` | At once. Gives a doc comment thread to a member, or clears it | |
-| `goal.target.set` | `tasks:write` | At once. The value of a target set by hand | A target counted from tasks is refused |
-| `goal.target.sources.add` | `tasks:write` | At once. Counts one more list or task toward a target | `kind` is `list` or `task` |
-| `goal.target.sources.remove` | `tasks:write` | At once. Stops counting one | |
+| `goal.target.set` | `tasks:manage` | At once. The value of a target set by hand | A target counted from tasks is refused |
+| `goal.target.sources.add` | `tasks:manage` | At once. Counts one more list or task toward a target | `kind` is `list` or `task` |
+| `goal.target.sources.remove` | `tasks:manage` | At once. Stops counting one | |
 | `queue.claim` | `tasks:write` | At once. Takes one queue item for 30 minutes | A claim gives no extra rights |
 | `queue.release` | `tasks:write` | At once. Gives an item back | |
-| `fields.create` | `tasks:write` | Waits, always. Up to 10 custom fields, a rollup or a formula among them, with up to 50 first values | Field names 80 characters |
-| `view.create` | `tasks:write` | Waits, always. A saved view | Name 60 characters |
-| `project.setup` | `tasks:write` | Waits, always. Statuses, lists, fields, views, automations and first tasks for an existing project | Up to 10 statuses, 10 lists, 10 fields, 5 views, 5 automations, 30 tasks |
-| `project.create` | `tasks:write` | Waits, always. A new project, with or without a plan | Name 3 to 100 characters, description up to 2000 |
-| `automation.create` | `tasks:write` | Waits, always, for an owner or admin. One automation rule for one project | Six step kinds; see "Automations" |
+| `fields.create` | `tasks:manage` | Waits, always. Up to 10 custom fields, a rollup or a formula among them, with up to 50 first values | Field names 80 characters |
+| `view.create` | `tasks:manage` | Waits, always. A saved view | Name 60 characters |
+| `project.setup` | `tasks:manage` | Waits, always. Statuses, lists, fields, views, automations and first tasks for an existing project | Up to 10 statuses, 10 lists, 10 fields, 5 views, 5 automations, 30 tasks |
+| `project.create` | `tasks:manage` | Waits, always. A new project, with or without a plan | Name 3 to 100 characters, description up to 2000 |
+| `automation.create` | `tasks:manage` | Waits, always, for an owner or admin. One automation rule for one project | Six step kinds; see "Automations" |
 | `dashboard.card.add` | `tasks:write` | Waits, always, for the dashboard's owner. One card on a dashboard they own, or on a new private one | Eight kinds of card; see "Dashboards" |
 | `timesheet.week` | `time:read` | Reads. Where your own timesheet week stands: not submitted, submitted, approved, sent back or reopened | `weekOf` (any day of the week) |
 | `timesheet.week.submit` | `time:write` | Waits, always, for you alone. Sends your own week for approval, as the Submit week button does. No tool approves, sends back or reopens a week | `weekOf`, `note` up to 500 characters; not for a connection kept to some projects |
@@ -433,7 +433,7 @@ These need `tasks:manage`, except where a plain form is described.
 
 ### Tags, links between tasks and lists
 
-These need `MCP_TOOLS_WORK` and the write scope, and no grant. Each asks the person for the permission the web app asks for the same change.
+These need `MCP_TOOLS_WORK` and the write scope; `tag.create`, `list.create`, `list.rename` and `list.move` also need the `tasks:manage` grant. Each asks the person for the permission the web app asks for the same change.
 
 `task.tags.add`, `task.tags.remove`: put one of the project's tags on a task, or take it off. Arguments: `taskId`, `tag` (a tag id or name from `tags.list`), and `reason`. A tag another project defines is refused. The result says `changed: false` when the task already had the tag, or never had it.
 
@@ -489,7 +489,7 @@ Undo, from the agent audit log: a tag and a link are put back as they were, a ta
 
 ### Fields and saved views
 
-These need `MCP_TOOLS_WORK` and the write scope, and no grant. A field or a view shows to everyone on the project, so a call never makes one: it is always filed for a person, whatever the project's policy says, and answers `pending` with the proposal it filed. The Inbox shows the person exactly what will be made: each field with its type and options, or the view with its layout and what it shows. An outside client's call is filed only when its connection holds `tasks:manage`, and approval asks that scope again. Once approved, each runs the web app's own route as the person behind the token, so it asks the permission the web app asks: custom fields (on the project or on tasks) for a field, views or project details for a view.
+These need `MCP_TOOLS_WORK`, the write scope and the `tasks:manage` grant. A field or a view shows to everyone on the project, so a call never makes one: it is always filed for a person, whatever the project's policy says, and answers `pending` with the proposal it filed. The Inbox shows the person exactly what will be made: each field with its type and options, or the view with its layout and what it shows. An outside client's call is filed only when its connection holds `tasks:manage`, and approval asks that scope again. Once approved, each runs the web app's own route as the person behind the token, so it asks the permission the web app asks: custom fields (on the project or on tasks) for a field, views or project details for a view.
 
 `fields.create`: add up to 10 custom fields to one project in one call. Arguments: `projectId`, `fields` (each with `name`, `type` and, for a dropdown, `options` as plain text; `description` is optional), and `reason`. The types are `text`, `textarea`, `number`, `money`, `date`, `dropdown`, `checkbox`, `email`, `phone`, `url`, `people`, `rating` and `progress`. Options are cleaned to plain text, at most 30 of 60 characters each. A field is made for that project alone, never company-wide. A field the project already has by that name is kept, not made twice. Several fields are one proposal and one approval; the result names each field as made, kept, or not saved and why.
 
@@ -568,7 +568,7 @@ Undo, from the Inbox or the agent audit log: a view an agent added is removed, a
 
 ### Automations
 
-These need `MCP_TOOLS_WORK`; `automation.catalogue` takes the read scope and `automation.create` the write scope, and neither needs a grant. A rule runs later with nobody watching, so a call never makes one: it is always filed for a person, whatever the project's policy says, and no "always do this" covers it. Only an owner or an admin can have a rule proposed for them, and only an owner or an admin can approve it, as on the Automations page.
+These need `MCP_TOOLS_WORK`; `automation.catalogue` takes the read scope, and `automation.create` the write scope and the `tasks:manage` grant. A rule runs later with nobody watching, so a call never makes one: it is always filed for a person, whatever the project's policy says, and no "always do this" covers it. Only an owner or an admin can have a rule proposed for them, and only an owner or an admin can approve it, as on the Automations page.
 
 `automation.catalogue`: what a rule can be made of. No arguments. It answers the triggers that start from a task, the condition fields with their operators, and the steps an agent may propose with their settings: `set_status`, `set_priority`, `add_comment`, `create_subtask`, `assign` and `notify`.
 
@@ -666,7 +666,7 @@ Undo takes a comment back with the replies it drew, and puts an assignment back 
 
 ### Goals
 
-These need `MCP_TOOLS_WORK`, the read scope to read and the write scope to change, and no grant. A goal is read and changed by the rule the Goals page keeps: a private goal is its owner's alone, a goal shared with people is theirs to read, a workspace goal is read by every member and changed by its owner, owners and admins. A guest reads a goal only when it is shared with them by name. The person's role must be allowed to list tasks.
+These need `MCP_TOOLS_WORK`, the read scope to read, and the write scope and the `tasks:manage` grant to change. A goal is read and changed by the rule the Goals page keeps: a private goal is its owner's alone, a goal shared with people is theirs to read, a workspace goal is read by every member and changed by its owner, owners and admins. A guest reads a goal only when it is shared with them by name. The person's role must be allowed to list tasks.
 
 `goals.list`: the goals you can read, as the Goals page lists them, each with its progress and its targets. Arguments: `mine` (the goals you own or are named on), `archived`, and `limit`. A target counted from tasks carries `sources` (the lists and tasks it counts) and `sourceNames`, which names only the ones you can open.
 

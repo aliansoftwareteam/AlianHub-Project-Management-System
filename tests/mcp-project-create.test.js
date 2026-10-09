@@ -95,7 +95,7 @@ const undo = (id, uid = INSIDER) => proposals.undoApproval(CID, id, { decider: h
 const tokenOf = (uid) => TOKEN.replace(/.$/, String(PEOPLE.indexOf(uid) + 1));
 const as = (uid, over = {}) => {
     const base = ctx(uid, over);
-    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid) } };
+    return { ...base, actor: { ...base.actor, tokenId: tokenOf(uid) }, token: { ...base.token, _id: tokenOf(uid), grants: ['tasks:manage'] } };
 };
 const filed = async (caller, args = PLAN) => {
     const out = await rpc(caller, TOOL, args);
@@ -119,7 +119,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.PROJECT_TAB_COMPONENTS, { _id: V_BOARD, keyName: 'ProjectKanban', name: 'Board', icon: 'board.svg', activeIcon: 'board-on.svg' });
     ['Priority', 'MultipleAssignees', 'TimeTracking', 'tags', 'CustomFields'].forEach((key) => mockDb.seed(SCHEMA_TYPE.APPS, { key, name: key, appStatus: true }));
     PEOPLE.forEach((userId) => mockDb.seed(SCHEMA_TYPE.API_TOKENS, {
-        _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
+        _id: tokenOf(userId), userId, active: true, scopes: ['read', 'write'], grants: ['tasks:manage'], projectIds: [], expiresAt: new Date(Date.now() + 86400000),
     }));
     jest.spyOn(memory, 'rememberApprovedChanges').mockResolvedValue([]);
 });
@@ -141,8 +141,8 @@ describe('the flag decides whether the tool exists', () => {
         expect(registry.get(TOOL)).toMatchObject({ risk: 'medium', undoable: true, write: true, proposeOnly: true });
         expect(registry.permissionsFor(TOOL)).toEqual([{ key: 'project.project_create', write: true }]);
         expect(actions.rating(TOOL)).toEqual({ write: true, reversible: true, scope: 'workspace', money: false });
-        expect(scopes.scopeForTool(TOOL)).toBe('tasks:write');
-        expect(tools.registered().find((tool) => tool.name === TOOL).grant).toBeUndefined();
+        expect(scopes.scopeForTool(TOOL)).toBe('tasks:manage');
+        expect(tools.registered().find((tool) => tool.name === TOOL).grant).toBe('tasks:manage');
         expect(registry.isNever('project.delete')).toBe(true);
     });
 });
