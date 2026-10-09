@@ -6,6 +6,7 @@ module.exports = Object.freeze({
     'workdays.get': 'projects:read',
     'task.fields.list': 'tasks:read',
     'proposal.get': 'tasks:read',
+    'pull_request.get': 'tasks:read',
     'chat.channels.list': CHAT_SCOPE,
     'chat.messages.list': CHAT_SCOPE,
 });

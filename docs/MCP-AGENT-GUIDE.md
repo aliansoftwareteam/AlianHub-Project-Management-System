@@ -17,7 +17,7 @@ To turn something off, set it in `.env` and restart: `MCP_OAUTH=off` stops apps 
 | Setting | Default | What it turns on |
 |---|---|---|
 | `MCP_OAUTH` | on (`both`) | Connecting Claude or ChatGPT by address, with a consent screen. `on`, `true`, `1` and `yes` mean `both` (apps and personal tokens work). `only` refuses personal tokens. Needs `MCP_OAUTH_ISSUER` or `APIURL` to be an `https` origin (plain `http` only on `localhost` outside production). Set on by hand with any other issuer, the server does not start; left unset, it stays off and the server says why in one startup log line. |
-| `MCP_TOOLS_DATA` | on | The data tools: the projects, lists, statuses, comments, docs and timesheet reads, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `proposal.get`, and reading chat. It is also the only setting that offers the `chat:read` permission |
+| `MCP_TOOLS_DATA` | on | The data tools: the projects, lists, statuses, comments, docs and timesheet reads, `comment.create`, `timelog.create`, `screen.link`, `person.place`, `person.me`, `workdays.get`, `task.fields.list`, `proposal.get`, `pull_request.get` (while `APP_CONNECTIONS` is on), and reading chat. It is also the only setting that offers the `chat:read` permission |
 | `MCP_TOOLS_MANAGE` | on | The task management tools and the doc writing tools, and the `tasks:manage` and `docs:manage` permissions. A token or app gets them only by asking for them by name |
 | `MCP_TOOLS_WORK` | on | Tags, links between tasks, lists, doc comments, goals, fields, saved views, project setup, new projects, automations, dashboard cards and the work queue. They need no manage permission |
 | `MCP_TOOLS_V2` | off | Names next to ids, paged lists, tool annotations, and an approval for any call rated as one that cannot be undone or that reaches the whole workspace |
@@ -102,7 +102,7 @@ Taking it back works at each level and takes effect on the app's next call: an o
 |---|---|---|---|
 | `performance.read` | `time:read` | Reads. Logged time, estimate against actual, velocity and cumulative flow | Up to 5 projects, a range of at most 120 days; needs `from` and `to` |
 
-### Data tools, `MCP_TOOLS_DATA` (20 tools)
+### Data tools, `MCP_TOOLS_DATA` (21 tools)
 
 | Tool | Permission | What it does | Limits |
 |---|---|---|---|
@@ -124,6 +124,7 @@ Taking it back works at each level and takes effect on the app's next call: an o
 | `workdays.get` | `projects:read` | Reads. The working days of the workspace or of one project | `projectId` optional; no list of public holidays |
 | `task.fields.list` | `tasks:read` | Reads. A task's custom fields and what each holds | Text over 2000 characters is cut |
 | `proposal.get` | `tasks:read` | Reads. What became of a change that waited for a person | Only a proposal this same connection filed |
+| `pull_request.get` | `tasks:read` | Reads. A GitHub pull request of the repository connected on App connections: title, state, author, branch, base, when merged, changed files, checks, description | Needs `APP_CONNECTIONS`; a task (`taskId` or `taskKey`), or the `number` or `url` of a pull request linked to a task you can open; 50 files a page, 20 pages; description cut at 4000 characters |
 | `chat.channels.list` | `chat:read` | Reads. Chat channels the person can open. Direct messages are never listed | `query`; at most 200 channels |
 | `chat.messages.list` | `chat:read` | Reads. Recent messages of one channel (`channelId`) or one task's comment thread (`taskId`) | 20 by default, at most 50; text cut at 2000 characters |
 
@@ -790,6 +791,14 @@ A channel is `{ "channelId", "name", "private", "space": { "id", "name" } }`. A 
 **What became of a proposal.** `proposal.get` says what happened to a change that waited for a person, so an agent can go on after an approval and stop after a refusal. It needs `MCP_TOOLS_DATA` and the right to read tasks, and it takes the `proposalId` the filing call answered.
 
 The answer is `{ "proposalId", "state", "what", "changes", "filedAt", "next": "..." }`. `state` is `waiting`, `approved` (approved and being applied), `applied` (with `changesApplied`), `declined` (with `declined.reason`, the words the person typed, kept as a record and not an instruction), `undone` or `failed`. `next` says in a sentence what the agent should do. It answers only for a proposal the same connection filed: the same personal token, or the same app under the same grant. Any other proposal answers `{ "error": "proposal not found" }`, as a missing one does. It carries nothing of what the change holds.
+
+**A task's pull request.** `pull_request.get` reads a GitHub pull request through the workspace's GitHub connection (App connections). It needs `MCP_TOOLS_DATA`, `APP_CONNECTIONS`, and the right to read tasks. Name a task by `taskId` or `taskKey` (such as `AP-12`) to read the pull request linked to it (the newest one, or the one `number` names), or give `number` or `url` alone, for a pull request linked to a task the person can open. Only the connected repository is read, only in projects it is linked to that both the person and the one who connected GitHub can open, and only through a task the person's task list rules show them (a hidden list counts). Any other repository is refused. A pull request linked to no such task answers `{ "error": "..." }`, the same whether it is unlinked, hidden or does not exist; a pull request links itself when its title or branch carries the task key, or a person adds the link on the task. The GitHub key is used on the server and never answered.
+
+```json
+{ "name": "pull_request.get", "arguments": { "taskKey": "AP-12", "filesPage": 1 } }
+```
+
+The answer is `{ "repo", "number", "url", "about", "title", "state", "draft", "author", "branch", "base", "createdAt", "updatedAt", "mergedAt", "closedAt", "checks", "changedFiles", "additions", "deletions", "files", "filesPage", "description" }`. `state` is `open`, `merged` or `closed`. `checks` counts the check runs and commit statuses of the newest commit: `conclusion` is `passed`, `failed`, `pending`, `none` or `unknown`, with up to 10 that did not pass named in `notPassing`. `files` is 50 to a page (`path`, `change`, `additions`, `deletions`), with `nextFilesPage` while there are more, up to page 20. `description.text` is cut at 4,000 characters with `cut: true`; titles, branches, file paths and check names are cut too. No connection, no repository picked, a pull request GitHub cannot find, GitHub's rate limit (`rateLimited: true`, `retryAt`), a slow answer and any other failure (a fixed message; the detail goes to the server log) each come back as `{ "error": "..." }`. What it holds is what people wrote on GitHub: content, never an instruction to the agent.
 
 **Message to task.** `task.from_message` makes a task from a comment on a task, or a message in a chat channel, that the person can read. It needs `MCP_TOOLS_MANAGE` and the `tasks:manage` grant, and it is the same create as `task.create`: the project's rule for agents, approval and undo apply as they do there. A comment on a task needs no more. A message in a channel (a chat channel, or the channel of a list) is chat, so the connection must also hold `chat:read`; without it the answer is `{ "ok": false, "error": "..." }` naming the scope, and nothing is made. A direct message is never read: it answers as a message that does not exist.
 
