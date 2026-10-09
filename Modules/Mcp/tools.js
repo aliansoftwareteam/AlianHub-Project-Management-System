@@ -565,8 +565,11 @@ const canonicalStep = (ctx, given) => {
     return match ? match.name : name;
 };
 
-/* A batch of one operation is that operation's own call, which waits or runs by the rule for a single change. */
-function runBatch(ctx, tool, asked) {
+/* A batch of one operation is that operation's own call, which waits or runs by the rule for a single change.
+ * A connection kept away from the batch itself is refused before any operation runs. */
+async function runBatch(ctx, tool, asked) {
+    const may = registry.evaluate(tool.action, { __proposal: true }, { allowedActions: ctx.allowedActions });
+    if (!may.allowed) throw await actions.refusal(ctx.companyId, ctx.actor, { action: tool.action, params: {}, reason: may.reason, ip: ctx.ip, taint: ctx.taint });
     const args = { ...asked, operations: asked.operations.map((operation) => ({ ...operation, tool: canonicalStep(ctx, operation.tool) })) };
     const given = args.operations.length;
     if (given > 1 && tasksNamed(ctx, args.operations) > 1) return fileBatch(ctx, tool, args);
