@@ -133,10 +133,14 @@ const SOURCE_MCP = 'mcp';
 // A proposal a project's daily look filed (Modules/Agents/manager). No agent and no person is behind it: once
 // approved it runs on the approver's own rights, inside the actions it was filed with.
 const SOURCE_SYSTEM = 'system';
+// A proposal the Ask box planned from a person's sentence (Modules/AI/askPlan.js). Like a system one it runs on the
+// approver's own rights, inside the actions it was filed with; requestedBy keeps who asked.
+const SOURCE_ASK = 'ask';
+const DETACHED = Object.freeze([SOURCE_SYSTEM, SOURCE_ASK]);
 const SYSTEM_DECIDER = 'system';
 const asStrings = (list) => (Array.isArray(list) ? list.map(String) : []);
-const systemFields = ({ source, allowedActions, finding }) => (source === SOURCE_SYSTEM
-    ? { source, allowedActions: asStrings(allowedActions), ...(finding ? { finding } : {}) }
+const systemFields = ({ source, allowedActions, finding, requestedBy }) => (DETACHED.includes(source)
+    ? { source, allowedActions: asStrings(allowedActions), ...(finding ? { finding } : {}), ...(source === SOURCE_ASK ? { requestedBy: String(requestedBy || '') } : {}) }
     : {});
 const mcpFields = ({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }) => (source === SOURCE_MCP
     ? {
@@ -171,7 +175,7 @@ const create = async (companyId, { agent, runId, taskId, taskIds, projectId, wha
             status: STATUS.PENDING, gate: gateOf(changes, gate), priority: priority || 'normal', cost: cost || null, auditIds: [],
             ...(marker && marker.reason ? { taint: { sources: Array.isArray(marker.sources) ? marker.sources : [], reason: String(marker.reason).slice(0, 2000) } } : {}),
             ...mcpFields({ source, requestedBy, tokenId, tokenProjectIds, allowedActions, oauthClientId, oauthGrantId }),
-            ...systemFields({ source, allowedActions, finding }),
+            ...systemFields({ source, allowedActions, finding, requestedBy }),
         },
     }, 'save');
     emit(companyId, saved);
@@ -354,7 +358,7 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     const held = kept ? await planFollowUp.heldBack(companyId, person, p, kept.keptKeys) : [];
 
     const runs = require('./runs');
-    const fromSystem = p.source === SOURCE_SYSTEM;
+    const fromSystem = DETACHED.includes(p.source);
     const agent = fromMcp || fromSystem ? { allowedActions: p.allowedActions || [] } : await runs.getAgent(companyId, p.agentId);
     if (!agent) return { error: 'This agent was deleted — decline the proposal instead.', status: 409 };
     const run = p.runId ? await runOf(companyId, p.runId) : null;
@@ -523,4 +527,4 @@ const reapStuck = async (companyId, { olderThanMs = stuckThresholdMs(), now = ne
     return { reaped };
 };
 
-module.exports = { STATUS, REASON, SOURCE_MCP, SOURCE_SYSTEM, SYSTEM_DECIDER, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, withdraw, undoApproval, fileApplied, bucketOf, reapStuck, stuckThresholdMs };
+module.exports = { STATUS, REASON, SOURCE_MCP, SOURCE_SYSTEM, SOURCE_ASK, SYSTEM_DECIDER, REAPED_PREFIX, UNDO_WINDOW_MS, GATE_OWNER_ADMIN, DECLINE_REASONS, validateChanges, create, list, get, approve, decline, withdraw, undoApproval, fileApplied, bucketOf, reapStuck, stuckThresholdMs };

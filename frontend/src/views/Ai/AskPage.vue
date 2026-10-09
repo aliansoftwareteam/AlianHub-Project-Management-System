@@ -78,6 +78,7 @@
                             <li v-for="turn in turns" :key="turn.key" class="ask-thread__turn" data-test="ask-turn">
                                 <p class="ask-thread__q"><span class="ah-sr-only">{{ $t('Ask.you_asked') }}</span>{{ turn.question }}</p>
                                 <AskAnswer v-if="showsAnswer(turn)" :answer="turn" :streaming="turn.status === 'streaming'" :projects="sources.projects || []" :project-id="projectId" />
+                                <AskPlanCard v-if="turn.mode === 'plan'" :turn="turn" @decide="decidePlan(turn, $event)" />
                                 <p v-if="turn.status === 'stopped'" class="ah-small" data-test="ask-stopped">{{ $t('Ask.stopped') }}</p>
                                 <p v-else-if="turn.status === 'error'" class="ah-field__error" data-test="ask-turn-error">{{ turn.error }}</p>
                                 <p v-else-if="turn.status === 'empty' || turn.status === 'unconfigured'" class="ah-empty">{{ turn.error }}</p>
@@ -134,6 +135,10 @@
                                     <ShellIcon name="reports" :size="13" />{{ $t('AiLanding.ctl_depth') }}
                                 </button>
 
+                                <button type="button" class="land__ctl" :class="{ 'is-on': mode === 'plan' }" :aria-pressed="mode === 'plan'" :title="$t('Ask.plan_hint')" data-test="ask-plan-toggle" @click="mode = mode === 'plan' ? 'ask' : 'plan'">
+                                    <ShellIcon name="checkSquare" :size="13" />{{ $t('Ask.plan_toggle') }}
+                                </button>
+
                                 <span class="land__pop-wrap">
                                     <button type="button" class="land__ctl" :class="{ 'is-on': pop === 'skills' }" @click="toggle('skills')">
                                         <ShellIcon name="docs" :size="13" />{{ $t('AiLanding.ctl_skills') }}
@@ -181,7 +186,7 @@
                                     <ShellIcon name="stop" :size="13" />{{ $t('Ask.stop') }}
                                 </button>
                                 <button v-else type="button" class="ah-btn ah-btn--primary ah-btn--sm" data-test="ask-send" :disabled="!question.trim()" @click="submit">
-                                    {{ mode === 'research' ? $t('AiLanding.send_research') : $t('AiLanding.send') }}
+                                    {{ { research: $t('AiLanding.send_research'), plan: $t('Ask.plan_send') }[mode] || $t('AiLanding.send') }}
                                 </button>
                             </div>
 
@@ -366,6 +371,7 @@ import { useAskConversation } from "./useAskConversation";
 import { MENU_ID, useAskComposer } from "./useAskComposer";
 import AskComposerMenu from "./AskComposerMenu.vue";
 import AskStarters from "./AskStarters.vue";
+import AskPlanCard from "./AskPlanCard.vue";
 
 defineOptions({ name: "AskPage" });
 
@@ -383,7 +389,7 @@ const companyId = inject("$companyId");
 const { agents, registryManifest, runs, routable, loadAgents, loadRegistry, loadRuns, loadRoutable, startRun } = useParity();
 const { spend, skillManifest, loadSkills, loadSpend } = useAgents();
 const { canManage } = useAgentAccess();
-const { turns, threadId, threads, threadsLoading, streaming, announcement, send, stop, newQuestion, loadThreads, openThread, removeThread, seed } = useAskConversation({ t });
+const { turns, threadId, threads, threadsLoading, streaming, announcement, send, plan, decidePlan, stop, newQuestion, loadThreads, openThread, removeThread, seed } = useAskConversation({ t });
 
 const route = useRoute();
 const tab = ref("ask");
@@ -517,7 +523,8 @@ const submit = async () => {
     question.value = "";
     const explicit = composer.body();
     composer.reset();
-    await send({ question: asked, mode: mode.value, projectId: projectId.value, ...explicit });
+    if (mode.value === "plan") await plan({ sentence: asked, projectId: projectId.value });
+    else await send({ question: asked, mode: mode.value, projectId: projectId.value, ...explicit });
 };
 
 const onEnter = (event) => {

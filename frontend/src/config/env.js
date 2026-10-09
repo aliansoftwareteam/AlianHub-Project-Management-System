@@ -290,6 +290,7 @@ module.exports.AI_ASK_CARD = '/api/v1/ai/ask/card';
 module.exports.AI_ASK_POST = '/api/v1/ai/ask/post';
 module.exports.AI_ASK_POST_TARGETS = '/api/v1/ai/ask/post/targets';
 module.exports.AI_ASK_STREAM = '/api/v1/ai/ask/stream';
+module.exports.AI_ASK_PLAN = '/api/v1/ai/ask/plan';
 module.exports.AI_ASK_THREADS = '/api/v1/ai/ask/threads';
 module.exports.AI_FEEDBACK = '/api/v1/ai/feedback';
 module.exports.AI_QUALITY = '/api/v1/ai/quality';
