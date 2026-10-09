@@ -310,7 +310,7 @@ With `MCP_TOOLS_WORK` on, it also takes `tag` (a tag id or name), `priority` (`U
 { "name": "sprints.list", "arguments": { "projectId": "<project id>" } }
 ```
 
-`members.list`: active members by name, with their role. With a `projectId`, each row says whether that person can open the project.
+`members.list`: active members by name, with their role. An owner or admin sees everyone; anyone else, and any connection kept to some projects, sees the people of the projects it can open. With a `projectId`, each row says whether that person can open the project.
 
 ```json
 { "name": "members.list", "arguments": { "query": "priya", "projectId": "<project id>" } }
