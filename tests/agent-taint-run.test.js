@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -55,7 +56,7 @@ beforeEach(() => {
     Object.keys(mockDb.store).forEach((k) => { mockDb.store[k].length = 0; });
     mockDb.calls.length = 0;
     jest.clearAllMocks();
-    delete process.env.AGENT_TAINT_ROUTING;
+    process.env.AGENT_TAINT_ROUTING = 'off';
     delete process.env.AI_REPLAY;
     delete process.env.AUDIT_CHAIN;
     mem = persistence.useInMemory();
@@ -66,7 +67,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.AGENTS, agent());
     mockDb.seed(dbCollections.COMPANIES, { _id: C });
 });
-afterEach(() => { mem.reset(); persistence.useMongo(); delete process.env.AGENT_TAINT_ROUTING; });
+afterEach(() => { mem.reset(); persistence.useMongo(); process.env.AGENT_TAINT_ROUTING = 'off'; });
 
 describe('with AGENT_TAINT_ROUTING off, a run that fetched a page leaves beta\'s records', () => {
     it('the run document, its decisions and the replay row carry no taint and the same fields as before', async () => {

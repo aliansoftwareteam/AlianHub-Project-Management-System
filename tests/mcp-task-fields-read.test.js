@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-1 gaps: the custom field values of one task. A connected agent reads what a task's fields hold,
    with each field's name and type, for a task the person behind it can open and fields that person is shown. */
 process.env.STORAGE_TYPE = 'server';
@@ -107,7 +108,7 @@ const lockFieldsOfThePrivateProject = () => {
 
 beforeEach(() => {
     seed();
-    delete process.env.MCP_TOOLS_WORK;
+    process.env.MCP_TOOLS_WORK = 'off';
     process.env.MCP_TOOLS_DATA = 'on';
     seedFields();
     Object.keys(mockElsewhere.store).forEach((type) => { mockElsewhere.store[type].length = 0; });
@@ -118,7 +119,7 @@ afterAll(() => FLAGS.forEach((flag) => { delete process.env[flag]; }));
 
 describe('the tool exists with the read tools', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_DATA;
+        process.env.MCP_TOOLS_DATA = 'off';
         expect(tools.names()).toEqual(BEFORE);
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);

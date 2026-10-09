@@ -113,10 +113,10 @@ beforeEach(() => {
 });
 afterEach(async () => {
     await settle();
-    delete process.env.MCP_OAUTH;
+    process.env.MCP_OAUTH = 'off';
     delete process.env.MCP_OAUTH_ISSUER;
 });
-afterAll(() => { delete process.env.MCP_TOOLS_WORK; delete process.env.MCP_TOOLS_MANAGE; });
+afterAll(() => { process.env.MCP_TOOLS_WORK = 'off'; process.env.MCP_TOOLS_MANAGE = 'off'; });
 
 describe('who is shown a person\'s connected AI', () => {
     it('shows it to the person, to another member and to the owner, and to no guest', async () => {

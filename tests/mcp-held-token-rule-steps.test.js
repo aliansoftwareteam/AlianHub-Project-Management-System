@@ -105,7 +105,7 @@ beforeAll(async () => {
 afterAll(async () => {
     domainEventBus.bus.off('domain.event', onEnvelope);
     await engine.stop();
-    delete process.env.MCP_TOOLS_MANAGE;
+    process.env.MCP_TOOLS_MANAGE = 'off';
 });
 
 beforeEach(() => {

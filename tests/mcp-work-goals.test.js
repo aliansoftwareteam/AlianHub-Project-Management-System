@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 046 M3, G7: an outside agent reads the goals the person behind its token can read, reports a
    target's value and changes what a target counts, through the goal routes' own handlers and no further.
    A token kept to some projects is given a goal only through the work it counts, and changes none. */
@@ -104,7 +105,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tools exist', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(tools.names()).toEqual(BEFORE);
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         NAMES.forEach((name) => {

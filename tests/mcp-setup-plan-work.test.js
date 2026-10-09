@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, S-2: a plan for a project can also hold automations and first tasks. Each one is made, once the plan
    is approved, as the call an agent would make for it alone: the same action, held to the same rules, with its
    own audit row and its own undo. So a plan asks for nothing its agent could not ask for one at a time. */
@@ -232,7 +233,7 @@ describe('a plan asks for nothing its agent could not ask for one at a time', ()
         const plan = tasksOnly();
         expect(await rpc(as(INSIDER, { token: { grants: [] } }), TOOL, plan)).toMatchObject({ isError: true, error: expect.stringMatching(/tasks:manage permission/) });
         expect(waiting()).toHaveLength(0);
-        delete process.env.MCP_TOOLS_MANAGE;
+        process.env.MCP_TOOLS_MANAGE = 'off';
         await refusedFor(as(INSIDER), plan, /^permission_denied: .*is not allowed to use/);
     });
 
@@ -447,7 +448,7 @@ describe('the "Set up my project" prompt', () => {
     });
 
     it('leaves the first tasks to the calls after the approval on a connection that may not create a task with its details', () => {
-        delete process.env.MCP_TOOLS_MANAGE;
+        process.env.MCP_TOOLS_MANAGE = 'off';
         const plain = promptText(as(OWNER));
         expect(plain).toMatch(/Then send the statuses, lists, fields and views and the automations together in one call/);
         expect(plain).toMatch(/Then make the rest of what I approved: .*tasks with `task\.create`/);

@@ -1,3 +1,4 @@
+const { FLAGS: DEFAULT_ON } = require('./fixtures/mcpFlagsOff');
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: jest.fn() }));
 jest.mock('../Modules/Audit/recorder', () => ({ recordAudit: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
@@ -21,6 +22,7 @@ const withEnv = (env, read) => {
     const names = Object.keys(EVERY_FLAG);
     const before = Object.fromEntries(names.map((name) => [name, process.env[name]]));
     names.forEach((name) => { delete process.env[name]; });
+    DEFAULT_ON.forEach((name) => { process.env[name] = 'off'; });
     Object.assign(process.env, env);
     try {
         return read();

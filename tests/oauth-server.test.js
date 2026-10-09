@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const crypto = require('crypto');
 const express = require('express');
 const bodyParser = require('body-parser');
@@ -92,7 +93,7 @@ beforeEach(() => {
     metadataDocument.forget();
     jest.clearAllMocks();
     delete process.env.MCP_OAUTH_DCR;
-    delete process.env.MCP_TOOLS_MANAGE;
+    process.env.MCP_TOOLS_MANAGE = 'off';
     delete process.env.MCP_OAUTH_ACCESS_TOKEN_MINUTES;
     delete process.env.MCP_OAUTH_REFRESH_TOKEN_DAYS;
     delete process.env.MCP_OAUTH_GRANT_MAX_DAYS;

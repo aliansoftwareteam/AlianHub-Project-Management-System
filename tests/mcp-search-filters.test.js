@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 048: tasks.search narrows by tag, priority and a custom field's value (equals; before and after for a date
    field). Each filter only narrows what the person can already open, and the answer keeps its shape. */
 process.env.STORAGE_TYPE = 'server';
@@ -93,7 +94,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the filters exist only with the flag on', () => {
     it('off, tasks.search takes and describes what it did before', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         const tool = tools.manifest(ctx(OWNER)).find((entry) => entry.name === 'tasks.search');
         expect(Object.keys(tool.inputSchema.properties)).toEqual(['query', 'projectId', 'status', 'limit']);
         expect(idsOf(await search(ctx(OWNER), { priority: 'LOW' }))).toHaveLength(5);

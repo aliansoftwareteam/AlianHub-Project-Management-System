@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-run: a connected agent asks to make a list a sprint with a first and a last day, or to change a
    sprint's days. It waits as one proposal with one preview; approved, it runs the route the list menu calls, as the
    approver; undo makes the list what it was, unless someone has changed it since. */
@@ -94,7 +95,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tool exists', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect((await rpc(as(OWNER), TOOL, ASK)).rpcError).toMatchObject({ code: -32601 });

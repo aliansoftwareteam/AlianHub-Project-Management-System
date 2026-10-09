@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-1 gaps: "who am I" and "which days count". A connected agent asks who the person behind it is, so
    "assign it to me" and "due tomorrow" mean something, and which days the workspace or a project works. */
 process.env.STORAGE_TYPE = 'server';
@@ -64,7 +65,7 @@ const days = (caller, args = {}) => rpc(caller, DAYS, args);
 
 beforeEach(() => {
     seed();
-    delete process.env.MCP_TOOLS_WORK;
+    process.env.MCP_TOOLS_WORK = 'off';
     process.env.MCP_TOOLS_DATA = 'on';
     Object.keys(mockElsewhere.store).forEach((type) => { mockElsewhere.store[type].length = 0; });
     mockElsewhere.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: OUTSIDER, roleType: 1, status: 2, isDelete: false });
@@ -75,7 +76,7 @@ afterAll(() => FLAGS.forEach((flag) => { delete process.env[flag]; }));
 
 describe('the tools exist with the read tools', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_DATA;
+        process.env.MCP_TOOLS_DATA = 'off';
         expect(tools.names()).toEqual(BEFORE);
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         BOTH.forEach((name) => {

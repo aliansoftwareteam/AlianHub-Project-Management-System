@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, benchmark job 6: a connected agent asks for a copy of a project. The call makes nothing: it waits as one
    proposal with one preview. Approved, the copy is made by the route the web app duplicates a project with, as the
    person who approved, and it is private to that person whoever is on the project it was copied from. Tasks come
@@ -118,7 +119,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tool exists', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect(actions.rating(TOOL)).toBeNull();

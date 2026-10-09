@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, AI-6: the work queue a connected agent pulls from. What it lists and to whom, a claim that one caller wins,
    lasts a bounded time and grants nothing, and the person who takes an item back. */
 process.env.STORAGE_TYPE = 'server';
@@ -132,11 +133,11 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GUEST, roleType: 0, status: 2, isDelete: false });
 });
 afterEach(settle);
-afterAll(() => { delete process.env.MCP_TOOLS_WORK; delete process.env.MCP_TOOLS_MANAGE; });
+afterAll(() => { process.env.MCP_TOOLS_WORK = 'off'; process.env.MCP_TOOLS_MANAGE = 'off'; });
 
 describe('the tools exist only while their flag is on', () => {
     it('off, nothing is listed, registered or callable', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect((await listed(agent(OWNER))).filter((name) => NAMES.includes(name))).toEqual([]);
         NAMES.forEach((name) => expect(registry.has(name)).toBe(false));
         expect((await rpc(agent(OWNER), 'queue.list', {})).rpcError).toMatchObject({ code: -32601 });

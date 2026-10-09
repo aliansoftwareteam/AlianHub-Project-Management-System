@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 048: a connected agent asks for a new tag on a project. It needs the manage grant, always waits for a person,
    and once approved runs the project's own tag route as the person behind the token. Undo removes it while unused. */
 process.env.STORAGE_TYPE = 'server';
@@ -107,7 +108,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag and the grant decide whether the tool exists', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(as(OWNER))).toEqual(BEFORE);
         expect(registry.has(TOOL)).toBe(false);
         expect(actions.rating(TOOL)).toBeNull();

@@ -134,7 +134,7 @@ beforeEach(() => {
     mockDb.seed(SCHEMA_TYPE.COMPANY_USERS, { userId: GUEST, roleType: 0, status: 2, isDelete: false });
 });
 afterEach(settle);
-afterAll(() => { delete process.env.MCP_TOOLS_WORK; delete process.env.MCP_TOOLS_MANAGE; });
+afterAll(() => { process.env.MCP_TOOLS_WORK = 'off'; process.env.MCP_TOOLS_MANAGE = 'off'; });
 
 describe('one item per agent at a time', () => {
     it('refuses a second item to a connection that holds one, and hands it out once the first is given back', async () => {

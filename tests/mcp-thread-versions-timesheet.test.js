@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 047, benchmark jobs 14, 16 and 18: a connected agent replies in a task's comment thread, reads a doc's
    versions, and reads and asks to send the person's own timesheet week. Each holds the agent to its person's rights. */
 process.env.STORAGE_TYPE = 'server';

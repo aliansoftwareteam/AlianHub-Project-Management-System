@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const mockDb = require('./fixtures/fakeMongo').create();
 
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...a) => mockDb.crud(...a) }));
@@ -68,7 +69,7 @@ beforeEach(() => {
     orchestrator.gather.mockResolvedValue({ status: 'gathered', context: {} });
     mockDb.seed(SCHEMA_TYPE.AGENTS, agent());
 });
-afterEach(() => { mem.reset(); persistence.useMongo(); delete process.env.AGENT_TAINT_ROUTING; });
+afterEach(() => { mem.reset(); persistence.useMongo(); process.env.AGENT_TAINT_ROUTING = 'off'; });
 
 describe('taint sources — each kind marks the run once, with a reference and never the content', () => {
     const run = (over = {}) => ({ _id: '6f0000000000000000000e01', projectId: 'p1', ...over });
@@ -124,7 +125,7 @@ describe('taint sources — each kind marks the run once, with a reference and n
     });
 
     it('with the flag off nothing is written and the run is never tainted', async () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         const row = await seeded();
         mockDb.calls.length = 0;
         const out = await taint.mark(C, row, [taint.fetched('https://example.com/a')]);
@@ -139,7 +140,7 @@ describe('taint sources — each kind marks the run once, with a reference and n
         mockDb.seed(SCHEMA_TYPE.TASKS, { _id: TASK._id, origin: { kind: 'form', ref: 'sub1' } });
         expect(await taint.originOf(C, { _id: TASK._id })).toEqual({ kind: 'form', ref: 'sub1' });
         expect(await taint.originOf(C, { _id: TASK._id, origin: { kind: 'email', ref: 'h1' } })).toEqual({ kind: 'email', ref: 'h1' });
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         mockDb.calls.length = 0;
         expect(await taint.originOf(C, { _id: TASK._id })).toBeNull();
         expect(mockDb.calls).toEqual([]);
@@ -184,7 +185,7 @@ describe('routing — a tainted run proposes its risky and out-of-project writes
     });
 
     it('with the flag off a tainted run decides exactly as before', () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         expect(on()).toMatchObject({ decision: 'act' });
         expect(on({ params: { taskId: 't2', projectId: 'p2' }, task: { _id: 't2', ProjectID: 'p2' } })).toMatchObject({ decision: 'act' });
         expect(on({ action: 'task.create', params: { projectId: 'p1', title: 'x' }, rating: { write: true, reversible: true, scope: 'project', money: false } })).toEqual({ decision: 'propose', reason: 'task.create reaches the whole project', rating: expect.any(Object) });
@@ -280,7 +281,7 @@ describe('the run engine — taint enters at gather or at the fetch, persists to
     });
 
     it('with the flag off a fetch leaves the run, the decisions, the spend context, the proposal and perform exactly as before', async () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         fetchThen([subtask('One'), newTask('Risky')]);
         const run = await start(agent());
         const out = await execute(run);

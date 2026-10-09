@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 process.env.STORAGE_TYPE = 'server';
 jest.setTimeout(30000);
 const mockDb = require('./fixtures/fakeMongo').create();
@@ -135,7 +136,7 @@ const reads = Object.entries(READS).map(([name, row]) => [name, row]);
 const among = (person, messages) => messages.filter((message) => person.includes(message));
 
 beforeEach(seedRows);
-afterEach(() => { delete process.env.MCP_TOOLS_DATA; });
+afterEach(() => { process.env.MCP_TOOLS_DATA = 'off'; });
 
 describe('chat among the rows a read lists across threads', () => {
     it.each(reads)('%s leaves a person every row they had', async (name, { read, person, prefix }) => {

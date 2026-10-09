@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 046, MCP parity part 3: an outside agent reads a project's lists and folders, and creates, renames and
    moves a list through the list routes' own handlers, as the person behind its token and no further. */
 process.env.STORAGE_TYPE = 'server';
@@ -95,7 +96,7 @@ afterAll(() => { FLAGS.forEach((flag) => { delete process.env[flag]; }); });
 
 describe('the flag decides whether the tools exist', () => {
     it('off, the tool list and the registry are what they were', async () => {
-        delete process.env.MCP_TOOLS_WORK;
+        process.env.MCP_TOOLS_WORK = 'off';
         expect(await listed(ctx(OWNER))).toEqual(BEFORE);
         NAMES.forEach((name) => { expect(registry.has(name)).toBe(false); expect(actions.rating(name)).toBeNull(); });
         expect((await rpc(ctx(OWNER), 'list.create', { projectId: P_OPEN, name: 'Later' })).rpcError).toMatchObject({ code: -32601 });

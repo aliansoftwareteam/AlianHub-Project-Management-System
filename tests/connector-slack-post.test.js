@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 const crypto = require('crypto');
 const verified = require('./fixtures/verifiedRequest');
 const mockDb = require('./fixtures/fakeMongo').create();
@@ -516,7 +517,7 @@ describe('with the flag off', () => {
     });
 
     it('named but without its preconditions: the screen is told why, and every route refuses', async () => {
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
         const catalogue = await call(integrations.listCatalog, MEMBER);
         expect(catalogue.body.connectors).toEqual(['slack']);
         const seen = await call(ctrl.getSlack, ADMIN);

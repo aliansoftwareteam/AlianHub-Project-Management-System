@@ -1,3 +1,4 @@
+require('./fixtures/mcpFlagsOff');
 /* Task 046, MCP parity part 1: an outside agent updates, assigns, moves, archives and lists tasks through
    the task routes' own preparation and handlers, as the person behind its token and no further. */
 process.env.STORAGE_TYPE = 'server';
@@ -175,7 +176,7 @@ describe('an outside client under a person\'s grant', () => {
         jest.clearAllMocks();
         process.env.MCP_OAUTH = 'on';
         process.env.MCP_OAUTH_ISSUER = ISSUER;
-        delete process.env.AGENT_TAINT_ROUTING;
+        process.env.AGENT_TAINT_ROUTING = 'off';
     });
 
     it('lists and runs the write tools once its grant holds the scope, as that person and no further', async () => {

@@ -17,9 +17,9 @@ describe('every registered MCP tool goes through the visibility filter', () => {
     });
     afterAll(() => {
         if (saved === undefined) delete process.env.AGENT_PERFORMANCE_READ; else process.env.AGENT_PERFORMANCE_READ = saved;
-        if (savedData === undefined) delete process.env.MCP_TOOLS_DATA; else process.env.MCP_TOOLS_DATA = savedData;
-        if (savedManage === undefined) delete process.env.MCP_TOOLS_MANAGE; else process.env.MCP_TOOLS_MANAGE = savedManage;
-        if (savedWork === undefined) delete process.env.MCP_TOOLS_WORK; else process.env.MCP_TOOLS_WORK = savedWork;
+        if (savedData === undefined) process.env.MCP_TOOLS_DATA = 'off'; else process.env.MCP_TOOLS_DATA = savedData;
+        if (savedManage === undefined) process.env.MCP_TOOLS_MANAGE = 'off'; else process.env.MCP_TOOLS_MANAGE = savedManage;
+        if (savedWork === undefined) process.env.MCP_TOOLS_WORK = 'off'; else process.env.MCP_TOOLS_WORK = savedWork;
     });
 
     const registered = () => tools.registered();

@@ -151,10 +151,10 @@ beforeEach(() => {
 });
 afterEach(async () => {
     await settle();
-    delete process.env.MCP_OAUTH;
+    process.env.MCP_OAUTH = 'off';
     delete process.env.MCP_OAUTH_ISSUER;
 });
-afterAll(() => { delete process.env.MCP_TOOLS_WORK; delete process.env.MCP_TOOLS_DATA; delete process.env.MCP_TOOLS_MANAGE; });
+afterAll(() => { process.env.MCP_TOOLS_WORK = 'off'; process.env.MCP_TOOLS_DATA = 'off'; process.env.MCP_TOOLS_MANAGE = 'off'; });
 
 describe('the fields this keeps', () => {
     it('are declared, so a strict schema does not drop them', () => {
