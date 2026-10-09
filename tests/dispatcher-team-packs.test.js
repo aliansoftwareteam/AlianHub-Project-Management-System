@@ -29,7 +29,7 @@ const SETTINGS = '/api/v2/assignment-rules/dispatcher/project/:projectId';
 const TRIAGER = 'it-company/bug-triager';
 const DESIGN_LEAD = 'it-company/design-lead';
 
-const NOTHING_ELSE = { rules: [], skippedRules: 0, tags: [], proposalId: null };
+const NOTHING_ELSE = { rules: [], skippedRules: 0, rulesAwaitingTags: 0, tags: [], proposalId: null };
 
 const oid = () => new mongoose.Types.ObjectId().toString();
 const engineering = playbooks.all().filter((role) => role.blueprint === 'it-company' && role.team === 'engineering').map((role) => `${role.blueprint}/${role.slug}`);
@@ -395,6 +395,29 @@ describe('team pack starter rules and tags', () => {
         const project = seedProject({ taskTypeCounts: BUGS, tagsArray: [{ uid: 'abc', tagName: 'Support' }] });
         const res = await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['support'], projectIds: [String(project._id)], starterRules: true } });
         expect(res.body.data.projects[0].rules).toEqual([{ id: expect.any(String), role: 'it-company/support-lead', when: { tags: ['abc'] } }]);
+    });
+
+    it('counts a tag rule whose tag it proposed as waiting for the approval, and adds it on the next apply once the tag is there', async () => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const support = { blueprint: 'it-company', teams: ['support'], projectIds: [String(project._id)], starterRules: true, proposeTags: true };
+        const first = await call('POST', PACKS, { body: support });
+        expect(first.body.data.projects[0]).toMatchObject({ rules: [], skippedRules: 0, rulesAwaitingTags: 1, tags: expect.arrayContaining(['support']) });
+        const again = await call('POST', PACKS, { body: support });
+        expect(again.body.data.projects[0]).toMatchObject({ rules: [], rulesAwaitingTags: 1, proposalId: null });
+
+        store(SCHEMA_TYPE.AGENT_PROPOSALS)[0].status = 'approved';
+        store(SCHEMA_TYPE.PROJECTS).find((row) => String(row._id) === String(project._id)).tagsArray = [{ uid: 'abc', tagName: 'support' }];
+        const after = await call('POST', PACKS, { body: support });
+        expect(after.body.data.projects[0]).toMatchObject({ rules: [{ role: 'it-company/support-lead', when: { tags: ['abc'] } }], rulesAwaitingTags: 0 });
+    });
+
+    it('still counts a tag rule as skipped when nobody proposed its tag', async () => {
+        seedRules(GRANTS);
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const res = await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['support'], projectIds: [String(project._id)], starterRules: true } });
+        expect(res.body.data.projects[0]).toMatchObject({ rules: [], skippedRules: 1, rulesAwaitingTags: 0 });
     });
 
     it('undoes only the rules its apply recorded, by id, and keeps one a person changed or wrote alike', async () => {

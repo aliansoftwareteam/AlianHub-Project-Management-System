@@ -101,16 +101,21 @@ const conditionFor = (kind, value, project) => {
 
 const starterRulesFor = (roleKeys, project, held) => {
     const made = [];
+    const missingTags = [];
     let skipped = 0;
     roleKeys.forEach((key) => {
         ((settings.roleOf(key) || {}).starterRules || []).forEach(({ kind, value }) => {
             const when = conditionFor(kind, value, project);
-            if (!when) { skipped += 1; return; }
+            if (!when) {
+                if (kind === 'tag') missingTags.push(lower(value));
+                skipped += 1;
+                return;
+            }
             const rule = { id: new mongoose.Types.ObjectId().toString(), ...cleanRule({ role: key, when }) };
             if (![...held, ...made].some((one) => sameRule(one, rule))) made.push(rule);
         });
     });
-    return { made, skipped };
+    return { made, skipped, missingTags };
 };
 
 const tagNamesFor = (roleKeys, project) => {
@@ -250,16 +255,20 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
         const project = body.starterRules === true || body.proposeTags === true ? await readProject(companyId, projectId) : {};
         const kept = current.roles.filter((key) => settings.roleOf(key));
         const added = pack.roles.filter((key) => !kept.includes(key));
-        const starter = body.starterRules === true ? starterRulesFor(pack.roles, project, current.rules) : { made: [], skipped: 0 };
+        const starter = body.starterRules === true ? starterRulesFor(pack.roles, project, current.rules) : { made: [], skipped: 0, missingTags: [] };
         const changed = added.length || starter.made.length;
         const tags = body.proposeTags === true ? tagNamesFor(pack.roles, project) : [];
+        const proposal = await tagProposalFor(companyId, projectId, tags, pack.blueprint);
+        const awaited = starter.missingTags.length ? new Set([...(proposal ? proposal.names : []).map(lower), ...await pendingTagNames(companyId, projectId)]) : new Set();
+        const awaiting = starter.missingTags.filter((name) => awaited.has(name)).length;
         plans.push({
             projectId,
             added,
             mode: current.mode,
             rules: starter.made,
-            skippedRules: starter.skipped,
-            proposal: await tagProposalFor(companyId, projectId, tags, pack.blueprint),
+            skippedRules: starter.skipped - awaiting,
+            rulesAwaitingTags: awaiting,
+            proposal,
             previous: bodyWith(current, kept, current.rules),
             body: changed ? bodyWith(current, [...kept, ...added], [...current.rules, ...starter.made]) : null,
         });
@@ -292,6 +301,7 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
         mode: plan.mode,
         rules: plan.rules,
         skippedRules: plan.skippedRules,
+        rulesAwaitingTags: plan.rulesAwaitingTags,
         tags: plan.proposal ? plan.proposal.names : [],
         proposalId: plan.proposalId || null,
     }));

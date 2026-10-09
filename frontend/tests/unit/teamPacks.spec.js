@@ -48,7 +48,7 @@ const serve = ({ on = true, refuse = null } = {}) => apiRequest.mockImplementati
         applied = body;
         return ok({ blueprint: body.blueprint, teams: body.teams, applyId: 'ap1', agents: { made: [], kept: [], widened: [] }, projects: [
             { projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', rules: body.starterRules ? [RULE] : [], skippedRules: 0, tags: ['bug', 'needs-triage'], proposalId: 'prop1' },
-            { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off', rules: [], skippedRules: 1, tags: [], proposalId: null }
+            { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off', rules: [], skippedRules: 1, rulesAwaitingTags: 2, tags: [], proposalId: null }
         ] });
     }
     return ok([]);
@@ -157,6 +157,8 @@ describe('Team packs', () => {
         expect(lines[0]).toContain('Proposed 2 tags for approval: bug, needs-triage.');
         expect(lines[1]).toContain('One starter rule waits for a tag or task type this project lacks.');
         expect(lines[1]).not.toContain('Proposed');
+        expect(lines[1]).toContain('2 starter rules wait for their tags to be approved; apply the pack again after the approval to add them.');
+        expect(lines[0]).not.toContain('to be approved');
     });
 
     it('offers the team\'s agents on by default, can leave them off, and sends the made agents back on undo', async () => {

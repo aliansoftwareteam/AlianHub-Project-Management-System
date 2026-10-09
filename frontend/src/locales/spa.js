@@ -13192,6 +13192,7 @@ export default {
         "tags_hint": "These roles hand work on with the tags {names}. The tags a project lacks are proposed to you as one approval per project; nothing is created until you approve.",
         "rules_added": "Added one routing rule. | Added {n} routing rules.",
         "rules_waiting": "One starter rule waits for a tag or task type this project lacks. | {n} starter rules wait for a tag or task type this project lacks.",
+        "rules_await_tags": "One starter rule waits for its tag to be approved; apply the pack again after the approval to add it. | {n} starter rules wait for their tags to be approved; apply the pack again after the approval to add them.",
         "tags_proposed": "Proposed one tag for approval: {names}. | Proposed {n} tags for approval: {names}.",
         "project_on": "{project}: the dispatcher is in {mode} mode.",
         "project_off": "{project}: the dispatcher is off in this project, so the roles wait until someone switches it on in the project's settings.",

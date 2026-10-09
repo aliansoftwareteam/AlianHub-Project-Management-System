@@ -9848,6 +9848,7 @@
     "TeamPacks.retry": "Retry",
     "TeamPacks.roles_were_on": "The roles were already on.",
     "TeamPacks.rules_added": "Added one routing rule. | Added {n} routing rules.",
+    "TeamPacks.rules_await_tags": "One starter rule waits for its tag to be approved; apply the pack again after the approval to add it. | {n} starter rules wait for their tags to be approved; apply the pack again after the approval to add them.",
     "TeamPacks.rules_waiting": "One starter rule waits for a tag or task type this project lacks. | {n} starter rules wait for a tag or task type this project lacks.",
     "TeamPacks.starter_rules": "Also add the roles' starter routing rules",
     "TeamPacks.starter_rules_hint": "One starter rule, by task type, tag or priority. It is never added twice, and undo removes only the rules this pack added. | {n} starter rules, by task type, tag or priority. A rule is never added twice, and undo removes only the rules this pack added.",
