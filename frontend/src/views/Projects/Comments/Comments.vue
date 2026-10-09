@@ -254,6 +254,7 @@ import { ROLE_ADMIN } from "@/utils/roles";
 import { isOnViewerSide } from "@/utils/commentSide";
 import CommentThread from "@/components/molecules/CommentThread/CommentThread.vue";
 import { applyCommentEvent, isTaskThread } from "@/composable/commentThreads";
+import { placeOfIncoming } from "./incomingComment";
 import { fetchOwnAi, fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
 import { maskOf } from "@/utils/iconMask";
 
@@ -1295,19 +1296,6 @@ function getMessages() {
     handleSocketData();
 }
 
-function getMessageId(data = {}) {
-    return data?._id ? String(data._id) : (data?.id ? String(data.id) : "");
-}
-
-function findMessageIndexById(data = {}) {
-    const messageId = getMessageId(data);
-    if(!messageId) return -1;
-
-    return messages.value.findIndex((message) => {
-        return getMessageId(message) === messageId || (message._id && String(message._id) === messageId);
-    });
-}
-
 function decorateIncomingMessage(docData) {
     const obj = {...docData, sent: isOnViewerSide(docData, userId.value)};
     const messageText = obj.message || "";
@@ -1327,24 +1315,14 @@ function upsertIncomingComment(docData, {replaceSending = false, incrementTotal 
     if(!docData) return false;
 
     const obj = decorateIncomingMessage(docData);
-    const existingIndex = findMessageIndexById(obj);
-    if(existingIndex > -1) {
-        messages.value[existingIndex] = {...messages.value[existingIndex], ...obj};
+    const place = placeOfIncoming(messages.value, obj, {replaceSending});
+    if(place.kind === "existing") {
+        messages.value[place.index] = {...messages.value[place.index], ...obj};
         return false;
     }
-
-    if(replaceSending) {
-        let type = "";
-        let name = "";
-        if(docData.mediaURL && docData.mediaURL.length) {
-            type = docData.type;
-            name = docData.mediaName;
-        }
-        const sendingIndex = messages.value.findIndex((x) => (x.isSending && x.type === type && x.mediaName === name));
-        if(sendingIndex > -1){
-            messages.value[sendingIndex] = obj;
-            return false;
-        }
+    if(place.kind === "pending") {
+        messages.value[place.index] = obj;
+        return false;
     }
 
     if(shouldShowDateDivider(obj)) {
