@@ -37,13 +37,13 @@ export const fetchTeamPacks = () => apiRequest("get", `${BASE}/team-packs`, unde
 
 export const applyTeamPack = (body) => apiRequest("post", `${BASE}/team-packs`, body).then(dataOf);
 
-/* Turns off only what `applied` (the answer of applyTeamPack) turned on. */
+/* The server undoes what it recorded for `applied.applyId`; the lists in the answer are only shown. */
 export const undoTeamPack = (applied) => apiRequest("post", `${BASE}/team-packs`, {
     undo: true,
     blueprint: applied.blueprint,
     teams: applied.teams,
     projectIds: applied.projects.map((project) => project.projectId),
-    roles: Object.fromEntries(applied.projects.map((project) => [project.projectId, project.added]))
+    applyId: applied.applyId
 }).then(dataOf);
 
 export const DISPATCHER_CHANGED_EVENT = "dispatcherChanged";
@@ -65,18 +65,21 @@ const CONDITION_KEYS = Object.freeze({ type: "taskTypeKeys", tag: "tags", priori
 const NUMBER_KINDS = Object.freeze(["type", "status"]);
 export const CONDITION_KINDS = Object.freeze([...Object.keys(CONDITION_KEYS), "field"]);
 
-/* A rule as the card edits it: one condition and one role. */
+/* A rule's id is kept through an edit so a team pack's undo can still find the rule it added. */
+const ruleIdOf = (rule) => (rule?.id ? { ruleId: rule.id } : {});
+const idOfRow = (row) => (row.ruleId ? { id: row.ruleId } : {});
+
 export const ruleToRow = (rule) => {
     const when = rule?.when || {};
-    if (Array.isArray(when.fields) && when.fields.length) return { kind: "field", fieldId: when.fields[0].id, value: String(when.fields[0].value ?? ""), role: rule.role };
+    if (Array.isArray(when.fields) && when.fields.length) return { ...ruleIdOf(rule), kind: "field", fieldId: when.fields[0].id, value: String(when.fields[0].value ?? ""), role: rule.role };
     const kind = Object.keys(CONDITION_KEYS).find((name) => Array.isArray(when[CONDITION_KEYS[name]]) && when[CONDITION_KEYS[name]].length) || "type";
-    return { kind, fieldId: "", value: String((when[CONDITION_KEYS[kind]] || [""])[0] ?? ""), role: rule?.role || "" };
+    return { ...ruleIdOf(rule), kind, fieldId: "", value: String((when[CONDITION_KEYS[kind]] || [""])[0] ?? ""), role: rule?.role || "" };
 };
 
 export const rowToRule = (row) => {
-    if (row.kind === "field") return { role: row.role, when: { fields: [{ id: row.fieldId, value: row.value }] } };
+    if (row.kind === "field") return { ...idOfRow(row), role: row.role, when: { fields: [{ id: row.fieldId, value: row.value }] } };
     const value = NUMBER_KINDS.includes(row.kind) ? Number(row.value) : row.value;
-    return { role: row.role, when: { [CONDITION_KEYS[row.kind]]: [value] } };
+    return { ...idOfRow(row), role: row.role, when: { [CONDITION_KEYS[row.kind]]: [value] } };
 };
 
 export const rowIsComplete = (row) => Boolean(row.role && String(row.value).trim() && (row.kind !== "field" || String(row.fieldId).trim())

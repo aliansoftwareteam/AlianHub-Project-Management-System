@@ -51,6 +51,7 @@ A change that waits is a proposal (`Modules/Agents/proposals.js`). It says what,
 - **Standing approval** (`Modules/Agents/standingApprovals.js`): "always do this" for one kind of change, one connection, one project, 90 days. It only turns a held change into `act`. It never covers a status change, a `proposeOnly` action, a high-risk action, an action that cannot be undone, or one that reaches further than one task.
 - **Outside content** (`Modules/Agents/taint.js`, `Modules/Mcp/taintHold.js`): with `AGENT_TAINT_ROUTING` on, risky writes from an outside client wait for a person.
 - **Daily look** (`Modules/Agents/manager/`): rules find slipping, blocked, stale and unowned work and file proposals. It changes nothing itself.
+- **Triage of new tasks** (`Modules/Agents/managerTriage.js`, kept apart from the daily look so the look stays model-free): on a switched-on project's working day, one call to the server's configured, priced model for a batch of new tasks suggests a priority, an estimate and a likely duplicate. Each is a finding and a proposal a person accepts; the manager is at Suggest. It skips with AI off, no priced provider or the spend cap reached, and its calls are booked under `project_triage`. Task text and the model's answer are data.
 - **Per-project limits and pause**: `Modules/Agents/projectLimits.js`.
 
 ---

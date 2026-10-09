@@ -26,6 +26,7 @@ const ACTION_DONE = 'agent.action';
 const ACTION_REFUSED = 'agent.action_refused';
 const ACTION_UNDONE = 'agent.action_undone';
 const PROPOSAL_DECIDED = 'agent.proposal_decided';
+const AGENT_CREATED = 'agent.created';
 const AGENT_DELETED = 'agent.deleted';
 const RUN_REVERTED = 'agent.run_reverted';
 const REVISION_PROMOTED = 'agent.revision_promoted';
@@ -194,6 +195,16 @@ const recordProposalDecision = async (companyId, actor, { proposalId, decision, 
     });
 };
 
+const recordAgentCreated = async (companyId, actor, { agentId, agentName, madeBy, ip }) => {
+    const a = attribution(actor);
+    return writeQuietly(companyId, {
+        actorId: a.actorId, actorName: a.label, ip,
+        action: AGENT_CREATED,
+        entityType: 'agent', entityId: String(agentId), entityName: agentName || '',
+        meta: { ...baseMeta(actor), agentId: String(agentId), agentName: agentName || null, ...(madeBy ? { madeBy } : {}) },
+    });
+};
+
 const recordAgentDeleted = async (companyId, actor, { agentId, agentName, ip }) => {
     const a = attribution(actor);
     return writeQuietly(companyId, {
@@ -322,8 +333,8 @@ const findById = async (companyId, auditId) => {
 };
 
 module.exports = {
-    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, PROJECT_POLICY_CHANGED, WORKSPACE_POLICY_CHANGED, BUDGET_CHANGED, STANDING_APPROVAL_MADE, STANDING_APPROVAL_ENDED, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
+    ACTION_DONE, ACTION_REFUSED, ACTION_UNDONE, PROPOSAL_DECIDED, AGENT_CREATED, AGENT_DELETED, RUN_REVERTED, REVISION_PROMOTED, REVISION_ROLLED_BACK, PROJECT_POLICY_CHANGED, WORKSPACE_POLICY_CHANGED, BUDGET_CHANGED, STANDING_APPROVAL_MADE, STANDING_APPROVAL_ENDED, STATE, AUDIT_UNAVAILABLE, AUDIT_UNMARKED,
     AuditUnavailableError, AuditUnmarkedError,
-    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentDeleted, recordRunReverted, recordRevisionChange, recordProjectPolicyChange, recordWorkspacePolicyChange, recordBudgetChange, recordRolePlaybookChange, recordStandingApproval, markUndone, findById, findByIdempotencyKey,
+    openAction, applyAction, failAction, recordAction, recordRefusal, recordUndo, recordProposalDecision, recordAgentCreated, recordAgentDeleted, recordRunReverted, recordRevisionChange, recordProjectPolicyChange, recordWorkspacePolicyChange, recordBudgetChange, recordRolePlaybookChange, recordStandingApproval, markUndone, findById, findByIdempotencyKey,
     undoneBefore, canRecordChange,
 };

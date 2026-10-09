@@ -10,6 +10,7 @@ export const formFromAgent = (agent) => ({
     spendCapUsd: Number(agent.spendCapUsd || 30),
     model: agent.model || "",
     projectIds: (agent.projectIds || []).map(String),
+    role: agent.role || "",
 });
 
 export const skillsPayload = (skills, namedKeys) => skills

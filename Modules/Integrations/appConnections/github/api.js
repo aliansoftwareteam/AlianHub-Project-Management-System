@@ -44,4 +44,32 @@ async function listPulls({ repo, token, companyId, since, get = defaultGet }) {
     return { pulls: pulls.reverse(), truncated };
 }
 
-module.exports = { listPulls, defaultGet, PAGE_SIZE, MAX_PAGES };
+const REPO_PAGES = 10;
+
+const parsed = (res) => {
+    if (res.status !== 200) throw refusal(res);
+    try { return JSON.parse(res.body); } catch (e) { throw new Error('GitHub sent a reply that is not JSON.'); }
+};
+
+async function listRepos({ token, companyId, page = 1, get = defaultGet }) {
+    const at = Math.min(Math.max(1, Math.floor(Number(page)) || 1), REPO_PAGES);
+    const url = `https://api.github.com/user/repos?affiliation=owner,collaborator,organization_member&sort=pushed&per_page=${PAGE_SIZE}&page=${at}`;
+    const rows = parsed(await get(url, { token, companyId }));
+    if (!Array.isArray(rows)) throw new Error('GitHub sent an unexpected reply.');
+    const repos = rows.filter((r) => r && typeof r.full_name === 'string').map((r) => ({ fullName: r.full_name, private: !!r.private }));
+    return { repos, page: at, hasMore: rows.length === PAGE_SIZE && at < REPO_PAGES };
+}
+
+async function canReadRepo({ repo, token, companyId, get = defaultGet }) {
+    const res = await get(`https://api.github.com/repos/${repo}`, { token, companyId });
+    if ([401, 403, 404].includes(res.status) && !rateLimited(res)) return false;
+    parsed(res);
+    return true;
+}
+
+async function accountOf({ token, companyId, get = defaultGet }) {
+    const body = parsed(await get('https://api.github.com/user', { token, companyId }));
+    return { id: String((body && body.id) || ''), login: String((body && body.login) || '') };
+}
+
+module.exports = { listPulls, listRepos, canReadRepo, accountOf, defaultGet, PAGE_SIZE, MAX_PAGES, REPO_PAGES };

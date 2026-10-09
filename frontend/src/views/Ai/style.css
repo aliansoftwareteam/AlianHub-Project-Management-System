@@ -10,7 +10,7 @@
 .ai-agent { padding: 14px 16px; }
 .ai-agent__top { display: flex; align-items: flex-start; gap: 12px; }
 .ai-agent__id { flex: 1; min-width: 0; }
-.ai-agent__name { display: flex; align-items: center; gap: 9px; }
+.ai-agent__name { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 9px; }
 .ai-agent__name strong { font: 600 14px/1.2 var(--font-ui); }
 .ai-agent__scope { font: var(--text-small); color: var(--ink-2); margin-top: 3px; }
 .ai-agent__skills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }

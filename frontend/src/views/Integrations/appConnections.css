@@ -16,6 +16,7 @@
 .apc__error { color: var(--danger-ink); }
 .apc__projects { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .apc__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.apc__repos { max-height: 280px; overflow: auto; }
 .apc__pick { display: flex; align-items: center; gap: 8px; font: var(--text-small); color: var(--ink); min-height: 32px; }
 
 @media (max-width: 760px) {

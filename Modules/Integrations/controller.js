@@ -11,6 +11,7 @@ const { SecretsStoreError } = require('../../Config/secrets');
 const { pinSessionTenant } = require('../../Config/tenant');
 const { requestAddress } = require('../../utils/requestAddress');
 const { connectionsChanged } = require('./helpers/connectionsChanged');
+const { grantOf, revokeGrant, revokeGrantOf } = require('./appConnections/githubConnect');
 
 // Secrets go to the store by handle or are sealed into config on every write (H.storeSecrets) and are stripped from every read (R.redact).
 
@@ -75,12 +76,14 @@ exports.connect = async (req, res) => {
                 type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ type: check.value.type, deletedStatusKey: { $ne: 1 } }],
             }, 'findOne');
             if (existing) {
+                const earlierGrant = await grantOf(companyId, existing);
                 const kept = await H.storeSecrets({ companyId, type: check.value.type, config: check.value.config, existing, actor });
                 const upd = await MongoDbCrudOpration(companyId, {
                     type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
                     data: [{ _id: existing._id }, { $set: { ...kept.set, name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(req.uid || ''), connectedBy: String(req.uid || ''), ...(sameTarget(existing, check.value) ? {} : { sync: {}, connectedAt: new Date() }) }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
                 }, 'findOneAndUpdate');
                 await H.retireSecrets({ companyId, handles: kept.stale, actor });
+                revokeGrant(earlierGrant);
                 removeCache(`integration_connections:${companyId}`);
                 connectionsChanged(companyId, existing._id, { status: 'connected', enabled: true });
                 return res.send({ status: true, statusText: 'Updated.', data: R.redact(upd) });
@@ -129,6 +132,7 @@ exports.disconnect = async (req, res) => {
             data: [{ _id, deletedStatusKey: { $ne: 1 } }, { $set: { deletedStatusKey: 1, enabled: false, status: 'disconnected', updatedBy: String(req.uid || '') } }, { returnDocument: 'after' }],
         }, 'findOneAndUpdate');
         if (!removed) return refuse(res, 404, 'Not found.');
+        await revokeGrantOf(companyId, removed);
         await H.revokeSecrets({ companyId, row: removed, actor: actorOf(req) });
         removeCache(`integration_connections:${companyId}`);
         connectionsChanged(companyId, _id, { status: 'disconnected', enabled: false });

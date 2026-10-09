@@ -82,6 +82,7 @@ const PUBLIC_ROUTES = [
     'GET /api/v1/download/:bucketId/*',
     // A provider redirect carries no session; the signed state authenticates it.
     'GET /api/v1/cloud-oauth/callback',
+    'GET /api/v1/github-connect/callback',
     // Google's redirect for a person's connector: it exchanges nothing, and the signed-in page completes it.
     'GET /api/v1/connector-oauth/google/callback',
     // Slack slash command: checked against the workspace's Slack verification token.
