@@ -7,6 +7,8 @@ team: site
 tools: [queue.list, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.history, task.relations.list, page.get, pages.search, queue.claim, queue.release, task.comment, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.status.set]
 hands_to: [construction-project-planner, change-order-recorder]
 gates: [the design manager approves the wording of an RFI before it is sent to the designer]
+starter_rules: [tag:rfi]
+tags: [rfi]
 ---
 
 # RFI Tracker (Construction, Site operations and design)

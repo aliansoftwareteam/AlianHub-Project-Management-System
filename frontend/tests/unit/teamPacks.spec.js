@@ -32,11 +32,12 @@ const store = createStore({
 const access = store.state.settings;
 const projectState = store.state.projectData;
 
-const TRIAGER = { key: 'it-company/bug-triager', slug: 'bug-triager', name: 'Bug Triager', department: 'Engineering', summary: 'Sorts new bugs.', tools: ['task.get', 'task.comment'] };
-const REVIEWER = { key: 'it-company/code-reviewer', slug: 'code-reviewer', name: 'Code Reviewer', department: 'Engineering', summary: 'Reviews pull requests.', tools: ['task.get'] };
+const TRIAGER = { key: 'it-company/bug-triager', slug: 'bug-triager', name: 'Bug Triager', department: 'Engineering', summary: 'Sorts new bugs.', tools: ['task.get', 'task.comment'], starterRules: [{ kind: 'type', value: 'Bug' }], tags: ['bug', 'needs-triage'] };
+const REVIEWER = { key: 'it-company/code-reviewer', slug: 'code-reviewer', name: 'Code Reviewer', department: 'Engineering', summary: 'Reviews pull requests.', tools: ['task.get'], starterRules: [], tags: ['Bug'] };
 const LEAD = { key: 'it-company/design-lead', slug: 'design-lead', name: 'Design Lead', department: 'Design', summary: 'Runs design reviews.', tools: ['task.get'] };
 const PACKS = [{ blueprint: 'it-company', teams: [{ team: 'engineering', roles: [TRIAGER, REVIEWER] }, { team: 'design', roles: [LEAD] }] }];
 
+const RULE = { role: 'it-company/bug-triager', when: { taskTypeKeys: [4] } };
 const ok = (data) => Promise.resolve({ data: { status: true, data } });
 let applied;
 const serve = ({ on = true, refuse = null } = {}) => apiRequest.mockImplementation((type, url, body) => {
@@ -45,7 +46,10 @@ const serve = ({ on = true, refuse = null } = {}) => apiRequest.mockImplementati
         if (refuse) return Promise.reject({ response: { status: refuse, data: { statusText: 'refused' } } });
         if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: body.roles[projectId], mode: 'off' })) });
         applied = body;
-        return ok({ blueprint: body.blueprint, teams: body.teams, projects: [{ projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest' }, { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off' }] });
+        return ok({ blueprint: body.blueprint, teams: body.teams, projects: [
+            { projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', rules: body.starterRules ? [RULE] : [], skippedRules: 0, tags: ['bug', 'needs-triage'], proposalId: 'prop1' },
+            { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off', rules: [], skippedRules: 1, tags: [], proposalId: null }
+        ] });
     }
     return ok([]);
 });
@@ -113,7 +117,7 @@ describe('Team packs', () => {
         for (const input of wrapper.findAll('[data-test="tp-project"] input')) await input.setValue(true);
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
         await flushPromises();
-        expect(applied).toEqual({ blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'] });
+        expect(applied).toEqual({ blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], starterRules: true, proposeTags: true });
         const result = wrapper.find('[data-test="tp-result"]');
         expect(result.text()).toContain('Turned on 4 roles.');
         expect(result.text()).toContain('Mobile app: the dispatcher is in suggest mode.');
@@ -122,9 +126,37 @@ describe('Team packs', () => {
         await wrapper.find('[data-test="tp-undo"]').trigger('click');
         await flushPromises();
         const undo = apiRequest.mock.calls.find(([type, , body]) => type === 'post' && body.undo);
-        expect(undo[2]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], roles: { p1: [TRIAGER.key, REVIEWER.key], p2: [TRIAGER.key, REVIEWER.key] } });
+        expect(undo[2]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: ['p1', 'p2'], roles: { p1: [TRIAGER.key, REVIEWER.key], p2: [TRIAGER.key, REVIEWER.key] }, rules: { p1: [RULE], p2: [] }, proposals: { p1: 'prop1' } });
         expect(wrapper.find('[data-test="tp-result"]').text()).toContain('The pack\'s roles are off again.');
         expect(wrapper.find('[data-test="tp-undo"]').exists()).toBe(false);
+    });
+
+    it('offers the starter rules as a checkbox that is on, and sends what it says', async () => {
+        route.query = { blueprint: 'it-company', team: 'engineering' };
+        const wrapper = await mountWith(AiTeamPacks);
+        const box = wrapper.find('[data-test="tp-starter-rules"]');
+        expect(box.element.checked).toBe(true);
+        expect(wrapper.find('[data-test="tp-starter-rules-hint"]').text()).toContain('One starter rule');
+        expect(wrapper.find('[data-test="tp-tags-hint"]').text()).toContain('bug, needs-triage');
+        await box.setValue(false);
+        await wrapper.find('[data-test="tp-project"] input').setValue(true);
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        expect(applied).toMatchObject({ starterRules: false, proposeTags: true });
+        expect(wrapper.find('[data-test="tp-result"]').text()).not.toContain('routing rule');
+    });
+
+    it('tells what each project got: rules added, rules waiting and tags proposed for approval', async () => {
+        route.query = { blueprint: 'it-company', team: 'engineering' };
+        const wrapper = await mountWith(AiTeamPacks);
+        for (const input of wrapper.findAll('[data-test="tp-project"] input')) await input.setValue(true);
+        await wrapper.find('[data-test="tp-apply"]').trigger('click');
+        await flushPromises();
+        const lines = wrapper.findAll('[data-test="tp-result"] li').map((li) => li.text());
+        expect(lines[0]).toContain('Added one routing rule.');
+        expect(lines[0]).toContain('Proposed 2 tags for approval: bug, needs-triage.');
+        expect(lines[1]).toContain('One starter rule waits for a tag or task type this project lacks.');
+        expect(lines[1]).not.toContain('Proposed');
     });
 
     it('says the dispatcher is off and keeps the button shut', async () => {

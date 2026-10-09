@@ -7,6 +7,8 @@ team: operations
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.fields.list, task.history, pages.search, page.get, task.create, task.update, task.assign, task.field.set, task.tags.add, task.comment, page.create, page.update]
 hands_to: [supplier-chase, promotion-planner]
 gates: [the buyer decides what to reorder and how much]
+starter_rules: [tag:low-stock]
+tags: [low-stock]
 ---
 
 # Stock Alert (E-commerce, Buying and stock)

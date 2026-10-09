@@ -7,6 +7,9 @@ const path = require('path');
 const ROOT = path.join(__dirname, '../../Modules/Agents/roles');
 const KEYS = ['slug', 'name', 'blueprint', 'department', 'team', 'tools', 'hands_to', 'gates'];
 const LISTS = ['tools', 'hands_to', 'gates'];
+const OPTIONAL_LISTS = ['starter_rules', 'tags'];
+const STARTER_RULE = /^(type|tag|priority):\S.*$/;
+const PRIORITIES = ['URGENT', 'HIGH', 'MEDIUM', 'LOW'];
 const SECTIONS = [
     'Who it is',
     'What it is responsible for',
@@ -61,6 +64,42 @@ describe('role playbooks', () => {
         expect(short).toEqual([]);
         const notLists = FILES.flatMap(({ rel, meta }) => LISTS.filter((key) => !Array.isArray(meta[key])).map((key) => `${rel}: ${key}`));
         expect(notLists).toEqual([]);
+    });
+
+    it('write the optional starter_rules and tags as lists', () => {
+        const notLists = FILES.flatMap(({ rel, meta }) => OPTIONAL_LISTS.filter((key) => meta[key] !== undefined && !Array.isArray(meta[key])).map((key) => `${rel}: ${key}`));
+        expect(notLists).toEqual([]);
+    });
+
+    it('write each starter rule as a type, tag or priority condition, with a priority the company has', () => {
+        const bad = FILES.flatMap(({ rel, meta }) => (meta.starter_rules || []).filter((rule) => !STARTER_RULE.test(rule) || (rule.startsWith('priority:') && !PRIORITIES.includes(rule.slice('priority:'.length)))).map((rule) => `${rel}: ${rule}`));
+        expect(bad).toEqual([]);
+    });
+
+    it('keep tags short, few and distinct, and never name a tag twice', () => {
+        const bad = FILES.flatMap(({ rel, meta }) => {
+            const tags = meta.tags || [];
+            const lower = tags.map((tag) => tag.toLowerCase());
+            return [
+                ...tags.filter((tag) => tag.length > 50).map((tag) => `${rel}: ${tag} is too long`),
+                ...(tags.length > 6 ? [`${rel}: more than 6 tags`] : []),
+                ...(new Set(lower).size !== lower.length ? [`${rel}: a tag is named twice`] : []),
+            ];
+        });
+        expect(bad).toEqual([]);
+    });
+
+    it('offer a tag condition only for a tag the same role proposes, so the rule has a tag to wait for', () => {
+        const orphan = FILES.flatMap(({ rel, meta }) => (meta.starter_rules || [])
+            .filter((rule) => rule.startsWith('tag:') && !(meta.tags || []).map((tag) => tag.toLowerCase()).includes(rule.slice('tag:'.length).toLowerCase()))
+            .map((rule) => `${rel}: ${rule}`));
+        expect(orphan).toEqual([]);
+    });
+
+    it('give starter rules to a handful of roles in every blueprint', () => {
+        const byBlueprint = new Map();
+        FILES.forEach(({ meta }) => byBlueprint.set(meta.blueprint, (byBlueprint.get(meta.blueprint) || 0) + ((meta.starter_rules || []).length ? 1 : 0)));
+        expect([...byBlueprint].filter(([, count]) => count < 3 || count > 8).map(([blueprint]) => blueprint)).toEqual([]);
     });
 
     it('use a slug no other blueprint uses, since readAll refuses a repeated slug', () => {

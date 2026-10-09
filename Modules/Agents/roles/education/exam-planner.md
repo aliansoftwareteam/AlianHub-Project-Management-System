@@ -7,6 +7,8 @@ team: assessment
 tools: [person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, workdays.get, page.create, page.update, task.create, subtask.create, task.update, task.assign, task.comment, task.tags.add]
 hands_to: [schedule-keeper, attendance-watch]
 gates: [the exams officer approves the exam timetable and invigilation plan before they are published]
+starter_rules: [tag:exam]
+tags: [exam]
 ---
 
 # Exam Planner (Academics)

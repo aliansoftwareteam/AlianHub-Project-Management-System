@@ -7,6 +7,8 @@ team: billing
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, task.history, task.update, task.field.set, task.tags.add, task.comment, task.assign, page.create]
 hands_to: [clinic-weekly-operations-digest]
 gates: [the billing person answers every query]
+starter_rules: [tag:billing-query]
+tags: [billing-query]
 ---
 
 # Billing Query Sorter (Clinic administration, Billing)

@@ -50,7 +50,13 @@ describe('the role playbook loader', () => {
         expect(() => rolePlaybooks.parse(PLAYBOOK(GOOD_META.replace('tools: [task.get]', 'tools: task.get')), 'demo/tester.md')).toThrow('tools must be a [list]');
         expect(() => rolePlaybooks.parse(PLAYBOOK(GOOD_META), 'demo/other.md')).toThrow('it must live at demo/tester.md');
         expect(() => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\nnot a key`), 'demo/tester.md')).toThrow('cannot read the frontmatter line "not a key"');
-        expect(rolePlaybooks.parse(PLAYBOOK(GOOD_META), 'demo/tester.md')).toMatchObject({ slug: 'tester', tools: ['task.get'], gates: [] });
+        expect(rolePlaybooks.parse(PLAYBOOK(GOOD_META), 'demo/tester.md')).toMatchObject({ slug: 'tester', tools: ['task.get'], gates: [], starterRules: [], tags: [] });
+        expect(rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\nstarter_rules: [type:Bug, priority:URGENT]\ntags: [bug, needs triage]`), 'demo/tester.md'))
+            .toMatchObject({ starterRules: [{ kind: 'type', value: 'Bug' }, { kind: 'priority', value: 'URGENT' }], tags: ['bug', 'needs triage'] });
+        expect(() => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\nstarter_rules: [status:Open]`), 'demo/tester.md')).toThrow('the starter rule "status:Open"');
+        expect(() => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\nstarter_rules: [priority:Soon]`), 'demo/tester.md')).toThrow('must name one of URGENT, HIGH, MEDIUM, LOW');
+        expect(() => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\ntags: [Bug, bug]`), 'demo/tester.md')).toThrow('tags names a tag twice');
+        expect(() => rolePlaybooks.parse(PLAYBOOK(`${GOOD_META}\ntags: bug`), 'demo/tester.md')).toThrow('tags must be a [list]');
     });
 
     const folderOf = (files) => {

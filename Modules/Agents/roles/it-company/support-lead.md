@@ -7,6 +7,8 @@ team: support
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, task.history, task.relations.list, task.fields.list, members.list, performance.read, pages.search, page.get, page.create, page.update, task.comment, task.assign, task.update, task.tags.add, task.status.set]
 hands_to: [bug-triager, knowledge-base-writer, feedback-collector]
 gates: [a support person sends every customer message, the support manager approves the weekly summary]
+starter_rules: [tag:support]
+tags: [support, customer-reported]
 ---
 
 # Support Lead (Support)

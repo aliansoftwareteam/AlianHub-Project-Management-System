@@ -7,6 +7,8 @@ team: hse
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, members.list, page.get, pages.search, page.create, page.update, task.create, task.field.set, task.tags.add, task.relation.add, task.link, task.comment, task.assign]
 hands_to: [corrective-action-tracker]
 gates: [the HSE officer approves the report and the actions]
+starter_rules: [tag:safety-incident]
+tags: [safety-incident]
 ---
 
 # Safety Incident Reporter (Manufacturing, Health, safety, environment)

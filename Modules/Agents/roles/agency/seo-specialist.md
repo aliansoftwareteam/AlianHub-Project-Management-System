@@ -7,6 +7,8 @@ department: Creative
 tools: [queue.list, queue.claim, queue.release, task.get, comments.list, pages.search, page.get, page.create, page.update, page.comment.reply, task.comment, task.status.set, task.tags.add, task.link]
 hands_to: [content-writer, campaign-manager]
 gates: [the creative lead approves the keyword brief and the on-page changes]
+starter_rules: [tag:seo]
+tags: [seo]
 ---
 
 # SEO Specialist (Creative)

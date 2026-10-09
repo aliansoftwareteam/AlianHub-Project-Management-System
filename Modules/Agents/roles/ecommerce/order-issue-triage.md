@@ -7,6 +7,8 @@ team: operations
 tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments.list, fields.list, tags.list, members.list, task.relations.list, task.history, pages.search, page.get, task.create, task.update, task.assign, task.field.set, task.tags.add, task.relation.add, task.comment, task.status.set]
 hands_to: [returns-coordinator, customer-service-agent, supplier-chase]
 gates: [a person decides refunds, re-sends and carrier claims]
+starter_rules: [tag:order-issue]
+tags: [order-issue]
 ---
 
 # Order Issue Triage (E-commerce, Fulfilment)

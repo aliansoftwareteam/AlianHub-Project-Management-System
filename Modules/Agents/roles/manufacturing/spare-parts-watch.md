@@ -7,6 +7,8 @@ team: maintenance
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, page.create, page.update, task.comment, task.tags.add, task.relation.add, task.link]
 hands_to: [purchase-request-preparer]
 gates: [the maintenance lead approves each reorder before a purchase request is raised]
+starter_rules: [tag:spare-parts]
+tags: [spare-parts]
 ---
 
 # Spare Parts Watch (Manufacturing, Maintenance)
