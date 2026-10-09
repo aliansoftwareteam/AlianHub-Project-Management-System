@@ -136,7 +136,13 @@ const THREAD_REFUSED = 'the task\'s comment thread is not one the person this ru
  * evaluate, so nothing is written. */
 /* A reply (`replyTo`, a comment on this task) is placed by the web app's comment route's own rule, and is held to
  * that thread as well as the task's. */
-const addComment = async (companyId, taskId, body, context = {}, { replyTo = '' } = {}) => {
+/* A new comment raises the unread counts of the task's people but its author's, as the comment route does; a reply
+ * is announced to its thread instead. Required on use: the counts pull in the notification modules. */
+const countUnread = (companyId, saved, mentionIds) => require('../../Comments/helpers/unreadBumps')
+    .bumpUnreadCounts(companyId, typeof saved.toObject === 'function' ? saved.toObject() : saved, mentionIds)
+    .catch((error) => require('../../../Config/loggerConfig').error(`[comments] unread counts not raised: ${error.message}`));
+
+const addComment = async (companyId, taskId, body, context = {}, { replyTo = '', resolveMentions = false } = {}) => {
     const task = await getTask(companyId, taskId);
     const text = String(body || '').trim();
     if (!text) throw new DeterministicError('comment body is empty');
@@ -160,11 +166,16 @@ const addComment = async (companyId, taskId, body, context = {}, { replyTo = '' 
         if (!access.allowed) throw new DeterministicError(THREAD_REFUSED);
     }
 
+    const authorId = context.userId || (context.ruleId ? `automation:${context.ruleId}` : 'automation');
+    const mentionIds = resolveMentions
+        ? await require('../../Comments/helpers/commentNotifications').resolveMentionIds(companyId, authorId, threadOf(placement.data), text)
+        : [];
     const saved = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.COMMENTS,
         data: {
             ...placement.data,
-            userId: context.userId || (context.ruleId ? `automation:${context.ruleId}` : 'automation'),
+            userId: authorId,
+            ...(mentionIds.length ? { mentionIds } : {}),
             type: 'text',
             message: text,
             isDeleted: false,
@@ -178,7 +189,10 @@ const addComment = async (companyId, taskId, body, context = {}, { replyTo = '' 
         },
     }, 'save');
 
-    if (saved && saved._id) emitCommentInsert(companyId, saved, context);
+    if (saved && saved._id) {
+        emitCommentInsert(companyId, saved, context);
+        if (!replyTo) await countUnread(companyId, saved, mentionIds);
+    }
 
     recordAutomationAudit(companyId, context, {
         action: 'automation.task.comment',
@@ -188,7 +202,7 @@ const addComment = async (companyId, taskId, body, context = {}, { replyTo = '' 
         meta: { runId: context.runId || null, ruleId: context.ruleId || null },
     });
 
-    return { changed: true, commentId: saved && saved._id ? String(saved._id) : null };
+    return { changed: true, commentId: saved && saved._id ? String(saved._id) : null, mentionIds };
 };
 
 /* Rules name a status by label; the project owns the list.
