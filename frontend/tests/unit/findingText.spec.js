@@ -42,6 +42,22 @@ describe('findingReasons', () => {
     });
 });
 
+describe('triage suggestions', () => {
+    const base = { rule: 'triage', facts: { taskKey: 'AH-7', reason: 'It blocks sign-in.' } };
+
+    it('each kind says what the AI model suggests, then its own reason', () => {
+        expect(findingReasons(t, { ...base, facts: { ...base.facts, kind: 'priority', priority: 'HIGH' } })).toEqual(['ProjectManager.reason_triage_priority(priority=HIGH)', 'It blocks sign-in.']);
+        expect(findingReasons(t, { ...base, facts: { kind: 'estimate', minutes: 90 } })).toEqual(['ProjectManager.reason_triage_estimate(n=90)']);
+        expect(findingReasons(t, { ...base, facts: { kind: 'duplicate', duplicateKey: 'AH-2' } })).toEqual(['ProjectManager.reason_triage_duplicate(other=AH-2)']);
+    });
+
+    it('offers and words the change by kind', () => {
+        expect(findingOffer(t, { ...base, facts: { ...base.facts, kind: 'estimate' } })).toBe('ProjectManager.offer_triage_estimate(task=AH-7)');
+        expect(findingFix(t, { ...base, facts: { ...base.facts, kind: 'priority', priority: 'LOW' } })).toBe('ProjectManager.fix_triage_priority(task=AH-7,priority=LOW)');
+        expect(findingFix(t, { ...base, facts: { ...base.facts, kind: 'duplicate', duplicateKey: 'AH-2' } })).toBe('ProjectManager.fix_triage_duplicate(task=AH-7,other=AH-2)');
+    });
+});
+
 describe('findingOffer', () => {
     it('names the task by its key, else by its name, else by nothing', () => {
         expect(findingOffer(t, { rule: 'stale', facts: { taskKey: 'AH-5', taskName: 'Fix' } })).toBe('ProjectManager.offer_stale(task=AH-5)');

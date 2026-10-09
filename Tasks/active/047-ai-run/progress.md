@@ -359,3 +359,4 @@ Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 I
 - The live view tab did not appear on the real build although its spec passed: a hidden tab drops its socket. Fixed in #1578 (build 822). Not seen by eye: the coordinator's browser pane is always hidden.
 - The local server's AI provider switched to Anthropic Sonnet 5.5 at the owner's request; the key is in the admin field.
 
+- AI-6, triage with the server model: the project manager asks the configured model once per batch of new tasks for a priority, an estimate and a likely duplicate, each filed as a suggestion a person accepts (`Modules/Agents/managerTriage.js`, hourly job `projectTriage`). Skips with AI off, no priced provider or the cap reached.

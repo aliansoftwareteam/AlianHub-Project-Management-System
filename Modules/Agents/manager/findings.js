@@ -13,7 +13,8 @@ const STATUS = Object.freeze({ OPEN: 'open', HANDLED: 'handled', DECLINED: 'decl
 const HANDED_OVER = 'handed_over';
 // A question a person put to their own connected AI in chat (./chatQuestions). It names no task, so nothing here lists it for a person.
 const ASKED_IN_CHAT = 'asked_in_chat';
-const FOUND_BY_NO_RULE = Object.freeze([HANDED_OVER, ASKED_IN_CHAT]);
+// A model's triage suggestion (./triage) is filed once per task and kind; the daily rules neither find it again nor close it.
+const FOUND_BY_NO_RULE = Object.freeze([HANDED_OVER, ASKED_IN_CHAT, RULE.TRIAGE]);
 const LEFT = Object.freeze({ TAKEN_BACK: 'taken_back', FINISHED: 'finished', WITHDRAWN: 'withdrawn' });
 const READ = 200;
 const SHOWN = 50;
@@ -29,6 +30,7 @@ const OFFER_NEEDS = Object.freeze({
     [RULE.UNTRIAGED]: 'task.task_assignee',
     [RULE.NO_ESTIMATE]: 'task.task_estimated_hours',
     [HANDED_OVER]: 'task.task_assignee',
+    [RULE.TRIAGE]: 'task.task_priority',
 });
 
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
