@@ -5610,7 +5610,7 @@
     "Instance.err_boolean": "Use on or off.",
     "Instance.err_credentials": "Leave the user name and password out of the URL; put the key in the API key field.",
     "Instance.err_json": "Enter JSON like {\"model-id\":{\"input\":2,\"output\":8}} with non-negative numbers.",
-    "Instance.err_mcp_issuer": "Connecting by address needs an https public API URL (or MCP_OAUTH_ISSUER). Set that first.",
+    "Instance.err_mcp_issuer": "Connecting by address needs a public API URL that starts with https. Set that first.",
     "Instance.err_number": "Enter a whole number.",
     "Instance.err_option": "Pick one of the listed options.",
     "Instance.err_protocol": "The URL must start with http:// or https://.",

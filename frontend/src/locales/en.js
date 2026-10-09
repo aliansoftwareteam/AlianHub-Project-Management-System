@@ -12194,7 +12194,7 @@ export default {
         f_MCP_TOOLS_WORK: "AI everyday work tools",
         h_MCP_TOOLS_WORK: "Tags, links, lists, doc comments, goals and project setup for a connected AI.",
         err_readonly: "This is set in .env and cannot be changed here.",
-        err_mcp_issuer: "Connecting by address needs an https public API URL (or MCP_OAUTH_ISSUER). Set that first.",
+        err_mcp_issuer: "Connecting by address needs a public API URL that starts with https. Set that first.",
         allowlist_placeholder: "hooks.lan\n192.168.10.0/24",
         include_files:"Include uploaded files (server storage only)",
         backup_now: "Back up now",
