@@ -57,7 +57,7 @@ beforeAll(async () => {
 
 afterAll(async () => { if (mongo) await mongo.close(); });
 
-describe('with MCP_OAUTH unset (the shared server)', () => {
+describe('with MCP_OAUTH off (the shared server)', () => {
     it('answers none of the new routes, as beta does', async () => {
         const owner = await login(state.baseURL, emailFor('owner'));
         const json = { accept: 'application/json' };
