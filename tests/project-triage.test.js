@@ -37,7 +37,7 @@ jest.mock('../Modules/AICore/modelCall', () => ({ askModel: jest.fn(), parseMode
 jest.mock('../Modules/AICore/llmProvider', () => ({ isAnyProviderConfigured: jest.fn(), getProvider: jest.fn(() => ({ model: 'priced-model' })) }));
 jest.mock('../Modules/AICore/aiSwitch', () => ({ allowed: jest.fn(async () => true) }));
 jest.mock('../Modules/AICore/usage', () => ({ checkConfiguredModelPriced: jest.fn() }));
-jest.mock('../Modules/Agents/budget', () => ({ check: jest.fn(async () => ({ ok: true, reason: '' })) }));
+jest.mock('../Modules/Agents/budget', () => ({ check: jest.fn(async () => ({ ok: true, reason: '' })), settings: jest.fn(async () => ({ monthlyBudgetUsd: 0 })) }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/mcpManageWorld');
@@ -83,6 +83,8 @@ beforeEach(() => {
     aiSwitch.allowed.mockResolvedValue(true);
     usage.checkConfiguredModelPriced.mockReturnValue({ ok: true, reason: '', model: 'priced-model' });
     budget.check.mockResolvedValue({ ok: true, reason: '' });
+    budget.settings.mockResolvedValue({ monthlyBudgetUsd: 0 });
+    mockDb.store[SCHEMA_TYPE.AI_USAGE] = [];
     project().agentManager = { on: true };
 });
 afterEach(settle);
@@ -212,5 +214,56 @@ describe('triage with the server model', () => {
         answers({ suggestions: [] });
         await triaged();
         expect(triageRows()[0].status).toBe(findings.STATUS.DECLINED);
+    });
+});
+
+describe('triage spend', () => {
+    const unreadable = (text) => modelCall.askModel.mockResolvedValue({
+        raw: null, text, model: 'priced-model', degraded: 'model did not return valid JSON', refused: null, usage: { inputTokens: 900, outputTokens: 2500, totalTokens: 3400 },
+    });
+
+    it('keeps the day and moves past the batch when a paid answer could not be read, so the batch is not bought twice', async () => {
+        fresh();
+        unreadable('{"suggestions": [{"id": "n1", "prio');
+        expect(await triage.runForCompany(CID, WEDNESDAY)).toEqual({ triaged: 1, filed: 0 });
+        expect(project().agentManagerTriagedOn).toBe('2026-10-07');
+        expect(await triage.runForCompany(CID, WEDNESDAY)).toEqual({ triaged: 0, filed: 0 });
+        expect(await triage.runForCompany(CID, new Date('2026-10-08T09:00:00Z'))).toEqual({ triaged: 0, filed: 0 });
+        expect(modelCall.askModel).toHaveBeenCalledTimes(1);
+    });
+
+    it('files the suggestions a truncated answer finished before the cut', async () => {
+        fresh();
+        fresh();
+        unreadable('{"suggestions": [{"id": "n1", "priority": "LOW", "reason": "a } in {text"}, {"id": "n2", "priority": "HI');
+        expect(await triaged()).toMatchObject({ triaged: 2, filed: 1 });
+        expect(triageRows()).toHaveLength(1);
+        expect(triageRows()[0].facts).toMatchObject({ kind: 'priority', priority: 'LOW' });
+    });
+
+    it('stops for the day at the default cap when the workspace set no monthly budget', async () => {
+        fresh();
+        answers({ suggestions: [] });
+        mockDb.seed(SCHEMA_TYPE.AI_USAGE, { companyId: CID, feature: FEATURES.PROJECT_TRIAGE, costUsd: triage.CAPS.DAILY_USD, at: new Date('2026-10-07T01:00:00Z') });
+        expect(await triaged()).toEqual({ skipped: 'daily_cap' });
+        expect(modelCall.askModel).not.toHaveBeenCalled();
+        budget.settings.mockResolvedValue({ monthlyBudgetUsd: 20 });
+        expect(await triaged()).toMatchObject({ triaged: 1 });
+    });
+
+    it('does not skip tasks that share the createdAt where a batch ended', async () => {
+        const same = new Date(WEDNESDAY.getTime() - 3600000);
+        const made = [];
+        for (let i = 0; i < triage.CAPS.BATCH + 2; i += 1) made.push(fresh({ createdAt: same }));
+        const seen = [];
+        modelCall.askModel.mockImplementation(async (skill, { prompt }) => {
+            seen.push(...[...prompt.split('Other open tasks:')[0].matchAll(/"key":"(NEW-\d+)"/g)].map((m) => m[1]));
+            return { raw: { suggestions: [] }, model: 'priced-model', degraded: null, refused: null, usage: {} };
+        });
+        expect(await triaged()).toMatchObject({ triaged: triage.CAPS.BATCH });
+        expect(await triaged()).toMatchObject({ triaged: 2 });
+        expect(await triaged()).toEqual({ skipped: 'no_new_tasks' });
+        expect(seen).toHaveLength(made.length);
+        expect(new Set(seen).size).toBe(made.length);
     });
 });

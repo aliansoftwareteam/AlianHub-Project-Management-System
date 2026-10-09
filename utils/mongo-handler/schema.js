@@ -3706,6 +3706,11 @@ const schema = {
             type: Date,
             required: false
         },
+        // Ids of tasks created at exactly agentManagerTriagedAt that were already triaged.
+        agentManagerTriagedIds: {
+            type: [String],
+            required: false
+        },
         ProjectType: {
             type: String,
             required: true

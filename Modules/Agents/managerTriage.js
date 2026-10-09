@@ -22,11 +22,13 @@ const { RULE, isWorkingDay } = require('./manager/rules');
 // duplicate. One call covers a batch. Each suggestion waits as a proposal; nothing here changes a task.
 
 const KIND = Object.freeze({ PRIORITY: 'priority', ESTIMATE: 'estimate', DUPLICATE: 'duplicate' });
-const SKIPPED = Object.freeze({ NOT_DUE: 'not_due', AI_OFF: 'ai_off', NO_PROVIDER: 'no_provider', UNPRICED: 'unpriced', BUDGET: 'budget', NO_NEW_TASKS: 'no_new_tasks' });
-const CAPS = Object.freeze({ BATCH: 15, NEIGHBOURS: 40, TEXT: 400, NAME: 160, REASON: 160, MAX_TOKENS: 1500, LOOKBACK_DAYS: 7 });
+const SKIPPED = Object.freeze({ NOT_DUE: 'not_due', AI_OFF: 'ai_off', NO_PROVIDER: 'no_provider', UNPRICED: 'unpriced', BUDGET: 'budget', DAILY_CAP: 'daily_cap', NO_NEW_TASKS: 'no_new_tasks', NO_ANSWER: 'no_answer' });
+/* DAILY_USD bounds a workspace that set no monthly budget; a workspace with a budget is bounded by it instead. */
+const CAPS = Object.freeze({ BATCH: 10, NEIGHBOURS: 40, TEXT: 400, NAME: 160, REASON: 160, MAX_TOKENS: 2500, LOOKBACK_DAYS: 7, DAILY_USD: 0.5 });
 const TASK_FIELDS = { TaskName: 1, TaskKey: 1, description: 1, rawDescription: 1, Task_Priority: 1, totalEstimatedTime: 1, points: 1, createdAt: 1 };
 const LOG_PREFIX = '[project-triage]';
 const MARKUP = /<[^>]*>/g;
+// eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f]/g;
 
 const SKILL = Object.freeze({
@@ -48,23 +50,40 @@ const clean = (value, cap) => {
 };
 const hasEstimate = (task) => Number(task.totalEstimatedTime) > 0 || Number(task.points) > 0;
 const keyOf = (task) => task.TaskKey || '';
+const dayOf = (now) => new Date(now).toISOString().slice(0, 10);
+const tokensSpent = (usage) => Boolean(usage) && [usage.totalTokens, usage.inputTokens, usage.outputTokens].some((n) => Number(n) > 0);
 
-const skipReason = async (companyId) => {
+const spentToday = async (companyId, now) => {
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AI_USAGE, data: [{ feature: FEATURES.PROJECT_TRIAGE, at: { $gte: new Date(`${dayOf(now)}T00:00:00.000Z`) } }, 'costUsd'],
+    }, 'find').catch(() => []);
+    return (rows || []).reduce((sum, row) => sum + Number(row.costUsd || 0), 0);
+};
+
+const skipReason = async (companyId, now) => {
     if (!(await aiSwitch.allowed(companyId))) return SKIPPED.AI_OFF;
     if (!isAnyProviderConfigured()) return SKIPPED.NO_PROVIDER;
     const priced = checkConfiguredModelPriced();
     if (!priced.model || !priced.ok) return SKIPPED.UNPRICED;
     if (!(await budget.check(companyId)).ok) return SKIPPED.BUDGET;
+    const { monthlyBudgetUsd } = await budget.settings(companyId);
+    if (!(monthlyBudgetUsd > 0) && (await spentToday(companyId, now)) >= CAPS.DAILY_USD) return SKIPPED.DAILY_CAP;
     return null;
 };
 
 const openTasks = (projectId) => ({ ProjectID: { $in: idForms([String(projectId)]) }, deletedStatusKey: { $ne: 1 }, mainChat: { $ne: true }, statusType: { $nin: CLOSED_STATUS_TYPES } });
 
-const readNew = async (companyId, project, now) => {
+/* The cursor is the last triaged createdAt plus the ids already seen at that instant, so tasks sharing it are neither skipped nor repeated. */
+const cursorOf = (project, now) => {
     const floor = new Date(new Date(now).getTime() - CAPS.LOOKBACK_DAYS * DAY_MS);
-    const since = project.agentManagerTriagedAt && new Date(project.agentManagerTriagedAt) > floor ? new Date(project.agentManagerTriagedAt) : floor;
-    return find(companyId, [{ ...openTasks(project._id), createdAt: { $gt: since } }, TASK_FIELDS, { sort: { createdAt: 1 }, limit: CAPS.BATCH }]);
+    const at = project.agentManagerTriagedAt ? new Date(project.agentManagerTriagedAt) : null;
+    return at && at >= floor ? { since: at, seen: (project.agentManagerTriagedIds || []).map(String) } : { since: floor, seen: [] };
 };
+
+const readNew = (companyId, project, cursor) => find(companyId, [
+    { ...openTasks(project._id), createdAt: { $gte: cursor.since }, ...(cursor.seen.length ? { _id: { $nin: idForms(cursor.seen) } } : {}) },
+    TASK_FIELDS, { sort: { createdAt: 1, _id: 1 }, limit: CAPS.BATCH },
+]);
 
 const readNeighbours = (companyId, projectId, batch) => find(companyId, [
     { ...openTasks(projectId), _id: { $nin: batch.map((task) => oid(task._id)) } }, TASK_FIELDS, { sort: { createdAt: -1 }, limit: CAPS.NEIGHBOURS },
@@ -79,6 +98,28 @@ const promptOf = (batch, neighbours) => [
     'New tasks:', ...batch.map((task, i) => line(`n${i + 1}`, task, true)),
     'Other open tasks:', ...neighbours.map((task, i) => line(`o${i + 1}`, task, false)),
 ].join('\n');
+
+const parsedOrNull = (text) => { try { return JSON.parse(text); } catch (e) { return null; } };
+
+/* A truncated answer still holds every suggestion object that closed before the cut. */
+const salvage = (text) => {
+    const body = String(text || '');
+    const out = [];
+    let depth = 0; let from = -1; let inString = false; let escaped = false;
+    for (let i = body.indexOf('[') + 1; i > 0 && i < body.length; i += 1) {
+        const c = body[i];
+        if (inString) {
+            if (escaped) escaped = false; else if (c === '\\') escaped = true; else if (c === '"') inString = false;
+        } else if (c === '"') inString = true;
+        else if (c === '{') { if (depth === 0) from = i; depth += 1; }
+        else if (c === '}' && depth > 0) {
+            depth -= 1;
+            const item = depth === 0 ? parsedOrNull(body.slice(from, i + 1)) : null;
+            if (item) out.push(item);
+        } else if (c === ']' && depth === 0) break;
+    }
+    return out.length ? { suggestions: out } : null;
+};
 
 /* The model's answer is data: only a listed id, a known priority and a sane whole-minute estimate get through. */
 const readSuggestions = (raw, batch, neighbours) => {
@@ -157,41 +198,46 @@ const settleAnswered = async (companyId, projectId) => {
     }
 };
 
-const moveCursor = (companyId, project, at) => MongoDbCrudOpration(companyId, {
-    type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(project._id) }, { $set: { agentManagerTriagedAt: at } }],
-}, 'updateOne');
+const moveCursor = (companyId, project, batch, cursor) => {
+    const at = new Date(batch[batch.length - 1].createdAt);
+    const atSame = batch.filter((task) => new Date(task.createdAt).getTime() === at.getTime()).map((task) => String(task._id));
+    const carried = cursor.since.getTime() === at.getTime() ? cursor.seen : [];
+    return MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: oid(project._id) }, { $set: { agentManagerTriagedAt: at, agentManagerTriagedIds: [...new Set([...carried, ...atSame])] } }],
+    }, 'updateOne');
+};
 
-/* One model call for the batch. The cursor moves only after a call that answered, so a skipped or failed day is tried again with the same tasks. */
+/* One model call for the batch. A call that bought tokens moves the cursor even when its answer could not be read, so the batch is never paid for twice;
+ * a skip or a call that cost nothing leaves the cursor, and the same tasks are tried again. */
 const run = async (companyId, project, now = new Date()) => {
     await settleAnswered(companyId, project._id);
-    const reason = await skipReason(companyId);
+    const reason = await skipReason(companyId, now);
     if (reason) return { skipped: reason };
-    const batch = await readNew(companyId, project, now);
+    const cursor = cursorOf(project, now);
+    const batch = await readNew(companyId, project, cursor);
     if (!batch.length) return { skipped: SKIPPED.NO_NEW_TASKS };
     const neighbours = await readNeighbours(companyId, project._id, batch);
     const answer = await askModel(SKILL, {
         prompt: promptOf(batch, neighbours), budget: {}, spend: { feature: FEATURES.PROJECT_TRIAGE, companyId: String(companyId) },
     });
-    if (!answer.raw) {
-        logger.warn(`${LOG_PREFIX} ${companyId}: project ${project._id} not triaged: ${answer.degraded || 'no answer'}`);
-        return { skipped: answer.refused ? SKIPPED.BUDGET : 'no_answer' };
-    }
-    const filed = await file(companyId, project, readSuggestions(answer.raw, batch, neighbours), now);
-    await moveCursor(companyId, project, batch.length === CAPS.BATCH ? batch[batch.length - 1].createdAt : now);
-    return { triaged: batch.length, filed, model: answer.model || '', costUsd: answer.usage && answer.usage.costUsd };
+    const raw = answer.raw || salvage(answer.text);
+    if (!answer.raw) logger.warn(`${LOG_PREFIX} ${companyId}: project ${project._id} answer unreadable${raw ? ', partly salvaged' : ''}: ${answer.degraded || 'no answer'}`);
+    if (!raw && !tokensSpent(answer.usage)) return { skipped: answer.refused ? SKIPPED.BUDGET : SKIPPED.NO_ANSWER };
+    await moveCursor(companyId, project, batch, cursor);
+    const filed = raw ? await file(companyId, project, readSuggestions(raw, batch, neighbours), now) : 0;
+    return { triaged: batch.length, filed, model: answer.model || '', costUsd: answer.usage && answer.usage.costUsd, ...(answer.raw ? {} : { degraded: answer.degraded || 'no answer' }) };
 };
 
 const COMPANY_CONCURRENCY = 5;
-const dayOf = (now) => new Date(now).toISOString().slice(0, 10);
 
-/* The day's mark is taken before the model is asked, so two servers never both pay for the same batch; it is given back when nothing was bought. */
+/* The day's mark is taken before the model is asked, so two servers never both pay for the same batch; it is given back only for a skip that bought nothing. */
 const triageAt = async (companyId, project, now) => {
     const week = await workingDaysOf(companyId, String(project._id));
     if (!isWorkingDay(now, week)) return null;
     const today = dayOf(now);
     const claimed = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.PROJECTS,
-        data: [{ _id: oid(project._id), 'agentManager.on': true, agentManagerTriagedOn: { $ne: today } }, { $set: { agentManagerTriagedOn: today } }, { projection: { ProjectName: 1, agentManagerTriagedAt: 1 } }],
+        data: [{ _id: oid(project._id), 'agentManager.on': true, agentManagerTriagedOn: { $ne: today } }, { $set: { agentManagerTriagedOn: today } }, { projection: { ProjectName: 1, agentManagerTriagedAt: 1, agentManagerTriagedIds: 1 } }],
     }, 'findOneAndUpdate');
     if (!claimed) return null;
     let result;
@@ -208,7 +254,7 @@ const triageAt = async (companyId, project, now) => {
 };
 
 const runForCompany = async (companyId, now = new Date()) => {
-    const projects = await find2(companyId, [{ 'agentManager.on': true, agentManagerTriagedOn: { $ne: dayOf(now) }, deletedStatusKey: { $ne: 1 } }, { ProjectName: 1, agentManagerTriagedAt: 1 }]);
+    const projects = await find2(companyId, [{ 'agentManager.on': true, agentManagerTriagedOn: { $ne: dayOf(now) }, deletedStatusKey: { $ne: 1 } }, { ProjectName: 1, agentManagerTriagedAt: 1, agentManagerTriagedIds: 1 }]);
     const totals = { triaged: 0, filed: 0 };
     for (const project of projects) {
         // eslint-disable-next-line no-await-in-loop
@@ -232,4 +278,4 @@ const runForAllCompanies = async (now = new Date()) => {
     return totals;
 };
 
-module.exports = { KIND, SKIPPED, CAPS, SKILL, run, runForCompany, runForAllCompanies, readSuggestions, finding };
+module.exports = { KIND, SKIPPED, CAPS, SKILL, run, runForCompany, runForAllCompanies, readSuggestions, salvage, finding };
