@@ -47,6 +47,9 @@ const SENT = {
     agentManager: { on: true },
     agentLimits: { atOnce: 9, paused: false },
     agentManagerLookedOn: '2099-01-01',
+    agentManagerTriagedOn: '2099-01-01',
+    agentManagerTriagedAt: '2099-01-01T00:00:00.000Z',
+    agentManagerTriagedIds: ['6a9954186dd786246031e4f1'],
 };
 const CALLERS = [
     ['a signed-in person', {}],

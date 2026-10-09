@@ -499,6 +499,15 @@
     "description": "GitHub OAuth app client secret.",
     "secret": true
   },
+  "GITHUB_CONNECT_CLIENT_ID": {
+    "group": "integrations",
+    "description": "GitHub OAuth app client id for one-click GitHub on App connections; its callback URL is APIURL + /api/v1/github-connect/callback. Falls back to GITHUB_CLIENT_ID."
+  },
+  "GITHUB_CONNECT_CLIENT_SECRET": {
+    "group": "integrations",
+    "description": "Client secret of the one-click GitHub OAuth app. Falls back to GITHUB_CLIENT_SECRET.",
+    "secret": true
+  },
   "GITHUB_TOKEN": {
     "group": "integrations",
     "description": "Token used to read release notes from GitHub for the changelog page.",

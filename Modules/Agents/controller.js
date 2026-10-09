@@ -115,6 +115,12 @@ const refuseSkills = async (res, companyId, set) => {
     return errors.length ? fail(res, 'The agent names skills that cannot run.', 400, { data: { errors } }) : null;
 };
 
+const roleNameOf = (key) => {
+    const [blueprint, slug] = String(key || '').split('/');
+    const role = blueprint && slug ? require('./rolePlaybooks').find(blueprint, slug) : null;
+    return role ? role.name : '';
+};
+
 const agentPatchFields = (body) => {
     const set = {};
     if (body.name !== undefined) set.name = String(body.name).trim().slice(0, 80);
@@ -147,7 +153,7 @@ exports.listAgents = async (req, res) => {
             callerOf(req, companyId).then((caller) => visibleProjectIdsFor(companyId, caller)),
         ]);
         const agents = await skillRecord.enrichAgentSkills(companyId, rows || []);
-        return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map((agent) => ({ ...agent, ...agentProjectsFor(agent, visible) })) });
+        return res.send({ status: true, statusText: 'Agents fetched.', data: agents.map((agent) => ({ ...agent, ...agentProjectsFor(agent, visible), roleName: roleNameOf(agent.role) })) });
     } catch (e) { logger.error(`listAgents: ${e.message}`); return fail(res, e.message, 500); }
 };
 

@@ -7,6 +7,8 @@ team: supplies
 tools: [queue.list, queue.claim, queue.release, task.get, tasks.search, comments.list, fields.list, tags.list, page.get, pages.search, page.create, page.update, task.create, task.comment, task.tags.add, task.link]
 hands_to: []
 gates: [the practice manager approves each reorder]
+starter_rules: [tag:low-stock]
+tags: [low-stock]
 ---
 
 # Supplies Stock Alert (Clinic administration, Supplies)

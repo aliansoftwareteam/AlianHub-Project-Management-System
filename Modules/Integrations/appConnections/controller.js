@@ -10,6 +10,7 @@ const { recordAuditFromReq } = require('../../Audit/recorder');
 const { visibleProjects } = require('../../Agents/scope');
 const R = require('../helpers/integrationsRules');
 const flag = require('./flag');
+const githubOAuth = require('./github/oauth');
 const registry = require('./registry');
 const { connectionsChanged } = require('../helpers/connectionsChanged');
 
@@ -36,7 +37,7 @@ const connectionRow = (row, names, privileged) => {
     const sync = row.sync || {};
     return {
         id: String(row._id), name: row.name, enabled: row.enabled !== false, status: row.status, target: targetOf(row),
-        connectedAt: row.connectedAt || null, secrets: R.redact(row).secrets,
+        connectedAt: row.connectedAt || null, secrets: R.redact(row).secrets, viaOAuth: (row.config || {}).auth === 'oauth',
         lastSyncAt: sync.lastSyncAt || null, lastError: sync.lastError || '', failures: Number(sync.failures) || 0, nextAttemptAt: sync.nextAttemptAt || null,
         ...linkedProjects(row, names, privileged),
     };
@@ -56,7 +57,7 @@ exports.hub = async (req, res) => {
         const names = new Map((projects || []).map((p) => [String(p._id), p.ProjectName || '']));
         const apps = R.getCatalog().map((item) => ({
             key: item.key, name: item.name, category: item.category, icon: item.icon, description: item.description, multiple: item.multiple, fields: item.fields,
-            syncs: !!registry.get(item.key),
+            syncs: !!registry.get(item.key), oneClick: item.key === 'github' && githubOAuth.isConfigured(),
             connections: (rows || []).filter((r) => r.type === item.key).map((r) => connectionRow(r, names, privileged)),
         }));
         return res.send({ status: true, data: { enabled: true, canManage: privileged, apps, projects: (projects || []).map((p) => ({ id: String(p._id), name: p.ProjectName || '' })) } });

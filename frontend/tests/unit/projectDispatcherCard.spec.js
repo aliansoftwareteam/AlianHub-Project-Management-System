@@ -107,6 +107,14 @@ describe('ProjectDispatcherCard', () => {
         expect(putBody()).toEqual({ mode: 'apply', roles: SETTINGS.roles, rules: SETTINGS.rules, threshold: 80, modelGuess: false });
     });
 
+    it('keeps a team pack rule\'s id through a save, so the pack\'s undo still knows it', async () => {
+        const PACK_RULE = { id: 'a'.repeat(24), role: TRIAGER.key, when: { tags: ['bug'] } };
+        const wrapper = await mountCard({ settings: { ...SETTINGS, rules: [...SETTINGS.rules, PACK_RULE] } });
+        await wrapper.find('[data-test="dispatcher-mode"]').setValue('apply');
+        await flushPromises();
+        expect(putBody().rules).toEqual([...SETTINGS.rules, PACK_RULE]);
+    });
+
     it('lists the tasks that need routing and sends one to the role a lead picks', async () => {
         const wrapper = await mountCard();
         const need = wrapper.find('[data-test="dispatcher-need"]');
