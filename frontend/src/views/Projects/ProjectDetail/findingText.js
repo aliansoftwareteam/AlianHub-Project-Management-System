@@ -1,6 +1,9 @@
 const waits = (finding) => finding.rule === "slipping" && Boolean(finding.facts?.blockerKey);
 
-const kindOf = (finding) => (waits(finding) ? "slipping_waits" : finding.rule);
+const kindOf = (finding) => {
+    if (finding.rule === "triage") return `triage_${(finding.facts || {}).kind}`;
+    return waits(finding) ? "slipping_waits" : finding.rule;
+};
 
 const taskOf = (facts) => facts.taskKey || facts.taskName || "";
 
@@ -18,6 +21,9 @@ export const findingReasons = (t, finding) => {
         case "no_owner": return [t("ProjectManager.reason_no_owner")];
         case "no_estimate": return [t("ProjectManager.reason_no_estimate")];
         case "handed_over": return [t("ProjectManager.reason_handed_over")];
+        case "triage_priority": return [t("ProjectManager.reason_triage_priority", { priority: facts.priority }), ...(facts.reason ? [facts.reason] : [])];
+        case "triage_estimate": return [t("ProjectManager.reason_triage_estimate", { n: facts.minutes }, facts.minutes), ...(facts.reason ? [facts.reason] : [])];
+        case "triage_duplicate": return [t("ProjectManager.reason_triage_duplicate", { other: facts.duplicateKey || facts.duplicateName }), ...(facts.reason ? [facts.reason] : [])];
         default: return [];
     }
 };
@@ -31,6 +37,9 @@ export const findingFix = (t, finding) => {
         case "slipping_waits": return t("ProjectManager.fix_slipping_waits", { task: taskOf(facts), n: facts.days }, facts.days);
         case "blocked": return t("ProjectManager.fix_blocked", { blocker: facts.blockerKey });
         case "stale": return t("ProjectManager.fix_stale", { task: taskOf(facts) });
+        case "triage_priority": return t("ProjectManager.fix_triage_priority", { task: taskOf(facts), priority: facts.priority });
+        case "triage_estimate": return t("ProjectManager.fix_triage_estimate", { task: taskOf(facts), n: facts.minutes }, facts.minutes);
+        case "triage_duplicate": return t("ProjectManager.fix_triage_duplicate", { task: taskOf(facts), other: facts.duplicateKey || facts.duplicateName });
         default: return "";
     }
 };

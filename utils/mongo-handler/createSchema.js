@@ -362,6 +362,9 @@ callsSchema.index({ callId: 1 }, { unique: true });
 callsSchema.index({ chatId: 1, createdAt: -1 });
 const integrationConnectionsSchema = new Schema(schema.integrationConnections, {strict: true, timestamps: true});
 integrationConnectionsSchema.index({ type: 1, deletedStatusKey: 1 });
+// One row per app event and task, kept for good: whoever inserts it first acts, so an old pull request updated again never acts twice.
+const appConnectionEventsSchema = new Schema(schema.appConnectionEvents, {strict: true, timestamps: true});
+appConnectionEventsSchema.index({ key: 1 }, { unique: true, name: 'event_task' });
 const cloudStorageConnectionsSchema = new Schema(schema.cloudStorageConnections, {strict: true, timestamps: true});
 // Every lookup is "this user's connection to this provider" — unique so a
 // double-tap on Connect can't leave two rows with divergent refresh tokens.
@@ -609,6 +612,7 @@ module.exports = {
     rolePlaybookOverridesSchema,
     callsSchema,
     integrationConnectionsSchema,
+    appConnectionEventsSchema,
     cloudStorageConnectionsSchema,
     formsSchema,
     formSubmissionsSchema,

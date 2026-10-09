@@ -8,6 +8,8 @@ tools: [queue.list, queue.claim, queue.release, tasks.search, task.get, comments
 tools_optional: [performance.read]
 hands_to: [customer-service-agent, product-listing-writer, returns-coordinator]
 gates: [the service manager approves the weekly summary and decides on escalations]
+starter_rules: [priority:URGENT]
+tags: [escalation]
 ---
 
 # Customer Service Lead (E-commerce, Customer service)

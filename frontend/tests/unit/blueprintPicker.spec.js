@@ -45,8 +45,8 @@ let posted;
 const serve = ({ on = true } = {}) => apiRequest.mockImplementation((type, url, body) => {
     if (type === 'get') return ok({ on, packs: [], companyBlueprints: BLUEPRINTS });
     posted.push(body);
-    if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: body.roles[projectId], mode: 'off' })) });
-    return ok({ blueprint: body.blueprint, teams: body.teams, projects: body.projectIds.map((projectId) => ({ projectId, added: body.only, mode: projectId === 'p1' ? 'suggest' : 'off' })) });
+    if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: IT_PACKS[0].roles, mode: 'off' })) });
+    return ok({ blueprint: body.blueprint, teams: body.teams, applyId: 'ap1', projects: body.projectIds.map((projectId) => ({ projectId, added: body.only, mode: projectId === 'p1' ? 'suggest' : 'off' })) });
 });
 
 const mounted = [];
@@ -98,14 +98,14 @@ describe('the company blueprint picker', () => {
         expect(wrapper.find('[data-test="bp-result"]').text()).toContain('the roles wait until someone switches it on');
     });
 
-    it('undoes with the roles it turned on', async () => {
+    it('undoes the apply the server recorded', async () => {
         const wrapper = await mountWith(BlueprintPicker);
         await wrapper.findAll('[data-test="bp-project"] input')[0].setValue(true);
         await wrapper.find('[data-test="bp-apply"]').trigger('click');
         await flushPromises();
         await wrapper.find('[data-test="bp-undo"]').trigger('click');
         await flushPromises();
-        expect(posted[1]).toMatchObject({ undo: true, blueprint: 'it-company', roles: { p1: IT_PACKS[0].roles } });
+        expect(posted[1]).toEqual({ undo: true, blueprint: 'it-company', teams: ['engineering', 'support'], projectIds: ['p1'], applyId: 'ap1' });
         expect(wrapper.find('[data-test="bp-result"]').text()).toContain('off again');
     });
 

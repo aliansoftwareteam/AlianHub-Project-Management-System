@@ -1200,6 +1200,8 @@ const schema = {
         allowedActions: { type: Array, default: [], required: false },
         // The role it plays ('blueprint/slug' of Modules/Agents/roles), so the dispatcher can give a role's task to the least loaded of its agents.
         role: { type: String, required: false },
+        // 'team-pack:<blueprint>' on an agent a team pack made, so undoing the pack can find it again.
+        madeBy: { type: String, required: false },
         projectIds: { type: Array, default: [], required: false },
         // 0 suggest everything · 1 act on low risk · 2 act on medium, propose the rest · 3 also on a schedule
         autonomy: { type: Number, default: 0, required: false },
@@ -1763,8 +1765,16 @@ const schema = {
         status: { type: String, default: 'connected', required: false },
         enabled: { type: Boolean, default: true, required: false },
         createdBy: { type: String, required: false },
+        connectedBy: { type: String, required: false },
         connectedAt: { type: Date, required: false },
+        projectIds: { type: [String], default: undefined, required: false },
+        sync: { type: Object, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    appConnectionEvents: {
+        key: { type: String, required: true },
+        connectionId: { type: String, required: false },
+        taskId: { type: String, required: false },
     },
     // AHE-3838 — one row per (user, cloud storage provider). Distinct from
     // integrationConnections above, which holds the COMPANY's app registration:
@@ -2328,8 +2338,11 @@ const schema = {
         updatedBy: { type: String, required: false },
         updatedAt: { type: Date, required: false },
         // The dispatcher (Modules/AssignmentRules/dispatcher): { mode: off | suggest | apply, threshold, modelGuess, roles: ['blueprint/slug'],
-        // rules: [{ role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
+        // rules: [{ id?, role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
         dispatcher: { type: Object, required: false },
+        // What each team pack applied here, so its undo takes back only that (Modules/AssignmentRules/dispatcher/packs.js):
+        // [{ applyId, blueprint, projectIds, roles, rules: [{ id, role, when }], proposalId, agents: { made, widened: [{ agentId, projectIds }] }, skills, by, at }]
+        teamPacks: { type: Array, default: undefined, required: false },
     },
     // One decision per task revision: what the rules chose, why, and what became of it. `inputHash` covers the task text
     // and the rule revision, so the same task is never decided twice for the same input.
@@ -3694,6 +3707,21 @@ const schema = {
         // The day (YYYY-MM-DD) of the last daily look: the mark a server takes before it looks, so two never look on one day.
         agentManagerLookedOn: {
             type: String,
+            required: false
+        },
+        // The day (YYYY-MM-DD) of the last triage: the mark a server takes before it asks the model.
+        agentManagerTriagedOn: {
+            type: String,
+            required: false
+        },
+        // The creation time up to which the manager's model has triaged new tasks (Modules/Agents/managerTriage.js).
+        agentManagerTriagedAt: {
+            type: Date,
+            required: false
+        },
+        // Ids of tasks created at exactly agentManagerTriagedAt that were already triaged.
+        agentManagerTriagedIds: {
+            type: [String],
             required: false
         },
         ProjectType: {

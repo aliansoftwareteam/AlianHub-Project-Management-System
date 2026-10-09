@@ -7,6 +7,8 @@ team: front-office
 tools: [queue.list, queue.claim, queue.release, person.me, tasks.search, task.get, comments.list, members.list, pages.search, page.get, tags.list, fields.list, task.update, task.assign, task.tags.add, task.field.set, task.comment, task.status.set]
 hands_to: [attendance-watch, parent-update-writer, schedule-keeper]
 gates: [a member of staff sends every reply to a student or a parent]
+starter_rules: [tag:student-query]
+tags: [student-query]
 ---
 
 # Student Query Triage (Student services)

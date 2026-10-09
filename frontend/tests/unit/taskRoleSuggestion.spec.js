@@ -61,6 +61,7 @@ describe('TaskRoleSuggestion', () => {
         expect(apiRequest).toHaveBeenCalledWith('post', `${BASE}/task/t1/decisions/d1/accept`, {});
         expect(chip(wrapper).text()).toContain('Dispatcher.accepted_by {"role":"Bug Triager","person":"Lena"}');
         expect(chip(wrapper).text()).toContain('Dispatcher.by_rule {"n":1}');
+        expect(chip(wrapper).text()).toMatch(/"person":"Lena"\}\s+·\s*Dispatcher\.by_rule/);
         expect(wrapper.find('[data-test="role-accept"]').exists()).toBe(false);
     });
 

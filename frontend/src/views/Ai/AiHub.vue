@@ -37,6 +37,7 @@
                                 <div class="ai-agent__name">
                                     <strong>{{ agent.name }}</strong>
                                     <span class="ah-chip ah-chip--agent" data-test="agent-autonomy" :title="autonomyTip(t, agent.autonomy)">{{ autonomyName(t, agent.autonomy) }}</span>
+                                    <span v-if="agent.roleName" class="ah-chip ah-chip--brand" data-test="agent-role">{{ agent.roleName }}</span>
                                     <span v-if="agent.paused" class="ah-chip ah-chip--warn">{{ $t('Ai.paused') }}</span>
                                 </div>
                                 <div class="ai-agent__scope">{{ scopeOf(agent) }}</div>

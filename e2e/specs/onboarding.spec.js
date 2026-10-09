@@ -68,10 +68,10 @@ test.describe('a brand-new account', () => {
     test.use({ viewport: { width: 1280, height: 800 } });
     test.beforeEach(async ({ page }) => skipFirstRun(page));
 
-    const FIVE = ['Home', 'My work', 'Projects', 'Inbox', 'Ask'];
+    const SIMPLE = ['Home', 'My work', 'Projects', 'Inbox', 'Ask', 'App connections'];
 
     // A member made for this test: the saved role sessions are shared by every other spec and stay on the full rail.
-    test('starts on five places, still reaches the rest, and switches to Full in one click', async ({ page, state, loginAs }) => {
+    test('starts on six places, still reaches the rest, and switches to Full in one click', async ({ page, state, loginAs }) => {
         const owner = await loginAs('owner');
         const suffix = uniqueSuffix();
         const email = emailFor('member', suffix);
@@ -82,8 +82,8 @@ test.describe('a brand-new account', () => {
         const places = rail.locator('.ah-rail__items > a.ah-rail__item .ah-rail__label');
         await expect(places.first()).toHaveText('Home');
         const shown = await places.allTextContents();
-        expect(shown.map((label) => label.trim()).filter((label) => !FIVE.includes(label))).toEqual([]);
-        expect(shown.length).toBeLessThanOrEqual(FIVE.length);
+        expect(shown.map((label) => label.trim()).filter((label) => !SIMPLE.includes(label))).toEqual([]);
+        expect(shown.length).toBeLessThanOrEqual(SIMPLE.length);
         await expect(rail.getByRole('link', { name: 'Planner' })).toHaveCount(0);
 
         await rail.getByRole('button', { name: 'More' }).click();
