@@ -1,0 +1,40 @@
+{
+    "job": 3,
+    "title": "Message to task",
+    "sentence": "Make a task in [AI bench] list from the last message in the scratch channel.",
+    "start": "The chat",
+    "passed": "AI-1 run 1, 2026-10-08, builds 815 to 817: pass, no approval, 11 steps",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "calls": [
+        {
+            "tool": "chat.channels.list",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "chat.messages.list",
+            "arguments": {
+                "channelId": "$channel:scratch",
+                "limit": 1
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "lists.list",
+            "arguments": {
+                "projectId": "$project"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "task.from_message",
+            "arguments": {
+                "messageId": "$message:[AI bench] Please fix the login page",
+                "projectId": "$project",
+                "sprintId": "$list"
+            },
+            "answer": "applied"
+        }
+    ],
+    "undo": true
+}

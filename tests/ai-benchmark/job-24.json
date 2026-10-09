@@ -1,0 +1,48 @@
+{
+    "job": 24,
+    "title": "Search and open",
+    "sentence": "Open the task about the supplier, and open the doc about the launch.",
+    "start": "Home",
+    "passed": "AI-1 run 1, 2026-10-08, builds 815 to 817: pass, no approval, 10 steps",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "seed": {
+        "tasks": [
+            "[AI bench] Call supplier"
+        ],
+        "pages": [
+            "[AI bench] Launch notes"
+        ]
+    },
+    "calls": [
+        {
+            "tool": "tasks.search",
+            "arguments": {
+                "query": "supplier"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "screen.link",
+            "arguments": {
+                "screen": "task",
+                "taskId": "$task:[AI bench] Call supplier"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "pages.search",
+            "arguments": {
+                "query": "launch"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "screen.link",
+            "arguments": {
+                "screen": "doc",
+                "pageId": "$page:[AI bench] Launch notes"
+            },
+            "answer": "read"
+        }
+    ]
+}
