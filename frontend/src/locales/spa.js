@@ -11895,6 +11895,8 @@ export default {
         "err_allowlist_broad": "That range is too wide. Use /8 or narrower for IPv4 and /32 or narrower for IPv6, and list 0.0.0.0/8, 127.0.0.0/8 or :: only as exactly that block.",
         "f_WEBHOOK_ALLOWED_PRIVATE_HOSTS": "Private webhook hosts",
         "h_WEBHOOK_ALLOWED_PRIVATE_HOSTS": "Webhooks refuse loopback, private and internal hosts. List the exact hostnames or CIDR ranges on your network they may post to. Removing an entry stops deliveries to it. Cloud metadata addresses stay blocked.",
+        "f_AGENT_TAINT_ROUTING": "Hold risky AI writes for approval",
+        "h_AGENT_TAINT_ROUTING": "A risky change by an AI that read outside content, or by an outside AI app, waits until a person approves it. On by default while the AI tools are on. Turning it off lets those changes apply at once.",
         "allowlist_placeholder": "hooks.lan\n192.168.10.0/24",
         "include_files": "Include uploaded files (server storage only)",
         "backup_now": "Back up now",
