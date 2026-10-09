@@ -118,7 +118,7 @@ async function inviteMember({ baseURL, ownerApi, companyId, role, email, firstNa
     assertOk(await api.put('/api/v1/root-members', { id: inviteRow._id, data: { userId, status: 2 }, companyId, linkId: inviteRow.linkId }), `accept invite for ${email}`);
     assertOk(await api.post('/api/v1/importSettingsNotification', { companyId, userId }), `notification settings for ${email}`);
     assertOk(await api.post('/api/v1/removeUserNotification', { companyId, userId, type: 'Add' }), `notification counter for ${email}`);
-    // A new account starts in Simple, with five places on the rail. The suite walks the whole app, so its
+    // A new account starts in Simple, with six places on the rail. The suite walks the whole app, so its
     // people get the full rail unless a spec asks for the newcomer's (navMode: null).
     if (navMode) assertOk(await api.put(NAV_PREFERENCES, { mode: navMode }), `${navMode} rail for ${email}`);
 

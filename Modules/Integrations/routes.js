@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const ctrl = require('./controller');
 const { agentsRefused } = require('../Agents/guard');
+const hub = require('./appConnections/controller');
 
 const slackLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false });
 
@@ -11,7 +12,9 @@ exports.init = (app) => {
     app.get('/api/v1/integrations/connections', ctrl.listConnections);
     app.post('/api/v1/integrations/connections', agentsRefused('integration.connect'), ctrl.connect);
     app.put('/api/v1/integrations/connections/:id', agentsRefused('integration.update'), ctrl.updateConnection);
-    app.delete('/api/v1/integrations/connections/:id', ctrl.disconnect);
+    app.delete('/api/v1/integrations/connections/:id', agentsRefused('integration.disconnect'), ctrl.disconnect);
+    app.get('/api/v1/integrations/app-connections', hub.hub);
+    app.put('/api/v1/integrations/connections/:id/projects', agentsRefused('integration.update'), hub.setProjects);
 
     // AUTO-06 — PUBLIC Slack slash-command webhook (NOT under /api/v1/integrations,
     // so it bypasses JWT; the verification token authenticates it). companyId in

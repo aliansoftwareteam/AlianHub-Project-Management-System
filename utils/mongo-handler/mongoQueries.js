@@ -122,6 +122,7 @@ const {
     agentSkillsSchema,
     callsSchema,
     integrationConnectionsSchema,
+    appConnectionEventsSchema,
     cloudStorageConnectionsSchema,
     formsSchema,
     formSubmissionsSchema,
@@ -397,6 +398,8 @@ exports.checkType = (type) => {
             return callsSchema
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
             return integrationConnectionsSchema
+        case SCHEMA_TYPE.APP_CONNECTION_EVENTS:
+            return appConnectionEventsSchema
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
             return cloudStorageConnectionsSchema
         case SCHEMA_TYPE.FORMS:
@@ -709,6 +712,8 @@ exports.tableType = (type) => {
                 return `${dbCollections.CALLS}`
         case SCHEMA_TYPE.INTEGRATION_CONNECTIONS:
                 return `${dbCollections.INTEGRATION_CONNECTIONS}`
+        case SCHEMA_TYPE.APP_CONNECTION_EVENTS:
+                return `${dbCollections.APP_CONNECTION_EVENTS}`
         case SCHEMA_TYPE.CLOUD_STORAGE_CONNECTIONS:
                 return `${dbCollections.CLOUD_STORAGE_CONNECTIONS}`
         case SCHEMA_TYPE.FORMS:
