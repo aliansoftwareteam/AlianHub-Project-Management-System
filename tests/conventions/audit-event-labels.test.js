@@ -52,7 +52,7 @@ const scan = () => {
 const NOT_KEYS = {
     'meta.state': 'a field of the row', 'meta.undo': 'a field of the row', 'meta.undoable': 'a field of the row', 'meta.failed': 'a field of the row',
     'meta.action': 'a field of the row', 'meta.reason': 'a field of the row', 'meta.amends': 'a field of the row', 'chain.seq': 'a field of the row',
-    'spend.usd': 'a field of a run', 'spend.tokens': 'a field of a run', 'episode.reverted': 'a field of a run', 'elem.id': 'an array filter',
+    'facts.role': 'a field of a queue row', 'spend.usd': 'a field of a run', 'spend.tokens': 'a field of a run', 'episode.reverted': 'a field of a run', 'elem.id': 'an array filter',
     'targets.${index}.sources': 'a field of a goal', 'opts.resolve': 'an argument name',
     'conversations.list': 'a Slack method', 'conversations.info': 'a Slack method', 'conversations.history': 'a Slack method', 'auth.test': 'a Slack method',
     'slack.channel': 'the name of a reader', 'home.arpa': 'a host name', 'github.com': 'a host name', 'gitlab.com': 'a host name',

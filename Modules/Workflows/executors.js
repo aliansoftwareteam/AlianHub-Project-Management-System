@@ -26,4 +26,18 @@ const types = () => [...executors.keys()];
 
 const unregister = (type) => executors.delete(String(type));
 
-module.exports = { register, get, has, types, unregister };
+/* Kept apart from the executors so a step that started under a switch still cleans up after the switch goes off. */
+const endings = new Map();
+
+const onEnd = (type, ending) => {
+    if (typeof ending !== 'function') throw new Error(`workflow step ending "${type}" must be a function`);
+    endings.set(String(type), ending);
+};
+
+/* Told whenever a step ends without succeeding (failed, skipped, refused, or its run ended under it). Must be safe to call twice. */
+const ended = async ({ companyId, run, step, why }) => {
+    const ending = step ? endings.get(String(step.type)) : null;
+    return ending ? ending({ companyId, run, step, why: String(why || '') }) : null;
+};
+
+module.exports = { register, get, has, types, unregister, onEnd, ended };

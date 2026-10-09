@@ -83,8 +83,17 @@ const approvalDeadlineMs = () => number(process.env.WORKFLOW_APPROVAL_DEADLINE_M
 const externalAgentSteps = (env = process.env) => ['on', 'true', '1', 'yes'].includes(String(env.EXTERNAL_AGENT_STEPS || '').trim().toLowerCase())
     && require('../AgentSessions/config').isOn(env);
 
+/* A role hand-over puts a task in a role's queue, which only the dispatcher's switch opens. */
+const roleHandoffSteps = (env = process.env) => ['on', 'true', '1'].includes(String(env.WORKFLOW_ENGINE || 'off').toLowerCase())
+    && ['on', 'true', '1'].includes(String(env.DISPATCHER || 'off').trim().toLowerCase());
+
+/* How long a role may hold a hand-over before the step gives up and takes the task back out of its queue. */
+const roleHandoffDeadlineMs = () => 7 * 24 * 60 * MINUTE;
+
+const roleHandoffPollMs = () => 30 * 1000;
+
 module.exports = {
-    enabled, externalAgentSteps, leaseMs, heartbeatMs, tenantConcurrency, maxAttempts, backoffLadder, DEFAULT_BACKOFF_MS,
+    enabled, externalAgentSteps, roleHandoffSteps, roleHandoffDeadlineMs, roleHandoffPollMs, leaseMs, heartbeatMs, tenantConcurrency, maxAttempts, backoffLadder, DEFAULT_BACKOFF_MS,
     maxFanOut, maxLoopIterations, maxRunsPerHour, runLimitCacheMs, approvalPollMs, joinPollMs, approvalDeadlineMs,
     runDeadlineMs, runBudgetUsd,
 };
