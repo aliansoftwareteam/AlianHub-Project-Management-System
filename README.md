@@ -95,12 +95,14 @@ AI and sign-in providers are configured afterwards from **Settings → Instance*
 [docs/ENV.md](docs/ENV.md) for every variable and
 [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) for the operator walkthrough.
 
-Each person can connect their own AI (Claude, ChatGPT, Claude Code) out of the
-box: the MCP tools and sign-in by address are on by default, and an outside
-app's risky writes wait for a person. The AI acts only as that person, with the
-permissions they grant it. Set `MCP_OAUTH=off`, `MCP_TOOLS_DATA=off`,
-`MCP_TOOLS_MANAGE=off` or `MCP_TOOLS_WORK=off` in `.env` to turn any of it off;
-see [docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md).
+On a new install each person can connect their own AI (Claude, ChatGPT, Claude
+Code) out of the box: the MCP tools and sign-in by address are on by default,
+and an outside app's risky writes wait for a person. The AI acts only as that
+person, with the permissions they grant it. Set `MCP_OAUTH=off`,
+`MCP_TOOLS_DATA=off`, `MCP_TOOLS_MANAGE=off` or `MCP_TOOLS_WORK=off` in `.env`,
+or switch them under **Settings → Instance → AI**, to turn any of it off. An
+upgraded install keeps them off until an owner turns them on there; see
+[docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md).
 
 **Prerequisite:** MongoDB running locally on `mongodb://localhost:27017`. If you don't have it: `docker run -d -p 27017:27017 mongo:7` or download from [mongodb.com](https://www.mongodb.com/try/download/community).
 

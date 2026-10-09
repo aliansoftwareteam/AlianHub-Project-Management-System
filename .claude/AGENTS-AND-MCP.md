@@ -171,7 +171,7 @@ These are the rules in `Tasks/active/047-ai-run/task.md`, as the code keeps them
 
 ## Flags
 
-`MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE`, `MCP_TOOLS_WORK` and `MCP_OAUTH` are on when unset (`Modules/Mcp/defaultOn.js`), and `AGENT_TAINT_ROUTING` is on when unset while any of them is; an explicit off in `.env` always wins. The rest are off by default. Each is read on every call, so a flag that is off leaves the registry, the ratings and the tool list as they were. A test that needs one of the default-on flags off sets it to `off`; deleting it from `process.env` turns it on.
+`MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE`, `MCP_TOOLS_WORK` and `MCP_OAUTH` are on when unset (`Modules/Mcp/defaultOn.js`); an install that existed before that change has off recorded in its instance settings by `migrations/074-mcp-old-defaults-for-existing-installs.js`. And `AGENT_TAINT_ROUTING` is on when unset while any of them is; an explicit off in `.env` always wins. The rest are off by default. Each is read on every call, so a flag that is off leaves the registry, the ratings and the tool list as they were. A test that needs one of the default-on flags off sets it to `off`; deleting it from `process.env` turns it on.
 
 | Variable | Where it is read | What it turns on |
 |---|---|---|

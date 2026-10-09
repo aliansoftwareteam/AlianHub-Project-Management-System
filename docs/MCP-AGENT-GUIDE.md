@@ -8,11 +8,11 @@ Every id below is a placeholder.
 
 ## For the person who runs the server
 
-Connecting your own AI works out of the box: `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` are on when `.env` does not name them, and so is `AGENT_TAINT_ROUTING`, which holds an outside app's risky writes for a person. Everything else below is off until you switch it on. Each setting is read on every call, so a value you set takes effect without rebuilding anything; restart the server after you edit `.env`.
+On a new install, connecting your own AI works out of the box: `MCP_OAUTH`, `MCP_TOOLS_DATA`, `MCP_TOOLS_MANAGE` and `MCP_TOOLS_WORK` are on when `.env` does not name them, and so is `AGENT_TAINT_ROUTING`, which holds an outside app's risky writes for a person. An install that already had a workspace before this change keeps the four off after upgrading, unless `.env` names them: the upgrade records off under Instance settings, AI, where an owner can turn each on. Everything else below is off until you switch it on. Each setting is read on every call, so a value you set takes effect without rebuilding anything; restart the server after you edit `.env`.
 
 Having the tools on gives nobody more than they had. Every call still acts as one person, with only what that person can open and change in the web app. A connected app holds only the permissions its person ticked on the consent screen, and the manage and chat permissions only when an owner or admin also approved them for that app. A personal token holds only what it was created with.
 
-To turn something off, set it in `.env` and restart: `MCP_OAUTH=off` stops apps connecting by address, `MCP_TOOLS_DATA=off`, `MCP_TOOLS_MANAGE=off` or `MCP_TOOLS_WORK=off` takes that group of tools away (`false`, `0` and `no` work too). An explicit value always wins over the default. `AGENT_TAINT_ROUTING` can also be set under Instance settings, Security ("Hold risky AI writes for approval"); turning it off lets those writes apply at once.
+To turn something off, set it in `.env` and restart: `MCP_OAUTH=off` stops apps connecting by address, `MCP_TOOLS_DATA=off`, `MCP_TOOLS_MANAGE=off` or `MCP_TOOLS_WORK=off` takes that group of tools away (`false`, `0` and `no` work too). An owner can also switch each of the four under Instance settings, AI, unless `.env` names it; changing `MCP_OAUTH` there takes a restart. A value in `.env` always wins. `AGENT_TAINT_ROUTING` is shown under Instance settings, Security ("Hold risky AI writes for approval") but only `.env` changes it; turning it off lets those writes apply at once.
 
 | Setting | Default | What it turns on |
 |---|---|---|

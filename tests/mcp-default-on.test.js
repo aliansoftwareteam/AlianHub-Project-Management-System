@@ -3,7 +3,7 @@ const manageFlag = require('../Modules/Mcp/manageFlag');
 const workFlag = require('../Modules/Mcp/workFlag');
 const oauth = require('../Modules/OAuthServer/config');
 const taint = require('../Modules/Agents/taint');
-const { describeSettings } = require('../Modules/Instance/settingsCatalog');
+const { describeSettings, validateSettings } = require('../Modules/Instance/settingsCatalog');
 
 const FLAGS = { MCP_TOOLS_DATA: dataFlag, MCP_TOOLS_MANAGE: manageFlag, MCP_TOOLS_WORK: workFlag };
 const KEYS = [...Object.keys(FLAGS), 'MCP_OAUTH', 'MCP_OAUTH_DCR', 'MCP_OAUTH_ISSUER', 'AGENT_TAINT_ROUTING', 'APIURL', 'NODE_ENV'];
@@ -115,19 +115,51 @@ describe('the instance settings page', () => {
     const row = (env, saved = {}, locked = []) => describeSettings({ saved, env, locked }).find((r) => r.key === 'AGENT_TAINT_ROUTING');
 
     it('shows taint routing under Security, on by default with the tools', () => {
-        expect(row({})).toMatchObject({ group: 'security', type: 'boolean', value: 'true', default: 'true', source: 'default', locked: false });
+        expect(row({})).toMatchObject({ group: 'security', type: 'boolean', value: 'true', default: 'true', source: 'default' });
     });
 
     it('shows it off by default when every MCP flag is off', () => {
         expect(row(ALL_OFF)).toMatchObject({ value: 'false', default: 'false', source: 'default' });
     });
 
-    it('shows an explicit off in the environment as off and locked', () => {
+    it('shows taint routing read-only: locked whether or not the environment names it', () => {
+        expect(row({})).toMatchObject({ readOnly: true, locked: true });
         expect(row({ AGENT_TAINT_ROUTING: 'off' }, {}, ['AGENT_TAINT_ROUTING'])).toMatchObject({ value: 'false', source: 'env', locked: true });
         expect(row({ AGENT_TAINT_ROUTING: 'on' }, {}, ['AGENT_TAINT_ROUTING'])).toMatchObject({ value: 'true', source: 'env', locked: true });
     });
 
-    it('shows a saved off', () => {
-        expect(row({}, { AGENT_TAINT_ROUTING: 'false' })).toMatchObject({ value: 'false', source: 'saved' });
+    it('refuses to save taint routing from the console', () => {
+        expect(validateSettings({ AGENT_TAINT_ROUTING: 'false' })).toMatchObject({ valid: false, errors: { AGENT_TAINT_ROUTING: 'readonly' }, values: {} });
+    });
+
+    it('never applies a stored taint routing value', () => {
+        const instance = require('../Config/instanceSettings');
+        instance._resetForTests();
+        expect(instance.applyInstanceSettings({ AGENT_TAINT_ROUTING: 'false' })).toEqual([]);
+        expect(process.env.AGENT_TAINT_ROUTING).toBeUndefined();
+        instance._resetForTests();
+    });
+
+    const toolRow = (key, env, saved = {}, locked = []) => describeSettings({ saved, env, locked }).find((r) => r.key === key);
+
+    it.each(Object.keys(FLAGS))('shows %s under AI, on by default, off once saved off', (key) => {
+        expect(toolRow(key, {})).toMatchObject({ group: 'ai', type: 'boolean', value: 'true', source: 'default', locked: false });
+        expect(toolRow(key, {}, { [key]: 'false' })).toMatchObject({ value: 'false', source: 'saved' });
+        expect(toolRow(key, { [key]: 'off' }, {}, [key])).toMatchObject({ value: 'false', source: 'env', locked: true });
+    });
+
+    it('shows MCP_OAUTH as a mode, needing a restart', () => {
+        expect(toolRow('MCP_OAUTH', HTTPS)).toMatchObject({ type: 'select', value: 'both', source: 'default', restart: true });
+        expect(toolRow('MCP_OAUTH', { ...HTTPS, MCP_OAUTH: 'on' }, {}, ['MCP_OAUTH'])).toMatchObject({ value: 'both', locked: true });
+        expect(toolRow('MCP_OAUTH', HTTPS, { MCP_OAUTH: 'off' })).toMatchObject({ value: 'off', source: 'saved' });
+    });
+
+    it('refuses to switch MCP_OAUTH on from the console while the issuer could not boot', () => {
+        process.env.APIURL = 'http://hub.example.com';
+        process.env.NODE_ENV = 'production';
+        expect(validateSettings({ MCP_OAUTH: 'both' }).errors).toEqual({ MCP_OAUTH: 'mcp_issuer' });
+        expect(validateSettings({ MCP_OAUTH: 'off' }).valid).toBe(true);
+        process.env.APIURL = 'https://hub.example.com';
+        expect(validateSettings({ MCP_OAUTH: 'both' }).valid).toBe(true);
     });
 });

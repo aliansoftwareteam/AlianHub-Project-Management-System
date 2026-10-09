@@ -43,7 +43,7 @@ With the extra permissions on the consent screen, and unless your admin has swit
 
 1. In AlianHub, open AI in the left menu, then **Connect your AI**. When you sign up for the first time, this is the last step, called "One last step". You can choose **Skip for now** and come back later.
 2. Pick your app and follow its steps. The page shows an address to paste. Copy it with the **Copy** button.
-   - Connecting by address is on unless the person who runs your server switched it off. If the page says it is off, ask them to switch it on, and use a token (below) until then.
+   - Connecting by address is on for a new server, and an owner can switch it on under Settings, Instance, AI on a server set up earlier. If the page says it is off, ask them to switch it on, and use a token (below) until then.
 3. The line at the top of the page changes by itself when your AI app makes its first call. It then says "Connected" and when the app was last seen.
 4. A first sentence appears: "Set up my project". It asks you a few questions and shows a plan. Nothing is made until you say yes.
 5. Under "What your AI can do here", the page lists what this server allows. Under "Switched off on this install" it names what your admin has switched off.
