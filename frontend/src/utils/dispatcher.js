@@ -65,7 +65,6 @@ const CONDITION_KEYS = Object.freeze({ type: "taskTypeKeys", tag: "tags", priori
 const NUMBER_KINDS = Object.freeze(["type", "status"]);
 export const CONDITION_KINDS = Object.freeze([...Object.keys(CONDITION_KEYS), "field"]);
 
-/* A rule as the card edits it: one condition and one role. */
 /* A rule's id is kept through an edit so a team pack's undo can still find the rule it added. */
 const ruleIdOf = (rule) => (rule?.id ? { ruleId: rule.id } : {});
 const idOfRow = (row) => (row.ruleId ? { id: row.ruleId } : {});

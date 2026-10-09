@@ -65,20 +65,20 @@ const actionsOf = (role) => registry.allowedActionsToStore([...new Set([...SKILL
 /* An agent with no projects named may work in any, so it already covers every project. */
 const overlaps = (agent, projectIds) => !idsOf(agent).length || idsOf(agent).some((id) => projectIds.includes(id));
 
-/* A role that already has an agent whose projects overlap these, whoever made it, reuses and widens that agent rather
- * than getting a second one. */
+/* A role reuses an overlapping agent rather than getting a second one, but only an agent a pack made is widened: an agent
+ * a person made may be switched on, so its missing projects get a new paused agent instead. */
 async function plan(companyId, roleKeys, projectIds) {
-    const existing = await find(companyId, SCHEMA_TYPE.AGENTS, [{ role: { $in: roleKeys }, deletedStatusKey: { $ne: 1 } }, { role: 1, projectIds: 1, name: 1 }, { sort: { createdAt: 1, _id: 1 } }]);
+    const existing = await find(companyId, SCHEMA_TYPE.AGENTS, [{ role: { $in: roleKeys }, deletedStatusKey: { $ne: 1 } }, { role: 1, projectIds: 1, name: 1, madeBy: 1 }, { sort: { createdAt: 1, _id: 1 } }]);
     const reuse = [];
     const create = [];
     for (const key of roleKeys) {
         const have = existing.find((agent) => agent.role === key && overlaps(agent, projectIds));
-        if (have) {
-            reuse.push({ roleKey: key, agent: have, missing: idsOf(have).length ? projectIds.filter((id) => !idsOf(have).includes(id)) : [] });
-            continue;
-        }
+        const missing = have && idsOf(have).length ? projectIds.filter((id) => !idsOf(have).includes(id)) : [];
+        const packMade = String(have?.madeBy || '').startsWith('team-pack:');
+        if (have) reuse.push({ roleKey: key, agent: have, missing: packMade ? missing : [] });
+        if (have && (packMade || !missing.length)) continue;
         const role = settings.roleOf(key);
-        create.push({ roleKey: key, role, skill: await skillInputFor(companyId, role) });
+        create.push({ roleKey: key, role, projectIds: have ? missing : [...projectIds], skill: await skillInputFor(companyId, role) });
     }
     return { projectIds, reuse, create };
 }
@@ -101,7 +101,7 @@ async function write(companyId, planned, actorId, written) {
         kept.push({ roleKey, agentId: String(agent._id), name: agent.name || '' });
     }
     const madeSkills = new Set();
-    for (const { roleKey, role, skill } of planned.create) {
+    for (const { roleKey, role, projectIds, skill } of planned.create) {
         if (skill && !madeSkills.has(skill.key)) {
             const saved = await skillRecord.createSkill(companyId, skill, { createdBy: actorId });
             madeSkills.add(skill.key);
@@ -111,7 +111,7 @@ async function write(companyId, planned, actorId, written) {
             name: agentName(role),
             description: roleSkill.skillDescription(role),
             role: roleKey,
-            projectIds: [...planned.projectIds],
+            projectIds,
             skills: [{ key: skillKeyOf(role), name: role.name, enabled: true }],
             allowedActions: actionsOf(role),
             autonomy: AUTONOMY,
