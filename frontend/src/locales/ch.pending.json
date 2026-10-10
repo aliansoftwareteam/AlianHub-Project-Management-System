@@ -4122,6 +4122,7 @@
     "Dispatcher.rules_title": "Routing rules, first match wins",
     "Dispatcher.save": "Save roles and rules",
     "Dispatcher.send": "Send",
+    "Dispatcher.settings_changed": "These settings were changed elsewhere and have been reloaded. Make your change again and save.",
     "Dispatcher.someone": "someone",
     "Dispatcher.suggests": "Dispatcher suggests {role}",
     "Dispatcher.title": "Dispatcher",

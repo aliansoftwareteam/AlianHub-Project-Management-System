@@ -93,15 +93,30 @@ const readRow = async (companyId, projectId) => plain(await MongoDbCrudOpration(
     data: [{ projectId: String(projectId) }, { dispatcher: 1 }],
 }, 'findOne'));
 
-async function save(companyId, projectId, body, actorId) {
+const SETTINGS_CHANGED = 'settings_changed';
+const MERGE_TRIES = 4;
+const MERGE_WAIT_MS = 25;
+
+const changedElsewhere = () => Object.assign(new RuleError('These dispatcher settings were changed by someone else. Reload them and save again.', 409), { reason: SETTINGS_CHANGED });
+const revisionOf = (row) => Number(row && row.dispatcher && row.dispatcher.revision) || 0;
+const matched = (result) => Boolean(result && (result.matchedCount || result.n || result.modifiedCount || result.nModified));
+
+/* With `revision`, the save lands only on that revision and is refused as changed elsewhere otherwise. */
+async function save(companyId, projectId, body, actorId, { revision } = {}) {
     const input = validate(body);
     const existing = await readRow(companyId, projectId);
-    const dispatcher = { ...input, revision: (Number(existing && existing.dispatcher && existing.dispatcher.revision) || 0) + 1, updatedBy: String(actorId), updatedAt: new Date() };
+    const was = revisionOf(existing);
+    const expected = revision === undefined || revision === null ? null : Number(revision);
+    if (expected !== null && expected !== was) throw changedElsewhere();
+    const dispatcher = { ...input, revision: was + 1, updatedBy: String(actorId), updatedAt: new Date() };
     if (existing) {
-        await MongoDbCrudOpration(companyId, {
+        const firstRevision = { $or: [{ 'dispatcher.revision': 0 }, { 'dispatcher.revision': { $exists: false } }] };
+        const onRevision = expected === null ? {} : (was ? { 'dispatcher.revision': was } : firstRevision);
+        const result = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.ASSIGNMENT_RULES,
-            data: [{ projectId: String(projectId) }, { $set: { dispatcher } }],
+            data: [{ projectId: String(projectId), ...onRevision }, { $set: { dispatcher } }],
         }, 'updateOne');
+        if (expected !== null && !matched(result)) throw changedElsewhere();
     } else {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.ASSIGNMENT_RULES,
@@ -115,10 +130,24 @@ async function save(companyId, projectId, body, actorId) {
     return view(dispatcher);
 }
 
-const addRule = async (companyId, projectId, rule, actorId) => {
-    const current = await load(companyId, projectId);
-    return save(companyId, projectId, { ...current, rules: [...current.rules, rule] }, actorId);
-};
+const loadLatest = async (companyId, projectId) => settingsOf(await readRow(companyId, projectId));
+
+/* `merge` turns the latest settings into the body to save, or null for no change; it runs again after a conflict. */
+async function saveMerged(companyId, projectId, merge, actorId) {
+    for (let attempt = 1; ; attempt += 1) {
+        const latest = await loadLatest(companyId, projectId);
+        const body = merge(latest);
+        if (!body) return null;
+        try {
+            return await save(companyId, projectId, body, actorId, { revision: latest.revision });
+        } catch (error) {
+            if (!error || error.reason !== SETTINGS_CHANGED || attempt >= MERGE_TRIES) throw error;
+            await new Promise((resolve) => { setTimeout(resolve, MERGE_WAIT_MS * attempt); });
+        }
+    }
+}
+
+const addRule = (companyId, projectId, rule, actorId) => saveMerged(companyId, projectId, (latest) => ({ ...latest, rules: [...latest.rules, rule] }), actorId);
 
 const fieldValue = (task, id) => {
     const entry = task.customField && task.customField[id];
@@ -146,4 +175,4 @@ const matches = (when, task) => {
 
 const roleChoices = () => playbooks.all().map((role) => ({ key: roleKey(role), name: role.name, blueprint: role.blueprint, department: role.department }));
 
-module.exports = { MODES, THRESHOLD, MAX_RULES, DEFAULTS, roleKey, roleOf, roleName, roleWho, view, settingsOf, load, validate, save, addRule, matches, roleChoices };
+module.exports = { MODES, THRESHOLD, MAX_RULES, DEFAULTS, SETTINGS_CHANGED, roleKey, roleOf, roleName, roleWho, view, settingsOf, load, loadLatest, validate, save, saveMerged, addRule, matches, roleChoices };

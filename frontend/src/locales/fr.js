@@ -13438,7 +13438,8 @@ export default {
         "offer_rule": "You sent this task type to {role} {times} times. Always send it there?",
         "offer_add": "Add rule",
         "offer_added": "Routing rule added.",
-        "failed": "Could not update the routing. Please try again."
+        "failed": "Could not update the routing. Please try again.",
+        "settings_changed": "These settings were changed elsewhere and have been reloaded. Make your change again and save."
     },
     "CompanyView": {
         "nav": "Company view",

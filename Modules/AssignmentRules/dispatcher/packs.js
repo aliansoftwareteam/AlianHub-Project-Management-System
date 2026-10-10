@@ -183,10 +183,40 @@ const validateAll = (plans) => plans.filter((plan) => plan.body).forEach((plan) 
     }
 });
 
-/* Every project's new settings are checked before any is written, so a pack lands in all of its projects or in none. */
-async function writeAll(companyId, plans, actorId) {
-    validateAll(plans);
-    for (const plan of plans.filter((one) => one.body)) await settings.save(companyId, plan.projectId, plan.body, actorId);
+/* A change is merged onto the settings as they are at the save, so it never writes back a stale copy of someone else's. */
+const withChange = (latest, { roles, rules, mode }) => {
+    const kept = latest.roles.filter((key) => settings.roleOf(key));
+    const added = roles.filter((key) => !kept.includes(key));
+    const newRules = rules.filter((rule) => !latest.rules.some((one) => sameRule(one, rule)));
+    const switched = Boolean(mode) && latest.mode === mode.from;
+    if (!added.length && !newRules.length && !switched) return null;
+    return {
+        body: bodyWith(latest, [...kept, ...added], [...latest.rules, ...newRules], switched ? mode.to : latest.mode),
+        change: { roles: added, rules: newRules, mode: switched ? mode : null },
+    };
+};
+
+/* A rule a person has changed since the pack added it stays: it must match the recorded one by id and by content. */
+const withoutChange = (latest, { roles, rules, mode }) => {
+    const removed = latest.roles.filter((key) => roles.includes(key));
+    const dropped = latest.rules.filter((rule) => rules.some((one) => one && one.id && one.id === rule.id && sameRule(one, rule)));
+    const restored = Boolean(mode) && latest.mode === mode.to;
+    if (!removed.length && !dropped.length && !restored) return null;
+    return {
+        body: bodyWith(latest, latest.roles.filter((key) => !removed.includes(key) && settings.roleOf(key)), latest.rules.filter((rule) => !dropped.includes(rule)), restored ? mode.from : latest.mode),
+        change: { roles: removed, rules: dropped, mode: restored ? mode : null },
+    };
+};
+
+async function saveChange(companyId, projectId, merge, change, actorId) {
+    let done = null;
+    let seen = null;
+    await settings.saveMerged(companyId, projectId, (latest) => {
+        seen = latest;
+        done = merge(latest, change);
+        return done && done.body;
+    }, actorId);
+    return { done, seen };
 }
 
 const journal = () => {
@@ -208,10 +238,10 @@ const journal = () => {
     };
 };
 
-const failedApply = (error, left) => {
+const failedApply = (error, left, verb = 'applied') => {
     const why = error instanceof RuleError ? ` ${error.message}` : '';
-    if (left.length) return new RuleError(`The team pack could not be applied, and ${left.join(', ')} could not be taken back. Check them before trying again.${why}`, 500);
-    return new RuleError(`The team pack could not be applied, so nothing was changed.${why || ' Please try again.'}`, error instanceof RuleError ? error.statusCode : 500);
+    if (left.length) return new RuleError(`The team pack could not be ${verb}, and ${left.join(', ')} could not be taken back. Check them before trying again.${why}`, 500);
+    return Object.assign(new RuleError(`The team pack could not be ${verb}, so nothing was changed.${why || ' Please try again.'}`, error instanceof RuleError ? error.statusCode : 500), { reason: error && error.reason });
 };
 
 const rowFilter = (projectId) => ({ projectId: String(projectId) });
@@ -286,7 +316,8 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
             rulesAwaitingTags: waitingRules.length,
             waitingRules,
             proposal,
-            previous: bodyWith(current, kept, current.rules),
+            wanted: pack.roles,
+            starter: starter.made,
             body: changed ? bodyWith(current, [...kept, ...added], [...current.rules, ...starter.made], mode) : null,
         });
     }
@@ -298,9 +329,14 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
     let agents = { made: [], kept: [], widened: [], skills: [] };
     let applyId = null;
     try {
-        for (const plan of plans.filter((one) => one.body)) {
-            await settings.save(companyId, plan.projectId, plan.body, actorId);
-            written.done(`the dispatcher settings of project ${plan.projectId}`, () => settings.save(companyId, plan.projectId, plan.previous, actorId));
+        for (const plan of plans) {
+            const { done, seen } = await saveChange(companyId, plan.projectId, withChange, { roles: plan.wanted, rules: plan.starter, mode: { from: 'off', to: ROUTING_ON } }, actorId);
+            Object.assign(plan, done
+                ? { added: done.change.roles, rules: done.change.rules, mode: done.body.mode, modeWas: done.change.mode ? done.change.mode.from : null, body: done.body }
+                : { added: [], rules: [], mode: seen.mode, modeWas: null, body: null });
+            if (done) {
+                written.done(`the dispatcher settings of project ${plan.projectId}`, () => saveChange(companyId, plan.projectId, withoutChange, done.change, actorId));
+            }
         }
         for (const plan of plans.filter((one) => one.proposal)) {
             plan.proposalId = String((await proposals.create(companyId, plan.proposal.input))._id);
@@ -336,7 +372,6 @@ const appliesOf = async (companyId, applyId) => ((await MongoDbCrudOpration(comp
     })
     .filter((row) => row.entry);
 
-/* A rule a person has changed since the pack added it stays: it must match the recorded one by id and by content. */
 async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     const actorId = actor.id;
     const projectIds = projectIdsOf(body);
@@ -353,21 +388,27 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     const widened = (record.agents && record.agents.widened) || [];
     if ((agentIds.length || widened.length) && !managesAgents) throw new RuleError(MANAGE_REFUSAL, 403);
     const plans = [];
-    for (const { projectId, entry, heir } of applied) {
-        const current = await settings.load(companyId, projectId);
-        const removed = current.roles.filter((key) => (entry.roles || []).includes(key));
-        const recorded = (entry.rules || []).filter((rule) => rule && rule.id);
-        const droppedRules = current.rules.filter((rule) => recorded.some((one) => one.id === rule.id && sameRule(one, rule)));
-        const left = current.rules.filter((rule) => !droppedRules.includes(rule));
-        const modeRestored = entry.modeWas && !heir && current.mode === ROUTING_ON ? entry.modeWas : null;
-        const mode = modeRestored || current.mode;
-        const changed = removed.length || droppedRules.length || modeRestored;
-        plans.push({
-            projectId, removed, rules: droppedRules, mode, modeRestored, proposalId: entry.proposalId, heir: entry.modeWas ? heir : null, modeWas: entry.modeWas,
-            body: changed ? bodyWith(current, current.roles.filter((key) => !removed.includes(key) && settings.roleOf(key)), left, mode) : null,
-        });
+    const written = journal();
+    try {
+        for (const { projectId, entry, heir } of applied) {
+            const recorded = { roles: entry.roles || [], rules: (entry.rules || []).filter((rule) => rule && rule.id), mode: entry.modeWas && !heir ? { from: entry.modeWas, to: ROUTING_ON } : null };
+            const { done, seen } = await saveChange(companyId, projectId, withoutChange, recorded, actorId);
+            if (done) written.done(`the dispatcher settings of project ${projectId}`, () => saveChange(companyId, projectId, withChange, done.change, actorId));
+            plans.push({
+                projectId,
+                removed: done ? done.change.roles : [],
+                rules: done ? done.change.rules : [],
+                mode: done ? done.body.mode : seen.mode,
+                modeRestored: done && done.change.mode ? done.change.mode.from : null,
+                proposalId: entry.proposalId,
+                heir: entry.modeWas ? heir : null,
+                modeWas: entry.modeWas,
+            });
+        }
+    } catch (error) {
+        logger.error(`[team-pack] undo of ${pack.blueprint} failed: ${(error && error.message) || error}`);
+        throw failedApply(error, await written.rollBack(), 'undone');
     }
-    await writeAll(companyId, plans, actorId);
     const projects = [];
     for (const plan of plans) {
         const withdrawn = await withdrawProposal(companyId, plan.projectId, plan.proposalId).catch(() => false);
@@ -392,7 +433,8 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 
-/* Lock-free, so an approval never waits on a pack change: each wait is claimed by pulling it, and only its claimer adds the rule. */
+/* Lock-free, so an approval never waits on a pack change: the rules are merged onto the latest settings first, and only
+ * then is each wait cleared and its rule recorded on its apply; a rule whose apply was undone meanwhile is taken back. */
 async function tagsApproved(companyId, proposalId, actor) {
     const id = String(proposalId || '').trim().toLowerCase();
     if (!OBJECT_ID.test(id)) return [];
@@ -407,44 +449,34 @@ async function tagsApproved(companyId, proposalId, actor) {
         .flatMap((entry) => (entry.waitingRules || []).filter((rule) => awaited.includes(rule.proposalId)).map((rule) => ({ entry, rule })));
     if (!waiting.length) return [];
     const project = await readProject(companyId, projectId);
-    const claimed = [];
-    for (const { entry, rule: { role, tag, proposalId: waitedOn } } of waiting) {
-        const when = conditionFor('tag', tag, project);
-        if (!when) continue;
-        const wait = { role, tag, proposalId: waitedOn };
-        const claim = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.ASSIGNMENT_RULES,
-            data: [onEntry(projectId, entry.applyId, { waitingRules: { $elemMatch: wait } }), { $pull: { 'teamPacks.$[pack].waitingRules': wait } }, entryNamed(entry.applyId)],
-        }, 'updateOne');
-        if (updated(claim)) claimed.push({ entry, role, when });
-    }
-    const current = await settings.load(companyId, projectId);
-    const made = [];
-    claimed.forEach(({ entry, role, when }) => {
-        if (!current.roles.includes(role)) return;
-        const rule = { id: new mongoose.Types.ObjectId().toString(), ...cleanRule({ role, when }) };
-        if ([...current.rules, ...made.map((one) => one.rule)].some((one) => sameRule(one, rule))) return;
-        made.push({ entry, rule });
-    });
-    if (!made.length) return [];
-    await settings.save(companyId, projectId, bodyWith(current, current.roles, [...current.rules, ...made.map((one) => one.rule)]), actor.id);
+    const ready = waiting.map(({ entry, rule: { role, tag, proposalId: waitedOn } }) => ({ entry, wait: { role, tag, proposalId: waitedOn }, when: conditionFor('tag', tag, project) }))
+        .filter((one) => one.when)
+        .map((one) => ({ ...one, rule: { id: new mongoose.Types.ObjectId().toString(), ...cleanRule({ role: one.wait.role, when: one.when }) } }));
+    if (!ready.length) return [];
+    let made = [];
+    await settings.saveMerged(companyId, projectId, (latest) => {
+        made = [];
+        ready.forEach((one) => {
+            if (latest.roles.includes(one.wait.role) && ![...latest.rules, ...made.map((other) => other.rule)].some((rule) => sameRule(rule, one.rule))) made.push(one);
+        });
+        return made.length ? bodyWith(latest, latest.roles, [...latest.rules, ...made.map((one) => one.rule)]) : null;
+    }, actor.id);
     const orphans = [];
-    for (const { entry, rule } of made) {
-        const kept = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [onEntry(projectId, entry.applyId), { $push: { 'teamPacks.$[pack].rules': rule } }, entryNamed(entry.applyId)],
+    for (const one of ready) {
+        const mine = made.includes(one);
+        const recorded = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.ASSIGNMENT_RULES,
+            data: [onEntry(projectId, one.entry.applyId), { $pull: { 'teamPacks.$[pack].waitingRules': one.wait }, ...(mine ? { $push: { 'teamPacks.$[pack].rules': one.rule } } : {}) }, entryNamed(one.entry.applyId)],
         }, 'updateOne');
-        if (!updated(kept)) orphans.push(rule.id);
+        if (mine && !updated(recorded)) orphans.push(one.rule.id);
     }
-    if (orphans.length) {
-        const now = await settings.load(companyId, projectId);
-        await settings.save(companyId, projectId, bodyWith(now, now.roles, now.rules.filter((rule) => !orphans.includes(rule.id))), actor.id);
-    }
-    const added = made.filter(({ rule }) => !orphans.includes(rule.id));
+    if (orphans.length) await saveChange(companyId, projectId, withoutChange, { roles: [], rules: made.filter((one) => orphans.includes(one.rule.id)).map((one) => one.rule), mode: null }, actor.id);
+    const added = made.filter((one) => !orphans.includes(one.rule.id));
     if (added.length) {
         const applies = [...new Map(added.map(({ entry }) => [entry.applyId, { applyId: entry.applyId, appliedBy: entry.by }])).values()];
         audit.settingsChanged(companyId, actor, projectId, { teamPackTags: id, rules: added.length, applies }, true);
     }
-    return added.map(({ rule }) => rule);
+    return added.map((one) => one.rule);
 }
 
 module.exports = {

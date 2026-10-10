@@ -391,12 +391,12 @@ describe('team packs make one agent per role', () => {
             seedRules(GRANTS);
             const project = seedProject();
             const settings = require('../Modules/AssignmentRules/dispatcher/settings');
-            const save = settings.save;
+            const saveMerged = settings.saveMerged;
             let saves = 0;
-            jest.spyOn(settings, 'save').mockImplementation(async (...args) => {
+            jest.spyOn(settings, 'saveMerged').mockImplementation(async (...args) => {
                 saves += 1;
                 if (saves > 1) throw new Error('down');
-                return save(...args);
+                return saveMerged(...args);
             });
             jest.spyOn(require('../Modules/Agents/agentRecord'), 'createAgentRecord').mockRejectedValue(new Error('down'));
             const res = await full([project]);

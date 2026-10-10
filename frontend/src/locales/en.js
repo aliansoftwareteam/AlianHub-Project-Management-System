@@ -13727,6 +13727,7 @@ export default {
         offer_add: "Add rule",
         offer_added: "Routing rule added.",
         failed: "Could not update the routing. Please try again.",
+        settings_changed: "These settings were changed elsewhere and have been reloaded. Make your change again and save.",
     },
     CompanyView: {
         nav: "Company view",

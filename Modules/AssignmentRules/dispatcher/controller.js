@@ -12,10 +12,10 @@ const company = require('./company');
 
 const companyOf = (req) => String(req.headers['companyid'] || '');
 
-const refuse = (res, statusCode, statusText) => res.status(statusCode).json({ status: false, statusText, message: statusText });
+const refuse = (res, statusCode, statusText, reason) => res.status(statusCode).json({ status: false, statusText, message: statusText, ...(reason ? { reason } : {}) });
 
 const fail = (res, what) => (error) => {
-    if (error instanceof RuleError) return refuse(res, error.statusCode, error.message);
+    if (error instanceof RuleError) return refuse(res, error.statusCode, error.message, error.reason);
     logger.error(`[dispatcher] ${what}: ${(error && error.message) || error}`);
     return refuse(res, 500, 'Something went wrong. Please try again.');
 };
@@ -97,7 +97,7 @@ const saved = (add) => async (req, res) => {
         const { projectId } = req.params;
         const result = add
             ? await settings.addRule(companyId, projectId, req.body || {}, actor.id)
-            : await settings.save(companyId, projectId, req.body || {}, actor.id);
+            : await settings.save(companyId, projectId, req.body || {}, actor.id, { revision: (req.body || {}).revision });
         audit.settingsChanged(companyId, actor, projectId, { mode: result.mode, threshold: result.threshold, modelGuess: result.modelGuess, roles: result.roles.length, rules: result.rules.length, revision: result.revision }, add);
         return res.json({ status: true, statusText: 'Dispatcher settings saved', data: result });
     } catch (error) {
