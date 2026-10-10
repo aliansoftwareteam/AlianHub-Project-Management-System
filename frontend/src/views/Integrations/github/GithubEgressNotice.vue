@@ -2,7 +2,7 @@
     <div class="gen" role="status" data-egress-blocked>
         <span>{{ $t('AppConnections.egress_blocked', { host }) }}</span>
         <div v-if="owner" class="gen__actions">
-            <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" data-allow-host @click="allow">
+            <button v-if="host === GITHUB_API_HOST" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" data-allow-host @click="allow">
                 {{ $t('AppConnections.egress_allow', { host }) }}
             </button>
             <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-egress-settings @click="openEgress">{{ $t('AppConnections.egress_settings') }}</button>
@@ -16,7 +16,7 @@
 import { onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
-import { allowHost, isInstanceOwner } from "./githubEgress";
+import { GITHUB_API_HOST, allowHost, isInstanceOwner } from "./githubEgress";
 
 defineOptions({ name: "GithubEgressNotice" });
 

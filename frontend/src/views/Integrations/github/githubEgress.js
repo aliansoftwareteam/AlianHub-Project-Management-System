@@ -3,6 +3,9 @@ import * as env from "@/config/env";
 
 export const EGRESS_BLOCKED = "egress_blocked";
 
+/* The card only ever offers to allow GitHub's own host; anything else is added on the egress page. */
+export const GITHUB_API_HOST = "api.github.com";
+
 export const blockedHostIn = (body) => (body?.code === EGRESS_BLOCKED ? body?.data?.host || "" : "");
 
 export const isInstanceOwner = async () => {
