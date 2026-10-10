@@ -151,6 +151,18 @@ describe('authorize', () => {
         const app = (await call(hub.hub, OWNER)).body.data.apps.find((a) => a.key === 'github');
         expect(app.oneClick).toBe(false);
         expect(app.fields.map((f) => f.key)).toEqual(['token', 'repo']);
+        expect(app.setup).toEqual({ homepageUrl: 'http://localhost:8080', callbackUrl: 'http://localhost:4000/api/v1/github-connect/callback' });
+    });
+
+    it('gives the setup addresses to an owner alone, never with a secret, and drops them once the app is set', async () => {
+        delete process.env.GITHUB_CONNECT_CLIENT_ID;
+        process.env.GITHUB_CONNECT_CLIENT_SECRET = 'connect-client-secret-value';
+        const owner = (await call(hub.hub, OWNER)).body;
+        expect(Object.keys(owner.data.apps.find((a) => a.key === 'github').setup)).toEqual(['homepageUrl', 'callbackUrl']);
+        expect(JSON.stringify(owner)).not.toContain('connect-client-secret-value');
+        expect((await call(hub.hub, MEMBER)).body.data.apps.find((a) => a.key === 'github').setup).toBeUndefined();
+        process.env.GITHUB_CONNECT_CLIENT_ID = 'Iv1.connectclient';
+        expect((await call(hub.hub, OWNER)).body.data.apps.find((a) => a.key === 'github').setup).toBeUndefined();
     });
 
     it('falls back to the sign-in GitHub app when no connect app is set', async () => {

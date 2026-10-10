@@ -57,9 +57,9 @@ describe('the App connections page', () => {
     });
 
     describe('Connect on GitHub', () => {
-        const openWith = async (oneClick, connections = []) => {
-            const app = { ...github, oneClick, connections };
-            apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage: true, apps: [app], projects: [] } } });
+        const openWith = async (oneClick, connections = [], { setup, canManage = true } = {}) => {
+            const app = { ...github, oneClick, connections, ...(setup ? { setup } : {}) };
+            apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage, apps: [app], projects: [] } } });
             const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
             await flushPromises();
             return wrapper;
@@ -76,17 +76,41 @@ describe('the App connections page', () => {
             expect(apiRequest).toHaveBeenLastCalledWith('get', expect.stringMatching(/\/github\/authorize$/));
             expect(assign).toHaveBeenCalledWith('https://github.com/login/oauth/authorize?state=s');
             expect(wrapper.find('[data-app="github"] form').exists()).toBe(false);
+            expect(wrapper.find('[data-github-setup]').exists()).toBe(false);
             vi.unstubAllGlobals();
         });
 
-        it('asks for a token and the repository, with a note on one-click, when the server has none', async () => {
-            const wrapper = await openWith(false);
+        it('shows an owner the setup steps with both addresses, and the token form only behind the link, when the server has no GitHub app', async () => {
+            const setup = { homepageUrl: 'https://pm.example.com', callbackUrl: 'https://api.example.com/api/v1/github-connect/callback' };
+            const wrapper = await openWith(false, [], { setup });
             const calls = apiRequest.mock.calls.length;
             await connectButton(wrapper).trigger('click');
             expect(apiRequest.mock.calls.length).toBe(calls);
+            const panel = wrapper.find('[data-github-setup]');
+            expect(panel.text()).toContain(en.AppConnections.github_setup_title);
+            expect(panel.find('[data-url="homepage"]').text()).toBe(setup.homepageUrl);
+            expect(panel.find('[data-url="callback"]').text()).toBe(setup.callbackUrl);
+            expect(panel.text()).toContain('GITHUB_CONNECT_CLIENT_ID');
+            expect(wrapper.findAll('[data-app="github"] .ah-field').length).toBe(0);
+
+            const writeText = vi.fn().mockResolvedValue();
+            vi.stubGlobal('navigator', { clipboard: { writeText } });
+            await panel.findAll('button').find((b) => b.text() === en.AppConnections.copy).trigger('click');
+            await flushPromises();
+            expect(writeText).toHaveBeenCalledWith(setup.homepageUrl);
+            vi.unstubAllGlobals();
+
+            await wrapper.find('[data-use-token]').trigger('click');
             const labels = wrapper.findAll('[data-app="github"] .ah-field .ah-label').map((l) => l.text());
             expect(labels).toEqual([en.AppConnections.field_github_token, en.AppConnections.field_github_repo]);
-            expect(wrapper.find('[data-one-click-off]').text()).toBe(en.AppConnections.one_click_off);
+            expect(wrapper.find('[data-github-setup]').exists()).toBe(false);
+        });
+
+        it('tells a member to ask an admin when the server has no GitHub app', async () => {
+            const wrapper = await openWith(false, [], { canManage: false });
+            expect(wrapper.find('[data-app="github"] [data-ask-admin]').text()).toBe(en.AppConnections.github_ask_admin);
+            expect(wrapper.findAll('[data-app="github"] button').length).toBe(0);
+            expect(wrapper.find('[data-github-setup]').exists()).toBe(false);
         });
 
         it('finishes a GitHub sign-in on the signed-in page and takes the code out of the address first', async () => {

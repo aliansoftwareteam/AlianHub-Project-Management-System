@@ -43,6 +43,8 @@ const connectionRow = (row, names, privileged) => {
     };
 };
 
+const githubSetup = () => ({ homepageUrl: githubOAuth.fallbackOrigin(), callbackUrl: githubOAuth.redirectUri() });
+
 exports.hub = async (req, res) => {
     try {
         const companyId = pinSessionTenant(req, res);
@@ -55,9 +57,11 @@ exports.hub = async (req, res) => {
         ]);
         const privileged = isPrivileged(roleType);
         const names = new Map((projects || []).map((p) => [String(p._id), p.ProjectName || '']));
+        const githubReady = githubOAuth.isConfigured();
         const apps = R.getCatalog().map((item) => ({
             key: item.key, name: item.name, category: item.category, icon: item.icon, description: item.description, multiple: item.multiple, fields: item.fields,
-            syncs: !!registry.get(item.key), oneClick: item.key === 'github' && githubOAuth.isConfigured(),
+            syncs: !!registry.get(item.key), oneClick: item.key === 'github' && githubReady,
+            ...(item.key === 'github' && !githubReady && privileged ? { setup: githubSetup() } : {}),
             connections: (rows || []).filter((r) => r.type === item.key).map((r) => connectionRow(r, names, privileged)),
         }));
         return res.send({ status: true, data: { enabled: true, canManage: privileged, apps, projects: (projects || []).map((p) => ({ id: String(p._id), name: p.ProjectName || '' })) } });
