@@ -5909,7 +5909,15 @@ export default {
         "repo_needed": "No repository picked yet, so nothing is read.",
         "repo_label": "Repository",
         "more_repos": "Show more",
-        "no_repos": "This GitHub account cannot see any repository."
+        "no_repos": "This GitHub account cannot see any repository.",
+        "repo_filter": "Search repositories",
+        "no_repo_match": "No repository matches that search.",
+        "egress_blocked": "AlianHub isn't allowed to reach {host} yet.",
+        "egress_allow": "Allow {host}",
+        "egress_settings": "Open Settings > Instance > Egress",
+        "egress_ask_owner": "Ask the instance owner to allow {host}.",
+        "egress_allowed": "{host} is allowed now.",
+        "egress_allow_failed": "{host} could not be allowed from here. Add it under Settings > Instance > Egress."
     },
     "Provenance": {
         "nav_external_data": "External data",

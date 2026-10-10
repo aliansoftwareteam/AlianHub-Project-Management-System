@@ -162,6 +162,16 @@ describe('with the flag on', () => {
             const { body } = await asOwner('GET', BASE);
             expect(workspace(body.data, CID_A).hosts).toEqual(['docs.example.com']);
         });
+
+        it('narrows to one workspace when asked, so a page can add one host to its own list', async () => {
+            seedList(CID_A, ['docs.example.com']);
+            const { status, body } = await asOwner('GET', `${BASE}?workspace=${CID_A}`);
+            expect(status).toBe(200);
+            expect(body.data.total).toBe(1);
+            expect(body.data.workspaces).toEqual([expect.objectContaining({ companyId: CID_A, hosts: ['docs.example.com'], version: 0 })]);
+            expect((await asOwner('GET', `${BASE}?workspace=nope`)).body).toMatchObject({ status: false, code: 'invalid_company_id' });
+            expect((await call('GET', `${BASE}?workspace=${CID_A}`, { uid: ADMIN })).status).toBe(403);
+        });
     });
 
     describe('replacing a workspace list', () => {
@@ -185,6 +195,18 @@ describe('with the flag on', () => {
                 meta: { added: ['*.new.example.com'], removed: ['old.example.com'], count: 2 },
             });
             expect(changeAudits(CID_A)[0].meta).not.toHaveProperty('emptied');
+        });
+
+        it('clears an app connection refused for a host the save now admits, and leaves the others', async () => {
+            const blocked = (host) => ({ errorCode: 'egress_blocked', blockedHost: host, lastError: 'blocked', failures: 3, nextAttemptAt: daysAgo(-1) });
+            mockDbFor(CID_A).seed('integration_connections', { _id: '6f00000000000000000000c1', type: 'github', sync: blocked('api.github.com') });
+            mockDbFor(CID_A).seed('integration_connections', { _id: '6f00000000000000000000c2', type: 'gitlab', sync: blocked('gitlab.com') });
+            seedList(CID_A, ['docs.example.com']);
+            const { status } = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com', 'api.github.com'], version: 0 });
+            expect(status).toBe(200);
+            const [github, gitlab] = mockDbFor(CID_A).store.integration_connections;
+            expect(github.sync).toMatchObject({ errorCode: '', blockedHost: '', lastError: '', nextAttemptAt: null });
+            expect(gitlab.sync).toMatchObject({ errorCode: 'egress_blocked', blockedHost: 'gitlab.com' });
         });
 
         it('creates the document for a workspace that had none', async () => {

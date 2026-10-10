@@ -34,7 +34,7 @@ jest.mock('../common-storage/common-server.js', () => mockStub());
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../Config/jwt', () => ({ verifyCompanyMembership: jest.fn(async () => true) }));
 jest.mock('../Modules/ApiTokens/controller', () => ({ verifyToken: jest.fn(), logTokenActivity: jest.fn() }));
-jest.mock('../Modules/Agents/engine/safeFetch', () => ({ safeFetch: jest.fn() }));
+jest.mock('../Modules/Agents/engine/safeFetch', () => ({ ...jest.requireActual('../Modules/Agents/engine/safeFetch'), safeFetch: jest.fn() }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { safeFetch } = require('../Modules/Agents/engine/safeFetch');
@@ -170,6 +170,14 @@ describe('reading a pull request', () => {
         expect(await read(ctx(OUTSIDER), { number: 42 })).toMatchObject({ rateLimited: true, retryAt: new Date(1791000000 * 1000).toISOString() });
         github({ [`/repos/${REPO}/pulls/42`]: () => { throw new Error('fetch exceeded its time budget'); } });
         expect(await read(ctx(OUTSIDER), { number: 42 })).toEqual({ error: expect.stringMatching(/did not answer in time/) });
+    });
+
+    it('names the host when the workspace egress allowlist leaves GitHub out', async () => {
+        const { EGRESS_UNLISTED } = jest.requireActual('../Modules/Agents/engine/safeFetch');
+        github({ [`/repos/${REPO}/pulls/42`]: () => { throw Object.assign(new Error('api.github.com is not on this workspace\'s egress allowlist'), { code: EGRESS_UNLISTED, host: 'api.github.com' }); } });
+        expect(await read(ctx(OUTSIDER), { number: 42 })).toEqual({
+            error: expect.stringMatching(/isn't allowed to reach api\.github\.com.*Instance > Egress/), code: 'egress_blocked', host: 'api.github.com',
+        });
     });
 });
 

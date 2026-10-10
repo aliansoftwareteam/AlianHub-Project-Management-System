@@ -16,12 +16,13 @@
 .apc__error { color: var(--danger-ink); }
 .apc__projects { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .apc__chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.apc__repos { max-height: 280px; overflow: auto; }
+.apc__repos { max-height: 280px; overflow: auto; display: flex; flex-direction: column; }
 .apc__setup { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; border-top: 1px solid var(--hairline); }
 .apc__steps { margin: 0; padding-inline-start: 18px; display: flex; flex-direction: column; gap: 8px; font: var(--text-small); color: var(--ink-2); }
 .apc__url { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .apc__code { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 6px; background: var(--surface-hover); color: var(--ink); overflow-wrap: anywhere; }
 .apc__alt { align-self: flex-start; }
+.apc__egress { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; padding: 8px 10px; border-radius: 6px; background: var(--warn-bg); color: var(--warn-ink); font: var(--text-small); }
 .apc__pick { display: flex; align-items: center; gap: 8px; font: var(--text-small); color: var(--ink); min-height: 32px; }
 
 @media (max-width: 760px) {

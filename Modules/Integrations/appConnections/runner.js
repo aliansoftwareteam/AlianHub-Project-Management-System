@@ -8,6 +8,7 @@ const H = require('../helpers/secretHandles');
 const R = require('../helpers/integrationsRules');
 const registry = require('./registry');
 const backoff = require('./backoff');
+const { unlistedHostOf } = require('../../Agents/engine/safeFetch');
 
 const T = SCHEMA_TYPE.INTEGRATION_CONNECTIONS;
 const AUDIT_ACTOR = { actorId: 'integration', actorName: 'App connections' };
@@ -20,6 +21,8 @@ const lastErrorOf = (results, truncated) => {
     if (truncated) return 'More changed than one check can read; the start point is kept so nothing is skipped.';
     return results.failed ? 'Some events could not be applied; see the audit log.' : '';
 };
+
+const CLEARED = Object.freeze({ errorCode: '', blockedHost: '' });
 
 const actingUserOf = (connection) => String(connection.connectedBy || connection.createdBy || '');
 
@@ -41,7 +44,7 @@ async function syncConnection({ companyId, connection, now = Date.now(), get }) 
         const unlinked = linked.length ? 'The person who connected this app can no longer open any linked project.' : 'No project is linked yet.';
         const waiting = projectIds.length ? (connector.waiting && connector.waiting(held.config || {})) || '' : unlinked;
         if (waiting) {
-            await state.record(companyId, held._id, { cursor: new Date(now).toISOString(), lastSyncAt: new Date(now), lockUntil: null, lastError: waiting, failures: 0, nextAttemptAt: null });
+            await state.record(companyId, held._id, { cursor: new Date(now).toISOString(), lastSyncAt: new Date(now), lockUntil: null, lastError: waiting, failures: 0, nextAttemptAt: null, ...CLEARED });
             return { events: 0, projects: projectIds.length };
         }
 
@@ -67,15 +70,16 @@ async function syncConnection({ companyId, connection, now = Date.now(), get }) 
 
         await state.record(companyId, held._id, {
             cursor: cursor || since, lastSyncAt: new Date(now), lastError: lastErrorOf(results, truncated),
-            failures: 0, nextAttemptAt: null, lockUntil: null, lastEvents: results.events,
+            failures: 0, nextAttemptAt: null, lockUntil: null, lastEvents: results.events, ...CLEARED,
         });
         if (results.events) audit(companyId, held, { action: 'app_connection.sync', meta: { events: results.events, acted: results.acted, failed: results.failed } });
         return results;
     } catch (error) {
         const failures = Number((held.sync && held.sync.failures) || 0) + 1;
-        const message = backoff.cleanError(error, secrets);
+        const blockedHost = unlistedHostOf(error);
+        const message = blockedHost ? backoff.egressBlockedMessage(blockedHost) : backoff.cleanError(error, secrets);
         await state.record(companyId, held._id, {
-            lastError: message, failures: failures, nextAttemptAt: new Date(backoff.nextAttempt(error, failures, now)), lockUntil: null,
+            lastError: message, errorCode: blockedHost ? backoff.EGRESS_BLOCKED : '', blockedHost, failures, nextAttemptAt: new Date(backoff.nextAttempt(error, failures, now)), lockUntil: null,
         }).catch((e) => logger.error(`[appConnections] could not record a failure for ${held._id}: ${e.message}`));
         audit(companyId, held, { action: 'app_connection.error', meta: { message, failures } });
         return { error: message, failures };

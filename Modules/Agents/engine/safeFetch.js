@@ -171,6 +171,10 @@ const withoutHeaders = (headers, names) => Object.fromEntries(Object.entries(hea
 
 const hopOf = (u, status) => ({ host: u.host, path: u.pathname, status });
 
+const EGRESS_UNLISTED = 'egress_unlisted';
+
+const unlistedHostOf = (error) => (error && error.code === EGRESS_UNLISTED ? String(error.host || '') : '');
+
 const REFUSAL = Object.freeze({ PRIVATE_HOST: 'private_host', UNLISTED: 'unlisted', PRIVATE_ADDRESS: 'private_address' });
 
 /* The workspace egress gateway. Off, with no workspace behind the fetch, or
@@ -186,7 +190,7 @@ async function egressGate({ companyId, actor }) {
     const refuse = (u, hop, reason) => {
         const host = canonicalHost(u.hostname);
         store.recordRefusal(companyId, { actor, host, port: portOf(u), reason, hop });
-        if (reason === REFUSAL.UNLISTED) throw new Error(`${host} is not on this workspace's egress allowlist — the instance owner can allow it under Instance > Egress`);
+        if (reason === REFUSAL.UNLISTED) throw Object.assign(new Error(`${host} is not on this workspace's egress allowlist — the instance owner can allow it under Instance > Egress`), { code: EGRESS_UNLISTED, host });
         throw new Error(`${host} is a private, local or internal host — agents do not fetch it, listed or not`);
     };
     return {
@@ -301,4 +305,4 @@ async function safeFetch(url, opts = {}) {
     }
 }
 
-module.exports = { safeFetch, resolvePublic, isBlockedHostname, isPrivateAddress, DEFAULTS };
+module.exports = { safeFetch, resolvePublic, isBlockedHostname, isPrivateAddress, unlistedHostOf, EGRESS_UNLISTED, DEFAULTS };

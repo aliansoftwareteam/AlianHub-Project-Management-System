@@ -10,6 +10,10 @@ const defaultGet = async (url, { token, companyId }) => {
     return safeFetch(url, { headers: headers(token), companyId, timeoutMs: 15000, maxBytes: 4 * 1024 * 1024 });
 };
 
+const { EGRESS_BLOCKED, egressBlockedMessage } = require('../backoff');
+
+const egressBlockedHost = (error) => require('../../../Agents/engine/safeFetch').unlistedHostOf(error);
+
 const header = (res, name) => (res.headers || {})[name];
 
 const rateLimited = (res) => res.status === 429
@@ -111,5 +115,6 @@ async function commitChecks({ repo, sha, token, companyId, get = defaultGet }) {
 
 module.exports = {
     listPulls, listRepos, canReadRepo, accountOf, readPull, pullFiles, commitChecks, defaultGet,
+    egressBlockedHost, egressBlockedMessage, EGRESS_BLOCKED,
     PAGE_SIZE, MAX_PAGES, REPO_PAGES, PULL_FILES_PER_PAGE, CHECK_RUNS_MAX,
 };

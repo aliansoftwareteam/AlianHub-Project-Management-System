@@ -8,6 +8,7 @@ const rules = require('../Agents/engine/egressRules');
 const store = require('../Agents/engine/egressAllowlist');
 const { isBlockedHostname } = require('../Agents/engine/safeFetch');
 const { requestAddress } = require('../../utils/requestAddress');
+const { clearAllowedRefusals } = require('../Integrations/appConnections/egressAllowed');
 
 const LIST_CHANGED_ACTION = 'agent.egress_allowlist';
 const ADMIN_KEY_ACTOR = 'instance-admin-key';
@@ -90,14 +91,17 @@ const within = (value, fallback, min, max) => {
 
 exports.summary = async (req, res) => {
     if (!egressContext.isOn()) return flagOff(res);
+    const only = String(req.query.workspace || '');
+    if (only && !OBJECT_ID.test(only)) return fail(res, 400, CODE.INVALID_COMPANY_ID, 'companyId must be a workspace id.');
+    const filter = only ? { _id: new mongoose.Types.ObjectId(only) } : {};
     try {
         const since = new Date(Date.now() - WINDOW_DAYS * DAY_MS);
         const pageSize = within(req.query.pageSize, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
-        const total = Number(await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{}] }, 'countDocuments')) || 0;
+        const total = Number(await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [filter] }, 'countDocuments')) || 0;
         const page = within(req.query.page, 1, 1, Math.max(1, Math.ceil(total / pageSize)));
         const companies = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
             type: SCHEMA_TYPE.COMPANIES,
-            data: [{}, 'Cst_CompanyName createdAt', { sort: { createdAt: -1, _id: -1 }, skip: (page - 1) * pageSize, limit: pageSize }],
+            data: [filter, 'Cst_CompanyName createdAt', { sort: { createdAt: -1, _id: -1 }, skip: (page - 1) * pageSize, limit: pageSize }],
         }, 'find');
         const workspaces = await inBatches(companies || [], COMPANY_BATCH, (company) => describeWorkspace(company, since));
         const names = await userNames(workspaces.map((w) => w.updatedBy));
@@ -166,6 +170,9 @@ exports.setHosts = async (req, res) => {
         // An emptied list reopens the workspace to every public host, so the row says so rather than leaving it to count: 0.
         const emptied = before.length > 0 && hosts.length === 0;
         if (changed) auditListChange(req, id, company, { added, removed, count: hosts.length, ...(emptied ? { emptied: true } : {}) });
+        if (added.length) {
+            await clearAllowedRefusals(id, added).catch((error) => logger.error(`egress allowlist ${id}: refusals not cleared: ${error.message || error}`));
+        }
         return ok(res, changed ? 'Egress allowlist set.' : 'Egress allowlist unchanged.', {
             companyId: id, ...saved, cacheTtlSeconds: store.CACHE_TTL_SECONDS,
         });

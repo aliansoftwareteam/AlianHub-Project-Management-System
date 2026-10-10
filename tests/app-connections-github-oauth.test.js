@@ -384,3 +384,56 @@ describe('the repository picker', () => {
         expect(r.body).toMatchObject({ status: false, statusText: 'Something went wrong.' });
     });
 });
+
+describe('a workspace egress allowlist without api.github.com', () => {
+    const { EGRESS_UNLISTED } = jest.requireActual('../Modules/Agents/engine/safeFetch');
+    const unlisted = () => Object.assign(new Error('api.github.com is not on this workspace\'s egress allowlist — the instance owner can allow it under Instance > Egress'), { code: EGRESS_UNLISTED, host: 'api.github.com' });
+    const connected = async () => { await complete(await stateFor()); return String(rows()[0]._id); };
+
+    it('answers the repository list with egress_blocked and the host, never a 500', async () => {
+        const id = await connected();
+        mockFetch.mockRejectedValue(unlisted());
+        const r = await call(github.repos, OWNER, { params: { id } });
+        expect(r.code).toBe(409);
+        expect(r.body).toMatchObject({ status: false, code: 'egress_blocked', data: { host: 'api.github.com' } });
+        expect(r.body.statusText).toMatch(/isn't allowed to reach api\.github\.com/);
+    });
+
+    it('answers a repository save the same way, and stores nothing', async () => {
+        const id = await connected();
+        mockFetch.mockRejectedValue(unlisted());
+        const r = await call(github.setRepo, OWNER, { params: { id }, body: { repo: 'acme/web' } });
+        expect(r.code).toBe(409);
+        expect(r.body).toMatchObject({ code: 'egress_blocked', data: { host: 'api.github.com' } });
+        expect(rows()[0].config.repo).toBeUndefined();
+    });
+
+    it('still completes the sign-in and says at once that the host is blocked', async () => {
+        mockFetch.mockRejectedValue(unlisted());
+        const r = await complete(await stateFor());
+        expect(r.body).toMatchObject({ status: true, data: { egressBlocked: { host: 'api.github.com' } } });
+        expect(rows()).toHaveLength(1);
+    });
+
+    it('the sync records it in plain words with the code, backs off, and clears it once GitHub is reached', async () => {
+        await connected();
+        Object.assign(rows()[0], { projectIds: ['bbbbbbbbbbbbbbbbbbbbbb01'], config: { ...rows()[0].config, repo: 'acme/web' } });
+        mockFetch.mockRejectedValue(unlisted());
+        const now = Date.now();
+        await runner.syncConnection({ companyId: COMPANY, connection: rows()[0], now });
+        expect(rows()[0].sync).toMatchObject({
+            lastError: 'AlianHub isn\'t allowed to reach api.github.com yet. The instance owner can allow it under Settings > Instance > Egress.',
+            errorCode: 'egress_blocked', blockedHost: 'api.github.com', failures: 1,
+        });
+        expect(new Date(rows()[0].sync.nextAttemptAt).getTime()).toBeGreaterThan(now);
+
+        const shown = await call(hub.hub, OWNER);
+        const card = shown.body.data.apps.find((a) => a.key === 'github').connections[0];
+        expect(card).toMatchObject({ errorCode: 'egress_blocked', blockedHost: 'api.github.com' });
+
+        mockFetch.mockResolvedValue({ status: 200, headers: {}, body: '[]' });
+        rows()[0].sync.nextAttemptAt = null;
+        await runner.syncConnection({ companyId: COMPANY, connection: rows()[0], now: now + 1 });
+        expect(rows()[0].sync).toMatchObject({ errorCode: '', blockedHost: '', failures: 0 });
+    });
+});
