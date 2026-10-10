@@ -89,23 +89,26 @@ const unlinkTasks = ({ companyId, who, taskId, relatedTaskId }) => withReason(()
     companyId: String(companyId), taskId: idOf(taskId), relatedTaskId: idOf(relatedTaskId),
 }));
 
-/* The blocker and the waiting task of a link, or null for a link that sets no order. */
 const orderOf = (taskId, relatedTaskId, type) => {
     if (type === 'blocks') return { blockerId: idOf(taskId), waitingId: idOf(relatedTaskId) };
     if (type === 'blocked_by') return { blockerId: idOf(relatedTaskId), waitingId: idOf(taskId) };
     return null;
 };
 
-/* What a link that waited for approval asks of the waiting task once approved: when the blocker already ends after it
- * starts, it and what waits on it move later, as a date move of the blocker would have moved them had the link been
- * there first. The link is read onto the blocker, so the card can show the moves before it exists. */
+const MCP_PROPOSAL = 'mcp';
+
+/* What a link filed over MCP asks of the waiting task once approved, the blocker's dates having perhaps moved while
+ * it waited: when the blocker ends after the waiting task starts, that task and what waits on it move later, as a
+ * date move of the blocker would have moved them had the link been there first. The link is read onto the blocker,
+ * so the card can show the moves before it exists. */
 const linkPlan = async ({ companyId, actor, params, applying }) => {
     const order = orderOf(params.taskId, params.relatedTaskId, idOf(params.type));
     if (!order) return null;
     const uid = personOf(actor);
     const blocker = await liveTask(companyId, order.blockerId);
     const relations = Array.isArray(blocker.relations) ? blocker.relations : [];
-    const linked = { ...blocker, relations: [...relations, { taskId: order.waitingId, type: 'blocks' }] };
+    const present = relations.some((entry) => entry && entry.type === 'blocks' && idOf(entry.taskId) === order.waitingId);
+    const linked = present ? blocker : { ...blocker, relations: [...relations, { taskId: order.waitingId, type: 'blocks' }] };
     return require('./waitingTasks').plan({ companyId, actor, uid, task: linked, to: {}, zone: await zoneOf(uid), approved: true, applying, linkedTo: order.waitingId });
 };
 
@@ -303,14 +306,13 @@ const executors = {
         return setTag({ companyId, who: whoOf(actor, depth), taskId: params.taskId, tag: params.tag, operation: 'remove' });
     },
 
-    async 'task.relation.add'({ companyId, actor, params, depth, approvedBy }) {
+    async 'task.relation.add'({ companyId, actor, params, depth, proposal }) {
         const who = whoOf(actor, depth);
         const task = await liveTask(companyId, params.taskId);
         const relatedTaskId = await openRelated(companyId, actor, 'task.relation.add', params.relatedTaskId);
         const type = idOf(params.type);
         await linkTasks({ companyId, who, taskId: task._id, relatedTaskId, type });
-        // Only a link that waited: the dates may have moved past it meanwhile, which a link made at once never sees.
-        const waiting = approvedBy ? await linkPlan({ companyId, actor, params: { taskId: idOf(task._id), relatedTaskId, type }, applying: true }) : null;
+        const waiting = proposal && proposal.source === MCP_PROPOSAL ? await linkPlan({ companyId, actor, params: { taskId: idOf(task._id), relatedTaskId, type }, applying: true }) : null;
         const { shifted, answer } = await moveWaiting(companyId, who, waiting);
         return {
             result: { taskId: idOf(task._id), relatedTaskId, type, ...(answer ? { waitingTasks: answer } : {}) },

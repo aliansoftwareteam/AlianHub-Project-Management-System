@@ -117,6 +117,12 @@ describe('the preview card for a task an agent wants to create', () => {
             delete LINE_KINDS.view;
         }
     });
+
+    it('counts the tasks a change also moves that the viewer cannot open', () => {
+        const { t } = i18n().global;
+        expect(linesOf(t, 'en', { lines: [{ kind: 'movesNotShown', count: 2 }] })).toEqual([{ kind: 'movesNotShown', label: 'Also moves later', text: '2 tasks you cannot open' }]);
+        expect(linesOf(t, 'en', { lines: [{ kind: 'movesNotShown', count: 0 }] })).toEqual([]);
+    });
 });
 
 describe('the card in a row of the Inbox approval queue', () => {

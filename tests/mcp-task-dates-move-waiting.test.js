@@ -311,6 +311,55 @@ describe('a link that waits for approval while the blocker\'s dates move at once
         expect(await rpc(ctx(OWNER), 'task.relation.add', { taskId: String(design._id), relatedTaskId: String(review._id), type: 'blocks' })).toMatchObject({ ok: true });
         expect(datesOf(review)).toEqual(['2026-10-12', '2026-10-13']);
     });
+
+    it('names on the card how many moved tasks the approver cannot open', async () => {
+        const hidden = named('Hidden', P_PRIVATE, S_PRIVATE, '14', '15');
+        link(review, hidden);
+        const filed = await linkWaits(design, review);
+        await move(design, '2026-10-13', '2026-10-14');
+        const row = mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS].find((entry) => String(entry._id) === filed.proposalId);
+        const card = (await intentPreview.forBatches(CID, MEMBER, [{ ...row, id: String(row._id) }], { bareChanges: true })).get(String(row._id));
+        expect(card.lines).toEqual(expect.arrayContaining([{ kind: 'movesNotShown', count: 1 }]));
+        expect(JSON.stringify(card)).not.toMatch(/Hidden/);
+    });
+
+    it('moves nothing outside the projects the token is held to', async () => {
+        const elsewhere = named('Elsewhere', P_DEST, S_DEST, '14', '15');
+        link(review, elsewhere);
+        mockDb.store[SCHEMA_TYPE.API_TOKENS][0].projectIds = [P_OPEN];
+        policyOf().agentPolicy = { connected: 'propose_all' };
+        const filed = await rpc(ctx(OWNER, { projectIds: [P_OPEN] }), 'task.relation.add', { taskId: String(design._id), relatedTaskId: String(review._id), type: 'blocks' });
+        delete policyOf().agentPolicy;
+        expect(filed).toMatchObject({ pending: true });
+        await move(design, '2026-10-13', '2026-10-14', OWNER, { projectIds: [P_OPEN] });
+        await proposals.approve(CID, filed.proposalId, { decider: human(OWNER), isPrivileged: true, ip: '' });
+        await settle();
+        expect(datesOf(review)).toEqual(['2026-10-14', '2026-10-15']);
+        expect(datesOf(elsewhere)).toEqual(['2026-10-14', '2026-10-15']);
+    });
+
+    it('says on undo that the link went but a task it moved and that changed since was left', async () => {
+        const filed = await linkWaits(design, review);
+        await move(design, '2026-10-13', '2026-10-14');
+        await proposals.approve(CID, filed.proposalId, { decider: human(OWNER), isPrivileged: true, ip: '' });
+        await settle();
+        stored(review._id).startDate = at('20');
+        stored(review._id).DueDate = at('21');
+        const [audit] = audits('task.relation.add', 'applied');
+        const out = await undo.undoAuditRow(CID, audit, human(OWNER), '');
+        expect(out.result).toMatchObject({ leftAlone: [String(review._id)], note: expect.stringMatching(/link was removed/) });
+        expect(datesOf(review)).toEqual(['2026-10-20', '2026-10-21']);
+    });
+
+    it('a link made as a part of something approved, not filed over MCP, moves nothing', async () => {
+        await move(design, '2026-10-13', '2026-10-14');
+        const actor = { kind: 'agent', userId: OWNER, agentName: 'Claude', viaAccount: 'personal', tokenId: String(TOKEN) };
+        await require('../Modules/Agents/actions').perform({
+            companyId: CID, actor, action: 'task.relation.add', params: { taskId: String(design._id), relatedTaskId: String(review._id), type: 'blocks', __proposal: true },
+            approved: true, approvedBy: OWNER,
+        });
+        expect(datesOf(review)).toEqual(['2026-10-12', '2026-10-13']);
+    });
 });
 
 describe('a long chain', () => {

@@ -486,10 +486,14 @@ const waitingMovesOf = async (companyId, uid, proposal) => {
     const moves = await require('../../Config/tokenNarrowing').runNarrowed({ userId: actor.userId, projectIds: listOf(proposal.tokenProjectIds) }, planned);
     if (!moves.length) return [];
     const seen = new Set(await readableTaskIds(companyId, uid, moves.map((move) => move.taskId)));
-    return moves.filter((move) => seen.has(move.taskId)).flatMap((move) => [
-        { kind: 'batchItem', task: move.title, what: 'start', value: move.startDate },
-        { kind: 'batchItem', task: move.title, what: 'due', value: move.dueDate },
-    ]);
+    const hidden = moves.filter((move) => !seen.has(move.taskId)).length;
+    return [
+        ...moves.filter((move) => seen.has(move.taskId)).flatMap((move) => [
+            { kind: 'batchItem', task: move.title, what: 'start', value: move.startDate },
+            { kind: 'batchItem', task: move.title, what: 'due', value: move.dueDate },
+        ]),
+        ...(hidden ? [{ kind: 'movesNotShown', count: hidden }] : []),
+    ];
 };
 
 /* For each batch among the proposals, by proposal id: its one card. A task is named, and can be opened from the

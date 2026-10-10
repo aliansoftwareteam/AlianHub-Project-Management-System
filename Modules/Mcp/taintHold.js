@@ -14,11 +14,14 @@ const heldForApproval = (ctx, action) => {
 };
 
 const WAITS = 'From this app it waits for a person\'s approval in AlianHub, and changes nothing until then.';
+const PERSON_DOES = 'From this app it is refused: a person has to do this in AlianHub.';
 
-/* A tool as an outside client is told of it: a write that waits for it does not say it is made at once. */
+/* A tool as an outside client is told of it: a write that is held does not say it is made at once. */
 const describedFor = (ctx, tool) => {
     if (tool.run || !heldForApproval(ctx, tool.action)) return tool;
-    return { ...tool, description: `${String(tool.description).replace(/,? at once(?=[.,;])/g, '')} ${WAITS}` };
+    const { outsideMayFile } = require('./propose');
+    const ending = outsideMayFile(ctx, tool) ? WAITS : PERSON_DOES;
+    return { ...tool, description: `${String(tool.description).replace(/,? at once(?=[.,;])/g, '')} ${ending}` };
 };
 
-module.exports = { heldForApproval, describedFor, WAITS };
+module.exports = { heldForApproval, describedFor, WAITS, PERSON_DOES };

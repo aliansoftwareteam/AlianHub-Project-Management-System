@@ -6261,6 +6261,7 @@
     "IntentPreview.line_links": "Links",
     "IntentPreview.line_members": "On it",
     "IntentPreview.line_moved_lists": "Lists moved in",
+    "IntentPreview.line_moves_not_shown": "Also moves later",
     "IntentPreview.line_new_lists": "New lists",
     "IntentPreview.line_new_statuses": "New statuses",
     "IntentPreview.line_parent": "Under",

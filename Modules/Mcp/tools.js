@@ -45,7 +45,6 @@ const taskFilter = (ctx, vis, narrowTo, extra = {}) => ({
 
 const taskTarget = (args) => ({ taskId: str(args.taskId, 40) });
 
-/* A task list the agent is shown counts as its read of each task, so a change right after it is not refused as changed since. */
 const shown = async (ctx, rows) => {
     await taskReads.sawRows(ctx.companyId, ctx.actor, rows).catch((e) => logger.error(`[mcp] the reads of a task list were not kept: ${e.message}`));
     return rows;

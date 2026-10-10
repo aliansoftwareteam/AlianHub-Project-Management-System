@@ -64,7 +64,7 @@ const PROJECT = '6f0000000000000000000b51';
 const REDIRECT = 'http://127.0.0.1:41415/callback';
 const CHAIN_KEY = 's10s4-audit-chain-key-0123456789abcdef';
 
-const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'AUDIT_CHAIN', 'AUDIT_CHAIN_KEY', 'AGENT_TAINT_ROUTING', 'MCP_TOOLS_MANAGE'];
+const ENV_KEYS = ['MCP_OAUTH', 'APIURL', 'JWT_SECRET', 'AUDIT_CHAIN', 'AUDIT_CHAIN_KEY', 'AGENT_TAINT_ROUTING', 'MCP_TOOLS_MANAGE', 'MCP_TOOLS_WORK'];
 const saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 afterAll(() => { ENV_KEYS.forEach((k) => { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }); });
 
@@ -365,6 +365,31 @@ describe('the manage tools for an OAuth client', () => {
         expect(resultOf(res)).toMatchObject({ ok: false, pending: true });
         process.env.AGENT_TAINT_ROUTING = 'off';
         expect(await described('task.create')).toMatch(/at once/);
+    });
+
+    it('says of no held write that it is made at once', async () => {
+        process.env.MCP_TOOLS_MANAGE = 'on';
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        process.env.MCP_TOOLS_WORK = 'on';
+        const { raw } = await mint(MANAGING, [...ALL_SCOPES, 'tasks:manage']);
+        const ctx = await require('../Modules/Mcp/oauthAuth').authenticate({ headers: {} }, raw);
+        const { heldForApproval } = require('../Modules/Mcp/taintHold');
+        const held = (await listed(raw)).filter((tool) => heldForApproval(ctx, require('../Modules/Mcp/tools').actionOf(tool.name)) && !require('../Modules/Mcp/tools').registered().find((t) => t.name === tool.name).run);
+        expect(held.length).toBeGreaterThan(5);
+        held.forEach((tool) => expect(`${tool.name}: ${tool.description}`).not.toMatch(/at once/));
+    });
+
+    it('tells a connection that cannot ask for approval that a person has to make a held write', async () => {
+        process.env.AGENT_TAINT_ROUTING = 'on';
+        process.env.MCP_TOOLS_WORK = 'on';
+        const { raw } = await mint(ALL_SCOPES);
+        const tool = (await listed(raw)).find((entry) => entry.name === 'task.relation.add');
+        const { PERSON_DOES, WAITS } = require('../Modules/Mcp/taintHold');
+        expect(tool.description).toContain(PERSON_DOES);
+        expect(tool.description).not.toContain(WAITS);
+        const res = await post(raw, call('task.relation.add', { taskId: TASK, relatedTaskId: TASK, type: 'relates_to' }));
+        expect(resultOf(res)).toMatchObject({ refused: true });
+        expect(proposalRows()).toHaveLength(0);
     });
 
     it('files a routed write for a person under the grant, and approval asks the grant again', async () => {

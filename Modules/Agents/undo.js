@@ -86,6 +86,8 @@ const putBackValues = async (companyId, values, actor) => {
     return { restored, kept };
 };
 
+const LINK_REMOVED_MOVES_LEFT = 'The link was removed, but some tasks it had moved were changed again since, so their dates were left as they are now.';
+
 /* Waiting tasks a change moved go back, unless one was changed again since or the person undoing cannot open it. */
 const moveBack = async (companyId, shifted, actor) => {
     const movedBack = [];
@@ -203,7 +205,8 @@ const inverses = {
     },
     async relation(companyId, u, actor) {
         await work().unlinkTasks({ companyId, who: undoer(actor), taskId: u.taskId, relatedTaskId: u.relatedTaskId });
-        return { taskId: u.taskId, unlinked: u.relatedTaskId, ...(await moveBack(companyId, u.shifted, actor)) };
+        const back = await moveBack(companyId, u.shifted, actor);
+        return { taskId: u.taskId, unlinked: u.relatedTaskId, ...back, ...(back.leftAlone ? { note: LINK_REMOVED_MOVES_LEFT } : {}) };
     },
     async relationRemoved(companyId, u, actor) {
         await work().linkTasks({ companyId, who: undoer(actor), taskId: u.taskId, relatedTaskId: u.relatedTaskId, type: u.type });

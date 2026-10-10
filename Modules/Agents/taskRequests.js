@@ -450,7 +450,6 @@ const waitingPlan = ({ companyId, actor, uid, task, changes, zone, approved, app
     return Object.keys(dated).length ? require('./waitingTasks').plan({ companyId, actor, uid, task, to: dated, zone, approved, applying }) : null;
 };
 
-/* Writes the moves a plan of ./waitingTasks names: what each moved task held before, for the undo, and the answer. */
 const moveWaiting = async (companyId, who, waiting) => {
     if (!waiting) return { shifted: [], answer: null };
     if (!waiting.rows.length) return { shifted: [], answer: waiting.answer };
