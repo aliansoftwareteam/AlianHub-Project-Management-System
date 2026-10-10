@@ -162,6 +162,16 @@ describe('with the flag on', () => {
             const { body } = await asOwner('GET', BASE);
             expect(workspace(body.data, CID_A).hosts).toEqual(['docs.example.com']);
         });
+
+        it('narrows to one workspace when asked, so a page can add one host to its own list', async () => {
+            seedList(CID_A, ['docs.example.com']);
+            const { status, body } = await asOwner('GET', `${BASE}?workspace=${CID_A}`);
+            expect(status).toBe(200);
+            expect(body.data.total).toBe(1);
+            expect(body.data.workspaces).toEqual([expect.objectContaining({ companyId: CID_A, hosts: ['docs.example.com'], version: 0 })]);
+            expect((await asOwner('GET', `${BASE}?workspace=nope`)).body).toMatchObject({ status: false, code: 'invalid_company_id' });
+            expect((await call('GET', `${BASE}?workspace=${CID_A}`, { uid: ADMIN })).status).toBe(403);
+        });
     });
 
     describe('replacing a workspace list', () => {

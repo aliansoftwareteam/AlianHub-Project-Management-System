@@ -33,4 +33,8 @@ const cleanError = (error, secrets = []) => {
     return text.replace(/\s+/g, ' ').slice(0, ERROR_MAX);
 };
 
-module.exports = { POLL_MS, MAX_DELAY_MS, LEASE_MS, delayAfter, nextAttempt, isDue, cleanError };
+const EGRESS_BLOCKED = 'egress_blocked';
+
+const egressBlockedMessage = (host) => `AlianHub isn't allowed to reach ${host} yet. The instance owner can allow it under Settings > Instance > Egress.`;
+
+module.exports = { EGRESS_BLOCKED, egressBlockedMessage, POLL_MS, MAX_DELAY_MS, LEASE_MS, delayAfter, nextAttempt, isDue, cleanError };

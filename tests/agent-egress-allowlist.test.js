@@ -21,7 +21,7 @@ const dns = require('dns');
 const { myCache } = require('../Config/config');
 const rules = require('../Modules/Agents/engine/egressRules');
 const egressContext = require('../Modules/Agents/engine/egressContext');
-const { safeFetch, resolvePublic, isBlockedHostname, isPrivateAddress } = require('../Modules/Agents/engine/safeFetch');
+const { safeFetch, resolvePublic, isBlockedHostname, isPrivateAddress, unlistedHostOf, EGRESS_UNLISTED } = require('../Modules/Agents/engine/safeFetch');
 const store = require('../Modules/Agents/engine/egressAllowlist');
 const skillRecord = require('../Modules/Agents/skillRecord');
 const pageAudit = require('../Modules/Agents/engine/pageAudit');
@@ -256,6 +256,14 @@ describe('the gateway', () => {
             expect(audits(CID_A)[0]).toMatchObject({ action: store.REFUSED_ACTION, actorId: ACTOR, entityType: 'host', entityId: 'other.public.test', meta: { reason: 'unlisted', host: 'other.public.test', port, hop: 0 } });
             expect(JSON.stringify(audits(CID_A)[0])).not.toContain(SECRET);
             expect(JSON.stringify(audits(CID_A)[0])).not.toContain('/secret');
+        });
+
+        it('marks an unlisted refusal with a code and the host, so a caller can say which host to allow', async () => {
+            seedList(CID_A, ['api.public.test']);
+            const error = await fetchAs(CID_A, `http://other.public.test:${port}/page`).catch((e) => e);
+            expect(error).toMatchObject({ code: EGRESS_UNLISTED, host: 'other.public.test' });
+            expect(unlistedHostOf(error)).toBe('other.public.test');
+            expect(unlistedHostOf(new Error('other.public.test is not on this workspace\'s egress allowlist'))).toBe('');
         });
 
         it('a suffix pattern admits subdomains and not the bare domain', async () => {

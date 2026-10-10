@@ -38,7 +38,7 @@ const connectionRow = (row, names, privileged) => {
     return {
         id: String(row._id), name: row.name, enabled: row.enabled !== false, status: row.status, target: targetOf(row),
         connectedAt: row.connectedAt || null, secrets: R.redact(row).secrets, viaOAuth: (row.config || {}).auth === 'oauth',
-        lastSyncAt: sync.lastSyncAt || null, lastError: sync.lastError || '', failures: Number(sync.failures) || 0, nextAttemptAt: sync.nextAttemptAt || null,
+        lastSyncAt: sync.lastSyncAt || null, lastError: sync.lastError || '', errorCode: sync.errorCode || '', blockedHost: sync.blockedHost || '', failures: Number(sync.failures) || 0, nextAttemptAt: sync.nextAttemptAt || null,
         ...linkedProjects(row, names, privileged),
     };
 };

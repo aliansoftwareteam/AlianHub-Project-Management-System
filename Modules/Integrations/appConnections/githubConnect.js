@@ -21,8 +21,14 @@ const UNCONFIGURED = 'One-click GitHub needs GITHUB_CONNECT_CLIENT_ID and GITHUB
 
 const refuse = (res, code, statusText) => res.status(code).send({ status: false, statusText, message: statusText });
 
+const egressBlocked = (res, host) => res.status(409).send({
+    status: false, code: api.EGRESS_BLOCKED, statusText: api.egressBlockedMessage(host), message: api.egressBlockedMessage(host), data: { host },
+});
+
 const failed = (res, e, what) => {
     logger.error(`appConnections github ${what}: ${(e && e.message) || e}`);
+    const host = api.egressBlockedHost(e);
+    if (host) return egressBlocked(res, host);
     return refuse(res, 500, 'Something went wrong.');
 };
 
@@ -115,7 +121,11 @@ exports.complete = async (req, res) => {
             logger.error(`appConnections github exchange: ${(e && e.message) || e}`);
             return refuse(res, 400, STALE);
         }
-        const account = await api.accountOf({ token, companyId }).catch(() => ({ id: '', login: '' }));
+        let blockedHost = '';
+        const account = await api.accountOf({ token, companyId }).catch((e) => {
+            blockedHost = api.egressBlockedHost(e);
+            return { id: '', login: '' };
+        });
         const existing = await liveGithub(companyId);
         const before = (existing && existing.config) || {};
         const earlier = await grantOf(companyId, existing);
@@ -131,7 +141,7 @@ exports.complete = async (req, res) => {
         let id;
         if (existing) {
             id = existing._id;
-            const sync = sameReading ? { ...(existing.sync || {}), failures: 0, nextAttemptAt: null, lastError: '' } : {};
+            const sync = sameReading ? { ...(existing.sync || {}), failures: 0, nextAttemptAt: null, lastError: '', errorCode: '', blockedHost: '' } : {};
             await MongoDbCrudOpration(companyId, {
                 type: T,
                 data: [{ _id: existing._id }, { $set: { ...kept.set, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: uid, connectedBy: uid, sync, ...(sameReading ? {} : { connectedAt: new Date() }) }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
@@ -148,7 +158,7 @@ exports.complete = async (req, res) => {
         removeCache(`integration_connections:${companyId}`);
         connectionsChanged(companyId, id, { status: 'connected', enabled: true });
         recordAuditFromReq(req, { action: 'app_connection.connected', entityType: 'integration', entityId: String(id), entityName: 'GitHub', meta: { via: 'oauth' } });
-        return res.send({ status: true, statusText: 'Connected.', data: { id: String(id), repo, account: account.login } });
+        return res.send({ status: true, statusText: 'Connected.', data: { id: String(id), repo, account: account.login, ...(blockedHost ? { egressBlocked: { host: blockedHost } } : {}) } });
     } catch (e) { return failed(res, e, 'complete'); }
 };
 

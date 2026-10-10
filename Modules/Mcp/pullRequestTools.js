@@ -10,7 +10,8 @@ const taint = require('../Agents/taint');
 const { visibleProjectIds } = require('../Agents/scope');
 const H = require('../Integrations/helpers/secretHandles');
 const api = require('../Integrations/appConnections/github/api');
-const { cleanError } = require('../Integrations/appConnections/backoff');
+const { cleanError, egressBlockedMessage, EGRESS_BLOCKED } = require('../Integrations/appConnections/backoff');
+const { unlistedHostOf } = require('../Agents/engine/safeFetch');
 const { TASK_ACCESS_FIELDS, NOT_VISIBLE } = require('./visibility');
 const { turnBackIfKeptAway, askThePerson } = require('./readGate');
 
@@ -207,6 +208,8 @@ const retryAtOf = (error) => {
 const answerOfError = (error, token) => {
     if (error && error.notFound) return { ...PULL_NOT_FOUND };
     if (error && error.rateLimited) return { error: 'GitHub\'s limit on reads is reached for now. Try again later.', rateLimited: true, retryAt: retryAtOf(error) };
+    const blockedHost = unlistedHostOf(error);
+    if (blockedHost) return { error: `${egressBlockedMessage(blockedHost)} Tell the person; nothing was read.`, code: EGRESS_BLOCKED, host: blockedHost };
     const said = cleanError(error, [token]);
     if (/time budget/i.test(said)) return { ...TIMED_OUT };
     if (error && Number.isInteger(error.githubStatus)) return { error: said };

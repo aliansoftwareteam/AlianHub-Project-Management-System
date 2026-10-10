@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { config, flushPromises, mount } from '@vue/test-utils';
 
-const { apiRequest, route, replace } = vi.hoisted(() => ({ apiRequest: vi.fn(), route: { query: {} }, replace: vi.fn() }));
+const { apiRequest, apiRequestWithoutCompnay, route, replace } = vi.hoisted(() => ({ apiRequest: vi.fn(), apiRequestWithoutCompnay: vi.fn(), route: { query: {}, params: {} }, replace: vi.fn() }));
 
-vi.mock('@/services', () => ({ apiRequest }));
+vi.mock('@/services', () => ({ apiRequest, apiRequestWithoutCompnay }));
 vi.mock('vue-router', async (importOriginal) => ({ ...(await importOriginal()), useRoute: () => route, useRouter: () => ({ replace }) }));
 
 import AppConnections from '@/views/Integrations/AppConnections.vue';
@@ -154,9 +154,118 @@ describe('the App connections page', () => {
             expect(apiRequest).toHaveBeenLastCalledWith('get', expect.stringMatching(/\/connections\/c1\/github-repos\?page=1$/));
             await wrapper.find('input[type="radio"][value="acme/web"]').setValue(true);
             apiRequest.mockResolvedValueOnce({ data: { status: true, data: { id: 'c1', repo: 'acme/web' } } });
-            await wrapper.findAll('.apc__repos button').find((b) => b.text() === en.AppConnections.save).trigger('click');
+            await wrapper.findAll('[data-repo-actions] button').find((b) => b.text() === en.AppConnections.save).trigger('click');
             await flushPromises();
             expect(apiRequest).toHaveBeenCalledWith('put', expect.stringMatching(/\/connections\/c1\/repo$/), { repo: 'acme/web' });
+        });
+
+        it('keeps Save, Cancel and Show more outside the scrolling list, and filters the list by name', async () => {
+            const wrapper = await openWith(true, [{ ...github.connections[0], target: '', viaOAuth: true }]);
+            const many = Array.from({ length: 30 }, (_, i) => ({ fullName: `acme/repo-${i}`, private: false }));
+            apiRequest.mockResolvedValueOnce({ data: { status: true, data: { repos: [...many, { fullName: 'acme/Billing', private: true }], page: 1, hasMore: true } } });
+            await wrapper.findAll('button').find((b) => b.text() === en.AppConnections.pick_repo).trigger('click');
+            await flushPromises();
+            const list = wrapper.find('[data-repo-list]');
+            const actions = wrapper.find('[data-repo-actions]');
+            expect(list.classes()).toContain('apc__repos');
+            expect(list.findAll('button')).toHaveLength(0);
+            expect(list.element.contains(actions.element)).toBe(false);
+            expect(actions.findAll('button').map((b) => b.text())).toEqual([en.AppConnections.more_repos, en.AppConnections.save, en.AppConnections.cancel]);
+            expect(list.element.contains(wrapper.find('[data-repo-filter]').element)).toBe(false);
+            expect(wrapper.find('[data-repo-filter]').attributes('placeholder')).toBe(en.AppConnections.repo_filter);
+            expect(list.findAll('input[type="radio"]')).toHaveLength(31);
+
+            await wrapper.find('[data-repo-filter]').setValue('bill');
+            expect(list.findAll('input[type="radio"]').map((r) => r.element.value)).toEqual(['acme/Billing']);
+            await wrapper.find('[data-repo-filter]').setValue('nothing-like-it');
+            expect(list.findAll('input[type="radio"]')).toHaveLength(0);
+            expect(wrapper.find('[data-no-match]').text()).toBe(en.AppConnections.no_repo_match);
+        });
+    });
+
+    describe('when the workspace egress allowlist leaves GitHub out', () => {
+        const CID = 'aaaaaaaaaaaaaaaaaaaaaaaa';
+        const blocked = Object.assign(new Error('x'), { response: { status: 409, data: { status: false, code: 'egress_blocked', statusText: 'Server words', data: { host: 'api.github.com' } } } });
+        const openBlocked = async ({ canManage = true, owner = true } = {}) => {
+            route.params = { cid: CID };
+            const app = { ...github, oneClick: true, connections: [{ ...github.connections[0], target: '', viaOAuth: true }] };
+            apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage, apps: [app], projects: [] } } });
+            apiRequestWithoutCompnay.mockImplementation(async (method, url) => {
+                if (url.endsWith('/instance/access')) {
+                    if (owner) return { data: { status: true, data: { allowed: true } } };
+                    throw Object.assign(new Error('x'), { response: { status: 403 } });
+                }
+                if (method === 'get') return { data: { status: true, data: { workspaces: [{ companyId: CID, hosts: ['docs.example.com'], version: 3 }] } } };
+                return { data: { status: true, data: {} } };
+            });
+            const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
+            await flushPromises();
+            apiRequest.mockRejectedValueOnce(blocked);
+            await wrapper.findAll('button').find((b) => b.text() === en.AppConnections.pick_repo).trigger('click');
+            await flushPromises();
+            return wrapper;
+        };
+        const blockedText = () => en.AppConnections.egress_blocked.replace('{host}', 'api.github.com');
+
+        beforeEach(() => { apiRequestWithoutCompnay.mockReset(); });
+
+        it('says so in plain words instead of a generic failure, and offers the instance owner a button', async () => {
+            const wrapper = await openBlocked();
+            const panel = wrapper.find('[data-egress-blocked]');
+            expect(panel.text()).toContain(blockedText());
+            expect(wrapper.text()).not.toContain('Server words');
+            expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+            expect(panel.find('[data-allow-host]').text()).toBe(en.AppConnections.egress_allow.replace('{host}', 'api.github.com'));
+            expect(panel.find('[data-egress-settings]').exists()).toBe(true);
+            expect(panel.find('[data-ask-owner]').exists()).toBe(false);
+        });
+
+        it('adds only api.github.com to the workspace list through the egress endpoint, then loads the repositories again', async () => {
+            const wrapper = await openBlocked();
+            apiRequest.mockResolvedValueOnce({ data: { status: true, data: { repos: [{ fullName: 'acme/web', private: true }], page: 1, hasMore: false } } });
+            await wrapper.find('[data-allow-host]').trigger('click');
+            await flushPromises();
+            expect(apiRequestWithoutCompnay).toHaveBeenCalledWith('get', `/api/v2/instance/egress?workspace=${CID}`);
+            expect(apiRequestWithoutCompnay).toHaveBeenCalledWith('put', `/api/v2/instance/egress/${CID}`, { hosts: ['docs.example.com', 'api.github.com'], version: 3 });
+            expect(apiRequest).toHaveBeenLastCalledWith('get', expect.stringMatching(/\/connections\/c1\/github-repos\?page=1$/));
+            expect(wrapper.find('[data-egress-blocked]').exists()).toBe(false);
+            expect(wrapper.find('input[type="radio"][value="acme/web"]').exists()).toBe(true);
+        });
+
+        it('tells anyone who cannot edit egress to ask the instance owner, with no button', async () => {
+            const wrapper = await openBlocked({ owner: false });
+            const panel = wrapper.find('[data-egress-blocked]');
+            expect(panel.text()).toContain(blockedText());
+            expect(panel.find('[data-ask-owner]').text()).toBe(en.AppConnections.egress_ask_owner.replace('{host}', 'api.github.com'));
+            expect(panel.find('[data-allow-host]').exists()).toBe(false);
+            expect(apiRequestWithoutCompnay.mock.calls.filter(([method]) => method === 'put')).toEqual([]);
+        });
+
+        it('shows a member the blocked state the sync recorded, worded from the locale', async () => {
+            route.params = { cid: CID };
+            const conn = { ...github.connections[0], lastError: 'Server words', errorCode: 'egress_blocked', blockedHost: 'api.github.com' };
+            apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage: false, apps: [{ ...github, connections: [conn] }], projects: [] } } });
+            apiRequestWithoutCompnay.mockRejectedValue(Object.assign(new Error('x'), { response: { status: 403 } }));
+            const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
+            await flushPromises();
+            expect(wrapper.find('[data-ask-owner]').exists()).toBe(true);
+            expect(wrapper.text()).not.toContain('Server words');
+            expect(buttons(wrapper)).toEqual([]);
+        });
+
+        it('shows the state right after the GitHub sign-in, before any repository list is asked for', async () => {
+            route.params = { cid: CID };
+            route.query = { github: 'complete', state: 's', code: 'k' };
+            const app = { ...github, oneClick: true, connections: [{ ...github.connections[0], target: '', viaOAuth: true }] };
+            apiRequest.mockImplementation(async (method) => (method === 'post'
+                ? { data: { status: true, data: { id: 'c1', repo: '', account: '', egressBlocked: { host: 'api.github.com' } } } }
+                : { data: { status: true, data: { enabled: true, canManage: true, apps: [app], projects: [] } } }));
+            apiRequestWithoutCompnay.mockResolvedValue({ data: { status: true, data: { allowed: true } } });
+            const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
+            await flushPromises();
+            expect(wrapper.find('[data-egress-blocked]').text()).toContain(blockedText());
+            expect(wrapper.find('[data-allow-host]').exists()).toBe(true);
+            expect(apiRequest.mock.calls.some(([, url]) => /github-repos/.test(url))).toBe(false);
         });
     });
 

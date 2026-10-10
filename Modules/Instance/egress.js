@@ -90,14 +90,17 @@ const within = (value, fallback, min, max) => {
 
 exports.summary = async (req, res) => {
     if (!egressContext.isOn()) return flagOff(res);
+    const only = String(req.query.workspace || '');
+    if (only && !OBJECT_ID.test(only)) return fail(res, 400, CODE.INVALID_COMPANY_ID, 'companyId must be a workspace id.');
+    const filter = only ? { _id: new mongoose.Types.ObjectId(only) } : {};
     try {
         const since = new Date(Date.now() - WINDOW_DAYS * DAY_MS);
         const pageSize = within(req.query.pageSize, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
-        const total = Number(await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [{}] }, 'countDocuments')) || 0;
+        const total = Number(await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, { type: SCHEMA_TYPE.COMPANIES, data: [filter] }, 'countDocuments')) || 0;
         const page = within(req.query.page, 1, 1, Math.max(1, Math.ceil(total / pageSize)));
         const companies = await MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
             type: SCHEMA_TYPE.COMPANIES,
-            data: [{}, 'Cst_CompanyName createdAt', { sort: { createdAt: -1, _id: -1 }, skip: (page - 1) * pageSize, limit: pageSize }],
+            data: [filter, 'Cst_CompanyName createdAt', { sort: { createdAt: -1, _id: -1 }, skip: (page - 1) * pageSize, limit: pageSize }],
         }, 'find');
         const workspaces = await inBatches(companies || [], COMPANY_BATCH, (company) => describeWorkspace(company, since));
         const names = await userNames(workspaces.map((w) => w.updatedBy));
