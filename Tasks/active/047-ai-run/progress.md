@@ -92,7 +92,7 @@ Every merged slice below is still behind its flag. `MCP_OAUTH` and the three `MC
 - [x] AI-1b The replay test in CI: the benchmark's tool calls replay with no model (#1623, build 850)
 
 **Step 7: prove it (needs the owner)**
-- [ ] AI-1 measured again: 15 delegations and 3 reserves, three runs each
+- [x] AI-1 measured again: 15 delegations and 3 reserves, three runs each, on build 852: 15 of 15 by the 2-of-3 rule, reserves 0 of 3 (`ai-1-run-2-results.md`)
 - [ ] The one-week trial on one project
 - [ ] The newcomer tests run again, on the "connect, then say it" path
 - [ ] The scorecard's AI row and newcomer row filled
