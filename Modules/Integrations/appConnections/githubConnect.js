@@ -13,6 +13,9 @@ const { connectionsChanged } = require('../helpers/connectionsChanged');
 const flag = require('./flag');
 const oauth = require('./github/oauth');
 const api = require('./github/api');
+const repoMap = require('./github/repoMap');
+const { visibleProjectIds } = require('../../Agents/scope');
+const { idForms } = require('../../../utils/mongo-handler/objectIdKeys');
 
 const T = SCHEMA_TYPE.INTEGRATION_CONNECTIONS;
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
@@ -54,6 +57,18 @@ const tokenOf = async (companyId, conn) => (await H.openSecrets({ companyId, row
 
 const withoutSecrets = (config) => Object.fromEntries(Object.entries(config || {}).filter(([key]) => !R.secretKeys('github').includes(key)));
 
+const NO_PROJECT = 'That project does not exist in this workspace.';
+const NO_TOKEN = 'No GitHub token is stored; connect GitHub again.';
+
+const liveProject = (companyId, projectId) => MongoDbCrudOpration(companyId, {
+    type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: idForms([projectId]) }, deletedStatusKey: { $nin: [1, 2] }, isPersonal: { $ne: true } }, { _id: 1 }],
+}, 'findOne');
+
+/* Another GitHub account may not see what the earlier one did: every repository starts again from now, failures cleared. */
+const restarted = (row, sameReading) => repoMap.reposOf(row).map(({ repo, projectIds, sync }) => ({
+    repo, projectIds, sync: sameReading ? { ...sync, failures: 0, nextAttemptAt: null, lastError: '', errorCode: '', blockedHost: '' } : { cursor: new Date().toISOString() },
+}));
+
 const isOAuth = (row) => !!row && row.type === 'github' && (row.config || {}).auth === 'oauth';
 
 /* Never rejects, and callers do not wait on it: ending the grant at GitHub must not hold up a reconnect or a disconnect. */
@@ -80,7 +95,9 @@ exports.authorize = async (req, res) => {
         const companyId = await managerOrRefuse(req, res);
         if (!companyId) return undefined;
         if (!oauth.isConfigured()) return refuse(res, 409, UNCONFIGURED);
-        const signed = oauth.encodeState({ companyId, userId: req.uid, sessionId: req.sessionId, returnOrigin: oauth.returnOriginOf(req) });
+        const projectId = String((req.query || {}).projectId || '');
+        if (projectId && (!OBJECT_ID.test(projectId) || !await liveProject(companyId, projectId))) return refuse(res, 400, NO_PROJECT);
+        const signed = oauth.encodeState({ companyId, userId: req.uid, sessionId: req.sessionId, returnOrigin: oauth.returnOriginOf(req), projectId });
         return res.send({ status: true, statusText: 'Open GitHub to connect.', data: { url: oauth.authorizeUrl(signed) } });
     } catch (e) { return failed(res, e, 'authorize'); }
 };
@@ -93,11 +110,13 @@ exports.callback = (req, res) => {
     const go = (origin, path, params) => res.redirect(302, `${origin}/#${path}?${new URLSearchParams(params)}`);
     if (!claims) return go(oauth.fallbackOrigin(), '/', { github: 'expired' });
     const origin = claims.returnOrigin || oauth.fallbackOrigin();
-    const page = `/${claims.companyId}/app-connections`;
-    if (query.error) return go(origin, page, { github: 'denied' });
+    const toProject = OBJECT_ID.test(String(claims.projectId || ''));
+    const page = toProject ? `/${claims.companyId}/project/${claims.projectId}/p` : `/${claims.companyId}/app-connections`;
+    const at = toProject ? { tab: 'ProjectDetail', section: 'github' } : {};
+    if (query.error) return go(origin, page, { ...at, github: 'denied' });
     const code = oauth.usableCode(query.code);
-    if (!code) return go(origin, page, { github: 'failed' });
-    return go(origin, page, { github: 'complete', state: query.state, code });
+    if (!code) return go(origin, page, { ...at, github: 'failed' });
+    return go(origin, page, { ...at, github: 'complete', state: query.state, code });
 };
 
 /* Only the person who started the sign-in, in the same session and workspace, and still an owner or admin, completes it. */
@@ -142,9 +161,10 @@ exports.complete = async (req, res) => {
         if (existing) {
             id = existing._id;
             const sync = sameReading ? { ...(existing.sync || {}), failures: 0, nextAttemptAt: null, lastError: '', errorCode: '', blockedHost: '' } : {};
+            const repos = repoMap.isMapped(existing) ? { repos: restarted(existing, sameReading) } : {};
             await MongoDbCrudOpration(companyId, {
                 type: T,
-                data: [{ _id: existing._id }, { $set: { ...kept.set, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: uid, connectedBy: uid, sync, ...(sameReading ? {} : { connectedAt: new Date() }) }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
+                data: [{ _id: existing._id }, { $set: { ...kept.set, ...repos, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: uid, connectedBy: uid, sync, ...(sameReading ? {} : { connectedAt: new Date() }) }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
             }, 'findOneAndUpdate');
             await H.retireSecrets({ companyId, handles: kept.stale, actor });
         } else {
@@ -175,27 +195,132 @@ exports.repos = async (req, res) => {
     } catch (e) { return failed(res, e, 'repos'); }
 };
 
-exports.setRepo = async (req, res) => {
+const update = (companyId, filter, change, options = {}) => MongoDbCrudOpration(companyId, {
+    type: T, data: [filter, change, { returnDocument: 'after', ...options }],
+}, 'findOneAndUpdate');
+
+const ENTRY_REPO = ['entry', 'repo'].join('.');
+const REPOS_REPO = ['repos', 'repo'].join('.');
+const inEntry = (repo) => ({ arrayFilters: [{ [ENTRY_REPO]: repo }] });
+const ENTRY_PROJECTS = ['repos', '$[entry]', 'projectIds'].join('.');
+
+/* A row still in the old shape is upgraded in one write that only lands if nobody upgraded it first; otherwise it is read again. */
+const upgraded = async (companyId, conn, edit, uid) => {
+    if (repoMap.isMapped(conn)) return { conn };
+    const { entries, changed } = edit(conn);
+    const change = repoMap.mappingUpdate(entries);
+    change.$set.updatedBy = uid;
+    if (await update(companyId, { _id: conn._id, repos: { $exists: false } }, change)) return { done: true, changed };
+    return { conn: await liveGithub(companyId, { _id: conn._id }) };
+};
+
+/* Each change touches only its own pair, so a sync writing a cursor or another admin's edit meanwhile is kept. */
+const addPair = async (companyId, conn, repo, projectId, uid) => {
+    const first = await upgraded(companyId, conn, (row) => repoMap.withProject(row, repo, projectId, new Date().toISOString()), uid);
+    if (first.done) return first.changed;
+    const row = first.conn;
+    if (!row) return false;
+    const entry = repoMap.reposOf(row).find((one) => repoMap.sameRepo(one.repo, repo));
+    if (entry && entry.projectIds.includes(projectId)) return false;
+    if (!entry) {
+        const fresh = { repo, projectIds: [projectId], sync: { cursor: new Date().toISOString() } };
+        if (await update(companyId, { _id: row._id, [REPOS_REPO]: { $ne: repo } }, { $push: { repos: fresh }, $set: { updatedBy: uid } })) return true;
+    }
+    await update(companyId, { _id: row._id }, { $addToSet: { [ENTRY_PROJECTS]: projectId }, $set: { updatedBy: uid } }, inEntry(entry ? entry.repo : repo));
+    return true;
+};
+
+const removePair = async (companyId, conn, repo, projectId, uid) => {
+    const first = await upgraded(companyId, conn, (row) => repoMap.withoutProject(row, repo, projectId), uid);
+    if (first.done) return first.changed;
+    const row = first.conn;
+    const entry = row && repoMap.reposOf(row).find((one) => repoMap.sameRepo(one.repo, repo) && one.projectIds.includes(projectId));
+    if (!entry) return false;
+    await update(companyId, { _id: row._id }, { $pull: { [ENTRY_PROJECTS]: projectId }, $set: { updatedBy: uid } }, inEntry(entry.repo));
+    await update(companyId, { _id: row._id }, { $pull: { repos: { projectIds: { $size: 0 } } } });
+    return true;
+};
+
+const mappingChanged = (req, companyId, conn, action, meta) => {
+    removeCache(`integration_connections:${companyId}`);
+    connectionsChanged(companyId, conn._id, { repos: true });
+    recordAuditFromReq(req, { action, entityType: 'integration', entityId: String(conn._id), entityName: conn.name || 'GitHub', meta });
+};
+
+const connectorOf = (conn) => String(conn.connectedBy || conn.createdBy || '');
+
+/* The sync reads as the person who connected GitHub, so a project they cannot open would never be fed. */
+exports.addRepo = async (req, res) => {
     try {
         const companyId = await managerOrRefuse(req, res);
         if (!companyId) return undefined;
-        const repo = String((req.body || {}).repo || '').trim();
-        if (!R.isGithubRepo(repo)) return refuse(res, 400, 'The repository must look like owner/repo.');
+        const body = req.body || {};
+        const repo = String(body.repo || '').trim();
+        const projectId = String(body.projectId || '');
+        if (!repoMap.isRepo(repo)) return refuse(res, 400, 'The repository must look like owner/repo.');
+        if (!OBJECT_ID.test(projectId)) return refuse(res, 400, 'A valid project id is required.');
         const conn = await githubOf(req, res, companyId);
         if (!conn) return undefined;
+        if (!await liveProject(companyId, projectId)) return refuse(res, 400, NO_PROJECT);
+        const connector = connectorOf(conn);
+        if (!connector || !(await visibleProjectIds(companyId, connector)).map(String).includes(projectId)) {
+            return refuse(res, 400, 'The person who connected GitHub cannot open that project, so it would never be fed.');
+        }
         const token = await tokenOf(companyId, conn);
-        if (!token) return refuse(res, 400, 'No GitHub token is stored; connect GitHub again.');
+        if (!token) return refuse(res, 400, NO_TOKEN);
         if (!await api.canReadRepo({ repo, token, companyId })) return refuse(res, 400, 'This GitHub connection cannot read that repository.');
-        const changed = (conn.config || {}).repo !== repo;
-        await MongoDbCrudOpration(companyId, {
-            type: T,
-            data: [{ _id: conn._id }, { $set: { config: { ...(conn.config || {}), repo }, updatedBy: String(req.uid || ''), ...(changed ? { sync: {}, connectedAt: new Date() } : {}) } }, { returnDocument: 'after' }],
-        }, 'findOneAndUpdate');
-        removeCache(`integration_connections:${companyId}`);
-        connectionsChanged(companyId, conn._id, { target: repo });
-        recordAuditFromReq(req, { action: 'app_connection.repo', entityType: 'integration', entityId: String(conn._id), entityName: conn.name || 'GitHub', meta: { repo } });
-        return res.send({ status: true, statusText: 'Updated.', data: { id: String(conn._id), repo } });
-    } catch (e) { return failed(res, e, 'setRepo'); }
+        const changed = await addPair(companyId, conn, repo, projectId, String(req.uid || ''));
+        if (changed) mappingChanged(req, companyId, conn, 'app_connection.repo_added', { repo, projectId });
+        return res.send({ status: true, statusText: changed ? 'Added.' : 'Already linked.', data: { id: String(conn._id), repo, projectId } });
+    } catch (e) { return failed(res, e, 'addRepo'); }
+};
+
+exports.removeRepo = async (req, res) => {
+    try {
+        const companyId = await managerOrRefuse(req, res);
+        if (!companyId) return undefined;
+        const repo = String((req.query || {}).repo || '').trim();
+        const projectId = String((req.params || {}).projectId || '');
+        if (!repoMap.isRepo(repo)) return refuse(res, 400, 'The repository must look like owner/repo.');
+        if (!OBJECT_ID.test(projectId)) return refuse(res, 400, 'A valid project id is required.');
+        const conn = await githubOf(req, res, companyId);
+        if (!conn) return undefined;
+        if (!await removePair(companyId, conn, repo, projectId, String(req.uid || ''))) return refuse(res, 404, 'That repository is not linked to this project.');
+        mappingChanged(req, companyId, conn, 'app_connection.repo_removed', { repo, projectId });
+        return res.send({ status: true, statusText: 'Removed.', data: { id: String(conn._id), repo, projectId } });
+    } catch (e) { return failed(res, e, 'removeRepo'); }
+};
+
+const repoRow = ({ repo, sync }) => ({
+    repo, lastSyncAt: sync.lastSyncAt || null, lastError: sync.lastError || '', errorCode: sync.errorCode || '', blockedHost: sync.blockedHost || '',
+});
+
+/* Anyone who can open the project sees which repositories feed it; only an owner or admin is offered the changes. */
+exports.projectView = async (req, res) => {
+    try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return undefined;
+        if (!flag.enabled()) return res.send({ status: true, statusText: 'App connections are not switched on.', data: { enabled: false } });
+        const projectId = String((req.params || {}).projectId || '');
+        if (!OBJECT_ID.test(projectId)) return refuse(res, 400, 'A valid project id is required.');
+        const [visible, roleType, conn] = await Promise.all([visibleProjectIds(companyId, req.uid), getRoleType(companyId, req.uid), liveGithub(companyId)]);
+        if (!(visible || []).map(String).includes(projectId)) return refuse(res, 404, 'Not found.');
+        const canManage = isPrivileged(roleType);
+        const sync = (conn && conn.sync) || {};
+        const connector = conn ? connectorOf(conn) : '';
+        const reachable = !!conn && !!connector && (await visibleProjectIds(companyId, connector)).map(String).includes(projectId);
+        return res.send({
+            status: true,
+            data: {
+                enabled: true, canManage, oneClick: oauth.isConfigured(),
+                connection: conn ? {
+                    id: String(conn._id), enabled: conn.enabled !== false, viaOAuth: isOAuth(conn), account: canManage ? (conn.config || {}).accountLogin || '' : '', reachable,
+                    errorCode: sync.errorCode || '', blockedHost: sync.blockedHost || '',
+                } : null,
+                repos: conn ? repoMap.reposOfProject(conn, projectId).map(repoRow) : [],
+            },
+        });
+    } catch (e) { return failed(res, e, 'projectView'); }
 };
 
 exports.grantOf = grantOf;

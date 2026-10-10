@@ -12,6 +12,13 @@ const record = (companyId, id, fields) => MongoDbCrudOpration(companyId, {
     type: T, data: [{ _id: id }, { $set: inSync(fields) }, { returnDocument: 'after' }],
 }, 'findOneAndUpdate');
 
+/* One repository's sync state inside the row's mapping; an entry removed meanwhile is simply not matched. */
+const recordRepo = (companyId, id, repo, fields) => MongoDbCrudOpration(companyId, {
+    type: T,
+    data: [{ _id: id }, { $set: Object.fromEntries(Object.entries(fields).map(([name, value]) => [['repos', '$[entry]', 'sync', name].join('.'), value])) },
+        { arrayFilters: [{ 'entry.repo': repo }], returnDocument: 'after' }],
+}, 'findOneAndUpdate');
+
 /* A lease on the row, so two servers (or a slow run and the next tick) never poll the same connection together. */
 const lease = async (companyId, connection, now) => {
     const held = await MongoDbCrudOpration(companyId, {
@@ -35,4 +42,4 @@ const claimer = (companyId, connection) => async (key, taskId) => {
     }
 };
 
-module.exports = { record, lease, claimer };
+module.exports = { record, recordRepo, lease, claimer };

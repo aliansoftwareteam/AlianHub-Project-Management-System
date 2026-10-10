@@ -1,0 +1,4 @@
+# 049 progress
+
+- 2026-10-10: PRD written from the owner decision and the coordinator's brief (project card complete in itself, chip in the header). Branch `feat/github-repos-per-project`, built on #1626 (egress message), tracker AP-524.
+- 2026-10-10: built. Server: `repos` mapping on the connection (`github/repoMap.js`), migration 075, add/remove routes and the project view (`githubConnect.js`), sign-in from a project returns to its details tab (project id signed into the state), runner syncs each repository with its own cursor and backoff, `pull_request.get` takes `repo`. Screen: Project → Repository table on App connections, GitHub repositories card on the project's details, header chip, shared picker and egress notice (`views/Integrations/github/`). Tests: `app-connections-github-repos`, `migration-github-repos-per-project`, MCP two-repository cases, `projectGithubCard.spec.js`, updated App connections spec.

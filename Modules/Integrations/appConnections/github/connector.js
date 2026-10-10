@@ -1,17 +1,16 @@
 const api = require('./api');
 const { eventsOfPull } = require('./keys');
 const actions = require('../taskActions');
-
-const REPO = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9._-]{1,100}$/;
+const repoMap = require('./repoMap');
 
 /* The cursor moves to the newest pull request read, or stays at `since` when the list was cut, so nothing older is skipped;
  * GitHub timestamps have a second's resolution, so the newest comes back once more and its claims turn it away. */
-async function poll({ companyId, config, since, get }) {
+async function poll({ companyId, config, repo, since, get }) {
     if (!config.token) throw new Error('No GitHub token is stored; connect GitHub again.');
-    if (!config.repo) throw new Error('No repository is picked yet; pick one on App connections.');
-    if (!REPO.test(String(config.repo))) throw new Error('The repository must look like owner/repo.');
-    const { pulls, truncated } = await api.listPulls({ repo: config.repo, token: config.token, companyId, since, get });
-    const events = pulls.flatMap((pull) => eventsOfPull(config.repo, pull));
+    if (!repo) throw new Error('No repository is picked yet; pick one on App connections.');
+    if (!repoMap.isRepo(repo)) throw new Error('The repository must look like owner/repo.');
+    const { pulls, truncated } = await api.listPulls({ repo, token: config.token, companyId, since, get });
+    const events = pulls.flatMap((pull) => eventsOfPull(repo, pull));
     const seen = pulls.map((pull) => pull.updated_at);
     const cursor = seen.length && !truncated ? seen[seen.length - 1] : since || null;
     return { events, cursor, truncated };
@@ -43,6 +42,6 @@ async function handle(ctx, event) {
     return done;
 }
 
-const waiting = (config) => (config.repo ? '' : 'No repository is picked yet.');
+const waiting = () => 'No repository is picked yet.';
 
-module.exports = { type: 'github', poll, handle, waiting };
+module.exports = { type: 'github', poll, handle, waiting, targets: repoMap.reposOf };

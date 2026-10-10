@@ -1768,6 +1768,8 @@ const schema = {
         connectedBy: { type: String, required: false },
         connectedAt: { type: Date, required: false },
         projectIds: { type: [String], default: undefined, required: false },
+        // GitHub: [{ repo: 'owner/name', projectIds: [String], sync: {...} }], each repository with its own cursor and backoff (migration 075).
+        repos: { type: Array, default: undefined, required: false },
         sync: { type: Object, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },

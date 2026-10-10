@@ -209,6 +209,21 @@ describe('with the flag on', () => {
             expect(gitlab.sync).toMatchObject({ errorCode: 'egress_blocked', blockedHost: 'gitlab.com' });
         });
 
+        it('clears each mapped repository refused for a host the save now admits', async () => {
+            const blocked = (host) => ({ errorCode: 'egress_blocked', blockedHost: host, lastError: 'blocked', failures: 3, nextAttemptAt: daysAgo(-1) });
+            mockDbFor(CID_A).seed('integration_connections', {
+                _id: '6f00000000000000000000c3', type: 'github', sync: blocked('api.github.com'),
+                repos: [{ repo: 'acme/web', projectIds: ['p1'], sync: blocked('api.github.com') }, { repo: 'acme/api', projectIds: ['p2'], sync: { lastError: 'GitHub refused the token (401).', failures: 1 } }],
+            });
+            seedList(CID_A, ['docs.example.com']);
+            const { status } = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com', 'api.github.com'], version: 0 });
+            expect(status).toBe(200);
+            const [row] = mockDbFor(CID_A).store.integration_connections;
+            expect(row.sync).toMatchObject({ errorCode: '', blockedHost: '', nextAttemptAt: null });
+            expect(row.repos[0].sync).toMatchObject({ errorCode: '', blockedHost: '', lastError: '', nextAttemptAt: null });
+            expect(row.repos[1].sync).toEqual({ lastError: 'GitHub refused the token (401).', failures: 1 });
+        });
+
         it('creates the document for a workspace that had none', async () => {
             const res = await asOwner('PUT', `${BASE}/${CID_A}`, { hosts: ['docs.example.com'], version: 0 });
             expect(res.status).toBe(200);

@@ -130,11 +130,11 @@ const apply = (doc, update = {}, arrayFilters) => {
         const list = Array.isArray(t[l]) ? t[l] : [];
         (v && Array.isArray(v.$each) ? v.$each : [v]).forEach((item) => { if (!list.some((have) => hex(have) === hex(item))) list.push(item); });
         t[l] = list;
-    }));
+    }, arrayFilters));
     Object.entries(update.$pull || {}).forEach(([k, v]) => write(doc, k, (t, l) => {
         const gone = (item) => (isOperatorObject(v) ? matches({ it: item }, { it: v }) : (v && typeof v === 'object' && !Array.isArray(v) ? matches(item, v) : hex(item) === hex(v)));
         t[l] = (Array.isArray(t[l]) ? t[l] : []).filter((item) => !gone(item));
-    }));
+    }, arrayFilters));
     return doc;
 };
 

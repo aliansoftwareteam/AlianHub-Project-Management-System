@@ -52,12 +52,14 @@ const returnOriginOf = (req) => {
 };
 
 /* The PKCE verifier rides in the state encrypted, so the state passes through GitHub and the address bar without revealing it. */
-const encodeState = ({ companyId, userId, sessionId = '', returnOrigin = '' }, now = Date.now()) => {
+/* A project id, when given, is signed in too, so the callback can only return to that project of the same workspace. */
+const encodeState = ({ companyId, userId, sessionId = '', returnOrigin = '', projectId = '' }, now = Date.now()) => {
     const verifier = crypto.randomBytes(48).toString('base64url');
     const state = jwt.sign(
         {
             companyId: String(companyId), userId: String(userId), sid: hash(sessionId || ''), nonce: crypto.randomBytes(16).toString('hex'),
             pkce: secretField.encrypt(verifier), returnOrigin: String(returnOrigin || ''), iat: Math.floor(now / 1000),
+            ...(OBJECT_ID.test(String(projectId || '')) ? { projectId: String(projectId) } : {}),
         },
         stateSecret(),
         { algorithm: 'HS256', audience: STATE_AUDIENCE, expiresIn: STATE_TTL_SECONDS },

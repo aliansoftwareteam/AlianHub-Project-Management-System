@@ -57,6 +57,7 @@
                     <span class="ph2__agents-label">{{ t('AgentWork.at_work', { n: agentsAtWork }, agentsAtWork) }}</span>
                     <span v-if="runMeta" class="ph2__agents-meta">{{ runMeta }}</span>
                 </button>
+                <ProjectGithubChip v-if="project?._id && !project?.isPersonal" :project-id="String(project._id)" />
                 <slot name="actions"></slot>
                 <button v-if="showAiAssist" type="button" class="ah-btn ah-btn--sm ph2__ai" @click="$emit('ai-assist')">
                     <span aria-hidden="true">✦</span>{{ $t('Projects.ai_assist') }}
@@ -100,6 +101,7 @@ import { computed, defineProps, defineEmits, inject } from 'vue';
 import { useI18n } from 'vue-i18n';
 import ShellIcon from '@/components/organisms/Shell/ShellIcon.vue';
 import FavouriteStar from '@/components/atom/FavouriteStar/FavouriteStar.vue';
+import ProjectGithubChip from './ProjectGithubChip.vue';
 import ListMenu from '@/components/molecules/ListMenu/ListMenu.vue';
 import { treeRoute } from '@/components/molecules/ProjectTree/projectTreeModel';
 import { projectTreeShown, toggleProjectTree } from './projectTreePanelState';

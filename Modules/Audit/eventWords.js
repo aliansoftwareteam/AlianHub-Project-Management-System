@@ -231,6 +231,8 @@ const ACTIONS = Object.freeze({
     'app_connection.projects': 'Link an app to projects',
     'app_connection.connected': 'Connect an app through its sign-in',
     'app_connection.repo': 'Pick the repository an app reads',
+    'app_connection.repo_added': 'Link a GitHub repository to a project',
+    'app_connection.repo_removed': 'Unlink a GitHub repository from a project',
     'app_connection.sync': 'Check a connected app for changes',
     'app_connection.task_linked': 'Link a pull request to a task',
     'app_connection.task_moved': 'Note a merged pull request on a task',

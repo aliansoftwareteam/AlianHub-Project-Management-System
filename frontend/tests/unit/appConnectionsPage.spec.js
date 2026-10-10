@@ -17,7 +17,10 @@ i18n.global.setLocaleMessage('en', en);
 const github = {
     key: 'github', name: 'GitHub', icon: 'G', description: 'Server English', multiple: false, syncs: true,
     fields: [{ key: 'token', label: 'Server token label', secret: true, required: true }, { key: 'repo', label: 'Server repo label', required: true }],
-    connections: [{ id: 'c1', enabled: true, status: 'connected', target: 'acme/web', lastSyncAt: null, lastError: '', projects: [{ id: 'p1', name: 'Web' }], hiddenProjects: 2 }],
+    connections: [{
+        id: 'c1', enabled: true, status: 'connected', target: '', lastSyncAt: null, lastError: '', projects: [{ id: 'p1', name: 'Web' }], hiddenProjects: 2,
+        repos: [{ repo: 'acme/web', projectId: 'p1', projectName: 'Web', hidden: false, lastError: '' }],
+    }],
 };
 const gitlab = { ...github, key: 'gitlab', name: 'GitLab', syncs: false, connections: [], fields: [{ key: 'token', label: 'Server', secret: true }, { key: 'project', label: 'Server' }] };
 
@@ -41,9 +44,10 @@ describe('the App connections page', () => {
         expect(wrapper.text()).toContain('2 more projects you cannot open');
     });
 
-    it('gives an owner or admin Connect, Pause, Disconnect and Link projects', async () => {
+    it('gives an owner or admin Connect, Pause, Disconnect, Add repository and Remove', async () => {
         const wrapper = await open(true);
-        expect(buttons(wrapper)).toEqual(expect.arrayContaining([en.AppConnections.connect, en.AppConnections.pause, en.AppConnections.disconnect, en.AppConnections.link_projects]));
+        expect(buttons(wrapper)).toEqual(expect.arrayContaining([en.AppConnections.connect, en.AppConnections.pause, en.AppConnections.disconnect, en.AppConnections.repo_add, en.AppConnections.repo_remove]));
+        expect(buttons(wrapper)).not.toContain(en.AppConnections.link_projects);
         expect(wrapper.text()).not.toContain(en.AppConnections.read_only);
     });
 
@@ -57,9 +61,9 @@ describe('the App connections page', () => {
     });
 
     describe('Connect on GitHub', () => {
-        const openWith = async (oneClick, connections = [], { setup, canManage = true } = {}) => {
+        const openWith = async (oneClick, connections = [], { setup, canManage = true, projects = [] } = {}) => {
             const app = { ...github, oneClick, connections, ...(setup ? { setup } : {}) };
-            apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage, apps: [app], projects: [] } } });
+            apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage, apps: [app], projects } } });
             const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
             await flushPromises();
             return wrapper;
@@ -122,7 +126,7 @@ describe('the App connections page', () => {
             await flushPromises();
             expect(replace).toHaveBeenCalledWith({ query: { tab: 'x' } });
             expect(apiRequest).toHaveBeenCalledWith('post', expect.stringMatching(/\/github\/complete$/), { state: 'signed', code: 'abc' });
-            expect(wrapper.find('[data-notice]').text()).toBe(en.AppConnections.github_connected);
+            expect(wrapper.find('[data-notice]').text()).toBe(en.AppConnections.github_connected_projects);
         });
 
         it('words a refused sign-in from the locale, not from the server', async () => {
@@ -145,29 +149,45 @@ describe('the App connections page', () => {
             expect(wrapper.text()).toContain(en.AppConnections.github_off);
         });
 
-        it('offers a repository picker on a connection made through sign-in', async () => {
-            const wrapper = await openWith(true, [{ ...github.connections[0], target: '', viaOAuth: true }]);
-            expect(wrapper.text()).toContain(en.AppConnections.repo_needed);
-            apiRequest.mockResolvedValueOnce({ data: { status: true, data: { repos: [{ fullName: 'acme/web', private: true }], page: 1, hasMore: false } } });
-            await wrapper.findAll('button').find((b) => b.text() === en.AppConnections.pick_repo).trigger('click');
+        it('shows the Project to Repository table, adds a pair through the picker and removes one', async () => {
+            const wrapper = await openWith(true, [{ ...github.connections[0], viaOAuth: true }], { projects: [{ id: 'p1', name: 'Web' }] });
+            const rows = wrapper.findAll('[data-repo-row]');
+            expect(rows.map((r) => r.text())).toEqual([expect.stringContaining('Web')]);
+            expect(rows[0].text()).toContain('acme/web');
+            apiRequest.mockResolvedValueOnce({ data: { status: true, data: { repos: [{ fullName: 'acme/api', private: true }], page: 1, hasMore: false } } });
+            await wrapper.find('[data-add-repo]').trigger('click');
             await flushPromises();
             expect(apiRequest).toHaveBeenLastCalledWith('get', expect.stringMatching(/\/connections\/c1\/github-repos\?page=1$/));
-            await wrapper.find('input[type="radio"][value="acme/web"]').setValue(true);
-            apiRequest.mockResolvedValueOnce({ data: { status: true, data: { id: 'c1', repo: 'acme/web' } } });
-            await wrapper.findAll('[data-repo-actions] button').find((b) => b.text() === en.AppConnections.save).trigger('click');
+            await wrapper.find('input[type="radio"][value="acme/api"]').setValue(true);
+            const save = () => wrapper.find('[data-repo-save]');
+            expect(save().attributes('disabled')).toBeDefined();
+            await wrapper.find('[data-project-select]').setValue('p1');
+            expect(save().attributes('disabled')).toBeUndefined();
+            apiRequest.mockResolvedValueOnce({ data: { status: true, data: { id: 'c1', repo: 'acme/api', projectId: 'p1' } } });
+            await save().trigger('click');
             await flushPromises();
-            expect(apiRequest).toHaveBeenCalledWith('put', expect.stringMatching(/\/connections\/c1\/repo$/), { repo: 'acme/web' });
+            expect(apiRequest).toHaveBeenCalledWith('post', expect.stringMatching(/\/connections\/c1\/repos$/), { repo: 'acme/api', projectId: 'p1' });
+            expect(wrapper.find('[data-repo-picker]').exists()).toBe(false);
+
+            await wrapper.find('[data-remove-repo]').trigger('click');
+            await flushPromises();
+            expect(apiRequest).toHaveBeenCalledWith('delete', expect.stringMatching(/\/connections\/c1\/repos\/p1\?repo=acme%2Fweb$/));
+        });
+
+        it('says when no repository feeds any project yet', async () => {
+            const wrapper = await openWith(true, [{ ...github.connections[0], repos: [] }]);
+            expect(wrapper.find('[data-no-repos]').text()).toBe(en.AppConnections.repo_none_mapped);
         });
 
         it('keeps Save, Cancel and Show more outside the scrolling list, and filters the list by name', async () => {
             const wrapper = await openWith(true, [{ ...github.connections[0], target: '', viaOAuth: true }]);
             const many = Array.from({ length: 30 }, (_, i) => ({ fullName: `acme/repo-${i}`, private: false }));
             apiRequest.mockResolvedValueOnce({ data: { status: true, data: { repos: [...many, { fullName: 'acme/Billing', private: true }], page: 1, hasMore: true } } });
-            await wrapper.findAll('button').find((b) => b.text() === en.AppConnections.pick_repo).trigger('click');
+            await wrapper.find('[data-add-repo]').trigger('click');
             await flushPromises();
             const list = wrapper.find('[data-repo-list]');
             const actions = wrapper.find('[data-repo-actions]');
-            expect(list.classes()).toContain('apc__repos');
+            expect(list.classes()).toContain('grp__list');
             expect(list.findAll('button')).toHaveLength(0);
             expect(list.element.contains(actions.element)).toBe(false);
             expect(actions.findAll('button').map((b) => b.text())).toEqual([en.AppConnections.more_repos, en.AppConnections.save, en.AppConnections.cancel]);
@@ -189,7 +209,7 @@ describe('the App connections page', () => {
         const openBlocked = async ({ canManage = true, owner = true, put } = {}) => {
             route.params = { cid: CID };
             const app = { ...github, oneClick: true, connections: [{ ...github.connections[0], target: '', viaOAuth: true }] };
-            apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage, apps: [app], projects: [] } } });
+            apiRequest.mockResolvedValue({ data: { status: true, data: { enabled: true, canManage, apps: [app], projects: [{ id: 'p1', name: 'Web' }] } } });
             apiRequestWithoutCompnay.mockImplementation(async (method, url) => {
                 if (url.endsWith('/instance/access')) {
                     if (owner) return { data: { status: true, data: { allowed: true } } };
@@ -202,7 +222,7 @@ describe('the App connections page', () => {
             const wrapper = mount(AppConnections, { global: { mocks: { $t: i18n.global.t } } });
             await flushPromises();
             apiRequest.mockRejectedValueOnce(blocked);
-            await wrapper.findAll('button').find((b) => b.text() === en.AppConnections.pick_repo).trigger('click');
+            await wrapper.find('[data-add-repo]').trigger('click');
             await flushPromises();
             return wrapper;
         };
@@ -262,6 +282,7 @@ describe('the App connections page', () => {
             await wrapper.find('[data-allow-host]').trigger('click');
             await flushPromises();
             await wrapper.find('input[type="radio"][value="acme/web"]').setValue(true);
+            await wrapper.find('[data-project-select]').setValue('p1');
             const reads = apiRequest.mock.calls.length;
             apiRequest.mockRejectedValueOnce(blocked);
             await wrapper.findAll('[data-repo-actions] button').find((b) => b.text() === en.AppConnections.save).trigger('click');
