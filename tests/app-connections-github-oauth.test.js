@@ -41,6 +41,7 @@ const SESSION = 'session-1';
 const TOKEN = 'gho_abcdefghijklmnopqrstuvwxyz0123456789';
 const SECOND = 'gho_second0000000000000000000000000000000';
 const CONN = SCHEMA_TYPE.INTEGRATION_CONNECTIONS;
+const PROJECT = 'bbbbbbbbbbbbbbbbbbbbbb01';
 const ENV = { ...process.env };
 
 const res = () => {
@@ -279,6 +280,16 @@ describe('completing the sign-in', () => {
         expect(rows()[0].sync).toEqual({});
     });
 
+    it('on reconnect as another account starts every mapped repository again from now, and keeps the mapping', async () => {
+        await complete(await stateFor());
+        rows()[0].repos = [{ repo: 'acme/web', projectIds: [PROJECT], sync: { cursor: '2026-01-01T00:00:00Z', failures: 4, lastError: 'GitHub refused the token (401).' } }];
+        fetchAs({ account: { id: 8, login: 'other' } });
+        axios.post.mockResolvedValue({ data: { access_token: SECOND } });
+        await complete(await stateFor(), { code: 'code-2' });
+        expect(rows()[0].repos).toEqual([{ repo: 'acme/web', projectIds: [PROJECT], sync: { cursor: expect.any(String) } }]);
+        expect(Date.parse(rows()[0].repos[0].sync.cursor)).toBeGreaterThan(Date.parse('2026-10-01T00:00:00Z'));
+    });
+
     it('still connects when GitHub will not revoke the earlier grant', async () => {
         await complete(await stateFor());
         axios.delete.mockRejectedValue(new Error('network'));
@@ -355,25 +366,25 @@ describe('the repository picker', () => {
         expect(mockFetch.mock.calls[mockFetch.mock.calls.length - 1][0]).toContain('page=10');
     });
 
-    it('saves a repository the token can read, resets the sync, and audits it', async () => {
+    beforeEach(() => mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Web', deletedStatusKey: 0 }));
+
+    it('maps a repository the token can read to a project, starting from now, and audits it', async () => {
         const id = await connected();
-        rows()[0].sync = { cursor: 'old' };
-        const r = await call(github.setRepo, OWNER, { params: { id }, body: { repo: 'acme/web' } });
-        expect(r.body).toMatchObject({ status: true, data: { id, repo: 'acme/web' } });
-        expect(rows()[0].config.repo).toBe('acme/web');
+        const r = await call(github.addRepo, OWNER, { params: { id }, body: { repo: 'acme/web', projectId: PROJECT } });
+        expect(r.body).toMatchObject({ status: true, data: { id, repo: 'acme/web', projectId: PROJECT } });
+        expect(rows()[0].repos).toEqual([{ repo: 'acme/web', projectIds: [PROJECT], sync: { cursor: expect.any(String) } }]);
         expect(isEncrypted(rows()[0].config.token)).toBe(true);
-        expect(rows()[0].sync).toEqual({});
-        expect(mockAudit.map((a) => a.action)).toContain('app_connection.repo');
+        expect(mockAudit.map((a) => a.action)).toContain('app_connection.repo_added');
     });
 
     it('refuses a repository the token cannot read, a malformed one, and a member', async () => {
         const id = await connected();
         fetchAs({ readable: false });
-        expect((await call(github.setRepo, OWNER, { params: { id }, body: { repo: 'acme/secret' } })).code).toBe(400);
-        expect((await call(github.setRepo, OWNER, { params: { id }, body: { repo: '../etc' } })).code).toBe(400);
-        expect((await call(github.setRepo, MEMBER, { params: { id }, body: { repo: 'acme/web' } })).code).toBe(403);
+        expect((await call(github.addRepo, OWNER, { params: { id }, body: { repo: 'acme/secret', projectId: PROJECT } })).code).toBe(400);
+        expect((await call(github.addRepo, OWNER, { params: { id }, body: { repo: '../etc', projectId: PROJECT } })).code).toBe(400);
+        expect((await call(github.addRepo, MEMBER, { params: { id }, body: { repo: 'acme/web', projectId: PROJECT } })).code).toBe(403);
         expect((await call(github.repos, MEMBER, { params: { id } })).code).toBe(403);
-        expect(rows()[0].config.repo).toBeUndefined();
+        expect(rows()[0].repos).toBeUndefined();
     });
 
     it('answers an unexpected failure with a 500 in the usual shape', async () => {
@@ -402,10 +413,11 @@ describe('a workspace egress allowlist without api.github.com', () => {
     it('answers a repository save the same way, and stores nothing', async () => {
         const id = await connected();
         mockFetch.mockRejectedValue(unlisted());
-        const r = await call(github.setRepo, OWNER, { params: { id }, body: { repo: 'acme/web' } });
+        mockDb.seed(SCHEMA_TYPE.PROJECTS, { _id: PROJECT, ProjectName: 'Web', deletedStatusKey: 0 });
+        const r = await call(github.addRepo, OWNER, { params: { id }, body: { repo: 'acme/web', projectId: PROJECT } });
         expect(r.code).toBe(409);
         expect(r.body).toMatchObject({ code: 'egress_blocked', data: { host: 'api.github.com' } });
-        expect(rows()[0].config.repo).toBeUndefined();
+        expect(rows()[0].repos).toBeUndefined();
     });
 
     it('still completes the sign-in and says at once that the host is blocked', async () => {

@@ -846,6 +846,9 @@ watch(route, (newVal) => {
     if (newVal.query.tab === 'comment') {
         activeTab.value = `Comments`;
     }
+    if (newVal.query.tab === 'ProjectDetail' && newVal.query.section === 'github') {
+        activeTab.value = 'ProjectDetail';
+    }
 });
 
 watch(() => projectDetailPermission.value, () => {

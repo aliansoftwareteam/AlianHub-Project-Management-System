@@ -21,7 +21,9 @@ exports.init = (app) => {
     app.get('/api/v1/integrations/github/authorize', agentsRefused('integration.connect'), github.authorize);
     app.post('/api/v1/integrations/github/complete', agentsRefused('integration.connect'), github.complete);
     app.get('/api/v1/integrations/connections/:id/github-repos', agentsRefused('integration.update'), github.repos);
-    app.put('/api/v1/integrations/connections/:id/repo', agentsRefused('integration.update'), github.setRepo);
+    app.post('/api/v1/integrations/connections/:id/repos', agentsRefused('integration.update'), github.addRepo);
+    app.delete('/api/v1/integrations/connections/:id/repos/:projectId', agentsRefused('integration.update'), github.removeRepo);
+    app.get('/api/v1/integrations/github/projects/:projectId', github.projectView);
     app.get(CALLBACK_PATH, githubCallbackLimiter, github.callback);
 
     // AUTO-06 — PUBLIC Slack slash-command webhook (NOT under /api/v1/integrations,

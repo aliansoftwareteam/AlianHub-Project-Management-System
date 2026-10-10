@@ -13,6 +13,7 @@ const flag = require('./flag');
 const githubOAuth = require('./github/oauth');
 const registry = require('./registry');
 const { connectionsChanged } = require('../helpers/connectionsChanged');
+const repoMap = require('./github/repoMap');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const PROJECTS_MAX = 100;
@@ -24,7 +25,7 @@ const targetOf = (row) => { const c = row.config || {}; return c.repo || c.proje
 
 /* A linked project the viewer cannot open is never named. An admin is told its id, so a save keeps the link; anyone else only how many. */
 const linkedProjects = (row, names, privileged) => {
-    const ids = (row.projectIds || []).map(String);
+    const ids = row.type === 'github' ? repoMap.mappedProjectIds(row) : (row.projectIds || []).map(String);
     const shown = ids.filter((id) => names.has(id)).map((id) => ({ id, name: names.get(id) }));
     const unseen = ids.filter((id) => !names.has(id));
     return {
@@ -33,6 +34,14 @@ const linkedProjects = (row, names, privileged) => {
     };
 };
 
+/* The Project → Repository table: one row per pair, a project the viewer cannot open shown to an admin by id alone. */
+const repoRows = (row, names, privileged) => repoMap.reposOf(row).flatMap(({ repo, projectIds, sync }) => projectIds
+    .filter((id) => privileged || names.has(id))
+    .map((id) => ({
+        repo, projectId: id, projectName: names.get(id) || '', hidden: !names.has(id),
+        lastSyncAt: sync.lastSyncAt || null, lastError: sync.lastError || '', errorCode: sync.errorCode || '', blockedHost: sync.blockedHost || '',
+    })));
+
 const connectionRow = (row, names, privileged) => {
     const sync = row.sync || {};
     return {
@@ -40,6 +49,7 @@ const connectionRow = (row, names, privileged) => {
         connectedAt: row.connectedAt || null, secrets: R.redact(row).secrets, viaOAuth: (row.config || {}).auth === 'oauth',
         lastSyncAt: sync.lastSyncAt || null, lastError: sync.lastError || '', errorCode: sync.errorCode || '', blockedHost: sync.blockedHost || '', failures: Number(sync.failures) || 0, nextAttemptAt: sync.nextAttemptAt || null,
         ...linkedProjects(row, names, privileged),
+        ...(row.type === 'github' ? { repos: repoRows(row, names, privileged) } : {}),
     };
 };
 
@@ -84,6 +94,7 @@ exports.setProjects = async (req, res) => {
         const conn = await MongoDbCrudOpration(companyId, { type: T, data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: { $ne: 1 } }] }, 'findOne');
         if (!conn) return refuse(res, 404, 'Not found.');
         if (!registry.get(conn.type)) return refuse(res, 400, 'This app does not link to projects.');
+        if (repoMap.isMapped(conn)) return refuse(res, 400, 'Each project picks its own repositories; add or remove them per repository.');
         const found = ids.length ? await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: idForms(ids) }, deletedStatusKey: { $nin: [1, 2] }, isPersonal: { $ne: true } }, { _id: 1 }],
         }, 'find') : [];

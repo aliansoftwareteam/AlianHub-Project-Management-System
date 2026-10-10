@@ -296,6 +296,48 @@ describe('narrowed and in-app callers', () => {
     });
 });
 
+describe('a project fed by several repositories', () => {
+    const API = 'acme/api';
+    const API_PULL = { ...PULL, number: 7, title: 'WEB-7 api side', html_url: `https://github.com/${API}/pull/7`, head: { ref: 'feat/web-7-api', sha: SHA } };
+    beforeEach(() => {
+        connect(mockDb, { config: { token: TOKEN }, projectIds: undefined, repos: [
+            { repo: REPO, projectIds: [P_OPEN], sync: {} },
+            { repo: API, projectIds: [P_OPEN, P_PRIVATE], sync: {} },
+            { repo: 'acme/secret', projectIds: [P_PRIVATE], sync: {} },
+        ] });
+        stored(SCHEMA_TYPE.TASKS, T_OPEN).links.push({ url: `https://github.com/${API}/pull/7`, kind: 'pr' });
+        github({ [`/repos/${API}/pulls/7`]: () => reply(200, API_PULL), [`/repos/${API}/pulls/7/files`]: () => reply(200, []) });
+    });
+
+    it('reads the newest pull request linked to the task, whichever repository it is in, and names the repository', async () => {
+        expect(await read(ctx(OUTSIDER), { taskKey: 'WEB-7' })).toMatchObject({
+            repo: API, number: 7, url: `https://github.com/${API}/pull/7`, linkedPullRequests: [`${REPO}#40`, `${REPO}#42`, `${API}#7`],
+        });
+        expect(await read(ctx(OUTSIDER), { taskId: T_OPEN, repo: REPO })).toMatchObject({ repo: REPO, number: 42, linkedPullRequests: [40, 42] });
+        expect(await read(ctx(OUTSIDER), { taskId: T_OPEN, number: 42 })).toMatchObject({ repo: REPO, number: 42 });
+        expect(await read(ctx(OUTSIDER), { taskId: T_OPEN, repo: 'acme/secret' })).toEqual({ error: expect.stringMatching(/not linked to the project of this task/) });
+    });
+
+    it('asks which repository when a number could be in several the person can open', async () => {
+        safeFetch.mockClear();
+        expect(await read(ctx(OUTSIDER), { number: 42 })).toEqual({ error: expect.stringMatching(/Several repositories/), repos: [REPO, API] });
+        expect(safeFetch).not.toHaveBeenCalled();
+        expect(await read(ctx(OUTSIDER), { number: 42, repo: REPO })).toMatchObject({ repo: REPO, number: 42, task: { taskId: T_OPEN } });
+        expect(await read(ctx(OUTSIDER), { number: 7, repo: API })).toMatchObject({ repo: API, number: 7 });
+        expect(await read(ctx(OUTSIDER), { url: `https://github.com/${API}/pull/7` })).toMatchObject({ repo: API, number: 7 });
+    });
+
+    it('refuses a repository mapped only to a project the person cannot open, and one not mapped at all', async () => {
+        Object.assign(stored(SCHEMA_TYPE.TASKS, T_PRIVATE), { links: [{ url: 'https://github.com/acme/secret/pull/5', kind: 'pr' }] });
+        safeFetch.mockClear();
+        expect(await read(ctx(OUTSIDER), { number: 5, repo: 'acme/secret' })).toEqual(NOT_LINKED);
+        expect(await read(ctx(OUTSIDER), { url: 'https://github.com/acme/secret/pull/5' })).toEqual(NOT_LINKED);
+        expect(await read(ctx(OUTSIDER), { number: 5, repo: 'someone/else' })).toMatchObject({ refused: true });
+        expect(await read(ctx(OUTSIDER), { url: `https://github.com/${API}/pull/7`, repo: REPO })).toEqual({ error: expect.stringMatching(/different repositories/) });
+        expect(safeFetch).not.toHaveBeenCalled();
+    });
+});
+
 describe('not connected', () => {
     it('says so with no connection, no repository picked, or the connection switched off', async () => {
         expect(await read(ctx(OWNER), { number: 42 })).toEqual({ error: expect.stringMatching(/GitHub is not connected/) });
