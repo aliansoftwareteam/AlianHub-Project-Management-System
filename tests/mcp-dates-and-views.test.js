@@ -102,6 +102,27 @@ describe('a day reads as the person\'s own calendar day', () => {
         expect(await rpc(ctx(INSIDER), 'task.get', { taskId: T_OPEN })).toMatchObject({ dueDate: '2026-10-11', dueDateWeekday: 'Sunday' });
     });
 
+    it('finds by dueFrom and dueTo the task it answers as due that day, for a person in India', async () => {
+        user(INSIDER).Time_Zone = 'Asia/Kolkata';
+        const shown = await rpc(managing(INSIDER), 'tasks.search', { query: 'Open task' });
+        expect(shown.tasks.find((task) => task.taskId === T_OPEN).dueDate).toBe('2026-10-11');
+        const onTheDay = await rpc(managing(INSIDER), 'tasks.search', { dueFrom: '2026-10-11', dueTo: '2026-10-11' });
+        expect(onTheDay.tasks.map((task) => task.taskId)).toContain(T_OPEN);
+        const dayBefore = await rpc(managing(INSIDER), 'tasks.search', { dueFrom: '2026-10-10', dueTo: '2026-10-10' });
+        expect(dayBefore.tasks.map((task) => task.taskId)).not.toContain(T_OPEN);
+    });
+
+    it('logs time on the person\'s own day and clock', async () => {
+        user(INSIDER).Time_Zone = 'Asia/Kolkata';
+        const parent = mockDb.seed(SCHEMA_TYPE.RULES, { key: 'sheet_settings', name: 'sheet_settings', isParent: true, roles: [] });
+        mockDb.seed(SCHEMA_TYPE.RULES, { key: 'user_timesheet', name: 'user_timesheet', isParent: false, parentId: String(parent._id), roles: [{ key: 3, permission: true }, { key: 0, permission: true }] });
+        jest.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-11T12:00:00Z'));
+        const out = await rpc(ctx(INSIDER), 'timelog.create', { taskId: T_OPEN, minutes: 30, date: '2026-10-11', startTime: '01:00' });
+        expect(out).toMatchObject({ ok: true });
+        const [entry] = rows(SCHEMA_TYPE.TIMESHEET);
+        expect(entry.LogStartTime).toBe(Date.parse('2026-10-10T19:30:00Z') / 1000);
+    });
+
     it('answers the day in UTC for a person with no time zone stored', async () => {
         const found = await rpc(ctx(INSIDER), 'tasks.search', { query: 'Open task' });
         expect(found.tasks.find((task) => task.taskId === T_OPEN)).toMatchObject({ dueDate: '2026-10-10', dueDateWeekday: 'Saturday' });
@@ -148,7 +169,23 @@ describe('views.list', () => {
 
 describe('view.create and a name already in use', () => {
     beforeEach(() => {
-        project(P_OPEN).ProjectRequiredComponent = [view(V_LIST, 'ProjectListView', 'List'), view(V_MINE, 'ProjectListView', 'Mine this week')];
+        project(P_OPEN).ProjectRequiredComponent = [view(V_LIST, 'ProjectListView', 'List'), view(V_MINE, 'ProjectListView', 'Mine this week'), view(V_OFF, 'ProjectKanban', 'Switched off', { viewStatus: false })];
+    });
+
+    it('takes the name of a switched-off view, which views.list does not show', async () => {
+        expect((await rpc(ctx(OWNER), 'views.list', { projectId: P_OPEN })).views.map((entry) => entry.name)).not.toContain('Switched off');
+        expect(await rpc(managing(OWNER), 'view.create', { projectId: P_OPEN, name: 'Switched off' })).toMatchObject({ ok: false, pending: true });
+    });
+
+    it('is refused by the add-view write itself when the name is taken by then', async () => {
+        const res = { status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
+        const body = { sourceViewId: V_LIST, title: 'MINE   this week', uniqueTitle: true };
+        await require('../Modules/Project/controller/viewSettings').createView({ headers: { companyid: CID }, params: { id: P_OPEN }, body, uid: OWNER }, res);
+        expect(res.code).toBe(409);
+        expect(project(P_OPEN).ProjectRequiredComponent).toHaveLength(3);
+        await require('../Modules/Project/controller/viewSettings').createView({ headers: { companyid: CID }, params: { id: P_OPEN }, body: { ...body, title: 'Mine next week' }, uid: OWNER }, res);
+        expect(res.code).toBe(200);
+        expect(project(P_OPEN).ProjectRequiredComponent).toHaveLength(4);
     });
 
     it('is refused with the link to the view that has the name, and nothing is filed', async () => {

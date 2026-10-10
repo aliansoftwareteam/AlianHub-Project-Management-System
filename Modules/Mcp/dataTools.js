@@ -1,3 +1,4 @@
+const { DateTime } = require('luxon');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const registry = require('../Agents/registry');
@@ -9,6 +10,7 @@ const { ownOrNotPersonal, isSomeoneElsesPersonalList } = require('../PersonalLis
 const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
+const dates = require('./dates');
 const { PAGE_TEXT_MAX, pageText } = require('./pageText');
 const { MENTIONS, REPLY_TO, replyParams } = require('./commentReply');
 const pageVersions = require('../Pages/helpers/pageVersions');
@@ -137,13 +139,18 @@ const entryProjects = (ctx, vis, args, sheetVisible) => {
     return allowed;
 };
 
-const dayRange = (args) => {
+const dayStartSeconds = (day, zone) => {
+    const start = DateTime.fromISO(day, { zone }).startOf('day');
+    return start.isValid && start.toISODate() === day ? start.toSeconds() : NaN;
+};
+
+const dayRange = (args, zone) => {
     const from = args.from ? String(args.from) : '';
     const to = args.to ? String(args.to) : '';
     if ((from && !DAY.test(from)) || (to && !DAY.test(to))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     const range = {};
-    if (from) range.$gte = Date.parse(`${from}T00:00:00Z`) / 1000;
-    if (to) range.$lte = Date.parse(`${to}T00:00:00Z`) / 1000 + DAY_SECONDS - 1;
+    if (from) range.$gte = dayStartSeconds(from, zone);
+    if (to) range.$lt = dayStartSeconds(to, zone) + DAY_SECONDS;
     if (Object.values(range).some((v) => !Number.isFinite(v))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     return { range: Object.keys(range).length ? range : null };
 };
@@ -335,8 +342,8 @@ const TOOLS = [
             type: 'object',
             properties: {
                 userId: { type: 'string', description: 'Whose entries; the person\'s own when left out' },
-                from: { type: 'string', description: 'First day, YYYY-MM-DD (UTC)' },
-                to: { type: 'string', description: 'Last day, YYYY-MM-DD (UTC)' },
+                from: { type: 'string', description: 'First day, YYYY-MM-DD, in the person\'s time zone' },
+                to: { type: 'string', description: 'Last day, YYYY-MM-DD, in the person\'s time zone' },
                 ...PROJECT_ARG,
                 ...LIMIT,
             },
@@ -360,7 +367,7 @@ const TOOLS = [
                 sheetVisible = sheet.visible;
                 closedTasks = sheet.closedTasks || [];
             }
-            const { range, error } = dayRange(args);
+            const { range, error } = dayRange(args, await dates.zoneOf(ctx));
             if (error) return { error };
             const filter = { Loggeduser: target };
             const projects = entryProjects(ctx, vis, args, sheetVisible);
@@ -395,8 +402,8 @@ const TOOLS = [
             properties: {
                 taskId: { type: 'string' },
                 minutes: { type: 'integer', minimum: 1, maximum: 1440 },
-                date: { type: 'string', description: 'YYYY-MM-DD (UTC); today when left out' },
-                startTime: { type: 'string', description: 'HH:MM (UTC); 09:00 when left out' },
+                date: { type: 'string', description: 'YYYY-MM-DD, the person\'s own day; today when left out' },
+                startTime: { type: 'string', description: 'HH:MM in the person\'s time zone; 09:00 when left out' },
                 description: { type: 'string' },
                 billable: { type: 'boolean' },
             },

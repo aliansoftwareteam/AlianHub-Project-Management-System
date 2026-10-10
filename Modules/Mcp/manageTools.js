@@ -1,3 +1,5 @@
+const { DateTime } = require('luxon');
+const { between } = require('./searchFilters');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { dbCollections } = require('../../Config/collections');
 const { ACTIVE_SEAT } = require('../../Config/seatStatus');
@@ -25,7 +27,6 @@ const names = require('./names');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const DAY_MS = 24 * 60 * 60 * 1000;
 const FIELDS_MAX = 200;
 const ROLE_NAMES = Object.freeze({ [ROLE_GUEST]: 'guest', [ROLE_OWNER]: 'owner', [ROLE_ADMIN]: 'admin', [ROLE_MEMBER]: 'member' });
 
@@ -143,14 +144,18 @@ const personName = (user) => user.Employee_Name || [user.Employee_FName, user.Em
 const SEARCH_INPUT = Object.freeze({
     assigneeId: { type: 'string', description: 'Only tasks assigned to this member' },
     sprintId: { type: 'string', description: 'Only tasks in this list' },
-    dueFrom: { type: 'string', description: 'Due on or after this day, YYYY-MM-DD (UTC)' },
-    dueTo: { type: 'string', description: 'Due on or before this day, YYYY-MM-DD (UTC)' },
+    dueFrom: { type: 'string', description: 'Due on or after this day, YYYY-MM-DD, in the person\'s time zone' },
+    dueTo: { type: 'string', description: 'Due on or before this day, YYYY-MM-DD, in the person\'s time zone' },
 });
 
-const dayStart = (day) => (DAY.test(String(day)) && Number.isFinite(Date.parse(`${day}T00:00:00Z`)) ? Date.parse(`${day}T00:00:00Z`) : null);
+const dayStart = (day, zone) => {
+    if (!DAY.test(String(day))) return null;
+    const start = DateTime.fromISO(String(day), { zone }).startOf('day');
+    return start.isValid && start.toISODate() === String(day) ? start : null;
+};
 
 /* The find clause the planning filters of tasks.search add, or the reason one of them is not usable. */
-const searchFilter = (args) => {
+const searchFilter = (args, zone = 'UTC') => {
     const filter = {};
     if (args.assigneeId !== undefined && args.assigneeId !== '') {
         if (!isId(args.assigneeId)) return { error: 'assigneeId must be the id of a member (see members.list).' };
@@ -160,11 +165,11 @@ const searchFilter = (args) => {
         if (!isId(args.sprintId)) return { error: 'sprintId must be the id of a list (see sprints.list).' };
         filter.sprintId = { $in: idForms(String(args.sprintId)) };
     }
-    const from = args.dueFrom ? dayStart(args.dueFrom) : undefined;
-    const to = args.dueTo ? dayStart(args.dueTo) : undefined;
+    const from = args.dueFrom ? dayStart(args.dueFrom, zone) : undefined;
+    const to = args.dueTo ? dayStart(args.dueTo, zone) : undefined;
     if (from === null || to === null) return { error: 'dueFrom and dueTo must be written YYYY-MM-DD.' };
     if (from !== undefined || to !== undefined) {
-        filter.DueDate = { ...(from !== undefined ? { $gte: new Date(from) } : {}), ...(to !== undefined ? { $lte: new Date(to + DAY_MS - 1) } : {}) };
+        Object.assign(filter, between('DueDate', from || null, to ? to.plus({ days: 1 }) : null));
     }
     return { filter };
 };

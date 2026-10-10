@@ -1,4 +1,5 @@
 const { isDeepStrictEqual } = require('util');
+const { cleanViewSettings } = require('../Project/helpers/viewSettings');
 const { DateTime } = require('luxon');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
@@ -468,7 +469,6 @@ const tasksShownBy = (settings) => ({
 /* The project's own saved view of that kind that already shows what was named and nothing narrower: the same
  * tasks, and the same grouping when one is named. null when there is none, or the project lacks a status or a field named. */
 const savedViewShowing = async (companyId, project, kind, look) => {
-    const { cleanViewSettings } = require('../Project/helpers/viewSettings');
     const { isCopyable } = require('../Project/controller/viewSettings');
     const asked = lookOf(look);
     const wanted = await settingsFor(companyId, project, asked);
@@ -485,19 +485,22 @@ const addressOf = (companyId, made) => {
     return base ? `${base}/#/${encodeURIComponent(String(companyId))}/project/${made.projectId}/p?tab=${made.keyName}&view=${made.viewId}` : '';
 };
 
+const NAME_TAKEN = 409;
 const kindOf = (keyName) => Object.keys(VIEW_KINDS).find((kind) => VIEW_KINDS[kind] === keyName) || keyName || '';
 
-/* A view everyone on the project shares, under the same name once spaces and case are set aside. */
+const titleOf = (view) => view.title || view.name || '';
+const isShared = (view) => Boolean(view && view.keyName) && view.viewStatus !== false && view.isPrivate !== true;
+
 const sharedViewNamed = (project, name) => {
     const wanted = lower(viewNameOf(name));
     if (!wanted) return null;
-    return viewsOf(project).find((view) => view && view.isPrivate !== true && lower(view.title || '') === wanted) || null;
+    return viewsOf(project).find((view) => isShared(view) && lower(viewNameOf(titleOf(view))) === wanted) || null;
 };
 
 const viewInUse = (companyId, project, view) => {
     const url = addressOf(companyId, { projectId: idOf(project._id), keyName: view.keyName, viewId: viewIdOf(view) });
-    const named = `This project already has a saved view named "${view.title}". Use that one${url ? ` (${url})` : ''}, or pick another name.`;
-    return { message: named, view: { viewId: viewIdOf(view), name: view.title, kind: kindOf(view.keyName), ...(url ? { url } : {}) } };
+    const named = `This project already has a saved view named "${titleOf(view)}". Use that one${url ? ` (${url})` : ''}, or pick another name.`;
+    return { message: named, view: { viewId: viewIdOf(view), name: titleOf(view), kind: kindOf(view.keyName), ...(url ? { url } : {}) } };
 };
 
 const GROUP_NAMES = Object.freeze(Object.fromEntries(Object.entries(GROUPS).map(([name, value]) => [value, name])));
@@ -517,14 +520,12 @@ const sortOf = (sort) => {
     return { by: SORT_NAMES[sort.field] || (field ? `field:${field[1]}` : String(sort.field)), direction: Number(sort.dir) === -1 ? 'desc' : 'asc' };
 };
 
-/* What a saved view shows, in the words view.create takes. */
 const viewSummary = (companyId, project, view, isPrivate) => {
-    const { cleanViewSettings } = require('../Project/helpers/viewSettings');
     const held = cleanViewSettings(view.settings);
     const url = addressOf(companyId, { projectId: idOf(project._id), keyName: view.keyName, viewId: viewIdOf(view) });
     return {
         viewId: viewIdOf(view),
-        name: view.title || view.name || '',
+        name: titleOf(view),
         kind: kindOf(view.keyName),
         private: isPrivate,
         default: view.setAsDefault === true,
@@ -537,9 +538,8 @@ const viewSummary = (companyId, project, view, isPrivate) => {
     };
 };
 
-/* The project's saved views the person sees: the shared ones that are switched on and their own private ones. */
 const savedViews = (companyId, project, privateViews = []) => [
-    ...viewsOf(project).filter((view) => view && view.keyName && view.viewStatus !== false && view.isPrivate !== true).map((view) => viewSummary(companyId, project, view, false)),
+    ...viewsOf(project).filter(isShared).map((view) => viewSummary(companyId, project, view, false)),
     ...listOf(privateViews).filter((view) => view && view.keyName && idOf(view.projectId) === idOf(project._id)).map((view) => viewSummary(companyId, project, view, true)),
 ];
 
@@ -554,7 +554,11 @@ const createView = async ({ companyId, who, projectId, name, kind = 'list', look
     const source = sourceView(project, kind);
     if (!source) throw refuse(noSource(kind));
     const fitted = await settingsFor(companyId, project, lookOf(look));
-    const answer = await answerOf('viewCreate', { companyId, who, params: { id: inProject }, body: { sourceViewId: viewIdOf(source), title: viewNameOf(name), settings: fitted.settings } });
+    const answer = await answerOf('viewCreate', { companyId, who, params: { id: inProject }, body: { sourceViewId: viewIdOf(source), title: viewNameOf(name), settings: fitted.settings, uniqueTitle: true } });
+    if (answer.code === NAME_TAKEN) {
+        const taken = sharedViewNamed(await storedProject(companyId, inProject), name);
+        throw refuse(taken ? viewInUse(companyId, project, taken).message : reasonOf(answer, 'A shared view by that name already exists.'));
+    }
     if (answer.code !== 200 || !answer.body || answer.body.status !== true) {
         throw Object.assign(refuse(reasonOf(answer, 'The view was not added. Try again, or tell the person.')), answer.code >= SERVER_FAULT ? { tryAgain: true } : {});
     }

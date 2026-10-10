@@ -386,3 +386,19 @@ describe('with MCP_TOOLS_V2 on the lists page with signed cursors and carry name
         WRITES.forEach((n) => expect(byName[n]).toMatchObject({ readOnlyHint: false, destructiveHint: false }));
     });
 });
+
+describe('timesheet.read reads its days in the person\'s time zone', () => {
+    beforeEach(() => as('owner'));
+
+    it('finds an entry by the day it was for the person, and gives its start at their offset', async () => {
+        mockDb.seed(SCHEMA_TYPE.USERS, { _id: ME, Time_Zone: 'Asia/Kolkata' });
+        const late = mockDb.seed(SCHEMA_TYPE.TIMESHEET, {
+            Loggeduser: ME, ProjectId: P_A, TicketID: fx.tA._id, LogStartTime: Date.parse('2026-09-02T20:00:00Z') / 1000, LogEndTime: Date.parse('2026-09-02T20:30:00Z') / 1000,
+            LogTimeDuration: 30, LogDescription: 'late', logAddType: 0, billable: true,
+        });
+        const out = await call('timesheet.read', { from: '2026-09-03', to: '2026-09-03' });
+        expect(out.entries.map((e) => e.timesheetId).sort()).toEqual([fx.myB._id, late._id].sort());
+        expect(out.entries.find((e) => e.timesheetId === late._id)).toMatchObject({ startedAt: '2026-09-03T01:30:00.000+05:30', startedAtWeekday: 'Thursday' });
+        expect((await call('timesheet.read', { from: '2026-09-02', to: '2026-09-02' })).entries.map((e) => e.timesheetId)).toEqual([fx.myC._id]);
+    });
+});

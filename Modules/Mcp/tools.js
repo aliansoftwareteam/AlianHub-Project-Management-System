@@ -106,7 +106,7 @@ const TOOLS = [
             const inList = workFlag.enabled() && named ? await workTools.listRows(ctx, vis, args.sprintId) : null;
             if (inList && inList.error) return { error: inList.error };
             if (planning) {
-                const more = manageTools.searchFilter(inList ? { ...args, sprintId: undefined } : args);
+                const more = manageTools.searchFilter(inList ? { ...args, sprintId: undefined } : args, await dates.zoneOf(ctx));
                 if (more.error) return { error: more.error };
                 // Added beside the caller's own clause: a filter on the same field must narrow it, never replace it.
                 filter.$and = [...(filter.$and || []), more.filter];
@@ -519,7 +519,7 @@ const batchItem = async (ctx, operation) => {
     const name = String(operation.tool);
     if (!batchTool(ctx, operation)) return { ok: false, error: `${name} ${NOT_BATCHABLE}` };
     try {
-        return await call(ctx, name, operation.arguments);
+        return await answerOf(ctx, name, operation.arguments || {});
     } catch (error) {
         return outcomeOf(error);
     }

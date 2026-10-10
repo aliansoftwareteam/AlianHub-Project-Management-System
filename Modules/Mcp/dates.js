@@ -83,7 +83,6 @@ const shown = (value, zone, depth = 0) => {
     return out;
 };
 
-/* A tool's answer with its days as the caller's calendar days and its moments at the caller's offset. */
 const inZone = async (ctx, answer) => shown(answer, await zoneOf(ctx));
 
-module.exports = { inZone, shown, zoneOf, dayIn, UTC };
+module.exports = { inZone, shown, zoneOf, zoneOfUser, dayIn, UTC };

@@ -77,7 +77,7 @@ Taking it back works at each level and takes effect on the app's next call: an o
   - **Reads**: nothing changes.
   - **At once**: the change is made and recorded in the audit log. Where the result says `undoable: true`, a person can undo it.
   - **Waits**: the call changes nothing. It files a request in the AI Inbox, answers `pending: true` and a `proposalId`, and a person approves or declines it.
-- Dates in answers are in the person's time zone (UTC when none is set): a day such as `dueDate` or `startDate` is `YYYY-MM-DD` with its weekday beside it (`dueDateWeekday`), and a moment carries the person's offset; a timer's `startedAt` also has its weekday. Arguments take the same formats as before.
+- Dates in answers are in the person's time zone (UTC when none is set): a day such as `dueDate` or `startDate` is `YYYY-MM-DD` with its weekday beside it (`dueDateWeekday`), and a moment carries the person's offset; a timer's `startedAt` also has its weekday. Day arguments keep their `YYYY-MM-DD` form and are read in the person's time zone too: `dueFrom` and `dueTo` of `tasks.search`, `from` and `to` of `timesheet.read`, and `date` and `startTime` of `timelog.create`. A due date is stored as the moment that day began for the person who set it, so it shows as the day in the reader's own zone: a reader in a zone behind the setter's sees the day before, as the web app does.
 - A list tool takes `limit` and, with `MCP_TOOLS_V2` on, a `cursor`. Its page size is 25 unless noted, and at most 100.
 - Every write also takes an optional `reason` (at most 500 characters) that goes into the audit log.
 

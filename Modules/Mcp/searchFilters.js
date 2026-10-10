@@ -173,4 +173,4 @@ const searchFilters = async (ctx, vis, args) => {
     return { clauses };
 };
 
-module.exports = { SEARCH_INPUT, searchFilters, PRIORITIES };
+module.exports = { SEARCH_INPUT, searchFilters, PRIORITIES, between };
