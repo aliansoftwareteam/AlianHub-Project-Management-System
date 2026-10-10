@@ -427,9 +427,17 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     const agents = await packAgents.remove(companyId, pack.blueprint, agentIds, reached, actor);
     agents.narrowed = await packAgents.narrow(companyId, widened);
     agents.skillsRemoved = await packAgents.dropUnusedSkills(companyId, applied.flatMap((row) => row.entry.skills || []));
-    await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [{ projectId: { $in: applied.map((row) => row.projectId) } }, { $pull: { teamPacks: { applyId } } }],
-    }, 'updateMany');
+    for (const project of projects) {
+        const before = plain(await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [rowFilter(project.projectId), { $pull: { teamPacks: { applyId } } }, { returnDocument: 'before' }],
+        }, 'findOneAndUpdate'));
+        const entry = ((before && before.teamPacks) || []).map(plain).find((one) => one && one.applyId === applyId);
+        const handled = project.rules.map((rule) => rule.id);
+        const late = ((entry && entry.rules) || []).filter((rule) => rule && rule.id && !handled.includes(rule.id));
+        if (!late.length) continue;
+        const { done } = await saveChange(companyId, project.projectId, withoutChange, { roles: [], rules: late, mode: null }, actorId);
+        if (done) project.rules = [...project.rules, ...done.change.rules];
+    }
     return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 

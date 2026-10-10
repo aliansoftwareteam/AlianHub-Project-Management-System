@@ -101,27 +101,47 @@ const changedElsewhere = () => Object.assign(new RuleError('These dispatcher set
 const revisionOf = (row) => Number(row && row.dispatcher && row.dispatcher.revision) || 0;
 const matched = (result) => Boolean(result && (result.matchedCount || result.n || result.modifiedCount || result.nModified));
 
-/* With `revision`, the save lands only on that revision and is refused as changed elsewhere otherwise. */
-async function save(companyId, projectId, body, actorId, { revision } = {}) {
-    const input = validate(body);
+const wait = (attempt) => new Promise((resolve) => { setTimeout(resolve, MERGE_WAIT_MS * attempt); });
+
+async function writeOn(companyId, projectId, input, actorId, expected) {
     const existing = await readRow(companyId, projectId);
     const was = revisionOf(existing);
-    const expected = revision === undefined || revision === null ? null : Number(revision);
     if (expected !== null && expected !== was) throw changedElsewhere();
     const dispatcher = { ...input, revision: was + 1, updatedBy: String(actorId), updatedAt: new Date() };
     if (existing) {
-        const firstRevision = { $or: [{ 'dispatcher.revision': 0 }, { 'dispatcher.revision': { $exists: false } }] };
-        const onRevision = expected === null ? {} : (was ? { 'dispatcher.revision': was } : firstRevision);
+        const onRevision = was ? { 'dispatcher.revision': was } : { $or: [{ 'dispatcher.revision': 0 }, { 'dispatcher.revision': { $exists: false } }] };
         const result = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.ASSIGNMENT_RULES,
             data: [{ projectId: String(projectId), ...onRevision }, { $set: { dispatcher } }],
         }, 'updateOne');
-        if (expected !== null && !matched(result)) throw changedElsewhere();
-    } else {
+        if (!matched(result)) throw changedElsewhere();
+        return dispatcher;
+    }
+    try {
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.ASSIGNMENT_RULES,
             data: { projectId: String(projectId), entries: [], dispatcher, revision: 1 },
         }, 'save');
+    } catch (error) {
+        if (error && error.code === 11000) throw changedElsewhere();
+        throw error;
+    }
+    return dispatcher;
+}
+
+/* With `revision`, the save lands only on that revision; without, it still writes on the revision it read, so two saves
+ * never share a revision number, and tries again on a conflict. */
+async function save(companyId, projectId, body, actorId, { revision } = {}) {
+    const input = validate(body);
+    const expected = revision === undefined || revision === null ? null : Number(revision);
+    let dispatcher;
+    for (let attempt = 1; !dispatcher; attempt += 1) {
+        try {
+            dispatcher = await writeOn(companyId, projectId, input, actorId, expected);
+        } catch (error) {
+            if (expected !== null || !error || error.reason !== SETTINGS_CHANGED || attempt >= MERGE_TRIES) throw error;
+            await wait(attempt);
+        }
     }
     removeCache(cacheKey(companyId, projectId));
     socketEmitter.emit('update', {
@@ -142,7 +162,7 @@ async function saveMerged(companyId, projectId, merge, actorId) {
             return await save(companyId, projectId, body, actorId, { revision: latest.revision });
         } catch (error) {
             if (!error || error.reason !== SETTINGS_CHANGED || attempt >= MERGE_TRIES) throw error;
-            await new Promise((resolve) => { setTimeout(resolve, MERGE_WAIT_MS * attempt); });
+            await wait(attempt);
         }
     }
 }

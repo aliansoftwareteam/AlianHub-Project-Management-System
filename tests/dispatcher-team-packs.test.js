@@ -800,6 +800,33 @@ describe('team pack writes that interleave', () => {
         expect(dispatcherOf(project).rules.filter((rule) => rule.role === SUPPORT_LEAD)).toEqual([]);
     });
 
+    it('removes a rule an approval recorded on the apply after the undo read it', async () => {
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const { applied, proposalId } = await withApprovedSupportTag(project);
+        let activated;
+        const restore = interleave(settingsWrite, async () => { activated = await packs().tagsApproved(C, proposalId, { id: OWNER }); });
+        const res = await call('POST', PACKS, { body: { undo: true, ...body(project, ['support'], { proposeTags: true }), applyId: applied.body.data.applyId } });
+        restore();
+        expect(activated).toHaveLength(1);
+        expect(res.body.data.projects[0].rules).toEqual(activated);
+        expect(dispatcherOf(project).rules).toEqual([]);
+        expect(rowOf(project).teamPacks).toEqual([]);
+    });
+
+    it('gives two saves without a revision two different revisions', async () => {
+        const project = seedProject();
+        const id = String(project._id);
+        await call('PUT', SETTINGS, { params: { projectId: id }, body: { mode: 'suggest', threshold: 80, roles: [], rules: [] } });
+        const settings = require('../Modules/AssignmentRules/dispatcher/settings');
+        let inner;
+        const restore = interleave(settingsWrite, async () => { inner = await settings.save(C, id, { mode: 'apply', roles: [], rules: [] }, OWNER); });
+        const outer = await settings.save(C, id, { mode: 'off', roles: [], rules: [] }, OWNER);
+        restore();
+        expect(inner.revision).toBe(2);
+        expect(outer.revision).toBe(3);
+        expect(dispatcherOf(project)).toMatchObject({ mode: 'off', revision: 3 });
+    });
+
     it('leaves the waits when the rules cannot be saved, so a later approval still adds them', async () => {
         const project = seedProject({ taskTypeCounts: BUGS });
         const { proposalId } = await withApprovedSupportTag(project);

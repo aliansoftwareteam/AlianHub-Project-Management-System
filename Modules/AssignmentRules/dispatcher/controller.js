@@ -82,7 +82,7 @@ exports.applyPack = async (req, res) => {
 exports.getSettings = async (req, res) => {
     try {
         const on = flag.enabled();
-        const data = on ? { on, settings: await settings.load(companyOf(req), req.params.projectId), roles: settings.roleChoices() } : { on, settings: null, roles: [] };
+        const data = on ? { on, settings: await settings.loadLatest(companyOf(req), req.params.projectId), roles: settings.roleChoices() } : { on, settings: null, roles: [] };
         return res.json({ status: true, statusText: 'Dispatcher settings', data });
     } catch (error) {
         return fail(res, 'read settings')(error);
