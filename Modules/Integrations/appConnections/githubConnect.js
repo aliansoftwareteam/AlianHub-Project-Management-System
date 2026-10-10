@@ -195,12 +195,55 @@ exports.repos = async (req, res) => {
     } catch (e) { return failed(res, e, 'repos'); }
 };
 
-const mappingChanged = async (req, companyId, conn, entries, action, meta) => {
-    const update = repoMap.mappingUpdate(entries);
-    update.$set.updatedBy = String(req.uid || '');
-    await MongoDbCrudOpration(companyId, { type: T, data: [{ _id: conn._id }, update, { returnDocument: 'after' }] }, 'findOneAndUpdate');
+const update = (companyId, filter, change, options = {}) => MongoDbCrudOpration(companyId, {
+    type: T, data: [filter, change, { returnDocument: 'after', ...options }],
+}, 'findOneAndUpdate');
+
+const ENTRY_REPO = ['entry', 'repo'].join('.');
+const REPOS_REPO = ['repos', 'repo'].join('.');
+const inEntry = (repo) => ({ arrayFilters: [{ [ENTRY_REPO]: repo }] });
+const ENTRY_PROJECTS = ['repos', '$[entry]', 'projectIds'].join('.');
+
+/* A row still in the old shape is upgraded in one write that only lands if nobody upgraded it first; otherwise it is read again. */
+const upgraded = async (companyId, conn, edit, uid) => {
+    if (repoMap.isMapped(conn)) return { conn };
+    const { entries, changed } = edit(conn);
+    const change = repoMap.mappingUpdate(entries);
+    change.$set.updatedBy = uid;
+    if (await update(companyId, { _id: conn._id, repos: { $exists: false } }, change)) return { done: true, changed };
+    return { conn: await liveGithub(companyId, { _id: conn._id }) };
+};
+
+/* Each change touches only its own pair, so a sync writing a cursor or another admin's edit meanwhile is kept. */
+const addPair = async (companyId, conn, repo, projectId, uid) => {
+    const first = await upgraded(companyId, conn, (row) => repoMap.withProject(row, repo, projectId, new Date().toISOString()), uid);
+    if (first.done) return first.changed;
+    const row = first.conn;
+    if (!row) return false;
+    const entry = repoMap.reposOf(row).find((one) => repoMap.sameRepo(one.repo, repo));
+    if (entry && entry.projectIds.includes(projectId)) return false;
+    if (!entry) {
+        const fresh = { repo, projectIds: [projectId], sync: { cursor: new Date().toISOString() } };
+        if (await update(companyId, { _id: row._id, [REPOS_REPO]: { $ne: repo } }, { $push: { repos: fresh }, $set: { updatedBy: uid } })) return true;
+    }
+    await update(companyId, { _id: row._id }, { $addToSet: { [ENTRY_PROJECTS]: projectId }, $set: { updatedBy: uid } }, inEntry(entry ? entry.repo : repo));
+    return true;
+};
+
+const removePair = async (companyId, conn, repo, projectId, uid) => {
+    const first = await upgraded(companyId, conn, (row) => repoMap.withoutProject(row, repo, projectId), uid);
+    if (first.done) return first.changed;
+    const row = first.conn;
+    const entry = row && repoMap.reposOf(row).find((one) => repoMap.sameRepo(one.repo, repo) && one.projectIds.includes(projectId));
+    if (!entry) return false;
+    await update(companyId, { _id: row._id }, { $pull: { [ENTRY_PROJECTS]: projectId }, $set: { updatedBy: uid } }, inEntry(entry.repo));
+    await update(companyId, { _id: row._id }, { $pull: { repos: { projectIds: { $size: 0 } } } });
+    return true;
+};
+
+const mappingChanged = (req, companyId, conn, action, meta) => {
     removeCache(`integration_connections:${companyId}`);
-    connectionsChanged(companyId, conn._id, { repos: entries.length });
+    connectionsChanged(companyId, conn._id, { repos: true });
     recordAuditFromReq(req, { action, entityType: 'integration', entityId: String(conn._id), entityName: conn.name || 'GitHub', meta });
 };
 
@@ -226,8 +269,8 @@ exports.addRepo = async (req, res) => {
         const token = await tokenOf(companyId, conn);
         if (!token) return refuse(res, 400, NO_TOKEN);
         if (!await api.canReadRepo({ repo, token, companyId })) return refuse(res, 400, 'This GitHub connection cannot read that repository.');
-        const { entries, changed } = repoMap.withProject(conn, repo, projectId, new Date().toISOString());
-        if (changed) await mappingChanged(req, companyId, conn, entries, 'app_connection.repo_added', { repo, projectId });
+        const changed = await addPair(companyId, conn, repo, projectId, String(req.uid || ''));
+        if (changed) mappingChanged(req, companyId, conn, 'app_connection.repo_added', { repo, projectId });
         return res.send({ status: true, statusText: changed ? 'Added.' : 'Already linked.', data: { id: String(conn._id), repo, projectId } });
     } catch (e) { return failed(res, e, 'addRepo'); }
 };
@@ -242,9 +285,8 @@ exports.removeRepo = async (req, res) => {
         if (!OBJECT_ID.test(projectId)) return refuse(res, 400, 'A valid project id is required.');
         const conn = await githubOf(req, res, companyId);
         if (!conn) return undefined;
-        const { entries, changed } = repoMap.withoutProject(conn, repo, projectId);
-        if (!changed) return refuse(res, 404, 'That repository is not linked to this project.');
-        await mappingChanged(req, companyId, conn, entries, 'app_connection.repo_removed', { repo, projectId });
+        if (!await removePair(companyId, conn, repo, projectId, String(req.uid || ''))) return refuse(res, 404, 'That repository is not linked to this project.');
+        mappingChanged(req, companyId, conn, 'app_connection.repo_removed', { repo, projectId });
         return res.send({ status: true, statusText: 'Removed.', data: { id: String(conn._id), repo, projectId } });
     } catch (e) { return failed(res, e, 'removeRepo'); }
 };
@@ -258,7 +300,7 @@ exports.projectView = async (req, res) => {
     try {
         const companyId = pinSessionTenant(req, res);
         if (!companyId) return undefined;
-        if (!flag.enabled()) return res.send({ status: true, data: { enabled: false } });
+        if (!flag.enabled()) return res.send({ status: true, statusText: 'App connections are not switched on.', data: { enabled: false } });
         const projectId = String((req.params || {}).projectId || '');
         if (!OBJECT_ID.test(projectId)) return refuse(res, 400, 'A valid project id is required.');
         const [visible, roleType, conn] = await Promise.all([visibleProjectIds(companyId, req.uid), getRoleType(companyId, req.uid), liveGithub(companyId)]);
@@ -272,7 +314,7 @@ exports.projectView = async (req, res) => {
             data: {
                 enabled: true, canManage, oneClick: oauth.isConfigured(),
                 connection: conn ? {
-                    id: String(conn._id), enabled: conn.enabled !== false, viaOAuth: isOAuth(conn), account: (conn.config || {}).accountLogin || '', reachable,
+                    id: String(conn._id), enabled: conn.enabled !== false, viaOAuth: isOAuth(conn), account: canManage ? (conn.config || {}).accountLogin || '' : '', reachable,
                     errorCode: sync.errorCode || '', blockedHost: sync.blockedHost || '',
                 } : null,
                 repos: conn ? repoMap.reposOfProject(conn, projectId).map(repoRow) : [],

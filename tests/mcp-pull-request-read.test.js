@@ -83,6 +83,7 @@ const connect = (db = mockDb, over = {}) => db.seed(SCHEMA_TYPE.INTEGRATION_CONN
     _id: CONNECTION, type: 'github', name: 'GitHub', config: { token: TOKEN, repo: REPO }, projectIds: [P_OPEN], connectedBy: OWNER, status: 'connected', enabled: true, deletedStatusKey: 0, ...over,
 });
 const read = (caller, args) => rpc(caller, TOOL, args);
+const withoutAuditId = ({ auditId, ...answer }) => answer;
 const NOT_LINKED = { error: 'Only a pull request linked to a task you can open can be read. It links itself when its title or branch carries the task key, or a person adds the link on the task.' };
 
 beforeEach(() => {
@@ -185,7 +186,10 @@ describe('what the person cannot open is not read', () => {
     it('a repository linked only to a project the person cannot open is refused, and GitHub is not asked', async () => {
         connect(mockDb, { projectIds: [P_PRIVATE] });
         expect(await read(ctx(OUTSIDER), { number: 42 })).toEqual(NOT_LINKED);
-        expect(await read(ctx(OUTSIDER), { url: `https://github.com/${REPO}/pull/42` })).toEqual(NOT_LINKED);
+        const named = await read(ctx(OUTSIDER), { url: `https://github.com/${REPO}/pull/42` });
+        const unmapped = await read(ctx(OUTSIDER), { url: 'https://github.com/someone/else/pull/42' });
+        expect(named).toMatchObject({ refused: true });
+        expect(withoutAuditId(named)).toEqual(withoutAuditId(unmapped));
         expect(safeFetch).not.toHaveBeenCalled();
         expect(await read(ctx(INSIDER), { number: 42 })).toMatchObject({ number: 42 });
     });
@@ -327,14 +331,18 @@ describe('a project fed by several repositories', () => {
         expect(await read(ctx(OUTSIDER), { url: `https://github.com/${API}/pull/7` })).toMatchObject({ repo: API, number: 7 });
     });
 
-    it('refuses a repository mapped only to a project the person cannot open, and one not mapped at all', async () => {
+    it('answers a repository mapped only to a project the person cannot open exactly as one not mapped at all, as a refusal', async () => {
         Object.assign(stored(SCHEMA_TYPE.TASKS, T_PRIVATE), { links: [{ url: 'https://github.com/acme/secret/pull/5', kind: 'pr' }] });
         safeFetch.mockClear();
-        expect(await read(ctx(OUTSIDER), { number: 5, repo: 'acme/secret' })).toEqual(NOT_LINKED);
-        expect(await read(ctx(OUTSIDER), { url: 'https://github.com/acme/secret/pull/5' })).toEqual(NOT_LINKED);
-        expect(await read(ctx(OUTSIDER), { number: 5, repo: 'someone/else' })).toMatchObject({ refused: true });
+        const hidden = await read(ctx(OUTSIDER), { number: 5, repo: 'acme/secret' });
+        expect(hidden).toMatchObject({ refused: true });
+        expect(withoutAuditId(hidden)).toEqual(withoutAuditId(await read(ctx(OUTSIDER), { number: 5, repo: 'someone/else' })));
+        const byUrl = await read(ctx(OUTSIDER), { url: 'https://github.com/acme/secret/pull/5' });
+        expect(byUrl).toMatchObject({ refused: true });
+        expect(withoutAuditId(byUrl)).toEqual(withoutAuditId(await read(ctx(OUTSIDER), { url: 'https://github.com/someone/else/pull/5' })));
         expect(await read(ctx(OUTSIDER), { url: `https://github.com/${API}/pull/7`, repo: REPO })).toEqual({ error: expect.stringMatching(/different repositories/) });
         expect(safeFetch).not.toHaveBeenCalled();
+        expect(await read(ctx(INSIDER), { number: 5, repo: 'acme/secret' })).not.toMatchObject({ refused: true });
     });
 });
 

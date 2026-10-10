@@ -12,6 +12,9 @@ const { pinSessionTenant } = require('../../Config/tenant');
 const { requestAddress } = require('../../utils/requestAddress');
 const { connectionsChanged } = require('./helpers/connectionsChanged');
 const { grantOf, revokeGrant, revokeGrantOf } = require('./appConnections/githubConnect');
+const repoMap = require('./appConnections/github/repoMap');
+const { visibleProjectIds } = require('../Agents/scope');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
 // Secrets go to the store by handle or are sealed into config on every write (H.storeSecrets) and are stripped from every read (R.redact).
 
@@ -44,6 +47,32 @@ const sameTarget = (existing, next) => {
     return JSON.stringify(keep(existing.type, existing.config)) === JSON.stringify(keep(next.type, next.config));
 };
 
+const withoutSecretsOf = (type, config) => Object.fromEntries(Object.entries(config || {}).filter(([key]) => !R.secretKeys(type).includes(key)));
+
+const PER_PROJECT = 'Token replaced. Add repositories per project.';
+
+/* A GitHub row holds one shape. Once it maps repositories to projects, a pasted token replaces only the token: the typed
+ * repository is left out (repositories are added per project), and the mapping, cursors and the person it reads as stay. */
+const pastedOnMapped = (existing, config) => {
+    const kept = withoutSecretsOf('github', existing.config);
+    ['repo', 'auth', 'clientId'].forEach((key) => { delete kept[key]; });
+    return { ...kept, token: config.token };
+};
+
+/* With a project named, the typed repository is folded into the mapping instead of the old single-repository fields. */
+const foldedRepo = async (companyId, uid, existing, config, projectId) => {
+    if (!OBJECT_ID.test(projectId)) return { refusal: 'A valid project id is required.' };
+    const project = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS, data: [{ _id: { $in: idForms([projectId]) }, deletedStatusKey: { $nin: [1, 2] }, isPersonal: { $ne: true } }, { _id: 1 }],
+    }, 'findOne');
+    if (!project) return { refusal: 'That project does not exist in this workspace.' };
+    if (!(await visibleProjectIds(companyId, uid)).map(String).includes(projectId)) return { refusal: 'You cannot open that project.' };
+    const { entries } = repoMap.withProject(existing || {}, config.repo, projectId, new Date().toISOString());
+    const rest = { ...config };
+    delete rest.repo;
+    return { config: rest, entries };
+};
+
 exports.listCatalog = async (req, res) => {
     try {
         const connectors = require('../Agents/connectors/flag').requested();
@@ -71,27 +100,42 @@ exports.connect = async (req, res) => {
         if (!check.valid) return refuse(res, 400, check.reason, { field: check.field });
         const item = R.byKey(check.value.type);
         const actor = actorOf(req);
-        if (item && !item.multiple) {
-            const existing = await MongoDbCrudOpration(companyId, {
-                type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ type: check.value.type, deletedStatusKey: { $ne: 1 } }],
-            }, 'findOne');
-            if (existing) {
-                const earlierGrant = await grantOf(companyId, existing);
-                const kept = await H.storeSecrets({ companyId, type: check.value.type, config: check.value.config, existing, actor });
-                const upd = await MongoDbCrudOpration(companyId, {
-                    type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
-                    data: [{ _id: existing._id }, { $set: { ...kept.set, name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: String(req.uid || ''), connectedBy: String(req.uid || ''), ...(sameTarget(existing, check.value) ? {} : { sync: {}, connectedAt: new Date() }) }, ...(kept.unset ? { $unset: kept.unset } : {}) }, { returnDocument: 'after' }],
-                }, 'findOneAndUpdate');
-                await H.retireSecrets({ companyId, handles: kept.stale, actor });
-                revokeGrant(earlierGrant);
-                removeCache(`integration_connections:${companyId}`);
-                connectionsChanged(companyId, existing._id, { status: 'connected', enabled: true });
-                return res.send({ status: true, statusText: 'Updated.', data: R.redact(upd) });
-            }
+        const isGithub = check.value.type === 'github';
+        const projectId = String((req.body || {}).projectId || '');
+        const uid = String(req.uid || '');
+        const existing = item && !item.multiple ? await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data: [{ type: check.value.type, deletedStatusKey: { $ne: 1 } }],
+        }, 'findOne') : null;
+        const mapped = isGithub && repoMap.isMapped(existing);
+        let config = check.value.config;
+        let repos = null;
+        if (mapped) config = pastedOnMapped(existing, config);
+        else if (isGithub && projectId) {
+            const folded = await foldedRepo(companyId, uid, existing, config, projectId);
+            if (folded.refusal) return refuse(res, 400, folded.refusal);
+            ({ config } = folded);
+            repos = folded.entries;
         }
-        const kept = await H.storeSecrets({ companyId, type: check.value.type, config: check.value.config, actor });
+        const shape = repos ? { repos } : {};
+        const unset = repos ? { projectIds: '' } : {};
+        if (existing) {
+            const earlierGrant = await grantOf(companyId, existing);
+            const kept = await H.storeSecrets({ companyId, type: check.value.type, config, existing, actor });
+            const restart = mapped || sameTarget(existing, { type: check.value.type, config }) ? {} : { sync: {}, connectedAt: new Date() };
+            const $unset = { ...(kept.unset || {}), ...unset };
+            const upd = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS,
+                data: [{ _id: existing._id }, { $set: { ...kept.set, ...shape, name: check.value.name, status: 'connected', enabled: true, secretsVersion: R.SECRETS_VERSION, updatedBy: uid, ...(mapped ? {} : { connectedBy: uid }), ...restart }, ...(Object.keys($unset).length ? { $unset } : {}) }, { returnDocument: 'after' }],
+            }, 'findOneAndUpdate');
+            await H.retireSecrets({ companyId, handles: kept.stale, actor });
+            revokeGrant(earlierGrant);
+            removeCache(`integration_connections:${companyId}`);
+            connectionsChanged(companyId, existing._id, { status: 'connected', enabled: true });
+            return res.send({ status: true, statusText: mapped ? PER_PROJECT : 'Updated.', data: R.redact(upd) });
+        }
+        const kept = await H.storeSecrets({ companyId, type: check.value.type, config, actor });
         const data = {
-            _id: new mongoose.Types.ObjectId(), type: check.value.type, name: check.value.name, ...kept.set, secretsVersion: R.SECRETS_VERSION,
+            _id: new mongoose.Types.ObjectId(), type: check.value.type, name: check.value.name, ...kept.set, ...shape, secretsVersion: R.SECRETS_VERSION,
             status: 'connected', enabled: true, createdBy: String(req.uid || ''), connectedBy: String(req.uid || ''), connectedAt: new Date(), deletedStatusKey: 0,
         };
         const saved = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.INTEGRATION_CONNECTIONS, data }, 'save');

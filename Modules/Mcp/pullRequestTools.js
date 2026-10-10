@@ -70,7 +70,8 @@ const connectionOf = async (ctx) => {
     return { row, repos: mapped.map(({ repo, projectIds }) => ({ repo, projectIds: projectIds.filter((id) => reachable.has(id)) })) };
 };
 
-const repoNamed = (conn, name) => conn.repos.find((entry) => sameRepo(entry.repo, name)) || null;
+// A repository linked only to projects the person cannot open is answered exactly as one linked to none.
+const REPO_NOT_OPEN = 'that repository is not connected to a project the person can open. Ask an owner or admin to connect it on App connections.';
 
 // In the order they were linked, so the last one is the newest whichever repository it is in.
 const pullsOnTask = (task, entries) => (Array.isArray(task.links) ? task.links : [])
@@ -146,23 +147,21 @@ const resolve = async (ctx, args, vis, conn) => {
     if (args.taskId !== undefined || args.taskKey !== undefined) return resolveByTask(ctx, args, vis, conn);
     let number = args.number;
     let named = args.repo;
+    const open = conn.repos.filter((entry) => entry.projectIds.some((id) => vis.allowsProject(id)));
+    const openNamed = (name) => open.find((entry) => sameRepo(entry.repo, name)) || null;
     if (args.url !== undefined) {
         const match = PULL_URL.exec(args.url.trim());
         if (!match || DOTS_ONLY.test(match[1])) return { answer: { ...NOT_A_PULL_URL } };
         if (named !== undefined && !sameRepo(named, match[1])) return { answer: { error: 'The repo and the address name different repositories. Give one of them.' } };
         named = match[1];
-        if (!repoNamed(conn, named)) {
-            throw await notVisible(ctx, { url: clip(args.url, TEXT_MAX.url) }, 'that repository is not connected to a project the person can open. Ask an owner or admin to connect it on App connections.');
-        }
+        if (!openNamed(named)) throw await notVisible(ctx, { url: clip(args.url, TEXT_MAX.url) }, REPO_NOT_OPEN);
         number = Number(match[2]);
         if (args.number !== undefined && args.number !== number) return { answer: { error: 'The number and the address name different pull requests. Give one of them.' } };
     }
-    const open = conn.repos.filter((entry) => entry.projectIds.some((id) => vis.allowsProject(id)));
     let entry;
     if (named !== undefined) {
-        entry = repoNamed(conn, named);
-        if (!entry && args.url === undefined) throw await notVisible(ctx, { repo: clip(named, TEXT_MAX.url) }, 'that repository is not linked to a project the person can open.');
-        if (!open.includes(entry)) return { answer: { ...NOT_LINKED_TO_A_TASK } };
+        entry = openNamed(named);
+        if (!entry) throw await notVisible(ctx, { repo: clip(named, TEXT_MAX.url) }, REPO_NOT_OPEN);
     } else if (open.length > 1) {
         return { answer: { error: 'Several repositories are linked to projects you can open. Give repo, one of these.', repos: open.map((one) => one.repo) } };
     } else {

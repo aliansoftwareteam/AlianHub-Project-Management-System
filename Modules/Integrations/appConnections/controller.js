@@ -42,14 +42,24 @@ const repoRows = (row, names, privileged) => repoMap.reposOf(row).flatMap(({ rep
         lastSyncAt: sync.lastSyncAt || null, lastError: sync.lastError || '', errorCode: sync.errorCode || '', blockedHost: sync.blockedHost || '',
     })));
 
+/* The row's summary names every repository that failed; anyone else is told only about the repositories of projects they can open. */
+const lastErrorFor = (row, rows, privileged) => {
+    const summary = (row.sync || {}).lastError || '';
+    if (privileged || !repoMap.isMapped(row)) return summary;
+    const own = [...new Map(rows.filter((r) => r.lastError).map((r) => [r.repo, `${r.repo}: ${r.lastError}`])).values()].join(' ');
+    if (own) return own;
+    return repoMap.reposOf(row).some(({ repo }) => summary.includes(repo)) ? '' : summary;
+};
+
 const connectionRow = (row, names, privileged) => {
     const sync = row.sync || {};
+    const repos = row.type === 'github' ? repoRows(row, names, privileged) : null;
     return {
         id: String(row._id), name: row.name, enabled: row.enabled !== false, status: row.status, target: targetOf(row),
         connectedAt: row.connectedAt || null, secrets: R.redact(row).secrets, viaOAuth: (row.config || {}).auth === 'oauth',
-        lastSyncAt: sync.lastSyncAt || null, lastError: sync.lastError || '', errorCode: sync.errorCode || '', blockedHost: sync.blockedHost || '', failures: Number(sync.failures) || 0, nextAttemptAt: sync.nextAttemptAt || null,
+        lastSyncAt: sync.lastSyncAt || null, lastError: repos ? lastErrorFor(row, repos, privileged) : sync.lastError || '', errorCode: sync.errorCode || '', blockedHost: sync.blockedHost || '', failures: Number(sync.failures) || 0, nextAttemptAt: sync.nextAttemptAt || null,
         ...linkedProjects(row, names, privileged),
-        ...(row.type === 'github' ? { repos: repoRows(row, names, privileged) } : {}),
+        ...(repos ? { repos } : {}),
     };
 };
 
@@ -59,7 +69,7 @@ exports.hub = async (req, res) => {
     try {
         const companyId = pinSessionTenant(req, res);
         if (!companyId) return undefined;
-        if (!flag.enabled()) return res.send({ status: true, data: { enabled: false, canManage: false, apps: [], projects: [] } });
+        if (!flag.enabled()) return res.send({ status: true, statusText: 'App connections are not switched on.', data: { enabled: false, canManage: false, apps: [], projects: [] } });
         const [rows, projects, roleType] = await Promise.all([
             MongoDbCrudOpration(companyId, { type: T, data: [{ deletedStatusKey: { $ne: 1 } }, {}, { sort: { updatedAt: -1 } }] }, 'find'),
             visibleProjects(companyId, req.uid),

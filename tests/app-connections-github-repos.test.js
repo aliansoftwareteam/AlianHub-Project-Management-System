@@ -39,6 +39,8 @@ const socketEmitter = require('../event/socketEventEmitter');
 const tools = require('../Modules/Automations/engine/tools');
 const github = require('../Modules/Integrations/appConnections/githubConnect');
 const hub = require('../Modules/Integrations/appConnections/controller');
+const integrations = require('../Modules/Integrations/controller');
+const syncState = require('../Modules/Integrations/appConnections/syncState');
 const runner = require('../Modules/Integrations/appConnections/runner');
 const backoff = require('../Modules/Integrations/appConnections/backoff');
 const repoMap = require('../Modules/Integrations/appConnections/github/repoMap');
@@ -171,11 +173,62 @@ describe('mapping repositories to projects', () => {
         expect(rowOf().config.token).toBe(TOKEN);
     });
 
+    it('keeps a concurrent cursor and another admin\'s pair when a pair is added or removed', async () => {
+        rowOf().repos = [{ repo: 'acme/web', projectIds: [P1], sync: { cursor: '2026-10-01T00:00:00Z' } }];
+        const stale = { ...rowOf(), repos: rowOf().repos.map((e) => ({ ...e, sync: { ...e.sync } })) };
+        await syncState.recordRepo(COMPANY, connection._id, 'acme/web', { cursor: '2026-10-10T11:00:00Z', failures: 0 });
+        rowOf().repos.push({ repo: 'acme/other', projectIds: [P2], sync: {} });
+        const original = mockDb.crud;
+        mockDb.crud = (companyId, q, method) => (method === 'findOne' && q.type === CONN ? Promise.resolve(stale) : original(companyId, q, method));
+        try {
+            expect((await add(OWNER, 'acme/web', P2)).body.status).toBe(true);
+            expect((await add(OWNER, 'acme/api', P1)).body.status).toBe(true);
+            expect((await remove(OWNER, 'acme/web', P1)).body.status).toBe(true);
+        } finally {
+            mockDb.crud = original;
+        }
+        expect(rowOf().repos).toEqual([
+            { repo: 'acme/web', projectIds: [P2], sync: { cursor: '2026-10-10T11:00:00Z', failures: 0 } },
+            { repo: 'acme/other', projectIds: [P2], sync: {} },
+            { repo: 'acme/api', projectIds: [P1], sync: { cursor: expect.any(String) } },
+        ]);
+    });
+
     it('no longer takes the whole-connection project list once each repository has its own', async () => {
         await add(OWNER, 'acme/web', P1);
         const r = await call(hub.setProjects, OWNER, { params: { id: id() }, body: { projectIds: [P2] } });
         expect(r.code).toBe(400);
         expect(rowOf().repos[0].projectIds).toEqual([P1]);
+    });
+});
+
+describe('a pasted token', () => {
+    const paste = (body) => call(integrations.connect, OWNER, { body: { type: 'github', name: 'GitHub', config: { token: 'ghp_abcdefghijklmnopqrstuvwxyz0123456789', repo: 'acme/typed' }, ...body } });
+
+    it('on a row mapping repositories replaces only the token, never storing the typed repository beside the mapping', async () => {
+        rowOf().repos = [{ repo: 'acme/web', projectIds: [P1], sync: { cursor: '2026-10-09T00:00:00Z' } }];
+        rowOf().sync = { cursor: 'x', lastSyncAt: new Date(NOW) };
+        const r = await paste({});
+        expect(r.body).toMatchObject({ status: true, statusText: expect.stringMatching(/per project/) });
+        expect(rowOf().config).toEqual({ accountLogin: 'octo', token: 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' });
+        expect(rowOf().repos).toEqual([{ repo: 'acme/web', projectIds: [P1], sync: { cursor: '2026-10-09T00:00:00Z' } }]);
+        expect(rowOf().connectedBy).toBe(CONNECTOR);
+        expect(rowOf().sync).toMatchObject({ cursor: 'x' });
+    });
+
+    it('on a row not yet mapping folds the typed repository into the mapping when a project is named', async () => {
+        expect((await paste({ projectId: PERSONAL })).code).toBe(400);
+        const r = await paste({ projectId: P2 });
+        expect(r.body.status).toBe(true);
+        expect(rowOf().repos).toEqual([{ repo: 'acme/typed', projectIds: [P2], sync: { cursor: expect.any(String) } }]);
+        expect(rowOf().config.repo).toBeUndefined();
+        expect(rowOf().projectIds).toBeUndefined();
+    });
+
+    it('without a project keeps the single-repository shape it always had', async () => {
+        await paste({});
+        expect(rowOf().config.repo).toBe('acme/typed');
+        expect(rowOf().repos).toBeUndefined();
     });
 });
 
@@ -194,13 +247,24 @@ describe('what each screen is told', () => {
         expect(JSON.stringify(member)).not.toContain(TOKEN);
     });
 
+    it('names in the last error only the repositories of projects the viewer can open', async () => {
+        rowOf().repos[1].sync = { lastError: 'GitHub refused access to the repository (403).' };
+        rowOf().sync = { lastError: 'acme/web: GitHub refused access to the repository (403). acme/api: GitHub refused access to the repository (403).' };
+        mockVisible[MEMBER] = [P2];
+        const member = (await call(hub.hub, MEMBER)).body.data.apps.find((a) => a.key === 'github').connections[0];
+        expect(member.lastError).toBe('acme/api: GitHub refused access to the repository (403).');
+        expect(JSON.stringify(member)).not.toContain('acme/web');
+        const owner = (await call(hub.hub, OWNER)).body.data.apps.find((a) => a.key === 'github').connections[0];
+        expect(owner.lastError).toContain('acme/web');
+    });
+
     it('a project shows its repositories to anyone who can open it, and the changes to an owner or admin', async () => {
         const member = await call(github.projectView, MEMBER, { params: { projectId: P1 } });
-        expect(member.body.data).toMatchObject({ enabled: true, canManage: false, connection: { id: id(), account: 'octo', reachable: true }, repos: [{ repo: 'acme/web', lastError: expect.stringMatching(/403/) }] });
+        expect(member.body.data).toMatchObject({ enabled: true, canManage: false, connection: { id: id(), account: '', reachable: true }, repos: [{ repo: 'acme/web', lastError: expect.stringMatching(/403/) }] });
         expect(JSON.stringify(member.body)).not.toContain(TOKEN);
         expect((await call(github.projectView, MEMBER, { params: { projectId: P2 } })).code).toBe(404);
         const owner = await call(github.projectView, OWNER, { params: { projectId: HIDDEN } });
-        expect(owner.body.data).toMatchObject({ canManage: true, oneClick: true, connection: { reachable: false } });
+        expect(owner.body.data).toMatchObject({ canManage: true, oneClick: true, connection: { account: 'octo', reachable: false } });
     });
 
     it('a project in a workspace not yet signed in to GitHub says so', async () => {
