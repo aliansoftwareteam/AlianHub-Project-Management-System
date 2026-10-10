@@ -24,8 +24,30 @@
                         </button>
                     </header>
 
-                    <form v-if="canManage && connecting === app.key" class="apc__form" @submit.prevent="connect(app)">
-                        <p v-if="app.key === 'github'" class="ah-small" data-one-click-off>{{ $t('AppConnections.one_click_off') }}</p>
+                    <p v-if="!canManage && app.key === 'github' && !app.oneClick && !app.connections.length" class="ah-small" data-ask-admin>{{ $t('AppConnections.github_ask_admin') }}</p>
+
+                    <section v-if="canManage && connecting === app.key && app.setup && !usingToken" class="apc__setup" data-github-setup>
+                        <strong class="apc__name">{{ $t('AppConnections.github_setup_title') }}</strong>
+                        <ol class="apc__steps">
+                            <li>
+                                <span>{{ $t('AppConnections.github_setup_register') }}</span>
+                                <div v-for="entry in setupUrls(app)" :key="entry.key" class="apc__url">
+                                    <span class="ah-label">{{ $t(`AppConnections.github_setup_${entry.key}`) }}</span>
+                                    <div class="apc__row">
+                                        <code class="ah-mono apc__code" :data-url="entry.key">{{ entry.value }}</code>
+                                        <button type="button" class="ah-btn ah-btn--secondary ah-btn--sm" @click="copy(entry.value)">
+                                            {{ copied === entry.value ? $t('AppConnections.copied') : $t('AppConnections.copy') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </li>
+                            <li>{{ $t('AppConnections.github_setup_env', { idName: 'GITHUB_CONNECT_CLIENT_ID', secretName: 'GITHUB_CONNECT_CLIENT_SECRET' }) }}</li>
+                            <li>{{ $t('AppConnections.github_setup_restart') }}</li>
+                        </ol>
+                        <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm apc__alt" data-use-token @click="usingToken = true">{{ $t('AppConnections.github_use_token') }}</button>
+                    </section>
+
+                    <form v-if="canManage && connecting === app.key && (!app.setup || usingToken)" class="apc__form" @submit.prevent="connect(app)">
                         <label v-for="field in app.fields" :key="field.key" class="ah-field">
                             <span class="ah-label">{{ $t(`AppConnections.field_${app.key}_${field.key}`) }}</span>
                             <input v-model="values[field.key]" class="ah-input" :type="field.secret ? 'password' : 'text'" :required="field.required" autocomplete="off" />
@@ -143,6 +165,8 @@ const reposPage = ref(1);
 const reposMore = ref(false);
 const reposLoaded = ref(false);
 const pickedRepo = ref("");
+const usingToken = ref(false);
+const copied = ref("");
 
 const GITHUB_OUTCOMES = ["expired", "denied", "rights", "off", "failed"];
 const GITHUB_REFUSALS = { 400: "github_expired", 403: "github_rights", 409: "github_off" };
@@ -205,8 +229,23 @@ const openConnect = async (app) => {
         }
         return;
     }
+    usingToken.value = false;
     values.value = {};
-    connecting.value = app.key;
+    connecting.value = connecting.value === app.key && app.setup ? "" : app.key;
+};
+
+const setupUrls = (app) => [
+    { key: "homepage", value: app.setup.homepageUrl },
+    { key: "callback", value: app.setup.callbackUrl },
+];
+
+const copy = async (text) => {
+    try {
+        await navigator.clipboard.writeText(text);
+        copied.value = text;
+    } catch (e) {
+        copied.value = "";
+    }
 };
 
 const pickable = (app, conn) => app.key === "github" && (app.oneClick || conn.viaOAuth);
