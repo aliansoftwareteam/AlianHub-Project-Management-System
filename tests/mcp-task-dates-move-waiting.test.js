@@ -250,6 +250,118 @@ describe('a date change that waits for approval', () => {
     });
 });
 
+describe('a link that waits for approval while the blocker\'s dates move at once', () => {
+    const human = (userId) => ({ kind: 'human', userId });
+    const policyOf = () => mockDb.store[SCHEMA_TYPE.PROJECTS].find((row) => String(row._id) === P_OPEN);
+    const linkWaits = async (blocker, waiting) => {
+        policyOf().agentPolicy = { connected: 'propose_all' };
+        const filed = await rpc(ctx(OWNER), 'task.relation.add', { taskId: String(blocker._id), relatedTaskId: String(waiting._id), type: 'blocks' });
+        delete policyOf().agentPolicy;
+        return filed;
+    };
+    let review;
+
+    beforeEach(() => { review = named('Review', P_OPEN, S_OPEN, '12', '13'); });
+
+    it('moves the waiting task when the link is approved, shows the move on its card, and one undo puts it back', async () => {
+        const filed = await linkWaits(design, review);
+        expect(filed).toMatchObject({ pending: true });
+        expect(await move(design, '2026-10-13', '2026-10-14')).toMatchObject({ ok: true });
+        expect(datesOf(review)).toEqual(['2026-10-12', '2026-10-13']);
+
+        const row = mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS].find((entry) => String(entry._id) === filed.proposalId);
+        const card = (await intentPreview.forBatches(CID, OWNER, [{ ...row, id: String(row._id) }], { bareChanges: true })).get(String(row._id));
+        expect(card.lines).toEqual(expect.arrayContaining([{ kind: 'batchItem', task: 'Review', what: 'start', value: '2026-10-14T00:00:00.000Z' }]));
+
+        const approved = await proposals.approve(CID, filed.proposalId, { decider: human(OWNER), isPrivileged: true, ip: '' });
+        await settle();
+        expect(approved.error).toBeUndefined();
+        expect(stored(design._id).relations.map((entry) => [String(entry.taskId), entry.type])).toContainEqual([String(review._id), 'blocks']);
+        expect(datesOf(review)).toEqual(['2026-10-14', '2026-10-15']);
+        expect(datesOf(build)).toEqual(['2026-10-14', '2026-10-15']);
+
+        const [audit] = audits('task.relation.add', 'applied');
+        expect(audit.meta.undo.shifted).toHaveLength(1);
+        expect(await undo.undoAuditRow(CID, audit, human(OWNER), '')).toMatchObject({ ok: true });
+        expect(datesOf(review)).toEqual(['2026-10-12', '2026-10-13']);
+    });
+
+    it('moves nothing when the blocker already ends before the waiting task starts', async () => {
+        const filed = await linkWaits(design, review);
+        await proposals.approve(CID, filed.proposalId, { decider: human(OWNER), isPrivileged: true, ip: '' });
+        await settle();
+        expect(datesOf(review)).toEqual(['2026-10-12', '2026-10-13']);
+    });
+
+    it('moves only the task it links, not one the blocker already overlapped', async () => {
+        const overlapped = named('Overlapped', P_OPEN, S_OPEN, '08', '09');
+        link(design, overlapped);
+        const filed = await linkWaits(design, review);
+        await move(design, '2026-10-13', '2026-10-14');
+        stored(overlapped._id).startDate = at('13');
+        stored(overlapped._id).DueDate = at('14');
+        await proposals.approve(CID, filed.proposalId, { decider: human(OWNER), isPrivileged: true, ip: '' });
+        await settle();
+        expect(datesOf(review)).toEqual(['2026-10-14', '2026-10-15']);
+        expect(datesOf(overlapped)).toEqual(['2026-10-13', '2026-10-14']);
+    });
+
+    it('a link made at once moves nothing', async () => {
+        await move(design, '2026-10-13', '2026-10-14');
+        expect(await rpc(ctx(OWNER), 'task.relation.add', { taskId: String(design._id), relatedTaskId: String(review._id), type: 'blocks' })).toMatchObject({ ok: true });
+        expect(datesOf(review)).toEqual(['2026-10-12', '2026-10-13']);
+    });
+
+    it('names on the card how many moved tasks the approver cannot open', async () => {
+        const hidden = named('Hidden', P_PRIVATE, S_PRIVATE, '14', '15');
+        link(review, hidden);
+        const filed = await linkWaits(design, review);
+        await move(design, '2026-10-13', '2026-10-14');
+        const row = mockDb.store[SCHEMA_TYPE.AGENT_PROPOSALS].find((entry) => String(entry._id) === filed.proposalId);
+        const card = (await intentPreview.forBatches(CID, MEMBER, [{ ...row, id: String(row._id) }], { bareChanges: true })).get(String(row._id));
+        expect(card.lines).toEqual(expect.arrayContaining([{ kind: 'movesNotShown', count: 1 }]));
+        expect(JSON.stringify(card)).not.toMatch(/Hidden/);
+    });
+
+    it('moves nothing outside the projects the token is held to', async () => {
+        const elsewhere = named('Elsewhere', P_DEST, S_DEST, '14', '15');
+        link(review, elsewhere);
+        mockDb.store[SCHEMA_TYPE.API_TOKENS][0].projectIds = [P_OPEN];
+        policyOf().agentPolicy = { connected: 'propose_all' };
+        const filed = await rpc(ctx(OWNER, { projectIds: [P_OPEN] }), 'task.relation.add', { taskId: String(design._id), relatedTaskId: String(review._id), type: 'blocks' });
+        delete policyOf().agentPolicy;
+        expect(filed).toMatchObject({ pending: true });
+        await move(design, '2026-10-13', '2026-10-14', OWNER, { projectIds: [P_OPEN] });
+        await proposals.approve(CID, filed.proposalId, { decider: human(OWNER), isPrivileged: true, ip: '' });
+        await settle();
+        expect(datesOf(review)).toEqual(['2026-10-14', '2026-10-15']);
+        expect(datesOf(elsewhere)).toEqual(['2026-10-14', '2026-10-15']);
+    });
+
+    it('says on undo that the link went but a task it moved and that changed since was left', async () => {
+        const filed = await linkWaits(design, review);
+        await move(design, '2026-10-13', '2026-10-14');
+        await proposals.approve(CID, filed.proposalId, { decider: human(OWNER), isPrivileged: true, ip: '' });
+        await settle();
+        stored(review._id).startDate = at('20');
+        stored(review._id).DueDate = at('21');
+        const [audit] = audits('task.relation.add', 'applied');
+        const out = await undo.undoAuditRow(CID, audit, human(OWNER), '');
+        expect(out.result).toMatchObject({ leftAlone: [String(review._id)], note: expect.stringMatching(/link was removed/) });
+        expect(datesOf(review)).toEqual(['2026-10-20', '2026-10-21']);
+    });
+
+    it('a link made as a part of something approved, not filed over MCP, moves nothing', async () => {
+        await move(design, '2026-10-13', '2026-10-14');
+        const actor = { kind: 'agent', userId: OWNER, agentName: 'Claude', viaAccount: 'personal', tokenId: String(TOKEN) };
+        await require('../Modules/Agents/actions').perform({
+            companyId: CID, actor, action: 'task.relation.add', params: { taskId: String(design._id), relatedTaskId: String(review._id), type: 'blocks', __proposal: true },
+            approved: true, approvedBy: OWNER,
+        });
+        expect(datesOf(review)).toEqual(['2026-10-12', '2026-10-13']);
+    });
+});
+
 describe('a long chain', () => {
     it('says the chain was cut at its cap, and how many waiting tasks were read', async () => {
         waitingTasks.limits.chainMax = 2;

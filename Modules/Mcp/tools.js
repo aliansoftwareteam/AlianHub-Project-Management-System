@@ -1,5 +1,6 @@
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
+const logger = require('../../Config/loggerConfig');
 const registry = require('../Agents/registry');
 const actions = require('../Agents/actions');
 const { oid } = require('../Automations/engine/tools');
@@ -9,7 +10,7 @@ const { PAGE_TEXT_MAX, pageText } = require('./pageText');
 const { hasScope } = require('../ApiTokens/helpers/apiTokenRules');
 const performanceRead = require('../Agents/performanceRead');
 const scopes = require('./scopes');
-const { heldForApproval } = require('./taintHold');
+const { heldForApproval, describedFor } = require('./taintHold');
 const projectPolicy = require('../Agents/projectPolicy');
 const taskReads = require('../Agents/taskReads');
 const visibility = require('./visibility');
@@ -45,10 +46,16 @@ const taskFilter = (ctx, vis, narrowTo, extra = {}) => ({
 
 const taskTarget = (args) => ({ taskId: str(args.taskId, 40) });
 
+const shown = async (ctx, rows) => {
+    await taskReads.sawRows(ctx.companyId, ctx.actor, rows).catch((e) => logger.error(`[mcp] the reads of a task list were not kept: ${e.message}`));
+    return rows;
+};
+
 const taskPage = async (ctx, tool, args, filter, sort, row = taskRow) => {
     const { rows, nextCursor } = await cursor.page(ctx, tool, args, ({ skip, limit }) => MongoDbCrudOpration(ctx.companyId, {
         type: SCHEMA_TYPE.TASKS, data: [filter, null, { sort, skip, limit }],
     }, 'find'));
+    await shown(ctx, rows);
     const tasks = await names.forTasks(ctx, rows, row);
     return nextCursor ? { tasks, nextCursor } : { tasks };
 };
@@ -84,7 +91,7 @@ const TOOLS = [
                 data: [filter, null, { sort: { Task_Priority: 1, DueDate: 1 }, limit: 5 }],
             }, 'find');
             const open = (rows || []).filter((t) => !registry.DONE_STATUS_TYPES.includes(String(t.statusType || '').toLowerCase()));
-            return { tasks: open.slice(0, 3).map(taskRow) };
+            return { tasks: (await shown(ctx, open.slice(0, 3))).map(taskRow) };
         },
     },
     {
@@ -123,7 +130,7 @@ const TOOLS = [
                 type: SCHEMA_TYPE.TASKS,
                 data: [filter, null, { sort: { updatedAt: -1 }, limit: clampLimit(args.limit) }],
             }, 'find');
-            return { tasks: (rows || []).map(row) };
+            return { tasks: (await shown(ctx, rows || [])).map(row) };
         },
     },
     {
@@ -301,7 +308,7 @@ const formFor = (ctx, tool) => {
     return { ...tool, description, input: { ...tool.input, properties: { ...tool.input.properties, ...more } } };
 };
 
-const toolsFor = (ctx) => offered().filter((tool) => holdsGrantFor(ctx, tool)).map((tool) => formFor(ctx, tool));
+const toolsFor = (ctx) => offered().filter((tool) => holdsGrantFor(ctx, tool)).map((tool) => describedFor(ctx, formFor(ctx, tool)));
 
 const toolNames = () => offered().map((t) => t.name);
 

@@ -17,6 +17,7 @@ const FIELDS = Object.freeze({ TaskName: 1, startDate: 1, DueDate: 1, relations:
 const DATES = Object.freeze({ startDate: true, DueDate: true });
 const NO_RIGHT = 'the person may not change dates in its project';
 const ROUNDS = 10;
+const EARLIEST = new Date(0);
 
 const idOf = (value) => (value === undefined || value === null ? '' : String(value));
 const blocked = (task) => (Array.isArray(task.relations) ? task.relations : []).filter((entry) => entry && entry.type === 'blocks').map((entry) => idOf(entry.taskId));
@@ -73,13 +74,15 @@ const projectsAllowing = async (companyId, actor, rows) => {
 };
 
 /* What moving `task` from its stored dates to `to` asks of the tasks waiting on it: the rows to write, what each
- * held before, and the answer. Null when the move pushes nothing later. `applying` takes each moved task's place in
- * its project's count of an agent's direct changes, as a change of its own would; `approved` is a person's approval
+ * held before, and the answer. Null when the move pushes nothing later. With `linkedTo`, `task` was just linked as
+ * blocking that task, and the link is what pushes it later. `applying` takes each moved task's place in its
+ * project's count of an agent's direct changes, as a change of its own would; `approved` is a person's approval
  * of this change, which the card showed these moves on. */
-const plan = async ({ companyId, actor, uid, task, to, zone, approved = false, applying = true }) => {
+const plan = async ({ companyId, actor, uid, task, to, zone, approved = false, applying = true, linkedTo = '' }) => {
     const start = to.startDate || task.startDate;
     const end = to.DueDate === undefined ? task.DueDate : to.DueDate;
-    if (!task.startDate || !task.DueDate || !start || !end || new Date(end) <= new Date(task.DueDate) || !blocked(task).length) return null;
+    const pushesLater = Boolean(linkedTo) || new Date(end) > new Date(task.DueDate);
+    if (!task.startDate || !task.DueDate || !start || !end || !pushesLater || !blocked(task).length) return null;
 
     const { chain, truncated } = await chainOf(companyId, uid, task);
     if (chain.length < 2) return null;
@@ -98,9 +101,13 @@ const plan = async ({ companyId, actor, uid, task, to, zone, approved = false, a
         }
         return asked.get(key);
     };
+    // A new link counts as the blocker arriving where it already is, pushing only the task it was just linked to and
+    // what waits on that one: an overlap with another task it blocked before is not this link's doing.
+    const placed = (row) => (linkedTo && idOf(row._id) === movedId ? { startDate: EARLIEST, DueDate: EARLIEST } : row);
+    const counts = (source, target) => !linkedTo || source !== movedId || target === idOf(linkedTo);
     const shiftNow = () => shiftDependants(
-        chain.map((row) => ({ id: idOf(row._id), startDate: row.startDate && onWall(row.startDate, zone), DueDate: row.DueDate && onWall(row.DueDate, zone) })),
-        chain.flatMap((row) => blocked(row).filter((id) => byId.has(id)).map((target) => ({ source: idOf(row._id), target }))),
+        chain.map((row) => ({ id: idOf(row._id), startDate: placed(row).startDate && onWall(placed(row).startDate, zone), DueDate: placed(row).DueDate && onWall(placed(row).DueDate, zone) })),
+        chain.flatMap((row) => blocked(row).filter((id) => byId.has(id) && counts(idOf(row._id), id)).map((target) => ({ source: idOf(row._id), target }))),
         movedId,
         { startDate: onWall(start, zone), DueDate: onWall(end, zone) },
         { workingDays, canEdit: (id) => !held.has(id) },

@@ -3,8 +3,19 @@
 process.env.STORAGE_TYPE = 'server';
 const mockDb = require('./fixtures/fakeMongo').create();
 
+/* With `mockStamping.on`, a task write stamps updatedAt as Mongoose timestamps do, unless it says timestamps: false. */
+const mockStamping = { on: false };
+const mockStamped = (q, method) => {
+    if (!mockStamping.on || q.type !== 'tasks' || !Array.isArray(q.data)) return q;
+    if (!['findOneAndUpdate', 'updateOne', 'updateMany'].includes(method)) return q;
+    const [filter, update, options] = q.data;
+    if ((options && options.timestamps === false) || !update || Array.isArray(update)) return q;
+    const operators = Object.keys(update).some((key) => key.startsWith('$'));
+    const stamped = operators ? { ...update, $set: { ...(update.$set || {}), updatedAt: new Date() } } : { ...update, updatedAt: new Date() };
+    return { ...q, data: [filter, stamped, ...q.data.slice(2)] };
+};
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
-    MongoDbCrudOpration: (companyId, q, method) => mockDb.crud(companyId, q, method),
+    MongoDbCrudOpration: (companyId, q, method) => mockDb.crud(companyId, mockStamped(q, method), method),
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0, flushAll: () => {} } }));
@@ -286,6 +297,151 @@ describe('changed since you read it', () => {
         await taskReads.saw(CID, inProduct(), taskId, taskRow(taskId).updatedAt);
         changedByAPerson(taskId);
         expect((await actions.perform({ ...change, approved: true })).auditId).toBeTruthy();
+    });
+
+    it('a task list the agent was shown counts as its read of each task on it, for a change of what a row shows', async () => {
+        const [{ taskId }] = await items(1);
+        await read(agent(1), taskId);
+        changedByAPerson(taskId);
+        expect(await rpc(agent(1), 'tasks.search', { query: taskRow(taskId).TaskName })).toMatchObject({ tasks: [expect.objectContaining({ taskId })] });
+        expect(await comment(agent(1), taskId)).toMatchObject({ ok: true });
+        expect(await rpc(agent(1), 'task.update', { taskId, priority: 'HIGH' })).toMatchObject({ ok: true });
+        changedByAPerson(taskId);
+        expect(await comment(agent(1), taskId, 'Again')).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+    });
+
+    it('a task list does not stand in for a full read before a change of what a row does not show', async () => {
+        const [{ taskId }] = await items(1);
+        await read(agent(1), taskId);
+        taskRow(taskId).rawDescription = 'a person rewrote it';
+        changedByAPerson(taskId);
+        await rpc(agent(1), 'tasks.search', { query: taskRow(taskId).TaskName });
+        const refused = await rpc(agent(1), 'task.update', { taskId, description: 'the agent rewrites it' });
+        expect(refused).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED_UNSHOWN });
+        expect(refused.reason).toContain('task.get');
+        expect(taskRow(taskId).rawDescription).toBe('a person rewrote it');
+        await read(agent(1), taskId);
+        expect(await rpc(agent(1), 'task.update', { taskId, description: 'the agent rewrites it' })).toMatchObject({ ok: true });
+    });
+
+    it('a search leaves no read behind for a task the agent never read', async () => {
+        const [{ taskId }] = await items(1);
+        await rpc(agent(1), 'tasks.search', { query: taskRow(taskId).TaskName });
+        expect(rows(SCHEMA_TYPE.AGENT_WORK_MARKS).filter((row) => row.scope === `read:${taskId}`)).toHaveLength(0);
+    });
+
+    it('a search by one connection does not move on the read of another connection of the same person', async () => {
+        const [{ taskId }] = await items(1);
+        await read(agent(1), taskId);
+        await read(agent(2), taskId);
+        changedByAPerson(taskId);
+        await rpc(agent(1), 'tasks.search', { query: taskRow(taskId).TaskName });
+        expect(await comment(agent(2), taskId)).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+        expect(await comment(agent(1), taskId)).toMatchObject({ ok: true });
+    });
+
+    describe('with task writes stamped as the database stamps them', () => {
+        beforeEach(() => { mockStamping.on = true; });
+        afterEach(() => { mockStamping.on = false; });
+
+        it('lets an agent comment twice after one read, its own bookkeeping leaving the task\'s stamp alone', async () => {
+            const [{ taskId }] = await items(1);
+            await read(agent(1), taskId);
+            const before = taskRow(taskId).updatedAt;
+            await require('../Modules/Tasks/helpers/completionStore').recordWork(CID, taskId, actions.workEntry(agent(1).actor, 0));
+            expect(taskRow(taskId).updatedAt).toEqual(before);
+            expect(await comment(agent(1), taskId, 'First')).toMatchObject({ ok: true });
+            expect(await comment(agent(1), taskId, 'Second')).toMatchObject({ ok: true });
+            expect(await rpc(agent(1), 'task.update', { taskId, priority: 'HIGH' })).toMatchObject({ ok: true });
+            expect(await comment(agent(1), taskId, 'Third')).toMatchObject({ ok: true });
+        });
+
+        it('still refuses the agent after a person changed the task between its writes', async () => {
+            const [{ taskId }] = await items(1);
+            await read(agent(1), taskId);
+            expect(await rpc(agent(1), 'task.update', { taskId, priority: 'HIGH' })).toMatchObject({ ok: true });
+            taskRow(taskId).updatedAt = new Date(Date.now() + 1000);
+            expect(await comment(agent(1), taskId, 'After a person')).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+        });
+    });
+
+    describe('after a change of its own that waited for approval', () => {
+        const change = (taskId, over = {}) => ({ companyId: CID, action: 'task.comment', params: { taskId, body: 'Reviewed' }, actor: agent(1).actor, approved: true, ...over });
+        const writing = (taskId, stamp) => {
+            const apply = actions.executors['task.comment'];
+            return jest.spyOn(actions.executors, 'task.comment').mockImplementation(async (args) => {
+                const out = await apply(args);
+                taskRow(taskId).updatedAt = stamp();
+                return out;
+            });
+        };
+
+        it('keeps the read current when the task had not changed before it', async () => {
+            const [{ taskId }] = await items(1);
+            await read(agent(1), taskId);
+            const spy = writing(taskId, () => new Date());
+            expect((await actions.perform(change(taskId))).auditId).toBeTruthy();
+            spy.mockRestore();
+            expect(await comment(agent(1), taskId, 'Next')).toMatchObject({ ok: true });
+        });
+
+        it('leaves the read behind when a person changed the task before it', async () => {
+            const [{ taskId }] = await items(1);
+            await read(agent(1), taskId);
+            changedByAPerson(taskId);
+            expect((await actions.perform(change(taskId))).auditId).toBeTruthy();
+            expect(await comment(agent(1), taskId, 'After a person')).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+        });
+
+        it('leaves the read behind when a person edited the change before approving it', async () => {
+            const [{ taskId }] = await items(1);
+            await read(agent(1), taskId);
+            const spy = writing(taskId, () => new Date());
+            expect((await actions.perform(change(taskId, { proposal: { source: 'mcp', edited: true } }))).auditId).toBeTruthy();
+            spy.mockRestore();
+            expect(await comment(agent(1), taskId, 'Next')).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+        });
+
+        it('leaves the read behind when the task was written after the change finished', async () => {
+            const [{ taskId }] = await items(1);
+            await read(agent(1), taskId);
+            const spy = writing(taskId, () => new Date(Date.now() + 60 * 60 * 1000));
+            expect((await actions.perform(change(taskId))).auditId).toBeTruthy();
+            spy.mockRestore();
+            expect(await comment(agent(1), taskId, 'Next')).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+        });
+    });
+
+    describe('the far end of a link it changes', () => {
+        const linking = (other) => {
+            const apply = actions.executors['task.relation.add'];
+            return jest.spyOn(actions.executors, 'task.relation.add').mockImplementation(async (args) => {
+                const out = await apply(args);
+                taskRow(other).updatedAt = new Date();
+                return out;
+            });
+        };
+        const linkAction = (taskId, other, over = {}) => ({ companyId: CID, action: 'task.relation.add', params: { taskId, relatedTaskId: other, type: 'relates_to' }, actor: agent(1).actor, ...over });
+
+        it('keeps the agent\'s read of it current', async () => {
+            const [{ taskId }, { taskId: other }] = await items(2);
+            await read(agent(1), taskId);
+            await read(agent(1), other);
+            const spy = linking(other);
+            expect((await actions.perform(linkAction(taskId, other))).auditId).toBeTruthy();
+            spy.mockRestore();
+            expect(await comment(agent(1), other, 'On the other one')).toMatchObject({ ok: true });
+        });
+
+        it('leaves it behind when a person edited the link before approving it', async () => {
+            const [{ taskId }, { taskId: other }] = await items(2);
+            await read(agent(1), taskId);
+            await read(agent(1), other);
+            const spy = linking(other);
+            expect((await actions.perform(linkAction(taskId, other, { approved: true, proposal: { source: 'mcp', edited: true } }))).auditId).toBeTruthy();
+            spy.mockRestore();
+            expect(await comment(agent(1), other, 'On the other one')).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+        });
     });
 
     it('of two agents changing one task at the same moment, one is told another agent is changing it', async () => {

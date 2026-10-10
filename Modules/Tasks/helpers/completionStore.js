@@ -40,18 +40,19 @@ const forStatusChange = async (companyId, taskId, { toStatus, actor, fromStatus 
     }
 };
 
-const save = async (companyId, taskId, completion) => MongoDbCrudOpration(companyId, {
+const save = async (companyId, taskId, completion, { touches = true } = {}) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.TASKS,
-    data: [{ _id: oid(taskId) }, { $set: { completion } }, { returnDocument: 'after' }],
+    data: [{ _id: oid(taskId) }, { $set: { completion } }, { returnDocument: 'after', ...(touches ? {} : { timestamps: false }) }],
 }, 'findOneAndUpdate');
 
-/* An agent (or person) touched the task through an action. Hours 0 unless given. */
+/* An agent (or person) touched the task through an action. Hours 0 unless given. Bookkeeping, not a change to the
+ * task, so the task's updatedAt stays that of the change itself. */
 const recordWork = async (companyId, taskId, entry) => {
     try {
         const { task, completion } = await current(companyId, taskId);
         if (!task) return null;
         const next = rules.addWork(completion, entry);
-        await save(companyId, taskId, next);
+        await save(companyId, taskId, next, { touches: false });
         return next;
     } catch (e) {
         logger.error(`completion.recordWork ${taskId}: ${e.message}`);

@@ -450,6 +450,18 @@ const waitingPlan = ({ companyId, actor, uid, task, changes, zone, approved, app
     return Object.keys(dated).length ? require('./waitingTasks').plan({ companyId, actor, uid, task, to: dated, zone, approved, applying }) : null;
 };
 
+const moveWaiting = async (companyId, who, waiting) => {
+    if (!waiting) return { shifted: [], answer: null };
+    if (!waiting.rows.length) return { shifted: [], answer: waiting.answer };
+    try {
+        await asRoute(companyId, who, 'bulkUpdateDates', { companyId: String(companyId), dates: waiting.rows, userData: {} });
+        return { shifted: waiting.before, answer: waiting.answer };
+    } catch (error) {
+        const { answer } = waiting;
+        return { shifted: [], answer: { ...answer, moved: [], notMoved: answer.moved.map((entry) => ({ taskId: entry.taskId, title: entry.title })), error: `The waiting tasks were not moved: ${error.message}` } };
+    }
+};
+
 /* The waiting tasks a task.edit waiting for approval would move once approved, for its card; nothing is counted or written. */
 const plannedMoves = async ({ companyId, actor, params }) => {
     const uid = personOf(actor);
@@ -509,16 +521,7 @@ const executors = {
             if (Object.keys(previous).length) await require('./undo').inverses.update(companyId, { taskId: idOf(task._id), previous }, actor).catch(() => null);
             throw error;
         }
-        let shifted = waiting && waiting.rows.length ? waiting.before : [];
-        let answer = waiting ? waiting.answer : null;
-        if (shifted.length) {
-            try {
-                await asRoute(companyId, who, 'bulkUpdateDates', { companyId: String(companyId), dates: waiting.rows, userData: {} });
-            } catch (error) {
-                answer = { ...answer, moved: [], notMoved: answer.moved.map((entry) => ({ taskId: entry.taskId, title: entry.title })), error: `The waiting tasks were not moved: ${error.message}` };
-                shifted = [];
-            }
-        }
+        const { shifted, answer } = await moveWaiting(companyId, who, waiting);
         const changed = changes.map((change) => change.name);
         return {
             result: { changed, ...(answer ? { waitingTasks: answer } : {}) },
@@ -614,4 +617,4 @@ const executors = {
     },
 };
 
-module.exports = { executors, plannedMoves, setArchived, setStatus, whoOf, zoneOf, asRoute, liveTask, storedProject, assignable, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };
+module.exports = { executors, plannedMoves, moveWaiting, personOf, setArchived, setStatus, whoOf, zoneOf, asRoute, liveTask, storedProject, assignable, LINK_KINDS, LINKS_MAX, PRIORITIES, ASSIGN_MODES, TITLE_MAX, DESCRIPTION_MAX, ESTIMATE_MAX_MINUTES, ASSIGNEES_MAX, SUBTASK_MOVES_WITH_PARENT, CANNOT_OPEN_PROJECT };

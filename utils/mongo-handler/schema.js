@@ -1184,6 +1184,7 @@ const schema = {
         at: { type: Date, required: false },
         until: { type: Date, required: false },
         seen: { type: Date, required: false },
+        listed: { type: Date, required: false },
         changed: { type: Array, default: undefined, required: false },
         rev: { type: Number, default: 0, required: false },
     },

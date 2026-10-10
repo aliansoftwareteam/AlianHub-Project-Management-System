@@ -9829,6 +9829,7 @@ export default {
         batch_assign_remove: "Remove {people}",
         batch_assign_none: "Nobody",
         line_batch_tasks: "Tasks",
+        line_moves_not_shown: "Also moves later",
         tasks_and_more: "and {n} more",
         tasks_not_shown: "{n} task you cannot open | {n} tasks you cannot open",
         tasks_show_all: "Show all {n} tasks",

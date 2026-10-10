@@ -442,7 +442,7 @@ Left out on purpose, with the reason:
 
 **Acceptance criteria**
 - [ ] `ai-benchmark.md` holds the 15 delegations and three reserves with sentence, start, end condition and counting rules.
-- [ ] A run is recorded with result, corrections, approvals, time and cost for every delegation, three runs each.
+- [x] A run is recorded with result, corrections, approvals, time and cost for every delegation, three runs each (`ai-1-run-2-results.md`, run 1's list of fifteen and its reserves).
 - [ ] The scorecard's AI row has a number and no longer reads "Not measured".
 - [ ] The replay test runs in CI with no model and fails when a seeded break is put in a tool.
 - [ ] Nothing the run made is deleted; everything is named `[AI bench] …` and listed at the end of the file.
