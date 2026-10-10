@@ -103,8 +103,8 @@ describe('moving a blocker later', () => {
         expect(datesOf(build)).toEqual(['2026-10-14', '2026-10-15']);
         expect(datesOf(ship)).toEqual(['2026-10-15', '2026-10-16']);
         expect(out.result.waitingTasks.moved).toEqual([
-            { taskId: String(build._id), title: 'Build', startDate: '2026-10-14T00:00:00.000Z', dueDate: '2026-10-15T00:00:00.000Z', workingDays: 2 },
-            { taskId: String(ship._id), title: 'Ship', startDate: '2026-10-15T00:00:00.000Z', dueDate: '2026-10-16T00:00:00.000Z', workingDays: 1 },
+            { taskId: String(build._id), title: 'Build', startDate: '2026-10-14', startDateWeekday: 'Wednesday', dueDate: '2026-10-15', dueDateWeekday: 'Thursday', workingDays: 2 },
+            { taskId: String(ship._id), title: 'Ship', startDate: '2026-10-15', startDateWeekday: 'Thursday', dueDate: '2026-10-16', dueDateWeekday: 'Friday', workingDays: 1 },
         ]);
         expect(out.result.waitingTasks.startTooEarly).toEqual([]);
     });
@@ -116,7 +116,7 @@ describe('moving a blocker later', () => {
         const gantt = shiftDependants(rows, links, String(design._id), { startDate: at('13'), DueDate: at('14') }, { workingDays: [1, 2, 3, 4, 5] });
         const out = await move(design, '2026-10-13', '2026-10-14');
         expect(out.result.waitingTasks.moved.map((row) => [row.startDate, row.dueDate]))
-            .toEqual(gantt.shifts.map((shift) => [shift.to.startDate.toISOString(), shift.to.DueDate.toISOString()]));
+            .toEqual(gantt.shifts.map((shift) => [shift.to.startDate.toISOString().slice(0, 10), shift.to.DueDate.toISOString().slice(0, 10)]));
         expect(stored(build._id).startDate).toEqual(stored(design._id).DueDate);
     });
 

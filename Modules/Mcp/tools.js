@@ -33,6 +33,7 @@ const argsSchema = require('./argsSchema');
 const { taskRow, planRow } = require('./taskRows');
 const { searchFilters } = require('./searchFilters');
 const { clientMessage } = require('./clientError');
+const dates = require('./dates');
 
 const str = (v, max = 500) => String(v === undefined || v === null ? '' : v).slice(0, max);
 const clampLimit = (v, def = 10, max = 50) => Math.min(Math.max(parseInt(v, 10) || def, 1), max);
@@ -112,7 +113,7 @@ const TOOLS = [
             const inList = workFlag.enabled() && named ? await workTools.listRows(ctx, vis, args.sprintId) : null;
             if (inList && inList.error) return { error: inList.error };
             if (planning) {
-                const more = manageTools.searchFilter(inList ? { ...args, sprintId: undefined } : args);
+                const more = manageTools.searchFilter(inList ? { ...args, sprintId: undefined } : args, await dates.zoneOf(ctx));
                 if (more.error) return { error: more.error };
                 // Added beside the caller's own clause: a filter on the same field must narrow it, never replace it.
                 filter.$and = [...(filter.$and || []), more.filter];
@@ -441,7 +442,7 @@ const runRead = async (ctx, tool, args) => {
 
 /* Run a tool for an MCP caller. Reads are authorised through the registry;
  * writes go through actions.perform, so they are audited and undoable. */
-const call = async (ctx, name, args = {}) => {
+const answerOf = async (ctx, name, args) => {
     if (sessionTools.owns(name)) return sessionTools.call(ctx, name, args);
     const tool = await resolved(ctx, name);
 
@@ -473,6 +474,8 @@ const call = async (ctx, name, args = {}) => {
     return { ok: true, auditId: out.auditId, result: out.result || null, undoable: Boolean(out.undo), ...(out.standing ? { standingApprovalId: out.standing.id } : {}) };
 };
 
+const call = async (ctx, name, args = {}) => dates.inZone(ctx, await answerOf(ctx, name, args));
+
 /* A read tool for the person's own session (the Ask box), which holds no token: what it answers is what a connection
  * of that person is shown, through the same registry, permission and visibility checks. */
 const readOwn = async (ctx, name, args = {}) => {
@@ -480,7 +483,7 @@ const readOwn = async (ctx, name, args = {}) => {
     if (sessionTools.owns(name) || !offered().some((t) => t.name === String(name) && t.run)) throw notReadable();
     const tool = await resolved(ctx, name);
     if (!tool.run) throw notReadable();
-    return runRead(ctx, tool, args);
+    return dates.inZone(ctx, await runRead(ctx, tool, args));
 };
 
 /* A write tool taken to the point where it is filed and no further, for a caller that is the person's own session and
@@ -523,7 +526,7 @@ const batchItem = async (ctx, operation) => {
     const name = String(operation.tool);
     if (!batchTool(ctx, operation)) return { ok: false, error: `${name} ${NOT_BATCHABLE}` };
     try {
-        return await call(ctx, name, operation.arguments);
+        return await answerOf(ctx, name, operation.arguments || {});
     } catch (error) {
         return outcomeOf(error);
     }

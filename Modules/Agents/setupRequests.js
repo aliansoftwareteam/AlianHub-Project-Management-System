@@ -1,4 +1,5 @@
 const { isDeepStrictEqual } = require('util');
+const { cleanViewSettings } = require('../Project/helpers/viewSettings');
 const { DateTime } = require('luxon');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
@@ -468,7 +469,6 @@ const tasksShownBy = (settings) => ({
 /* The project's own saved view of that kind that already shows what was named and nothing narrower: the same
  * tasks, and the same grouping when one is named. null when there is none, or the project lacks a status or a field named. */
 const savedViewShowing = async (companyId, project, kind, look) => {
-    const { cleanViewSettings } = require('../Project/helpers/viewSettings');
     const { isCopyable } = require('../Project/controller/viewSettings');
     const asked = lookOf(look);
     const wanted = await settingsFor(companyId, project, asked);
@@ -485,16 +485,80 @@ const addressOf = (companyId, made) => {
     return base ? `${base}/#/${encodeURIComponent(String(companyId))}/project/${made.projectId}/p?tab=${made.keyName}&view=${made.viewId}` : '';
 };
 
+const NAME_TAKEN = 409;
+const kindOf = (keyName) => Object.keys(VIEW_KINDS).find((kind) => VIEW_KINDS[kind] === keyName) || keyName || '';
+
+const titleOf = (view) => view.title || view.name || '';
+const isShared = (view) => Boolean(view && view.keyName) && view.viewStatus !== false && view.isPrivate !== true;
+
+const sharedViewNamed = (project, name) => {
+    const wanted = lower(viewNameOf(name));
+    if (!wanted) return null;
+    return viewsOf(project).find((view) => isShared(view) && lower(viewNameOf(titleOf(view))) === wanted) || null;
+};
+
+const viewInUse = (companyId, project, view) => {
+    const url = addressOf(companyId, { projectId: idOf(project._id), keyName: view.keyName, viewId: viewIdOf(view) });
+    const named = `This project already has a saved view named "${titleOf(view)}". Use that one${url ? ` (${url})` : ''}, or pick another name.`;
+    return { message: named, view: { viewId: viewIdOf(view), name: titleOf(view), kind: kindOf(view.keyName), ...(url ? { url } : {}) } };
+};
+
+const GROUP_NAMES = Object.freeze(Object.fromEntries(Object.entries(GROUPS).map(([name, value]) => [value, name])));
+const SORT_NAMES = Object.freeze(Object.fromEntries(Object.entries(SORTS).map(([name, field]) => [field, name])));
+const CUSTOM_GROUP = /^cf:([a-f0-9]{24})$/i;
+const CUSTOM_SORT = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
+
+const groupNameOf = (groupBy) => {
+    if (Object.hasOwn(GROUP_NAMES, groupBy)) return GROUP_NAMES[groupBy];
+    const field = CUSTOM_GROUP.exec(String(groupBy || ''));
+    return field ? `field:${field[1]}` : (groupBy === undefined || groupBy === null ? null : String(groupBy));
+};
+
+const sortOf = (sort) => {
+    if (!sort || !sort.field) return null;
+    const field = CUSTOM_SORT.exec(String(sort.field));
+    return { by: SORT_NAMES[sort.field] || (field ? `field:${field[1]}` : String(sort.field)), direction: Number(sort.dir) === -1 ? 'desc' : 'asc' };
+};
+
+const viewSummary = (companyId, project, view, isPrivate) => {
+    const held = cleanViewSettings(view.settings);
+    const url = addressOf(companyId, { projectId: idOf(project._id), keyName: view.keyName, viewId: viewIdOf(view) });
+    return {
+        viewId: viewIdOf(view),
+        name: titleOf(view),
+        kind: kindOf(view.keyName),
+        private: isPrivate,
+        default: view.setAsDefault === true,
+        groupBy: groupNameOf(held.groupBy),
+        sort: sortOf(held.sort),
+        mine: held.me === true,
+        filters: held.filters.map((row) => row.name.name || row.name.value),
+        ...(held.search ? { search: held.search } : {}),
+        ...(url ? { url } : {}),
+    };
+};
+
+const savedViews = (companyId, project, privateViews = []) => [
+    ...viewsOf(project).filter(isShared).map((view) => viewSummary(companyId, project, view, false)),
+    ...listOf(privateViews).filter((view) => view && view.keyName && idOf(view.projectId) === idOf(project._id)).map((view) => viewSummary(companyId, project, view, true)),
+];
+
 const createView = async ({ companyId, who, projectId, name, kind = 'list', look }) => {
     const project = await storedProject(companyId, projectId);
     const inProject = idOf(project._id);
     if (!Object.hasOwn(VIEW_KINDS, kind)) throw refuse(`The kind of view must be one of ${Object.keys(VIEW_KINDS).join(', ')}.`);
+    const named = sharedViewNamed(project, name);
+    if (named) throw refuse(viewInUse(companyId, project, named).message);
     const problem = lookProblem(look);
     if (problem) throw refuse(problem);
     const source = sourceView(project, kind);
     if (!source) throw refuse(noSource(kind));
     const fitted = await settingsFor(companyId, project, lookOf(look));
-    const answer = await answerOf('viewCreate', { companyId, who, params: { id: inProject }, body: { sourceViewId: viewIdOf(source), title: viewNameOf(name), settings: fitted.settings } });
+    const answer = await answerOf('viewCreate', { companyId, who, params: { id: inProject }, body: { sourceViewId: viewIdOf(source), title: viewNameOf(name), settings: fitted.settings, uniqueTitle: true } });
+    if (answer.code === NAME_TAKEN) {
+        const taken = sharedViewNamed(await storedProject(companyId, inProject), name);
+        throw refuse(taken ? viewInUse(companyId, project, taken).message : reasonOf(answer, 'A shared view by that name already exists.'));
+    }
     if (answer.code !== 200 || !answer.body || answer.body.status !== true) {
         throw Object.assign(refuse(reasonOf(answer, 'The view was not added. Try again, or tell the person.')), answer.code >= SERVER_FAULT ? { tryAgain: true } : {});
     }
@@ -545,6 +609,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
+    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing, sharedViewNamed, viewInUse, savedViews,
     FIELD_TYPES, CREATE_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };

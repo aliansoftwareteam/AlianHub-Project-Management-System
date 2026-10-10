@@ -70,13 +70,14 @@ Taking it back works at each level and takes effect on the app's next call: an o
 
 ## Every tool, by group
 
-80 tools in all. How to read the tables:
+81 tools in all. How to read the tables:
 
 - **Permission** is the scope an OAuth app needs. A personal token with the read scope holds every `*:read` scope, and one with the write scope holds every `*:write` scope, except the manage and chat permissions, which a token holds only as grants.
 - **What it does** says how a personal token's call ends with the settings at their defaults (`MCP_TOOLS_V2` off, a project on "Act on single tasks, propose anything wider"). A connected app's write that reaches past one task follows "What happens to a write", since `AGENT_TAINT_ROUTING` is on by default:
   - **Reads**: nothing changes.
   - **At once**: the change is made and recorded in the audit log. Where the result says `undoable: true`, a person can undo it.
   - **Waits**: the call changes nothing. It files a request in the AI Inbox, answers `pending: true` and a `proposalId`, and a person approves or declines it.
+- Dates in answers are in the person's time zone (UTC when none is set): a day such as `dueDate` or `startDate` is `YYYY-MM-DD` with its weekday beside it (`dueDateWeekday`), and a moment carries the person's offset; a timer's `startedAt` also has its weekday. Day arguments keep their `YYYY-MM-DD` form and are read in the person's time zone too: `dueFrom` and `dueTo` of `tasks.search`, `from` and `to` of `timesheet.read`, and `date` and `startTime` of `timelog.create`. A due date is stored as the moment that day began for the person who set it, so it shows as the day in the reader's own zone: a reader in a zone behind the setter's sees the day before, as the web app does.
 - A list tool takes `limit` and, with `MCP_TOOLS_V2` on, a `cursor`. Its page size is 25 unless noted, and at most 100.
 - Every write also takes an optional `reason` (at most 500 characters) that goes into the audit log.
 
@@ -102,7 +103,7 @@ Taking it back works at each level and takes effect on the app's next call: an o
 |---|---|---|---|
 | `performance.read` | `time:read` | Reads. Logged time, estimate against actual, velocity and cumulative flow | Up to 5 projects, a range of at most 120 days; needs `from` and `to` |
 
-### Data tools, `MCP_TOOLS_DATA` (21 tools)
+### Data tools, `MCP_TOOLS_DATA` (22 tools)
 
 | Tool | Permission | What it does | Limits |
 |---|---|---|---|
@@ -110,6 +111,7 @@ Taking it back works at each level and takes effect on the app's next call: an o
 | `project.get` | `projects:read` | Reads. One project: key, privacy, members, number of statuses | Needs `projectId` |
 | `sprints.list` | `projects:read` | Reads. The lists of one project. A private list is listed only for its people and for owners and admins | Needs `projectId` |
 | `statuses.list` | `projects:read` | Reads. A project's statuses in board order | Needs `projectId` |
+| `views.list` | `projects:read` | Reads. A project's saved views: the shared ones and your own private ones, with kind, grouping, sorting, filters and a link | Needs `projectId` |
 | `comments.list` | `tasks:read` | Reads. A task's comments, newest first | Needs `taskId` |
 | `pages.search` | `docs:read` | Reads. Docs you can open, by title | `query`, `projectId`, `limit` |
 | `page.get` | `docs:read` | Reads. One doc with its full text | Text up to 40000 characters |
@@ -311,7 +313,7 @@ With `MCP_TOOLS_WORK` on, it also takes `tag` (a tag id or name), `priority` (`U
 { "name": "task.links.list", "arguments": { "taskId": "<task id>" } }
 ```
 
-`projects.list`, `project.get`, `sprints.list`, `statuses.list`: the projects you can open, and a project's lists and statuses.
+`projects.list`, `project.get`, `sprints.list`, `statuses.list`, `views.list`: the projects you can open, and a project's lists, statuses and saved views.
 
 ```json
 { "name": "sprints.list", "arguments": { "projectId": "<project id>" } }
@@ -527,7 +529,7 @@ A rollup of a field that is not there or is not a number, and a formula that can
 - Approved, the fields are made first, then each value is set as `task.field.set` sets it, and only on a live task of the project that the person behind the token and the approver can both open and may both edit the fields of. A value that is not set does not stop the others: `values` in the result says, for each, `set` or the reason.
 - Undo puts each value back to what the task held, then takes the fields away as above. A value on a task the person undoing cannot open stays, and so does the field that holds it.
 
-`view.create`: add a saved view to one project. Arguments: `projectId`, `name`, `kind` (`list`, `board`, `table`, `calendar` or `workload`; a list when left out), and what the view shows: `groupBy` and `sortBy` (a built-in choice or the id of a custom field), `sortDirection`, `mine`, `assigneeIds`, `statuses` (by name), `priorities`, `search`, `subtasks`, `showFieldIds`, and a due date: `due` (`today`, `tomorrow`, `this_week`, `next_week`, `next_7_days`, `this_month` or `overdue`) or a range of days in `dueFrom` and `dueTo` (`YYYY-MM-DD`). The due date is stored as the row the task filter saves, so a span is counted from the day the view is opened, a day of a range is that day where the person looking is, and `overdue` is "due before today" whatever the status; add `statuses` to leave closed tasks out. The view starts as a copy of the project's view of that kind, as "duplicate view" does; a project with no view of that kind answers so at once. A status or a field the project does not have is left out, and the result's `leftOut` names the part. The result holds the view's web address when the server has one set.
+`view.create`: add a saved view to one project. Arguments: `projectId`, `name`, `kind` (`list`, `board`, `table`, `calendar` or `workload`; a list when left out), and what the view shows: `groupBy` and `sortBy` (a built-in choice or the id of a custom field), `sortDirection`, `mine`, `assigneeIds`, `statuses` (by name), `priorities`, `search`, `subtasks`, `showFieldIds`, and a due date: `due` (`today`, `tomorrow`, `this_week`, `next_week`, `next_7_days`, `this_month` or `overdue`) or a range of days in `dueFrom` and `dueTo` (`YYYY-MM-DD`). The due date is stored as the row the task filter saves, so a span is counted from the day the view is opened, a day of a range is that day where the person looking is, and `overdue` is "due before today" whatever the status; add `statuses` to leave closed tasks out. The view starts as a copy of the project's view of that kind, as "duplicate view" does; a project with no view of that kind answers so at once. A status or a field the project does not have is left out, and the result's `leftOut` names the part. A name the project already uses for a shared view, in any case, is refused at once with that view in `existing` (its id, name, kind and link), and nothing is filed: read `views.list` first. The result holds the view's web address when the server has one set.
 
 ```json
 { "name": "view.create", "arguments": { "projectId": "<project id>", "name": "My open work", "kind": "board", "groupBy": "priority", "mine": true } }

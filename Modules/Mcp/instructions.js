@@ -32,6 +32,7 @@ const findingYourWay = (has) => {
         has('sprints.list') ? '`sprints.list` shows its lists' : has('lists.list') && '`lists.list` shows its lists and folders',
         has('statuses.list') && '`statuses.list` shows its statuses',
         has('fields.list') && '`fields.list` shows its fields',
+        has('views.list') && '`views.list` its saved views',
         has('members.list') && '`members.list` shows its people',
     ].filter(Boolean);
     const docReads = [
@@ -77,7 +78,7 @@ const rules = (ctx, has, changes) => [
     changes
         ? '- Read before you write. Open the task or the project before you describe it or change it.'
         : '- Read before you answer. Open the task or the project before you describe it.',
-    '- Never guess a name, a person or an id. Look it up, and ask the person when more than one thing matches.',
+    '- Never guess a name, a person or an id. Look it up, and ask when more than one thing matches.',
     changes && '- Say what will change before you change it, and what changed afterwards.',
     '- Talk to the person in plain words. Use the names of things, and keep tool names and ids to yourself unless they ask.',
     changes && '- Every change you make is recorded as made by you for the person. The person can undo it in AlianHub, or is asked to approve it there before it happens. '
@@ -98,7 +99,7 @@ const limits = (changes) => [
     'What you cannot do here:',
     !changes && '- This connection only reads. To change something, the person does it in AlianHub, or connects you again and allows changes.',
     '- You cannot delete a task or a project, remove a person, or change permissions or billing. The person does these in AlianHub.',
-    '- When something needs a tool you do not have, say so, and tell the person where in AlianHub they can do it.',
+    '- When something needs a tool you lack, say so and tell the person where in AlianHub to do it.',
     '- You work only while the person has this conversation open. Nothing here runs by itself.',
 ].filter(Boolean);
 

@@ -102,6 +102,7 @@ const dayStart = (day, zone) => (DAY.test(String(day)) ? DateTime.fromISO(String
 const between = (path, from, until) => ({
     $or: [
         { [path]: { $type: 'date', ...(from ? { $gte: from.toJSDate() } : {}), ...(until ? { $lt: until.toJSDate() } : {}) } },
+        // Compares as text, so it assumes the Z-suffixed ISO strings agent writes store.
         { [path]: { $type: 'string', $gte: from ? from.toUTC().toISO() : '0', ...(until ? { $lt: until.toUTC().toISO() } : {}) } },
     ],
 });
@@ -173,4 +174,4 @@ const searchFilters = async (ctx, vis, args) => {
     return { clauses };
 };
 
-module.exports = { SEARCH_INPUT, searchFilters, PRIORITIES };
+module.exports = { SEARCH_INPUT, searchFilters, PRIORITIES, between };

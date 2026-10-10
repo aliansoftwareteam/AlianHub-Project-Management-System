@@ -1,3 +1,4 @@
+const { DateTime } = require('luxon');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const registry = require('../Agents/registry');
@@ -9,6 +10,7 @@ const { ownOrNotPersonal, isSomeoneElsesPersonalList } = require('../PersonalLis
 const v2 = require('./v2Flag');
 const cursor = require('./cursor');
 const names = require('./names');
+const dates = require('./dates');
 const { PAGE_TEXT_MAX, pageText } = require('./pageText');
 const { MENTIONS, REPLY_TO, replyParams } = require('./commentReply');
 const pageVersions = require('../Pages/helpers/pageVersions');
@@ -18,7 +20,6 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const DAY_SECONDS = 24 * 60 * 60;
 
 const isId = (v) => OBJECT_ID.test(String(v || ''));
 const idOf = (v) => (v === undefined || v === null ? '' : String(v));
@@ -137,13 +138,18 @@ const entryProjects = (ctx, vis, args, sheetVisible) => {
     return allowed;
 };
 
-const dayRange = (args) => {
+const dayStartSeconds = (day, zone, after = 0) => {
+    const start = DateTime.fromISO(day, { zone }).startOf('day');
+    return start.isValid && start.toISODate() === day ? start.plus({ days: after }).toSeconds() : NaN;
+};
+
+const dayRange = (args, zone) => {
     const from = args.from ? String(args.from) : '';
     const to = args.to ? String(args.to) : '';
     if ((from && !DAY.test(from)) || (to && !DAY.test(to))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     const range = {};
-    if (from) range.$gte = Date.parse(`${from}T00:00:00Z`) / 1000;
-    if (to) range.$lte = Date.parse(`${to}T00:00:00Z`) / 1000 + DAY_SECONDS - 1;
+    if (from) range.$gte = dayStartSeconds(from, zone);
+    if (to) range.$lt = dayStartSeconds(to, zone, 1);
     if (Object.values(range).some((v) => !Number.isFinite(v))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     return { range: Object.keys(range).length ? range : null };
 };
@@ -216,6 +222,22 @@ const TOOLS = [
             const out = { projectId: String(project._id), statuses: statusRows(project) };
             if (!v2.enabled()) return out;
             return { ...out, project: { id: out.projectId, name: project.ProjectName || null } };
+        },
+    },
+    {
+        name: 'views.list',
+        action: 'views.list',
+        description: 'Shows the saved views of a project that the person sees: the shared ones and their own private ones, each with its name, kind, grouping, sorting, filters and a link. '
+            + 'Read it before you add a view or tell the person a view does not exist. Changes nothing.',
+        input: { type: 'object', properties: PROJECT_ARG, required: ['projectId'] },
+        visibility: 'filtered',
+        readParams: projectParams,
+        run: async (ctx, args, vis) => {
+            const project = await loadProject(ctx, vis, args.projectId);
+            if (!project) return { ...NO_PROJECT };
+            const member = await findOne(ctx, SCHEMA_TYPE.COMPANY_USERS, { userId: String(ctx.userId) }, { ProjectRequiredComponent: 1 });
+            const views = require('../Agents/setupRequests').savedViews(ctx.companyId, project, member && member.ProjectRequiredComponent);
+            return { projectId: String(project._id), project: { id: String(project._id), name: project.ProjectName || null }, views };
         },
     },
     {
@@ -319,8 +341,8 @@ const TOOLS = [
             type: 'object',
             properties: {
                 userId: { type: 'string', description: 'Whose entries; the person\'s own when left out' },
-                from: { type: 'string', description: 'First day, YYYY-MM-DD (UTC)' },
-                to: { type: 'string', description: 'Last day, YYYY-MM-DD (UTC)' },
+                from: { type: 'string', description: 'First day, YYYY-MM-DD, in the person\'s time zone' },
+                to: { type: 'string', description: 'Last day, YYYY-MM-DD, in the person\'s time zone' },
                 ...PROJECT_ARG,
                 ...LIMIT,
             },
@@ -344,7 +366,7 @@ const TOOLS = [
                 sheetVisible = sheet.visible;
                 closedTasks = sheet.closedTasks || [];
             }
-            const { range, error } = dayRange(args);
+            const { range, error } = dayRange(args, await dates.zoneOf(ctx));
             if (error) return { error };
             const filter = { Loggeduser: target };
             const projects = entryProjects(ctx, vis, args, sheetVisible);
@@ -379,8 +401,8 @@ const TOOLS = [
             properties: {
                 taskId: { type: 'string' },
                 minutes: { type: 'integer', minimum: 1, maximum: 1440 },
-                date: { type: 'string', description: 'YYYY-MM-DD (UTC); today when left out' },
-                startTime: { type: 'string', description: 'HH:MM (UTC); 09:00 when left out' },
+                date: { type: 'string', description: 'YYYY-MM-DD, the person\'s own day; today when left out' },
+                startTime: { type: 'string', description: 'HH:MM in the person\'s time zone; 09:00 when left out' },
                 description: { type: 'string' },
                 billable: { type: 'boolean' },
             },
@@ -402,6 +424,7 @@ const SCOPES = Object.freeze({
     'project.get': 'projects:read',
     'sprints.list': 'projects:read',
     'statuses.list': 'projects:read',
+    'views.list': 'projects:read',
     'comments.list': 'tasks:read',
     'pages.search': 'docs:read',
     'page.get': 'docs:read',

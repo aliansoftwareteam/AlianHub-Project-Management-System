@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { DateTime } = require('luxon');
+const { zoneOfUser } = require('../Mcp/dates');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const socketEmitter = require('../../event/socketEventEmitter');
@@ -191,15 +192,17 @@ const CLOCK = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAX_LOG_MINUTES = 24 * 60;
 
 /* The entry the manual log form writes (Modules/LogTime manualLogtime), for the person behind the agent only. */
-const timelogEntry = (params) => {
+const timelogEntry = (params, zone = 'UTC') => {
     const minutes = Number(params.minutes);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > MAX_LOG_MINUTES) throw new tools.DeterministicError(`The time must be a whole number of minutes from 1 to ${MAX_LOG_MINUTES}.`);
-    const day = params.date ? String(params.date) : DateTime.utc().toISODate();
+    const day = params.date ? String(params.date) : DateTime.now().setZone(zone).toISODate();
     const clock = params.startTime ? String(params.startTime) : '09:00';
-    if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('The date must be written YYYY-MM-DD and the start time HH:MM (UTC).');
-    const start = DateTime.fromISO(`${day}T${clock}`, { zone: 'utc' });
+    if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('The date must be written YYYY-MM-DD and the start time HH:MM.');
+    const start = DateTime.fromISO(`${day}T${clock}`, { zone });
     if (!start.isValid || start.toISODate() !== day) throw new tools.DeterministicError(`${day} is not a real date.`);
-    if (start.startOf('day') > DateTime.utc().plus({ days: 1 }).startOf('day')) throw new tools.DeterministicError('Time cannot be logged on a day that has not come yet.');
+    const now = DateTime.now().setZone(zone);
+    if (start.startOf('day') > now.startOf('day')) throw new tools.DeterministicError('Time cannot be logged on a day that has not come yet.');
+    if (start > now) throw new tools.DeterministicError('Time cannot be logged from a start time that has not come yet.');
     return { start: Math.floor(start.toSeconds()), minutes };
 };
 
@@ -240,7 +243,7 @@ const executors = {
         const task = await tools.getTask(companyId, params.taskId);
         const userId = String(actor.userId || '');
         if (!OBJECT_ID.test(userId)) throw new tools.DeterministicError('Time can only be logged for a person. Ask the person to connect you again.');
-        const { start, minutes } = timelogEntry(params);
+        const { start, minutes } = timelogEntry(params, await zoneOfUser(companyId, userId));
         if (await isPeriodLocked({ companyId, userId, date: new Date(start * 1000) })) {
             throw new tools.DeterministicError('That day is in a timesheet period a person already approved, so no time can be added to it. Ask the person to have it reopened.');
         }

@@ -133,7 +133,13 @@ const LOOK = Object.freeze({
 const viewToStartFrom = async (ctx, args, vis) => {
     const kind = args.kind === undefined ? 'list' : String(args.kind);
     const project = await loadProject(ctx, vis, args.projectId);
-    if (project && !setup.sourceView(project, kind)) return { answer: { ok: false, error: setup.noSource(kind) } };
+    if (!project) return { args: { ...args, kind } };
+    const named = setup.sharedViewNamed(project, args.name);
+    if (named) {
+        const inUse = setup.viewInUse(ctx.companyId, project, named);
+        return { answer: { ok: false, error: inUse.message, existing: inUse.view } };
+    }
+    if (!setup.sourceView(project, kind)) return { answer: { ok: false, error: setup.noSource(kind) } };
     return { args: { ...args, kind } };
 };
 
@@ -296,6 +302,7 @@ const TOOLS = [
         description: `Adds a saved view to one project: a ${Object.keys(setup.VIEW_KINDS).join(', ')} view with its own name, grouping, sorting, filters and columns. `
             + 'Everyone on the project sees it. A status or a field the project does not have is left out, and the answer says which part. '
             + 'A list or table view totals each number column it shows, group by group. '
+            + 'Read views.list first: a name the project already uses for a shared view is refused, with the link to that view. '
             + `${WAITS} To only show the person a view that exists, give them a link with screen.link instead. ${ONE_PLAN}`,
         input: input({
             projectId: ID,

@@ -2486,6 +2486,7 @@ export default {
         project_get: "Read a project",
         sprints_list: "List a project's lists",
         statuses_list: "List a project's statuses",
+        views_list: "List a project's saved views",
         comments_list: "Read a task's comments",
         pages_search: "Search docs",
         page_get: "Read a doc",

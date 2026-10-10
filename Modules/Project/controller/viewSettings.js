@@ -71,6 +71,9 @@ exports.saveViewSettings = async (req, res) => {
     }
 };
 
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const sameTitle = (title) => new RegExp(`^\\s*${title.trim().split(/\s+/).map(escapeRegex).join('\\s+')}\\s*$`, 'i');
+
 const isCopyable = (view) => Boolean(view && view.keyName) && viewIdOf(view).length > EMBED_ID_LENGTH;
 
 exports.isCopyable = isCopyable;
@@ -136,14 +139,18 @@ exports.createView = async (req, res) => {
             createdAt: new Date(),
         };
 
+        const unique = body.uniqueTitle === true;
+        /* Checked in the write itself, so two approvals running at once cannot both add the name. */
+        const notTaken = unique ? { $nor: [{ ProjectRequiredComponent: { $elemMatch: { $or: [{ title: sameTitle(title) }, { title: { $in: [null, ''] }, name: sameTitle(title) }], isPrivate: { $ne: true }, viewStatus: { $ne: false } } } }] } : {};
         const updated = await MongoDbCrudOpration(context.companyId, {
             type: SCHEMA_TYPE.PROJECTS,
             data: [
-                { _id: new mongoose.Types.ObjectId(context.projectId) },
+                { _id: new mongoose.Types.ObjectId(context.projectId), ...notTaken },
                 { $push: { ProjectRequiredComponent: view } },
                 { returnDocument: 'after' },
             ],
         }, 'findOneAndUpdate');
+        if (!updated && unique) return refuse(res, 409, 'A shared view by that name already exists.');
         if (!updated) return refuse(res, 404, 'Project not found.');
 
         announce(context.companyId, updated, { ProjectRequiredComponent: 'add' });
