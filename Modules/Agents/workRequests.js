@@ -4,7 +4,7 @@ const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries'
 const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 const tools = require('../Automations/engine/tools');
 const permissions = require('./permissions');
-const { asRoute, liveTask, storedProject, whoOf } = require('./taskRequests');
+const { asRoute, liveTask, storedProject, whoOf, zoneOf, moveWaiting, personOf } = require('./taskRequests');
 const { runAs, byline } = require('./actingAgent');
 const { answerOf } = require('./pageRequests');
 const { RELATION_TYPE_LIST } = require('../Tasks/helpers/taskMongo/relationRules');
@@ -88,6 +88,34 @@ const linkTasks = ({ companyId, who, taskId, relatedTaskId, type }) => {
 const unlinkTasks = ({ companyId, who, taskId, relatedTaskId }) => withReason(() => asRoute(companyId, who, 'removeTaskRelation', {
     companyId: String(companyId), taskId: idOf(taskId), relatedTaskId: idOf(relatedTaskId),
 }));
+
+const orderOf = (taskId, relatedTaskId, type) => {
+    if (type === 'blocks') return { blockerId: idOf(taskId), waitingId: idOf(relatedTaskId) };
+    if (type === 'blocked_by') return { blockerId: idOf(relatedTaskId), waitingId: idOf(taskId) };
+    return null;
+};
+
+const MCP_PROPOSAL = 'mcp';
+
+/* What a link filed over MCP asks of the waiting task once approved, the blocker's dates having perhaps moved while
+ * it waited: when the blocker ends after the waiting task starts, that task and what waits on it move later, as a
+ * date move of the blocker would have moved them had the link been there first. The link is read onto the blocker,
+ * so the card can show the moves before it exists. */
+const linkPlan = async ({ companyId, actor, params, applying }) => {
+    const order = orderOf(params.taskId, params.relatedTaskId, idOf(params.type));
+    if (!order) return null;
+    const uid = personOf(actor);
+    const blocker = await liveTask(companyId, order.blockerId);
+    const relations = Array.isArray(blocker.relations) ? blocker.relations : [];
+    const present = relations.some((entry) => entry && entry.type === 'blocks' && idOf(entry.taskId) === order.waitingId);
+    const linked = present ? blocker : { ...blocker, relations: [...relations, { taskId: order.waitingId, type: 'blocks' }] };
+    return require('./waitingTasks').plan({ companyId, actor, uid, task: linked, to: {}, zone: await zoneOf(uid), approved: true, applying, linkedTo: order.waitingId });
+};
+
+const plannedLinkMoves = async ({ companyId, actor, params }) => {
+    const waiting = await linkPlan({ companyId, actor, params, applying: false });
+    return waiting ? waiting.answer.moved : [];
+};
 
 /* A task's links as the relations route answers them to `uid`, which leaves out whole a link to a task that
  * person cannot open; null where the route answers that there is no such task. */
@@ -278,15 +306,17 @@ const executors = {
         return setTag({ companyId, who: whoOf(actor, depth), taskId: params.taskId, tag: params.tag, operation: 'remove' });
     },
 
-    async 'task.relation.add'({ companyId, actor, params, depth }) {
+    async 'task.relation.add'({ companyId, actor, params, depth, proposal }) {
         const who = whoOf(actor, depth);
         const task = await liveTask(companyId, params.taskId);
         const relatedTaskId = await openRelated(companyId, actor, 'task.relation.add', params.relatedTaskId);
         const type = idOf(params.type);
         await linkTasks({ companyId, who, taskId: task._id, relatedTaskId, type });
+        const waiting = proposal && proposal.source === MCP_PROPOSAL ? await linkPlan({ companyId, actor, params: { taskId: idOf(task._id), relatedTaskId, type }, applying: true }) : null;
+        const { shifted, answer } = await moveWaiting(companyId, who, waiting);
         return {
-            result: { taskId: idOf(task._id), relatedTaskId, type },
-            undo: { kind: 'relation', taskId: idOf(task._id), relatedTaskId }, entityId: task._id, entityName: task.TaskName,
+            result: { taskId: idOf(task._id), relatedTaskId, type, ...(answer ? { waitingTasks: answer } : {}) },
+            undo: { kind: 'relation', taskId: idOf(task._id), relatedTaskId, ...(shifted.length ? { shifted } : {}) }, entityId: task._id, entityName: task.TaskName,
         };
     },
 
@@ -363,7 +393,7 @@ const executors = {
 };
 
 module.exports = {
-    executors, tagsOf, setTag, linkTasks, unlinkTasks, relationsOf, createList, renameList, moveList, withdrawList, pageCommentsOf, assignPageComment,
+    executors, plannedLinkMoves, tagsOf, setTag, linkTasks, unlinkTasks, relationsOf, createList, renameList, moveList, withdrawList, pageCommentsOf, assignPageComment,
     extraListsOf, setExtraList,
     RELATION_TYPE_LIST, LIST_NAME_MAX, COMMENT_MAX: MAX_MESSAGE_LENGTH, MAX_EXTRA_LISTS,
 };

@@ -556,8 +556,9 @@ const pauseOverProposal = async (companyId, actor, { action, params, approved, c
  * policy refusal leaves the same audit row as a registry one. `approved` is an
  * argument and never read from `params`, so only the approval of a proposal sets it; `approvedBy` is the person who
  * approved, for an executor that holds each of its parts to that person's rights too. `within` is what this call was
- * held to, for an executor that runs a part of its change as an action of its own. */
-const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false, approvedBy = '' }) => {
+ * held to, for an executor that runs a part of its change as an action of its own. `proposal` is the approved
+ * proposal's `{ source, edited }`, which a part of a plan does not carry. */
+const perform = async ({ companyId, actor, action, params = {}, reason = '', cost = null, ip = '', allowedActions, decision = null, depth = 0, taint = null, approved = false, approvedBy = '', proposal = null }) => {
     await liveStep(companyId, actor, { action, params, ip, taint });
     if (decision && decision.decision === 'refuse') throw await refusal(companyId, actor, { action, params, reason: decision.reason, ip, taint });
     const check = registry.evaluate(action, params, { allowedActions });
@@ -573,9 +574,9 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
     const exec = executors[action];
     if (!exec) throw new tools.DeterministicError(`${action} is not ready to be used yet, so nothing was changed.`);
 
-    const turn = await taskReads.turnFor({ companyId, actor, action, params, approved });
+    const turn = await taskReads.turnFor({ companyId, actor, action, params, approved, edited: Boolean(proposal && proposal.edited) });
     if (turn.refusal) throw await refusal(companyId, actor, { action, params, reason: turn.refusal, ip, taint });
-    let changed = false;
+    let changedAt = null;
     try {
         const standing = rule.standing || null;
         const auditId = await audit.openAction(companyId, actor, {
@@ -584,16 +585,16 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
         });
         let out;
         try {
-            out = await exec({ companyId, actor, params, depth: clampDepth(depth), approvedBy: approved ? String(approvedBy || '') : '', within: { allowedActions, ip, taint } });
+            out = await exec({ companyId, actor, params, depth: clampDepth(depth), approvedBy: approved ? String(approvedBy || '') : '', within: { allowedActions, ip, taint }, proposal: approved ? proposal : null });
         } catch (e) {
             await audit.failAction(companyId, auditId, e.message);
             throw e;
         }
-        changed = true;
         if (isAgent(actor) && params.taskId && !WRITES_OWN_COMPLETION.has(action)) {
             await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
         }
         await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });
+        changedAt = new Date();
         if (standing) {
             await require('./standingApprovals').recordUse(companyId, standing, { action, params, auditId, reason })
                 .catch((e) => logger.error(`[standing-approval] ${standing.id} applied ${action} (audit ${auditId}) but its use was not recorded: ${e.message}`));
@@ -601,7 +602,7 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
         if (!approved) changeNotice.announce(companyId, actor, auditId);
         return { result: out.result, auditId, undo: out.undo, task: out.task || null, ...(standing ? { standing } : {}) };
     } finally {
-        await turn.end(changed);
+        await turn.end(changedAt);
     }
 };
 

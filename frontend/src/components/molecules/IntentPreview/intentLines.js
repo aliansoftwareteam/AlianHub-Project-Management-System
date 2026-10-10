@@ -244,6 +244,10 @@ export const LINE_KINDS = {
             ...(rest.length ? { rest, restText: closed ? t('IntentPreview.tasks_not_shown', { n: closed }, closed) : '' } : {}),
         };
     },
+    movesNotShown: (t, line) => {
+        const count = countOf(line.count);
+        return count ? { label: t('IntentPreview.line_moves_not_shown'), text: t('IntentPreview.tasks_not_shown', { n: count }, count) } : null;
+    },
     ...AUTOMATION_LINE_KINDS,
     ...LIST_SETUP_LINE_KINDS,
     ...PROJECT_COPY_LINE_KINDS,
