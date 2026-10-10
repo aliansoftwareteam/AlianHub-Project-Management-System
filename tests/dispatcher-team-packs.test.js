@@ -572,6 +572,68 @@ describe('team pack starter rules and tags', () => {
             expect(await packs().tagsApproved(C, proposalId, { id: OWNER })).toEqual([{ id: expect.any(String), role: SUPPORT_LEAD, when: { tags: ['abc'] } }]);
         });
 
+        const packsOf = (project) => (store(SCHEMA_TYPE.ASSIGNMENT_RULES).find((row) => String(row.projectId) === String(project._id)) || {}).teamPacks || [];
+        const setTag = (project, tagsArray = [{ uid: 'abc', tagName: 'support' }]) => { store(SCHEMA_TYPE.PROJECTS).find((one) => String(one._id) === String(project._id)).tagsArray = tagsArray; };
+        const proposalRow = (proposalId) => store(SCHEMA_TYPE.AGENT_PROPOSALS).find((one) => String(one._id) === proposalId);
+
+        it('adds the rule while a pack change holds the lock, without waiting for it', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const { proposalId } = (await call('POST', PACKS, { body: support(project) })).body.data.projects[0];
+            proposalRow(proposalId).status = 'approved';
+            setTag(project);
+            const { withPackLock } = require('../Modules/AssignmentRules/dispatcher/packLock');
+            const made = await withPackLock(C, () => packs().tagsApproved(C, proposalId, { id: OWNER }));
+            expect(made).toEqual([{ id: expect.any(String), role: SUPPORT_LEAD, when: { tags: ['abc'] } }]);
+            expect(supportRules(project)).toEqual(made);
+            expect(recordAudit.mock.calls.map(([, entry]) => entry).find((entry) => entry.action === 'dispatcher.rule_added').meta)
+                .toEqual({ teamPackTags: proposalId, rules: 1, applies: [{ applyId: packsOf(project)[0].applyId, appliedBy: EDITOR }] });
+        });
+
+        it('records the waiting rule of a second apply that asks for starter rules after the first proposed the tags', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const first = await call('POST', PACKS, { body: { ...support(project), starterRules: false } });
+            const { proposalId } = first.body.data.projects[0];
+            expect(proposalId).toBeTruthy();
+            const second = await call('POST', PACKS, { body: support(project) });
+            expect(second.body.data.projects[0]).toMatchObject({ rules: [], rulesAwaitingTags: 1, proposalId: null });
+            expect(second.body.data.applyId).toBeTruthy();
+
+            await approve(proposalId);
+            expect(supportRules(project)).toEqual([{ id: expect.any(String), role: SUPPORT_LEAD, when: { tags: [String(tagIdOf(project, 'support'))] } }]);
+        });
+
+        it('keeps a rule waiting through a partial approval and adds it when the part left for later is approved', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const { proposalId } = (await call('POST', PACKS, { body: support(project) })).body.data.projects[0];
+            proposalRow(proposalId).status = 'edited';
+            setTag(project, [{ uid: 'xyz', tagName: 'something-else' }]);
+            expect(await packs().tagsApproved(C, proposalId, { id: OWNER })).toEqual([]);
+            expect(packsOf(project)[0].waitingRules).toHaveLength(1);
+
+            const split = mockDb.seed(SCHEMA_TYPE.AGENT_PROPOSALS, { projectId: String(project._id), agentId: 'team-pack', status: 'approved', splitFrom: proposalId, changes: [] });
+            setTag(project);
+            expect(await packs().tagsApproved(C, String(split._id), { id: OWNER })).toEqual([{ id: expect.any(String), role: SUPPORT_LEAD, when: { tags: ['abc'] } }]);
+            expect(packsOf(project)[0].waitingRules).toEqual([]);
+            expect(await packs().tagsApproved(C, String(split._id), { id: OWNER })).toEqual([]);
+        });
+
+        it('stops waiting on a tag approval an undo withdrew', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const first = await call('POST', PACKS, { body: support(project) });
+            await call('POST', PACKS, { body: support(project) });
+            expect(packsOf(project).map((entry) => entry.waitingRules.length)).toEqual([1, 1]);
+            await call('POST', PACKS, { body: { undo: true, ...support(project), applyId: first.body.data.applyId } });
+            expect(packsOf(project).map((entry) => entry.waitingRules)).toEqual([[]]);
+        });
+
         it('adds no rule for a role a person has turned off since the apply', async () => {
             seedRules(GRANTS);
             process.env.MCP_TOOLS_WORK = 'on';
@@ -596,6 +658,22 @@ describe('team pack starter rules and tags', () => {
             expect(dispatcherOf(project).mode).toBe('suggest');
             const undone = await undoOf(project, applied);
             expect(undone.body.data.projects[0]).toMatchObject({ mode: 'off', modeRestored: 'off' });
+            expect(dispatcherOf(project).mode).toBe('off');
+        });
+
+        it('keeps suggesting while a later pack remains, and turns off when the last is undone', async () => {
+            seedRules(GRANTS);
+            const project = seedProject();
+            const first = await applyPack([project]);
+            const second = await applyPack([project], { teams: ['design'] });
+            expect(second.body.data.projects[0]).toMatchObject({ mode: 'suggest', modeWas: null });
+
+            const undoneFirst = await undoOf(project, first);
+            expect(undoneFirst.body.data.projects[0]).toMatchObject({ mode: 'suggest', modeRestored: null });
+            expect(dispatcherOf(project).mode).toBe('suggest');
+
+            const undoneSecond = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['design'], projectIds: [idOf(project)], applyId: second.body.data.applyId } });
+            expect(undoneSecond.body.data.projects[0]).toMatchObject({ mode: 'off', modeRestored: 'off' });
             expect(dispatcherOf(project).mode).toBe('off');
         });
 

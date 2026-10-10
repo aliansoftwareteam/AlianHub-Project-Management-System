@@ -48,7 +48,7 @@ const serve = ({ on = true, refuse = null } = {}) => apiRequest.mockImplementati
         applied = body;
         return ok({ blueprint: body.blueprint, teams: body.teams, applyId: 'ap1', agents: { made: [], kept: [], widened: [] }, projects: [
             { projectId: 'p1', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', rules: body.starterRules ? [RULE] : [], skippedRules: 0, tags: ['bug', 'needs-triage'], proposalId: 'prop1' },
-            { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'off', rules: [], skippedRules: 1, rulesAwaitingTags: 2, tags: [], proposalId: null }
+            { projectId: 'p2', added: [TRIAGER.key, REVIEWER.key], mode: 'suggest', modeWas: 'off', rules: [], skippedRules: 1, rulesAwaitingTags: 2, tags: [], proposalId: null }
         ] });
     }
     return ok([]);
@@ -121,7 +121,7 @@ describe('Team packs', () => {
         const result = wrapper.find('[data-test="tp-result"]');
         expect(result.text()).toContain('Turned on 4 roles.');
         expect(result.text()).toContain('Mobile app: the dispatcher is in suggest mode.');
-        expect(result.text()).toContain('Website: the dispatcher is off in this project');
+        expect(result.text()).toContain('Website: the dispatcher is in suggest mode. Its dispatcher was off, so it now suggests a role; undo turns it off again.');
 
         await wrapper.find('[data-test="tp-undo"]').trigger('click');
         await flushPromises();
@@ -177,7 +177,7 @@ describe('Team packs', () => {
         apiRequest.mockImplementation((type, url, body) => {
             if (type === 'get') return ok({ on: true, packs: PACKS });
             if (body.undo) return ok({ projects: [], agents: { removed: [{ agentId: 'g1', name: 'Bug Triager · IT company' }], kept: [{ agentId: 'g2', name: 'Code Reviewer · IT company', why: 'has_worked' }, { agentId: 'g3', name: 'QA Engineer · IT company', why: 'running' }] } });
-            return ok({ blueprint: 'it-company', teams: ['engineering'], applyId: 'ap2', projects: [{ projectId: 'p1', added: [TRIAGER.key], mode: 'off' }], agents: { made: [{ agentId: 'g1', roleKey: TRIAGER.key, name: 'Bug Triager · IT company' }, { agentId: 'g2', roleKey: REVIEWER.key, name: 'Code Reviewer · IT company' }], kept: [] } });
+            return ok({ blueprint: 'it-company', teams: ['engineering'], applyId: 'ap2', projects: [{ projectId: 'p1', added: [TRIAGER.key], mode: 'suggest' }], agents: { made: [{ agentId: 'g1', roleKey: TRIAGER.key, name: 'Bug Triager · IT company' }, { agentId: 'g2', roleKey: REVIEWER.key, name: 'Code Reviewer · IT company' }], kept: [] } });
         });
         await wrapper.find('[data-test="tp-apply"]').trigger('click');
         await flushPromises();

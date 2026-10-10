@@ -13384,7 +13384,6 @@ export default {
         "rules_await_tags": "One starter rule waits for its tag to be approved; it is added when the tag is approved. | {n} starter rules wait for their tags to be approved; they are added when the tags are approved.",
         "tags_proposed": "Proposed one tag for approval: {names}. | Proposed {n} tags for approval: {names}.",
         "project_on": "{project}: the dispatcher is in {mode} mode.",
-        "project_off": "{project}: the dispatcher is off in this project, so the roles wait until someone switches it on in the project's settings.",
         "mode_suggest": "suggest",
         "mode_apply": "apply",
         "mode_switched": "Its dispatcher was off, so it now suggests a role; undo turns it off again.",

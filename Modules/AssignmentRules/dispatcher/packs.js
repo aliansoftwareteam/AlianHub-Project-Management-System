@@ -8,7 +8,7 @@ const { RuleError, plain } = require('../rules');
 const settings = require('./settings');
 const audit = require('./audit');
 const packAgents = require('./packAgents');
-const { withPackLock, BUSY } = require('./packLock');
+const { withPackLock } = require('./packLock');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const MAX_PROJECTS = 50;
@@ -215,11 +215,15 @@ const failedApply = (error, left) => {
 };
 
 const rowFilter = (projectId) => ({ projectId: String(projectId) });
+const updated = (result) => Boolean(result && (result.modifiedCount || result.nModified));
+const onEntry = (projectId, applyId, extra = {}) => ({ ...rowFilter(projectId), teamPacks: { $elemMatch: { applyId, ...extra } } });
+const entryNamed = (applyId) => ({ arrayFilters: [{ 'pack.applyId': applyId }] });
+const EVERY_ENTRY = Object.freeze({ arrayFilters: [{ 'pack.applyId': { $exists: true } }] });
 
 /* What an apply added is kept on each of its projects' rule rows, so an undo takes back that and never a list a client
  * sends. Only the last few applies per project are kept. */
 async function recordApply(companyId, { blueprint, projectIds, plans, agents, actorId }, written) {
-    const changed = plans.some((plan) => plan.body || plan.proposalId) || agents.made.length || agents.widened.length;
+    const changed = plans.some((plan) => plan.body || plan.proposalId || plan.waitingRules.length) || agents.made.length || agents.widened.length;
     if (!changed) return null;
     const applyId = new mongoose.Types.ObjectId().toString();
     const shared = {
@@ -251,9 +255,7 @@ async function recordApply(companyId, { blueprint, projectIds, plans, agents, ac
     return applyId;
 }
 
-/* A project whose dispatcher is off is switched to suggesting a role, never to assigning on its own, so the pack routes
- * work at once; the record keeps the old mode for undo. Everything is planned and checked before the first write, so a
- * pack lands whole or not at all. */
+/* An off dispatcher is switched to suggest, never apply, so the pack routes work at once; all is checked before any write. */
 async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
     const projectIds = projectIdsOf(body);
     const pack = rolesOfPack(body);
@@ -328,7 +330,10 @@ async function apply(companyId, body, actorId, { managesAgents = false } = {}) {
 const appliesOf = async (companyId, applyId) => ((await MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [{ teamPacks: { $elemMatch: { applyId } } }, { projectId: 1, teamPacks: 1 }],
 }, 'find')) || []).map((row) => (row && typeof row.toObject === 'function' ? row.toObject() : row))
-    .map((row) => ({ projectId: String(row.projectId), entry: (row.teamPacks || []).find((one) => one && one.applyId === applyId) }))
+    .map((row) => {
+        const others = (row.teamPacks || []).filter((one) => one && one.applyId !== applyId);
+        return { projectId: String(row.projectId), entry: (row.teamPacks || []).find((one) => one && one.applyId === applyId), heir: others[others.length - 1] || null };
+    })
     .filter((row) => row.entry);
 
 /* A rule a person has changed since the pack added it stays: it must match the recorded one by id and by content. */
@@ -348,17 +353,17 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     const widened = (record.agents && record.agents.widened) || [];
     if ((agentIds.length || widened.length) && !managesAgents) throw new RuleError(MANAGE_REFUSAL, 403);
     const plans = [];
-    for (const { projectId, entry } of applied) {
+    for (const { projectId, entry, heir } of applied) {
         const current = await settings.load(companyId, projectId);
         const removed = current.roles.filter((key) => (entry.roles || []).includes(key));
         const recorded = (entry.rules || []).filter((rule) => rule && rule.id);
         const droppedRules = current.rules.filter((rule) => recorded.some((one) => one.id === rule.id && sameRule(one, rule)));
         const left = current.rules.filter((rule) => !droppedRules.includes(rule));
-        const modeRestored = entry.modeWas && current.mode === ROUTING_ON ? entry.modeWas : null;
+        const modeRestored = entry.modeWas && !heir && current.mode === ROUTING_ON ? entry.modeWas : null;
         const mode = modeRestored || current.mode;
         const changed = removed.length || droppedRules.length || modeRestored;
         plans.push({
-            projectId, removed, rules: droppedRules, mode, modeRestored, proposalId: entry.proposalId,
+            projectId, removed, rules: droppedRules, mode, modeRestored, proposalId: entry.proposalId, heir: entry.modeWas ? heir : null, modeWas: entry.modeWas,
             body: changed ? bodyWith(current, current.roles.filter((key) => !removed.includes(key) && settings.roleOf(key)), left, mode) : null,
         });
     }
@@ -366,6 +371,16 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     const projects = [];
     for (const plan of plans) {
         const withdrawn = await withdrawProposal(companyId, plan.projectId, plan.proposalId).catch(() => false);
+        if (withdrawn) {
+            await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [rowFilter(plan.projectId), { $pull: { 'teamPacks.$[pack].waitingRules': { proposalId: String(plan.proposalId) } } }, EVERY_ENTRY],
+            }, 'updateOne');
+        }
+        if (plan.heir && !plan.heir.modeWas) {
+            await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [onEntry(plan.projectId, plan.heir.applyId), { $set: { 'teamPacks.$[pack].modeWas': plan.modeWas } }, entryNamed(plan.heir.applyId)],
+            }, 'updateOne');
+        }
         projects.push({ projectId: plan.projectId, removed: plan.removed, rules: plan.rules, mode: plan.mode, modeRestored: plan.modeRestored, tagsWithdrawn: withdrawn });
     }
     const agents = await packAgents.remove(companyId, pack.blueprint, agentIds, reached, actor);
@@ -377,10 +392,7 @@ async function undo(companyId, body, actor, { managesAgents = false } = {}) {
     return { blueprint: pack.blueprint, teams: pack.teams, projects, agents };
 }
 
-/* A tag rule waits in its apply's record for the tag approval it needs, or for the part of it a person left for later.
- * Once its tag exists the rule is added, if its role is still on, and recorded on the apply so undo takes it back; the
- * wait is cleared, so a second call adds nothing. The person who applied the pack chose the rules; the approver only
- * supplies the tags. */
+/* Lock-free, so an approval never waits on a pack change: each wait is claimed by pulling it, and only its claimer adds the rule. */
 async function tagsApproved(companyId, proposalId, actor) {
     const id = String(proposalId || '').trim().toLowerCase();
     if (!OBJECT_ID.test(id)) return [];
@@ -391,54 +403,53 @@ async function tagsApproved(companyId, proposalId, actor) {
     const awaited = [id, String(proposal.splitFrom || '')].filter(Boolean);
     const projectId = String(proposal.projectId);
     const row = plain(await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [rowFilter(projectId), { teamPacks: 1 }] }, 'findOne'));
-    const entries = ((row && row.teamPacks) || []).map(plain);
-    const waiting = entries.flatMap((entry) => (entry.waitingRules || []).filter((rule) => awaited.includes(rule.proposalId)).map((rule) => ({ applyId: entry.applyId, rule })));
+    const waiting = ((row && row.teamPacks) || []).map(plain)
+        .flatMap((entry) => (entry.waitingRules || []).filter((rule) => awaited.includes(rule.proposalId)).map((rule) => ({ entry, rule })));
     if (!waiting.length) return [];
     const project = await readProject(companyId, projectId);
+    const claimed = [];
+    for (const { entry, rule: { role, tag, proposalId: waitedOn } } of waiting) {
+        const when = conditionFor('tag', tag, project);
+        if (!when) continue;
+        const wait = { role, tag, proposalId: waitedOn };
+        const claim = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.ASSIGNMENT_RULES,
+            data: [onEntry(projectId, entry.applyId, { waitingRules: { $elemMatch: wait } }), { $pull: { 'teamPacks.$[pack].waitingRules': wait } }, entryNamed(entry.applyId)],
+        }, 'updateOne');
+        if (updated(claim)) claimed.push({ entry, role, when });
+    }
     const current = await settings.load(companyId, projectId);
     const made = [];
-    const byApply = new Map();
-    const settled = new Set();
-    waiting.forEach(({ applyId, rule: waited }) => {
-        const when = conditionFor('tag', waited.tag, project);
-        if (!when) return;
-        settled.add(waited);
-        if (!current.roles.includes(waited.role)) return;
-        const rule = { id: new mongoose.Types.ObjectId().toString(), ...cleanRule({ role: waited.role, when }) };
-        if ([...current.rules, ...made].some((one) => sameRule(one, rule))) return;
-        made.push(rule);
-        byApply.set(applyId, [...(byApply.get(applyId) || []), rule]);
+    claimed.forEach(({ entry, role, when }) => {
+        if (!current.roles.includes(role)) return;
+        const rule = { id: new mongoose.Types.ObjectId().toString(), ...cleanRule({ role, when }) };
+        if ([...current.rules, ...made.map((one) => one.rule)].some((one) => sameRule(one, rule))) return;
+        made.push({ entry, rule });
     });
-    if (!settled.size) return [];
-    if (made.length) await settings.save(companyId, projectId, bodyWith(current, current.roles, [...current.rules, ...made]), actor.id);
-    const teamPacks = entries.map((entry) => ({
-        ...entry,
-        rules: [...(entry.rules || []), ...(byApply.get(entry.applyId) || [])],
-        waitingRules: (entry.waitingRules || []).filter((rule) => !settled.has(rule)),
-    }));
-    await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [rowFilter(projectId), { $set: { teamPacks } }] }, 'updateOne');
-    if (made.length) audit.settingsChanged(companyId, actor, projectId, { teamPackTags: id, rules: made.length }, true);
-    return made;
-}
-
-const LOCK_TRIES = 3;
-const LOCK_WAIT_MS = 2000;
-
-/* An approval cannot be asked to try again later, so it waits briefly for a pack change in progress. */
-async function underLockWaiting(companyId, work) {
-    for (let attempt = 1; ; attempt += 1) {
-        try {
-            return await withPackLock(companyId, work);
-        } catch (error) {
-            if (attempt >= LOCK_TRIES || !error || error.message !== BUSY) throw error;
-            await new Promise((resolve) => { setTimeout(resolve, LOCK_WAIT_MS); });
-        }
+    if (!made.length) return [];
+    await settings.save(companyId, projectId, bodyWith(current, current.roles, [...current.rules, ...made.map((one) => one.rule)]), actor.id);
+    const orphans = [];
+    for (const { entry, rule } of made) {
+        const kept = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.ASSIGNMENT_RULES, data: [onEntry(projectId, entry.applyId), { $push: { 'teamPacks.$[pack].rules': rule } }, entryNamed(entry.applyId)],
+        }, 'updateOne');
+        if (!updated(kept)) orphans.push(rule.id);
     }
+    if (orphans.length) {
+        const now = await settings.load(companyId, projectId);
+        await settings.save(companyId, projectId, bodyWith(now, now.roles, now.rules.filter((rule) => !orphans.includes(rule.id))), actor.id);
+    }
+    const added = made.filter(({ rule }) => !orphans.includes(rule.id));
+    if (added.length) {
+        const applies = [...new Map(added.map(({ entry }) => [entry.applyId, { applyId: entry.applyId, appliedBy: entry.by }])).values()];
+        audit.settingsChanged(companyId, actor, projectId, { teamPackTags: id, rules: added.length, applies }, true);
+    }
+    return added.map(({ rule }) => rule);
 }
 
 module.exports = {
     MAX_PROJECTS, PACK_AGENT_ID: PACK_AGENT._id, packs, normaliseProjectIds,
-    tagsApproved: (companyId, ...rest) => underLockWaiting(companyId, () => tagsApproved(companyId, ...rest)),
+    tagsApproved,
     apply: (companyId, ...rest) => withPackLock(companyId, () => apply(companyId, ...rest)),
     undo: (companyId, ...rest) => withPackLock(companyId, () => undo(companyId, ...rest)),
 };

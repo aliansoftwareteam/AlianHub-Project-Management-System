@@ -50,7 +50,7 @@ export const packProjectLine = (t, project, name) => {
     const rules = (project.rules || []).length;
     const tags = project.tags || [];
     return [
-        project.mode === "off" ? t("TeamPacks.project_off", { project: name }) : t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) }),
+        t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) }),
         project.modeWas === "off" ? t("TeamPacks.mode_switched") : "",
         rules ? t("TeamPacks.rules_added", { n: rules }, rules) : "",
         project.skippedRules ? t("TeamPacks.rules_waiting", { n: project.skippedRules }, project.skippedRules) : "",
