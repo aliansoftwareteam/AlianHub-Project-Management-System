@@ -157,7 +157,7 @@ describe('Team packs', () => {
         expect(lines[0]).toContain('Proposed 2 tags for approval: bug, needs-triage.');
         expect(lines[1]).toContain('One starter rule waits for a tag or task type this project lacks.');
         expect(lines[1]).not.toContain('Proposed');
-        expect(lines[1]).toContain('2 starter rules wait for their tags to be approved; apply the pack again after the approval to add them.');
+        expect(lines[1]).toContain('2 starter rules wait for their tags to be approved; they are added when the tags are approved.');
         expect(lines[0]).not.toContain('to be approved');
     });
 

@@ -52,7 +52,8 @@ exports.applyPack = async (req, res) => {
         const agentAccess = require('../../Agents/access');
         const managesAgents = agentAccess.canManageAgents(await agentAccess.callerOf(req, companyId));
         const result = undone ? await packs.undo(companyId, body, actor, { managesAgents }) : await packs.apply(companyId, body, actor.id, { managesAgents });
-        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length));
+        const modeChanged = (project) => Boolean(undone ? project.modeRestored : project.modeWas);
+        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length) || modeChanged(project));
         const agentsChanged = undone ? result.agents.removed : result.agents.made;
         const agentsTouched = agentsChanged.length || (undone ? result.agents.narrowed : result.agents.widened).length;
         if (agentsTouched) {
@@ -67,6 +68,7 @@ exports.applyPack = async (req, res) => {
                     roles: undone ? project.removed : project.added,
                     rules: project.rules.length,
                     ...(undone ? {} : { tags: project.tags }),
+                    ...(modeChanged(project) ? { mode: project.mode } : {}),
                 })),
                 agents: { [undone ? 'removed' : 'created']: agentsChanged.map((agent) => agent.agentId), kept: result.agents.kept.map((agent) => agent.agentId), ...(undone ? { narrowed: result.agents.narrowed.map((agent) => agent.agentId) } : { widened: result.agents.widened.map((agent) => agent.agentId) }) },
             });

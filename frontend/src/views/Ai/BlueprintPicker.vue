@@ -77,7 +77,7 @@
                     <ul class="bp__list">
                         <li v-for="project in resultProjects" :key="project.projectId" class="ah-small" :data-mode="project.mode">{{ projectLine(project) }}</li>
                     </ul>
-                    <button v-if="!undone && addedCount" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="bp-undo" :disabled="busy" @click="undo">
+                    <button v-if="!undone && (addedCount || otherChanges)" type="button" class="ah-btn ah-btn--secondary ah-btn--sm" data-test="bp-undo" :disabled="busy" @click="undo">
                         {{ busy ? $t('TeamPacks.undoing') : $t('TeamPacks.undo') }}
                     </button>
                 </div>
@@ -93,7 +93,7 @@ import { useStore } from "vuex";
 import { refusalText } from "@/utils/assignmentRules";
 import { useCustomComposable } from "@/composable";
 import { isOwnerOrAdmin } from "@/utils/roles";
-import { applyStarterRoles, blueprintName, COMPANY_SIZES, fetchTeamPacks, teamName, undoStarterRoles } from "@/utils/dispatcher";
+import { applyStarterRoles, blueprintName, COMPANY_SIZES, fetchTeamPacks, packProjectLine, teamName, undoStarterRoles } from "@/utils/dispatcher";
 
 defineOptions({ name: "BlueprintPicker" });
 
@@ -137,18 +137,16 @@ const groups = computed(() => current.value?.packs || []);
 const startCount = computed(() => groups.value.reduce((sum, group) => sum + group.roles.length, 0));
 const resultProjects = computed(() => (results.value || []).flatMap((one) => one.projects));
 const addedCount = computed(() => resultProjects.value.reduce((sum, project) => sum + (project.added || []).length, 0));
+const otherChanges = computed(() => resultProjects.value.some((project) => (project.rules || []).length || (project.tags || []).length || project.modeWas));
 const projectName = (id) => (projects.value.find((p) => p.id === String(id)) || {}).name || id;
 
 const resultHead = computed(() => {
     if (undone.value) return t("TeamPacks.undone");
-    return addedCount.value ? t("TeamPacks.applied", { n: addedCount.value }, addedCount.value) : t("TeamPacks.nothing_new");
+    if (addedCount.value) return t("TeamPacks.applied", { n: addedCount.value }, addedCount.value);
+    return otherChanges.value ? t("TeamPacks.roles_were_on") : t("TeamPacks.nothing_new");
 });
 
-const projectLine = (project) => {
-    const name = projectName(project.projectId);
-    if (project.mode === "off") return t("TeamPacks.project_off", { project: name });
-    return t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) });
-};
+const projectLine = (project) => packProjectLine(t, project, projectName(project.projectId));
 
 const failText = (e, fallback) => (e?.response?.status === OFF ? t("TeamPacks.dispatcher_off") : refusalText(e, fallback));
 
