@@ -259,7 +259,7 @@ const TOOLS = [
         strict: true,
         filedUnder: GRANT,
         target: linkTarget,
-        description: 'Links a task to another task the person can open, at once. The type reads from the first task: it blocks, is blocked_by, duplicates, is duplicated_by or relates_to the other. The other task shows the matching link. One link per pair of tasks.',
+        description: 'Links a task to another task the person can open, at once. The type reads from the first task: it blocks, is blocked_by, duplicates, is duplicated_by or relates_to the other. The other task shows the matching link. One link per pair of tasks. A blocking link that waits for approval moves the waiting task later when approved, if the blocker ends after it starts.',
         input: input({ taskId: ID, relatedTaskId: ID, type: { type: 'string', enum: [...work.RELATION_TYPE_LIST] }, ...REASON }, ['taskId', 'relatedTaskId', 'type']),
         params: (args) => ({ taskId: str(args.taskId, 40), relatedTaskId: str(args.relatedTaskId, 40), type: str(args.type, 20) }),
     },

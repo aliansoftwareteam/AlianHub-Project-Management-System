@@ -86,6 +86,26 @@ const putBackValues = async (companyId, values, actor) => {
     return { restored, kept };
 };
 
+/* Waiting tasks a change moved go back, unless one was changed again since or the person undoing cannot open it. */
+const moveBack = async (companyId, shifted, actor) => {
+    const movedBack = [];
+    const leftAlone = [];
+    for (const row of Array.isArray(shifted) ? shifted : []) {
+        // eslint-disable-next-line no-await-in-loop
+        if (!actor || !(await taskReadable(companyId, actor.userId, row.taskId))) continue;
+        // eslint-disable-next-line no-await-in-loop
+        const now = await findRow(companyId, SCHEMA_TYPE.TASKS, row.taskId, { startDate: 1, DueDate: 1 });
+        if (!now || !sameInstant(now.startDate, row.movedStart) || !sameInstant(now.DueDate, row.movedDue)) { leftAlone.push(row.taskId); continue; }
+        // eslint-disable-next-line no-await-in-loop
+        await setTask(companyId, row.taskId, { startDate: row.startDate, DueDate: row.DueDate });
+        movedBack.push(row.taskId);
+    }
+    return {
+        ...(movedBack.length ? { movedBack } : {}),
+        ...(leftAlone.length ? { leftAlone, note: 'Some waiting tasks were changed again since, so their dates were left as they are now.' } : {}),
+    };
+};
+
 const inverses = {
     async comment(companyId, u) {
         await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.COMMENTS, data: [{ _id: oid(u.commentId) }, { $set: { isDeleted: true } }] }, 'updateOne');
@@ -104,21 +124,7 @@ const inverses = {
         const set = {}; const unset = {};
         Object.entries(u.previous || {}).forEach(([k, v]) => { if (v === null) unset[k] = 1; else set[k] = v; });
         await setTask(companyId, u.taskId, set, Object.keys(unset).length ? unset : undefined);
-        const shifted = Array.isArray(u.shifted) ? u.shifted : [];
-        const movedBack = [];
-        const leftAlone = [];
-        for (const row of shifted) {
-            if (!actor || !(await taskReadable(companyId, actor.userId, row.taskId))) continue;
-            const now = await findRow(companyId, SCHEMA_TYPE.TASKS, row.taskId, { startDate: 1, DueDate: 1 });
-            if (!now || !sameInstant(now.startDate, row.movedStart) || !sameInstant(now.DueDate, row.movedDue)) { leftAlone.push(row.taskId); continue; }
-            await setTask(companyId, row.taskId, { startDate: row.startDate, DueDate: row.DueDate });
-            movedBack.push(row.taskId);
-        }
-        return {
-            taskId: u.taskId, restored: Object.keys(u.previous || {}),
-            ...(movedBack.length ? { movedBack } : {}),
-            ...(leftAlone.length ? { leftAlone, note: 'Some waiting tasks were changed again since, so their dates were left as they are now.' } : {}),
-        };
+        return { taskId: u.taskId, restored: Object.keys(u.previous || {}), ...(await moveBack(companyId, u.shifted, actor)) };
     },
     async sprint(companyId, u) {
         const before = await findRow(companyId, SCHEMA_TYPE.TASKS, u.taskId, { ProjectID: 1, sprintId: 1 });
@@ -197,7 +203,7 @@ const inverses = {
     },
     async relation(companyId, u, actor) {
         await work().unlinkTasks({ companyId, who: undoer(actor), taskId: u.taskId, relatedTaskId: u.relatedTaskId });
-        return { taskId: u.taskId, unlinked: u.relatedTaskId };
+        return { taskId: u.taskId, unlinked: u.relatedTaskId, ...(await moveBack(companyId, u.shifted, actor)) };
     },
     async relationRemoved(companyId, u, actor) {
         await work().linkTasks({ companyId, who: undoer(actor), taskId: u.taskId, relatedTaskId: u.relatedTaskId, type: u.type });

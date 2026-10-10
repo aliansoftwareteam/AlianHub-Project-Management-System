@@ -471,15 +471,18 @@ const setFieldNames = async (companyId, changes, tasks) => {
 };
 
 const PENDING = 'pending';
+const LINK_ADD = 'task.relation.add';
 
 /* The tasks waiting on a task whose dates a pending change moves, as approving it would move them: worked out as the
  * person behind the token, inside the token's projects, and named only where this viewer can open them. */
 const waitingMovesOf = async (companyId, uid, proposal) => {
     if (proposal.status !== PENDING || proposal.source !== SOURCE_MCP) return [];
-    const dated = changesOf(proposal).filter((change) => EDITS.includes(change.action) && ['DueDate', 'startDate'].some((field) => Object.hasOwn(objectOf(paramsOf(change).fields), field)));
+    const datesMove = (change) => EDITS.includes(change.action) && ['DueDate', 'startDate'].some((field) => Object.hasOwn(objectOf(paramsOf(change).fields), field));
+    const dated = changesOf(proposal).filter((change) => datesMove(change) || change.action === LINK_ADD);
     if (!dated.length) return [];
     const actor = { kind: 'agent', userId: idOf(proposal.requestedBy), tokenId: idOf(proposal.tokenId) || null, ...(proposal.oauthClientId ? { clientId: idOf(proposal.oauthClientId) } : {}), viaAccount: 'personal' };
-    const planned = async () => (await Promise.all(dated.map((change) => require('./taskRequests').plannedMoves({ companyId, actor, params: paramsOf(change) }).catch(() => [])))).flat();
+    const movesOf = (change) => (change.action === LINK_ADD ? require('./workRequests').plannedLinkMoves : require('./taskRequests').plannedMoves);
+    const planned = async () => (await Promise.all(dated.map((change) => movesOf(change)({ companyId, actor, params: paramsOf(change) }).catch(() => [])))).flat();
     const moves = await require('../../Config/tokenNarrowing').runNarrowed({ userId: actor.userId, projectIds: listOf(proposal.tokenProjectIds) }, planned);
     if (!moves.length) return [];
     const seen = new Set(await readableTaskIds(companyId, uid, moves.map((move) => move.taskId)));

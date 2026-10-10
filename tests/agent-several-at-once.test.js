@@ -288,6 +288,40 @@ describe('changed since you read it', () => {
         expect((await actions.perform({ ...change, approved: true })).auditId).toBeTruthy();
     });
 
+    it('a task list the agent was shown counts as its read of each task on it', async () => {
+        const [{ taskId }] = await items(1);
+        await read(agent(1), taskId);
+        changedByAPerson(taskId);
+        expect(await rpc(agent(1), 'tasks.search', { query: taskRow(taskId).TaskName })).toMatchObject({ tasks: [expect.objectContaining({ taskId })] });
+        expect(await comment(agent(1), taskId)).toMatchObject({ ok: true });
+        changedByAPerson(taskId);
+        expect(await comment(agent(1), taskId, 'Again')).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+    });
+
+    it('a search leaves no read behind for a task the agent never read', async () => {
+        const [{ taskId }] = await items(1);
+        await rpc(agent(1), 'tasks.search', { query: taskRow(taskId).TaskName });
+        expect(rows(SCHEMA_TYPE.AGENT_WORK_MARKS).filter((row) => row.scope === `read:${taskId}`)).toHaveLength(0);
+    });
+
+    it('the agent\'s own change that a person approved does not hold its next one, and a change by someone else still does', async () => {
+        const [{ taskId }] = await items(1);
+        const change = { companyId: CID, action: 'task.comment', params: { taskId, body: 'Reviewed' }, actor: agent(1).actor };
+        await read(agent(1), taskId);
+        const apply = actions.executors['task.comment'];
+        const spy = jest.spyOn(actions.executors, 'task.comment').mockImplementation(async (args) => {
+            const out = await apply(args);
+            changedByAPerson(taskId);
+            return out;
+        });
+        expect((await actions.perform({ ...change, approved: true })).auditId).toBeTruthy();
+        spy.mockRestore();
+        expect(await comment(agent(1), taskId, 'Next')).toMatchObject({ ok: true });
+        changedByAPerson(taskId);
+        expect((await actions.perform({ ...change, approved: true })).auditId).toBeTruthy();
+        expect(await comment(agent(1), taskId, 'After a person')).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+    });
+
     it('of two agents changing one task at the same moment, one is told another agent is changing it', async () => {
         const [{ taskId }] = await items(1);
         await read(agent(1), taskId);
