@@ -590,11 +590,11 @@ const perform = async ({ companyId, actor, action, params = {}, reason = '', cos
             await audit.failAction(companyId, auditId, e.message);
             throw e;
         }
-        changedAt = new Date();
         if (isAgent(actor) && params.taskId && !WRITES_OWN_COMPLETION.has(action)) {
             await completionStore.recordWork(companyId, params.taskId, workEntry(actor, 0));
         }
         await audit.applyAction(companyId, auditId, { undo: out.undo, entityType: out.entityType || 'task', entityId: out.entityId, entityName: out.entityName });
+        changedAt = new Date();
         if (standing) {
             await require('./standingApprovals').recordUse(companyId, standing, { action, params, auditId, reason })
                 .catch((e) => logger.error(`[standing-approval] ${standing.id} applied ${action} (audit ${auditId}) but its use was not recorded: ${e.message}`));

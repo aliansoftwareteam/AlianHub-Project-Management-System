@@ -16,7 +16,7 @@ const TURN = 'turn';
 const TURN_MS = 60 * 1000;
 const NOT_A_TASK_CHANGE = new Set(['queue.claim', 'queue.release', 'tasks.batch']);
 const LIST_SAFE_ACTIONS = new Set(['task.comment', 'comment.create', 'task.status.set', 'task.status.change', 'task.link', 'task.relation.add', 'task.relation.remove', 'timelog.start', 'timelog.stop', 'timelog.create']);
-const LIST_SAFE_FIELDS = new Set(['Task_Priority', 'DueDate', 'startDate', 'totalEstimatedTime']);
+const LIST_SAFE_FIELDS = new Set(['Task_Priority', 'DueDate', 'totalEstimatedTime']);
 const LISTED_MAX = 100;
 
 const REFUSAL = Object.freeze({
@@ -85,7 +85,8 @@ const currentReads = async (companyId, reader, ids, safe) => {
 };
 
 /* After its own change a read that was current is kept current, at the level it had, as of what that change wrote: a
- * stamp later than the moment the change finished is someone else's, and leaves the read behind. */
+ * stamp later than the moment the change finished is someone else's, and leaves the read behind. This assumes the
+ * process that wrote the change stamps updatedAt from the same clock as `changedAt`. */
 const keepReads = (companyId, actor, kept, reader, changedAt) => Promise.all(kept.map(async ({ id, level }) => {
     const stamp = await stampOf(companyId, id);
     if (!stamp || time(stamp) > time(changedAt)) return;

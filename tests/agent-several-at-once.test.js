@@ -3,8 +3,19 @@
 process.env.STORAGE_TYPE = 'server';
 const mockDb = require('./fixtures/fakeMongo').create();
 
+/* With `mockStamping.on`, a task write stamps updatedAt as Mongoose timestamps do, unless it says timestamps: false. */
+const mockStamping = { on: false };
+const mockStamped = (q, method) => {
+    if (!mockStamping.on || q.type !== 'tasks' || !Array.isArray(q.data)) return q;
+    if (!['findOneAndUpdate', 'updateOne', 'updateMany'].includes(method)) return q;
+    const [filter, update, options] = q.data;
+    if ((options && options.timestamps === false) || !update || Array.isArray(update)) return q;
+    const operators = Object.keys(update).some((key) => key.startsWith('$'));
+    const stamped = operators ? { ...update, $set: { ...(update.$set || {}), updatedAt: new Date() } } : { ...update, updatedAt: new Date() };
+    return { ...q, data: [filter, stamped, ...q.data.slice(2)] };
+};
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
-    MongoDbCrudOpration: (companyId, q, method) => mockDb.crud(companyId, q, method),
+    MongoDbCrudOpration: (companyId, q, method) => mockDb.crud(companyId, mockStamped(q, method), method),
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0, flushAll: () => {} } }));
@@ -327,6 +338,31 @@ describe('changed since you read it', () => {
         await rpc(agent(1), 'tasks.search', { query: taskRow(taskId).TaskName });
         expect(await comment(agent(2), taskId)).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
         expect(await comment(agent(1), taskId)).toMatchObject({ ok: true });
+    });
+
+    describe('with task writes stamped as the database stamps them', () => {
+        beforeEach(() => { mockStamping.on = true; });
+        afterEach(() => { mockStamping.on = false; });
+
+        it('lets an agent comment twice after one read, its own bookkeeping leaving the task\'s stamp alone', async () => {
+            const [{ taskId }] = await items(1);
+            await read(agent(1), taskId);
+            const before = taskRow(taskId).updatedAt;
+            await require('../Modules/Tasks/helpers/completionStore').recordWork(CID, taskId, actions.workEntry(agent(1).actor, 0));
+            expect(taskRow(taskId).updatedAt).toEqual(before);
+            expect(await comment(agent(1), taskId, 'First')).toMatchObject({ ok: true });
+            expect(await comment(agent(1), taskId, 'Second')).toMatchObject({ ok: true });
+            expect(await rpc(agent(1), 'task.update', { taskId, priority: 'HIGH' })).toMatchObject({ ok: true });
+            expect(await comment(agent(1), taskId, 'Third')).toMatchObject({ ok: true });
+        });
+
+        it('still refuses the agent after a person changed the task between its writes', async () => {
+            const [{ taskId }] = await items(1);
+            await read(agent(1), taskId);
+            expect(await rpc(agent(1), 'task.update', { taskId, priority: 'HIGH' })).toMatchObject({ ok: true });
+            taskRow(taskId).updatedAt = new Date(Date.now() + 1000);
+            expect(await comment(agent(1), taskId, 'After a person')).toMatchObject({ refused: true, reason: taskReads.REFUSAL.CHANGED });
+        });
     });
 
     describe('after a change of its own that waited for approval', () => {
