@@ -49,3 +49,5 @@ Confirmed by the owner on 2026-10-08: "go with your recommendations". Decisions 
 
 ### 2026-10-10
 - Pack run 2, Manufacturing, on build 852 in Sweep Project W2d: see `pack-run-2-manufacturing-results.md`. The three starter roles (Order Intake, Non-conformance Recorder, Maintenance Planner) each worked a routed task through the owner's Claude and stopped where a person decides; about $8.12 on the owner's plan. Found: the blueprint picker's "Turn on 3 starter roles" sends no starter rules or tag proposals, so nothing matched and the lead routed by hand; a tag rule waits for a re-apply after its tag is approved; tasks made before the dispatcher is switched on are not routed; one connection holds one queue item across roles, so parallel role runs collide; a fresh project lacks the fields, tags and docs the Manufacturing playbooks expect.
+- Pack run 2 results merged (#1628, build 857). Its fixes: a blueprint pack brings its starter rules and tags and turns routing on, and settings changes check the revision (#1629, 858).
+- Local build: the Manufacturing pack on Sweep Project W2d with its 3 agents paused; the IT company pack on AlianHub Platform with 3 agents on.

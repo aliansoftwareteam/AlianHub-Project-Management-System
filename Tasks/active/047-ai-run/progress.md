@@ -368,3 +368,8 @@ Builds 813 to 815 reached `beta` between 2026-10-02 23:44 and 2026-10-04 11:09 I
 - Not done: a plan names one project (steps for a second are reported, not filed); no per-person time zone for "today" in the prompt (a due day is still read in the person's zone when the change runs).
 - Builds 836 to 852 (all 2026-10-09): agent comments show at once and count as unread (#1608, 838; #1610, 839), with an unread count on list rows (#1617, 844); MCP tool access follows the web app's rules (#1614, 841); the Ask box plans with the server model (#1611, 842); app connections and GitHub pull requests linked to tasks, its own main-menu item (#1607, 843); manager triage on a schedule (#1609, 846); GitHub one-click connect through GitHub sign-in (#1619, 847); MCP tools on by default for new installs (#1615, 848); a daily AI budget (#1618) and every server-key call counted, a failed budget read refusing (#1620, both in 849); the benchmark replay test, AI-1b (#1623, 850); `pull_request.get` over MCP (#1622, 851); the installable app shell (#1621, 852, replaces #1306).
 - Local build: daily AI budget $50, monthly $1,500; `APP_CONNECTIONS=on` in the owner's `.env`. GitHub one-click needs the owner's GitHub app keys (AP-506).
+
+### 2026-10-10
+- AI-1 run 2 on build 852, three runs each with the reserves: 15 of 15 pass (#1630, build 859).
+- Its fixes: fewer needless holds and conflicts on a person's own AI's writes (#1631, 860); day arguments read in the person's zone, view names kept unique, and a `views.list` tool (#1632, 861).
+- Open for the owner: whether creates from an outside AI should wait for approval. Default A: keep the hold.
