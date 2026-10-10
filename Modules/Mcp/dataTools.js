@@ -219,6 +219,22 @@ const TOOLS = [
         },
     },
     {
+        name: 'views.list',
+        action: 'views.list',
+        description: 'Shows the saved views of a project that the person sees: the shared ones and their own private ones, each with its name, kind, grouping, sorting, filters and a link. '
+            + 'Read it before you add a view or tell the person a view does not exist. Changes nothing.',
+        input: { type: 'object', properties: PROJECT_ARG, required: ['projectId'] },
+        visibility: 'filtered',
+        readParams: projectParams,
+        run: async (ctx, args, vis) => {
+            const project = await loadProject(ctx, vis, args.projectId);
+            if (!project) return { ...NO_PROJECT };
+            const member = await findOne(ctx, SCHEMA_TYPE.COMPANY_USERS, { userId: String(ctx.userId) }, { ProjectRequiredComponent: 1 });
+            const views = require('../Agents/setupRequests').savedViews(ctx.companyId, project, member && member.ProjectRequiredComponent);
+            return { projectId: String(project._id), project: { id: String(project._id), name: project.ProjectName || null }, views };
+        },
+    },
+    {
         name: 'comments.list',
         action: 'comments.list',
         description: 'Shows the comments on a task the person can open, newest first. Changes nothing.',
@@ -402,6 +418,7 @@ const SCOPES = Object.freeze({
     'project.get': 'projects:read',
     'sprints.list': 'projects:read',
     'statuses.list': 'projects:read',
+    'views.list': 'projects:read',
     'comments.list': 'tasks:read',
     'pages.search': 'docs:read',
     'page.get': 'docs:read',

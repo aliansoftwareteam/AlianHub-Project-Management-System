@@ -375,6 +375,7 @@
     "AgentActions.timesheet_week": "Read where the timesheet week stands",
     "AgentActions.timesheet_week_submit": "Send the timesheet week for approval",
     "AgentActions.view_create": "Add a saved view",
+    "AgentActions.views_list": "List a project's saved views",
     "AgentActions.workdays_get": "Read the working days",
     "AgentCatalogue.blocked_ai_fields": "Not available yet: needs AI fields.",
     "AgentCatalogue.blocked_doc_drafting": "Not available yet: needs a skill that drafts documents.",

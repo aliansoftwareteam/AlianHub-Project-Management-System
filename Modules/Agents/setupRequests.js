@@ -485,10 +485,70 @@ const addressOf = (companyId, made) => {
     return base ? `${base}/#/${encodeURIComponent(String(companyId))}/project/${made.projectId}/p?tab=${made.keyName}&view=${made.viewId}` : '';
 };
 
+const kindOf = (keyName) => Object.keys(VIEW_KINDS).find((kind) => VIEW_KINDS[kind] === keyName) || keyName || '';
+
+/* A view everyone on the project shares, under the same name once spaces and case are set aside. */
+const sharedViewNamed = (project, name) => {
+    const wanted = lower(viewNameOf(name));
+    if (!wanted) return null;
+    return viewsOf(project).find((view) => view && view.isPrivate !== true && lower(view.title || '') === wanted) || null;
+};
+
+const viewInUse = (companyId, project, view) => {
+    const url = addressOf(companyId, { projectId: idOf(project._id), keyName: view.keyName, viewId: viewIdOf(view) });
+    const named = `This project already has a saved view named "${view.title}". Use that one${url ? ` (${url})` : ''}, or pick another name.`;
+    return { message: named, view: { viewId: viewIdOf(view), name: view.title, kind: kindOf(view.keyName), ...(url ? { url } : {}) } };
+};
+
+const GROUP_NAMES = Object.freeze(Object.fromEntries(Object.entries(GROUPS).map(([name, value]) => [value, name])));
+const SORT_NAMES = Object.freeze(Object.fromEntries(Object.entries(SORTS).map(([name, field]) => [field, name])));
+const CUSTOM_GROUP = /^cf:([a-f0-9]{24})$/i;
+const CUSTOM_SORT = /^customField\.([a-f0-9]{24})\.fieldValue$/i;
+
+const groupNameOf = (groupBy) => {
+    if (Object.hasOwn(GROUP_NAMES, groupBy)) return GROUP_NAMES[groupBy];
+    const field = CUSTOM_GROUP.exec(String(groupBy || ''));
+    return field ? `field:${field[1]}` : (groupBy === undefined || groupBy === null ? null : String(groupBy));
+};
+
+const sortOf = (sort) => {
+    if (!sort || !sort.field) return null;
+    const field = CUSTOM_SORT.exec(String(sort.field));
+    return { by: SORT_NAMES[sort.field] || (field ? `field:${field[1]}` : String(sort.field)), direction: Number(sort.dir) === -1 ? 'desc' : 'asc' };
+};
+
+/* What a saved view shows, in the words view.create takes. */
+const viewSummary = (companyId, project, view, isPrivate) => {
+    const { cleanViewSettings } = require('../Project/helpers/viewSettings');
+    const held = cleanViewSettings(view.settings);
+    const url = addressOf(companyId, { projectId: idOf(project._id), keyName: view.keyName, viewId: viewIdOf(view) });
+    return {
+        viewId: viewIdOf(view),
+        name: view.title || view.name || '',
+        kind: kindOf(view.keyName),
+        private: isPrivate,
+        default: view.setAsDefault === true,
+        groupBy: groupNameOf(held.groupBy),
+        sort: sortOf(held.sort),
+        mine: held.me === true,
+        filters: held.filters.map((row) => row.name.name || row.name.value),
+        ...(held.search ? { search: held.search } : {}),
+        ...(url ? { url } : {}),
+    };
+};
+
+/* The project's saved views the person sees: the shared ones that are switched on and their own private ones. */
+const savedViews = (companyId, project, privateViews = []) => [
+    ...viewsOf(project).filter((view) => view && view.keyName && view.viewStatus !== false && view.isPrivate !== true).map((view) => viewSummary(companyId, project, view, false)),
+    ...listOf(privateViews).filter((view) => view && view.keyName && idOf(view.projectId) === idOf(project._id)).map((view) => viewSummary(companyId, project, view, true)),
+];
+
 const createView = async ({ companyId, who, projectId, name, kind = 'list', look }) => {
     const project = await storedProject(companyId, projectId);
     const inProject = idOf(project._id);
     if (!Object.hasOwn(VIEW_KINDS, kind)) throw refuse(`The kind of view must be one of ${Object.keys(VIEW_KINDS).join(', ')}.`);
+    const named = sharedViewNamed(project, name);
+    if (named) throw refuse(viewInUse(companyId, project, named).message);
     const problem = lookProblem(look);
     if (problem) throw refuse(problem);
     const source = sourceView(project, kind);
@@ -545,6 +605,6 @@ const executors = {
 };
 
 module.exports = {
-    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing,
+    executors, answerOf, reasonOf, lineOf, createFields, createView, withdrawFields, withdrawView, draftsOf, draftsProblem, draftsMisfit, valuesOf, valuesProblem, valuesMisfit, fieldChoice, lookOf, lookProblem, viewNameOf, viewIdOf, sourceView, noSource, savedViewShowing, sharedViewNamed, viewInUse, savedViews,
     FIELD_TYPES, CREATE_TYPES, FIELDS_MAX, FIELD_NAME_MAX, OPTIONS_MAX, OPTION_MAX, NOTE_MAX, VALUES_MAX, FIELD_SET, VIEW_KINDS, VIEW_NAME_MAX, GROUPS, SORTS, DIRECTIONS, PRIORITIES, SUBTASKS, LOOK_MAX, DUE,
 };
