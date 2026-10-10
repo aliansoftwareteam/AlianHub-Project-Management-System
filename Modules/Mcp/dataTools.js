@@ -20,7 +20,6 @@ const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
 
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
-const DAY_SECONDS = 24 * 60 * 60;
 
 const isId = (v) => OBJECT_ID.test(String(v || ''));
 const idOf = (v) => (v === undefined || v === null ? '' : String(v));
@@ -139,9 +138,9 @@ const entryProjects = (ctx, vis, args, sheetVisible) => {
     return allowed;
 };
 
-const dayStartSeconds = (day, zone) => {
+const dayStartSeconds = (day, zone, after = 0) => {
     const start = DateTime.fromISO(day, { zone }).startOf('day');
-    return start.isValid && start.toISODate() === day ? start.toSeconds() : NaN;
+    return start.isValid && start.toISODate() === day ? start.plus({ days: after }).toSeconds() : NaN;
 };
 
 const dayRange = (args, zone) => {
@@ -150,7 +149,7 @@ const dayRange = (args, zone) => {
     if ((from && !DAY.test(from)) || (to && !DAY.test(to))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     const range = {};
     if (from) range.$gte = dayStartSeconds(from, zone);
-    if (to) range.$lt = dayStartSeconds(to, zone) + DAY_SECONDS;
+    if (to) range.$lt = dayStartSeconds(to, zone, 1);
     if (Object.values(range).some((v) => !Number.isFinite(v))) return { error: 'The first and the last day must be written YYYY-MM-DD.' };
     return { range: Object.keys(range).length ? range : null };
 };

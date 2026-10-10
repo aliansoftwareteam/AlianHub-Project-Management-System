@@ -121,6 +121,9 @@ describe('a day reads as the person\'s own calendar day', () => {
         expect(out).toMatchObject({ ok: true });
         const [entry] = rows(SCHEMA_TYPE.TIMESHEET);
         expect(entry.LogStartTime).toBe(Date.parse('2026-10-10T19:30:00Z') / 1000);
+        expect(await rpc(ctx(INSIDER), 'timelog.create', { taskId: T_OPEN, minutes: 30, date: '2026-10-12' })).toMatchObject({ isError: true, error: expect.stringMatching(/day that has not come yet/) });
+        expect(await rpc(ctx(INSIDER), 'timelog.create', { taskId: T_OPEN, minutes: 30, date: '2026-10-11', startTime: '20:00' })).toMatchObject({ isError: true, error: expect.stringMatching(/start time that has not come yet/) });
+        expect(rows(SCHEMA_TYPE.TIMESHEET)).toHaveLength(1);
     });
 
     it('answers the day in UTC for a person with no time zone stored', async () => {

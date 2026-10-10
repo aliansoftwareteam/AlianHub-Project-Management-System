@@ -401,4 +401,27 @@ describe('timesheet.read reads its days in the person\'s time zone', () => {
         expect(out.entries.find((e) => e.timesheetId === late._id)).toMatchObject({ startedAt: '2026-09-03T01:30:00.000+05:30', startedAtWeekday: 'Thursday' });
         expect((await call('timesheet.read', { from: '2026-09-02', to: '2026-09-02' })).entries.map((e) => e.timesheetId)).toEqual([fx.myC._id]);
     });
+
+    const at = (iso) => mockDb.seed(SCHEMA_TYPE.TIMESHEET, {
+        Loggeduser: ME, ProjectId: P_A, TicketID: fx.tA._id, LogStartTime: Date.parse(iso) / 1000, LogEndTime: Date.parse(iso) / 1000 + 600,
+        LogTimeDuration: 10, LogDescription: iso, logAddType: 0, billable: true,
+    });
+
+    it('keeps the last hour of a day the clocks go back, in New York', async () => {
+        mockDb.seed(SCHEMA_TYPE.USERS, { _id: ME, Time_Zone: 'America/New_York' });
+        const lastHour = at('2026-11-02T04:30:00Z');
+        const nextDay = at('2026-11-02T05:30:00Z');
+        const ids = (await call('timesheet.read', { from: '2026-11-01', to: '2026-11-01' })).entries.map((e) => e.timesheetId);
+        expect(ids).toContain(lastHour._id);
+        expect(ids).not.toContain(nextDay._id);
+    });
+
+    it('takes no hour of the next day on a day the clocks go forward, in New York', async () => {
+        mockDb.seed(SCHEMA_TYPE.USERS, { _id: ME, Time_Zone: 'America/New_York' });
+        const lastHour = at('2026-03-09T03:30:00Z');
+        const nextDay = at('2026-03-09T04:30:00Z');
+        const ids = (await call('timesheet.read', { from: '2026-03-08', to: '2026-03-08' })).entries.map((e) => e.timesheetId);
+        expect(ids).toContain(lastHour._id);
+        expect(ids).not.toContain(nextDay._id);
+    });
 });

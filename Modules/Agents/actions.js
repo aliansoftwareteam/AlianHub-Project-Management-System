@@ -200,7 +200,9 @@ const timelogEntry = (params, zone = 'UTC') => {
     if (!DAY.test(day) || !CLOCK.test(clock)) throw new tools.DeterministicError('The date must be written YYYY-MM-DD and the start time HH:MM.');
     const start = DateTime.fromISO(`${day}T${clock}`, { zone });
     if (!start.isValid || start.toISODate() !== day) throw new tools.DeterministicError(`${day} is not a real date.`);
-    if (start.startOf('day') > DateTime.now().setZone(zone).plus({ days: 1 }).startOf('day')) throw new tools.DeterministicError('Time cannot be logged on a day that has not come yet.');
+    const now = DateTime.now().setZone(zone);
+    if (start.startOf('day') > now.startOf('day')) throw new tools.DeterministicError('Time cannot be logged on a day that has not come yet.');
+    if (start > now) throw new tools.DeterministicError('Time cannot be logged from a start time that has not come yet.');
     return { start: Math.floor(start.toSeconds()), minutes };
 };
 

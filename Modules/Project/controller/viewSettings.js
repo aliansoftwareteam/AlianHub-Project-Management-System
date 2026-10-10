@@ -141,7 +141,7 @@ exports.createView = async (req, res) => {
 
         const unique = body.uniqueTitle === true;
         /* Checked in the write itself, so two approvals running at once cannot both add the name. */
-        const notTaken = unique ? { $nor: [{ ProjectRequiredComponent: { $elemMatch: { title: sameTitle(title), isPrivate: { $ne: true }, viewStatus: { $ne: false } } } }] } : {};
+        const notTaken = unique ? { $nor: [{ ProjectRequiredComponent: { $elemMatch: { $or: [{ title: sameTitle(title) }, { title: { $in: [null, ''] }, name: sameTitle(title) }], isPrivate: { $ne: true }, viewStatus: { $ne: false } } } }] } : {};
         const updated = await MongoDbCrudOpration(context.companyId, {
             type: SCHEMA_TYPE.PROJECTS,
             data: [
