@@ -29,7 +29,7 @@ const SETTINGS = '/api/v2/assignment-rules/dispatcher/project/:projectId';
 const TRIAGER = 'it-company/bug-triager';
 const DESIGN_LEAD = 'it-company/design-lead';
 
-const NOTHING_ELSE = { rules: [], skippedRules: 0, rulesAwaitingTags: 0, tags: [], proposalId: null };
+const NOTHING_ELSE = { modeWas: null, rules: [], skippedRules: 0, rulesAwaitingTags: 0, tags: [], proposalId: null };
 
 const oid = () => new mongoose.Types.ObjectId().toString();
 const engineering = playbooks.all().filter((role) => role.blueprint === 'it-company' && role.team === 'engineering').map((role) => `${role.blueprint}/${role.slug}`);
@@ -121,7 +121,7 @@ describe('team packs', () => {
         expect(res.body.data.packs.find((pack) => pack.blueprint === 'manufacturing')).toBeTruthy();
     });
 
-    it('turns the pack\'s roles on in every project, keeps the mode, clears the cache, announces it and logs one row', async () => {
+    it('turns the pack\'s roles on in every project, keeps a mode that is on and turns an off one to suggest, clears the cache, announces it and logs one row', async () => {
         seedRules(GRANTS);
         const live = seedProject();
         const quiet = seedProject();
@@ -133,15 +133,15 @@ describe('team packs', () => {
         expect(res.statusCode).toBe(200);
         expect(res.body.data.projects).toEqual([
             { ...NOTHING_ELSE, projectId: String(live._id), added: engineering, mode: 'suggest' },
-            { ...NOTHING_ELSE, projectId: String(quiet._id), added: engineering, mode: 'off' },
+            { ...NOTHING_ELSE, projectId: String(quiet._id), added: engineering, mode: 'suggest', modeWas: 'off' },
         ]);
         expect(dispatcherOf(live)).toMatchObject({ mode: 'suggest', roles: [DESIGN_LEAD, ...engineering] });
-        expect(dispatcherOf(quiet)).toMatchObject({ mode: 'off', roles: engineering });
+        expect(dispatcherOf(quiet)).toMatchObject({ mode: 'suggest', roles: engineering });
         expect(removeCache).toHaveBeenCalledWith(`assignmentRules:${C}:${live._id}`);
         expect(emitted.filter((e) => e.module === 'dispatcherSettings' && e.companyId === C)).toHaveLength(2);
         expect(audited()).toEqual([expect.objectContaining({
             companyId: C, actorId: EDITOR, action: 'dispatcher.pack_applied', entityType: 'team_pack',
-            meta: { blueprint: 'it-company', teams: ['engineering'], projects: [{ projectId: String(live._id), roles: engineering, rules: 0, tags: [] }, { projectId: String(quiet._id), roles: engineering, rules: 0, tags: [] }], agents: { created: [], kept: [], widened: [] } },
+            meta: { blueprint: 'it-company', teams: ['engineering'], projects: [{ projectId: String(live._id), roles: engineering, rules: 0, tags: [] }, { projectId: String(quiet._id), roles: engineering, rules: 0, tags: [], mode: 'suggest' }], agents: { created: [], kept: [], widened: [] } },
         })]);
         expect(new Set(mockDb.calls.map((c) => c.companyId).filter((id) => id !== dbCollections.GLOBAL))).toEqual(new Set([C]));
     });
@@ -154,7 +154,7 @@ describe('team packs', () => {
         recordAudit.mockClear();
 
         const again = await applyPack([project]);
-        expect(again.body.data.projects).toEqual([{ ...NOTHING_ELSE, projectId: String(project._id), added: [], mode: 'off' }]);
+        expect(again.body.data.projects).toEqual([{ ...NOTHING_ELSE, projectId: String(project._id), added: [], mode: 'suggest' }]);
         expect(dispatcherOf(project).revision).toBe(revision);
         expect(audited()).toEqual([]);
     });
@@ -169,7 +169,7 @@ describe('team packs', () => {
         recordAudit.mockClear();
 
         const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: [String(project._id)], applyId: applied.body.data.applyId } });
-        expect(res.body.data.projects).toEqual([{ projectId: String(project._id), removed: added, rules: [], mode: 'apply', tagsWithdrawn: false }]);
+        expect(res.body.data.projects).toEqual([{ projectId: String(project._id), removed: added, rules: [], mode: 'apply', modeRestored: null, tagsWithdrawn: false }]);
         expect(dispatcherOf(project)).toMatchObject({ mode: 'apply', roles: [DESIGN_LEAD, TRIAGER] });
         expect(audited()).toEqual([expect.objectContaining({ action: 'dispatcher.pack_undone', meta: expect.objectContaining({ projects: [{ projectId: String(project._id), roles: added, rules: 0 }] }) })]);
     });
@@ -223,7 +223,7 @@ describe('team packs', () => {
         recordAudit.mockClear();
         const id = String(project._id);
         const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['design'], projectIds: [id], applyId: applied.body.data.applyId, roles: { [id]: [TRIAGER] } } });
-        expect(res.body.data.projects).toEqual([{ projectId: id, removed: applied.body.data.projects[0].added, rules: [], mode: 'suggest', tagsWithdrawn: false }]);
+        expect(res.body.data.projects).toEqual([{ projectId: id, removed: applied.body.data.projects[0].added, rules: [], mode: 'suggest', modeRestored: null, tagsWithdrawn: false }]);
         expect(dispatcherOf(project).roles).toEqual([TRIAGER]);
         expect(audited()).toEqual([expect.objectContaining({ action: 'dispatcher.pack_undone', entityId: 'it-company', meta: expect.objectContaining({ blueprint: 'it-company', teams: ['design'] }) })]);
 
@@ -287,7 +287,7 @@ describe('team packs', () => {
         expect((await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering'], projectIds: ['nope'] } })).statusCode).toBe(400);
         expect(dispatcherOf(project)).toBeUndefined();
     });
-    it('turns on only the roles named in only, for a company blueprint\'s first three, and leaves a project\'s mode as it is', async () => {
+    it('turns on only the roles named in only, for a company blueprint\'s first three, and turns only an off project to suggest', async () => {
         seedRules(GRANTS);
         const quiet = seedProject();
         const live = seedProject();
@@ -299,8 +299,8 @@ describe('team packs', () => {
             expect(project.added).toHaveLength(3);
             expect(project.added).toEqual(expect.arrayContaining(first));
         });
-        expect(res.body.data.projects.map((project) => project.mode)).toEqual(['off', 'suggest']);
-        expect(dispatcherOf(quiet).mode).toBe('off');
+        expect(res.body.data.projects.map((project) => [project.mode, project.modeWas])).toEqual([['suggest', 'off'], ['suggest', null]]);
+        expect(dispatcherOf(quiet).mode).toBe('suggest');
         expect(dispatcherOf(live).mode).toBe('suggest');
     });
 
@@ -341,7 +341,7 @@ describe('team pack starter rules and tags', () => {
         expect(res.statusCode).toBe(200);
         expect(res.body.data.projects[0].rules).toEqual([{ id: expect.stringMatching(/^[a-f0-9]{24}$/), ...triagerRule() }]);
         expect(dispatcherOf(project)).toMatchObject({ roles: engineering, rules: [{ id: res.body.data.projects[0].rules[0].id, ...triagerRule() }], revision: 1 });
-        expect(audited()[0].meta.projects).toEqual([{ projectId: String(project._id), roles: engineering, rules: 1, tags: [] }]);
+        expect(audited()[0].meta.projects).toEqual([{ projectId: String(project._id), roles: engineering, rules: 1, tags: [], mode: 'suggest' }]);
     });
 
     it('leaves the rules alone unless they are asked for', async () => {
@@ -511,5 +511,370 @@ describe('team pack starter rules and tags', () => {
         const res = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: [id], applyId: applied.body.data.applyId } });
         expect(res.body.data.projects[0].tagsWithdrawn).toBe(true);
         expect(pending()[0].status).toBe('declined');
+    });
+
+    describe('when the pack\'s tags are approved', () => {
+        const SUPPORT_LEAD = 'it-company/support-lead';
+        const support = (project) => ({ blueprint: 'it-company', teams: ['support'], projectIds: [String(project._id)], starterRules: true, proposeTags: true });
+        const approve = (proposalId) => require('../Modules/Agents/proposals').approve(C, proposalId, { decider: { kind: 'human', userId: OWNER, personName: 'Olive' }, isPrivileged: true });
+        const packs = () => require('../Modules/AssignmentRules/dispatcher/packs');
+        const supportRules = (project) => dispatcherOf(project).rules.filter((rule) => rule.role === SUPPORT_LEAD);
+        const tagIdOf = (project, name) => (store(SCHEMA_TYPE.PROJECTS).find((row) => String(row._id) === String(project._id)).tagsArray || [])
+            .find((tag) => String(tag.tagName).toLowerCase() === name)?.uid;
+
+        it('adds the waiting tag rule on approval, once, and the pack\'s undo takes it back', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const applied = await call('POST', PACKS, { body: support(project) });
+            const [row] = applied.body.data.projects;
+            expect(row).toMatchObject({ rulesAwaitingTags: 1, proposalId: expect.any(String) });
+            expect(supportRules(project)).toEqual([]);
+
+            const decided = await approve(row.proposalId);
+            expect(decided.error).toBeUndefined();
+            const tag = tagIdOf(project, 'support');
+            expect(tag).toBeDefined();
+            expect(supportRules(project)).toEqual([{ id: expect.any(String), role: SUPPORT_LEAD, when: { tags: [String(tag)] } }]);
+            expect(recordAudit.mock.calls.map(([, entry]) => entry)).toEqual(expect.arrayContaining([
+                expect.objectContaining({ action: 'dispatcher.rule_added', actorId: OWNER, entityId: String(project._id) }),
+            ]));
+
+            expect(await packs().tagsApproved(C, row.proposalId, { id: OWNER })).toEqual([]);
+            expect(supportRules(project)).toHaveLength(1);
+
+            const added = supportRules(project);
+            const undone = await call('POST', PACKS, { body: { undo: true, ...support(project), applyId: applied.body.data.applyId } });
+            expect(undone.body.data.projects[0].rules).toEqual(expect.arrayContaining(added));
+            expect(supportRules(project)).toEqual([]);
+        });
+
+        it('adds nothing for an approval in another company, or for a proposal that is not the pack\'s', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const applied = await call('POST', PACKS, { body: support(project) });
+            const { proposalId } = applied.body.data.projects[0];
+            const proposal = store(SCHEMA_TYPE.AGENT_PROPOSALS).find((one) => String(one._id) === proposalId);
+            proposal.status = 'approved';
+            store(SCHEMA_TYPE.PROJECTS).find((one) => String(one._id) === String(project._id)).tagsArray = [{ uid: 'abc', tagName: 'support' }];
+
+            const home = mockDb;
+            const elsewhere = fakeMongo.create();
+            mockDb = { ...home, crud: (companyId, ...rest) => (companyId === C ? home : elsewhere).crud(companyId, ...rest) };
+            expect(await packs().tagsApproved('c00000000000000000000009', proposalId, { id: OWNER })).toEqual([]);
+            mockDb = home;
+            expect(supportRules(project)).toEqual([]);
+            proposal.agentId = 'someone-else';
+            expect(await packs().tagsApproved(C, proposalId, { id: OWNER })).toEqual([]);
+            expect(supportRules(project)).toEqual([]);
+            proposal.agentId = 'team-pack';
+            expect(await packs().tagsApproved(C, proposalId, { id: OWNER })).toEqual([{ id: expect.any(String), role: SUPPORT_LEAD, when: { tags: ['abc'] } }]);
+        });
+
+        const packsOf = (project) => (store(SCHEMA_TYPE.ASSIGNMENT_RULES).find((row) => String(row.projectId) === String(project._id)) || {}).teamPacks || [];
+        const setTag = (project, tagsArray = [{ uid: 'abc', tagName: 'support' }]) => { store(SCHEMA_TYPE.PROJECTS).find((one) => String(one._id) === String(project._id)).tagsArray = tagsArray; };
+        const proposalRow = (proposalId) => store(SCHEMA_TYPE.AGENT_PROPOSALS).find((one) => String(one._id) === proposalId);
+
+        it('adds the rule while a pack change holds the lock, without waiting for it', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const { proposalId } = (await call('POST', PACKS, { body: support(project) })).body.data.projects[0];
+            proposalRow(proposalId).status = 'approved';
+            setTag(project);
+            const { withPackLock } = require('../Modules/AssignmentRules/dispatcher/packLock');
+            const made = await withPackLock(C, () => packs().tagsApproved(C, proposalId, { id: OWNER }));
+            expect(made).toEqual([{ id: expect.any(String), role: SUPPORT_LEAD, when: { tags: ['abc'] } }]);
+            expect(supportRules(project)).toEqual(made);
+            expect(recordAudit.mock.calls.map(([, entry]) => entry).find((entry) => entry.action === 'dispatcher.rule_added').meta)
+                .toEqual({ teamPackTags: proposalId, rules: 1, applies: [{ applyId: packsOf(project)[0].applyId, appliedBy: EDITOR }] });
+        });
+
+        it('records the waiting rule of a second apply that asks for starter rules after the first proposed the tags', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const first = await call('POST', PACKS, { body: { ...support(project), starterRules: false } });
+            const { proposalId } = first.body.data.projects[0];
+            expect(proposalId).toBeTruthy();
+            const second = await call('POST', PACKS, { body: support(project) });
+            expect(second.body.data.projects[0]).toMatchObject({ rules: [], rulesAwaitingTags: 1, proposalId: null });
+            expect(second.body.data.applyId).toBeTruthy();
+
+            await approve(proposalId);
+            expect(supportRules(project)).toEqual([{ id: expect.any(String), role: SUPPORT_LEAD, when: { tags: [String(tagIdOf(project, 'support'))] } }]);
+        });
+
+        it('keeps a rule waiting through a partial approval and adds it when the part left for later is approved', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const { proposalId } = (await call('POST', PACKS, { body: support(project) })).body.data.projects[0];
+            proposalRow(proposalId).status = 'edited';
+            setTag(project, [{ uid: 'xyz', tagName: 'something-else' }]);
+            expect(await packs().tagsApproved(C, proposalId, { id: OWNER })).toEqual([]);
+            expect(packsOf(project)[0].waitingRules).toHaveLength(1);
+
+            const split = mockDb.seed(SCHEMA_TYPE.AGENT_PROPOSALS, { projectId: String(project._id), agentId: 'team-pack', status: 'approved', splitFrom: proposalId, changes: [] });
+            setTag(project);
+            expect(await packs().tagsApproved(C, String(split._id), { id: OWNER })).toEqual([{ id: expect.any(String), role: SUPPORT_LEAD, when: { tags: ['abc'] } }]);
+            expect(packsOf(project)[0].waitingRules).toEqual([]);
+            expect(await packs().tagsApproved(C, String(split._id), { id: OWNER })).toEqual([]);
+        });
+
+        it('stops waiting on a tag approval an undo withdrew', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const first = await call('POST', PACKS, { body: support(project) });
+            await call('POST', PACKS, { body: support(project) });
+            expect(packsOf(project).map((entry) => entry.waitingRules.length)).toEqual([1, 1]);
+            await call('POST', PACKS, { body: { undo: true, ...support(project), applyId: first.body.data.applyId } });
+            expect(packsOf(project).map((entry) => entry.waitingRules)).toEqual([[]]);
+        });
+
+        it('adds no rule for a role a person has turned off since the apply', async () => {
+            seedRules(GRANTS);
+            process.env.MCP_TOOLS_WORK = 'on';
+            const project = seedProject({ taskTypeCounts: BUGS });
+            const applied = await call('POST', PACKS, { body: support(project) });
+            const current = dispatcherOf(project);
+            await call('PUT', SETTINGS, { params: { projectId: String(project._id) }, body: { mode: current.mode, threshold: 80, roles: current.roles.filter((key) => key !== SUPPORT_LEAD), rules: current.rules } });
+            await approve(applied.body.data.projects[0].proposalId);
+            expect(supportRules(project)).toEqual([]);
+        });
+    });
+
+    describe('the project\'s dispatcher mode', () => {
+        const idOf = (project) => String(project._id);
+        const undoOf = (project, applied) => call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['engineering'], projectIds: [idOf(project)], applyId: applied.body.data.applyId } });
+
+        it('switches an off dispatcher to suggest and the undo turns it off again', async () => {
+            seedRules(GRANTS);
+            const project = seedProject();
+            const applied = await applyPack([project]);
+            expect(applied.body.data.projects[0]).toMatchObject({ mode: 'suggest', modeWas: 'off' });
+            expect(dispatcherOf(project).mode).toBe('suggest');
+            const undone = await undoOf(project, applied);
+            expect(undone.body.data.projects[0]).toMatchObject({ mode: 'off', modeRestored: 'off' });
+            expect(dispatcherOf(project).mode).toBe('off');
+        });
+
+        it('keeps suggesting while a later pack remains, and turns off when the last is undone', async () => {
+            seedRules(GRANTS);
+            const project = seedProject();
+            const first = await applyPack([project]);
+            const second = await applyPack([project], { teams: ['design'] });
+            expect(second.body.data.projects[0]).toMatchObject({ mode: 'suggest', modeWas: null });
+
+            const undoneFirst = await undoOf(project, first);
+            expect(undoneFirst.body.data.projects[0]).toMatchObject({ mode: 'suggest', modeRestored: null });
+            expect(dispatcherOf(project).mode).toBe('suggest');
+
+            const undoneSecond = await call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams: ['design'], projectIds: [idOf(project)], applyId: second.body.data.applyId } });
+            expect(undoneSecond.body.data.projects[0]).toMatchObject({ mode: 'off', modeRestored: 'off' });
+            expect(dispatcherOf(project).mode).toBe('off');
+        });
+
+        it('never turns on auto-assign, and leaves a mode a person changed after the apply', async () => {
+            seedRules(GRANTS);
+            const auto = seedProject();
+            await call('PUT', SETTINGS, { params: { projectId: idOf(auto) }, body: { mode: 'apply', threshold: 80, roles: [], rules: [] } });
+            const kept = await applyPack([auto]);
+            expect(kept.body.data.projects[0]).toMatchObject({ mode: 'apply', modeWas: null });
+
+            const project = seedProject();
+            const applied = await applyPack([project]);
+            const now = dispatcherOf(project);
+            await call('PUT', SETTINGS, { params: { projectId: idOf(project) }, body: { mode: 'apply', threshold: 80, roles: now.roles, rules: now.rules } });
+            const undone = await undoOf(project, applied);
+            expect(undone.body.data.projects[0]).toMatchObject({ mode: 'apply', modeRestored: null });
+            expect(dispatcherOf(project).mode).toBe('apply');
+        });
+    });
+});
+
+describe('team pack writes that interleave', () => {
+    const BUGS = [{ name: 'Task', value: 'task', key: 1 }, { name: 'Bug', value: 'bug', key: 4 }];
+    const SUPPORT_LEAD = 'it-company/support-lead';
+    const packs = () => require('../Modules/AssignmentRules/dispatcher/packs');
+    const body = (project, teams, extra = {}) => ({ blueprint: 'it-company', teams, projectIds: [String(project._id)], starterRules: true, ...extra });
+    const rowOf = (project) => store(SCHEMA_TYPE.ASSIGNMENT_RULES).find((row) => String(row.projectId) === String(project._id));
+    const projectRow = (project) => store(SCHEMA_TYPE.PROJECTS).find((one) => String(one._id) === String(project._id));
+    const settingsWrite = (companyId, { type, data }, method) => type === SCHEMA_TYPE.ASSIGNMENT_RULES && method === 'updateOne' && Boolean(data[1] && data[1].$set && data[1].$set.dispatcher);
+    const recordWrite = (companyId, { type, data }, method) => type === SCHEMA_TYPE.ASSIGNMENT_RULES && method === 'updateOne' && Boolean(data[1] && data[1].$push && data[1].$push['teamPacks.$[pack].rules']);
+    const tagRule = (project, role, name) => ({ id: expect.any(String), role, when: { tags: [String(projectRow(project).tagsArray.find((tag) => tag.tagName === name).uid)] } });
+
+    /* Runs `hook` once, just before the first database call `when` picks, so it lands between another write's read and its save. */
+    const interleave = (when, hook, { every = false } = {}) => {
+        const crud = mockDb.crud;
+        let fired = false;
+        let inHook = false;
+        mockDb.crud = async (...args) => {
+            if (!inHook && (every || !fired) && when(...args)) {
+                fired = true;
+                inHook = true;
+                try { await hook(); } finally { inHook = false; }
+            }
+            return crud(...args);
+        };
+        return () => { mockDb.crud = crud; };
+    };
+
+    const withApprovedSupportTag = async (project) => {
+        const applied = await call('POST', PACKS, { body: body(project, ['support'], { proposeTags: true }) });
+        const { proposalId } = applied.body.data.projects[0];
+        store(SCHEMA_TYPE.AGENT_PROPOSALS).find((one) => String(one._id) === proposalId).status = 'approved';
+        projectRow(project).tagsArray = [{ uid: 'tag-support', tagName: 'support' }];
+        return { applied, proposalId };
+    };
+
+    beforeEach(() => {
+        seedRules(GRANTS);
+        process.env.MCP_TOOLS_WORK = 'on';
+    });
+
+    it('keeps both the approval\'s rule and the apply\'s rules when the approval lands between the apply\'s read and its save', async () => {
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const { proposalId } = await withApprovedSupportTag(project);
+        let activated;
+        const restore = interleave(settingsWrite, async () => { activated = await packs().tagsApproved(C, proposalId, { id: OWNER }); });
+        const res = await call('POST', PACKS, { body: body(project, ['engineering']) });
+        restore();
+        expect(res.statusCode).toBe(200);
+        expect(activated).toEqual([tagRule(project, SUPPORT_LEAD, 'support')]);
+        const { roles, rules } = dispatcherOf(project);
+        expect(roles).toEqual(expect.arrayContaining([...engineering, SUPPORT_LEAD]));
+        expect(rules).toEqual(expect.arrayContaining([...activated, ...res.body.data.projects[0].rules]));
+        expect(res.body.data.projects[0].rules).toEqual([{ id: expect.any(String), role: TRIAGER, when: { taskTypeKeys: [4] } }]);
+    });
+
+    it('keeps the approval\'s rule when an undo of another apply runs between its read and its save', async () => {
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const { proposalId } = await withApprovedSupportTag(project);
+        const other = await call('POST', PACKS, { body: body(project, ['engineering']) });
+        const restore = interleave(settingsWrite, () => call('POST', PACKS, { body: { undo: true, ...body(project, ['engineering']), applyId: other.body.data.applyId } }));
+        const activated = await packs().tagsApproved(C, proposalId, { id: OWNER });
+        restore();
+        expect(activated).toHaveLength(1);
+        const { roles, rules } = dispatcherOf(project);
+        expect(rules).toEqual(activated);
+        expect(roles).toContain(SUPPORT_LEAD);
+        expect(roles.filter((key) => engineering.includes(key))).toEqual([]);
+    });
+
+    it('keeps both rules when the approval and its split-off part are decided at once, each once', async () => {
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const applied = await call('POST', PACKS, { body: body(project, ['engineering'], { proposeTags: true }) });
+        const { proposalId } = applied.body.data.projects[0];
+        store(SCHEMA_TYPE.AGENT_PROPOSALS).find((one) => String(one._id) === proposalId).status = 'edited';
+        const split = mockDb.seed(SCHEMA_TYPE.AGENT_PROPOSALS, { projectId: String(project._id), agentId: 'team-pack', status: 'approved', splitFrom: proposalId, changes: [] });
+        projectRow(project).tagsArray = [{ uid: 'tag-review', tagName: 'needs-review' }];
+        let fromSplit;
+        const restore = interleave(settingsWrite, async () => {
+            projectRow(project).tagsArray = [...projectRow(project).tagsArray, { uid: 'tag-incident', tagName: 'incident' }];
+            fromSplit = await packs().tagsApproved(C, String(split._id), { id: OWNER });
+        });
+        const fromParent = await packs().tagsApproved(C, proposalId, { id: OWNER });
+        restore();
+        const tagRules = dispatcherOf(project).rules.filter((rule) => rule.when.tags);
+        expect(tagRules).toEqual(expect.arrayContaining([
+            tagRule(project, 'it-company/code-reviewer', 'needs-review'),
+            tagRule(project, 'it-company/incident-scribe', 'incident'),
+        ]));
+        expect(tagRules).toHaveLength(2);
+        expect([...fromSplit, ...fromParent]).toHaveLength(2);
+        const entry = rowOf(project).teamPacks[0];
+        expect(entry.rules.filter((rule) => rule.when.tags)).toHaveLength(2);
+        expect(entry.waitingRules.map((rule) => rule.tag)).toEqual(['release']);
+    });
+
+    it('takes the rule back out when its apply is undone between the save and the record', async () => {
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const { proposalId } = await withApprovedSupportTag(project);
+        const restore = interleave(recordWrite, async () => { rowOf(project).teamPacks = []; });
+        const activated = await packs().tagsApproved(C, proposalId, { id: OWNER });
+        restore();
+        expect(activated).toEqual([]);
+        expect(dispatcherOf(project).rules.filter((rule) => rule.role === SUPPORT_LEAD)).toEqual([]);
+    });
+
+    it('removes a rule an approval recorded on the apply after the undo read it', async () => {
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const { applied, proposalId } = await withApprovedSupportTag(project);
+        let activated;
+        const restore = interleave(settingsWrite, async () => { activated = await packs().tagsApproved(C, proposalId, { id: OWNER }); });
+        const res = await call('POST', PACKS, { body: { undo: true, ...body(project, ['support'], { proposeTags: true }), applyId: applied.body.data.applyId } });
+        restore();
+        expect(activated).toHaveLength(1);
+        expect(res.body.data.projects[0].rules).toEqual(activated);
+        expect(dispatcherOf(project).rules).toEqual([]);
+        expect(rowOf(project).teamPacks).toEqual([]);
+    });
+
+    it('gives two saves without a revision two different revisions', async () => {
+        const project = seedProject();
+        const id = String(project._id);
+        await call('PUT', SETTINGS, { params: { projectId: id }, body: { mode: 'suggest', threshold: 80, roles: [], rules: [] } });
+        const settings = require('../Modules/AssignmentRules/dispatcher/settings');
+        let inner;
+        const restore = interleave(settingsWrite, async () => { inner = await settings.save(C, id, { mode: 'apply', roles: [], rules: [] }, OWNER); });
+        const outer = await settings.save(C, id, { mode: 'off', roles: [], rules: [] }, OWNER);
+        restore();
+        expect(inner.revision).toBe(2);
+        expect(outer.revision).toBe(3);
+        expect(dispatcherOf(project)).toMatchObject({ mode: 'off', revision: 3 });
+    });
+
+    it('leaves the waits when the rules cannot be saved, so a later approval still adds them', async () => {
+        const project = seedProject({ taskTypeCounts: BUGS });
+        const { proposalId } = await withApprovedSupportTag(project);
+        const settings = require('../Modules/AssignmentRules/dispatcher/settings');
+        const spy = jest.spyOn(settings, 'saveMerged').mockRejectedValueOnce(new Error('rules must be a list of at most 50 rules.'));
+        await expect(packs().tagsApproved(C, proposalId, { id: OWNER })).rejects.toThrow('at most 50');
+        spy.mockRestore();
+        expect(rowOf(project).teamPacks[0].waitingRules).toHaveLength(1);
+        expect(await packs().tagsApproved(C, proposalId, { id: OWNER })).toHaveLength(1);
+    });
+
+    it('answers 409 and takes back what it wrote when the settings keep changing under an apply', async () => {
+        const one = seedProject();
+        const two = seedProject();
+        for (const project of [one, two]) await call('PUT', SETTINGS, { params: { projectId: String(project._id) }, body: { mode: 'off', threshold: 80, roles: [], rules: [] } });
+        const restore = interleave((companyId, sent, method) => settingsWrite(companyId, sent, method) && sent.data[0]['dispatcher.revision'] !== undefined && String(sent.data[0].projectId) === String(two._id), async () => {
+            rowOf(two).dispatcher.revision += 1;
+        }, { every: true });
+        const res = await call('POST', PACKS, { body: { blueprint: 'it-company', teams: ['engineering'], projectIds: [String(one._id), String(two._id)] } });
+        restore();
+        expect(res.statusCode).toBe(409);
+        expect(res.body.reason).toBe('settings_changed');
+        expect(dispatcherOf(one)).toMatchObject({ mode: 'off', roles: [] });
+        expect(dispatcherOf(two)).toMatchObject({ mode: 'off', roles: [] });
+        expect(rowOf(one).teamPacks || []).toEqual([]);
+    });
+
+    it('turns routing off only after the last pack is undone, whichever is undone first', async () => {
+        const project = seedProject();
+        const first = await applyPack([project]);
+        const second = await applyPack([project], { teams: ['design'] });
+        const undoOf = (applied, teams) => call('POST', PACKS, { body: { undo: true, blueprint: 'it-company', teams, projectIds: [String(project._id)], applyId: applied.body.data.applyId } });
+        expect((await undoOf(second, ['design'])).body.data.projects[0]).toMatchObject({ mode: 'suggest', modeRestored: null });
+        expect((await undoOf(first, ['engineering'])).body.data.projects[0]).toMatchObject({ mode: 'off', modeRestored: 'off' });
+        expect(dispatcherOf(project).mode).toBe('off');
+    });
+
+    it('refuses a person\'s save made on settings that changed since they were read', async () => {
+        const project = seedProject();
+        const id = String(project._id);
+        await call('PUT', SETTINGS, { params: { projectId: id }, body: { mode: 'suggest', threshold: 80, roles: [], rules: [] } });
+        const { revision } = dispatcherOf(project);
+        await applyPack([project]);
+        const stale = await call('PUT', SETTINGS, { params: { projectId: id }, body: { mode: 'apply', threshold: 80, roles: [], rules: [], revision } });
+        expect(stale.statusCode).toBe(409);
+        expect(stale.body.reason).toBe('settings_changed');
+        expect(dispatcherOf(project).roles).toEqual(engineering);
+        const fresh = await call('PUT', SETTINGS, { params: { projectId: id }, body: { mode: 'apply', threshold: 80, roles: engineering, rules: [], revision: dispatcherOf(project).revision } });
+        expect(fresh.statusCode).toBe(200);
     });
 });

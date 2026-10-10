@@ -46,7 +46,12 @@ const serve = ({ on = true } = {}) => apiRequest.mockImplementation((type, url, 
     if (type === 'get') return ok({ on, packs: [], companyBlueprints: BLUEPRINTS });
     posted.push(body);
     if (body.undo) return ok({ projects: body.projectIds.map((projectId) => ({ projectId, removed: IT_PACKS[0].roles, mode: 'off' })) });
-    return ok({ blueprint: body.blueprint, teams: body.teams, applyId: 'ap1', projects: body.projectIds.map((projectId) => ({ projectId, added: body.only, mode: projectId === 'p1' ? 'suggest' : 'off' })) });
+    return ok({
+        blueprint: body.blueprint, teams: body.teams, applyId: 'ap1',
+        projects: body.projectIds.map((projectId) => (projectId === 'p1'
+            ? { projectId, added: body.only, mode: 'apply', modeWas: null, rules: [{ id: 'r1' }], rulesAwaitingTags: 0, tags: [] }
+            : { projectId, added: body.only, mode: 'suggest', modeWas: 'off', rules: [], rulesAwaitingTags: 1, tags: ['support'] })),
+    });
 });
 
 const mounted = [];
@@ -83,7 +88,7 @@ describe('the company blueprint picker', () => {
         expect(wrapper.find('[data-test="bp-seats"]').text()).toBe('About 4 roles and 60 to 200 seats');
     });
 
-    it('applies the first three roles to the chosen projects in one request narrowed by only', async () => {
+    it('applies the first three roles with their starter rules and tags, in one request narrowed by only, and says what changed', async () => {
         const wrapper = await mountWith(BlueprintPicker);
         const apply = wrapper.find('[data-test="bp-apply"]');
         expect(apply.attributes('disabled')).toBeDefined();
@@ -92,10 +97,13 @@ describe('the company blueprint picker', () => {
         expect(apply.text()).toBe('Turn on 3 starter roles');
         await apply.trigger('click');
         await flushPromises();
-        expect(posted).toEqual([{ blueprint: 'it-company', teams: ['engineering', 'support'], only: IT_PACKS[0].roles, projectIds: ['p1', 'p2'] }]);
+        expect(posted).toEqual([{ blueprint: 'it-company', teams: ['engineering', 'support'], only: IT_PACKS[0].roles, projectIds: ['p1', 'p2'], starterRules: true, proposeTags: true }]);
         expect(wrapper.find('[data-test="bp-result"]').text()).toContain('Turned on 6 roles');
-        expect(wrapper.findAll('[data-test="bp-result"] li').map((li) => li.attributes('data-mode'))).toEqual(['suggest', 'off']);
-        expect(wrapper.find('[data-test="bp-result"]').text()).toContain('the roles wait until someone switches it on');
+        const lines = wrapper.findAll('[data-test="bp-result"] li');
+        expect(lines.map((li) => li.attributes('data-mode'))).toEqual(['apply', 'suggest']);
+        expect(lines[0].text()).toBe('Mobile app: the dispatcher is in apply mode. Added one routing rule.');
+        expect(lines[1].text()).toBe('Website: the dispatcher is in suggest mode. Its dispatcher was off, so it now suggests a role; undo turns it off again. '
+            + 'One starter rule waits for its tag to be approved; it is added when the tag is approved. Proposed one tag for approval: support.');
     });
 
     it('undoes the apply the server recorded', async () => {

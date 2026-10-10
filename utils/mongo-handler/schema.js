@@ -2343,7 +2343,8 @@ const schema = {
         // rules: [{ id?, role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
         dispatcher: { type: Object, required: false },
         // What each team pack applied here, so its undo takes back only that (Modules/AssignmentRules/dispatcher/packs.js):
-        // [{ applyId, blueprint, projectIds, roles, rules: [{ id, role, when }], proposalId, agents: { made, widened: [{ agentId, projectIds }] }, skills, by, at }]
+        // [{ applyId, blueprint, projectIds, roles, rules: [{ id, role, when }], proposalId, modeWas, waitingRules: [{ role, tag, proposalId }],
+        //    agents: { made, widened: [{ agentId, projectIds }] }, skills, by, at }]
         teamPacks: { type: Array, default: undefined, required: false },
     },
     // One decision per task revision: what the rules chose, why, and what became of it. `inputHash` covers the task text

@@ -12,10 +12,10 @@ const company = require('./company');
 
 const companyOf = (req) => String(req.headers['companyid'] || '');
 
-const refuse = (res, statusCode, statusText) => res.status(statusCode).json({ status: false, statusText, message: statusText });
+const refuse = (res, statusCode, statusText, reason) => res.status(statusCode).json({ status: false, statusText, message: statusText, ...(reason ? { reason } : {}) });
 
 const fail = (res, what) => (error) => {
-    if (error instanceof RuleError) return refuse(res, error.statusCode, error.message);
+    if (error instanceof RuleError) return refuse(res, error.statusCode, error.message, error.reason);
     logger.error(`[dispatcher] ${what}: ${(error && error.message) || error}`);
     return refuse(res, 500, 'Something went wrong. Please try again.');
 };
@@ -52,7 +52,8 @@ exports.applyPack = async (req, res) => {
         const agentAccess = require('../../Agents/access');
         const managesAgents = agentAccess.canManageAgents(await agentAccess.callerOf(req, companyId));
         const result = undone ? await packs.undo(companyId, body, actor, { managesAgents }) : await packs.apply(companyId, body, actor.id, { managesAgents });
-        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length));
+        const modeChanged = (project) => Boolean(undone ? project.modeRestored : project.modeWas);
+        const changed = result.projects.filter((project) => (undone ? project.removed : project.added).length || project.rules.length || (undone ? project.tagsWithdrawn : project.tags.length) || modeChanged(project));
         const agentsChanged = undone ? result.agents.removed : result.agents.made;
         const agentsTouched = agentsChanged.length || (undone ? result.agents.narrowed : result.agents.widened).length;
         if (agentsTouched) {
@@ -67,6 +68,7 @@ exports.applyPack = async (req, res) => {
                     roles: undone ? project.removed : project.added,
                     rules: project.rules.length,
                     ...(undone ? {} : { tags: project.tags }),
+                    ...(modeChanged(project) ? { mode: project.mode } : {}),
                 })),
                 agents: { [undone ? 'removed' : 'created']: agentsChanged.map((agent) => agent.agentId), kept: result.agents.kept.map((agent) => agent.agentId), ...(undone ? { narrowed: result.agents.narrowed.map((agent) => agent.agentId) } : { widened: result.agents.widened.map((agent) => agent.agentId) }) },
             });
@@ -80,7 +82,7 @@ exports.applyPack = async (req, res) => {
 exports.getSettings = async (req, res) => {
     try {
         const on = flag.enabled();
-        const data = on ? { on, settings: await settings.load(companyOf(req), req.params.projectId), roles: settings.roleChoices() } : { on, settings: null, roles: [] };
+        const data = on ? { on, settings: await settings.loadLatest(companyOf(req), req.params.projectId), roles: settings.roleChoices() } : { on, settings: null, roles: [] };
         return res.json({ status: true, statusText: 'Dispatcher settings', data });
     } catch (error) {
         return fail(res, 'read settings')(error);
@@ -95,7 +97,7 @@ const saved = (add) => async (req, res) => {
         const { projectId } = req.params;
         const result = add
             ? await settings.addRule(companyId, projectId, req.body || {}, actor.id)
-            : await settings.save(companyId, projectId, req.body || {}, actor.id);
+            : await settings.save(companyId, projectId, req.body || {}, actor.id, { revision: (req.body || {}).revision });
         audit.settingsChanged(companyId, actor, projectId, { mode: result.mode, threshold: result.threshold, modelGuess: result.modelGuess, roles: result.roles.length, rules: result.rules.length, revision: result.revision }, add);
         return res.json({ status: true, statusText: 'Dispatcher settings saved', data: result });
     } catch (error) {

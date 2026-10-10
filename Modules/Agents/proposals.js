@@ -393,6 +393,10 @@ const approve = async (companyId, id, { decider, isPrivileged, changes: edited, 
     const notMade = planFollowUp.notMadeBy(changes, applied);
     const updated = await setStatus(companyId, id, { status, changes, undoUntil, auditIds, ...(delivery.length ? { delivery } : {}), ...(notMade.length ? { notMade } : {}) });
     await audit.recordProposalDecision(companyId, { ...decider, ...runTrace }, { proposalId: id, decision: status, agentName: p.agentName, runId: p.runId, changes: applied, ip });
+    const packs = require('../AssignmentRules/dispatcher/packs');
+    if (p.agentId === packs.PACK_AGENT_ID && applied.some((a) => a.ok)) {
+        await quietly(`add the rules waiting on ${id}`, () => packs.tagsApproved(companyId, id, { id: decider.userId, Employee_Name: decider.personName || '' }));
+    }
     const row = typeof p.toObject === 'function' ? p.toObject() : p;
     await quietly(`remember approved changes of ${id}`, () => memory.rememberApprovedChanges({ companyId, projectId: p.projectId, proposal: { ...row, changes, decidedBy: decider.userId }, applied }));
     for (const [i, a] of applied.entries()) {

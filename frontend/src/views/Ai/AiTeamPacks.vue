@@ -126,7 +126,7 @@ import { aiAvailability, AI_STATE } from "@/composable/aiAvailability";
 import { refusalText } from "@/utils/assignmentRules";
 import { useCustomComposable } from "@/composable";
 import { isOwnerOrAdmin } from "@/utils/roles";
-import { applyTeamPack, blueprintName, fetchTeamPacks, teamName, undoTeamPack } from "@/utils/dispatcher";
+import { applyTeamPack, blueprintName, fetchTeamPacks, packProjectLine, teamName, undoTeamPack } from "@/utils/dispatcher";
 
 defineOptions({ name: "AiTeamPacks" });
 
@@ -179,7 +179,7 @@ const tagNames = computed(() => {
 });
 const ruleCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.rules || []).length, 0));
 const addedCount = computed(() => (result.value?.projects || []).reduce((sum, project) => sum + (project.added || []).length, 0));
-const changedCount = computed(() => addedCount.value + ruleCount.value + (result.value?.projects || []).filter((project) => project.proposalId).length);
+const changedCount = computed(() => addedCount.value + ruleCount.value + (result.value?.projects || []).filter((project) => project.proposalId || project.modeWas).length);
 const madeAgents = computed(() => result.value?.agents?.made || []);
 const keptAgents = computed(() => (undone.value ? undoneKept.value : []));
 const agentLine = computed(() => {
@@ -199,18 +199,7 @@ const resultHead = computed(() => {
     return ruleCount.value || tagCount.value ? t("TeamPacks.roles_were_on") : t("TeamPacks.nothing_new");
 });
 
-const projectLine = (project) => {
-    const name = projectName(project.projectId);
-    const rules = (project.rules || []).length;
-    const tags = project.tags || [];
-    return [
-        project.mode === "off" ? t("TeamPacks.project_off", { project: name }) : t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) }),
-        rules ? t("TeamPacks.rules_added", { n: rules }, rules) : "",
-        project.skippedRules ? t("TeamPacks.rules_waiting", { n: project.skippedRules }, project.skippedRules) : "",
-        project.rulesAwaitingTags ? t("TeamPacks.rules_await_tags", { n: project.rulesAwaitingTags }, project.rulesAwaitingTags) : "",
-        tags.length ? t("TeamPacks.tags_proposed", { n: tags.length, names: tags.join(", ") }, tags.length) : ""
-    ].filter(Boolean).join(" ");
-};
+const projectLine = (project) => packProjectLine(t, project, projectName(project.projectId));
 
 watch(blueprint, () => {
     const known = teamsOfPack.value.map((team) => team.team);

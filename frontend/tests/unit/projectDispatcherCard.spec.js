@@ -19,7 +19,7 @@ const TRIAGER = { key: 'it-company/bug-triager', name: 'Bug Triager', blueprint:
 const REVIEWER = { key: 'it-company/code-reviewer', name: 'Code Reviewer', blueprint: 'it-company' };
 const PLANNER = { key: 'manufacturing/production-planner', name: 'Production Planner', blueprint: 'manufacturing' };
 const SETTINGS = {
-    mode: 'suggest', threshold: 80, modelGuess: false, roles: [TRIAGER.key, REVIEWER.key],
+    mode: 'suggest', threshold: 80, modelGuess: false, revision: 3, roles: [TRIAGER.key, REVIEWER.key],
     rules: [{ role: TRIAGER.key, when: { taskTypeKeys: [2] } }, { role: REVIEWER.key, when: { tags: ['tag-ui'] } }],
 };
 const NEED = { decision: { _id: 'd9', state: 'needs_routing' }, task: { _id: 't9', TaskName: 'Odd one', TaskKey: 'LCH-9' } };
@@ -104,7 +104,22 @@ describe('ProjectDispatcherCard', () => {
         const wrapper = await mountCard();
         await wrapper.find('[data-test="dispatcher-mode"]').setValue('apply');
         await flushPromises();
-        expect(putBody()).toEqual({ mode: 'apply', roles: SETTINGS.roles, rules: SETTINGS.rules, threshold: 80, modelGuess: false });
+        expect(putBody()).toEqual({ mode: 'apply', roles: SETTINGS.roles, rules: SETTINGS.rules, threshold: 80, modelGuess: false, revision: 3 });
+    });
+
+    it('reloads and says so when the settings changed elsewhere since they were read', async () => {
+        const wrapper = await mountCard();
+        const fresh = { ...SETTINGS, mode: 'off', revision: 4 };
+        apiRequest.mockImplementation((type, url) => {
+            if (type === 'put') return Promise.reject({ response: { status: 409, data: { status: false, reason: 'settings_changed', statusText: 'changed' } } });
+            if (type === 'get' && url.endsWith('/needs-routing')) return ok({ on: true, items: [] });
+            return ok({ on: true, settings: fresh, roles: [TRIAGER, REVIEWER, PLANNER] });
+        });
+        await wrapper.find('[data-test="dispatcher-mode"]').setValue('apply');
+        await flushPromises();
+        expect(putBody().revision).toBe(3);
+        expect(wrapper.find('[role="alert"]').text()).toBe('Dispatcher.settings_changed');
+        expect(wrapper.find('[data-test="dispatcher-mode"]').element.value).toBe('off');
     });
 
     it('keeps a team pack rule\'s id through a save, so the pack\'s undo still knows it', async () => {

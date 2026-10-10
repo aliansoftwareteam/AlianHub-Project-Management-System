@@ -13348,7 +13348,7 @@ export default {
     "TeamPacks": {
         "nav": "Team packs",
         "title": "Team packs",
-        "lead": "Turn on a team's role agents in your projects with one click. Nothing runs by itself: each project's dispatcher keeps its mode, and you can undo the pack.",
+        "lead": "Turn on a team's role agents in your projects with one click. A project whose dispatcher is off starts suggesting a role; nothing is assigned by itself, and you can undo the pack.",
         "loading": "Loading…",
         "load_failed": "Could not load the team packs.",
         "retry": "Retry",
@@ -13381,12 +13381,12 @@ export default {
         "tags_hint": "These roles hand work on with the tags {names}. The tags a project lacks are proposed to you as one approval per project; nothing is created until you approve.",
         "rules_added": "Added one routing rule. | Added {n} routing rules.",
         "rules_waiting": "One starter rule waits for a tag or task type this project lacks. | {n} starter rules wait for a tag or task type this project lacks.",
-        "rules_await_tags": "One starter rule waits for its tag to be approved; apply the pack again after the approval to add it. | {n} starter rules wait for their tags to be approved; apply the pack again after the approval to add them.",
+        "rules_await_tags": "One starter rule waits for its tag to be approved; it is added when the tag is approved. | {n} starter rules wait for their tags to be approved; they are added when the tags are approved.",
         "tags_proposed": "Proposed one tag for approval: {names}. | Proposed {n} tags for approval: {names}.",
         "project_on": "{project}: the dispatcher is in {mode} mode.",
-        "project_off": "{project}: the dispatcher is off in this project, so the roles wait until someone switches it on in the project's settings.",
         "mode_suggest": "suggest",
         "mode_apply": "apply",
+        "mode_switched": "Its dispatcher was off, so it now suggests a role; undo turns it off again.",
         "undo": "Undo",
         "undoing": "Undoing…",
         "undone": "The pack's roles are off again.",
@@ -13438,7 +13438,8 @@ export default {
         "offer_rule": "You sent this task type to {role} {times} times. Always send it there?",
         "offer_add": "Add rule",
         "offer_added": "Routing rule added.",
-        "failed": "Could not update the routing. Please try again."
+        "failed": "Could not update the routing. Please try again.",
+        "settings_changed": "These settings were changed elsewhere and have been reloaded. Make your change again and save."
     },
     "CompanyView": {
         "nav": "Company view",
@@ -13504,7 +13505,7 @@ export default {
         "some_written": "{n} of the first {total} roles are written yet; only those are turned on.",
         "no_projects": "There are no projects to choose yet. Create a project, then come back to AI, Team packs.",
         "apply": "Turn on one starter role | Turn on {n} starter roles",
-        "suggest_only": "Roles only suggest. A project's dispatcher mode is never changed here.",
+        "suggest_only": "Roles only suggest. A project whose dispatcher is off is switched to suggesting a role, and undo switches it back.",
         "welcome_link": "Set up your teams (optional)",
         "welcome_kicker": "Optional step",
         "welcome_title": "Set up your teams",

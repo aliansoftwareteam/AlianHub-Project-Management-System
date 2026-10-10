@@ -46,6 +46,19 @@ export const undoTeamPack = (applied) => apiRequest("post", `${BASE}/team-packs`
     applyId: applied.applyId
 }).then(dataOf);
 
+export const packProjectLine = (t, project, name) => {
+    const rules = (project.rules || []).length;
+    const tags = project.tags || [];
+    return [
+        t("TeamPacks.project_on", { project: name, mode: t(`TeamPacks.mode_${project.mode}`) }),
+        project.modeWas === "off" ? t("TeamPacks.mode_switched") : "",
+        rules ? t("TeamPacks.rules_added", { n: rules }, rules) : "",
+        project.skippedRules ? t("TeamPacks.rules_waiting", { n: project.skippedRules }, project.skippedRules) : "",
+        project.rulesAwaitingTags ? t("TeamPacks.rules_await_tags", { n: project.rulesAwaitingTags }, project.rulesAwaitingTags) : "",
+        tags.length ? t("TeamPacks.tags_proposed", { n: tags.length, names: tags.join(", ") }, tags.length) : ""
+    ].filter(Boolean).join(" ");
+};
+
 export const DISPATCHER_CHANGED_EVENT = "dispatcherChanged";
 
 /* Calls `onChange` whenever the dispatcher's decisions or settings change in the company; the socket is replaced on reconnect. */
@@ -93,11 +106,12 @@ export const priorityChoices = (list) => (Array.isArray(list) ? list : [])
 
 export const COMPANY_SIZES = Object.freeze(["small", "medium", "large"]);
 
-/* The starter roles of a company blueprint go in one request per playbook blueprint, each narrowed to those roles by `only`. */
+/* The starter roles of a company blueprint go in one request per playbook blueprint, each narrowed to those roles by `only`,
+ * with their starter rules and missing tags as a team pack brings them. */
 export async function applyStarterRoles(groups, projectIds) {
     const applied = [];
     for (const group of groups) {
-        applied.push(await applyTeamPack({ blueprint: group.blueprint, teams: group.teams, only: group.roles, projectIds }));
+        applied.push(await applyTeamPack({ blueprint: group.blueprint, teams: group.teams, only: group.roles, projectIds, starterRules: true, proposeTags: true }));
     }
     return applied;
 }

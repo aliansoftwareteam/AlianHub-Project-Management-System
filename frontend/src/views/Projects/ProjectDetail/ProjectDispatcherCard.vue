@@ -94,6 +94,7 @@ const props = defineProps({
 });
 
 const MODES = ["off", "suggest", "apply"];
+const SETTINGS_CHANGED = "settings_changed";
 
 const { t, te } = useI18n();
 const uid = `pdc-${Math.random().toString(36).slice(2, 8)}`;
@@ -168,22 +169,26 @@ async function save(body) {
     try {
         take(await saveDispatcher(props.projectId, body));
     } catch (e) {
-        error.value = refusalText(e, t("Dispatcher.failed"));
+        if (e?.response?.data?.reason === SETTINGS_CHANGED) {
+            await load(props.projectId);
+            error.value = t("Dispatcher.settings_changed");
+        } else {
+            error.value = refusalText(e, t("Dispatcher.failed"));
+        }
     } finally {
         busy.value = false;
     }
 }
 
 const savedBody = () => {
-    const { roles, rules, threshold, modelGuess } = settings.value;
-    return { roles, rules, threshold, modelGuess };
+    const { roles, rules, threshold, modelGuess, revision } = settings.value;
+    return { roles, rules, threshold, modelGuess, revision };
 };
 
 async function saveMode() {
     if (!settings.value || busy.value) return;
-    const before = settings.value.mode;
     await save({ ...savedBody(), mode: mode.value });
-    if (error.value) mode.value = before;
+    if (error.value) mode.value = settings.value?.mode || "off";
 }
 
 async function saveAll() {
