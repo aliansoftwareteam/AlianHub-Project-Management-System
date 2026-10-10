@@ -76,7 +76,7 @@
                         <div v-if="blockedHostOf(conn)" class="apc__egress" role="status" data-egress-blocked>
                             <span>{{ $t('AppConnections.egress_blocked', { host: blockedHostOf(conn) }) }}</span>
                             <div v-if="instanceOwner" class="apc__actions">
-                                <button type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" data-allow-host @click="allowHost(app, conn)">
+                                <button v-if="blockedHostOf(conn) === GITHUB_API_HOST" type="button" class="ah-btn ah-btn--primary ah-btn--sm" :disabled="busy" data-allow-host @click="allowHost(app, conn)">
                                     {{ $t('AppConnections.egress_allow', { host: blockedHostOf(conn) }) }}
                                 </button>
                                 <button type="button" class="ah-btn ah-btn--ghost ah-btn--sm" data-egress-settings @click="openEgress">{{ $t('AppConnections.egress_settings') }}</button>
@@ -192,6 +192,7 @@ const allowedHosts = ref([]);
 const instanceOwner = ref(null);
 
 const EGRESS_BLOCKED = "egress_blocked";
+const GITHUB_API_HOST = "api.github.com";
 const GITHUB_OUTCOMES = ["expired", "denied", "rights", "off", "failed"];
 const GITHUB_REFUSALS = { 400: "github_expired", 403: "github_rights", 409: "github_off" };
 
@@ -365,15 +366,19 @@ const openRepos = async (conn) => {
 };
 
 const saveRepo = async (conn) => {
-    await act(async () => {
-        try {
-            return await apiRequest("put", `${env.INTEGRATIONS}/connections/${conn.id}/repo`, { repo: pickedRepo.value });
-        } catch (e) {
-            if (markBlocked(conn, e?.response?.data)) return { data: { status: true } };
-            throw e;
-        }
-    });
-    if (!error.value) choosingRepo.value = "";
+    busy.value = true;
+    error.value = "";
+    try {
+        const res = await apiRequest("put", `${env.INTEGRATIONS}/connections/${conn.id}/repo`, { repo: pickedRepo.value });
+        if (res?.data?.status === false) { error.value = res.data.statusText || t("AppConnections.failed"); return; }
+        choosingRepo.value = "";
+        await load();
+    } catch (e) {
+        if (markBlocked(conn, e?.response?.data)) choosingRepo.value = "";
+        else error.value = failure(e);
+    } finally {
+        busy.value = false;
+    }
 };
 
 const finishGithub = async () => {

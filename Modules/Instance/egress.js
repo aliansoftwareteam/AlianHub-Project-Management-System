@@ -8,6 +8,7 @@ const rules = require('../Agents/engine/egressRules');
 const store = require('../Agents/engine/egressAllowlist');
 const { isBlockedHostname } = require('../Agents/engine/safeFetch');
 const { requestAddress } = require('../../utils/requestAddress');
+const { clearAllowedRefusals } = require('../Integrations/appConnections/egressAllowed');
 
 const LIST_CHANGED_ACTION = 'agent.egress_allowlist';
 const ADMIN_KEY_ACTOR = 'instance-admin-key';
@@ -169,6 +170,9 @@ exports.setHosts = async (req, res) => {
         // An emptied list reopens the workspace to every public host, so the row says so rather than leaving it to count: 0.
         const emptied = before.length > 0 && hosts.length === 0;
         if (changed) auditListChange(req, id, company, { added, removed, count: hosts.length, ...(emptied ? { emptied: true } : {}) });
+        if (added.length) {
+            await clearAllowedRefusals(id, added).catch((error) => logger.error(`egress allowlist ${id}: refusals not cleared: ${error.message || error}`));
+        }
         return ok(res, changed ? 'Egress allowlist set.' : 'Egress allowlist unchanged.', {
             companyId: id, ...saved, cacheTtlSeconds: store.CACHE_TTL_SECONDS,
         });
