@@ -61,7 +61,10 @@ Built for enterprises, startups, and growing teams — no per-seat pricing, no v
 
 <p align="center">
   <a href="https://demo.alianhub.com" target="_blank">
-    <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/AlianHub_Main.png" alt="AlianHub open-source project management dashboard with projects, tasks and widgets" width="100%" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/home-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/home-light.png" alt="AlianHub home screen with My Work, tasks waiting on you for approval, and a planner for the day">
+</picture>
   </a>
 </p>
 
@@ -70,6 +73,14 @@ Built for enterprises, startups, and growing teams — no per-seat pricing, no v
 ---
 
 ## Quick Start
+
+**Requirements**
+
+| | |
+|---|---|
+| Docker | Docker with Compose, for the one-command install. Images are multi-arch (amd64 + arm64). |
+| Node.js | 20.x, for installing from source (`engines` in `package.json`). |
+| MongoDB | 7 (the Compose file runs `mongo:7`). |
 
 ### Option 1 — Self-hosting with Docker (recommended)
 
@@ -90,6 +101,13 @@ docker compose pull && docker compose up -d
 ```
 
 > Images are published to GHCR: `ghcr.io/aliansoftwareteam/alianhub:latest`. Multi-arch (amd64 + arm64).
+
+</details>
+
+<details>
+<summary><b>Upgrading and database migrations</b></summary>
+
+Migrations run automatically at boot, before the server starts listening, and each one is recorded in the database. A failed migration does not stop the server: `/health` reports `migrationError` and the next boot retries it. To run them by hand set `MIGRATIONS_AUTO=false` and use `npm run migrate:status`, `npm run migrate -- up --dry-run` and `npm run migrate`. Back up before a major upgrade. **Settings → Instance → Upgrade** shows the running version, the latest release and the migration state. The full walkthrough is in [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md).
 
 </details>
 
@@ -217,6 +235,18 @@ AlianHub is built using a pragmatic and scalable stack:
 
 ---
 
+## What's new in 14.37
+
+- **Agent teams** — ready-made team packs create one agent per role, with starter rules, tags and workflows. A company view shows the roles as an org chart, and a dispatcher can route new tasks to a role, in suggest or apply mode.
+- **AI planning** — the Ask box and the project generator plan with the server model, name and set up views, and can add starter automations that start switched off. A workspace can set a daily AI budget.
+- **GitHub** — connect GitHub in one click, pick repositories per project, and see pull requests linked to tasks.
+- **Connect your own AI** — the MCP tools and sign-in by address are on by default for new installs; upgraded installs keep them off until an owner turns them on.
+- **Installable app** — the web app can be installed, and its shell opens offline.
+
+Every release is listed in [CHANGELOG.md](CHANGELOG.md).
+
+---
+
 ## Features
 
 ### Key features of AlianHub
@@ -307,7 +337,7 @@ AlianHub is built using a pragmatic and scalable stack:
 
 - **💬 Built-in chat & channels** — Real-time messaging and dedicated channels per project or team.
 
-- **💻 Web + desktop (Electron)** — Identical experience in the browser and as a native desktop app. **Multi-language UI** via vue-i18n.
+- **💻 Web + desktop (Electron)** — Identical experience in the browser and as a native desktop app. **Fourteen UI languages** via vue-i18n: English, Arabic, Chinese, French, German, Greek, Gujarati, Hindi, Italian, Japanese, Korean, Portuguese (Brazil), Russian and Spanish.
 
 - **🏠 Self-hosted, your data** — Run on your own servers with MongoDB and Wasabi/S3 (or local filesystem) storage. **No vendor lock-in, no per-seat pricing, no data leaving your infrastructure.**
 
@@ -355,6 +385,104 @@ Capabilities that are **free and built-in** here — but paid, limited, or absen
 ## 📸 Screenshots
 
 A quick tour of AlianHub. [Try the live demo](https://demo.alianhub.com) to explore for yourself.
+
+<details>
+<summary><b>Screenshot gallery (light and dark)</b></summary>
+
+<p>Your browser picks the light or dark version. The workspace shown is made-up demo data.</p>
+
+<h4>Home</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/home-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/home-light.png" alt="Home with My Work, items waiting for approval and the planner" width="800">
+</picture>
+</p>
+
+<h4>List view</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/list-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/list-light.png" alt="List view of the Website relaunch project, grouped by status within the Build list" width="800">
+</picture>
+</p>
+
+<h4>Board view</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/board-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/board-light.png" alt="Board view with To Do, In Progress and Done columns" width="800">
+</picture>
+</p>
+
+<h4>Gantt chart</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/gantt-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/gantt-light.png" alt="Gantt chart with a bar per task across four lists" width="800">
+</picture>
+</p>
+
+<h4>Task detail</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/task-detail-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/task-detail-light.png" alt="Task detail panel with status, assignee, dates and list" width="800">
+</picture>
+</p>
+
+<h4>Dashboard</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/dashboard-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/dashboard-light.png" alt="Dashboard with tasks by status, free capacity, tasks due soon and project pulse cards" width="800">
+</picture>
+</p>
+
+<h4>Time tracking</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/time-tracking-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/time-tracking-light.png" alt="Weekly timesheet with hours per task and day against an 8-hour capacity" width="800">
+</picture>
+</p>
+
+<h4>Docs</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/docs-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/docs-light.png" alt="A doc with headings, lists and an on-this-page outline" width="800">
+</picture>
+</p>
+
+<h4>AI Inbox</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-inbox-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-inbox-light.png" alt="AI Inbox with agent proposals waiting for approval and the changes one would make" width="800">
+</picture>
+</p>
+
+<h4>AI agents</h4>
+
+<p align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-agents-dark.png">
+  <img src="https://raw.githubusercontent.com/aliansoftwareteam/AlianHub-Project-Management-System/main/.gitbook/assets/screenshots/ai-agents-light.png" alt="AI Agents page with three agents, their autonomy level and the autonomy ladder" width="800">
+</picture>
+</p>
+
+</details>
+
 
 ### Dashboard
 
@@ -470,6 +598,8 @@ Using Claude or ChatGPT with AlianHub? [docs/guide/agents/](docs/guide/agents/RE
 
 For development:
 
+- 🛠️ [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md) — set up, architecture and how to change things
+- 🏠 [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) — run, back up and upgrade your own instance
 - 🤝 [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute
 - 🌿 [BRANCHING.md](BRANCHING.md) — branching strategy and PR workflow
 - 🛡️ [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards
