@@ -417,7 +417,6 @@ exports.counts = async (req, res) => {
                 // Done and Cleared hold rows already dealt with, so they carry no badge.
                 primary: notifications + mentions,
                 approval: approvals + proposals.all,
-                // Home asks the person only for what was filed for them; the rest waits for the team.
                 approvalOwn: approvals + proposals.own,
                 approvalTeam: proposals.all - proposals.own,
                 other,

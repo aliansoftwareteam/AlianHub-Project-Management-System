@@ -154,6 +154,17 @@ const startedBy = async (companyId, runId) => {
 const askedFor = async (companyId, uid, proposal) => Boolean(uid)
     && [String(proposal.requestedBy || ''), await startedBy(companyId, proposal.runId)].includes(String(uid));
 
+/* askedFor over many proposals, with one read of their runs. */
+const askedForOf = async (companyId, uid, proposals) => {
+    const person = String(uid || '');
+    const runIds = [...new Set(proposals.map((p) => (p.runId ? String(p.runId) : '')).filter(Boolean))];
+    const runs = person && runIds.length ? await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: { $in: runIds }, startedBy: person }, '_id'],
+    }, 'find').catch(() => []) : [];
+    const ownRuns = new Set((runs || []).map((run) => String(run._id)));
+    return (proposal) => Boolean(person) && (String(proposal.requestedBy || '') === person || (Boolean(proposal.runId) && ownRuns.has(String(proposal.runId))));
+};
+
 const inOwnPersonalList = async (companyId, uid, proposal) => {
     if (!uid || !OBJECT_ID.test(String(proposal.projectId || ''))) return false;
     const list = await MongoDbCrudOpration(companyId, {
@@ -186,5 +197,5 @@ module.exports = {
     privileged, humanActor, callerOf, personOf, canManageAgents, canControlRun, canUndoDecision, canActAsAgent,
     visibleProjectIdsFor, agentProjectsFor, hiddenTaskIdsFor, canSeeTaskOf, projectScope, REFUSAL,
     privateWorkFor, readScopeOf, canSeeRun, readableRuns, canSeeProposal,
-    GATE_OWNER_ADMIN, proposalScopeClause, decidesProposals, staysInside, reachesOutsideClause, isOwnProposal,
+    GATE_OWNER_ADMIN, proposalScopeClause, decidesProposals, staysInside, reachesOutsideClause, isOwnProposal, askedForOf,
 };

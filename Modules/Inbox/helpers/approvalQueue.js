@@ -79,20 +79,11 @@ const readQueue = async (companyId, userId) => {
         logger.error(`[inbox] proposal previews: ${error.message}`);
         return new Map();
     });
-    const [previews, batches, standings] = await Promise.all([cards(intentPreview.forProposals), cards(intentPreview.forBatches), approverRights.standingsOf(companyId, caller, listed, locks)]);
-    const row = toRow(previews, batches, { userId: String(userId), privileged: caller.privileged }, await ownOf(companyId, userId, listed));
+    const [previews, batches, standings, mine] = await Promise.all([
+        cards(intentPreview.forProposals), cards(intentPreview.forBatches), approverRights.standingsOf(companyId, caller, listed, locks), access.askedForOf(companyId, userId, listed),
+    ]);
+    const row = toRow(previews, batches, { userId: String(userId), privileged: caller.privileged }, mine);
     return listed.map((proposal, at) => row(proposal, standings[at]));
-};
-
-/* A proposal is the person's own when their connection filed it or their agent's run did. */
-const ownOf = async (companyId, userId, listed) => {
-    const uid = String(userId);
-    const runIds = [...new Set(listed.map((p) => (p.runId ? String(p.runId) : '')).filter(Boolean))];
-    const runs = runIds.length ? await MongoDbCrudOpration(companyId, {
-        type: SCHEMA_TYPE.AGENT_RUNS, data: [{ _id: { $in: runIds }, startedBy: uid }, '_id'],
-    }, 'find').catch(() => []) : [];
-    const ownRuns = new Set((runs || []).map((run) => String(run._id)));
-    return (proposal) => String(proposal.requestedBy || '') === uid || (Boolean(proposal.runId) && ownRuns.has(String(proposal.runId)));
 };
 
 const waitingCount = (rows) => rows.filter((row) => !row.locked).length;
