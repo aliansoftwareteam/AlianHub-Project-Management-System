@@ -360,4 +360,40 @@ describe('AiProjectCreator guided flow', () => {
         expect(wrapper.vm.step).toBe('preview');
         expect(callsTo(env.AI_PROJECT_GUIDE)).toHaveLength(0);
     });
+
+    it('lists the planned automations as off, what was left out with why, and what was made on the done screen', async () => {
+        const tellCreator = { name: 'Tell the creator when done', trigger: 'task.status_changed', conditions: [], actions: [{ action: 'notify', config: { recipients: ['task_creator'], message: 'Done' } }] };
+        const planResponse = {
+            ...plan,
+            rules: [tellCreator, { name: 'Review subtask', trigger: 'task.created', conditions: [], actions: [{ action: 'create_subtask', config: { title: 'Review' } }] }],
+            rulesDropped: [{ name: 'Email the client', reason: 'Only these steps can be proposed: …', code: 'step' }]
+        };
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), planResponse });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+
+        const rows = wrapper.findAll('[data-test="plan-rules"] li').map((li) => li.findAll('span').map((s) => s.text()));
+        expect(rows).toEqual([['Tell the creator when done', 'AiProject.rule_off'], ['Review subtask', 'AiProject.rule_off']]);
+        expect(wrapper.find('[data-test="plan-rules-notes"]').text()).toBe('Email the client — AiProject.rule_reason_step');
+        expect(wrapper.text()).not.toContain('Only these steps');
+
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        expect(callsTo(env.AI_PROJECT_EXECUTE)[0][2].plan.rules).toEqual(planResponse.rules);
+
+        FakeEventSource.last.emit({
+            event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 4 },
+            rules: { made: [{ name: 'Tell the creator when done', ruleId: 'r1' }], notMade: [{ name: 'Review subtask', reason: 'Only an owner or an admin can approve an automation', code: 'admin' }, { name: 'Odd one', reason: 'x', code: 'unheard_of' }] }
+        });
+        await flushPromises();
+
+        const outcome = wrapper.find('[data-test="rules-outcome"]');
+        expect(outcome.find('[data-test="plan-rules"]').text()).toContain('Tell the creator when done');
+        expect(outcome.find('[data-test="plan-rules-hint"]').text()).toBe('AiProject.rules_turn_on');
+        expect(outcome.findAll('[data-test="plan-rules-notes"] li').map((li) => li.text())).toEqual([
+            'Review subtask — AiProject.rule_reason_admin',
+            'Odd one — AiProject.rule_reason_other'
+        ]);
+        expect(outcome.text()).not.toContain('Only an owner');
+    });
 });

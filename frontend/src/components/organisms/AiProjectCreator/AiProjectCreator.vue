@@ -301,6 +301,14 @@
                         </div>
                     </div>
 
+                    <div v-if="(plan.rules || []).length || (plan.rulesDropped || []).length" class="aipg-card">
+                        <PlanRules
+                            :rules="plan.rules || []"
+                            :notes="plan.rulesDropped || []"
+                            :title="$t('AiProject.rules_title')"
+                            :notes-title="$t('AiProject.rules_dropped_title')"/>
+                    </div>
+
                     <div v-if="planAssumptions.length" class="aipg-card aipg-card-accent" data-test="plan-assumptions">
                         <label class="aipg-field-label">{{ $t('AiProject.assumptions_title') }}</label>
                         <ul class="aipg-assumption-list">
@@ -433,6 +441,15 @@
                         </button>
                     </div>
 
+                    <div v-if="step === 'done' && (ruleOutcome.made.length || ruleOutcome.notMade.length)" class="aipg-card" data-test="rules-outcome">
+                        <PlanRules
+                            :rules="ruleOutcome.made"
+                            :notes="ruleOutcome.notMade"
+                            :title="$t('AiProject.rules_made_title')"
+                            :notes-title="$t('AiProject.rules_not_made_title')"
+                            :hint="$t('AiProject.rules_turn_on')"/>
+                    </div>
+
                     <div v-if="step === 'done'" class="aipg-actions">
                         <button class="aipg-btn aipg-btn-primary" data-test="open-project" @click="onOpenProject">
                             {{ $t('AiProject.open_project') }}
@@ -465,6 +482,7 @@ import CoverageChips from './brief/CoverageChips.vue';
 import BriefStep from './brief/BriefStep.vue';
 import SplitBadge from './plan/SplitBadge.vue';
 import GuidePreview from './plan/GuidePreview.vue';
+import PlanRules from './plan/PlanRules.vue';
 import { POINTS } from './brief/points';
 import { useAiProjectGenerator } from '@/composable/aiProjectGenerator';
 import { useStore } from 'vuex';
@@ -476,7 +494,7 @@ import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
     name: 'AiProjectCreator',
-    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, SkillsSelect, ProjectSourceSelect },
+    components: { Sidebar, ClarifyStep, CoverageChips, BriefStep, SplitBadge, GuidePreview, PlanRules, SkillsSelect, ProjectSourceSelect },
     props: {
         visible: { type: Boolean, default: false },
     },
@@ -525,6 +543,7 @@ export default defineComponent({
         const guideError = ref('');
 
         const outcome = reactive({ guideAgentId: null, runsQueued: 0, runsRefused: [] });
+        const ruleOutcome = reactive({ made: [], notMade: [] });
 
         // True when ANY in-flight operation owns the modal — brief upload,
         // clarify LLM call, plan LLM call, or the orchestrator's execute
@@ -1021,6 +1040,9 @@ export default defineComponent({
 
         function applyOutcome(payload) {
             if (!payload || typeof payload !== 'object') return;
+            const rules = payload.rules || {};
+            if (Array.isArray(rules.made)) ruleOutcome.made = rules.made.filter(Boolean);
+            if (Array.isArray(rules.notMade)) ruleOutcome.notMade = rules.notMade.filter(Boolean);
             if (payload.guideAgentId) outcome.guideAgentId = payload.guideAgentId;
             if (typeof payload.runsQueued === 'number') outcome.runsQueued = payload.runsQueued;
             if (Array.isArray(payload.runsRefused)) outcome.runsRefused = payload.runsRefused.filter(Boolean);
@@ -1273,6 +1295,8 @@ export default defineComponent({
             briefLoading.value = false;
             guideLoading.value = false;
             resetBriefFlow();
+            ruleOutcome.made = [];
+            ruleOutcome.notMade = [];
             outcome.guideAgentId = null;
             outcome.runsQueued = 0;
             outcome.runsRefused = [];
@@ -1310,6 +1334,7 @@ export default defineComponent({
             onBriefEdit, onApproveBrief, onGenerateFromBrief, onSkipBrief, onBriefBack, startBrief,
             planAssumptions, splitSummary,
             guide, guideMarkdown, guideLoading, guideError, loadGuide,
+            ruleOutcome,
             outcome, hasOutcome,
         };
     },

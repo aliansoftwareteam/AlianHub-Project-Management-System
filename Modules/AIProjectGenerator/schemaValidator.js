@@ -183,6 +183,12 @@ const TaskSchema = z.object({
     }
 });
 
+const PlanRuleNoteSchema = z.object({
+    name: z.string().max(200).optional().default(''),
+    reason: z.string().max(2000).optional().default(''),
+    code: z.string().max(40).optional().default('other'),
+});
+
 const SprintSchema = z.object({
     sprintName: z.string().min(1).max(80),
     // Safety cap only: 100 tasks per sprint is an absurd ceiling no honest
@@ -252,6 +258,10 @@ const ProjectSchema = z.object({
 });
 
 const PlanSchema = z.object({
+    // Any shape on purpose: ./planAutomations.js keeps only catalogue rules and
+    // drops the rest with a reason, so a bad rule never sends the plan back for repair.
+    rules: z.array(z.unknown()).max(20).optional(),
+    rulesDropped: z.array(PlanRuleNoteSchema).max(20).optional(),
     project: ProjectSchema,
     // Safety cap only: 200 sprints is far beyond any honest plan.
     sprints: z.array(SprintSchema).min(1).max(200),

@@ -53,6 +53,7 @@ const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
 const { keptOnProject } = require('../../Config/projectPeople');
 const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const planRules = require('./planRules');
+const planAutomations = require('./planAutomations');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
 const { taskCreatedHistoryMessage, projectCreatedHistoryMessage, projectCreatedNoticeMessage } = require('./historyMessages');
@@ -1151,9 +1152,13 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
             companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide, approvedBrief, assumptions,
         });
 
+        // Last, so nothing after it can roll the project back and leave a rule behind.
+        const rules = await planAutomations.makeRules({ companyId, uid, projectId: tracker.project, plan });
+
         const totals = { sprints: tracker.sprints.length, tasks: tracker.tasks.length };
         emit({
             event: 'complete',
+            rules,
             projectId: tracker.project,
             projectName: projectDoc.ProjectName,
             totals,

@@ -54,6 +54,10 @@
           }
         ]
       }
+    ],
+
+    "rules": [                                            // optional; 0-3, see Automations
+      { "name": string, "trigger": string, "conditions": [ { "field": string, "op": string, "value": any } ], "actions": [ { "action": string, "config": { } } ] }
     ]
   }
 }

@@ -15,6 +15,7 @@ const { COVERAGE_POINTS, PlanSchema, ClarifyResponseSchema, TasksPlanSchema, Tas
 const { buildSystemPrompt, buildUserMessage, buildRepairPrompt, buildTasksSystemPrompt, buildTasksUserMessage } = require('./promptBuilder');
 const { briefUpload, extractFromFile, safeUnlink, MAX_BRIEF_BYTES } = require('./briefExtractor');
 const { attachSplit } = require('./planSplit');
+const planAutomations = require('./planAutomations');
 const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
 const planRules = require('./planRules');
 const sseEmitter = require('./sseEmitter');
@@ -265,6 +266,12 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         // the LLM picked.
         if (plan && plan.project && typeof isPrivateSpace === 'boolean') {
             plan.project.isPrivateSpace = isPrivateSpace;
+        }
+
+        if (plan && typeof plan === 'object') {
+            const trimmed = planAutomations.trimRules(plan.rules, plan.project);
+            plan.rules = trimmed.kept;
+            plan.rulesDropped = trimmed.dropped;
         }
 
         // Re-validate after sanitization, then normalize status colors so the
@@ -656,6 +663,9 @@ exports.execute = async (req, res) => {
         if (plan && plan.project && typeof req.body.isPrivateSpace === 'boolean') {
             plan.project.isPrivateSpace = req.body.isPrivateSpace;
         }
+
+        plan.rules = planAutomations.trimRules(plan.rules, plan.project).kept;
+        delete plan.rulesDropped;
 
         // Always re-validate server-side — never trust a client-supplied plan.
         const reCheck = PlanSchema.safeParse(plan);
