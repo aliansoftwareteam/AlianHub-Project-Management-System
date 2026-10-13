@@ -1,6 +1,10 @@
 const { defineConfig } = require('@vue/cli-service');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const path = require('path');
+const webpack = require('webpack');
+const { FIRST_PAINT_BUDGET_BYTES } = require('./firstPaintBudget');
 const brandSettings = require('../brandSettings.json');
+const { ShellWorkerPlugin } = require('./shellWorkerPlugin');
 const imageURL = `/api/v1/getlogo?key=logo&type=web`;
 
 module.exports = defineConfig({
@@ -13,7 +17,20 @@ module.exports = defineConfig({
       },
       // Server-rendered public share pages (GET /share/:token and its intake
       // form POST) live on the backend, same as /api.
+      '^/version$': {
+        target: 'http://localhost:4000',
+        changeOrigin: true
+      },
       '^/share': {
+        target: 'http://localhost:4000',
+        changeOrigin: true
+      },
+      '^/pickers/': {
+        target: 'http://localhost:4000',
+        changeOrigin: true
+      },
+      // The MCP authorization server's consent page and its calls (MCP_OAUTH).
+      '^/(oauth/|\\.well-known/oauth-)': {
         target: 'http://localhost:4000',
         changeOrigin: true
       },
@@ -24,7 +41,37 @@ module.exports = defineConfig({
     }
   },
   configureWebpack: {
+    resolve: {
+      alias: {
+        '@pageContent': path.resolve(__dirname, '../Modules/Pages/helpers/pageContent.js'),
+        '@agentWork': path.resolve(__dirname, '../Modules/Agents/workKinds.js'),
+        '@egressRules': path.resolve(__dirname, '../Modules/Agents/engine/egressRules.js'),
+        '@agentDailyRunLimit': path.resolve(__dirname, '../Modules/Agents/dailyRunLimit.js'),
+        '@passwordRule': path.resolve(__dirname, '../Modules/Auth/helpers/passwordRule.js'),
+        '@viewSettings': path.resolve(__dirname, '../Modules/Project/helpers/viewSettings.js'),
+        '@fieldTaskTypes': path.resolve(__dirname, '../Modules/CustomField/helpers/fieldTaskTypes.js'),
+        '@datePastFuture': path.resolve(__dirname, '../Modules/CustomField/helpers/datePastFuture.js'),
+        '@fieldTypes': path.resolve(__dirname, '../Modules/CustomField/fieldTypes'),
+        '@automationTemplates': path.resolve(__dirname, '../Modules/Automations/templates.js'),
+        '@workingDays': path.resolve(__dirname, '../Modules/Company/helpers/workingDays.js'),
+        '@ganttShift': path.resolve(__dirname, '../Modules/Tasks/helpers/ganttShift.js'),
+        '@taskTreeRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskTreeRules.js'),
+        '@taskExtraListsRules': path.resolve(__dirname, '../Modules/Tasks/helpers/taskExtraListsRules.js'),
+        '@descriptionBlock': path.resolve(__dirname, '../Modules/Tasks/helpers/descriptionBlock.js'),
+        '@richTextAllowlist': path.resolve(__dirname, '../Modules/Tasks/helpers/richTextAllowlist.js'),
+        '@formLogic': path.resolve(__dirname, '../Modules/Forms/helpers/formLogic.js'),
+      },
+    },
+    // A production build fails once the files a first paint downloads outgrow the budget. Only that
+    // set is budgeted: a chunk fetched later may be any size (the city list alone is 8 MB).
+    performance: {
+      hints: process.env.NODE_ENV === 'production' ? 'error' : false,
+      maxEntrypointSize: FIRST_PAINT_BUDGET_BYTES,
+      maxAssetSize: Number.MAX_SAFE_INTEGER,
+    },
     plugins: [
+      // moment pulls in every locale it ships; the app never switches moment's locale.
+      new webpack.IgnorePlugin({ resourceRegExp: /^\.\/locale$/, contextRegExp: /moment$/ }),
       new HtmlWebpackPlugin({
         template: 'public/index.html',
         filename: 'index.html',
@@ -78,11 +125,20 @@ module.exports = defineConfig({
             content: '315'
           },
         }
-      })
+      }),
+      // The dev server gets no sw.js, and the app does not register one there.
+      // "login" is the webpackChunkName of the sign-in page in src/router/auth: it has to open with no network.
+      ...(process.env.NODE_ENV === 'production' ? [new ShellWorkerPlugin({ firstPaintChunks: ['login'] })] : [])
     ]
   },
   chainWebpack: config => {
     // Remove the default HtmlWebpackPlugin added by Vue CLI
     config.plugins.delete('html');
+    // Without it vue-i18n compiles every message with new Function, which a content security policy
+    // without 'unsafe-eval' refuses; with it messages are interpreted from their syntax tree.
+    config.plugin('define').tap((args) => {
+      args[0].__INTLIFY_JIT_COMPILATION__ = JSON.stringify(true);
+      return args;
+    });
   }
 });

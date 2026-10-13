@@ -1,5 +1,5 @@
 <template>
-    <div v-show="tabIndexCheck === 1">
+    <div v-show="tabIndexCheck === 1" data-field-tab="1">
         <CustomFieldInputComponent
             :label="$t('PlaceHolder.field_label')"
             :type="'text'"
@@ -14,10 +14,9 @@
             :label="$t('Description.description')"
             :type="'textarea'"
             :placeholder="$t('PlaceHolder.Enter_Description')"
-            :validations="'required:trim|length:10'"
+            :validations="''"
             :bindValue="props.customFieldObject?.fieldDescription ? props.customFieldObject.fieldDescription : fieldDescription"
             :validationVisibility="'blur'"
-            :className="'custom__field-required'"
             :name="'fieldDescription'"
         />
         <CustomFieldInputComponent
@@ -29,26 +28,22 @@
             :name="'formulaExpression'"
             @inputUpdate="(val) => formulaExpression = val ? val : ''"
         />
-        <div class="formkit__form-wrapper" v-if="referenceableFields.length">
+        <div class="formkit__form-wrapper">
             <label class="formkit-label">{{ $t('CustomField.referenceable_fields') }}</label>
-            <p class="font-size-12 font-weight-400 gray81 m-0">
-                <span v-for="(field, index) in referenceableFields" :key="field._id">
-                    {{ '{' + field.fieldTitle + '}' }}<span v-if="index !== referenceableFields.length - 1">, </span>
-                </span>
-            </p>
+            <p class="formula-tokens" data-formula-tokens>{{ tokens.join(', ') }}</p>
         </div>
-        <DropDown :zIndex="10" v-if="isType">
+        <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                     <div class="custom__field-required">
                         <div class="formkit-wrapper">
-                            <label class="formkit-label" for="text">{{$t('Billing.type')}}</label>
+                            <span class="formkit-label">{{$t('Billing.type')}}</span>
                             <div class="d-flex border-gray border-radius-5-px align-items-center justify-content-between">
                                 <div class="d-flex align-items-center">
                                     <span class="formkit-input text-capitalize">{{type?.toLowerCase()}}</span>
                                 </div>
                                 <div class="mr-8px">
-                                    <img class="rotate-z-90" :src="dropDownArrow" alt="triangleBlack">
+                                    <img class="rotate-z-90" :src="dropDownArrow" alt="">
                                 </div>
                             </div>
                         </div>
@@ -56,10 +51,10 @@
                 </div>
             </template>
             <template #options>
-                <DropDownOption @click="$refs[customFieldTypeUniqueId].click(),handleType('project')">
+                <DropDownOption :selected="type === 'project'" @click="$refs[customFieldTypeUniqueId].click(),handleType('project')">
                     {{$t('Projects.Project')}}
                 </DropDownOption>
-                <DropDownOption @click="$refs[customFieldTypeUniqueId].click(),handleType('task')">
+                <DropDownOption :selected="type === 'task'" @click="$refs[customFieldTypeUniqueId].click(),handleType('task')">
                     {{$t('subProjectRulesNames.Task')}}
                 </DropDownOption>
             </template>
@@ -74,6 +69,7 @@
     import DropDown from '@/components/molecules/DropDown/DropDown.vue';
     import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue';
     import CustomFieldInputComponent from "../../customFieldSidebar/customFieldSidebarComponent/customFieldInputComponent/customFieldInputComponent.vue";
+    import { tokensOfFields } from "@/plugins/customFieldView/formulaTokens";
 
     // props
     const props = defineProps({
@@ -112,7 +108,6 @@
     const type = ref(props?.customFieldObject?.type ? props?.customFieldObject?.type : 'task');
     const tabIndexCheck = ref(props.tabIndex);
 
-    // List of existing numeric task custom fields that a formula may reference by {Title}.
     const referenceableFields = computed(() => {
         const list = getters['settings/finalCustomFields'] || [];
         return list.filter((f) =>
@@ -122,10 +117,11 @@
             (!props.customFieldObject || f._id !== props.customFieldObject._id)
         );
     });
+    const tokens = computed(() => tokensOfFields(referenceableFields.value));
 
     // Redirect to the tab where the validation error message is displayed.
     const handleTabComp = (node) => {
-        if(!(node._value.fieldDescription && node._value.fieldTitle)){
+        if(!node._value.fieldTitle){
             tabIndexCheck.value = 1;
             emit('tabIndexUpdate',tabIndexCheck.value)
         }
@@ -137,7 +133,7 @@
         object.fieldImageGrey = props.componentDetail.cfIconGrey;
         object.formulaExpression = object.formulaExpression ? String(object.formulaExpression).trim() : '';
         object.fieldTitle = object.fieldTitle.trim();
-        object.fieldDescription = object.fieldDescription.trim();
+        object.fieldDescription = (object.fieldDescription || '').trim();
         if(props.isType === true){
             object.type = type.value;
         }
@@ -149,3 +145,6 @@
 
     defineExpose({handleTabComp,handleSubmitComp});
 </script>
+<style scoped>
+.formula-tokens { margin: 0; font: 500 11px/1.7 var(--font-mono); color: var(--ink-2); overflow-wrap: anywhere; }
+</style>

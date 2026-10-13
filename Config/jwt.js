@@ -8,6 +8,11 @@ const {myCache} = require('./config');
 // circular dependency risk. The controller is lazy-required inside
 // verifyApiTokenRequest below.
 const { looksLikeToken, hasScope } = require('../Modules/ApiTokens/helpers/apiTokenRules');
+const { bearerRefusal } = require('../Modules/ApiTokens/helpers/bearerRules');
+const { sessionTokenQuery, readAccessSession, sessionCacheKey } = require('../Modules/Auth/helpers/refreshTokenRules');
+const { readCookie, clearOptions } = require('./cookies');
+const { ACTIVE_SEAT } = require('./seatStatus');
+const { isRetiring } = require('../middlewares/mongoConnector/retiring');
 
 // Mongo ObjectId pattern — used to reject regex/control characters in the
 // `companyid` request header before any token-membership check.
@@ -45,11 +50,20 @@ const getMembershipCacheTtlSeconds = () => {
     return raw;
 };
 
+const holdsActiveSeat = async (uid, companyId) => {
+    const seat = await mongoC.MongoDbCrudOpration(String(companyId), {
+        type: dbCollections.COMPANY_USERS,
+        data: [{ userId: String(uid), ...ACTIVE_SEAT }, { _id: 1 }],
+    }, 'findOne');
+    return Boolean(seat);
+};
+
 const verifyCompanyMembership = async (uid, companyId) => {
     if (!uid || !companyId) return false;
     if (!OBJECT_ID_PATTERN.test(String(uid)) || !OBJECT_ID_PATTERN.test(String(companyId))) {
         return false;
     }
+    if (isRetiring(companyId)) return false;
     const cacheKey = `${MEMBERSHIP_CACHE_PREFIX}${uid}:${companyId}`;
     const cached = myCache.get(cacheKey);
     if (cached === true) return true;
@@ -63,8 +77,12 @@ const verifyCompanyMembership = async (uid, companyId) => {
             }],
         };
         const resData = await mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, 'findOne');
-        const isMember = !!(resData && resData._id);
-        myCache.set(cacheKey, isMember, getMembershipCacheTtlSeconds());
+        // Removing a member retires the seat but can leave AssignCompany behind, so the seat decides.
+        // It is read only after AssignCompany matched, so a header naming any other id opens no connection.
+        const isMember = !!(resData && resData._id) && await holdsActiveSeat(uid, companyId);
+        const ttl = getMembershipCacheTtlSeconds();
+        // node-cache keeps a value set with a TTL of 0 forever.
+        if (ttl > 0) myCache.set(cacheKey, isMember, ttl);
         return isMember;
     } catch (error) {
         logger.error(`verifyCompanyMembership error for uid=${uid} companyId=${companyId}: ${error.message || error}`);
@@ -101,7 +119,8 @@ const PAT_ALLOWED_EXCEPTIONS = ['/api/v2/api-tokens/me'];
 const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
     try {
         // Lazy require keeps Config/jwt.js independent of module load order.
-        const { verifyToken: verifyApiToken, logTokenActivity } = require('../Modules/ApiTokens/controller');
+        const { resolveToken, logTokenActivity } = require('../Modules/ApiTokens/controller');
+        const { holdNarrowedToken } = require('./narrowedTokenRoutes');
 
         const path = String(req.originalUrl || req.path || '').split('?')[0];
         if (path.startsWith(PAT_BLOCKED_PATH_PREFIX) && !PAT_ALLOWED_EXCEPTIONS.includes(path)) {
@@ -112,11 +131,11 @@ const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
             });
         }
 
-        const tokenDoc = await verifyApiToken(companyId, rawToken);
+        const { token: tokenDoc, refusal } = await resolveToken(companyId, rawToken);
         if (!tokenDoc) {
             return res.status(401).json({
                 status: false,
-                error: 'Invalid, expired or revoked API token',
+                error: refusal || 'Invalid, expired or revoked API token',
                 statusText: 'Unauthorized',
                 isJwtError: true,
             });
@@ -158,7 +177,7 @@ const verifyApiTokenRequest = async (req, res, next, companyId, rawToken) => {
             });
         });
 
-        return next();
+        return holdNarrowedToken(req, res, next);
     } catch (error) {
         logger.error(`PAT auth error: ${error.message || error}`);
         return res.status(401).json({
@@ -195,20 +214,29 @@ const generateJWTToken = (obj) => {
     });
 };
 
+/* The presented access token: an explicit header wins, the session cookie fills
+ * in when the client sent none (the web app after the httpOnly migration). A
+ * bare 'Bearer' is an emptied header with its whitespace trimmed away, not a
+ * token, so it falls through to the cookie like an absent header does. */
+const bearerFrom = (req) => {
+    let token = req.headers['x-access-token'] || req.headers['authorization'] || '';
+    if (token.startsWith('Bearer ')) token = token.slice(7);
+    if (!token.trim() || token.trim() === 'Bearer') return readCookie(req, 'accessToken') || '';
+    return token;
+};
+
 const removeCacheAndCookie = (key, cacheKey, res, refreshToken) => {
     if (key === "accessToken") {
-        res.clearCookie('accessToken');
+        res.clearCookie('accessToken', clearOptions(res.req));
         return;
     }
     myCache.del(cacheKey);
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
-    if (refreshToken) {
+    res.clearCookie('accessToken', clearOptions(res.req));
+    res.clearCookie('refreshToken', clearOptions(res.req));
+    if (typeof refreshToken === 'string' && refreshToken) {
         let obj = {
             type: dbCollections.SESSIONS,
-            data: [{
-                refreshToken: refreshToken,
-            }]
+            data: [sessionTokenQuery(refreshToken)]
         }
         mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "deleteMany").then((resData)=>{
             if (!(resData && resData.deletedCount)) {
@@ -221,105 +249,96 @@ const removeCacheAndCookie = (key, cacheKey, res, refreshToken) => {
     }
 }
 
-const checkToken = (isValid, req, res, next) => {
-    if (isValid) {
-        const { uid, refreshToken,aud } = isValid;
-        req.uid = uid;
-        req.aud = aud;
-        req.body.refreshToken = refreshToken; 
-        const cacheKey = `session:${uid}:${refreshToken}`;
-        const value = myCache.get(cacheKey);
-        try {
-            if (value) {
-                const isRefreshTokenValid = jwt.verify(refreshToken, process.env.JWT_SECRET);
-                if (isRefreshTokenValid) {
-                    req.uid = uid;
-                    next();
-                } else {
-                    removeCacheAndCookie("", cacheKey, res, refreshToken);
-                    // Access Denied
-                    return res.status(401).json({
-                        status: false,
-                        error: 'Refresh Token has expired',
-                        statusText: 'Refresh Token has expired',
-                        isRefreshTokenError: true,
-                        isJwtError: true,
-                        isLogout: true
-                    });
-                }
-            } else {
-                let obj = {
-                    type: dbCollections.SESSIONS,
-                    data: [{
-                        userId: uid,
-                        refreshToken: refreshToken,
-                    }]
-                }
-                mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, obj, "findOne").then((resData)=>{
-                    if (!(resData && resData._id)) {
-                        removeCacheAndCookie("", cacheKey, res, refreshToken);
-                        return res.status(401).json({
-                            status: false,
-                            error: "Your session is expired",
-                            statusText: 'Unauthorized',
-                            isJwtError: true,
-                            isRefreshTokenError: true,
-                            isLogout: true
-                        });
-                    }
-                    const isRefreshTokenValid = jwt.verify(refreshToken, process.env.JWT_SECRET);
-                    if (isRefreshTokenValid) {
-                        myCache.set(cacheKey, JSON.stringify({_id: resData._id, userId: uid, refreshToken: refreshToken}), 600);
-                        req.uid = uid;
-                        next();
-                    } else {
-                        removeCacheAndCookie("", cacheKey, res, refreshToken);
-                        // Access Denied
-                        return res.status(401).json({
-                            status: false,
-                            error: 'Refresh Token has expired',
-                            statusText: 'Refresh Token has expired',
-                            isRefreshTokenError: true,
-                            isJwtError: true,
-                            isLogout: true
-                        });
-                    }
-                }).catch((error)=>{
-                    removeCacheAndCookie("", cacheKey, res, refreshToken);
-                    return res.status(401).json({
-                        status: false,
-                        error: error.message,
-                        statusText: 'Unauthorized',
-                        isJwtError: true,
-                        isRefreshTokenError: true,
-                        isLogout: true
-                    });
-                })
-            }
-        } catch (error) {
-            removeCacheAndCookie("", cacheKey, res, refreshToken);
-            return res.status(401).json({
-                status: false,
-                error: error.message,
-                statusText: 'Unauthorized',
-                isJwtError: true,
-                isRefreshTokenError: true,
-                isLogout: true
-            });
-        }
-    } else {
-        removeCacheAndCookie("accessToken", "", res);
-        // Access Denied
-        return res.status(401).json({
-            status: false,
-            error: 'Token has expired',
-            statusText: 'Token has expired',
-            isJwtError: true
-        });
-    }
-}
+const SESSION_CACHE_SECONDS = 600;
+
+// The client still holds a usable refresh token (its session was rotated elsewhere, or the
+// access token predates named sessions), so it is sent to refresh instead of being logged out.
+const refuseForRefresh = (res) => res.status(401).json({
+    status: false,
+    error: 'Token has expired',
+    statusText: 'Token has expired',
+    isJwtError: true
+});
+
+const refuseSession = (res, error, statusText = 'Unauthorized') => {
+    res.clearCookie('accessToken', clearOptions(res.req));
+    res.clearCookie('refreshToken', clearOptions(res.req));
+    return res.status(401).json({
+        status: false,
+        error,
+        statusText,
+        isJwtError: true,
+        isRefreshTokenError: true,
+        isLogout: true
+    });
+};
+const sessionsQuery = (uid, sid, method) => mongoC.MongoDbCrudOpration(dbCollections.GLOBAL, {
+    type: dbCollections.SESSIONS,
+    data: [{ _id: new mongoose.Types.ObjectId(sid), userId: uid }]
+}, method);
 
 /**
+ * The session an access token names, or why it can no longer be used.
+ *
+ * The signature alone says nothing about whether the session still exists: logging out
+ * deletes the session row, and the token the browser (or an open socket) still holds keeps
+ * verifying until it expires. Anything that authenticates a caller from an access token —
+ * the HTTP middleware below and the socket handshake in socket/socketinit.js — resolves it
+ * through here so there is one answer, cached under one key, invalidated by one logout.
+ *
+ * Reasons: 'legacy' and 'rotated' mean the client should refresh; every other reason means
+ * the session is gone and the client should be signed out.
+ */
+const resolveAccessSession = async (payload) => {
+    const access = readAccessSession(payload);
+    if (access.kind === 'legacy') return { ok: false, reason: 'legacy' };
+    if (access.kind !== 'session') return { ok: false, reason: 'invalid' };
+    const { uid, sid, rti, sexp } = access;
+    const cacheKey = sessionCacheKey(uid, sid, rti);
+    if (sexp * 1000 <= Date.now()) {
+        myCache.del(cacheKey);
+        sessionsQuery(uid, sid, "deleteMany").catch((error) => logger.error(`Expired session remove error ${error.message || error}`));
+        return { ok: false, reason: 'expired', uid, sid };
+    }
+    if (myCache.get(cacheKey)) return { ok: true, uid, sid };
+    let session;
+    try {
+        session = await sessionsQuery(uid, sid, "findOne");
+    } catch (error) {
+        logger.error(`Session lookup error ${error.message || error}`);
+        return { ok: false, reason: 'unreadable', uid, sid };
+    }
+    if (!(session && session._id)) return { ok: false, reason: 'ended', uid, sid };
+    if (session.refreshTokenJti !== rti) return { ok: false, reason: 'rotated', uid, sid };
+    myCache.set(cacheKey, JSON.stringify({ _id: session._id, userId: uid }), SESSION_CACHE_SECONDS);
+    return { ok: true, uid, sid };
+};
+
+const checkToken = async (isValid, req, res, next) => {
+    if (!isValid) {
+        removeCacheAndCookie("accessToken", "", res);
+        return refuseForRefresh(res);
+    }
+    req.uid = isValid.uid;
+    req.aud = isValid.aud;
+    const session = await resolveAccessSession(isValid);
+    if (session.sid) req.sessionId = session.sid;
+    if (session.ok) return next();
+    if (session.reason === 'legacy' || session.reason === 'rotated') return refuseForRefresh(res);
+    if (session.reason === 'invalid') {
+        res.clearCookie('accessToken', clearOptions(req));
+        return res.status(401).json({
+            status: false,
+            error: "Your session is expired",
+            statusText: 'Unauthorized',
+            isJwtError: true,
+            isRefreshTokenError: true,
+            isLogout: true
+        });
+    }
+    if (session.reason === 'expired') return refuseSession(res, 'Refresh Token has expired', 'Refresh Token has expired');
+    return refuseSession(res, "Your session is expired");
+}/**
  * Verify JWT Auth token is valid or not
  * @param {Object} req
  * @param {Object} res
@@ -400,7 +419,7 @@ const verifyJWTTokenWithC = async (req, res, next) => {
 }
 
 const verifyJWTTokenWithCV2 = async (req, res, next) => {
-    let token = req.headers['x-access-token'] || req.headers['authorization']; // Express headers are auto converted to lowercase
+    let token = bearerFrom(req);
     const companyId = req.headers['companyid'] || "";
     if (!companyId) {
         return res.status(401).json({
@@ -429,9 +448,13 @@ const verifyJWTTokenWithCV2 = async (req, res, next) => {
             if (looksLikeToken(token)) {
                 return verifyApiTokenRequest(req, res, next, companyId, token);
             }
+            const refusedBearer = bearerRefusal(token);
+            if (refusedBearer) {
+                return res.status(401).json({ status: false, error: refusedBearer, statusText: 'Unauthorized', isJwtError: true });
+            }
             const isValid = jwt.verify(token, process.env.JWT_SECRET);
             if (!isCompanyInAudience(isValid.aud, companyId)) {
-                res.clearCookie('accessToken');
+                res.clearCookie('accessToken', clearOptions(req));
                 return res.status(401).json({
                     status: false,
                     error: 'Unauthorized',
@@ -443,7 +466,7 @@ const verifyJWTTokenWithCV2 = async (req, res, next) => {
             // BUG-013 / #67 fix: live membership re-check (cached).
             const isMember = await verifyCompanyMembership(isValid.uid, companyId);
             if (!isMember) {
-                res.clearCookie('accessToken');
+                res.clearCookie('accessToken', clearOptions(req));
                 return res.status(403).json({
                     status: false,
                     error: 'You are no longer a member of this company',
@@ -455,7 +478,7 @@ const verifyJWTTokenWithCV2 = async (req, res, next) => {
 
             checkToken(isValid, req, res, next);
         } catch (error) {
-            res.clearCookie('accessToken');
+            res.clearCookie('accessToken', clearOptions(req));
             return res.status(401).json({
                 status: false,
                 error: 'Unauthorized',
@@ -517,7 +540,7 @@ const verifyJWTToken = (req, res, next) => {
 }
 
 const verifyJWTTokenV2 = (req, res, next) => {
-    let token = req.headers['x-access-token'] || req.headers['authorization']; // Express headers are auto converted to lowercase
+    let token = bearerFrom(req);
     
     if (token) {
         if (token.startsWith('Bearer ')) {
@@ -538,12 +561,16 @@ const verifyJWTTokenV2 = (req, res, next) => {
             }
             return verifyApiTokenRequest(req, res, next, companyId, token);
         }
+        const refusedBearer = bearerRefusal(token);
+        if (refusedBearer) {
+            return res.status(401).json({ status: false, error: refusedBearer, statusText: 'Unauthorized', isJwtError: true });
+        }
 
         try {
             const isValid = jwt.verify(token, process.env.JWT_SECRET);
             checkToken(isValid, req, res, next);
         } catch (error) {
-            res.clearCookie('accessToken');
+            res.clearCookie('accessToken', clearOptions(req));
             return res.status(401).json({
                 status: false,
                 error: error.message,
@@ -567,33 +594,41 @@ const verifyJWTTokenV2 = (req, res, next) => {
  * the JWT audience claim. Routes that legitimately operate without a
  * company scope pass through unchanged.
  *
- * Non-ObjectId candidates (e.g. the global "USER_PROFILES" bucket name
- * used for user profile pictures) pass through too — they aren't real
- * company tenants, and the controllers that accept them have their own
+ * A non-ObjectId `companyid` header is refused, because handlers open the
+ * header's value as a database name. Non-ObjectId values in the
+ * body, params or query (e.g. the global "USER_PROFILES" bucket name used
+ * for user profile pictures) pass through — they aren't real company
+ * tenants, and the controllers that accept them have their own
  * authorization for that bucket. Forcing them through this check would
- * 400-block legitimate uploads.
+ * block legitimate uploads.
+ *
+ * Every company the request names is checked, the `companyid` header first: this used to judge
+ * the body before the header, while `tenantOf` takes the header before the body, so a request
+ * could be judged on one company and then served for another.
  *
  * Applied after `verifyJWTTokenV2` so `req.aud` is already populated.
  */
 const requireCompanyAud = (req, res, next) => {
     try {
-        const candidate =
-            (req.body && (req.body.companyId || req.body.CompanyId)) ||
-            (req.params && req.params.companyId) ||
-            (req.query && req.query.companyId) ||
-            (req.headers && req.headers.companyid) ||
-            null;
-
-        if (!candidate) return next();
-
-        const companyId = String(candidate).trim();
-        // Skip enforcement for non-ObjectId values (special buckets like
-        // USER_PROFILES). Those aren't tenants and have controller-level
-        // checks.
-        if (!OBJECT_ID_PATTERN.test(companyId)) {
-            return next();
+        const header = String((req.headers && req.headers.companyid) || '').trim();
+        if (header && !OBJECT_ID_PATTERN.test(header)) {
+            return res.status(403).json({
+                status: false,
+                error: 'Invalid company id',
+                statusText: 'Forbidden',
+                isJwtError: true,
+            });
         }
-        if (!isCompanyInAudience(req.aud, companyId)) {
+        const candidates = [
+            req.headers && req.headers.companyid,
+            req.params && req.params.companyId,
+            req.query && req.query.companyId,
+            req.body && req.body.companyId,
+            req.body && req.body.CompanyId,
+        ].map((value) => String(value == null ? '' : value).trim())
+            .filter((value) => OBJECT_ID_PATTERN.test(value));
+
+        if (candidates.some((companyId) => !isCompanyInAudience(req.aud, companyId))) {
             return res.status(403).json({
                 status: false,
                 error: 'You do not have access to this company',
@@ -609,6 +644,37 @@ const requireCompanyAud = (req, res, next) => {
             statusText: 'Unauthorized',
             isJwtError: true,
         });
+    }
+};
+
+/**
+ * The live membership re-check `verifyJWTTokenWithCV2` does, for the company routes that take
+ * their company from the request body and so only ever ran `verifyJWTTokenV2` + `requireCompanyAud`.
+ * The audience is frozen at login, so without this a caller removed from the company keeps
+ * reaching those handlers with the token they already hold.
+ *
+ * API-token requests are left alone: `verifyApiTokenRequest` has already re-checked membership.
+ */
+const requireLiveCompanyMembership = async (req, res, next) => {
+    if (req.apiToken) return next();
+    try {
+        const { namedCompanyIds } = require('./tenant');
+        const named = namedCompanyIds(req).filter((companyId) => OBJECT_ID_PATTERN.test(companyId));
+        for (const companyId of named) {
+            if (!(await verifyCompanyMembership(req.uid, companyId))) {
+                return res.status(403).json({
+                    status: false,
+                    error: 'You are no longer a member of this company',
+                    statusText: 'Forbidden',
+                    isJwtError: true,
+                    isLogout: true,
+                });
+            }
+        }
+        return next();
+    } catch (error) {
+        logger.error(`requireLiveCompanyMembership error for uid=${req.uid}: ${error.message || error}`);
+        return res.status(403).json({ status: false, error: 'Forbidden', statusText: 'Forbidden' });
     }
 };
 
@@ -666,10 +732,14 @@ module.exports = {
     verifyJWTToken: verifyJWTToken,
     verifyJWTTokenV2: verifyJWTTokenV2,
     verifyToken: verifyToken,
+    resolveAccessSession: resolveAccessSession,
     removeCacheAndCookie: removeCacheAndCookie,
     requireCompanyAud: requireCompanyAud,
+    requireLiveCompanyMembership: requireLiveCompanyMembership,
     // BUG-013 / #67
     verifyCompanyMembership: verifyCompanyMembership,
     invalidateMembershipCache: invalidateMembershipCache,
     getMembershipCacheTtlSeconds: getMembershipCacheTtlSeconds,
+    PAT_BLOCKED_PATH_PREFIX: PAT_BLOCKED_PATH_PREFIX,
+    PAT_ALLOWED_EXCEPTIONS: PAT_ALLOWED_EXCEPTIONS,
 }

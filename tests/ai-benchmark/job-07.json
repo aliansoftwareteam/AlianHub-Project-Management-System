@@ -1,0 +1,400 @@
+{
+    "job": 7,
+    "title": "Bulk-edit twenty",
+    "sentence": "Set \"[AI bench] bulk 01\" to \"bulk 20\" to high priority and assign them all to Priya Other.",
+    "start": "The list",
+    "passed": "AI-1 run 1, 2026-10-08, builds 815 to 817: pass with one approval, 7 steps. The run's first batch named its steps with underscores and was refused (fixed in #1569); the batch kept here is the one that was filed",
+    "kept": "Rebuilt on 2026-10-09 from Tasks/active/047-ai-run/ai-1-run-1-results.md and the tool path of the job in ai-benchmark.md: the run did not record its calls. Ids are named by placeholder and resolved against the replay world.",
+    "calls": [
+        {
+            "tool": "person.place",
+            "arguments": {},
+            "answer": "read"
+        },
+        {
+            "tool": "tasks.search",
+            "arguments": {
+                "projectId": "$project",
+                "query": "[AI bench] bulk",
+                "limit": 50
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "members.list",
+            "arguments": {
+                "query": "Priya"
+            },
+            "answer": "read"
+        },
+        {
+            "tool": "tasks.batch",
+            "arguments": {
+                "reason": "Bulk 01 to 20: high priority, assigned to Priya Other",
+                "operations": [
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 01",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 02",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 03",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 04",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 05",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 06",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 07",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 08",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 09",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 10",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 11",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 12",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 13",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 14",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 15",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 16",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 17",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 18",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 19",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.update",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 20",
+                            "priority": "HIGH"
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 01",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 02",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 03",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 04",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 05",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 06",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 07",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 08",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 09",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 10",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 11",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 12",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 13",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 14",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 15",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 16",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 17",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 18",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 19",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    },
+                    {
+                        "tool": "task.assign",
+                        "arguments": {
+                            "taskId": "$task:[AI bench] bulk 20",
+                            "mode": "set",
+                            "userIds": [
+                                "$teammate"
+                            ]
+                        }
+                    }
+                ]
+            },
+            "answer": "pending"
+        }
+    ],
+    "preview": {
+        "kind": "batch",
+        "tasks": 20,
+        "changes": 40,
+        "lines": [
+            {
+                "kind": "batchChange",
+                "what": "priority",
+                "count": 20,
+                "value": "HIGH"
+            },
+            {
+                "kind": "batchChange",
+                "what": "assignees",
+                "count": 20
+            }
+        ]
+    },
+    "approve": true,
+    "undo": true
+}

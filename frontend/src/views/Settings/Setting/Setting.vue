@@ -1,5 +1,5 @@
 <template>
-<div class="main-setting_wrapper style-scroll p-1">
+<div class="main-setting_wrapper setting-style-scroll p-1">
     <div v-if="checkPermission('settings.settings_edit_company') !== null || checkPermission('settings.settings_task_priority') !== null
         || checkPermission('settings.milestone_weekly_range') !== null || checkPermission('settings.settings_file_extensions') !== null
         || checkPermission('settings.settings_project_milestone_status') !== null">
@@ -29,17 +29,17 @@
                 -->
                 <SettingScreenshotRetention />
                 <SettingAutoCloseProjects />
+                <SettingAiSwitch />
                 <SettingTimeReminder />
             </div>
         </div>
     </div>
-    <div v-else class="text-center">
-        <img :src="accesDenied" />
-    </div>
+    <AppState v-else kind="denied" />
 </div>
 </template>
 
 <script setup>
+import AppState from '@/components/molecules/AppState/AppState.vue';
 import SettingCompanyDetailsVue from "@/components/molecules/Setting/SettingCompanyDetails.vue";
 import SettingTaskPriorityVue from "@/components/molecules/Setting/SettingTaskPriority.vue";
 import SettingMilestoneWeeklyRange from "@/components/molecules/Setting/SettingMilestoneWeeklyRange.vue";
@@ -49,10 +49,10 @@ import SettingProjectSkills from "@/components/molecules/Setting/SettingProjectS
 import SettingCurrency from "@/components/molecules/Setting/SettingCurrencys.vue";
 import SettingScreenshotRetention from "@/components/molecules/Setting/SettingScreenshotRetention.vue";
 import SettingAutoCloseProjects from "@/components/molecules/Setting/SettingAutoCloseProjects.vue";
+import SettingAiSwitch from "@/components/molecules/Setting/SettingAiSwitch.vue";
 import SettingTimeReminder from "@/components/molecules/Setting/SettingTimeReminder.vue";
 import { defineComponent} from "vue";
 import { useCustomComposable } from '@/composable';
-const accesDenied = require("@/assets/images/access_denied_img.png");
 const { checkPermission } = useCustomComposable();
 defineComponent({
     name: "SettingComponent",
@@ -77,4 +77,20 @@ defineComponent({
 /* .main-setting_wrapper{
     height: calc(100vh - 101px);
 } */
+</style>
+
+<style scoped>
+.setting-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.setting-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.setting-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

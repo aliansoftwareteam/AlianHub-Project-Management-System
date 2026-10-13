@@ -1,0 +1,280 @@
+{
+  "about": "Shared by the server test and the web app spec of Modules/Forms/helpers/formLogic.js. A case puts one rule on a question placed after its source and says whether that question is shown for the answer. A case with no answer is an unanswered source.",
+  "sources": {
+    "text": { "id": "q_text", "type": "short_text", "label": "Company" },
+    "long": { "id": "q_long", "type": "long_text", "label": "Details" },
+    "email": { "id": "q_email", "type": "email", "label": "Email" },
+    "website": { "id": "q_site", "type": "website", "label": "Website" },
+    "phone": { "id": "q_phone", "type": "phone", "label": "Phone" },
+    "location": { "id": "q_place", "type": "location", "label": "Location" },
+    "number": { "id": "q_num", "type": "number", "label": "Seats" },
+    "money": { "id": "q_money", "type": "money", "label": "Budget" },
+    "progress": { "id": "q_progress", "type": "progress", "label": "Done so far" },
+    "rating": { "id": "q_rating", "type": "rating", "label": "Score", "max": 5 },
+    "date": { "id": "q_date", "type": "date", "label": "Needed by" },
+    "dropdown": {
+      "id": "q_kind", "type": "dropdown", "label": "Kind",
+      "options": [{ "id": "o1", "label": "Bug" }, { "id": "o2", "label": "Feature" }, { "id": "o3", "label": "Question" }]
+    },
+    "checkbox": {
+      "id": "q_pick", "type": "checkbox", "label": "Pick one",
+      "options": [{ "id": "o1", "label": "Yes" }, { "id": "o2", "label": "No" }]
+    },
+    "voting": {
+      "id": "q_vote", "type": "voting", "label": "Vote",
+      "options": [{ "id": "o1", "label": "For" }, { "id": "o2", "label": "Against" }, { "id": "o3", "label": "Abstain" }]
+    },
+    "priority": {
+      "id": "q_priority", "type": "dropdown", "mapTo": "Task_Priority", "label": "Priority",
+      "options": [{ "id": "LOW", "label": "LOW" }, { "id": "MEDIUM", "label": "MEDIUM" }, { "id": "HIGH", "label": "HIGH" }, { "id": "URGENT", "label": "URGENT" }]
+    },
+    "labels": {
+      "id": "q_tags", "type": "labels", "label": "Areas",
+      "options": [{ "id": "o1", "label": "Billing" }, { "id": "o2", "label": "Login" }, { "id": "o3", "label": "Reports" }]
+    }
+  },
+  "cases": [
+    { "source": "text", "op": "equals", "value": "acme", "answer": "Acme ", "shown": true },
+    { "source": "text", "op": "equals", "value": "acme", "answer": "Acme Ltd", "shown": false },
+    { "source": "text", "op": "equals", "value": "acme", "shown": false },
+    { "source": "text", "op": "equals", "value": "acme", "answer": ["acme", "other"], "shown": true },
+    { "source": "text", "op": "not_equals", "value": "acme", "answer": "Other", "shown": true },
+    { "source": "text", "op": "not_equals", "value": "acme", "answer": "ACME", "shown": false },
+    { "source": "text", "op": "not_equals", "value": "acme", "shown": true },
+    { "source": "text", "op": "contains", "value": "urgent", "answer": "This is URGENT", "shown": true },
+    { "source": "text", "op": "contains", "value": "urgent", "answer": "calm", "shown": false },
+    { "source": "text", "op": "contains", "value": "urgent", "shown": false },
+    { "source": "text", "op": "is_empty", "answer": "", "shown": true },
+    { "source": "text", "op": "is_empty", "answer": "   ", "shown": true },
+    { "source": "text", "op": "is_empty", "answer": "x", "shown": false },
+    { "source": "text", "op": "is_empty", "shown": true },
+    { "source": "text", "op": "is_not_empty", "answer": "x", "shown": true },
+    { "source": "text", "op": "is_not_empty", "shown": false },
+    { "source": "long", "op": "contains", "value": "refund", "answer": "Please\nREFUND me", "shown": true },
+    { "source": "long", "op": "is_empty", "shown": true },
+    { "source": "email", "op": "contains", "value": "@acme.test", "answer": "pat@acme.test", "shown": true },
+    { "source": "email", "op": "equals", "value": "pat@acme.test", "answer": "sam@acme.test", "shown": false },
+    { "source": "website", "op": "contains", "value": "acme", "answer": "https://acme.test", "shown": true },
+    { "source": "phone", "op": "is_not_empty", "answer": "+1 555 0100", "shown": true },
+    { "source": "location", "op": "equals", "value": "pune", "answer": "Pune", "shown": true },
+
+    { "source": "number", "op": "equals", "value": 5, "answer": "5", "shown": true },
+    { "source": "number", "op": "equals", "value": 5, "answer": "5.0", "shown": true },
+    { "source": "number", "op": "equals", "value": 5, "answer": "6", "shown": false },
+    { "source": "number", "op": "equals", "value": 5, "answer": "five", "shown": false },
+    { "source": "number", "op": "equals", "value": 5, "shown": false },
+    { "source": "number", "op": "equals", "value": 0, "answer": "0", "shown": true },
+    { "source": "number", "op": "not_equals", "value": 5, "answer": "6", "shown": true },
+    { "source": "number", "op": "not_equals", "value": 5, "answer": "5", "shown": false },
+    { "source": "number", "op": "not_equals", "value": 5, "shown": true },
+    { "source": "number", "op": "greater_than", "value": 10, "answer": "11", "shown": true },
+    { "source": "number", "op": "greater_than", "value": 10, "answer": "10", "shown": false },
+    { "source": "number", "op": "greater_than", "value": 10, "answer": "1,200", "shown": true },
+    { "source": "number", "op": "greater_than", "value": 10, "answer": "lots", "shown": false },
+    { "source": "number", "op": "greater_than", "value": 10, "shown": false },
+    { "source": "number", "op": "less_than", "value": 10, "answer": "9", "shown": true },
+    { "source": "number", "op": "less_than", "value": 10, "answer": "10", "shown": false },
+    { "source": "number", "op": "less_than", "value": 10, "answer": "-3", "shown": true },
+    { "source": "number", "op": "less_than", "value": 10, "shown": false },
+    { "source": "number", "op": "is_empty", "answer": "lots", "shown": true },
+    { "source": "number", "op": "is_empty", "answer": "0", "shown": false },
+    { "source": "number", "op": "is_not_empty", "answer": "0", "shown": true },
+    { "source": "money", "op": "equals", "value": 19.99, "answer": "19.99", "shown": true },
+    { "source": "money", "op": "greater_than", "value": 1000, "answer": "999.99", "shown": false },
+    { "source": "progress", "op": "greater_than", "value": 50, "answer": "55", "shown": true },
+    { "source": "progress", "op": "less_than", "value": 50, "answer": "0", "shown": true },
+    { "source": "rating", "op": "equals", "value": 4, "answer": "4", "shown": true },
+    { "source": "rating", "op": "less_than", "value": 3, "answer": "2", "shown": true },
+    { "source": "rating", "op": "less_than", "value": 3, "answer": 4, "shown": false },
+
+    { "source": "date", "op": "equals", "value": "2026-10-01", "answer": "2026-10-01", "shown": true },
+    { "source": "date", "op": "equals", "value": "2026-10-01", "answer": "2026-10-02", "shown": false },
+    { "source": "date", "op": "not_equals", "value": "2026-10-01", "answer": "2026-10-02", "shown": true },
+    { "source": "date", "op": "not_equals", "value": "2026-10-01", "shown": true },
+    { "source": "date", "op": "greater_than", "value": "2026-10-01", "answer": "2026-10-02", "shown": true },
+    { "source": "date", "op": "greater_than", "value": "2026-10-01", "answer": "2026-10-01", "shown": false },
+    { "source": "date", "op": "greater_than", "value": "2026-10-01", "answer": "2026-09-30", "shown": false },
+    { "source": "date", "op": "greater_than", "value": "2026-10-01", "answer": "", "shown": false },
+    { "source": "date", "op": "less_than", "value": "2026-10-01", "answer": "2026-09-30", "shown": true },
+    { "source": "date", "op": "less_than", "value": "2026-10-01", "shown": false },
+    { "source": "date", "op": "is_empty", "answer": "soon", "shown": true },
+    { "source": "date", "op": "is_empty", "answer": "2026-02-30", "shown": true },
+    { "source": "date", "op": "is_not_empty", "answer": "2026-02-28", "shown": true },
+
+    { "source": "dropdown", "op": "equals", "value": "o1", "answer": "Bug", "shown": true },
+    { "source": "dropdown", "op": "equals", "value": "o1", "answer": "Feature", "shown": false },
+    { "source": "dropdown", "op": "equals", "value": "o1", "answer": "o1", "shown": false },
+    { "source": "dropdown", "op": "equals", "value": "o1", "answer": "Something else", "shown": false },
+    { "source": "dropdown", "op": "equals", "value": "o1", "shown": false },
+    { "source": "dropdown", "op": "not_equals", "value": "o1", "answer": "Feature", "shown": true },
+    { "source": "dropdown", "op": "not_equals", "value": "o1", "answer": "Bug", "shown": false },
+    { "source": "dropdown", "op": "not_equals", "value": "o1", "shown": true },
+    { "source": "dropdown", "op": "one_of", "value": ["o1", "o3"], "answer": "Question", "shown": true },
+    { "source": "dropdown", "op": "one_of", "value": ["o1", "o3"], "answer": "Feature", "shown": false },
+    { "source": "dropdown", "op": "one_of", "value": ["o1", "o3"], "shown": false },
+    { "source": "dropdown", "op": "is_empty", "answer": "Something else", "shown": true },
+    { "source": "dropdown", "op": "is_not_empty", "answer": "Bug", "shown": true },
+    { "source": "checkbox", "op": "equals", "value": "o1", "answer": "Yes", "shown": true },
+    { "source": "checkbox", "op": "equals", "value": "o1", "answer": "No", "shown": false },
+    { "source": "checkbox", "op": "is_empty", "shown": true },
+    { "source": "voting", "op": "one_of", "value": ["o2", "o3"], "answer": "Abstain", "shown": true },
+    { "source": "voting", "op": "not_equals", "value": "o1", "answer": "For", "shown": false },
+    { "source": "priority", "op": "equals", "value": "HIGH", "answer": "HIGH", "shown": true },
+    { "source": "priority", "op": "one_of", "value": ["HIGH", "URGENT"], "answer": "LOW", "shown": false },
+
+    { "source": "labels", "op": "contains", "value": "o2", "answer": ["Billing", "Login"], "shown": true },
+    { "source": "labels", "op": "contains", "value": "o2", "answer": "Login", "shown": true },
+    { "source": "labels", "op": "contains", "value": "o2", "answer": ["Billing"], "shown": false },
+    { "source": "labels", "op": "contains", "value": "o2", "shown": false },
+    { "source": "labels", "op": "one_of", "value": ["o1", "o3"], "answer": ["Login", "Reports"], "shown": true },
+    { "source": "labels", "op": "one_of", "value": ["o1", "o3"], "answer": ["Login"], "shown": false },
+    { "source": "labels", "op": "is_empty", "answer": [], "shown": true },
+    { "source": "labels", "op": "is_empty", "answer": ["Not offered"], "shown": true },
+    { "source": "labels", "op": "is_empty", "answer": ["Billing"], "shown": false },
+    { "source": "labels", "op": "is_not_empty", "answer": "Billing", "shown": true }
+  ],
+  "forms": [
+    {
+      "name": "any of: one condition holding is enough",
+      "questions": [
+        { "id": "a", "type": "short_text", "label": "A" },
+        { "id": "b", "type": "number", "label": "B" },
+        { "id": "t", "type": "short_text", "label": "T", "showWhen": { "any": [{ "question": "a", "op": "equals", "value": "yes" }, { "question": "b", "op": "greater_than", "value": 3 }] } }
+      ],
+      "answers": { "a": "no", "b": "4" },
+      "shown": ["a", "b", "t"]
+    },
+    {
+      "name": "all of: one condition failing hides the question",
+      "questions": [
+        { "id": "a", "type": "short_text", "label": "A" },
+        { "id": "b", "type": "number", "label": "B" },
+        { "id": "t", "type": "short_text", "label": "T", "showWhen": { "all": [{ "question": "a", "op": "equals", "value": "yes" }, { "question": "b", "op": "greater_than", "value": 3 }] } }
+      ],
+      "answers": { "a": "yes", "b": "3" },
+      "shown": ["a", "b"]
+    },
+    {
+      "name": "a group inside a group",
+      "questions": [
+        { "id": "a", "type": "short_text", "label": "A" },
+        { "id": "b", "type": "number", "label": "B" },
+        { "id": "c", "type": "date", "label": "C" },
+        { "id": "t", "type": "short_text", "label": "T", "showWhen": { "all": [{ "question": "a", "op": "is_not_empty" }, { "any": [{ "question": "b", "op": "less_than", "value": 0 }, { "question": "c", "op": "greater_than", "value": "2026-01-01" }] }] } }
+      ],
+      "answers": { "a": "x", "b": "5", "c": "2026-06-01" },
+      "shown": ["a", "b", "c", "t"]
+    },
+    {
+      "name": "a group inside a group, the inner one failing",
+      "questions": [
+        { "id": "a", "type": "short_text", "label": "A" },
+        { "id": "b", "type": "number", "label": "B" },
+        { "id": "c", "type": "date", "label": "C" },
+        { "id": "t", "type": "short_text", "label": "T", "showWhen": { "all": [{ "question": "a", "op": "is_not_empty" }, { "any": [{ "question": "b", "op": "less_than", "value": 0 }, { "question": "c", "op": "greater_than", "value": "2026-01-01" }] }] } }
+      ],
+      "answers": { "a": "x", "b": "5", "c": "2025-06-01" },
+      "shown": ["a", "b", "c"]
+    },
+    {
+      "name": "an answer to a hidden question does not count for the questions after it",
+      "questions": [
+        { "id": "a", "type": "short_text", "label": "A" },
+        { "id": "b", "type": "short_text", "label": "B", "showWhen": { "all": [{ "question": "a", "op": "equals", "value": "yes" }] } },
+        { "id": "c", "type": "short_text", "label": "C", "showWhen": { "all": [{ "question": "b", "op": "is_not_empty" }] } }
+      ],
+      "answers": { "a": "no", "b": "typed before it was hidden" },
+      "shown": ["a"]
+    },
+    {
+      "name": "a chain that holds all the way down",
+      "questions": [
+        { "id": "a", "type": "short_text", "label": "A" },
+        { "id": "b", "type": "short_text", "label": "B", "showWhen": { "all": [{ "question": "a", "op": "equals", "value": "yes" }] } },
+        { "id": "c", "type": "short_text", "label": "C", "showWhen": { "all": [{ "question": "b", "op": "is_not_empty" }] } }
+      ],
+      "answers": { "a": "yes", "b": "typed" },
+      "shown": ["a", "b", "c"]
+    },
+    {
+      "name": "a question hidden from the form stays hidden whatever its rule says",
+      "questions": [
+        { "id": "a", "type": "short_text", "label": "A" },
+        { "id": "b", "type": "short_text", "label": "B", "hidden": true },
+        { "id": "c", "type": "short_text", "label": "C", "hidden": true, "showWhen": { "all": [{ "question": "a", "op": "is_not_empty" }] } }
+      ],
+      "answers": { "a": "x" },
+      "shown": ["a"]
+    },
+    {
+      "name": "no rule, a null rule and an empty rule all mean shown",
+      "questions": [
+        { "id": "a", "type": "short_text", "label": "A" },
+        { "id": "b", "type": "short_text", "label": "B", "showWhen": null },
+        { "id": "c", "type": "short_text", "label": "C", "showWhen": { "all": [] } }
+      ],
+      "answers": {},
+      "shown": ["a", "b", "c"]
+    },
+    {
+      "name": "an information block can be shown by a rule",
+      "questions": [
+        { "id": "a", "type": "number", "label": "A" },
+        { "id": "note", "type": "info_block", "label": "Large orders", "showWhen": { "all": [{ "question": "a", "op": "greater_than", "value": 100 }] } }
+      ],
+      "answers": { "a": "50" },
+      "shown": ["a"]
+    }
+  ],
+  "malformed": [
+    { "name": "a code string", "rule": "answers.a === 'yes'" },
+    { "name": "a list", "rule": [{ "question": "a", "op": "is_empty" }] },
+    { "name": "both all and any", "rule": { "all": [{ "question": "a", "op": "is_empty" }], "any": [{ "question": "a", "op": "is_empty" }] } },
+    { "name": "an unknown group key", "rule": { "none": [{ "question": "a", "op": "is_empty" }] } },
+    { "name": "a group that is not a list", "rule": { "all": { "question": "a", "op": "is_empty" } } },
+    { "name": "an unknown operator", "rule": { "all": [{ "question": "a", "op": "matches", "value": ".*" }] } },
+    { "name": "an extra key on a condition", "rule": { "all": [{ "question": "a", "op": "is_empty", "script": "alert(1)" }] } },
+    { "name": "a value on an operator that takes none", "rule": { "all": [{ "question": "a", "op": "is_empty", "value": "x" }] } },
+    { "name": "a missing value", "rule": { "all": [{ "question": "a", "op": "equals" }] } },
+    { "name": "an empty text value", "rule": { "all": [{ "question": "a", "op": "equals", "value": "  " }] } },
+    { "name": "an operator the question type does not offer", "rule": { "all": [{ "question": "n", "op": "contains", "value": "1" }] } },
+    { "name": "a text value for a number question", "rule": { "all": [{ "question": "n", "op": "greater_than", "value": "10" }] } },
+    { "name": "a date that is not a day", "rule": { "all": [{ "question": "d", "op": "equals", "value": "tomorrow" }] } },
+    { "name": "an option the question does not have", "rule": { "all": [{ "question": "k", "op": "equals", "value": "o9" }] } },
+    { "name": "one_of with no list", "rule": { "all": [{ "question": "k", "op": "one_of", "value": "o1" }] } },
+    { "name": "one_of with an empty list", "rule": { "all": [{ "question": "k", "op": "one_of", "value": [] }] } },
+    { "name": "a question that is not on the form", "rule": { "all": [{ "question": "nowhere", "op": "is_empty" }] } },
+    { "name": "a question hidden from the form", "rule": { "all": [{ "question": "h", "op": "is_empty" }] } },
+    { "name": "a file question", "rule": { "all": [{ "question": "f", "op": "is_empty" }] } },
+    { "name": "the question itself", "rule": { "all": [{ "question": "t", "op": "is_empty" }] } },
+    { "name": "a question further down", "rule": { "all": [{ "question": "z", "op": "is_empty" }] } },
+    { "name": "an empty group inside", "rule": { "all": [{ "any": [] }] } },
+    {
+      "name": "three levels of groups",
+      "rule": { "all": [{ "any": [{ "all": [{ "question": "a", "op": "is_empty" }] }] }] }
+    },
+    {
+      "name": "eleven conditions",
+      "rule": {
+        "any": [
+          { "question": "a", "op": "equals", "value": "1" }, { "question": "a", "op": "equals", "value": "2" },
+          { "question": "a", "op": "equals", "value": "3" }, { "question": "a", "op": "equals", "value": "4" },
+          { "question": "a", "op": "equals", "value": "5" }, { "question": "a", "op": "equals", "value": "6" },
+          { "question": "a", "op": "equals", "value": "7" }, { "question": "a", "op": "equals", "value": "8" },
+          { "question": "a", "op": "equals", "value": "9" }, { "question": "a", "op": "equals", "value": "10" },
+          { "question": "a", "op": "equals", "value": "11" }
+        ]
+      }
+    }
+  ],
+  "malformedForm": [
+    { "id": "a", "type": "short_text", "label": "A" },
+    { "id": "n", "type": "number", "label": "N" },
+    { "id": "d", "type": "date", "label": "D" },
+    { "id": "k", "type": "dropdown", "label": "K", "options": [{ "id": "o1", "label": "One" }, { "id": "o2", "label": "Two" }] },
+    { "id": "h", "type": "short_text", "label": "H", "hidden": true },
+    { "id": "f", "type": "files", "label": "F" },
+    { "id": "t", "type": "short_text", "label": "T" },
+    { "id": "z", "type": "short_text", "label": "Z" }
+  ]
+}

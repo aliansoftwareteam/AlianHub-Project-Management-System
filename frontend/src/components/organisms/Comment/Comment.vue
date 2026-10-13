@@ -1,15 +1,27 @@
 <template>
     <div>
-        <div v-if="showDay" class="position-re bg-gray my-1 w-100 show__day">
-            <span class="bg-light-gray position-ab px-1 border-radius-5-px cursor-default show__day-format">{{convertDateFormat(message.createdAt)}}</span>
+        <div v-if="showDay" class="position-re comment-bg-gray my-1 w-100 show__day">
+            <span class="position-ab px-1 border-radius-5-px cursor-default show__day-format">{{convertDateFormat(message.createdAt)}}</span>
         </div>
         <div v-if="showUnread" class="d-flex justify-content-center w-100 mt-10px">
-            <span class="border-radius-10-px cursor-default text-center unread__message-text bg-lightgreen py-10px">{{showUnread}} {{$t('Comments.unread_message')}}</span>
+            <span class="border-radius-10-px cursor-default text-center unread__message-text comment-bg-lightgreen py-10px">{{showUnread}} {{$t('Comments.unread_message')}}</span>
         </div>
         <div class="message d-flex align-items-center mt-1" :style="{marginTop: (!showMessageTime ? '5px' : '')}" :class="{'right-message': message.sent, 'justify-content-between': !message.sent}">
             <div class="d-flex" :style="{paddingLeft: (!message.sent && !showUser ? '35px' : '')}">
-                <UserProfile
-                    v-if="!message.sent && showUser"
+                <span
+                    v-if="!message.sent && showUser && agentAuthor"
+                    class="ah-avatar ah-avatar--agent message__profile-image message__agent-avatar mr-10px"
+                    :title="authorName"
+                    aria-hidden="true"
+                >◉</span>
+                <span
+                    v-else-if="!message.sent && showUser && automationAuthor"
+                    class="ah-avatar ah-avatar--automation message__profile-image message__agent-avatar mr-10px"
+                    :title="authorName"
+                    aria-hidden="true"
+                >⚙</span>
+                <UserProfile decorative
+                    v-else-if="!message.sent && showUser"
                     :showDot="false"
                     class="cursor-pointer profile-image message__profile-image mr-10px"
                     :data="{
@@ -22,18 +34,20 @@
                 />
                 <div>
                     <div class="cursor-default mb-5px" :class="{'text-right': message.sent, 'text-left': !message.sent}">
-                        <span v-if="showUser" class="font-size-14 font-weight-700 mr-5px color63 show__user">
-                            {{!message.sent ? getUser(message.userId).Employee_Name : ''}}
+                        <span v-if="showUser" class="comment-font-size-14 comment-font-weight-700 mr-5px comment-color63 show__user">
+                            {{!message.sent ? authorName : ''}}
                         </span>
-                        <span class="font-size-12 font-weight-300 gray text-lowercase show" v-if="showMessageTime">
+                        <span v-if="showUser && !message.sent && agentAuthor" class="ah-chip ah-chip--agent ah-chip--mono mr-5px">{{ $t('Comments.agent_tag') }}</span>
+                        <span v-else-if="showUser && !message.sent && automationAuthor" class="ah-chip ah-chip--automation ah-chip--mono mr-5px">{{ $t('Comments.automation_tag') }}</span>
+                        <span class="comment-font-size-12 font-weight-300 comment-gray text-lowercase show" v-if="showMessageTime">
                             {{getDateType(new Date(message.createdAt).getTime())}}
                         </span>
                     </div>
                     <div class="d-flex position-re" :class="{'justify-content-end': message.sent}">
-                        <span v-if="!message.isDeleted && message.sent && new Date(message.createdAt)?.getTime() !== new Date(message.updatedAt)?.getTime()" class="font-size-10">({{$t('Comments.edited')}})</span>
-                        <div :id="message._id" class="border-radius-10-px p-10px message_id-sent" :class="{'bg-white': !message.sent, 'bg-light-blue': message.sent}" :style="`${message.type !== 'text' || message.type !== 'link' ? 'width: auto;' : ''}`">
+                        <span v-if="!message.isDeleted && message.sent && new Date(message.createdAt)?.getTime() !== new Date(message.updatedAt)?.getTime()" class="comment-font-size-10">({{$t('Comments.edited')}})</span>
+                        <div :id="message._id" class="border-radius-10-px p-10px message_id-sent" :class="{'comment-bg-white': !message.sent, 'comment-bg-light-blue': message.sent}" :style="`${message.type !== 'text' || message.type !== 'link' ? 'width: auto;' : ''}`">
                             <template v-if="message.isDeleted">
-                                <pre class="red font-italic" v-html="message.userId === userId ? $t('Comments.You_deleted_this_message') : $t('Comments.This_message_is_deleted')"/>
+                                <pre class="comment-red comment-font-italic" v-html="message.userId === userId ? $t('Comments.You_deleted_this_message') : $t('Comments.This_message_is_deleted')"/>
                             </template>
                             <template v-else>
                                 <Spinner
@@ -84,8 +98,19 @@
                                 <template v-else>
                                     <template v-if="message.hasReply">
                                         <div>
-                                            <div @click="$emit('highlight', message.reply)" class="d-flex align-items-center border-radius-10-px cursor-pointer p-10px mb-5px message_replay" :class="{'bg-light-gray': !message.sent, 'bg-fresh-air' : message.sent}">
-                                                <UserProfile
+                                            <div @click="$emit('highlight', message.reply)" class="d-flex align-items-center border-radius-10-px cursor-pointer p-10px mb-5px message_replay" :class="{'comment-bg-light-gray': !message.sent, 'comment-bg-fresh-air' : message.sent}">
+                                                <span
+                                                    v-if="replyAgentAuthor"
+                                                    class="ah-avatar ah-avatar--agent message__profile-image message__agent-avatar mr-10px"
+                                                    aria-hidden="true"
+                                                >◉</span>
+                                                <span
+                                                    v-else-if="replyAutomationAuthor"
+                                                    class="ah-avatar ah-avatar--automation message__profile-image message__agent-avatar mr-10px"
+                                                    aria-hidden="true"
+                                                >⚙</span>
+                                                <UserProfile decorative
+                                                    v-else
                                                     :showDot="false"
                                                     class="profile-image message__profile-image mr-10px"
                                                     :data="{
@@ -96,16 +121,16 @@
                                                     width="30px"
                                                     :thumbnail="'30x30'"
                                                 />
-                                                <strong class="text-nowrap mr-5px">{{getUser(message.reply_userId).Employee_Name}}: </strong>
+                                                <strong class="text-nowrap mr-5px">{{ replyAuthorName }}: </strong>
                                                 <pre
                                                     class="text-ellipsis text-nowrap white__space-nowrap"
-                                                    :title="['link', 'text'].includes(message.reply_type) ? checkLink(changeText(message?.reply_message || ''), true) : message?.reply_mediaOriginalName"
-                                                    v-html="['link', 'text'].includes(message.reply_type) ? checkLink(changeText(message?.reply_message || ''), true) : message?.reply_mediaOriginalName"
+                                                    :title="['link', 'text'].includes(message.reply_type) ? commentPlainText(message?.reply_message) : message?.reply_mediaOriginalName"
+                                                    v-html="commentHtml(['link', 'text'].includes(message.reply_type) ? message?.reply_message : message?.reply_mediaOriginalName, { links: true })"
                                                 />
                                             </div>
                                             <pre
-                                                :class="{'para-overflow': message.overflow && !showMore}"
-                                                v-html="message.type === 'link' ? checkLink(changeText(message.message), true) : changeText(message.message)"
+                                                :class="{'para-overflow': message.overflow && !showMore, 'message__agent-body': agentAuthor}"
+                                                v-html="bodyHtml"
                                             />
                                             <div v-if="message.overflow" class="text-center cursor-pointer border-top mt-10px pt-5px text-center" @click="showMore = !showMore">
                                                 <span>{{$t('Permissions.Read')}} {{showMore ? $t('Comments.less') : $t('Comments.more')}}</span>
@@ -114,8 +139,8 @@
                                     </template>
                                     <template v-else>
                                         <pre
-                                            :class="{'para-overflow': message.overflow && !showMore}"
-                                            v-html="message.type === 'link' ? checkLink(changeText(message.message), true) : changeText(message.message)"
+                                            :class="{'para-overflow': message.overflow && !showMore, 'message__agent-body': agentAuthor}"
+                                            v-html="bodyHtml"
                                         />
                                         <div v-if="message.overflow" class="text-center cursor-pointer border-top mt-10px pt-5px text-center" @click="showMore = !showMore">
                                             <span>{{$t('Permissions.Read')}} {{showMore ? $t('Comments.less') : $t('Comments.more')}}</span>
@@ -124,7 +149,7 @@
                                 </template>
                             </template>
                         </div>
-                        <span v-if="!message.isDeleted && !message.sent && new Date(message.createdAt).getTime() !== new Date(message.updatedAt).getTime()"  class="font-size-10">({{$t('Comments.edited')}})</span>
+                        <span v-if="!message.isDeleted && !message.sent && new Date(message.createdAt).getTime() !== new Date(message.updatedAt).getTime()"  class="comment-font-size-10">({{$t('Comments.edited')}})</span>
                         <ReactionBar
                             v-if="!message.isDeleted"
                             :reactions="localReactions"
@@ -133,37 +158,38 @@
                             @toggle="(emoji) => toggleCommentReaction(emoji)"
                         />
                     </div>
+                    <slot name="thread" />
                 </div>
             </div>
-            <DropDown v-if="showOptions && !message?.isDeleted" class="align-self-start"  :bodyClass="{'comments__message--dropdown' : true}">
+            <DropDown mode="menu" themed v-if="showOptions && !message?.isDeleted" class="align-self-start"  :bodyClass="{'comments__message--dropdown' : true}">
                 <template #button>
-                    <img :ref="`message_option_${message._id}`" :src="verticalDots" alt="verticalDots" class="cursor-pointer ml-10px" :class="[showMessageTime ? 'mt-30px' : 'mt-10px']">
+                    <img :src="verticalDots" :alt="$t('Comments.message_actions')" class="cursor-pointer ml-10px" :class="[showMessageTime ? 'mt-30px' : 'mt-10px']">
                 </template>
                 <template #options>
                     <template v-if="!message.isDeleted">
-                        <DropDownOption v-if="message.sent && (message.type === 'text' || message.type === 'link') && new Date(message.createdAt).setSeconds(0, 0) > (new Date().setSeconds(0, 0) - 360000)" @click="$emit('edit', JSON.parse(JSON.stringify(message))), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="message.sent && (message.type === 'text' || message.type === 'link') && new Date(message.createdAt).setSeconds(0, 0) > (new Date().setSeconds(0, 0) - 360000)" @click="$emit('edit', JSON.parse(JSON.stringify(message)))">
                             {{$t('Comments.edit')}}
                         </DropDownOption>
-                        <DropDownOption v-if="!mainChat && (message.type === 'text' || message.type === 'link')" @click="$emit('createTask', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="!mainChat && (message.type === 'text' || message.type === 'link')" @click="$emit('createTask', message)">
                             {{$t('Comments.create_task')}}
                         </DropDownOption>
-                        <DropDownOption v-if="!mainChat && (message.type === 'text' || message.type === 'link')" @click="$emit('addCheckList', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="!mainChat && (message.type === 'text' || message.type === 'link')" @click="$emit('addCheckList', message)">
                             {{ $t('Comments.add_to_checklist') }}
                         </DropDownOption>
-                        <DropDownOption v-if="message.type === 'text' || message.type === 'link'" @click="$emit('copy', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="message.type === 'text' || message.type === 'link'" @click="$emit('copy', message)">
                             {{$t('Comments.copy_message')  }}
                         </DropDownOption>
-                        <DropDownOption v-if="message.sent" @click="$emit('delete', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="message.sent || message.userId === userId" @click="$emit('delete', message)">
                             {{$t('Projects.delete')}}
                         </DropDownOption>
-                        <DropDownOption @click="$emit('reply', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption @click="$emit('reply', message)">
                             {{$t('Comments.reply')}}
                         </DropDownOption>
-                        <DropDownOption v-if="mainChat" @click="$emit('pin', message), $refs[`message_option_${message._id}`].click()">
+                        <DropDownOption v-if="mainChat" @click="$emit('pin', message)">
                             {{!message?.pinnedMessage ? $t('Projects.pin') : $t('Projects.unpin')}} {{$t('Comments.message')}}
                         </DropDownOption>
                     </template>
-                    <DropDownOption id="mark_as_unread" @click="showUnread ? '' : $emit('markUnread', message), $refs[`message_option_${message._id}`].click()">
+                    <DropDownOption id="mark_as_unread" @click="showUnread ? '' : $emit('markUnread', message)">
                         {{$t('Comments.mark_unread')}}
                     </DropDownOption>
                 </template>
@@ -175,8 +201,13 @@
 
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, inject, onMounted, ref, watch } from 'vue';
-import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
+import { computed, defineComponent, defineProps, inject, onMounted, ref, watch } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useConvertDate, useGetterFunctions } from '@/composable';
+import { useVisiblePages } from '@/composable/useVisiblePages';
+import { useProvenanceActors } from '@/components/molecules/Provenance/useProvenanceActors';
+import { commentHtml, commentPlainText } from '@/utils/commentHtml';
+import { agentAuthorOf, agentReplyHtml, automationAuthorOf, pageRefIds } from '@/utils/agentComment';
 
 // COMPONENTS
 import WasabiImageComp from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue"
@@ -197,7 +228,6 @@ const { handleStorageImageRequest } = storageHelper();
 const {getDateType} = useProjects();
 
 // UTILS
-const {changeText, checkLink} = useCustomComposable();
 const {convertDateFormat} = useConvertDate();
 const {getUser} = useGetterFunctions();
 const userId = inject("$userId");
@@ -250,6 +280,46 @@ const props = defineProps({
 })
 
 const showMore = ref(false);
+
+const { t } = useI18n();
+const visiblePages = useVisiblePages();
+const { ensureAgents, agentName } = useProvenanceActors();
+
+const agentAuthor = computed(() => agentAuthorOf(props.message));
+const replyAgentAuthor = computed(() => agentAuthorOf({ userId: props.message?.reply_userId }));
+
+const agentLabel = (author, row) => {
+    if (author.assistant) return t('Comments.ai_assistant');
+    return author.name || agentName(row) || t('Comments.an_agent');
+};
+
+const automationAuthor = computed(() => automationAuthorOf(props.message));
+const replyAutomationAuthor = computed(() => automationAuthorOf({ userId: props.message?.reply_userId }));
+const automationLabel = (author) => author.name || t('Comments.an_automation');
+
+const authorName = computed(() => {
+    if (agentAuthor.value) return agentLabel(agentAuthor.value, props.message);
+    if (automationAuthor.value) return automationLabel(automationAuthor.value);
+    return getUser(props.message.userId).Employee_Name;
+});
+
+const replyAuthorName = computed(() => {
+    if (replyAgentAuthor.value) return agentLabel(replyAgentAuthor.value, {});
+    if (replyAutomationAuthor.value) return automationLabel(replyAutomationAuthor.value);
+    return getUser(props.message.reply_userId).Employee_Name;
+});
+
+const pageHref = (id) => `${window.location.origin}/${encodeURIComponent(String(companyId?.value || ''))}/pages/${id}`;
+
+const bodyHtml = computed(() => {
+    if (!agentAuthor.value || props.message.type !== 'text') return commentHtml(props.message.message, { links: props.message.type === 'link' });
+    return agentReplyHtml(props.message.message, {
+        pageOf: visiblePages.pageOf,
+        pageHref,
+        pageLabel: t('Comments.cited_page'),
+        hiddenPageLabel: t('Comments.cited_page_hidden'),
+    });
+});
 
 // Reactions render from a local copy so we never mutate the prop directly;
 // socket-driven prop updates (other users reacting) re-sync it via the watch.
@@ -344,12 +414,31 @@ function handleDownloadUrl(url) {
 }
 
 onMounted(async () => {
-    await processUrl(props.message);   
+    if (agentAuthor.value && pageRefIds(props.message.message).length) visiblePages.ensure();
+    if (agentAuthor.value && !agentAuthor.value.name && props.message.agentId) ensureAgents();
+    await processUrl(props.message);
 });
 </script>
 
 <style scoped>
 @import './style.css';
+/* Agent replies are rendered markdown, so the block elements set the spacing, not the source newlines. */
+.message pre.message__agent-body {
+    white-space: normal;
+}
+.message__agent-body :deep(p),
+.message__agent-body :deep(ul),
+.message__agent-body :deep(ol) {
+    margin: 0 0 6px;
+}
+.message__agent-body :deep(ul),
+.message__agent-body :deep(ol) {
+    padding-left: 20px;
+}
+.message__agent-body :deep(.comment-cite--hidden) {
+    font-style: italic;
+    opacity: 0.7;
+}
 @media(min-width:1300px){
     .message_replay{
     max-width: 460px;
@@ -367,4 +456,49 @@ onMounted(async () => {
 }
 
 
+</style>
+
+<style scoped>
+.comment-gray {
+    color: var(--ink-2);
+}
+.comment-red {
+    color: var(--danger-ink);
+}
+.comment-color63 {
+    color: var(--ink);
+}
+.comment-bg-white {
+    background-color: var(--surface);
+}
+.comment-bg-light-blue {
+    background-color: var(--brand-tint);
+}
+.comment-bg-fresh-air {
+    background-color: var(--brand-tint);
+}
+.comment-bg-gray {
+    background-color: var(--fill);
+}
+.comment-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.comment-bg-lightgreen {
+    background-color: var(--ok-bg);
+}
+.comment-font-italic {
+    font-style: italic;
+}
+.comment-font-weight-700 {
+    font-weight: 700 !important;
+}
+.comment-font-size-10 {
+    font-size: 10px;
+}
+.comment-font-size-12 {
+    font-size: 12px;
+}
+.comment-font-size-14 {
+    font-size: 14px;
+}
 </style>

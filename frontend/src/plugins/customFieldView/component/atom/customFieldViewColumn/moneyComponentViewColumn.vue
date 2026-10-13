@@ -225,13 +225,13 @@
 </script>
 <style scoped>
     .formkit__content-currency{
-        font-family: 'Roboto';
+        font-family: var(--font-ui);
         font-size: 13px;
         font-style: normal;
         font-weight: 400;
         line-height: 19.24px !important;
         padding: 0px;
-        color: #505050;
+        color: var(--ink-label);
         padding-right: 2px;
     }
     .formkit__content-view-column .formkit-inner {

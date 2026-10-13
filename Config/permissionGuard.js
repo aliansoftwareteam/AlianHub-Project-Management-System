@@ -1,207 +1,502 @@
 /**
  * Server-side permission enforcement — the backend counterpart of the
- * frontend `checkPermission()` (frontend/src/composable/index.js).
+ * frontend `checkPermission()` (frontend/src/composable/index.js) and of what
+ * the Security & Permissions matrix shows an admin.
  *
  * WHY: permission/role checks were previously evaluated ONLY in the Vue
  * app. Any API client (curl, scripts, the MCP server) using a valid token
  * could bypass them. This module re-evaluates the SAME rule model on the
- * server so every client — web, MCP, anything — obeys the same roles &
- * permissions. Single source of truth (MCP plan decision D4).
+ * server. Single source of truth (MCP plan decision D4).
  *
  * Model (mirrors the frontend exactly):
+ *   - A role comes from an ACTIVE company seat and nothing else: a pending invitee
+ *     and a removed member both keep a company_users row carrying a roleType, and
+ *     neither of them is a member.
  *   - roleType 1 (owner) and 2 (admin) bypass all permission checks.
- *   - roleType >= 3 is evaluated against the company RULES document.
- *   - The RULES collection is a flat array of rule docs:
- *       { _id, key, name, isParent, parentId, roles: [{ key: roleType,
- *         permission: null | false | true }] }
- *     arranged into { parentKey: { ...parent, childKey: childRule } }
- *     (see frontend mutateArrangedRules). Three-value result:
- *       null  = no access (hidden)   false = read-only   true = write
+ *   - Every other role, guest (0) included, is evaluated against the company
+ *     RULES, or the project's own PROJECT_RULES when that project has
+ *     isGlobalPermission === false. settings.* keys always read the company RULES.
+ *   - tests/fixtures/permissionParity.json holds the cases both evaluators must
+ *     agree on, and the known differences.
+ *   - A role with no entry on a rule, or a rule that does not exist, is
+ *     null: the matrix shows it as "None".
+ *   - null = no access, false = read-only, true = write,
+ *     1 | 2 = "Own" | "Everyone" on the selection fields.
  */
 const mongoose = require("mongoose");
 const { myCache } = require("./config");
-const { dbCollections } = require("./collections");
+const { idForms } = require("../utils/mongo-handler/objectIdKeys");
 const { SCHEMA_TYPE } = require("./schemaType");
 const { MongoDbCrudOpration } = require("../utils/mongo-handler/mongoQueries");
 const { fetchRules } = require("../Modules/settings/securityPermissions/controller");
 const logger = require("./loggerConfig");
+const { ROLE_GUEST, ROLE_OWNER, ROLE_ADMIN, ROLE_MEMBER, isPrivileged } = require("./roleTypes");
+const { ACTIVE_SEAT, INVITED_SEAT } = require("./seatStatus");
+const { resolveMode, OFF, ENFORCE } = require("./permissionEnforcement");
+const { recordDecision, REASONS, GLOBAL_SCOPE } = require("./permissionDecisions");
+const { TASK_ACTIONS, BODY_COMPANY_PATHS, requirementsOf, actionEntry } = require("./taskWritePermissions");
+const { arrangeRules, rolePermission, isWritable, isReadable } = require("./rulePermissions");
 
-const ROLE_OWNER = 1;
-const ROLE_ADMIN = 2;
 const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
 const ROLE_CACHE_TTL_SECONDS = 60;
+const PROJECT_RULES_TTL_SECONDS = 604800;
 
-// Ops escape hatch (runbook kill switch): if a fine-grained permission edge
-// case ever blocks a legitimate member workflow in production, set
-// DISABLE_PERMISSION_ENFORCEMENT=true and restart to bypass the per-KEY
-// layer (requirePermission). The role guards (requireRole) for the
-// privilege-escalation endpoints stay ON regardless — they are not affected.
+// A project's own rules never hold these two keys, and checkPermission(path, false) grants them.
+const PROJECT_CONTEXT_GRANTED = ['project.project_list', 'project.public_projects'];
+
+// Project rules are seeded from the project and task sections only, and the web app never checks a settings or chat key against them.
+const isCompanyWideKey = (path) => ['settings.', 'chat.'].some((prefix) => String(path).startsWith(prefix));
+
+// Runbook kill switch (DISABLE_PERMISSION_ENFORCEMENT=true): API tokens and project edits skip the per-key
+// checks, and a browser session set to enforce is judged in report mode instead. Role guards stay on for tokens.
 const fineGrainedEnforced = () => process.env.DISABLE_PERMISSION_ENFORCEMENT !== 'true';
 
-// HARD ISOLATION (2026-06-15): these guards must NEVER affect the web app.
-// Web-app requests authenticate via JWT session and set `req.uid` but NOT
-// `req.apiToken`. MCP / PAT requests (Authorization: Bearer ahp_…) set
-// `req.apiToken` (see Config/jwt.js verifyApiTokenRequest). We therefore run
-// permission/role enforcement ONLY for PAT requests and let every JWT/web
-// request fall straight through — so the existing frontend/backend behavior
-// is byte-for-byte unchanged. (The backend mirror of frontend checkPermission
-// is not yet a perfect match for per-project overrides, so gating shared web
-// routes caused false denials in production — e.g. assigning a task.)
+// API tokens set req.apiToken (Config/jwt.js verifyApiTokenRequest) and are always enforced. Browser sessions
+// follow PERMISSION_ENFORCEMENT_MODE: gating them unannounced once caused false denials in production.
 const isApiTokenRequest = (req) => Boolean(req && req.apiToken);
 
-// PATCH /api/v2/tasks dispatches many actions; map each to its permission
-// key (mirrors the frontend per-field gates). Actions not listed pass
-// through (structural ops like moveTask/convert have no single key).
-const TASK_ACTION_PERMISSION = {
-    updateStatus: 'task.task_status',
-    updatePriority: 'task.task_priority',
-    updateAssignee: 'task.task_assignee',
-    updateDueDate: 'task.task_due_date',
-    updateStartDate: 'task.task_due_date',
-    updateTaskType: 'task.task_type',
-    updateDescription: 'task.task_description',
-    updateTaskTotalEstimate: 'task.task_estimated_hours',
-    updatePoints: 'task.task_estimated_hours',
+const ALLOWED = Object.freeze({ allowed: true });
+
+const toObjectId = (value) => (OBJECT_ID_PATTERN.test(String(value || '')) ? new mongoose.Types.ObjectId(String(value)) : null);
+
+/**
+ * Which company_users rows a lookup may read. `active` is the only one that answers
+ * "what may this caller do": a pending invitee has not accepted yet and a removed member
+ * keeps their row, and neither is a member. The other two exist so a flow that must still
+ * see such a row says so, and is read as a deliberate exception at the call site.
+ */
+const SEAT_SCOPES = {
+    active: ACTIVE_SEAT,
+    invited: INVITED_SEAT,
+    any: {},
 };
 
-/** Resolve a user's roleType within a company (cached 60s). null if not a member. */
-const getRoleType = async (companyId, uid) => {
+/**
+ * Resolve a user's roleType within a company from a live seat (cached 60s). null if not a member.
+ * A failed read is null too unless `throwOnError`, for callers that must not mistake an outage for a missing seat.
+ */
+const getRoleType = async (companyId, uid, { seat = 'active', throwOnError = false } = {}) => {
     if (!companyId || !uid || !OBJECT_ID_PATTERN.test(String(companyId)) || !OBJECT_ID_PATTERN.test(String(uid))) {
         return null;
     }
-    const cacheKey = `roleType:${companyId}:${uid}`;
+    const seatFilter = SEAT_SCOPES[seat];
+    if (!seatFilter) throw new Error(`getRoleType: unknown seat scope ${seat}`);
+    const cacheKey = `roleType:${seat}:${companyId}:${uid}`;
     const cached = myCache.get(cacheKey);
     if (cached !== undefined) return cached;
     try {
         const companyUser = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: String(uid) }, { roleType: 1 }],
+            data: [{ userId: String(uid), ...seatFilter }, { roleType: 1 }],
         }, "findOne");
         const roleType = companyUser && typeof companyUser.roleType === "number" ? companyUser.roleType : null;
         myCache.set(cacheKey, roleType, ROLE_CACHE_TTL_SECONDS);
         return roleType;
     } catch (error) {
         logger.error(`getRoleType error company=${companyId} uid=${uid}: ${error.message || error}`);
+        if (throwOnError) throw error;
         return null;
     }
 };
 
-const isPrivileged = (roleType) => roleType === ROLE_OWNER || roleType === ROLE_ADMIN;
+/* Same cache key as Modules/projectRules, so an edit there invalidates this too. */
+const loadProjectRules = async (companyId, projectId) => {
+    const key = `projectRules:${projectId}`;
+    const cached = myCache.get(key);
+    if (Array.isArray(cached) && cached.length) return cached;
+    const rules = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECT_RULES, data: [{ projectId: { $in: idForms(String(projectId)) } }] }, 'find');
+    myCache.set(key, rules || [], PROJECT_RULES_TTL_SECONDS);
+    return rules || [];
+};
 
-/** Arrange the flat RULES array into the nested object the frontend uses. */
-const arrangeRules = (rawRules) => {
-    const arranged = {};
-    const rules = [...(rawRules || [])].sort((a, b) => (a.isParent > b.isParent ? -1 : 1));
-    rules.forEach((rule) => {
-        const ownKey = rule.key ? rule.key : String(rule.name || "").replaceAll(" ", "_").toLowerCase();
-        if (rule.isParent) {
-            arranged[ownKey] = { ...rule };
-        } else {
-            const parent = rules.find((x) => String(x._id) === String(rule.parentId));
-            if (parent && parent.key && arranged[parent.key]) {
-                arranged[parent.key][ownKey] = rule;
-            }
-        }
-    });
-    return arranged;
+/*
+ * The web app reads a missing flag as true (checkPermission's default) and an explicit null as the
+ * project rules. Null stays on the company rules here: the project routes enforce this evaluator for
+ * every session, so reading the project rules would refuse requests allowed today. It is a known
+ * difference in tests/fixtures/permissionParity.json.
+ */
+const usesProjectRules = (project) => Boolean(project) && project.isGlobalPermission === false;
+
+const rulesFor = async (companyId, projectId) => {
+    const id = toObjectId(projectId);
+    const project = id
+        ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: id }, { isGlobalPermission: 1 }] }, 'findOne')
+        : null;
+    if (usesProjectRules(project)) {
+        return { arranged: arrangeRules(await loadProjectRules(companyId, projectId)), projectScoped: true };
+    }
+    return { arranged: arrangeRules(await fetchRules(companyId)), projectScoped: false };
+};
+
+const permissionIn = ({ arranged, projectScoped }, roleType, path) => {
+    if (projectScoped && PROJECT_CONTEXT_GRANTED.includes(path)) return true;
+    return rolePermission(arranged, roleType, path);
 };
 
 /**
- * Evaluate a permission path (e.g. "task.task_status") for a user.
- * Returns null | false | true exactly like the frontend.
- * (Global company rules; project-scoped overrides are a future addition.)
+ * null | false | true (or 1 | 2 for scoped keys), exactly as the matrix stores it.
+ * Throws when the rules cannot be read; callers decide, and every guard refuses.
  */
-const evaluatePermission = async (companyId, uid, path) => {
-    const roleType = await getRoleType(companyId, uid);
+const evaluatePermission = async (companyId, uid, path, { projectId, strict = false } = {}) => {
+    const roleType = await getRoleType(companyId, uid, { throwOnError: strict });
     if (roleType === null) return null;
     if (isPrivileged(roleType)) return true;
+    return permissionIn(await rulesFor(companyId, isCompanyWideKey(path) ? null : projectId), roleType, path);
+};
 
-    let arranged;
-    try {
-        arranged = arrangeRules(await fetchRules(companyId));
-    } catch (error) {
-        logger.error(`evaluatePermission fetchRules error: ${error.message || error}`);
-        return null;
-    }
+const TASK_ID_FIELDS = [['taskData', '_id'], ['task', '_id']];
+const PROJECT_ID_FIELDS = [['data', 'ProjectID'], ['projectData', '_id'], ['project', '_id'], ['projectId']];
 
-    let rule = null;
-    for (const segment of String(path).split(".")) {
-        rule = rule ? rule[segment] : arranged[segment];
-        if (rule === undefined || rule === null) return null;
+const ABSENT = Object.freeze({ absent: true });
+const UNREADABLE = Object.freeze({ unreadable: true });
+
+/*
+ * The one id a value names, read as the task handlers read it: ObjectId takes hex in any case or { id }, a
+ * Mongo filter also casts { _id }, and the bulk handlers trim. Stored ids stringify in lower case. A missing
+ * or empty value names nothing; anything else a handler could still act on (an operator, a list) is unreadable.
+ */
+const readId = (value) => {
+    if (value === undefined || value === null) return ABSENT;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return ABSENT;
+        return OBJECT_ID_PATTERN.test(trimmed) ? { id: trimmed.toLowerCase() } : UNREADABLE;
     }
-    if (!rule || !Array.isArray(rule.roles)) return null;
-    const match = rule.roles.find((r) => r.key === roleType);
-    return match ? match.permission : null;
+    const keys = typeof value === 'object' && !Array.isArray(value) ? Object.keys(value) : [];
+    if (keys.length === 1 && ['id', '_id'].includes(keys[0]) && typeof value[keys[0]] === 'string') {
+        const inner = readId(value[keys[0]]);
+        return inner.id ? inner : UNREADABLE;
+    }
+    return UNREADABLE;
+};
+
+/* Every id at the paths; '*' reads each element of a list, and a value there that is not a list cannot be read. */
+const readIdsAt = (body, paths) => {
+    const ids = new Set();
+    let unreadable = false;
+    paths.forEach((fields) => {
+        const values = fields.reduce((nodes, field) => nodes.flatMap((node) => {
+            if (field !== '*') return node && typeof node === 'object' && !Array.isArray(node) ? [node[field]] : [];
+            if (Array.isArray(node)) return node;
+            if (!readId(node).absent) unreadable = true;
+            return [];
+        }), [body]);
+        values.forEach((value) => {
+            const read = readId(value);
+            if (read.id) ids.add(read.id);
+            if (read.unreadable) unreadable = true;
+        });
+    });
+    return { ids: [...ids], unreadable };
+};
+
+const idsAt = (body, paths) => readIdsAt(body, paths).ids;
+
+/* Per request, the task and project ids it names that its caller cannot open. A refusal resting on the
+ * rules of one would say it exists, so once found they are judged as ids that name nothing are. */
+const unopenable = new WeakMap();
+const NONE_UNOPENABLE = new Set();
+
+/*
+ * The projects whose rules judge a request, from every body shape the web app sends to a guarded route
+ * (tests/permission-request-project.test.js). Named tasks decide over named projects and every one of
+ * them must allow, so a client cannot borrow a more permissive project's rules. `unresolved` marks a body
+ * whose tasks all failed to resolve. `legacyProjectId` is what this lookup returned before it covered the
+ * task and project shapes; the enforced API-token path still allows what that project allowed.
+ * A `lookup` from Config/taskWritePermissions.js names the task and project ids its handler writes
+ * through instead, and every project either reaches is judged.
+ */
+const projectsForRequest = async (companyId, req, lookup = null) => {
+    const body = (req && req.body) || {};
+    const hidden = (req && unopenable.get(req)) || NONE_UNOPENABLE;
+    const openIdsAt = (paths) => idsAt(body, paths).filter((id) => !hidden.has(id));
+    const taskIds = idsAt(body, lookup ? (lookup.tasks || []) : TASK_ID_FIELDS);
+    const projectOfTask = new Map();
+    if (taskIds.length) {
+        const tasks = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: { $in: taskIds.map(toObjectId) } }, { ProjectID: 1 }],
+        }, 'find');
+        (tasks || []).forEach((task) => {
+            const id = String(task._id).toLowerCase();
+            if (task.ProjectID && !hidden.has(id)) projectOfTask.set(id, String(task.ProjectID).toLowerCase());
+        });
+    }
+    const taskProjectIds = [...new Set(taskIds.map((id) => projectOfTask.get(id)).filter(Boolean))];
+    const projectIds = lookup
+        ? [...new Set([...taskProjectIds, ...openIdsAt(lookup.projects || [])])]
+        : (taskIds.length ? taskProjectIds : openIdsAt(PROJECT_ID_FIELDS));
+    const legacyTaskId = idsAt(body, [['taskData', '_id']])[0] || null;
+    const legacyProjectId = legacyTaskId
+        ? (projectOfTask.get(legacyTaskId) || null)
+        : (openIdsAt([['data', 'ProjectID']])[0] || openIdsAt([['projectId']])[0] || null);
+    return { projectIds, unresolved: taskIds.length > 0 && taskProjectIds.length === 0, legacyProjectId };
 };
 
 /**
  * Express middleware: require the caller's roleType to be in `allowed`.
  * Use for owner/admin-only endpoints (settings, members, permissions).
- * Reads req.uid (set by both the JWT and PAT auth branches) + companyid header.
  */
 const requireRole = (allowed = [ROLE_OWNER, ROLE_ADMIN]) => async (req, res, next) => {
-    if (!isApiTokenRequest(req)) return next(); // web/JWT requests pass through untouched
+    const forbid = (statusText) => res.status(403).json({ status: false, statusText, error: "Forbidden" });
+    if (!isApiTokenRequest(req)) {
+        return judgeSession(req, res, next, {
+            permission: `role:${allowed.join(',')}`,
+            refuse: forbid,
+            check: async () => {
+                const role = await getRoleType(req.headers["companyid"] || "", req.uid, { throwOnError: true });
+                if (role !== null && allowed.includes(role)) return ALLOWED;
+                return { allowed: false, role, scope: GLOBAL_SCOPE, reason: role === null ? REASONS.NO_SEAT : REASONS.ROLE_NOT_ALLOWED };
+            },
+        });
+    }
     try {
         const companyId = req.headers["companyid"] || "";
         const roleType = await getRoleType(companyId, req.uid);
         if (roleType !== null && allowed.includes(roleType)) return next();
-        return res.status(403).json({
-            status: false,
-            statusText: "You do not have permission to perform this action.",
-            error: "Forbidden",
-        });
+        return forbid("You do not have permission to perform this action.");
     } catch (error) {
         logger.error(`requireRole error: ${error.message || error}`);
-        return res.status(403).json({ status: false, statusText: "Permission check failed.", error: "Forbidden" });
+        return forbid("Permission check failed.");
     }
 };
 
 /**
- * Express middleware: require a permission KEY.
- * - write:true (default) needs permission === true.
- * - write:false (read) needs permission !== null.
- * Owner/admin always pass.
+ * Hard gate for company settings and permission-rule writes, for web sessions and API tokens alike.
+ * `permission` names the matching catalogue key; admins pass whatever the matrix says, exactly as
+ * the frontend checkPermission() treats them, and every other role is refused.
  */
-// Normalize heterogeneous permission values to a write/read decision.
-// boolean keys: true = read+write, false = read-only, null = none.
-// scoped keys: 1 = Own (write own), 2 = Everyone (write all), null/0 = none.
-const isWritable = (permission) => permission === true || permission === 1 || permission === 2;
-const isReadable = (permission) => permission !== null && permission !== undefined && permission !== 0;
+const requireCompanyAdmin = ({ permission = null } = {}) => async (req, res, next) => {
+    const refuse = (statusText) => res.status(403).json({ status: false, statusText, message: 'Forbidden', ...(permission ? { permission } : {}) });
+    try {
+        const roleType = await getRoleType(req.headers["companyid"] || "", req.uid);
+        if (isPrivileged(roleType)) return next();
+        return refuse("Only an owner or an admin can change company settings.");
+    } catch (error) {
+        logger.error(`requireCompanyAdmin error (${permission || 'settings'}): ${error.message || error}`);
+        return refuse("Permission check failed.");
+    }
+};
 
-const requirePermission = (path, { write = true } = {}) => async (req, res, next) => {
-    if (!isApiTokenRequest(req)) return next(); // web/JWT requests pass through untouched
+const passes = (permission, write) => (write ? isWritable(permission) : isReadable(permission));
+
+const unopenableIds = async (companyId, req, lookups) => {
+    // Required here: both modules read roles through this one.
+    const { readableTaskIds } = require("../Modules/Tasks/helpers/taskWritePlacement");
+    const { canReadProject } = require("./projectAccess");
+    const body = (req && req.body) || {};
+    const taskIds = idsAt(body, lookups.flatMap((lookup) => lookup.tasks || []));
+    const projectIds = idsAt(body, lookups.flatMap((lookup) => lookup.projects || []));
+    const readable = new Set((await readableTaskIds(companyId, req.uid, taskIds)).map((id) => String(id).toLowerCase()));
+    const closed = [];
+    for (const projectId of projectIds) {
+        if (!(await canReadProject(companyId, req.uid, projectId)).allowed) closed.push(projectId);
+    }
+    return [...taskIds.filter((id) => !readable.has(id)), ...closed];
+};
+
+/* A refusal is judged again with what the caller cannot open taken as missing, so a route that answers
+ * "not found" for both never tells them apart here. `lookups` is null on routes that do not ask for it. */
+const judgedOnWhatOpens = async (req, lookups, judge) => {
+    const verdict = await judge();
+    if (verdict.allowed || !lookups) return verdict;
+    const hidden = await unopenableIds(String(req.headers["companyid"] || ""), req, lookups);
+    if (!hidden.length) return verdict;
+    unopenable.set(req, new Set(hidden));
+    return judge();
+};
+
+/* The first project whose rules refuse, GLOBAL_SCOPE when the company rules refuse, or null when all allow. */
+const refusingScope = async (companyId, uid, path, write, projectIds, strict) => {
+    for (const projectId of projectIds.length ? projectIds : [null]) {
+        if (!passes(await evaluatePermission(companyId, uid, path, { projectId, strict }), write)) return projectId || GLOBAL_SCOPE;
+    }
+    return null;
+};
+
+/*
+ * A body whose tasks do not exist is judged on the company rules rather than passed through: the task
+ * handlers write through the ids and the company the body names, so it could reach a task this check never saw.
+ * `strict` makes a failed role read throw instead of reading as no seat; the API-token path keeps the old answer.
+ * A `lookup` gets no legacy fallback: nothing it judges was refused before, so there is nothing to keep allowing.
+ */
+const requestVerdict = async (companyId, uid, req, path, write, { strict = false, lookup = null } = {}) => {
+    if (isCompanyWideKey(path)) {
+        return passes(await evaluatePermission(companyId, uid, path, { strict }), write) ? ALLOWED : { allowed: false, scope: GLOBAL_SCOPE };
+    }
+    const { projectIds, unresolved, legacyProjectId } = await projectsForRequest(companyId, req, lookup);
+    if (unresolved) logger.warn(`permission guard ${path}: the tasks named in the body were not found; judged on the company rules`);
+    const scopes = unresolved && projectIds.length ? [...projectIds, null] : projectIds;
+    const scope = await refusingScope(companyId, uid, path, write, scopes, strict);
+    if (!scope) return ALLOWED;
+    if (lookup) return { allowed: false, scope, unresolved };
+    const sameContext = projectIds.length <= 1 && (projectIds[0] || null) === legacyProjectId;
+    if (sameContext || !passes(await evaluatePermission(companyId, uid, path, { projectId: legacyProjectId, strict }), write)) {
+        return { allowed: false, scope, unresolved };
+    }
+    logger.warn(`permission guard ${path}: known difference, refused by project ${projectIds.join(', ') || 'none'} but allowed by ${legacyProjectId || 'the company rules'} as before`);
+    return ALLOWED;
+};
+
+/* The web app reads a null flag as the project's own rules; where those allow, the refusal is that known difference. */
+const nullFlagWouldAllow = async (companyId, roleType, path, write, projectId) => {
+    const id = toObjectId(projectId);
+    const project = id && await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: id }, { isGlobalPermission: 1 }] }, 'findOne');
+    if (!project || project.isGlobalPermission !== null) return false;
+    const own = { arranged: arrangeRules(await loadProjectRules(companyId, projectId)), projectScoped: true };
+    return passes(permissionIn(own, roleType, path), write);
+};
+
+const denialReason = async (companyId, uid, path, write, { scope, unresolved }) => {
+    const role = await getRoleType(companyId, uid, { throwOnError: true });
+    if (role === null) return { role, reason: REASONS.NO_SEAT };
+    if (unresolved) return { role, reason: REASONS.TASKS_NOT_FOUND };
+    if (scope !== GLOBAL_SCOPE && await nullFlagWouldAllow(companyId, role, path, write, scope)) return { role, reason: REASONS.NULL_GLOBAL_FLAG };
+    return { role, reason: REASONS.DENIED };
+};
+
+const sessionPermissionVerdict = async (req, path, write, sessionAllows, lookup = null) => {
+    if (sessionAllows && await sessionAllows(req)) return ALLOWED;
+    const companyId = req.headers["companyid"] || "";
+    const verdict = await requestVerdict(companyId, req.uid, req, path, write, { strict: true, lookup });
+    return verdict.allowed ? verdict : { ...verdict, ...(await denialReason(companyId, req.uid, path, write, verdict)) };
+};
+
+/*
+ * A browser session in report mode runs the check enforce would run and always goes through; a would-be
+ * denial, or a check that throws, is recorded once the response is out. Off skips the check entirely.
+ */
+const judgeSession = async (req, res, next, { permission, check, refuse }) => {
+    const companyId = String(req.headers["companyid"] || "");
+    const mode = await resolveMode(companyId);
+    if (mode === OFF) return next();
+    let verdict;
+    try {
+        verdict = await check();
+    } catch (error) {
+        logger.error(`permission guard ${permission} (${mode}): ${error.message || error}`);
+        verdict = { allowed: false, failed: true };
+    }
+    if (verdict.allowed) return next();
+    recordDecision(req, res, {
+        companyId, mode, permission: verdict.permission || permission, uid: req.uid, role: verdict.role, scope: verdict.scope,
+        reason: verdict.failed ? REASONS.CHECK_FAILED : verdict.reason,
+    });
+    if (mode !== ENFORCE) return next();
+    return refuse(verdict.failed ? "Permission check failed." : "You do not have permission to perform this action.", verdict);
+};
+
+/**
+ * Express middleware: require a permission KEY for the request's project.
+ * write:true (default) needs a writable value, write:false any readable one.
+ * `sessionAllows(req)` names the browser-session requests the route's handler allows without the key,
+ * such as a member changing their own preferences; API tokens are judged on the key alone.
+ */
+const requirePermission = (path, { write = true, sessionAllows = null, unopenableIn = null } = {}) => Object.assign(async (req, res, next) => {
+    const forbid = (statusText) => res.status(403).json({ status: false, statusText, error: "Forbidden", permission: path });
+    if (!isApiTokenRequest(req)) {
+        return judgeSession(req, res, next, { permission: path, refuse: forbid, check: () => sessionPermissionVerdict(req, path, write, sessionAllows) });
+    }
     if (!fineGrainedEnforced()) return next();
     try {
         const companyId = req.headers["companyid"] || "";
-        const permission = await evaluatePermission(companyId, req.uid, path);
-        const ok = write ? isWritable(permission) : isReadable(permission);
-        if (ok) return next();
-        return res.status(403).json({
-            status: false,
-            statusText: "You do not have permission to perform this action.",
-            error: "Forbidden",
-            permission: path,
-        });
+        const verdict = await judgedOnWhatOpens(req, unopenableIn, () => requestVerdict(companyId, req.uid, req, path, write));
+        if (verdict.allowed) return next();
+        return forbid("You do not have permission to perform this action.");
     } catch (error) {
-        // Fail-open on internal errors (e.g. transient rules-fetch failure)
-        // so a glitch never blocks the whole app; real denials still block.
         logger.error(`requirePermission error (${path}): ${error.message || error}`);
-        return next();
+        return forbid("Permission check failed.");
     }
+}, { permission: path });
+
+const needLabel = (need) => (need.anyOf ? need.anyOf.map((option) => option.key).join('|') : need.key);
+
+const needVerdict = async (req, need, lookup) => {
+    if (need.anyOf) {
+        let refusal = null;
+        for (const option of need.anyOf) {
+            const verdict = await needVerdict(req, option, lookup);
+            if (verdict.allowed) return ALLOWED;
+            refusal = refusal || verdict;
+        }
+        return { ...refusal, permission: needLabel(need) };
+    }
+    const verdict = await sessionPermissionVerdict(req, need.key, need.write, null, lookup);
+    return verdict.allowed ? ALLOWED : { ...verdict, permission: need.key };
 };
 
-/**
- * Express middleware for PATCH /api/v2/tasks: enforce the permission key
- * mapped to req.body.action. Unmapped actions pass through.
- */
-const requireTaskActionPermission = () => async (req, res, next) => {
-    if (!isApiTokenRequest(req)) return next(); // web/JWT requests pass through untouched
-    if (!fineGrainedEnforced()) return next();
-    const action = req.body && req.body.action;
-    const key = action && TASK_ACTION_PERMISSION[action];
-    if (!key) return next();
-    return requirePermission(key, { write: true })(req, res, next);
+const taskWriteVerdict = async (req, taskEntry, needs) => {
+    const own = { tasks: taskEntry.tasks || [], projects: taskEntry.projects || [] };
+    for (const need of needs) {
+        const verdict = await needVerdict(req, need, need.lookup || own);
+        if (!verdict.allowed) return verdict;
+    }
+    return ALLOWED;
 };
+
+const PROBLEM_TEXT = Object.freeze({
+    [REASONS.COMPANY_MISMATCH]: "The request names a company other than the one it was sent for.",
+    [REASONS.UNRESOLVABLE_ID]: "The request names a task or project id that cannot be read.",
+});
+
+const DEFAULT_LOOKUP = Object.freeze({ tasks: TASK_ID_FIELDS, projects: PROJECT_ID_FIELDS });
+
+const valueAt = (body, fields) => fields.reduce((node, field) => (node && typeof node === 'object' ? node[field] : undefined), body);
+
+/* The handlers pick the database from these body fields, while the mode and the rules come from the header. */
+const namesOtherCompany = (req, body) => {
+    const companyId = String(req.headers["companyid"] || "");
+    return BODY_COMPANY_PATHS.some((fields) => {
+        const value = valueAt(body, fields);
+        return value !== undefined && value !== null && value !== '' && value !== companyId;
+    });
+};
+
+const lookupsOf = (taskEntry, needs) => [taskEntry.tokenEnforced ? DEFAULT_LOOKUP : taskEntry, ...needs.filter((need) => need.lookup).map((need) => need.lookup)];
+
+const taskWriteProblem = (req, taskEntry, needs) => {
+    const body = (req && req.body) || {};
+    if (namesOtherCompany(req, body)) return REASONS.COMPANY_MISMATCH;
+    const paths = lookupsOf(taskEntry, needs).flatMap((lookup) => [...(lookup.tasks || []), ...(lookup.projects || [])]);
+    return readIdsAt(body, paths).unreadable ? REASONS.UNRESOLVABLE_ID : null;
+};
+
+const problemVerdict = async (req, reason) => ({
+    allowed: false,
+    reason,
+    scope: GLOBAL_SCOPE,
+    statusText: PROBLEM_TEXT[reason],
+    role: await getRoleType(req.headers["companyid"] || "", req.uid, { throwOnError: true }),
+});
+
+/*
+ * API tokens are refused a body naming another company or an unreadable id in every mode. Otherwise the nine
+ * token-enforced actions keep the token path they had, and every other task write goes through the workspace's
+ * mode for tokens and sessions alike, so a new mapping refuses nothing until a workspace enforces.
+ * `unopenableAsMissing` is for a route whose handler answers "not found" for what its caller cannot open.
+ */
+const requireTaskWritePermission = (taskEntry, { unopenableAsMissing = false } = {}) => Object.assign(async (req, res, next) => {
+    const needs = requirementsOf(taskEntry, req.body);
+    const unopenableIn = unopenableAsMissing ? lookupsOf(taskEntry, needs) : null;
+    const label = needs.map(needLabel).join('+');
+    const problem = taskWriteProblem(req, taskEntry, needs);
+    const refuse = (statusText, verdict = {}) => res.status(403).json({ status: false, statusText: verdict.statusText || statusText, error: "Forbidden", permission: verdict.permission || label });
+    if (isApiTokenRequest(req)) {
+        if (problem) {
+            logger.warn(`permission guard ${label}: API token refused, ${problem}`);
+            return refuse(PROBLEM_TEXT[problem]);
+        }
+        if (taskEntry.tokenEnforced) return requirePermission(needs[0].key, { unopenableIn })(req, res, next);
+    }
+    const judge = () => (taskEntry.tokenEnforced ? sessionPermissionVerdict(req, needs[0].key, needs[0].write, null) : taskWriteVerdict(req, taskEntry, needs));
+    const check = () => (problem ? problemVerdict(req, problem) : judgedOnWhatOpens(req, unopenableIn, judge));
+    return judgeSession(req, res, next, { permission: label, refuse, check });
+}, { taskWrites: taskEntry });
+
+const requireTaskActionPermission = (actions = TASK_ACTIONS, options = {}) => Object.assign(async (req, res, next) => {
+    const taskEntry = actionEntry(actions, req.body && req.body.action);
+    return taskEntry ? requireTaskWritePermission(taskEntry, options)(req, res, next) : next();
+}, { taskWrites: actions });
 
 /** The permission keys the MCP server enforces (one per tool/field). */
 const MCP_PERMISSION_KEYS = [
@@ -229,13 +524,14 @@ const MCP_PERMISSION_KEYS = [
     'sheet_settings.workload_timesheet',
 ];
 
+const NO_RULES = { arranged: {}, projectScoped: false };
+
 /**
- * Evaluate many permission keys at once for a user.
- * Returns { roleType, permissions: { key: null|false|true } }.
- * Used by the whoami endpoint so the MCP server gets the full effective
- * permission map in one call at connect time.
+ * The effective map { roleType, permissions: { key: value } }, read once for many keys, with the answers
+ * evaluatePermission gives. Without a projectId it is company-wide: what the whoami endpoint hands the
+ * MCP server at connect time. Unreadable rules answer null for every key.
  */
-const evaluateMany = async (companyId, uid, keys = MCP_PERMISSION_KEYS) => {
+const evaluateMany = async (companyId, uid, keys = MCP_PERMISSION_KEYS, { projectId } = {}) => {
     const roleType = await getRoleType(companyId, uid);
     const permissions = {};
     if (roleType === null) {
@@ -246,45 +542,44 @@ const evaluateMany = async (companyId, uid, keys = MCP_PERMISSION_KEYS) => {
         keys.forEach((k) => { permissions[k] = true; });
         return { roleType, permissions };
     }
-    let arranged = {};
+    let scoped = NO_RULES;
+    let company = NO_RULES;
     try {
-        arranged = arrangeRules(await fetchRules(companyId));
+        scoped = await rulesFor(companyId, projectId);
+        company = scoped.projectScoped && keys.some(isCompanyWideKey) ? await rulesFor(companyId, null) : scoped;
     } catch (error) {
-        logger.error(`evaluateMany fetchRules error: ${error.message || error}`);
+        scoped = NO_RULES;
+        company = NO_RULES;
+        logger.error(`evaluateMany rules error: ${error.message || error}`);
     }
-    for (const key of keys) {
-        let rule = null;
-        let ok = true;
-        for (const segment of String(key).split('.')) {
-            rule = rule ? rule[segment] : arranged[segment];
-            if (rule === undefined || rule === null) { ok = false; break; }
-        }
-        if (ok && rule && Array.isArray(rule.roles)) {
-            const match = rule.roles.find((r) => r.key === roleType);
-            permissions[key] = match ? match.permission : null;
-        } else {
-            permissions[key] = null;
-        }
-    }
+    keys.forEach((key) => { permissions[key] = permissionIn(isCompanyWideKey(key) ? company : scoped, roleType, key); });
     return { roleType, permissions };
 };
 
 /** Invalidate the cached roleType (call from member add/remove/role-change flows). */
 const invalidateRoleCache = (companyId, uid) => {
-    if (companyId && uid) myCache.del(`roleType:${companyId}:${uid}`);
+    if (companyId && uid) Object.keys(SEAT_SCOPES).forEach((seat) => myCache.del(`roleType:${seat}:${companyId}:${uid}`));
 };
 
 module.exports = {
+    ROLE_GUEST,
     ROLE_OWNER,
     ROLE_ADMIN,
+    ROLE_MEMBER,
     getRoleType,
     isPrivileged,
     arrangeRules,
     evaluatePermission,
+    projectsForRequest,
     requireRole,
+    requireCompanyAdmin,
     requirePermission,
     requireTaskActionPermission,
+    requireTaskWritePermission,
     evaluateMany,
     MCP_PERMISSION_KEYS,
     invalidateRoleCache,
+    fineGrainedEnforced,
+    isWritable,
+    isReadable,
 };

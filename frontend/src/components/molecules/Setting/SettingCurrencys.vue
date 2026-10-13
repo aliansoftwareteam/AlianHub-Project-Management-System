@@ -14,7 +14,7 @@
             </div>
             <Sidebar
                 v-model:visible="isVisible"
-                title="Currencies"
+                :title="$t('Settings.currencies')"
                 :enable-search="true"
                 :options="option"
                 :multiSelect="true"
@@ -135,7 +135,7 @@
 </script>
 <style scoped>
     .currencies_wrapper_setting {
-        background: #ECEEF1;
+        background: var(--fill);
         padding: 3.5px 10px !important;
         border-radius: 23px;
         margin: 0px 10px 10px 0px !important;

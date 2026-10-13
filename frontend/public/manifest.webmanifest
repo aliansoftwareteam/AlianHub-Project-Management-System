@@ -1,15 +1,19 @@
 {
+  "id": "/",
   "name": "AlianHub",
   "short_name": "AlianHub",
-  "description": "AlianHub — self-hosted project management",
+  "description": "Self-hosted project management: tasks, projects, docs and chat for your team.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#ffffff",
-  "theme_color": "#2F3990",
+  "background_color": "#f7f6f3",
+  "theme_color": "#f7f6f3",
+  "categories": ["productivity", "business"],
   "icons": [
-    { "src": "/api/v1/getlogo?key=favicon", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/api/v1/getlogo?key=favicon", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

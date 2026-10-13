@@ -23,4 +23,7 @@ const isPeriodLocked = async ({ companyId, userId, date } = {}) => {
     return !!doc;
 };
 
-module.exports = { isPeriodLocked };
+/* Sent with refusals of new time so the web app can show its own translated message. */
+const PERIOD_LOCKED = 'period_locked';
+
+module.exports = { isPeriodLocked, PERIOD_LOCKED };

@@ -20,6 +20,7 @@ const { emitListener } = require("../../../Company/eventController.js");
 const { createCustomFields } = require("../helper.js");
 const { removeCache } = require('../../../../utils/commonFunctions.js');
 const { updateRemainingTime } = require('../../../LogTime/controllerV2.js');
+const { taskNotFound } = require('../taskWriteFields');
 module.exports = {
 
     /* -------------- (AUTO RUN ON TASK CREATE) UPDATE TASK KEY -----------------*/
@@ -59,7 +60,6 @@ module.exports = {
                         return;
                 }
                 MongoDbCrudOpration(companyId, objSchema, 'findOneAndUpdate').then(async(res)=>{
-                    socketEmitter.emit('update', { type: "update", data: res , updatedFields: {}, module: 'task' });
                     let taskObj;
                     let updateObj = {
                         TaskKey: `${projectCode}-${res.lastTaskId+1}`
@@ -96,7 +96,7 @@ module.exports = {
                         data: taskObj
                     }
                     MongoDbCrudOpration(companyId, objSh, 'findOneAndUpdate').then((result)=>{
-                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: updateObj, module: 'task' });
+                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: updateObj, module: 'task', companyId });
                         resolve();
                     }).catch((error)=>{
                         reject(error)
@@ -128,7 +128,7 @@ module.exports = {
         }
 
         MongoDbCrudOpration(companyId, query, "findOneAndUpdate").then((result)=>{
-            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTask}, module: 'task' });
+            socketEmitter.emit('update', { type: "update", data: result , updatedFields: {subTasks: result.subTask}, module: 'task', companyId });
         })
         .catch((error) => {
             logger.error(`ERROR in update parent subtask count: ${error.message}`);
@@ -151,11 +151,17 @@ module.exports = {
     updateTaskIndex (companyId,projectId,taskId,indexObj,taskKey,sprintId)  {
         return new Promise((resolve, reject) => {
             try {
+                    // Aggregates skip Mongoose casting, and tasks store ProjectID as an ObjectId.
+                    const projectObjectId = mongoose.isObjectIdOrHexString(projectId) ? new mongoose.Types.ObjectId(String(projectId)) : null;
+                    if (!projectObjectId) {
+                        resolve(0);
+                        return;
+                    }
                     if (indexObj.searchKey === "AssigneeUserId" && indexObj.searchValue == "[]") {
                         let taskObj = [
                             {
                               $match: {
-                                ProjectID: projectId,
+                                ProjectID: projectObjectId,
                                 TaskKey: {$ne: taskKey},
                                 [indexObj.indexName]: { $exists: true },
                                 // sprintId: sprintId,
@@ -177,7 +183,7 @@ module.exports = {
                             data: [taskObj]
                         }
                         MongoDbCrudOpration(companyId, objSh, 'aggregate').then((resp)=>{
-                            if (resp && resp[0].results && resp[0].results.length) {
+                            if (resp?.[0]?.results?.length) {
                                 resolve(resp[0].results[0][indexObj.indexName] - 65536)
                             } else {
                                 resolve(0)
@@ -199,7 +205,7 @@ module.exports = {
                               $match: {
                                 $and: [
                                   {[indexObj.indexName]: {$exists: true}},
-                                  { ProjectID: new mongoose.Types.ObjectId(projectId) },
+                                  { ProjectID: projectObjectId },
                                 //   { sprintId: sprintId },
                                   { [indexObj.searchKey]: searchValue },
                                   {[indexObj.indexName]: {$ne: -999999999999999 }}
@@ -231,7 +237,7 @@ module.exports = {
     },
 
     // UPDATE TASK FOR QUEUE LIST
-    updateQueueList({CompanyId, projectId, sprintId, taskId,userId,actionType,taskName,userData}) {
+    updateQueueList({CompanyId, projectId, sprintId, taskId,userId,actionType,userData}) {
         return new Promise((resolve,reject) => {
             try {
                 const query = {
@@ -249,8 +255,13 @@ module.exports = {
                 }
                 MongoDbCrudOpration(CompanyId, query, "findOneAndUpdate")
                 .then((result) => {
-                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {queueListArray: result.queueListArray}, module: 'task' });
+                    if (!result) {
+                        reject(taskNotFound());
+                        return;
+                    }
+                    socketEmitter.emit('update', { type: "update", data: result , updatedFields: {queueListArray: result.queueListArray}, module: 'task', companyId: CompanyId });
                     resolve({status: true, statusText: "updateQueueList updated successfully"});
+                    const taskName = sanitizeInput(String(result.TaskName || ''));
                     let historyObj = {};
                     historyObj.key = "Task_Queue";
                     if(actionType === "add"){
@@ -273,66 +284,5 @@ module.exports = {
                 reject(error)
             }
         })
-    },
-
-    updateStartDateAndDueDate({commonDateFormatString, userData, notificationObj, firebaseObj,task,project}) {
-        return new Promise((resolve,reject)=> {
-            firebaseObj.dueDateDeadLine = firebaseObj.dueDateDeadLine.map((x) => ({date: new Date(x.date)}));
-            firebaseObj.DueDate = new Date(firebaseObj.DueDate);
-            firebaseObj.startDate = new Date(firebaseObj.startDate);
-
-            const query = {
-                type: dbCollections.TASKS,
-                data: [
-                    {
-                        _id: new mongoose.Types.ObjectId(task._id)
-                    }, {
-                        $set: {
-                            ...firebaseObj
-                        },
-                        $unset: {
-                            groupByDueDateIndex: 1
-                        },
-                    },
-                    {
-                        returnDocument: 'after'
-                    }
-                ]
-            }
-            MongoDbCrudOpration(project.CompanyId, query, "findOneAndUpdate")
-            .then((result) => {
-                socketEmitter.emit('update', { type: "update", data: result , updatedFields: {...firebaseObj}, module: 'task' });
-                resolve({status: true, statusText: "Start Date And Due Date updated successfully"});
-                if (notificationObj && Object.keys(notificationObj).length > 0) {
-                    HandleBothNotification({
-                        type:'tasks',
-                        userData,
-                        companyId: project.CompanyId,
-                        projectId: project._id,
-                        taskId: task._id,
-                        folderId: task.folderObjId || "",
-                        sprintId: task.sprintId,
-                        object: notificationObj
-                    })
-                    .catch((error) => {
-                        logger.error(`ERROR in update Start Date : ${error.message}`);
-                    })
-                }
-                var historyObj = {};
-                historyObj.key = "Project_StartDate_DueDate";
-                if (firebaseObj.dueDateDeadLine.length === 1) {
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has added <b> Start Date</b> as <b>DATE_${new Date(firebaseObj.startDate).getTime()}</b> and <b> Due Date</b> as <b>DATE_${new Date(firebaseObj.DueDate).getTime()} </b>.`;
-                } else {
-                    historyObj.message = `<b>${userData.Employee_Name}</b> has Changed <b> Start Date</b> as <b>DATE_${new Date(firebaseObj.startDate).getTime()}</b> and <b> Due Date</b> as <b>DATE_${new Date(firebaseObj.DueDate).getTime()} </b>.`;
-                }
-                historyObj.sprintId = task.sprintId;
-                HandleHistory('task',project.CompanyId, project._id,task._id,historyObj, userData).
-                catch((error) => {
-                    logger.error(`ERROR in update Start Date And Due Date update hostory : ${error.message}`);
-                });
-            }).catch((error) => {
-                reject(error);
-            })
-        });
     }
 };

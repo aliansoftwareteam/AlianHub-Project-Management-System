@@ -1,32 +1,36 @@
 <template>
-    <FormKit
-        type="form"
-        :form-class="submitted ? 'hide' : 'show'"
-        @submit="handleSubmit"
-        :actions="false"
-        ref="myForm"
-    >
-        <component
-            :is="getView(props.componentDetail.cfType)"
-            :tabIndex="props.tabIndex"
-            :componentDetail="props.componentDetail"
-            :customFieldObject="props.customFieldObject"
-            @handleFunction="(val,isEdit) => emit('handleFunction',val,isEdit)"
-            @tabIndexUpdate="(val) => emit('tabIndexUpdate',val)" 
-            ref="childRef"
-            :isType="isType"
-        />
-        <div class="custom_field-btn">
-            <FormKit type="button" @click="handleTabCheck" :label="$t('Projects.cancel')" />
-            <FormKit type="submit" @click="handleTab" :label="$t('Projects.save')" :disabled="submitted" />
-        </div>
-    </FormKit>
+    <div ref="formHolder" @keydown.enter="saveFromName">
+        <FormKit
+            type="form"
+            :form-class="submitted ? 'hide' : 'show'"
+            @submit="handleSubmit"
+            @submit-invalid="showFirstError"
+            :actions="false"
+            ref="myForm"
+        >
+            <component
+                :is="getView(props.componentDetail.cfType)"
+                :tabIndex="props.tabIndex"
+                :componentDetail="props.componentDetail"
+                :customFieldObject="props.customFieldObject"
+                @handleFunction="(val,isEdit) => emit('handleFunction',withTaskTypes(val),isEdit,another)"
+                @tabIndexUpdate="(val) => emit('tabIndexUpdate',val)"
+                ref="childRef"
+                :isType="isType"
+            />
+            <FieldTaskTypesPicker v-if="forTasks" v-model="taskTypes" :projectIds="taskTypeProjectIds" />
+            <div class="custom_field-btn" :class="{ 'custom_field-btn--three': isNew }">
+                <FormKit type="button" @click="handleTabCheck" :label="$t('Projects.cancel')" />
+                <FormKit v-if="isNew" type="button" data-field-save-another @click="save(true)" :label="$t('Fields.save_and_add_another')" :disabled="submitted" />
+                <FormKit type="submit" @click="saveByButton" :label="$t('Projects.save')" :disabled="submitted" />
+            </div>
+        </FormKit>
+    </div>
 </template>
 
 <script setup>
-    //import
-    import { ref} from "vue";
-    import {FormKit} from '@formkit/vue';
+    import { computed, inject, nextTick, onMounted, provide, ref, unref, watch } from "vue";
+    import { FormKit } from '@/plugins/customFieldView/lazyFormKit';
     import TextComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/textComponents.vue";
     import CheckboxCustomField from "../../../atom/customFieldSidebar/customFieldSidebarComponent/checkboxCustomFields.vue";
     import PhoneComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/phoneComponent.vue";
@@ -38,15 +42,15 @@
     import EmailComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/emailComponent.vue";
     import FormulaComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/formulaComponent.vue";
     import RollupComponent from "../../../atom/customFieldSidebar/customFieldSidebarComponent/rollupComponent.vue";
+    import FieldTaskTypesPicker from "../../../atom/FieldTaskTypesPicker/FieldTaskTypesPicker.vue";
+    import { fieldProjectIds } from "@/plugins/customFieldView/taskTypeOptions";
     import { useToast } from "vue-toast-notification";
     import { useI18n } from "vue-i18n";
     const { t } = useI18n();
 
-    //emit
     const emit = defineEmits(['handleFunction','tabIndexUpdate','closeSidebar']);
     const $toast = useToast();
 
-    //props
     const props = defineProps({
         tabIndex:{
             type: Number,
@@ -66,13 +70,32 @@
         }
     });
 
-    // ref
     const myForm = ref();
+    const formHolder = ref(null);
     const submitted = ref(false);
-    const childRef = ref();
+    const another = ref(false);
+    const isNew = computed(() => !props.customFieldObject?._id);
 
-    //function
-    // save function
+    onMounted(() => nextTick(() => formHolder.value?.querySelector('input[name="fieldTitle"]')?.focus()));
+    const childRef = ref();
+    const taskTypes = ref([]);
+    const forTasks = !inject('customFieldForProject', false) && props.customFieldObject?.type !== 'project';
+
+    /* Settings (isType) saves a new field company-wide; a task panel or a List saves it to the project it is open in. */
+    const hostProject = inject('selectedProject', null);
+    const taskTypeProjectIds = computed(() => {
+        if (props.customFieldObject?._id) return fieldProjectIds(props.customFieldObject);
+        return props.isType ? [] : fieldProjectIds({ projectId: unref(hostProject)?._id });
+    });
+
+    watch(() => props.customFieldObject?.fieldTaskTypes, (stored) => { taskTypes.value = [...(stored || [])]; }, { immediate: true });
+
+    /* Only a field that has or gets task types sends the list, so the other callers of this form save what they always did. */
+    const withTaskTypes = (val) => {
+        if (!forTasks || val?.type === 'project' || !(taskTypes.value.length || props.customFieldObject?.fieldTaskTypes?.length)) return val;
+        return { ...val, fieldTaskTypes: [...taskTypes.value] };
+    };
+
     const handleSubmit = async (object) => {
         if(props.componentDetail.cfType == "text" || props.componentDetail.cfType == "textarea" || props.componentDetail.cfType == "number") {
             if(object.fieldEntryLimits.length && object.fieldMinimum === '' && object.fieldMaximum === ''){
@@ -90,18 +113,48 @@
         submitted.value = true;
     };
 
-    // cancel function
     const handleTabCheck = () => {
        emit('closeSidebar',false)
     };
 
-    // tab validation check
-    const handleTab = () => {            
+    const handleTab = () => {
         const node = myForm.value.node;
         childRef.value.handleTabComp(node);
     };
 
-    //component
+    const saveByButton = () => {
+        another.value = false;
+        handleTab();
+    };
+
+    const save = (andAnother) => {
+        another.value = andAnother;
+        handleTab();
+        myForm.value.node.submit();
+    };
+    provide('saveFieldForm', () => save(false));
+
+    /* The browser submits on Enter by itself, as a click on Save. It is done here so one key press saves once, whatever the browser. */
+    const saveFromName = (event) => {
+        if (event.target?.name !== 'fieldTitle' || event.isComposing) return;
+        event.preventDefault();
+        save(false);
+    };
+
+    /* A field in error can sit on a tab that is not shown, where its message cannot be seen. */
+    const showFirstError = async (form) => {
+        let invalid = null;
+        form.walk((child) => {
+            if (!invalid && child.type === 'input' && child.context?.state.valid === false) invalid = child;
+        });
+        const holder = invalid && document.getElementById(invalid.props.id);
+        if (!holder) return;
+        const tab = Number(holder.closest('[data-field-tab]')?.dataset.fieldTab);
+        if (tab) emit('tabIndexUpdate', tab);
+        await nextTick();
+        (holder.matches('input, textarea, select') ? holder : holder.querySelector('input, textarea, select'))?.focus();
+    };
+
     const getView = (val) => {
         switch(val) {
             case 'text':

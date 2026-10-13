@@ -3,11 +3,14 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { isShareToken, escapeHtml } = require('../PublicShares/helpers/shareRules');
+const { shareStillAuthorised } = require('../PublicShares/helpers/shareAccess');
 const { taskMongo } = require('../Tasks/helpers/task_class_Mongo'); // canonical task create
 const { mapSubmission, buildDescription, buildDescriptionBlock } = require('./helpers/submissionRules');
-const { normalizeSettings, hydrateStored } = require('./helpers/formRules');
-const { typeOf, resolveSpan, GRID_COLUMNS } = require('./helpers/questionTypes');
-const { storeSubmissionFiles, messageFor, REPICK, ACCEPT_ATTR, MAX_FILE_BYTES, MAX_FILES } = require('./helpers/formUpload');
+const { normalizeSettings, hydrateStored, SEEN_FIELD, MORE_ANCHOR } = require('./helpers/formRules');
+const { typeOf, resolveSpan } = require('./helpers/questionTypes');
+const { shownQuestions, hasRules } = require('./helpers/formLogic');
+const { storeSubmissionFiles, discardFiles, messageFor, REPICK, ACCEPT_ATTR, MAX_FILE_BYTES, MAX_FILES } = require('./helpers/formUpload');
+const { publishFormSubmitted } = require('../Automations/engine/formEvent');
 
 // The public half of Forms: an unauthenticated page, and the submission that
 // becomes a task.
@@ -15,8 +18,12 @@ const { storeSubmissionFiles, messageFor, REPICK, ACCEPT_ATTR, MAX_FILE_BYTES, M
 // Server-rendered rather than an SPA route, matching the shared docs: no login,
 // no bundle, and a policy that forbids scripts outright — every widget here is
 // one the browser renders on its own, so the page needs none. That constraint is
-// why conditional logic, one-question-per-page and a signature pad are not
-// offered: each would need script on a page anonymous traffic can reach.
+// why one-question-per-page and a signature pad are not offered: each would need
+// script on a page anonymous traffic can reach. A question shown by an earlier
+// answer needs none, because the rule is applied here on the round trip: the
+// answers come in, and the page that goes back asks what they call for.
+
+const STORED_TASK_FIELDS = { TaskKey: 1, TaskName: 1, statusType: 1, statusKey: 1, Task_Priority: 1 };
 
 /* No script of ours, and none of theirs. The page is built from escaped values,
  * and this is the backstop if any of them were ever missed. */
@@ -85,20 +92,13 @@ const PAGE_STYLE = `
     button:hover{filter:brightness(.94)}
     .note{margin-top:18px;font-size:13px;padding:11px 13px;border-radius:8px}
     .note.err{background:#fdf1f0;color:#a33227;border:1px solid #f0cfcb}
-    /* Sent confirmation. The form stays on screen so another submission needs no
-       navigation, and the banner takes itself away after a couple of seconds.
-       Done in CSS because this page runs no script — the policy forbids it. */
-    /* Sits above the form, so it needs room beneath it or the first label touches
-       it. The collapse below has to zero this margin too. */
     .note.ok{display:flex;align-items:center;gap:9px;margin-bottom:20px;background:#eef8f2;color:#1c6b41;
-        border:1px solid #c8e6d5;overflow:hidden;animation:sent-away .45s ease 2s forwards}
+        border:1px solid #c8e6d5}
+    .more{margin:0;font-size:13px;padding:10px 12px;border-radius:8px;background:#eef2ff;color:#2f3a8f;
+        border:1px solid #c9d0f5}
     .note.ok .tick{flex:0 0 20px;width:20px;height:20px;border-radius:50%;background:#1c7a43;color:#fff;
         display:flex;align-items:center;justify-content:center;font-size:12px}
-    @keyframes sent-away{
-        to{opacity:0;visibility:hidden;max-height:0;margin-top:0;margin-bottom:0;
-            padding-top:0;padding-bottom:0;border-width:0}
-    }
-    @media (prefers-reduced-motion:reduce){.note.ok{animation-duration:.01s}}
+    .again{display:inline-block;font-size:14px;font-weight:600;color:inherit}
     .footer{margin-top:22px;text-align:center;font-size:12px}
     /* One per row on a phone: thirds and quarters are unusable at that width. */
     @media (max-width:640px){.q,.q--3,.q--4,.q--6{grid-column:span 12}}
@@ -110,14 +110,15 @@ const PAGE_STYLE = `
 const themeStyle = (s) => {
     const dark = s.theme === 'dark';
     const ink = dark ? '#e8e9f0' : '#222';
-    const muted = dark ? '#9aa0b4' : '#6b7280';
+    const muted = dark ? '#9aa0b4' : '#5f6573';
     const surface = dark ? '#1f2130' : '#fff';
     const edge = dark ? '#343850' : '#e6e6e6';
     return `
     body{background:${s.background};color:${ink}}
     .card{background:${surface};border:1px solid ${edge}}
     .head--rule{border-bottom-color:${edge}}
-    .intro,.help,.footer{color:${muted}}
+    .intro,.help,.footer,.drop .hint{color:${muted}}
+    .stars label{color:${dark ? '#6b7090' : '#8a8fa3'}}
     input[type=text],input[type=date],input[type=email],input[type=url],input[type=tel],
     input[type=number],textarea,select,.money .sym{background:${surface};color:${ink};
         border-color:${dark ? '#3b3f5a' : '#d7d9e6'}}
@@ -145,7 +146,8 @@ const ERROR_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false
     + '<rect x="7.1" y="4" width="1.8" height="5" rx=".9" fill="#fff"/>'
     + '<circle cx="8" cy="11.4" r="1" fill="#fff"/></svg>';
 
-const gone = (res) => send(res, 404, 'Not available', '<h1>This form is not available.</h1>');
+const gone = (res) => send(res, 404, 'Not available', '<h1>This form is not available.</h1>'
+    + '<p class="intro">Ask the person who sent you this link for a new one.</p>');
 
 /* Where a completed submission is sent.
  *
@@ -158,13 +160,6 @@ const SENT_QUERY = 'sent=1';
 const redirectAfterSubmit = (res, token) => res
     .set('Cache-Control', 'no-store')
     .redirect(303, `/form/${encodeURIComponent(token)}?${SENT_QUERY}`);
-
-/* The confirmation banner. Shared, so the GET that follows a submission and any
- * other caller cannot word it differently. */
-const sentBanner = (form) => {
-    const thanks = form.successMessage || 'Thanks - your submission has been received.';
-    return `<div class="note ok"><span class="tick">&#10003;</span><span>${escapeHtml(thanks)}</span></div>`;
-};
 
 /* Resolve token -> tenant -> form. The GLOBAL index exists because a public
  * request carries no company: the token has to name the tenant first. */
@@ -179,6 +174,8 @@ async function resolveForm(token) {
     }, 'findOne');
     if (!share || share.entityType !== 'form' || share.enabled === false) return null;
     if (share.expiresAt && new Date(share.expiresAt).getTime() < Date.now()) return null;
+    // Tasks are filed as the publisher, so the link dies with the publisher's access.
+    if (!(await shareStillAuthorised(index.companyId, share))) return null;
 
     const form = await MongoDbCrudOpration(index.companyId, {
         type: SCHEMA_TYPE.FORMS, data: [{ _id: share.entityId, deletedStatusKey: 0 }],
@@ -209,8 +206,35 @@ const echoed = (values, id) => {
     return (Array.isArray(v) ? v : [v]).map((x) => String(x));
 };
 
-/* One question, as markup the browser already knows how to render. */
-function renderQuestion(q, values, errors, layout) {
+/* What the page asked last time, posted back so the next page can tell which
+ * questions are new to this visitor. It only decides whether they get a look at
+ * a new question before the submission is read; what is required, checked and
+ * stored never depends on it. */
+const seenField = (questions) => `<input type="hidden" name="${SEEN_FIELD}"`
+    + ` value="${escapeHtml(JSON.stringify(questions.map((q) => String(q.id))))}">`;
+
+const notYetSeen = (asked, posted) => {
+    let seen;
+    try {
+        seen = JSON.parse(String(Array.isArray(posted) ? posted[0] : posted));
+    } catch (error) {
+        return [];
+    }
+    if (!Array.isArray(seen)) return [];
+    const ids = new Set(seen.map(String));
+    return asked.filter((q) => !ids.has(String(q.id)));
+};
+
+const moreNote = (count) => `<p class="q q--12 more" id="${MORE_ANCHOR}" role="status">`
+    + `${count === 1
+        ? 'Your answers added one more question. Answer it, then submit again.'
+        : `Your answers added ${count} more questions. Answer them, then submit again.`}</p>`;
+
+/* One question, as markup the browser already knows how to render. `lead` marks
+ * the first question new to this visitor: its control takes the focus and is
+ * described by the note above it, which is how a screen reader hears of it on a
+ * page with no script to announce anything. */
+function renderQuestion(q, values, errors, layout, lead) {
     const meta = typeOf(q.type);
     if (!meta) return '';
     const span = resolveSpan(q, layout);
@@ -302,24 +326,27 @@ function renderQuestion(q, values, errors, layout) {
                 + ` value="${one}"${req}>`;
     }
 
+    if (lead) field = field.replace(/<(input|textarea|select) /, `<$1 autofocus aria-describedby="${MORE_ANCHOR}" `);
+
     return `<div class="q${width}${error ? ' bad' : ''}">`
         + `<label for="${id}">${label}${star}${help}</label>${field}`
         + `${error ? `<span class="err-line">${ERROR_ICON}${escapeHtml(error)}</span>` : ''}</div>`;
 }
 
-/* The whole card: heading, an optional banner, and the questions. Used for the
- * first view, a rejected submission and the view after a successful one, so all
- * three cannot drift apart. */
-function formBody(form, token, questions, opts) {
-    const o = opts || {};
-    const s = o.settings || normalizeSettings({});
+function formHead(form, s) {
     // Title and description are ruled off and aligned together: a centred title
     // above a left-aligned description of itself reads as a mistake.
     const head = `head head--${s.titleAlign}${s.titleDivider ? ' head--rule' : ''}`;
     let body = `<div class="${head}"><h1>${escapeHtml(form.title || 'Form')}</h1>`;
     if (form.description) body += `<p class="intro">${escapeHtml(form.description)}</p>`;
-    body += '</div>';
-    if (o.banner) body += o.banner;
+    return `${body}</div>`;
+}
+
+/* Used for the first view and a rejected submission, so the two cannot drift apart. */
+function formBody(form, token, questions, opts) {
+    const o = opts || {};
+    const s = o.settings || normalizeSettings({});
+    let body = formHead(form, s);
     // novalidate: the page validates on the server and renders its own message
     // per field, which the native popup would otherwise pre-empt.
     // multipart only when a file can be sent: it is a heavier encoding, and the
@@ -327,14 +354,27 @@ function formBody(form, token, questions, opts) {
     const carriesFile = questions.some((q) => (typeOf(q.type) || {}).widget === 'file');
     const enc = carriesFile ? ' enctype="multipart/form-data"' : '';
     body += `<form method="POST" action="/form/${escapeHtml(token)}"${enc} novalidate><div class="grid">`;
-    body += questions.map((q) => renderQuestion(q, o.values, o.errors, s.layout)).join('');
+    const fresh = o.fresh || [];
+    const lead = fresh.find((q) => (typeOf(q.type) || {}).input !== false);
+    body += questions.map((q) => (q === fresh[0] ? moreNote(fresh.length) : '')
+        + renderQuestion(q, o.values, o.errors, s.layout, q === lead)).join('');
     body += '</div>';
+    if (hasRules(form.questions)) body += seenField(questions);
     // Only when no field could carry the message. Repeating "one or more fields
     // are required" under a column of per-field messages says nothing new.
     const fieldErrors = o.errors ? Object.keys(o.errors).length : 0;
     if (o.reason && !fieldErrors) body += `<div class="note err">${escapeHtml(o.reason)}</div>`;
     body += '<button type="submit">Submit</button></form>';
     return body;
+}
+
+/* Shown in place of the form, and it stays: an empty form under a confirmation
+ * that fades invites someone who looked away to send it again. */
+function sentBody(form, token, settings) {
+    const thanks = form.successMessage || 'Thanks - your submission has been received.';
+    return formHead(form, settings)
+        + `<div class="note ok" role="status"><span class="tick">&#10003;</span><span>${escapeHtml(thanks)}</span></div>`
+        + `<a class="again" href="/form/${escapeHtml(encodeURIComponent(token))}">Submit another response</a>`;
 }
 
 /* GET /form/:token — the public form. */
@@ -345,14 +385,12 @@ exports.renderForm = async (req, res) => {
         const form = liveForm(resolved.form);
         const settings = normalizeSettings(form.settings);
         // Reached by the redirect that follows a submission. A stray ?sent=1 on a
-        // hand-typed url only shows a banner above an empty form, which is
-        // harmless — nothing is recorded by rendering.
+        // hand-typed url only shows the thank-you state, which is harmless —
+        // nothing is recorded by rendering.
         const justSent = String(req.query.sent || '') === '1';
-        return send(res, 200, form.title || 'Form',
-            formBody(form, req.params.token, visibleQuestions(form), {
-                banner: justSent ? sentBanner(form) : '',
-                settings,
-            }), settings);
+        return send(res, 200, form.title || 'Form', justSent
+            ? sentBody(form, req.params.token, settings)
+            : formBody(form, req.params.token, shownQuestions(visibleQuestions(form), {}), { settings }), settings);
     } catch (error) {
         logger.error(`ERROR in render public form: ${error.message}`);
         return send(res, 500, 'Error', '<h1>Something went wrong.</h1>');
@@ -370,15 +408,32 @@ exports.submitForm = async (req, res) => {
         const { companyId } = resolved;
         const form = liveForm(resolved.form);
         const settings = normalizeSettings(form.settings);
-        const questions = visibleQuestions(form);
+        const answers = req.body || {};
+        const questions = shownQuestions(visibleQuestions(form), answers);
+
+        const fresh = hasRules(form.questions) ? notYetSeen(questions, answers[SEEN_FIELD]) : [];
+        if (fresh.length) {
+            // Nothing is read as a submission until the visitor has seen every
+            // question their answers call for, so nothing is stored either.
+            const repick = {};
+            for (const file of req.files || []) {
+                const target = questions.find((q) => q.id === file.fieldname && (typeOf(q.type) || {}).widget === 'file');
+                if (target) repick[target.id] = REPICK;
+            }
+            discardFiles(req.files);
+            return send(res, 200, form.title || 'Form', formBody(form, req.params.token, questions, {
+                fresh, values: answers, errors: repick, settings,
+            }), settings);
+        }
 
         // A file arrives beside the answers and has to be stored before the
         // mapping runs, because the mapper is pure — no fs, no req — which is what
         // makes it testable without standing Wasabi up.
         //
         // Ordering is deliberate: the form is resolved, each file is matched to a
-        // visible question of the right type on THIS form, checked, and only then
-        // written. A file for a question that does not exist never reaches the
+        // question of the right type that THIS form asks for these answers,
+        // checked, and only then written. A file for a question that does not
+        // exist, or that these answers do not call for, never reaches the
         // tenant's bucket.
         const uploads = await storeSubmissionFiles({
             companyId, form, questions, incoming: req.files || [],
@@ -400,7 +455,7 @@ exports.submitForm = async (req, res) => {
             }
         }
 
-        const mapped = mapSubmission(form, req.body || {}, {
+        const mapped = mapSubmission(form, answers, {
             requireTaskName: settings.createTask,
             files: uploads.files,
             fileErrors,
@@ -413,7 +468,7 @@ exports.submitForm = async (req, res) => {
             return send(res, 200, form.title || 'Form', formBody(form, req.params.token, questions, {
                 reason: mapped.reason,
                 errors: mapped.errors,
-                values: req.body || {},
+                values: answers,
                 settings,
             }), settings);
         }
@@ -439,6 +494,14 @@ exports.submitForm = async (req, res) => {
                 type: SCHEMA_TYPE.FORMS,
                 data: [{ _id: form._id }, { $inc: { submissionCount: 1 } }, {}],
             }, 'updateOne').catch(() => {});
+            publishFormSubmitted({
+                companyId,
+                form,
+                submissionId: stored && stored._id,
+                answers: mapped.record,
+                task: null,
+                actor: { kind: 'system' },
+            });
             return redirectAfterSubmit(res, req.params.token);
         }
 
@@ -460,6 +523,7 @@ exports.submitForm = async (req, res) => {
             // Declared on the tasks schema as an untyped Array, so the descriptor's
             // own keys survive; an undeclared sibling field would not.
             attachments: mapped.attachments || [],
+            origin: { kind: 'form', ref: String((stored && stored._id) || form._id) },
             rawDescription: answerText,
             // The editor reads this one; rawDescription alone showed an empty
             // description on the task.
@@ -490,26 +554,40 @@ exports.submitForm = async (req, res) => {
             data: [{ _id: form._id }, { $inc: { submissionCount: 1 } }, {}],
         }, 'updateOne').catch(() => {});
 
-        // Linked back so the response table can show which task each answer made.
+        // taskMongo.create resolves only { status, id }; the key and the defaults are set inside
+        // it, so the rule this submission fires is handed the row as stored.
+        const taskId = String(result.id || data._id);
+        const created = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TASKS,
+            data: [{ _id: new mongoose.Types.ObjectId(taskId) }, STORED_TASK_FIELDS],
+        }, 'findOne').catch(() => null);
+        const storedTask = created && typeof created.toObject === 'function' ? created.toObject() : created;
+        const taskKey = String((storedTask && storedTask.TaskKey) || '');
+
         if (stored && stored._id) {
             await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.FORM_SUBMISSIONS,
-                data: [{ _id: stored._id }, {
-                    $set: {
-                        taskId: String((result.data && result.data._id) || data._id),
-                        taskKey: String((result.data && result.data.TaskKey) || ''),
-                    },
-                }, {}],
+                data: [{ _id: stored._id }, { $set: { taskId, taskKey } }, {}],
             }, 'updateOne').catch(() => {});
         }
 
-        // Redirected, not rendered: the empty form with its self-dismissing banner
-        // is served by the GET that follows, so reloading it repeats nothing.
+        publishFormSubmitted({
+            companyId,
+            form,
+            submissionId: stored && stored._id,
+            answers: mapped.record,
+            task: storedTask ? { ...storedTask, _id: taskId } : { ...data, _id: taskId },
+            actor: { kind: 'system' },
+        });
+
+        // Redirected, not rendered: the thank-you state is served by the GET that
+        // follows, so reloading it repeats nothing.
         return redirectAfterSubmit(res, req.params.token);
     } catch (error) {
         logger.error(`ERROR in submit public form: ${error.message}`);
         return send(res, 500, 'Error', '<h1>Something went wrong.</h1>');
     } finally {
         if (cleanupFiles) cleanupFiles();
+        else discardFiles(req.files);
     }
 };

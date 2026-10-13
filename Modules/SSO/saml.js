@@ -2,8 +2,9 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const logger = require("../../Config/loggerConfig");
 const { extractIdentity } = require("./helpers/ssoRules");
-const { jitProvisionUser } = require("./provisioning");
+const { ssoSignInUser, SSO_NOT_ALLOWED } = require("./provisioning");
 const { finalizeSsoSession } = require("./ssoSession");
+const { isKnownCompany } = require("../../Config/knownCompany");
 
 // `samlify` (+ its schema validator) are lazy-required so app load never breaks
 // before `npm install`. SAML responses MUST be signature-validated — samlify
@@ -23,9 +24,9 @@ const ensureValidator = () => {
     validatorReady = true;
 };
 
-const loadConfig = async (companyId) => MongoDbCrudOpration(companyId, {
+const loadConfig = async (companyId) => ((await isKnownCompany(companyId)) ? MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.SSO_CONFIGS, data: [{ deletedStatusKey: 0, isEnabled: true }],
-}, 'findOne');
+}, 'findOne') : null);
 
 const buildSp = (companyId) => {
     const samlify = require('samlify');
@@ -53,7 +54,7 @@ const buildIdp = (cfg) => {
 /* GET /api/v2/sso/saml/initiate?companyId= — redirect to the IdP. */
 exports.samlInitiate = async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.headers['companyid'];
+        const companyId = req.query.companyId || req.headers['companyid']; // tenant-scoping: sign-in starts before any session; the company only picks which IdP to redirect to
         if (!companyId) return res.status(400).send('companyId is required');
         const cfg = await loadConfig(companyId);
         if (!cfg || cfg.provider !== 'saml') return res.status(404).send('SAML SSO is not configured for this company');
@@ -70,7 +71,7 @@ exports.samlInitiate = async (req, res) => {
 /* POST /api/v2/sso/saml/acs?companyId= — IdP posts the signed assertion here. */
 exports.samlAcs = async (req, res) => {
     try {
-        const companyId = req.query.companyId || (req.body && req.body.companyId);
+        const companyId = req.query.companyId || (req.body && req.body.companyId); // tenant-scoping: the IdP posts here before any session; the company only picks whose IdP certificate must have signed the response
         if (!companyId) return res.redirect('/login?ssoError=config');
         const cfg = await loadConfig(companyId);
         if (!cfg || cfg.provider !== 'saml') return res.redirect('/login?ssoError=config');
@@ -81,17 +82,10 @@ exports.samlAcs = async (req, res) => {
         const claims = { ...(extract.attributes || {}), nameID: extract.nameID };
         const id = extractIdentity(claims, (cfg.saml && cfg.saml.attributeMap) || {});
         if (!id.valid) return res.redirect('/login?ssoError=identity');
-        const uid = await jitProvisionUser({
-            companyId,
-            email: id.email,
-            firstName: id.firstName,
-            lastName: id.lastName,
-            externalId: id.externalId,
-            defaultRoleType: cfg.defaultRoleType,
-            autoProvision: cfg.autoProvisionUsers !== false,
-        });
+        const uid = await ssoSignInUser({ companyId, cfg, identity: id });
         return finalizeSsoSession(req, res, uid, `/${companyId}`);
     } catch (error) {
+        if (error && error.code === SSO_NOT_ALLOWED) return res.redirect('/login?ssoError=not_allowed');
         logger.error(`samlAcs: ${error.message || error}`);
         return res.redirect('/login?ssoError=callback');
     }
@@ -100,7 +94,7 @@ exports.samlAcs = async (req, res) => {
 /* GET /api/v2/sso/saml/metadata?companyId= — SP metadata for the IdP admin. */
 exports.samlMetadata = async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.headers['companyid'];
+        const companyId = req.query.companyId || req.headers['companyid']; // tenant-scoping: public SP metadata for the IdP admin; it names the company but holds none of its data
         if (!companyId) return res.status(400).send('companyId is required');
         const sp = buildSp(companyId);
         res.type('application/xml');

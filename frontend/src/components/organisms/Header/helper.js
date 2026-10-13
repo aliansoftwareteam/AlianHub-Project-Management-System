@@ -1,126 +1,16 @@
-import moment from "moment";
 import { inject,computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useCustomComposable } from "@/composable";
 import { useStore } from "vuex";
 import { useToast } from "vue-toast-notification";
-const {checkPermission} = useCustomComposable();
+import { openTask, isSameProjectPage } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import { i18n } from "@/locales/main";
 const t = i18n.global.t;
+
+/* A reply in a chat thread: the notice's taskId names the conversation and changeData.threadId the thread. */
+const CHAT_THREAD_REPLY = "chat_thread_reply";
 export function useHelper() {
     const companyId = inject("$companyId");
     const router = useRouter();
-    const menu = [
-        {
-            name: "Projects",
-            to: {path: `/${companyId.value}/project`},
-            show:true,
-            showerr: () => {
-                return true;
-                // return this.rules && this.checkPermission(this.rules.project, this.companyUserDetail.roleType) !== null && this.checkPermission(this.rules.project.project_list, this.companyUserDetail.roleType) !== null;
-            },
-            submenu: [],
-            isActive: true
-        },
-        {
-            // Workspace — oversight + planning + apps grouped under one menu.
-            name: "Workspace",
-            show: true,
-            submenu: [
-                {
-                    name: "Portfolio",
-                    to: {path: `/${companyId.value}/portfolio`},
-                    show: true
-                },
-                {
-                    name: "Capacity_Planning",
-                    to: {path: `/${companyId.value}/reports/capacity`},
-                    show: true
-                },
-                {
-                    name: "Integrations",
-                    to: {path: `/${companyId.value}/integrations`},
-                    // Hidden from the Workspace menu for now — route + page are kept; flip to true to restore.
-                    show: false
-                }
-            ]
-        },
-        {
-            name: "Time_Sheet",
-            id: "time_sheet_driver",
-            show:checkPermission('sheet_settings.workload_timesheet') !== null || checkPermission('sheet_settings.project_timesheet') !== null || checkPermission('sheet_settings.user_timesheet') !== null,
-            shower: () => {
-                return true;
-                // return this.rules && this.checkPermission(this.rules.sheet_settings, this.companyUserDetail.roleType) !== null && (this.checkPermission(this.rules.sheet_settings.user_timesheet, this.companyUserDetail.roleType) !== null || this.checkPermission(this.rules.sheet_settings.project_timesheet, this.companyUserDetail.roleType) !== null || this.checkPermission(this.rules.sheet_settings.workload_timesheet, this.companyUserDetail.roleType) !== null);
-            },
-            submenu: [
-                {
-                    name: "User_Timesheet",
-                    id: "user_time_sheet_driver",
-                    to: {path: `/${companyId.value}/timesheet/user`},
-                    show: checkPermission('sheet_settings.user_timesheet') !== null,
-                    showerr: () => {
-                        return true;
-                        // return this.rules && this.checkPermission(this.rules.sheet_settings.user_timesheet, this.companyUserDetail.roleType) !== null;
-                    }
-                },
-                {
-                    name: "project_Timesheet",
-                    id: "project_time_sheet_driver",
-                    to: {path: `/${companyId.value}/timesheet/project`},
-                    show: checkPermission('sheet_settings.project_timesheet') !== null,
-                    shower: () => {
-                        return true;
-                        // return this.rules && this.checkPermission(this.rules.sheet_settings.project_timesheet, this.companyUserDetail.roleType) !== null;
-                    }
-                },
-                {
-                    name: "Workload_Timesheet",
-                    id: "workload_time_sheet_driver",
-                    to: {path: `/${companyId.value}/timesheet/workload`},
-                    show: checkPermission('sheet_settings.workload_timesheet') !== null,
-                    shower: () => {
-                        return true;
-                        // return this.rules && this.checkPermission(this.rules.sheet_settings.workload_timesheet, this.companyUserDetail.roleType) !== null;
-                    }
-                },
-                {
-                    name: "Tracker_Timesheet",
-                    id: "tracker_time_sheet_driver",
-                    to: {path: `/${companyId.value}/timesheet/tracker`},
-                    show: checkPermission('sheet_settings.tracker_timesheet') !== null,
-                    shower: () => {
-                        return true;
-                        // return this.rules && this.checkPermission(this.rules.sheet_settings.workload_timesheet, this.companyUserDetail.roleType) !== null;
-                    }
-                }
-            ]
-        },
-        {
-            // Reports — Milestone (permission-gated). Custom & Variance are hidden for now;
-            // their entries and routes are left in place so turning them back on is a
-            // one-word change (NavLinks renders only submenu items with show === true).
-            name: "Reports",
-            show: true,
-            submenu: [
-                {
-                    name: "Milestone_Report",
-                    to: {path: `/${companyId.value}/report/milestone`},
-                    show:checkPermission('sheet_settings.milestone_report') !== null
-                },
-                {
-                    name: "Custom_Report",
-                    to: {path: `/${companyId.value}/custom-reports`},
-                    show: false
-                },
-                {
-                    name: "Variance_Report",
-                    to: {path: `/${companyId.value}/reports/variance`},
-                    show: false
-                }
-            ]
-        }
-    ]
     const prevRoute = useRoute();
 
     function openRoute(data, key,options = {gettersVal: null}) {
@@ -143,6 +33,14 @@ export function useHelper() {
                 query: {tab: "Comments"}
             }
             const projects = computed(() => tmpGetter["projectData/projects"])
+            if(data.changeType === CHAT_THREAD_REPLY && data.changeData?.threadId) {
+                router.push({
+                    name: "chat_project_channel",
+                    params: { cid: companyId.value, pid: data.projectId, sid: data.taskId },
+                    query: { thread: data.changeData.threadId }
+                });
+                return;
+            }
             if(key === "notifications") {
                 route.query = {tab: "ProjectListView"};
                 if(data.type.toLowerCase() !== "project") {
@@ -218,12 +116,14 @@ export function useHelper() {
                 }
                 if(data.mainChat) {
                     route.name="chat_project_channel";
+                    // A channel is opened by its sprint; a direct message, whose sprint every one of them shares, by its task.
                     route.params = {
                         cid: companyId.value,
                         pid: data.projectId,
-                        sid: data.sprintId
+                        sid: data.taskId && data.taskId !== "default" ? data.taskId : data.sprintId
                     }
-                    route.query = {};
+                    const threadId = data.threadId || data.comment_parentId;
+                    route.query = threadId ? { thread: threadId } : {};
                 } else {
                     route.query = {tab: "Comments"};
     
@@ -250,24 +150,24 @@ export function useHelper() {
                     }
                 }
             }
+            if (route.params.taskId && isSameProjectPage(route.params.id, route.params.sprintId)) {
+                openTask({
+                    companyId: route.params.cid,
+                    projectId: route.params.id,
+                    sprintId: route.params.sprintId,
+                    folderId: route.params.folderId || "",
+                    taskId: route.params.taskId,
+                    tab: route.query?.detailTab === "comment" ? "activity" : ""
+                });
+                return;
+            }
             router.push(route);
         } catch (error) {
             console.error(error,"ERROR IN ROUTE");
         }
     }
 
-    function getDateType(seconds) {
-        if(seconds >= new Date().getTime()) {
-            return moment(new Date(seconds)).format("LT");
-        } 
-        else {
-            return moment(new Date(seconds)).format("ddd, D MMM, YYYY [at] hh:mm a");
-        }
-    }
-
     return {
-        menu,
-        openRoute,
-        getDateType
+        openRoute
     }
 }

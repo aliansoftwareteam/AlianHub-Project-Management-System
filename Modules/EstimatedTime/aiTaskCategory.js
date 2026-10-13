@@ -27,9 +27,11 @@ const logger = require('../../Config/loggerConfig');
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 
+const { FEATURES } = require('../AICore/features');
+
 let providerFactory = null;
 try {
-    providerFactory = require('../AIProjectGenerator/llmProvider');
+    providerFactory = require('../AICore/llmProvider');
 } catch (_e) {
     providerFactory = null;
 }
@@ -47,7 +49,7 @@ const SYSTEM_PROMPT = (() => {
     );
     try {
         const raw = fs.readFileSync(promptPath, 'utf8');
-        return raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+        return raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
     } catch (_e) {
         // Inline fallback — only used if the partial file is missing.
         return [
@@ -164,7 +166,7 @@ function parseResponse(content) {
     return null;
 }
 
-async function callProvider(message) {
+async function callProvider(message, spend) {
     if (!providerFactory || typeof providerFactory.getProvider !== 'function') return null;
     if (typeof providerFactory.isAnyProviderConfigured === 'function'
         && !providerFactory.isAnyProviderConfigured()) {
@@ -182,6 +184,7 @@ async function callProvider(message) {
         jsonMode: true,
         temperature: 0.15,
         maxTokens: 256,
+        spend,
     });
     const result = await Promise.race([
         chatPromise,
@@ -296,7 +299,7 @@ async function classifyAndPersist({ companyId, taskId, task = null, force = fals
         const ctx = await loadContext(companyId, taskDoc);
         const message = buildContextMessage({ task: taskDoc, project: ctx.project, recentLogs: ctx.recentLogs });
 
-        const result = await callProvider(message);
+        const result = await callProvider(message, { feature: FEATURES.TASK_CATEGORY, companyId });
         if (!result || !result.category) {
             return { status: false, reason: 'no classification returned' };
         }

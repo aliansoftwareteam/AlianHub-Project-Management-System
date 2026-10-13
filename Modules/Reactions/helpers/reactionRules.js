@@ -32,9 +32,22 @@ const validateReactionInput = ({ companyId, targetType, targetId, emoji, userId 
     return { valid: true, reason: '' };
 };
 
+/* One entry per person and emoji: reacting again with the same emoji takes it back. */
+const reactionToggle = (target, emoji, userId, now = new Date()) => {
+    const uid = String(userId);
+    const removes = ((target && target.reactions) || []).some((reaction) => reaction.emoji === emoji && String(reaction.userId) === uid);
+    return {
+        removes,
+        change: removes
+            ? { $pull: { reactions: { emoji, userId: uid } } }
+            : { $push: { reactions: { emoji, userId: uid, createdAt: now } } },
+    };
+};
+
 module.exports = {
     REACTION_EMOJIS,
     TARGET_TYPES,
     isObjectIdString,
     validateReactionInput,
+    reactionToggle,
 };

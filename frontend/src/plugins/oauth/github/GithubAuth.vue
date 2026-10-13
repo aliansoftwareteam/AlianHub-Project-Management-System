@@ -1,25 +1,28 @@
 <template>
-    <button @click="loginWithGitHub" class="border-0 border-radius-6-px cursor-pointer p-15px" :disabled="isLoading" title="Github">
-        <div v-if="isLoading" class="oauth-spinner"></div>
-        <img v-else :src="GithubIcon" alt="github-icon"/>
+    <button type="button" class="auth__provider" :disabled="isLoading" :aria-busy="isLoading" @click="loginWithGitHub">
+        <span v-if="isLoading" class="oauth-spinner"></span>
+        <ShellIcon v-else name="github" :size="16" />
+        <span>{{ label || $t('Auth.continue_with', { provider: 'GitHub' }) }}</span>
     </button>
 </template>
 
 <script setup>
+import { publicConfig } from "@/config/publicConfig";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 import { onMounted, ref, defineProps } from "vue";
-import Cookies from 'js-cookie';
 import { useToast } from 'vue-toast-notification';
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from "vue-i18n";
 
 // Image
-import GithubIcon from "@/assets/images/svg/github_icon.svg";
 
 // Utilities
 import { apiRequestWithoutSecure, apiRequestWithoutCompnay, getAuth } from "@/services";
 import * as env from '@/config/env';
+import { rememberInvitationLink, takeInvitationLink } from "../invitationLink";
 
 const props = defineProps({
+    label: { type: String, default: "" },
     mode: {
         type: String,
         default: "login"
@@ -31,6 +34,10 @@ const props = defineProps({
     companyUserDocID: {
         type: String,
         default: null
+    },
+    linkId: {
+        type: String,
+        default: ""
     }
 });
 
@@ -70,10 +77,11 @@ onMounted(async () => {
 // Trigger GitHub OAuth
 function loginWithGitHub() {
     localStorage.setItem("githubAuthMode", props.mode);
-    const clientId = process.env.VUE_APP_GITHUB_CLIENT_ID;
+    rememberInvitationLink(props.linkId);
+    const clientId = publicConfig.auth.github.clientId;
     const scope = "read:user user:email";
     const redirectUri = window.location.origin; 
-    const githubAuthUrl = `${process.env.VUE_APP_GITHUB_BASE_OAUTH_URL}/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
+    const githubAuthUrl = `${publicConfig.auth.github.baseUrl}/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}`;
     window.location.href = githubAuthUrl;
 }
 
@@ -107,10 +115,7 @@ const login = async (userInfo) => {
         const object = {
             email: userInfo.email,
             githubId: userInfo.githubId,
-            // Forward the GitHub access token so the backend can re-verify the
-            // identity against GitHub's /user API instead of trusting the
-            // client-supplied id/email. Without this, login is rejected in the
-            // default (strict) server mode.
+            // The server takes the identity from this token alone.
             accessToken: userInfo.accessToken,
             isLoginType: "frontend",
             authProvider: "github"
@@ -129,8 +134,6 @@ const login = async (userInfo) => {
         userData.value = userResponse?.data?.data.userData;
         if (userResponse.data.status == false) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
             throw new Error('MongoDB Error from Api')
         }
 
@@ -138,8 +141,6 @@ const login = async (userInfo) => {
         let cid = localStorage.getItem("selectedCompany") ?? companyID;
         if (!uData.isEmailVerified) {
             localStorage.removeItem("updateToken");
-            Cookies.remove('refreshToken');
-            Cookies.remove('accessToken');
             throw new Error("Verify your email and try again");
         }
 
@@ -197,11 +198,9 @@ const login = async (userInfo) => {
         } else if(error?.response?.data?.message === "User not found"){
             $toast.error('User not found', { position: 'top-right' });
         } else {
-            $toast.error(t("Toast.something_went_wrong"), { position: 'top-right' });
+            $toast.error(error?.response?.data?.message || t("Toast.something_went_wrong"), { position: 'top-right' });
         }
-        
-        Cookies.remove('refreshToken');
-        Cookies.remove('accessToken');
+
         localStorage.removeItem("updateToken");
         localStorage.removeItem("userId");
         localStorage.removeItem("isLogging");
@@ -223,8 +222,10 @@ const signup = async (userInfo) => {
             lastName: userInfo.lastName,
             email: userInfo.email,
             githubId: userInfo.githubId,
+            accessToken: userInfo.accessToken,
             assignCompany: companyId,
-            companyUserDocID: companyUserDocID
+            companyUserDocID: companyUserDocID,
+            linkId: takeInvitationLink()
         };
 
         const signupRes = await apiRequestWithoutSecure("post", env.API_SIGNUP_WITH_GITHUB, payload);

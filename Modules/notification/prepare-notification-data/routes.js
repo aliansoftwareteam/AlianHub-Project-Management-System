@@ -1,4 +1,6 @@
 const ctrlV2  = require("./controllerV2");
+const { agentsRefused } = require('../../Agents/guard');
+
 exports.init = (app) => {
 
     /**
@@ -112,5 +114,5 @@ exports.init = (app) => {
      *              description: status:true/false,message:message
      */
 
-      app.post('/api/v2/prepare-notification-data', ctrlV2.handleNotification);
+      app.post('/api/v2/prepare-notification-data', agentsRefused('notification.send'), ctrlV2.handleNotification);
 };

@@ -24,7 +24,7 @@ function generateRandomNumber(min = 900, max = 1200) {
 .round-skeleton{
     width: 15px;
     height: 15px;
-    background: #E8E8E8;
+    background: var(--track);
     border: 1px solid transparent;
     border-radius: 7.5px;
 }
@@ -36,13 +36,13 @@ function generateRandomNumber(min = 900, max = 1200) {
 
 @keyframes pulse-bg {
     0% {
-      background-color: #ddd;
+      background-color: var(--track);
     }
     50% {
-      background-color: #d0d0d0;
+      background-color: var(--border);
     }
     100% {
-      background-color: #ddd;
+      background-color: var(--track);
     }
 }
 </style>

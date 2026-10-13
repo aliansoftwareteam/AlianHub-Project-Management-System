@@ -6,10 +6,10 @@
     <div class="pt-20px">
         <div class="checklist-main mobile__bg--withPadding">
             <div class="d-flex align-items-center">
-                <h4 :class="{'font-size-16 font-weight-600' : clientWidth <=767 , 'font-size-14 font-weight-700' : clientWidth > 767 }" class="black">{{$t('Checklist.checklist')}}</h4>
-                <div class="d-flex align-items-center ml-auto" @click="generateChecklistWithAi()" v-if="checkApps('AI',project) && checkPermission('task.task_checklist',project?.isGlobalPermission) === true">
+                <h3 :class="{'check-list-font-size-16 check-list-font-weight-600' : clientWidth <=767 , 'check-list-font-size-14 check-list-font-weight-700' : clientWidth > 767 }" class="check-list-black checklist-main__title">{{$t('Checklist.checklist')}}</h3>
+                <div class="d-flex align-items-center ml-auto" @click="generateChecklistWithAi()" v-if="canUseAi({ project, permitted: checkPermission('task.task_checklist',project?.isGlobalPermission) === true })">
                     <img :src="aiIcon" class="mr-3px" />
-                    <h5 class="cursor-pointer ai-color ai-border-bottom font-size-14 font-weight-500" :class="[{'pointer-event-none' : isSpinnerAi}]">{{$t('Checklist.suggest_checklists')}}</h5>
+                    <span class="cursor-pointer ai-color ai-border-bottom check-list-font-size-14 check-list-font-weight-500 checklist-main__suggest" :class="[{'pointer-event-none' : isSpinnerAi}]">{{$t('Checklist.suggest_checklists')}}</span>
                 </div>
             </div>
             <div v-if="props.isMainSpinner">
@@ -25,7 +25,7 @@
                                 <div class="d-flex justify-content-between parent-item">
                                     <div class="d-flex align-items-center w-85">
                                         <img src="@/assets/images/table_arrow.png" alt="" v-if="row?.subItems && row.subItems.length" class="align-items-center cursor-pointer" :style="`transform: rotateZ(${row.isExpand ? '90' : '0'}deg); margin-left:2px;`" @click="handleCollapseExpand(row)"/>
-                                        <label class="font-weight-normal font-size-14 d-flex ml-10-px black" :class="[{'w-90': row.name.length > 100}]">
+                                        <label class="check-list-font-weight-normal check-list-font-size-14 d-flex ml-10-px check-list-black" :class="[{'w-90': row.name.length > 100}]">
                                             <InputText v-if="row.isEdit"
                                                 v-model.trim="oldItemName"
                                                 :placeHolder="$t('PlaceHolder.Enter_item_name')"
@@ -35,10 +35,10 @@
                                                 class="input-edit-checklist"
                                                 :class="[{'border-bottom-red': isInvalid}]"
                                             />
-                                            <span v-else class="text-ellipsis font-size-14 font-weight-500 black" :title="row.name">{{ row.name }}</span>
+                                            <span v-else class="text-ellipsis check-list-font-size-14 check-list-font-weight-500 check-list-black" :title="row.name">{{ row.name }}</span>
                                         </label>
                                         <div class="d-flex ml-10-px">
-                                            <span class="d-flex align-items-center font-size-13 font-weight-400 GunPowder">({{ row.checkItem }}/{{ row.totalSubItems }})</span>
+                                            <span class="d-flex align-items-center check-list-font-size-13 check-list-font-weight-400 check-list-GunPowder">({{ row.checkItem }}/{{ row.totalSubItems }})</span>
                                         </div>
                                         <div class="d-flex align-items-center">
                                             <img v-if="permission === true" class="ml-10-px mr-4-px cursor-pointer action-img-border" src="@/assets/images/svg/pluss.svg" alt="Add" @click="showInput(row)" />
@@ -58,7 +58,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="input-section d-flex" v-if="row.id === rowId">
+                            <div class="input-section d-flex" v-if="row.id === rowId" @keydown.esc.stop.prevent="rowId=''">
                                 <InputTextarea
                                     v-model.trim="inputModelValue"
                                     :placeHolder="$t('PlaceHolder.Add_an_item')"
@@ -99,7 +99,7 @@
                                 <h3 class="m-0">{{$t('Home.Confirm')}}</h3>
                             </template>
                             <template #body>
-                                <span>{{$t('Filters.are_you_suredelete')}}?</span>
+                                <span>{{$t('Filters.are_you_suredelete')}}</span>
                             </template>
                         </ConfirmModal>
                     </ul>
@@ -115,13 +115,13 @@
                         @updateChecklist="updateChecklist($event)"
                     />
                 </div>
-                <div v-if="permission === true" class="new-checklist-section" @click="addCheckList">
-                    <span class="d-flex"><i class="mr-8px font-size-18 font-normal">+</i>{{$t('Checklist.add_checklist')}}</span>
-                </div>
+                <button v-if="permission === true" type="button" class="new-checklist-section" :disabled="adding" :aria-busy="adding ? 'true' : 'false'" @click="addCheckList">
+                    <span class="d-flex"><i class="mr-8px check-list-font-size-18 check-list-font-normal">+</i>{{$t('Checklist.add_checklist')}}</span>
+                </button>
                 <div v-if="isSpinnerAi">
                     <Skelaton v-for="i in 4" :key="i" class="border-radius-5-px m-5px border-bottom px-1 subtask__item-input"/>
                 </div>
-                <span v-if="isError" class="red">{{$t('generalErrorMessage.something_went_wrong')}}</span>
+                <span v-if="isError" class="check-list-red">{{$t('generalErrorMessage.something_went_wrong')}}</span>
             </div>
         </div>
     </div>
@@ -143,14 +143,17 @@ import { apiRequest } from '../../../services';
 import { useToast } from 'vue-toast-notification';
 import AiCheckList from './AiCheckList.vue';
 import { useAiApiFunction } from "@/composable/aiHelper";
+import { canUseAi } from "@/composable/aiAvailability";
+import { isChecklistItem, parseGeneratedList } from "@/utils/parseGeneratedList";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue";
 import Skelatons from '@/components/atom/Skelaton/Skelaton.vue';
 import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 import taskClass from "@/utils/TaskOperations";
+import { removePerson } from "@/utils/assigneeOptions";
 
 // UTILS
-const {makeUniqueId, checkPermission,checkApps,debouncerWithPromise} = useCustomComposable();
+const {makeUniqueId, checkPermission,debouncerWithPromise} = useCustomComposable();
 const { getUser } = useGetterFunctions();
 const { getters } = useStore();
 const $toast = useToast();
@@ -215,7 +218,7 @@ let checklsitType = ref("");
 const isError = ref(false)
 const checkListAi = ref([]);
 const isSpinnerAi = ref(false);
-// Get user details
+const adding = ref(false);
 function getUserData() {
     const user = getUser(userId.value);
     return {
@@ -258,14 +261,13 @@ watch(() => props.isMainSpinner, (newVal) => {
 })
 
 
-// Watch Property
 watch(() => props.data, (newVal, oldVal) => {
     if(JSON.stringify(newVal) === JSON.stringify(oldVal)) {
         return
     }
     var tempArray = [];
     let newItem = {};
-    if(newVal.length > 0){
+    if(newVal?.length > 0){
         newVal.map(item => {
             if(checklistArray.value.length > 0 && checklistArray.value.map(itm=>itm.id).includes(item.id)){
                 var OldItems = checklistArray.value.find(itm => itm.id == item.id)
@@ -278,12 +280,19 @@ watch(() => props.data, (newVal, oldVal) => {
     }
     checklistArray.value = tempArray
     manageCheckList();
-    let find = checklistArray.value.find((x) => x.id === newItem.parentId);
-    if(find && find.isChecked === true && newItem){
+    if(newItem.id && !addsInFlight.has(newItem.id)) untickParentOf(newItem);
+});
+
+/* A new item under a ticked parent unticks that parent, which rewrites the whole checklist. For an item added
+   here that write waits until the item itself is stored, or the two could be stored in the wrong order. */
+const addsInFlight = new Set();
+function untickParentOf(newItem) {
+    const parent = checklistArray.value.find((x) => x.id === newItem.parentId);
+    if(parent && parent.isChecked === true){
         newItem.isChecked = true
         handleChecked(newItem);
     }
-});
+}
 
 // This is the recursive function for rendering checklist items. This is used to manage listing array based on parent and child items
 function manageCheckList () {
@@ -327,27 +336,6 @@ function manageCheckList () {
     }
 }
 
-// This function is used to manage all the checklist hostory for the project and tasks
-const manageHistory = async (type, key, message) => {
-    const axiosData = {
-        "type": type,
-        "companyId": companyId.value,
-        "projectId": project.value._id,
-        "taskId": props.taskId || null,
-        "object": {
-            "sprintId": props.taskId.length ? props.task.sprintId : null,
-            "key": key,
-            "message": message
-        },
-        "userData": getUserData()
-    };
-    await apiRequest("post", env.HANDLE_HISTORY, axiosData).then((result) => {
-        if(result.data.status) {
-            console.info(result.data.statusText)
-        }
-    });
-}
-
 // This function is used to manage all the expand and collepse event for the parent and sub checklist component
 function handleCollapseExpand (obj) {
     obj.isExpand = !obj.isExpand;
@@ -358,8 +346,8 @@ function handleCollapseExpand (obj) {
     });
 }
 
-// This function is used for the create new parent checklist
 const addCheckList = async () => {
+    if(adding.value) return;
     const uniqueId = makeUniqueId(6);
     let dataArray = {
         AssigneeUserId: [],
@@ -379,8 +367,11 @@ const addCheckList = async () => {
         }
         let localUpdateArray = [...new Set([...checklistArray.value || [], ...[dataArray]])];
 
+        adding.value = true;
         taskClass.updateChecklistsv2({localUpdateArray:localUpdateArray,data:dataArray, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'taskchecklistcreate',taskData: props.task}).catch((error) => {
-            console.error("ERROR in delete: ", error.message);
+            console.error("ERROR in add checklist: ", error);
+        }).finally(() => {
+            adding.value = false;
         });
         rowId.value = uniqueId;
         setTimeout(() => {
@@ -399,15 +390,14 @@ const addCheckList = async () => {
         operation: 'push'
     }
 
+    adding.value = true;
     await apiRequest("post", `${env.PROJECTS_CHECKLIST}`, params).then(() => {
         checklistArray.value = [...checklistArray.value, { ...dataArray }];
         manageCheckList();
-
-        // Manage checklist history
-        const msg =  `<b>${userData.Employee_Name}</b> has created new checklist`;
-        manageHistory(checklsitType.value, "Task_Checklist", msg);
     }).catch((error) => {
         console.error(`Error in addCheckList hook => ${error}`)
+    }).finally(() => {
+        adding.value = false;
     });
 }
 
@@ -437,8 +427,15 @@ const addItem = async (obj, child = false) => {
         }
         let localUpdateArray = [...new Set([...checklistArray.value, ...strArray])];
 
-        taskClass.updateChecklistsv2({data:strArray,localUpdateArray, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: props.task}).catch((error) => {
-            console.error("ERROR in delete: ", error.message);
+        const lastAdded = strArray[strArray.length - 1];
+        strArray.forEach((row) => addsInFlight.add(row.id));
+        taskClass.updateChecklistsv2({data:strArray,localUpdateArray, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: props.task}).then(() => {
+            const stored = checklistArray.value.find((x) => x.id === lastAdded?.id);
+            if(stored) untickParentOf(stored);
+        }).catch((error) => {
+            console.error("ERROR in add item: ", error);
+        }).finally(() => {
+            strArray.forEach((row) => addsInFlight.delete(row.id));
         });
         checklistArray.value.forEach((x) => {
             if(x.parentId === obj.parentId) {
@@ -459,10 +456,6 @@ const addItem = async (obj, child = false) => {
     await apiRequest("post", `${env.PROJECTS_CHECKLIST}`, params).then(() => {
         checklistArray.value = [...checklistArray.value, { ...strArray[0] }];
         manageCheckList();
-
-        // Manage checklist history
-        const msg = `<b>${userData.Employee_Name}</b> has created new checklist item <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${obj.name}">${obj.name}</b>`;
-        manageHistory(checklsitType.value, "Task_Checklist", msg);
         checklistArray.value.forEach((x) => {
             if(x.parentId === obj.parentId) {
                 x.isExpand = true;
@@ -544,8 +537,9 @@ async function handleConfirm(val) {
                     extractedData
                 }
 
-                taskClass.updateChecklistsv2({data:obj, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistremove',taskData: props.task}).catch((error) => {
-                    console.error("ERROR in delete: ", error.message);
+                const localUpdateArray = checklistArray.value.filter((row) => !obj.includes(row.id));
+                taskClass.updateChecklistsv2({data:obj, localUpdateArray, projectId:project.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistremove',taskData: props.task}).catch((error) => {
+                    console.error("ERROR in delete: ", error);
                 });
                 return;
             }
@@ -571,10 +565,6 @@ async function handleConfirm(val) {
             const parentIds = getParentIds(item);
             const extractedData = mergeFunctions(item);
             deleteQuery(Object.keys(parentIds),extractedData);
-            if(checklsitType.value === "project") {
-                const msg =  `<b>${userData.Employee_Name}</b> has removed checklist item <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${extractedData.name}">${extractedData.name}</b> and its subitems <b class="text-ellipsis vertical-middle d-inline-block" style="max-width:150px" title="${extractedData.subItemNames.slice(1).join('\n')}">${extractedData.subItemNames.slice(1).join('\n')}</b>`;
-                manageHistory(checklsitType.value, "Task_Checklist", msg);
-            }
             return;
         }
         deleteItems(selectedRow.value);
@@ -622,20 +612,6 @@ const handleChecked = async (item) => {
 
         await apiRequest("post", `${env.PROJECTS_CHECKLIST}`, params).then(() => {
             manageCheckList();
-
-            // Manage checklist history
-            let historyObj = {
-                key : "CheckList_Checked",
-                message : `<b>${userData.Employee_Name}</b> has <b>${item.isChecked ? 'checked' : 'unchecked'}</b> <b>${item.name}</b> checklist.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": checklsitType.value === "project" ? 'project' : 'task',
-                "companyId": companyId.value,
-                "projectId": project.value._id,
-                "taskId": checklsitType.value === 'project' ? null : props.taskId,
-                "object": historyObj,
-                "userData": userData
-            })
         }).catch((error) => {
             console.error(`Error in addItem hook => ${error}`) 
         });
@@ -679,8 +655,7 @@ async function changeAssignee(type, {user, data}) {
     if(type === "add") {
         assignee.push(user.id);
     } else if(type === 'remove') {
-        const index = assignee.findIndex((x) => x === user.id)
-        assignee.splice(index, 1);
+        removePerson(assignee, user.id);
     } else if(type === 'replace') {
         assignee = [];
         assignee.push(user.id);
@@ -724,11 +699,6 @@ async function changeAssignee(type, {user, data}) {
 
     await apiRequest("post", `${env.PROJECTS_CHECKLIST}`, params).then(() => {
         manageCheckList();
-
-        // Manage checklist history
-        const msg =  `<b>${userData.Employee_Name}</b> has ${type === 'add' || type === "replace" ? 'added': 'removed'} <b>${user.label}</b> ${type === 'add' ? 'into': 'from'} checklist item <b>${data.name}</b>`;
-        const chkType = type === "add" || type === "replace" ? "Task_Checklist_Assign" : "Task_Checklist_Remove";
-        manageHistory(checklsitType.value, chkType, msg);
     }).catch((error) => {
         console.error(`Error in addItem hook => ${error}`) 
     });
@@ -790,10 +760,6 @@ const handleUpdate = async (obj, child = false) => {
         checklistArray.value = dataArray;
         checklistArray.value.forEach((x) => x.isExpand = true);
         manageCheckList();
-
-        // Manage checklist history
-        const msg =  `<b>${userData.Employee_Name}</b> has changed checklist item name from <b>${!child ? obj.name : oldItemName.value}</b> to <b>${name}</b>`;
-        manageHistory(checklsitType.value, "Task_Checklist", msg);
     }).catch((error) => {
         console.error(`Error in addItem hook => ${error}`) 
     });
@@ -834,21 +800,16 @@ function generateChecklistWithAi (){
             }
             generateAiRequestForFunction(data,props.task.TaskName,props.task.rawDescription,'Generate a Checklist',true,'single',project.value?.isGlobalPermission).then((result) => {
                 if(result.status === true){
-                    try {
-                        let data = JSON.parse(JSON.stringify(result.statusText.data.statusText)).replace('```json', '').trim();
-                        data = data.replace('```', '').trim();
-                        data = data.replace(/\n|\r/g, '').trim();
-                        data = eval(data);
-                        data.forEach((element) => {
+                    isSpinnerAi.value = false;
+                    const parsed = parseGeneratedList(result.statusText?.data?.statusText, isChecklistItem);
+                    if(parsed.ok){
+                        parsed.items.forEach((element) => {
                             if (element.parentId === null) {
                                 delete element.parentId;
                             }
                         });
-                        checkListAi.value = data.map((x) => ({...x,AssigneeUserId:[],isExpand: true,isChecked:true,isAigenerated:true}));
-                        isSpinnerAi.value = false;
-                    } catch (error) {
-                        isSpinnerAi.value = false;
-                        console.error(error,"ERROR IN CATCH");
+                        checkListAi.value = parsed.items.map((x) => ({...x,AssigneeUserId:[],isExpand: true,isChecked:true,isAigenerated:true}));
+                    }else{
                         isError.value = true;
                     }
                 }else{
@@ -872,5 +833,49 @@ function updateChecklist (array) {
     checklistArray.value = checklistArray.value.concat(array);
     manageCheckList();
 }
+
+defineExpose({ addCheckList });
 </script>
 <style> @import "./style.css"; </style>
+
+<style scoped>
+.check-list-black {
+    color: var(--ink);
+}
+.check-list-red {
+    color: var(--danger-ink);
+}
+.check-list-GunPowder {
+    color: var(--ink-2);
+}
+.check-list-font-weight-normal {
+    font-weight: normal;
+}
+.check-list-font-normal {
+    font-style: normal;
+}
+.check-list-font-weight-400 {
+    font-weight: 400 !important;
+}
+.check-list-font-weight-500 {
+    font-weight: 500 !important;
+}
+.check-list-font-weight-600 {
+    font-weight: 600 !important;
+}
+.check-list-font-weight-700 {
+    font-weight: 700 !important;
+}
+.check-list-font-size-13 {
+    font-size: 13px;
+}
+.check-list-font-size-14 {
+    font-size: 14px;
+}
+.check-list-font-size-16 {
+    font-size: 16px;
+}
+.check-list-font-size-18 {
+    font-size: 18px !important;
+}
+</style>

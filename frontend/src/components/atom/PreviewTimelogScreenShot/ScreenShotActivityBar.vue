@@ -60,7 +60,7 @@
  .container {
     position: relative;
     height: 3px;
-    background-color: #eee;
+    background-color: var(--track);
 }
 
 .progress-bar {
@@ -68,7 +68,7 @@
     top: 0;
     left: 0;
     height: 100%;
-    background-color: #2F3990;
+    background-color: var(--brand);
     opacity: 1;
     z-index: 1;
 }
@@ -76,14 +76,14 @@
     position: relative;
     height: 100%;
     width: 50%;
-    background-color: #DFE1E6;
+    background-color: var(--track);
 }
 .progress-box:after {
     content: '';
     position: absolute;
     height: inherit;
     width: inherit;
-    background-color: #fff;
+    background-color: var(--surface);
     z-index: 7;
 }
 .box1 { width: 10%; }

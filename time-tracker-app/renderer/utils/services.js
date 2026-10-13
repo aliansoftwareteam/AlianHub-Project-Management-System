@@ -78,7 +78,16 @@ axiosInstanceWithoutSecure.interceptors.request.use((req) => {
     return Promise.reject(error);
 });
 
-export const getAuth = async (id) => {
+let pendingAuth = null;
+
+export const getAuth = (id) => {
+    if (!pendingAuth) {
+        pendingAuth = requestAuth(id).finally(() => { pendingAuth = null; });
+    }
+    return pendingAuth;
+};
+
+const requestAuth = (id) => {
     const refreshToken = localStorage.getItem("refreshToken") || '';
     return new Promise((resolve, reject) => {
         let data = {
@@ -92,10 +101,14 @@ export const getAuth = async (id) => {
         let url = "/api/v2/generateToken";
         axios.post(apiHost + url, data, { headers }).then((result) => {
             localStorage.setItem('token', result.data.token)
+            if (result.data.refreshToken) {
+                localStorage.setItem('refreshToken', result.data.refreshToken)
+            }
             resolve(result.data);
         }).catch((error) => {
             console.error('error', error);
             if (error?.response?.data?.isLogout) {
+                pendingAuth = null;
                 logoutFunction()
                 .then(() => {
                     Router.push('/login');

@@ -83,37 +83,26 @@ npm run setup
 
 That's it. `npm run setup` will:
 
-1. Install all dependencies (root, frontend, wizard) in parallel
+1. Install all dependencies (root and frontend) in parallel
 2. Generate a `.env` file with secure random secrets
-3. Build the installation wizard UI
-4. Start the server (the same entry production uses)
-5. Open `http://localhost:4000` in your browser
+3. Start the server (the same entry production uses)
+4. Open `http://localhost:4000` in your browser
 
-On a fresh system the server serves the **installation wizard**. Complete it
-yourself — connect MongoDB, choose storage, skip or configure optional services
-(Firebase / AI / SMTP), and create **your own** company and admin account.
-Nothing is created automatically.
+On an empty database the app opens its **first-run setup** (`/setup`): create
+your own owner account and company, optionally with sample data. Mail, storage,
+AI and sign-in providers are configured afterwards from **Settings → Instance**
+(product owners only) or through environment variables — see
+[docs/ENV.md](docs/ENV.md) for every variable and
+[docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) for the operator walkthrough.
 
-When it's done, you'll see this in your terminal:
-
-```
-────────────────────────────────────────────────────────────
-  ✓  Server running — finish installation in your browser
-────────────────────────────────────────────────────────────
-
-  URL:   http://localhost:4000
-  The wizard guides you to connect MongoDB, choose storage, and create
-  your own company and admin account.
-  When it finishes, the app rebuilds and the server stops (same as
-  production). Run `npm start` again, then sign in.
-  Stop:  Ctrl+C
-────────────────────────────────────────────────────────────
-```
-
-The wizard's final step rebuilds the frontend and the server exits — the same
-flow production relies on, where a process manager (e.g. pm2) restarts the app.
-Locally there's no process manager, so just run **`npm start`** again, open
-`http://localhost:4000`, and **log in with the account you created**.
+On a new install each person can connect their own AI (Claude, ChatGPT, Claude
+Code) out of the box: the MCP tools and sign-in by address are on by default,
+and an outside app's risky writes wait for a person. The AI acts only as that
+person, with the permissions they grant it. Set `MCP_OAUTH=off`,
+`MCP_TOOLS_DATA=off`, `MCP_TOOLS_MANAGE=off` or `MCP_TOOLS_WORK=off` in `.env`,
+or switch them under **Settings → Instance → AI**, to turn any of it off. An
+upgraded install keeps them off until an owner turns them on there; see
+[docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md).
 
 **Prerequisite:** MongoDB running locally on `mongodb://localhost:27017`. If you don't have it: `docker run -d -p 27017:27017 mongo:7` or download from [mongodb.com](https://www.mongodb.com/try/download/community).
 
@@ -121,12 +110,14 @@ Locally there's no process manager, so just run **`npm start`** again, open
 
 | Command | What it does |
 |---------|--------------|
-| `npm run setup` | Install deps, prepare `.env`, build the wizard UI, and start the server |
+| `npm run setup` | Install deps, prepare `.env`, and start the server |
 | `npm run dev` | Same as setup but skips dependency install |
 | `npm run setup:reset` | Wipe `node_modules` and reinstall everything |
 | `npm run setup -- --no-open` | Start without auto-opening a browser |
+| `npm test` / `npm run lint` | Jest (unit + conventions) / ESLint — the CI gate |
+| `cd frontend && npm test` | Vitest component specs |
 
-> All existing scripts (`npm start`, `npm run nodemon`, `npm run basic-install`) are unchanged. For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately once the system is installed.
+> For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately. Developers: [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md).
 
 ---
 
@@ -350,12 +341,21 @@ A quick tour of AlianHub. [Try the live demo](https://demo.alianhub.com) to expl
 
 📘 **Full user guide & API reference:** [help.alianhub.com](https://help.alianhub.com)
 
+New to project tools? [docs/guide/first-hour/](docs/guide/first-hour/README.md) walks through your first hour, one short page at a time.
+
+Going deeper? [docs/guide/](docs/guide/README.md) is the guide's index. It links [views, filters and saved views](docs/guide/views.md), [custom fields](docs/guide/custom-fields.md) and [rules](docs/guide/rules.md).
+
+Coming from ClickUp? [docs/MOVING-FROM-CLICKUP.md](docs/MOVING-FROM-CLICKUP.md) says what to export, what comes across and what does not.
+
+Using Claude or ChatGPT with AlianHub? [docs/guide/agents/](docs/guide/agents/README.md) says how to connect it, what it can do, what waits for your approval, how to undo a change and how to pause it.
+
 For development:
 
 - 🤝 [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute
 - 🌿 [BRANCHING.md](BRANCHING.md) — branching strategy and PR workflow
 - 🛡️ [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — community standards
 - 🔒 [SECURITY.md](SECURITY.md) — responsible disclosure for security issues
+- ♿ [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md) — accessibility statement, known gaps and how to report a problem
 - 🆘 [SUPPORT.md](SUPPORT.md) — where to ask questions, report bugs, request features
 
 ---

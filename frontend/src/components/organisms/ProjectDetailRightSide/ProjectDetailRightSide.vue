@@ -1,19 +1,19 @@
 <template>
-    <div class="projectRightside overflow-y-auto style-scroll">
-        <div :class="{'border-bottom-mobiledrop' : clientWidth > 767}" :style="[{paddingBottom : clientWidth > 767 ? '5px' : '0px'}]" v-if="checkPermission('project.project_details',projectData?.isGlobalPermission)!== null">
-            <h4 class="black font-roboto-sans detailsHead" :class="`${clientWidth > 767 ? 'font-size-14 font-weight-700' : 'font-size-16 font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
+    <div class="projectRightside overflow-y-auto project-detail-right-side-style-scroll">
+        <div class="projectRightside__details" v-if="checkPermission('project.project_details',projectData?.isGlobalPermission)!== null">
+            <h4 class="font-ui detailsHead" :class="`${clientWidth > 767 ? 'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-700' : 'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-600'}`">{{$t('ProjectDetails.details')}}</h4>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_status_change',projectData?.isGlobalPermission)!== null">
-                <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.status')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500 status__title' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.status')}}</h4>
                 <ProjectStatus
                     class="d-flex nohover__project-rightside d-inline-block text-ellipsis"
                     :projectKey="projectData.status"
-                    @update:projectstatus="(val,val1) => updateStatus(val,val1)"
+                    @update:projectstatus="(val,val1) => updateStatus(val1)"
                 />
             </div>
-             <!-- v-if="checkPermission('project.project_status_change',projectData?.isGlobalPermission)!== null" -->
             <div class="d-flex project-right-side-label" v-if="projectData?.projectCreatedBy">
-                <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('Comment.created_by')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500 status__title' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('Comment.created_by')}}</h4>
                 <UserProfile
+                    decorative
                     :showDot="false"
                     class="user__profile cursor-pointer mr-10px"
                     :data="{
@@ -25,14 +25,14 @@
                     :thumbnail="'30x30'"
                 />
                 <span 
-                    class="black project-type-name text-ellipsis project-created-by"
-                    :class="{'font-size-13 font-weight-400' : clientWidth > 767, 'font-size-16' : clientWidth <=767}"
+                    class="project-type-name text-ellipsis project-created-by"
+                    :class="{'project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400' : clientWidth > 767, 'project-detail-right-side-font-size-16' : clientWidth <=767}"
                     :title="createdByUser?.Employee_Name || 'N/A'">
                     {{ createdByUser?.Employee_Name || 'N/A' }}
                 </span>
             </div>
             <div class="d-flex project-right-side-label" v-if="projectData?.isPrivateSpace && checkPermission('project.project_assignee',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500 status__title' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.assignee')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500 status__title' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.assignee')}}</h4>
                 <Assignee
                     class="nohover__project-rightside ml-5px"
                     :numOfUsers="2"
@@ -46,35 +46,35 @@
                 />
             </div>
             <div class="d-flex project-right-side-label">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.key')}}</h4>
-                <span class="black projectKeyClass hover__on-projectrightside text-ellipsis cursor-default" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.key')}}</h4>
+                <span class="projectKeyClass hover__on-projectrightside text-ellipsis cursor-default" :class="{'project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400' : clientWidth > 767 ,'project-detail-right-side-font-size-16' : clientWidth <=767}"
                     :style="[{padding : clientWidth > 767 ? '10px 10px 10px 0' : '10px 0px'}]"
                     :title="projectData.ProjectCode"
                 >{{projectData.ProjectCode ? projectData.ProjectCode : 'N/A'}}</span>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_type',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.type')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.type')}}</h4>
                 <ProjectType
                     class="hover__on-projectrightside text-ellipsis"
                     :projectData="projectData"
-                    @selected="updateType($event,projectData.ProjectType)"
+                    @selected="updateType($event)"
                 />
             </div>
             <div class="d-flex project-right-side-label" v-if="projectData.ProjectType === 'Hourly'">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.billing_period')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.billing_period')}}</h4>
                 <BillingPeriod :projectData="projectData" @selected="updateBillingPeriod($event)" class="hover__on-projectrightside text-ellipsis"/>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_currency',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.currency')}}</h4>
-                <Currency :projectData="projectData" @selected="updateCurrency($event,projectData?.ProjectCurrency?.name)"  class="hover__on-projectrightside text-ellipsis" />
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.currency')}}</h4>
+                <Currency :projectData="projectData" @selected="updateCurrency($event)"  class="hover__on-projectrightside text-ellipsis" />
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_amount',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.amount')}}</h4>
-                <span class="black project-amount cursor-pointer  hover__on-projectrightside text-ellipsis" :class="{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}"
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.amount')}}</h4>
+                <span class="project-amount cursor-pointer hover__on-projectrightside text-ellipsis" :class="{'project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400' : clientWidth > 767 ,'project-detail-right-side-font-size-16' : clientWidth <=767}"
                 :style="[{padding : clientWidth > 767 ? '2px' : '10px 0px'}]" :title="projectData?.ProjectCurrency?.symbol + ' ' + (projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0) ">{{projectData?.ProjectCurrency?.symbol}} {{projectData.milestoneAmount ? getCommaSeperatedNumber(projectData.milestoneAmount) : 0}}</span>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_source',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.source')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.source')}}</h4>
                 <ProjectSourceSelect
                     class="hover__on-projectrightside"
                     mode="inline"
@@ -84,12 +84,12 @@
                 />
             </div>
             <div class="d-flex project-right-side-label">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">
                     {{$t('ProjectDetails.proposal_id')}}<span class="text-red asterisk" v-if="isUpworkSource">*</span>
                 </h4>
                 <InputText
                     v-if="proposalIdEditable"
-                    class="hover__on-projectrightside--input box-sizing-box font-size-13 font-weight-400"
+                    class="hover__on-projectrightside--input box-sizing-box project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400"
                     inputId="project-proposal-id"
                     height="36px"
                     width="calc(100% - 38%)"
@@ -102,15 +102,15 @@
                     @enter="updateProposalId"
                 />
                 <span v-else
-                    class="black projectKeyClass hover__on-projectrightside text-ellipsis"
-                    :class="[{'font-size-13 font-weight-400' : clientWidth > 767 ,'font-size-16' : clientWidth <=767}, canEditDetails ? 'cursor-pointer' : 'cursor-default']"
+                    class="projectKeyClass hover__on-projectrightside text-ellipsis"
+                    :class="[{'project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400' : clientWidth > 767 ,'project-detail-right-side-font-size-16' : clientWidth <=767}, canEditDetails ? 'cursor-pointer' : 'cursor-default']"
                     :style="[{padding : clientWidth > 767 ? '10px 10px 10px 0' : '10px 0px'}]"
                     :title="projectData.proposalId || proposalIdHint"
                     @click="editProposalId()"
                 >{{projectData.proposalId ? projectData.proposalId : 'N/A'}}</span>
             </div>
             <div class="d-flex project-right-side-label">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.skills')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.skills')}}</h4>
                 <SkillsSelect
                     class="hover__on-projectrightside"
                     :modelValue="projectData.skills || []"
@@ -119,7 +119,7 @@
                 />
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_start_date',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.start_date')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.start_date')}}</h4>
                 <StartEndDate
                     v-if="checkPermission('project.project_start_date',projectData?.isGlobalPermission) === true"
                     class="hover__on-projectrightside text-ellipsis"
@@ -130,17 +130,17 @@
                     :maxDate="projectData.EndDate ? projectData.EndDate.seconds ? new Date(projectData.EndDate.seconds * 1000) : new Date(projectData.EndDate) : ''"
                     :calenderImage="false"
                     :InputDesign="false"
-                    @SelectedDate="($event) => updateStartDate($event,projectData?.StartDate)"
+                    @SelectedDate="updateStartDate"
                     :startDateChanges="startDateWarning"
                     :position="`right`"
                 ></StartEndDate>
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-if="projectData.StartDate">{{convertDateFormat(projectData.StartDate)}}</span>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_start_date')}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-if="projectData.StartDate">{{convertDateFormat(projectData.StartDate)}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_start_date')}}</span>
                 </template>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_end_date',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767 ,'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.end_date')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767 ,'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('ProjectDetails.end_date')}}</h4>
                 <StartEndDate
                     v-if="checkPermission('project.project_end_date',projectData?.isGlobalPermission) === true"
                     class="hover__on-projectrightside text-ellipsis"
@@ -151,30 +151,37 @@
                     :maxDate="''"
                     :calenderImage="false"
                     :InputDesign="false"
-                    @SelectedDate="($event) => updateEndDate($event,projectData?.EndDate)"
+                    @SelectedDate="updateEndDate"
                     :position="`right`"
                 ></StartEndDate>
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-if="projectData.EndDate">{{convertDateFormat(projectData.EndDate)}}</span>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_end_date')}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-if="projectData.EndDate">{{convertDateFormat(projectData.EndDate)}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_end_date')}}</span>
                 </template>
             </div>
             <div class="d-flex project-right-side-label" v-if="checkPermission('project.project_due_date',projectData?.isGlobalPermission) !== null">
-                <h4 :class="{'font-size-14 font-weight-500' : clientWidth > 767, 'font-size-16 font-weight-400' : clientWidth <=767}">{{$t('Projects.due_date')}}</h4>
+                <h4 :class="{'project-detail-right-side-font-size-14 project-detail-right-side-font-weight-500' : clientWidth > 767, 'project-detail-right-side-font-size-16 project-detail-right-side-font-weight-400' : clientWidth <=767}">{{$t('Projects.due_date')}}</h4>
                 <DueDateCompo
                     v-if="checkPermission('project.project_due_date',projectData?.isGlobalPermission) === true"
                     class="hover__on-projectrightside text-ellipsis"
                     id="due-date-project"
                     :displyDate="projectData.DueDate ? projectData.DueDate : ''"
                     :isShowDateAndicon="true"
-                    @SelectedDate="($event) => updateDueDate($event,projectData.DueDate)"
+                    @SelectedDate="updateDueDate"
                     :position="`right`"
                 />
                 <template v-else>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-if="projectData.DueDate">{{convertDateFormat(projectData.DueDate)}}</span>
-                    <span class="font-size-13 font-weight-400 black hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_due_date')}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-if="projectData.DueDate">{{convertDateFormat(projectData.DueDate)}}</span>
+                    <span class="project-detail-right-side-font-size-13 project-detail-right-side-font-weight-400 hover__on-projectrightside" v-else>{{$t('ProjectDetails.no_due_date')}}</span>
                 </template>
             </div>
+            <ProjectWorkingDays
+                :key="workingDaysKey"
+                :project="projectData"
+                :company="currentCompany"
+                :editable="canEditDetails"
+                @update="updateWorkingDays"
+            />
         </div>
         <div class="position-re" v-if="checkPermission('project.project_custom_field',projectData?.isGlobalPermission) !== null">
             <!-- App enabled for this project: existing behavior (feature, or blurred feature + upgrade overlay when the plan doesn't include it). -->
@@ -218,7 +225,7 @@
             </template>
             <template #footer>
                 <div class="text-right">
-                    <button class="btn-primary p0x-15px" @click="showConfirmModal = false">ok</button>
+                    <button class="btn-primary p0x-15px" @click="showConfirmModal = false">{{ $t('ProjectDetails.ok') }}</button>
                 </div>
             </template>
         </ConfirmModal>
@@ -227,7 +234,7 @@
             @closeSidebar="handleCloseSidebar"
             :componentDetail="componentDetail && Object.keys(componentDetail).length ? componentDetail : {}"
             :customFieldObject="componentDetail && Object.keys(componentDetail).length ? customFieldObject : {}"
-            :isCustomField="isCustomField"
+            v-model:isCustomField="isCustomField"
             @handleClose="handleClose()"
         />
     </div>
@@ -244,10 +251,9 @@ import Currency from '@/components/atom/Currency/Currency.vue';
 import Assignee from '@/components/molecules/Assignee/Assignee.vue';
 import ProjectType from '@/components/atom/ProjectType/ProjectType.vue';
 import BillingPeriod from '@/components/atom/BillingPeriod/BillingPeriod.vue';
-import { defineProps , inject ,computed,ref,nextTick,defineEmits } from 'vue';
+import { defineProps , inject ,computed,ref,nextTick,defineEmits, provide } from 'vue';
 import DueDateCompo from '@/components/molecules/DueDateCompo/DueDateCompo.vue';
 import ProjectStatus from '@/components/molecules/ProjectStatus/ProjectStatus.vue'
-import { projectAssignee, projectAssigneeRemove, projectCurrency, projectDueDateAdd, projectDueDateChange, projectEndDateAdd, projectEndDateChange, projectStartDateAdd, projectStartDateChange, projectStatus, projectType } from '@/utils/NotificationTemplate';
 import { useConvertDate, useCustomComposable, useGetterFunctions } from '@/composable';
 import StartEndDate from '@/components/molecules/FixMilestoneDate/FixMilestoneDate.vue';
 import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
@@ -256,9 +262,11 @@ import UserProfile from '@/components/atom/UserProfile/UserProfile.vue';
 import InputText from '@/components/atom/InputText/InputText.vue';
 import SkillsSelect from '@/components/molecules/SkillsSelect/SkillsSelect.vue';
 import ProjectSourceSelect from '@/components/molecules/ProjectSourceSelect/ProjectSourceSelect.vue';
+import ProjectWorkingDays from '@/components/molecules/WorkingDaysPicker/ProjectWorkingDays.vue';
 import { DEFAULT_SOURCE, checkProposalId, cleanProposalId } from '@/utils/projectSource';
 
 const { checkPermission,checkApps,getAppState } = useCustomComposable();
+provide('customFieldForProject', true);
 const {convertDateFormat} = useConvertDate();
 
 const { t } = useI18n();
@@ -293,11 +301,11 @@ const showConfirmModal = ref(false);
 const CustomFieldData = ref(JSON.parse(JSON.stringify(getters["settings/customFields"])));
 const proposalIdValue = ref('');
 const proposalIdEditable = ref(false);
+const workingDaysKey = ref(0);
 
 //computed
 const users = computed(() => getters["users/users"]);
 const teams = computed(() => getters["settings/teams"]);
-const projectSkills = computed(() => getters["settings/projectSkills"]);
 // Projects created before the field exists read as the default rather than blank.
 const projectSource = computed(() => props.projectData?.source || DEFAULT_SOURCE);
 const isUpworkSource = computed(() => projectSource.value === 'upwork');
@@ -305,18 +313,11 @@ const isUpworkSource = computed(() => projectSource.value === 'upwork');
 // extra line would push into the field below it.
 const proposalIdHint = computed(() => (isUpworkSource.value ? t('Projects.proposal_id_format_hint') : ''));
 const currentCompany = computed(() => getters["settings/selectedCompany"]);
-const companyOwner = computed(() => { return getters["settings/companyOwnerDetail"];});
 const showCustomField = computed(() => checkPermission("project.project_custom_field", props?.projectData?.isGlobalPermission, {gettersVal: getters}));
 const canEditDetails = computed(() => checkPermission('project.project_details', props?.projectData?.isGlobalPermission) === true);
 
 //user detail
-const user = getUser(userId.value);
 const createdByUser = getUser(props?.projectData?.projectCreatedBy || '');
-const userData = {
-    id: user.id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: user.companyOwnerId
-}
 
 // convert the number into us formate 
 const getCommaSeperatedNumber = (n)=> {
@@ -325,7 +326,7 @@ const getCommaSeperatedNumber = (n)=> {
 };
 
 // project status update
-const updateStatus = (oldVal, newval) => {
+const updateStatus = (newval) => {
     const object = {
         updateObject : {
             status: newval.value,
@@ -335,44 +336,6 @@ const updateStatus = (oldVal, newval) => {
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Status</b> as <b>${newval.name}</b>.`,
-                'key' : 'Project_Status',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-                'backColor' : oldVal.backgroundColor,
-                'color':oldVal.textColor,
-                'statusName':oldVal.name,
-                'bgColor':newval.backgroundColor,
-                'textColor':newval.textColor,
-                'newStatusName':newval.name
-            }
-            let notificationObject = {
-                message: projectStatus(notifyObj),
-                key: "project_status_change",
-            };
-            
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'status',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -386,64 +349,19 @@ const updateStatus = (oldVal, newval) => {
 
 // update the assignee in project
 const updateAssignee = (type, user) => {
-    var historyObj = {};
-    let object = {};
-    if (type === "add") {
-        object = {
-            key:"$addToSet",
-            updateObject : {
-                AssigneeUserId: user.id
-            }
-        }
-        historyObj.key = "Project_Assignee_Add";
-        historyObj.message = `<b>${userData.Employee_Name}</b> has added the <b>${getUser(user.id).Employee_Name}</b> to <b>Assignee</b>.`;
-    } else {
-        object = {
-            key:"$pull",
-            updateObject : {
+    const object = type === "add"
+        ? { key: "$addToSet", updateObject: { AssigneeUserId: user.id } }
+        : {
+            key: "$pull",
+            updateObject: {
                 AssigneeUserId: user.id,
-                    ...(props.projectData.LeadUserId.includes(user.id) && { LeadUserId: user.id })
+                ...(props.projectData.LeadUserId.includes(user.id) && { LeadUserId: user.id })
             }
-        }
-        historyObj.key = "Project_Assignee_Removed";
-        historyObj.message = `<b>${userData.Employee_Name}</b> has removed the <b>${getUser(user.id).Employee_Name}</b> to <b>Assignee</b>.`;
-    }
-    let notifyObj = {
-        'projectName' : props.projectData.ProjectName,
-        'Employee_Name' : user.label,
-        type : type,
-        name : user.label
-    }
-    let notificationObject = {
-        message: type === 'add' ? projectAssignee(notifyObj) : projectAssigneeRemove(notifyObj),
-        key: "project_assignee",
-    };
-    
+        };
 
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t(`Toast.Assignee ${type === "add" ? 'added' : 'removed'} successfully`),{position: 'top-right'});
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                mentionUserId:[user.id],
-                changeType:'assignee',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData},projectId:props.projectData._id,key:'AssigneeChange',subKey: type === 'add' ? 'add' : 'remove',userId: user.id});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -456,7 +374,7 @@ const updateAssignee = (type, user) => {
 }
 
 // update the type of project
-const updateType = (type,val) => {
+const updateType = (type) => {
     let object = {
         updateObject : {
             ProjectType: type.label,...((type.label === 'Hourly' && !props.projectData.BillingPeriod) && {BillingPeriod: "Monthly" })
@@ -466,39 +384,6 @@ const updateType = (type,val) => {
         if(res.status === 200){
             emit('rightSideBarEmit','projectType',object);
             sourceEditable.value = false;
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Type</b> as <b>${type.label}</b>.`,
-                'key' : 'Project_Type',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-                'previousType': val,
-                'name':type.label
-            }
-            let notificationObject = {
-                message: projectType(notifyObj),
-                key: "project_type"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'project_type',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
@@ -512,7 +397,7 @@ const updateType = (type,val) => {
 }
 
 // update the currency of project
-const updateCurrency = (currency,oldVal) => {
+const updateCurrency = (currency) => {
     if (props.projectData && props.projectData.ProjectCurrency) {
         if (currency.code !== props.projectData.ProjectCurrency.code) {
             let object = {
@@ -551,39 +436,6 @@ const updateCurrency = (currency,oldVal) => {
         if(res.status === 200){
             emit('rightSideBarEmit','currency',currency);
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Currency</b> as <b>${currency.name}</b>.`,
-                'key' : 'Project_Currency',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-                'ProjectCurrency': oldVal,
-                'name':currency.name
-            }
-            let notificationObject = {
-                message: projectCurrency(notifyObj),
-                key: "project_currency"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'currency',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -596,7 +448,7 @@ const updateCurrency = (currency,oldVal) => {
 }
 
 // update the duedate of project
-const updateDueDate = (event,oldVal) => {
+const updateDueDate = (event) => {
     let newdueDateDeadLine = [];
     if(props.projectData.dueDateDeadLine && props.projectData.dueDateDeadLine.length > 0) {
         props.projectData.dueDateDeadLine.forEach((date) => {
@@ -611,48 +463,12 @@ const updateDueDate = (event,oldVal) => {
         updateObject : {
             DueDate: event.dateVal,
             dueDateDeadLine: newdueDateDeadLine,
-        }
+        },
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     }
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                key : "Project_DueDate",
-                message : `<b>${userData.Employee_Name}</b> has changed <b> Due Date</b> as <b>DATE_${new Date(event.dateVal).getTime()}</b>.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-            }
-            if(oldVal){
-                notifyObj.previousDate=convertDateFormat(oldVal,'DD MMM[,] YYYY',{showDayName: false})
-                notifyObj.changedDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }else{
-                notifyObj.changedDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }
-            let notificationObject = {
-                message: oldVal ? projectDueDateChange(notifyObj) : projectDueDateAdd(notifyObj),
-                key: "project_due_date"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'due_date',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -665,15 +481,12 @@ const updateDueDate = (event,oldVal) => {
 }
 
 // update the startdate of project
-const updateStartDate = (event,oldVal) => {
-    let object = {
+const updateStartDate = (event) => {
+    const object = {
         updateObject : {
             StartDate: event.dateVal
-        }
-    } 
-    let historyObj = {
-        key : "Project_StartDate",
-        message : `<b>${userData.Employee_Name}</b> has changed <b> Start Date</b> as <b>DATE_${new Date(event.dateVal).getTime()}</b>.`
+        },
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     }
     if(props.projectData.ProjectType === 'Hourly'){
         let getStartDate = new Date(event.dateVal).getTime()
@@ -694,57 +507,24 @@ const updateStartDate = (event,oldVal) => {
                     startDateWarning.value = props.projectData.StartDate
                     return;
                 }else{
-                    commonStartDateUpdateFun(event,object,historyObj,oldVal);
+                    commonStartDateUpdateFun(event,object);
                 }
             }else{
-                commonStartDateUpdateFun(event,object,historyObj,oldVal);
+                commonStartDateUpdateFun(event,object);
             }
         }).catch((err)=>{
             console.error("ERROR",err)
-            commonStartDateUpdateFun(event);
+            commonStartDateUpdateFun(event,object);
         });
     }else{
-        commonStartDateUpdateFun(event,object,historyObj,oldVal);
+        commonStartDateUpdateFun(event,object);
     }
 }
 
-const commonStartDateUpdateFun = (event,object,historyObj,oldVal) =>{
+const commonStartDateUpdateFun = (event,object) =>{
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((response) => {
         if(response.status === 200){
             emit('rightSideBarEmit','startDate', event.dateVal);
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-            }
-            if(oldVal){
-                notifyObj.formetedStartDate=convertDateFormat(oldVal,'DD MMM[,] YYYY',{showDayName: false})
-                notifyObj.newDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }else{
-                notifyObj.formetedStartDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }
-            let notificationObject = {
-                message: oldVal ? projectStartDateChange(notifyObj) : projectStartDateAdd(notifyObj),
-                key: "project_start_date"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'start_date',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
@@ -757,51 +537,15 @@ const commonStartDateUpdateFun = (event,object,historyObj,oldVal) =>{
 }
 
 // update the enddate of project
-const updateEndDate = (event,oldVal) => {
+const updateEndDate = (event) => {
     const object = {
         updateObject : {
             EndDate: event.dateVal
-        }
+        },
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
     }
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
-            let historyObj = {
-                key : "Project_EndDate",
-                message : `<b>${userData.Employee_Name}</b> has changed <b> End Date</b> as <b>DATE_${new Date(event.dateVal).getTime()}</b>.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
-            let notifyObj = {
-                'ProjectName' : props.projectData.ProjectName,
-            }
-            if(oldVal){
-                notifyObj.formatedDate=convertDateFormat(oldVal,'DD MMM[,] YYYY',{showDayName: false})
-                notifyObj.newDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }else{
-                notifyObj.formatedDate=convertDateFormat(event.dateVal,'DD MMM[,] YYYY',{showDayName: false})
-            }
-            let notificationObject = {
-                message: oldVal ? projectEndDateChange(notifyObj) : projectEndDateAdd(notifyObj),
-                key: "project_end_date"
-            };
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: props.projectData._id,
-                object: notificationObject,
-                userData: userData,
-                changeType:'end_date',
-                changeData: notifyObj
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
@@ -857,18 +601,6 @@ const updateSource = (source) => {
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Source</b> as <b>${t('Projects.source_' + source)}</b>.`,
-                'key' : 'Project_Source',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -909,18 +641,6 @@ const updateProposalId = ({value}) => {
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Proposal ID</b> as <b>${newValue || 'N/A'}</b>.`,
-                'key' : 'Project_ProposalId',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -942,22 +662,6 @@ const updateSkills = (slugs) => {
     apiRequest("put",`${env.PROJECT}/${props.projectData._id}`,object).then((res) => {
         if(res.status === 200){
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            const skillNames = slugs.map((slug) => {
-                const match = projectSkills.value.find((s) => s.slug === slug);
-                return match ? match.name : slug;
-            });
-            let historyObj = {
-                'message': `<b>${userData.Employee_Name}</b> has changed <b> Skills</b> as <b>${skillNames.join(', ') || 'N/A'}</b>.`,
-                'key' : 'Project_Skills',
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             commit('projectData/projectLocalUpdate', {itemData:  {...props.projectData , ...object.updateObject}});
         }else{
             $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
@@ -969,6 +673,21 @@ const updateSkills = (slugs) => {
     })
 }
 
+const updateWorkingDays = (workingDays) => {
+    const object = { updateObject: { workingDays } };
+    /* A refused save remounts the control, which drops the week it was showing ahead of the answer. */
+    const failed = (err) => {
+        if (err) console.error(err, "Error in Project Working Days Update");
+        workingDaysKey.value += 1;
+        $toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+    };
+    apiRequest("put", `${env.PROJECT}/${props.projectData._id}`, object).then((res) => {
+        if (res.status !== 200) return failed();
+        $toast.success(t('Toast.Updated_successfully'), { position: 'top-right' });
+        commit('projectData/projectLocalUpdate', { itemData: { ...props.projectData, ...object.updateObject } });
+    }).catch(failed);
+};
+
 // custom field
 const submitHandler = async (value,detail,id,edit) => {
     if(showCustomField.value === true){
@@ -976,21 +695,21 @@ const submitHandler = async (value,detail,id,edit) => {
             if(detail.fieldType === 'date'){
                 try{
                     detail.fieldValue = new Date(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'dropdown'){
                 detail.fieldValue = [value.id];
                 try {
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
             }else if(detail.fieldType === 'number' || detail.fieldType === 'money'){
                 try{
                     detail.fieldValue = String(value);
-                    insertCustomField(detail,value);
+                    insertCustomField(detail);
                 } catch(error){
                     console.error('ERROR',error);
                 }
@@ -1013,7 +732,7 @@ const submitHandler = async (value,detail,id,edit) => {
                                     detail.fieldFlag = detail.fieldFlag ? detail.fieldFlag : detail.fieldCountryObject.code;
                                 }
                             }
-                            insertCustomField(detail,value);
+                            insertCustomField(detail);
                         } catch(error){
                             console.error('ERROR',error);
                         }
@@ -1023,7 +742,7 @@ const submitHandler = async (value,detail,id,edit) => {
         } else if(detail.fieldType === 'checkbox'){
             try{
                 detail.fieldValue = value;
-                insertCustomField(detail,value);
+                insertCustomField(detail);
             } catch(error){
                 console.error('ERROR',error);
             }
@@ -1032,13 +751,8 @@ const submitHandler = async (value,detail,id,edit) => {
 };
 
 // insert or update the value of custom field in the project
-const insertCustomField = async(detail,data) => {
+const insertCustomField = async(detail) => {
     let updateDetail = {};
-    let userData = {
-        id: user?.id || '',
-        name: user?.Employee_Name || '',
-        companyOwnerId: companyOwner?.value?._id || '',
-    }
     updateDetail.fieldValue = detail.fieldValue;
     if(detail.fieldType === "phone"){
         updateDetail.fieldCode = detail?.fieldCode;
@@ -1049,18 +763,6 @@ const insertCustomField = async(detail,data) => {
 
     await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${props.projectData._id}`,{updateObject: { [`customField.${detail._id}`]: updateDetail }}).then((res) => {
         if(res.status === 200){
-            let historyObj = {
-                'message': `<b>${userData.name}</b> has added value in <b> ${detail.fieldTitle}</b> Custom Field as <b>${data.value ? data.value : data}</b> for project.`,
-                'key' : 'Project_CustomField'
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": props.projectData._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             $toast.success(t('Toast.Custom_field_updated_successfully'), {position: 'top-right' });
             const localUpdateCustomfield = props.projectData
             localUpdateCustomfield.customField = {
@@ -1083,11 +785,6 @@ const insertCustomField = async(detail,data) => {
 // add the new custom field or edit the custom field
 const customFieldStore = async(object,isEdit) => {    
     let value = JSON.parse(JSON.stringify(object))
-    let userData = {
-        id: user.id,
-        name: user.Employee_Name,
-        companyOwnerId: companyOwner.value._id,
-    }
     if(!isEdit){       
         value.global = false;
         value.projectId = [props.projectData._id];
@@ -1104,21 +801,6 @@ const customFieldStore = async(object,isEdit) => {
                 value._id = res?.data?._id || '';
                 commit("settings/mutateFinalCustomFields", {data: value || {},op: "added"});
                 $toast.success(t('Toast.Field_Added_Successfully'), {position: 'top-right' });
-                let historyObj = {
-                    'message': `<b>${userData.name}</b> has Created <b> Custom Field </b> as <b>${value.fieldTitle}</b> for project.`,
-                    'key' : 'Project_CustomField',
-                }
-                apiRequest("post", env.HANDLE_HISTORY, {
-                    "type": 'project',
-                    "companyId": companyId.value,
-                    "projectId": props.projectData._id,
-                    "taskId": null,
-                    "object": historyObj,
-                    "userData": userData
-                }).catch((err)=>{
-                    $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
-                    console.error("Error",err)
-                });
             }else{
                 $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
             }
@@ -1130,7 +812,6 @@ const customFieldStore = async(object,isEdit) => {
             console.error("Error inserting the custom field",err)
         });
     }else{
-        const oldFieldValue = customFieldObject.value.fieldTitle
         value.updatedAt = new Date();
         const object = {
             type: "updateOne",
@@ -1141,20 +822,6 @@ const customFieldStore = async(object,isEdit) => {
         await apiRequest("put",env.CUSTOM_FIELD,object).then((res) => {
             if(res.status === 200){
                 commit("settings/mutateFinalCustomFields", {data: {...customFieldObject.value,...value} || {},op: "modified"});
-                if(oldFieldValue !== value.fieldTitle){
-                    let historyObj = {
-                        'message': `<b>${userData.name}</b> has Edited <b> Custom Field </b> from <b>${oldFieldValue}</b> to <b>${value.fieldTitle}</b> for project.`,
-                        'key' : 'Project_CustomField',
-                    }
-                    apiRequest("post", env.HANDLE_HISTORY, {
-                        "type": 'project',
-                        "companyId": companyId.value,
-                        "projectId": props.projectData._id,
-                        "taskId": null,
-                        "object": historyObj,
-                        "userData": userData
-                    })
-                }
                 $toast.success(t('Toast.Field_Updated_Successfully'), {position: 'top-right' })
             }else{
                 $toast.error(t('Toast.something_went_wrong'), {position: 'top-right' });
@@ -1196,4 +863,41 @@ const handleClose = () => {
 
 </script>
 <style src='./style.css'>
+</style>
+
+<style scoped>
+.project-detail-right-side-font-weight-400 {
+    font-weight: 400 !important;
+}
+.project-detail-right-side-font-weight-500 {
+    font-weight: 500 !important;
+}
+.project-detail-right-side-font-weight-600 {
+    font-weight: 600 !important;
+}
+.project-detail-right-side-font-weight-700 {
+    font-weight: 700 !important;
+}
+.project-detail-right-side-font-size-13 {
+    font-size: 13px;
+}
+.project-detail-right-side-font-size-14 {
+    font-size: 14px;
+}
+.project-detail-right-side-font-size-16 {
+    font-size: 16px;
+}
+.project-detail-right-side-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.project-detail-right-side-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.project-detail-right-side-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

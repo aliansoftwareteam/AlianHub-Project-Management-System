@@ -5,45 +5,44 @@ This is the deferred **migration**: (A) backfill library icons + colors onto exi
 task types, and (B) repair malformed task-type keys (`NaN`, duplicates) **and update every
 task that references them**.
 
-> Status: SPEC. This document is the reviewed contract, **not** the thing that runs at deploy.
-> The deploy artifact is a standalone script (see §"Deploy artifact"). No script written yet.
+> Status: shipped as **`migrations/004-task-type-icons.js`**, with the logic in
+> [`migrations/lib/taskTypeIcons.js`](../migrations/lib/taskTypeIcons.js) and its unit check in
+> [`.claude/tests/test-task-type-migration.js`](./tests/test-task-type-migration.js). The standalone
+> `scripts/migrate-task-type-icons.js` this plan first described was replaced by the migrations
+> runner (0c0234f1) and no longer exists. The sections below are the design record.
 
-## Deploy artifact — what actually runs
+## How it runs
 
-This `.md` is a spec. The migration executes as a **one-off Node script** (repo has no migration
-framework; follows the `scripts/*.js` ops-script pattern, e.g. `seed-formula-rollup-types.js`):
+The runner applies `004-task-type-icons` once, at boot, for **every company**, and records the
+outcome per company in `global.schema_versions`; a company that fails is retried on the next boot.
+With `MIGRATIONS_AUTO=false`, an operator runs it by hand:
 
-- `scripts/migrate-task-type-icons.js --company <id>` → **dry-run** (default): prints the full
-  report (key remaps, task rewrite counts, status-like usage, orphans), writes nothing.
-- `scripts/migrate-task-type-icons.js --company <id> --apply` → performs it, after a backup.
-
-Run manually by ops during the deploy window, once per company. Scope for this run: **one
-company only** (per decision #3).
-
-### Deploy runbook
 ```bash
-# 1. Backup (only safety net — no automatic rollback)
-mongodump --uri "$MONGODB_URL/<companyId>" --out ./backup-<companyId>-<date>
-
-# 2. Dry-run — review the report, confirm numbers match the baseline below
-node scripts/migrate-task-type-icons.js --company <companyId>
-
-# 3. Apply
-node scripts/migrate-task-type-icons.js --company <companyId> --apply
-
-# 4. Clear caches so the app serves fresh data (or restart the backend)
-#    keys: tasktype:<companyId>, taskTypeTemplate:<companyId>, UserProjectData:<companyId>:*
+mongodump --uri "$MONGODB_URL" --out ./backup-<date>   # the only rollback; 004 has no down()
+npm run migrate:status
+npm run migrate
 ```
-Rollback = `mongorestore` from step 1. Changes are additive (icon fields) plus one key fix, so
-restore is rarely needed, but keep the dump until verified in the app.
 
-### Dry-run baseline — company `6571e7165470e64b12032734` (captured pre-deploy)
-Expected report (data may drift before deploy; investigate large deltas):
+Each company returns a summary (`projects`, `keyFixes`, `merged`, `tasksRewritten`, `iconsSet`),
+and the migration clears `tasktype:<companyId>`, `taskTypeTemplate:<companyId>` and
+`UserProjectData:<companyId>:*` itself.
+
+What changed from the plan below:
+- **No dry-run and no post-apply verify mode.** The runner has neither; both are still open on
+  task 021. Take the backup first.
+- **All companies, not one** (decision #3 was for the manual one-off script).
+- **Same-value duplicates are merged** onto one keeper (§B2 step 3), should a project have any.
+- **No catalog re-sequence (§B4).** The company catalog and templates get icons only; their keys
+  are left as they are.
+- **Status-like rows (§B5) are left in place** and get icons like any other type; nothing reports
+  their usage.
+
+### Pre-deploy baseline — company `6571e7165470e64b12032734` (historical)
+Captured against the original script's dry-run, for comparison with the per-company summary:
 - Projects scanned: **865**; needing key fixes: **1** (`Alian Hub ERP` → `feedback_&_revision null→4`, 1 task).
 - Total tasks to re-key: **1**. Orphan tasks (untouched): **~9,980** — dominated by `TaskType:"task"`
   in projects whose `taskTypeCounts` omits a "task" entry (pre-existing; resolves by key, left alone).
-- Status-like usage: **0** (`in_progress` present, 0 tasks; others absent). → status-like rows carry
-  no task usage; safe to leave (or drop from catalog later).
+- Status-like usage: **0**.
 - Catalog entries: **46**; template entries: **9**; project entries: all 865 get icons.
 
 ---
@@ -122,7 +121,7 @@ Per project:
 | `NaN` | UI · UX · Graphic Design · Branding · Web Design · Print Design · Motion Graphics · Photography/Videography · Content Creation · Storyboarding · Feedback & Revision |
 
 No duplicate **values** exist → no merges; every distinct type gets a unique key. (Note: the
-above is the company *catalog*; the script re-runs detection per **project** `taskTypeCounts`,
+above is the company *catalog*; the migration re-runs detection per **project** `taskTypeCounts`,
 which may differ.)
 
 ### B3. Rewrite task references (lockstep, same project only)
@@ -157,33 +156,6 @@ They're coupled — (iii) is unsafe without (ii)'s counts. **Plan: run (ii) in t
 decide (i) vs (iii) from the numbers.**
 
 ---
-
-## Safety & execution
-
-- **Backup first**: `mongodump` the company DB (or at least `tasks`, `projects`, `main_chats`,
-  `settings`, `task_type_templates`). Rollback = restore.
-- **Dry-run mode (default)**: script emits a full report — per project: key remaps, task counts
-  to be rewritten, merges, orphans — and writes **nothing**. Only `--apply` mutates.
-- **Per-company**: loop tenants (or take a `companyId`), connect to that DB (`mongoConnector`).
-- **Idempotent**: re-running a completed migration is a no-op (already-unique keys skipped;
-  icon fields re-set to same values).
-- **Batched writes** with `bulkWrite` per project; wrap each project's taskTypeCounts + task
-  updates so a project is all-or-nothing.
-- **Verification queries** after apply:
-  - no `taskTypeCounts` entry with `NaN`/duplicate key in any project;
-  - every `tasks.TaskTypeKey` resolves to exactly one entry in its project;
-  - counts of rewritten tasks match the dry-run report;
-  - every task type has `iconType`, `iconValue`, `iconColor`.
-- **Cache bust**: clear `tasktype:${companyId}`, `taskTypeTemplate:${companyId}`,
-  `UserProjectData:*` after apply (see the removeCache keys in the settings controllers).
-- **Socket note**: no live emit needed for a maintenance migration; users refresh. If run hot,
-  consider emitting a project-update so open boards re-resolve icons.
-
-## Ordering
-1. Backup → 2. Dry-run, review report (esp. orphans + merges + status-like) →
-3. `--apply` Workstream B (keys) → 4. `--apply` Workstream A (icons/colors) →
-5. Verify → 6. Cache bust.
-(A after B so icon fields land on the final, corrected entries.)
 
 ## Decisions (resolved)
 1. **Status-like rows** — *pending numbers*: dry-run reports usage counts (B5 option ii); decide

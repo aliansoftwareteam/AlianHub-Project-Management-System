@@ -1,8 +1,8 @@
 const { myCache } = require("../../../Config/config");
-const { reconcileCompanyRules } = require('./reconcileRules');
 const { removeCache } = require("../../../utils/commonFunctions");
 const { dbCollections } = require("../../../Config/collections");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
+const { settingsUpdateProblem, SETTINGS_UPDATES } = require("../settingsDocUpdate");
 const mongoose = require("mongoose");
 
 
@@ -33,6 +33,8 @@ exports.updateSecurityPermissions = async (req, res) => {
         }else{
             return res.status(400).json({message: 'Invalid type'});
         }
+        const problem = settingsUpdateProblem(SETTINGS_UPDATES.rule, key, updateObject);
+        if (problem) return res.status(400).json({ status: false, message: problem });
         const currentDate = new Date();
 
         const updateObjectDate = {
@@ -49,6 +51,8 @@ exports.updateSecurityPermissions = async (req, res) => {
         };
         const response = await MongoDbCrudOpration(companyId, query, type);
         removeCache(`rules:${companyId}`);
+        // The project list is built from these rules.
+        removeCache(`UserProjectData:${companyId}:`, true);
         return res.status(200).json(response);
     } catch (error) {
         console.error(`Error updating or inserting security & permissions:`, error);
@@ -75,14 +79,7 @@ exports.getSecurityPermissions = async (req, res) => {
                 error: "Company ID is required in headers."
             });
         }
-        let response = await exports.fetchRules(companyId);
-
-        // Repair a company that predates a permission. Deliberately only here and not inside
-        // fetchRules: fetchRules is a hot path (getProjectList calls it on every load), and the
-        // repair re-seeds the rules collection, so triggering it from an ordinary page load would
-        // put a delete-then-insert in front of every user. This screen is admin-only and rarely
-        // opened, which is where that work belongs.
-        response = await reconcileCompanyRules(companyId, response);
+        const response = await exports.fetchRules(companyId);
 
         return res.status(200).json(response && response.length ? response : []);
     } catch (error) {

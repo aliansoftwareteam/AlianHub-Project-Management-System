@@ -35,6 +35,25 @@ Either tier can be overridden per task: the user can say "just do it" (skip the 
 
 The `task-manager` skill in [.claude/skills/task-manager/](.claude/skills/task-manager/SKILL.md) is the mechanism for steps 4–5; task tracking lives in [Tasks/](Tasks/README.md).
 
+### Rule 3 — Every user-visible string goes through i18n
+
+- Templates never ship bare text, `title`, `placeholder` or `aria-label`: use `$t('Namespace.key')` / `t(...)` with the key added to `frontend/src/locales/en.js` under the feature's namespace.
+- After adding keys to `en.js`, run `npm run i18n:backfill` — it fills every other locale (machine-translated when `TRANSLATE_API_KEY` is set, English copy otherwise) and records the keys in `<locale>.pending.json` for review. Pending files are sorted and timestamp-free so different keys merge cleanly; on a conflict keep both sides' keys and re-run the backfill.
+- `npm run i18n:check` (also `tests/conventions/i18n-check.test.js`) fails when a locale lacks a key or a `.vue` file grows past its baseline in `scripts/i18n-allowlist.json`; the baseline may only shrink.
+
+### Rule 4 — Every merge to beta is a numbered build
+
+- The running version is derived from git, never hand-edited: `npm run version:show` prints it (`<next>-beta.<build>`, e.g. `14.36.0-beta.59`), and release-please alone edits `package.json` and `CHANGELOG.md`.
+- After merging PRs into `beta`, run `npm run version:log` and commit `docs/BETA-LOG.md` in the follow-up docs PR that ticks task progress, naming the build numbers those merges became.
+- After merges that add or change a route, run `npm run api:doc` in that same docs PR and commit `docs/API.md` and `docs/api/openapi.json`; `npm run api:doc:check` fails while they are stale. A feature PR leaves both files alone, so two PRs that each add a route cannot break `beta`.
+- Commit and PR titles stay Conventional Commits, because the next version is computed from them (`feat` → minor, `!` or `BREAKING CHANGE` → major, anything else → patch).
+
+### Rule 5 — Every colour comes from a token
+
+- Styles never ship a hard-coded colour (`#hex`, `rgb()`/`hsl()`, `white`, `black`) or a legacy utility class (`bg-white`, `GunPowder`, `btn-white`, `font-size-13`, …): use the tokens in `frontend/src/assets/css/tokens.css` (`var(--surface)`, `var(--ink)`, `var(--brand)`, …) and the `ah-` classes.
+- `npm run style:check` (also `tests/conventions/style-check.test.js`) fails when a `.vue`, `.css` or `.scss` file under `frontend/src` grows past its baseline in `scripts/style-baseline.json`, or when the baseline is higher than the file now needs; the baseline may only shrink. `npm run style:check -- <file>` lists that file's findings by line.
+- After removing colours or legacy classes, run `npm run style:baseline` and commit the lowered baseline in the same PR. It refuses to raise a count: `npm run style:baseline -- --allow-increase` is for a deliberate exception (a file that moved, a colour that cannot be a token), named in the PR body. On a merge conflict keep the higher count and re-run `npm run style:baseline`.
+
 ---
 
 ## What is AlianHub?
@@ -272,6 +291,7 @@ See [.claude/SECURITY-PATTERNS.md](.claude/SECURITY-PATTERNS.md) for detailed pr
 - [.claude/CONVENTIONS.md](.claude/CONVENTIONS.md) — Code naming, module organization, patterns
 - [.claude/FOLDER-STRUCTURE.md](.claude/FOLDER-STRUCTURE.md) — Project layout and file organization
 - [.claude/COMMON-TASKS.md](.claude/COMMON-TASKS.md) — How to add features, routes, tests, files
+- [.claude/AGENTS-AND-MCP.md](.claude/AGENTS-AND-MCP.md) — How an AI agent changes things, and how to add an agent action or MCP tool
 
 **Best Practices**
 - [.claude/SECURITY-PATTERNS.md](.claude/SECURITY-PATTERNS.md) — Security essentials (companyId scoping, JWT, validation)
@@ -310,6 +330,6 @@ See [.claude/SECURITY-PATTERNS.md](.claude/SECURITY-PATTERNS.md) for detailed pr
 
 ---
 
-**Last Updated:** 2026-05-12  
-**Version:** 14.0.26  
+**Last Updated:** 2026-10-02  
+**Version:** 14.36.0-beta.766 (`npm run version:show` prints the current one)  
 **Status:** ✅ Documentation reorganized for Claude Code

@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const logger = require("../../Config/loggerConfig");
-const { version: appVersion } = require("../../package.json");
+const buildInfo = require("../../Config/buildInfo");
 
 // Serves the repo-root CHANGELOG.md (maintained by release-please) as
 // structured JSON for the in-app "What's New" page. The parsed result is
@@ -16,6 +16,18 @@ const RELEASE_HEADING = /^##\s+(?:\[v?([^\]]+)\]\((https?:\/\/[^)\s]+)\)|\[v?([^
 const SECTION_HEADING = /^###\s+(.+)$/;
 const BULLET_ITEM = /^\s*[*-]\s+(.+)$/;
 const ISO_DATE = /\((\d{4}-\d{2}-\d{2})\)/;
+
+// What a release means for whoever runs their own install. release-please
+// only emits the fixed sections in release-please-config.json, so the note is
+// read from two places a commit author can already write it into: a section
+// whose title says so ("BREAKING CHANGES", "Self-hosting", "Upgrade notes"),
+// or a bullet scoped that way ("**self-host:** ...", "**migration:** ...",
+// "**env:** ..."). Either one marks the release as needing attention on upgrade.
+const SELF_HOST_SECTION = /breaking|self-?host|upgrade|migration|deploy/i;
+const SELF_HOST_SCOPE = /^(?:<strong>)?(self-?host|selfhost|migration|migrate|env|upgrade|deploy|infra|breaking)\b/i;
+const UPGRADE_HINT = /migration|migrate|restart|\.env\b|env var|environment variable|breaking|re-?index|npm install|reinstall/i;
+
+const stripTags = (html) => String(html || "").replace(/<[^>]+>/g, "");
 
 let cache = { mtimeMs: 0, payload: null };
 
@@ -79,7 +91,8 @@ const parseChangelog = (markdown) => {
                 section = { title: "", items: [] };
                 release.sections.push(section);
             }
-            section.items.push({ html: inlineMarkdownToHtml(bulletMatch[1]) });
+            const html = inlineMarkdownToHtml(bulletMatch[1]);
+            section.items.push({ html, selfHost: SELF_HOST_SECTION.test(section.title) || SELF_HOST_SCOPE.test(html) });
             noteOpen = false;
             continue;
         }
@@ -106,6 +119,25 @@ const parseChangelog = (markdown) => {
 };
 
 // "https://github.com/<org>/<repo>/compare/..." -> "https://github.com/<org>/<repo>"
+// Pull the self-hoster's notes out of a parsed release and decide whether the
+// upgrade needs a hand (a migration, a restart, an env change) or is a plain
+// pull-and-restart.
+const withSelfHost = (release) => {
+    const notes = [];
+    release.sections.forEach((section) => {
+        section.items.forEach((item) => { if (item.selfHost) notes.push(item.html); });
+    });
+    const text = notes.map(stripTags).join(" ");
+    return {
+        ...release,
+        selfHost: {
+            notes,
+            upgradeNeeded: notes.length > 0 && UPGRADE_HINT.test(text),
+            breaking: release.sections.some((section) => /breaking/i.test(section.title)),
+        },
+    };
+};
+
 const deriveRepoUrl = (releases) => {
     const withUrl = releases.find((item) => item.compareUrl);
     return withUrl ? withUrl.compareUrl.split("/compare/")[0] : "";
@@ -163,16 +195,21 @@ exports.getChangelog = async (req, res) => {
             return res.send({
                 status: true,
                 statusText: "Changelog file not found.",
-                data: { currentVersion: appVersion, repoUrl: "", releases: [] },
+                data: { currentVersion: buildInfo.get().version, repoUrl: "", releases: [] },
             });
         }
 
         if (!cache.payload || cache.mtimeMs !== stats.mtimeMs) {
             const markdown = await fs.promises.readFile(CHANGELOG_PATH, "utf8");
-            const releases = parseChangelog(markdown);
+            const releases = parseChangelog(markdown).map(withSelfHost);
             cache = {
                 mtimeMs: stats.mtimeMs,
-                payload: { currentVersion: appVersion, repoUrl: deriveRepoUrl(releases), releases },
+                payload: {
+                    currentVersion: buildInfo.get().version,
+                    latestVersion: releases.length ? releases[0].version : buildInfo.get().release,
+                    repoUrl: deriveRepoUrl(releases),
+                    releases,
+                },
             };
         }
 
@@ -188,3 +225,7 @@ exports.getChangelog = async (req, res) => {
         return res.send({ status: false, statusText: error.message });
     }
 };
+
+exports.parseChangelog = parseChangelog;
+exports.withSelfHost = withSelfHost;
+exports.deriveRepoUrl = deriveRepoUrl;

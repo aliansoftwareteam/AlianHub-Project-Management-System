@@ -4,7 +4,7 @@
  * Provider-agnostic helper for the dedicated "Write with AI" popover on the
  * task/project description editor. Mirrors the AI time-estimator pattern
  * (Modules/EstimatedTime/aiTaskEstimator.js): it reuses the
- * AIProjectGenerator/llmProvider factory (Anthropic / OpenAI / DeepSeek),
+ * AICore/llmProvider factory (Anthropic / OpenAI / DeepSeek),
  * loads a file-based system prompt once at module load, and parses a single
  * JSON object out of the model response.
  *
@@ -26,9 +26,12 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../../Config/loggerConfig');
 
+const { FEATURES } = require('../AICore/features');
+const { withTimeout } = require('./withTimeout');
+
 let providerFactory = null;
 try {
-    providerFactory = require('../AIProjectGenerator/llmProvider');
+    providerFactory = require('../AICore/llmProvider');
 } catch (_e) {
     providerFactory = null;
 }
@@ -49,7 +52,7 @@ const MAX_QUESTIONS = 3;
 const SYSTEM_PROMPT = (() => {
     const promptPath = path.join(__dirname, 'prompts', 'write-description.md');
     const raw = fs.readFileSync(promptPath, 'utf8');
-    return raw.replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+    return raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
 })();
 
 function clampStr(value, cap) {
@@ -211,14 +214,9 @@ async function callProvider(input) {
         // ADD mode reproduces the whole description plus the addition, so allow
         // room for a long description to come back in full.
         maxTokens: 8192,
+        spend: { feature: FEATURES.DESCRIPTION, companyId: input.companyId, userId: input.userId },
     });
-    const result = await Promise.race([
-        chatPromise,
-        new Promise((_, reject) => setTimeout(
-            () => reject(new Error('AI description request timed out')),
-            REQUEST_TIMEOUT_MS,
-        )),
-    ]);
+    const result = await withTimeout(chatPromise, REQUEST_TIMEOUT_MS, 'AI description request timed out');
     if (!result || typeof result.content !== 'string') return null;
     return parseDescriptionResponse(result.content);
 }
@@ -233,6 +231,8 @@ async function callProvider(input) {
  * @param {string} [params.existingDescription] Current description text.
  * @param {string} [params.intent]              Free-text "what to cover".
  * @param {Array<{question:string,answer:string}>} [params.answers]
+ * @param {string} params.companyId
+ * @param {string} [params.userId]
  * @returns {Promise<{status:boolean, data?:{questions?:string[], description?:string}, reason?:string}>}
  */
 async function generateDescription(params = {}) {

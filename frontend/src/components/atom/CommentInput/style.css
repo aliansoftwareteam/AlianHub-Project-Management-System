@@ -3,7 +3,7 @@
     width: -webkit-fill-available;
     padding: 10px 15px;
     /* border-radius: 6px; */
-    font-family: 'Roboto', sans-serif;
+    font-family: var(--font-ui);
     font-weight: 500; 
     resize: none;
     height: 56px; /* Initial height */
@@ -41,4 +41,26 @@
 .emplyoee__profile-img img{ max-width: 25px }
 .emp__profile-wrapper{
     width: calc(100% - 25px) !important;
+}
+.cancel__reply-btn { display: inline-flex; padding: 0; border: 0; background: none; cursor: pointer; }
+
+.comment-input__ai-hint {
+    opacity: 0.75;
+}
+.comment-input__menu-note {
+    margin: 0;
+    padding: 5px 10px;
+    border-top: 1px solid var(--hairline);
+    font-size: 12px;
+    color: var(--ink-2);
+}
+.comment-input__agent-note {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-left: 10px;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.75;
 }

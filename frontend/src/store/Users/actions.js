@@ -27,26 +27,14 @@ export const setUsers = ({ commit }, payload) => {
 
                             resolve(array);
                         } else {
-                            commit("mutateUsers", {
-                                data: [],
-                                op: "added",
-                            })
                             resolve([]);
                         }
                     } else {
-                        commit("mutateUsers", {
-                            data: [],
-                            op: "added",
-                        })
                         resolve([]);
                     }
                 })
                 .catch((error) => {
                     console.error("ERROR in get data: ", error);
-                    commit("mutateUsers", {
-                        data: [],
-                        op: "added",
-                    })
                     resolve([]);
                 })
 

@@ -26,6 +26,10 @@
       "LeadUserId": string[]                              // member ids only; default []
     },
 
+    "views": [                                            // optional; 0-5, see Views
+      { "name": string, "kind": "list" | "board" | "table" | "calendar" | "workload", "look": { } }
+    ],
+
     "sprints": [
       {
         "sprintName": string,                             // 1-80 chars
@@ -54,6 +58,10 @@
           }
         ]
       }
+    ],
+
+    "rules": [                                            // optional; 0-3, see Automations
+      { "name": string, "trigger": string, "conditions": [ { "field": string, "op": string, "value": any } ], "actions": [ { "action": string, "config": { } } ] }
     ]
   }
 }

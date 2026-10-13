@@ -4,34 +4,17 @@ const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { dbCollections } = require("../../../Config/collections");
 const { addAndRemoveUserInMongodbNotificationCount } = require("../controller");
-// BUG-040 / #94 — drop the `atob` npm shim; Node has had `atob`
-// available as a runtime global since v16. Same intent (decode a
-// base64 string), one less unmaintained dependency, smaller install.
 const atob = (input) => Buffer.from(input, 'base64').toString('binary');
-const { updateUserFun, getUserByQueyFun } = require("../../Users/controller");
+const { updateUserFun } = require("../../Users/controller");
 const { updateMemberFunction } = require('../../settings/Members/controller');
+const { importUserNotifications } = require("../../../utils/data");
+const { recordInvitedOwner } = require("../../Company/helpers/recordInvitedOwner");
+const { linkTokenAccepted } = require("./invitationPreview");
 
-/**
- * BUG-011 / #65 fix: parse the base64 invitation blob into a *local*
- * object with a fixed key allow-list. Previously the handler did:
- *
- *     for (let i = 0; i < idArray.length; i += 1) {
- *         const aidArray = idArray[i].split('=');
- *         finalObj[aidArray[0]] = aidArray[1];
- *     }
- *     req.body = finalObj;
- *
- * — i.e. any key in the attacker-controlled blob was merged into
- * `req.body` and downstream code (here and elsewhere) saw whatever the
- * attacker wanted under whatever name.
- *
- * Now: build a local object, only copy keys from a fixed allow-list,
- * and leave `req.body` untouched.
- */
+/* Only these keys are read from the link; anything else in it is ignored. */
 const ALLOWED_INVITE_KEYS = new Set(['userId', 'companyId', 'linkId', 'docId']);
 
-// Strict base64 check — the npm `atob` package is permissive and happily
-// returns garbage on malformed input, so we gate on the alphabet first.
+// Buffer decoding is permissive and returns garbage on malformed input, so gate on the alphabet first.
 const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 
 exports.parseInviteBlob = (encoded) => {
@@ -50,197 +33,141 @@ exports.parseInviteBlob = (encoded) => {
         const eq = parts[i].indexOf('=');
         if (eq < 0) continue;
         const key = parts[i].slice(0, eq);
-        const value = parts[i].slice(eq + 1); // preserve any `=` inside the value
+        const value = parts[i].slice(eq + 1);
         if (ALLOWED_INVITE_KEYS.has(key)) {
             out[key] = value;
         }
     }
-    // If nothing recognised was extracted, treat the blob as invalid.
     if (Object.keys(out).length === 0) return null;
     return out;
 };
 
-/**
- * Check Permission
- * @param {Object} req
- * @param {Object} res
- * @returns
- */
-exports.checkPermission = (req, res) => {
-    if (!(req.body && req.body.id)) {
-        res.json({
-            status: false,
-            key: 1,
-            statusText: "Invalid URL id."
-        });
-        return;
-    }
+const OBJECT_ID_PATTERN = /^[a-f0-9]{24}$/i;
+const PENDING = 1;
+const ACCEPTED = 2;
+const INVITATION_TTL_MS = 24 * 60 * 60 * 1000;
 
-    const invite = exports.parseInviteBlob(req.body.id);
-    if (!invite) {
-        res.json({
-            status: false,
-            key: 1,
-            statusText: "Invalid URL."
-        });
-        return;
-    }
+const isObjectId = (value) => OBJECT_ID_PATTERN.test(String(value || ''));
+const isIdString = (value) => typeof value === 'string' && OBJECT_ID_PATTERN.test(value);
+const normalizedEmail = (value) => String(value || '').trim().toLowerCase();
 
-    if (!invite.userId) {
-        res.json({
-            status: true,
-            key: 2,
-            companyId: invite.companyId,
-            linkId: invite.linkId,
-            statusText: "User Not Found."
-        });
-        return;
-    }
+/* One answer for every refusal, so the link cannot be used to learn which accounts or
+ * invitations exist. */
+const refuse = (res) => res.json({ status: false, key: 1, statusText: 'Invalid URL.' });
 
-    if (!invite.companyId) {
-        res.json({
-            status: false,
-            key: 1,
-            statusText: "Invalid URL."
-        });
-        return;
-    }
+/* An invitation names its account when the invitee was registered at send time; one sent
+ * to an address with no account yet belongs to whoever proved they own that address. */
+exports.invitationBindsAccount = (invitation, account) => {
+    if (!invitation || !account || account.isDeleted === true || account.isActive === false) return false;
+    const invitedUserId = String(invitation.userId || '');
+    if (invitedUserId) return invitedUserId === String(account._id);
+    return account.isEmailVerified === true
+        && normalizedEmail(invitation.userEmail) !== ''
+        && normalizedEmail(invitation.userEmail) === normalizedEmail(account.Employee_Email);
+};
 
-    if (!invite.linkId) {
-        res.json({
-            status: false,
-            key: 1,
-            statusText: "Invalid URL."
-        });
-        return;
-    }
+const findInvitation = (companyId, memberId) => MongoDbCrudOpration(companyId, {
+    type: dbCollections.COMPANY_USERS,
+    data: [{ _id: new mongoose.Types.ObjectId(String(memberId)), isDelete: { $ne: true } }]
+}, 'findOne');
 
+const findAccount = (userId) => MongoDbCrudOpration(SCHEMA_TYPE.GOLBAL, {
+    type: dbCollections.USERS,
+    data: [{ _id: new mongoose.Types.ObjectId(String(userId)) }, { Employee_Email: 1, isEmailVerified: 1, isActive: 1, isDeleted: 1 }]
+}, 'findOne');
+
+const acceptable = (invitation, linkId, account) => Boolean(invitation)
+    && invitation.status === PENDING
+    && typeof linkId === 'string'
+    && linkTokenAccepted(invitation.linkId, linkId)
+    && exports.invitationBindsAccount(invitation, account);
+
+/* The seat alone is not a joined workspace: no session names a company the account does not list, and an owner
+ * invitation hands the company over on its own row. When either write fails the seat is given back, so the person
+ * is told it failed and the same link works on the next try. */
+class NotJoined extends Error {}
+
+const notJoined = (res) => res.status(500).json({ status: false, statusText: 'The invitation could not be accepted just now. Try again.' });
+
+/* Recorded as one conditional update, so a withdrawal or a second accept racing this one wins or loses whole. */
+const claimInvitation = async (companyId, invitation, account) => {
+    const userId = String(account._id);
+    const claimed = await updateMemberFunction(companyId, [
+        { _id: invitation._id, status: PENDING, linkId: invitation.linkId },
+        { $set: { status: ACCEPTED, linkId: '', userId } },
+        { returnDocument: 'after' }
+    ], 'findOneAndUpdate');
+    if (!claimed.data || !claimed.data._id) return false;
+
+    const onAccount = (change) => updateUserFun(SCHEMA_TYPE.GOLBAL, {
+        type: dbCollections.USERS,
+        data: [{ _id: new mongoose.Types.ObjectId(userId) }, { [change]: { AssignCompany: companyId } }]
+    }, 'updateOne', companyId, userId);
+    let putOnAccount = false;
     try {
-        const query = {
-            _id: new mongoose.Types.ObjectId(invite.userId)
-        }
-        getUserByQueyFun(query)
-        .then((resp) => {
-            const snap = resp[0];
-            if(!snap) {
-                res.send({
-                    status: true,
-                    key: 2,
-                    companyId: invite.companyId,
-                    linkId: invite.linkId,
-                    statusText: "User Not Found."
-                });
-                return;
-            }
-            const companyUserQuery = {
-                type: dbCollections.COMPANY_USERS,
-                data: [
-                    {
-                        _id: new mongoose.Types.ObjectId(invite.docId)
-                    }
-                ]
-            }
-            MongoDbCrudOpration(invite.companyId, companyUserQuery, "findOne")
-            .then((cUser) => {
-                if(!cUser) {
-                    res.send({
-                        status: false,
-                        key: 1,
-                        statusText: "Invalid URL."
-                    });
-                    return;
-                }
-                let userData = {};
-                userData = cUser;
-
-                if (userData.status === 2) {
-                    res.send({
-                        status: false,
-                        key: 3,
-                        statusText: "You already accepted the invitation."
-                    });
-                    return;
-                }
-                if (new Date(new Date(userData.sendInvitationTime).getTime()+(24*60*60*1000)) < new Date()) {
-                    res.send({
-                        status: false,
-                        key: 4,
-                        statusText: "Link is Expired."
-                    });
-                    return;
-                }
-                if (userData.linkId !== invite.linkId) {
-                    res.send({
-                        status: false,
-                        key: 4,
-                        statusText: "Link is Expired."
-                    });
-                    return;
-                }
-                res.json({
-                    status: true,
-                    key: 5,
-                    companyId: invite.companyId
-                });
-
-                const memberObject = [
-                    {
-                        _id: new mongoose.Types.ObjectId(invite.docId)
-                    }, {
-                        $set: {
-                            status: 2,
-                            linkId: ""
-                        }
-                    }
-                ]
-
-                updateMemberFunction(invite.companyId, memberObject, "updateOne")
-                .then(() => {
-                    const userUpdateQuery = {
-                        type: dbCollections.USERS,
-                        data: [
-                            {
-                                _id: new mongoose.Types.ObjectId(invite.userId)
-                            }, {
-                                $push: {
-                                    AssignCompany: invite.companyId
-                                }
-                            }
-                        ]
-                    }
-                    updateUserFun(SCHEMA_TYPE.GOLBAL, userUpdateQuery, "updateOne", invite.companyId, invite.userId)
-                    .catch((error) => {
-                        logger.error(`ERROR in update user: ${error.message}`);
-                    })
-
-                    addAndRemoveUserInMongodbNotificationCount(invite.companyId, invite.userId, "Add").catch((error)=>{
-                        logger.error(`ERROR in create user In mongodb: ${error}`)
-                    })
-                })
-                .catch((error) => {
-                    logger.error(`ERROR in update company_users: ${error.message}`);
-                })
-            }).catch((CError) => {
-                logger.error(`Check Permission Error: ${CError}`);
-                res.send({
-                    status: false,
-                    key: 1,
-                    statusText: "Invalid URL."
-                });
-            });
-        }).catch((error) => {
-            logger.error(`Check Permission Error: ${error}`);
-            res.send({
-                status: false,
-                key: 1,
-                statusText: "Invalid URL."
-            });
-        })
+        const listed = await onAccount('$addToSet');
+        if (listed?.data?.matchedCount === 0) throw new Error('the account was not found');
+        putOnAccount = listed?.data?.modifiedCount === 1;
+        await recordInvitedOwner({ companyId, invitation, userId });
     } catch (error) {
-        res.send({
-            status: false,
-            key: 1,
-            statusText: "Invalid URL."
-        });
+        logger.error(`accept invitation ${invitation._id}: not joined, so the invitation waits again: ${error?.message || error}`);
+        const givenBack = await Promise.allSettled([
+            putOnAccount ? onAccount('$pull') : null,
+            updateMemberFunction(companyId, [
+                { _id: invitation._id, status: ACCEPTED, userId },
+                { $set: { status: PENDING, linkId: invitation.linkId, userId: invitation.userId || '' } }
+            ], 'findOneAndUpdate'),
+        ]);
+        givenBack.filter((step) => step.status === 'rejected').forEach((step) => logger.error(`accept invitation ${invitation._id}: could not be given back: ${step.reason?.message || step.reason}`));
+        throw new NotJoined();
+    }
+    importUserNotifications(companyId, userId).catch((error) => {
+        logger.error(`ERROR in import notification settings: ${error}`);
+    });
+    addAndRemoveUserInMongodbNotificationCount(companyId, userId, 'Add').catch((error) => {
+        logger.error(`ERROR in create user In mongodb: ${error}`);
+    });
+    return true;
+};
+
+exports.checkPermission = async (req, res) => {
+    try {
+        const invite = exports.parseInviteBlob(req.body && req.body.id);
+        if (!invite || !isObjectId(invite.userId) || !isObjectId(invite.companyId) || !isObjectId(invite.docId) || !invite.linkId) {
+            return refuse(res);
+        }
+        const [invitation, account] = await Promise.all([findInvitation(invite.companyId, invite.docId), findAccount(invite.userId)]);
+        if (!acceptable(invitation, invite.linkId, account)) return refuse(res);
+        if (new Date(invitation.sendInvitationTime).getTime() + INVITATION_TTL_MS < Date.now()) {
+            return res.json({ status: false, key: 4, statusText: 'Link is Expired.' });
+        }
+        if (!(await claimInvitation(invite.companyId, invitation, account))) return refuse(res);
+        res.json({ status: true, key: 5, companyId: invite.companyId });
+    } catch (error) {
+        if (error instanceof NotJoined) return notJoined(res);
+        logger.error(`Check Permission Error: ${error}`);
+        if (!res.headersSent) refuse(res);
+    }
+};
+
+const refuseSignedIn = (res) => res.status(403).json({ status: false, statusText: 'This invitation cannot be accepted.' });
+
+/* The copied join link names no account, so the account is the signed-in one. Unlike the emailed link it
+ * does not expire: it is useless without that account's session, and the preview it follows never expires
+ * a pending invitation either. */
+exports.acceptSignedIn = async (req, res) => {
+    try {
+        const { companyId, memberId, linkId } = req.body || {};
+        if (req.apiToken || !isObjectId(req.uid) || !isIdString(companyId) || !isIdString(memberId)) {
+            return refuseSignedIn(res);
+        }
+        const [invitation, account] = await Promise.all([findInvitation(companyId, memberId), findAccount(req.uid)]);
+        if (!acceptable(invitation, linkId, account)) return refuseSignedIn(res);
+        if (!(await claimInvitation(companyId, invitation, account))) return refuseSignedIn(res);
+        return res.json({ status: true, statusText: 'Invitation accepted.', companyId });
+    } catch (error) {
+        if (error instanceof NotJoined) return notJoined(res);
+        logger.error(`accept invitation signed in: ${error?.message || error}`);
+        if (!res.headersSent) refuseSignedIn(res);
     }
 };

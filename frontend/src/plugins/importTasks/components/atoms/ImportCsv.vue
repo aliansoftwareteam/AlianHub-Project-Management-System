@@ -25,7 +25,7 @@
 
 <script setup>
 import { ref, inject, defineProps } from 'vue';
-import * as XLSX from 'xlsx';
+import { loadXlsx } from '@/utils/loadXlsx';
 import demoCsv from '../demoCsv.json';
 import demoUserCsv from '../demoUserCsv.json';
 import { useToast } from 'vue-toast-notification';
@@ -59,8 +59,13 @@ const handleFileChange = (event) => {
 	}
 
 	const reader = new FileReader();
-	reader.onload = function (e) {
+	reader.onload = async function (e) {
 		const data = e.target.result;
+		const XLSX = await loadXlsx().catch(() => null);
+		if (!XLSX) {
+			$toast.error(t('Toast.something_went_wrong'), { position: 'top-right' });
+			return;
+		}
 		const workbook = XLSX.read(data, { type: 'binary', codepage: 65001 });
 		const sheetName = workbook.SheetNames[0];
 		const worksheet = workbook.Sheets[sheetName];

@@ -12,16 +12,37 @@ import varianceReport from './varianceReport';
 import capacityPlanning from './capacityPlanning';
 import integrations from './integrations';
 import inbox from './inbox';
+import pages from './pages';
+import home from './home';
+import people from './people';
+import ai from './ai';
+import automations from './automations';
+import workflows from './workflows';
+import billing from './billing';
+import team from './team';
+import trash from './trash';
 
 import { useCustomComposable } from '@/composable'
+import { i18n } from '@/locales/main'
 import dashboard from "../plugins/dashboard/router";
 import { apiRequestWithoutCompnay } from '@/services'
 import * as env from '@/config/env';
 import Cookies from 'js-cookie'
+import { loginReturnPath } from '@/views/Integrations/githubReturn'
+import { readSetupStatus, isKnownInstalled } from './setupStatus';
+import { readSessionUser } from './sessionCheck';
+import { markAway } from '@/offline';
+import { opensWithoutWorkspace } from './withoutWorkspace';
 
 
 const routes = [
 	...auth,
+
+	// AUTOMATIONS
+	...automations,
+
+	// WORKFLOW BUILDER
+	...workflows,
 
 	// PROJECT ROUTES
 	...projects,
@@ -60,6 +81,19 @@ const routes = [
 	// INTEGRATIONS & AUTOMATION HUB (AUTO-01..07)
 	...integrations,
 	...inbox,
+	...pages,
+	...trash,
+	...home,
+	...people,
+
+	// PROJECT BILLING (handoff 19a-19d)
+	...billing,
+
+	// AI AGENT SYSTEM
+	...ai,
+
+	// TEAM BOARD (handoff 13h)
+	...team,
 
 	// CHANGELOG / WHAT'S NEW ROUTE
 	{
@@ -70,6 +104,17 @@ const routes = [
 			requiresAuth: true
 		},
 		component: () => import(/* webpackChunkName: "changelog" */ '@/views/Changelog/Changelog.vue')
+	},
+	// requiresAuth is what makes App.vue draw the shell around it. A repeatable param ranks below
+	// every /:cid/... route and, unlike (.*), cannot match an empty tail, so /:cid/ still opens Home.
+	{
+		path: "/:cid/:catchAll+",
+		name: "404_in_app",
+		component: () => import(/* webpackChunkName: "404" */ '@/views/NotFound'),
+		meta: {
+			title: '404',
+			requiresAuth: true
+		}
 	},
 	{
 		path: "/:catchAll(.*)",
@@ -90,6 +135,13 @@ const router = createRouter({
 const jsonData = require('../../../brandSettings.json');
 const {setTitle} = useCustomComposable()
 router.beforeEach(async(to, _, next) => {
+	// A fresh instance has nowhere to go but the setup page, and a set-up one must never show it.
+	if (!isKnownInstalled()) {
+		const setup = await readSetupStatus();
+		if (setup && !setup.installed && to.name !== 'Setup') { next({ name: 'Setup' }); return; }
+	}
+	if (to.name === 'Setup' && isKnownInstalled()) { next({ name: 'Log-in' }); return; }
+
 	let query = to.query;
 	let fullPath = to.fullPath;
 	if (to.path == '/business' && to.query.code) {
@@ -100,26 +152,31 @@ router.beforeEach(async(to, _, next) => {
 		fullPath = removeCodeParam(to.fullPath);
 	}
 	const localUserId = localStorage.getItem("userId");
-	const app = localUserId ? await apiRequestWithoutCompnay('get',`${env.USER_UPATE}/${localUserId}`) : null;
-	let user = app && app?.status === 200 ? app?.data || null : null;
-	
+	const { user, unreachable } = await readSessionUser(localUserId, (id) => apiRequestWithoutCompnay('get',`${env.USER_UPATE}/${id}`));
+	// Opened with no connection: App.vue draws the offline screen, or the sign-in page says it is offline.
+	if (unreachable) {
+		setTitle({title: to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
+		markAway();
+		next();
+		return;
+	}
+
 	// onAuthStateChanged(authInst, (user) => {
 		// CHECK META FOR AUTH REQUIRED
 		// const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 		const requiresAuth = to.meta.requiresAuth;
-		const token = Cookies.get('accessToken') || '';
 		// SET PAGE TITLE
-		setTitle({title: to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
+		setTitle({title: to.meta.titleKey ? i18n.global.t(to.meta.titleKey) : to.meta.title, prefix: jsonData?.productName ? `${jsonData.productName} | ` : ''});
 
 		if(user === null && requiresAuth === true) {
 			// IF USER IS NOT LOGGED IN AND REQUESTS AUTH REQUIRED PAGE
-			next({name: 'Log-in', query: {redirect_url: fullPath}});
+			next({name: 'Log-in', query: {redirect_url: to.query.github ? loginReturnPath(to) : fullPath}});
 			return;
 		} else if(user !== null && requiresAuth === false) {
 			// IF USER IS LOGGED IN AND REQUESTS NO AUTH REQUIRED PAGE
-			if(to.meta.title === 'Support'){
+			if(to.meta.title === 'Support' || opensWithoutWorkspace(to)){
 				next();
-			}else if(token && !user?.AssignCompany?.length){
+			}else if(!user?.AssignCompany?.length){
 				next({name: "Create_Company", query: query});
 			}else{
 				next({name: "Home", params: {

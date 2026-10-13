@@ -2,10 +2,9 @@
 const Notification_key = {
   //TASK
   COMMENTS_IM_MENTIONS_IN:"comments_I'm_@mentioned_in",
+  COMMENT_REPLY:"comment_reply",
+  COMMENT_ASSIGNED:"comment_assigned",
   CREATE_TASK:"task_create",
-  TASK_STATUS:"task_status",
-  TASK_DESCRIPTION:"task_description",
-  TASK_PRIORITY:"task_priority",
   TASK_NAME:"task_edit",
   TASK_NOTIFICATION:"task_notification",
   TASK_CREATE:"task_create",
@@ -48,6 +47,14 @@ const Notification_key = {
   PROJECT_MILESTONE_STATUS_CHANGE:"project_milestone_status_change",
   PROJECT_SPRINT_CREATE:"project_sprint_create",
   PROJECT_FOLDER_CREATE:"project_folder_create",
+  DOC_MENTION:"doc_mention",
+  DOC_COMMENT_MENTION:"doc_comment_mention",
+  DOC_COMMENT_REPLY:"doc_comment_reply",
+  DOC_COMMENT_ASSIGNED:"doc_comment_assigned",
+  GOAL_TARGET_REACHED:"goal_target_reached",
+  GOAL_REACHED:"goal_reached",
+  DOC_SHARED:"doc_shared",
+  CREDENTIAL_EXPIRING:"credential_expiring",
 }
 const TemplateType = {
  CREATE:'create',
@@ -80,8 +87,46 @@ const ChangeTypes={
   PROJECT_CLOSE:"project_close"
 }
 
+// Task notice types added after users had settings documents; Modules/Comments/helpers/noticeItems.js adds them to older ones.
+const COMMENT_NOTICE_ITEMS = Object.freeze([
+  { name: "Replies to my comments", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_REPLY },
+  { name: "Comments assigned to me", email: false, browser: true, mobile: true, key: Notification_key.COMMENT_ASSIGNED },
+]);
+
+// A settings section, and items in it, added after users had settings documents; Modules/notification/docNotices.js adds them to older ones.
+const DOC_NOTICE_SECTION = Object.freeze({
+  key: "docs",
+  sectionName: "Docs",
+  items: Object.freeze([
+    Object.freeze({ name: "Docs I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_MENTION }),
+    Object.freeze({ name: "Doc comments I'm @mentioned in", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_MENTION }),
+    Object.freeze({ name: "Replies to my doc comments", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_REPLY }),
+    Object.freeze({ name: "Doc comments assigned to me", email: false, browser: true, mobile: true, key: Notification_key.DOC_COMMENT_ASSIGNED }),
+    Object.freeze({ name: "Docs shared with me", email: false, browser: true, mobile: true, key: Notification_key.DOC_SHARED }),
+  ]),
+});
+
+// Added the same way, by Modules/notification/goalNotices.js.
+const GOAL_NOTICE_SECTION = Object.freeze({
+  key: "goals",
+  sectionName: "Goals",
+  items: Object.freeze([
+    Object.freeze({ name: "Targets reached on my goals", email: false, browser: true, mobile: true, key: Notification_key.GOAL_TARGET_REACHED }),
+    Object.freeze({ name: "Goals reached", email: false, browser: true, mobile: true, key: Notification_key.GOAL_REACHED }),
+  ]),
+});
+
+const copyOf = (section) => ({ ...section, items: section.items.map((item) => ({ ...item })) });
+const docNoticeSection = () => copyOf(DOC_NOTICE_SECTION);
+const goalNoticeSection = () => copyOf(GOAL_NOTICE_SECTION);
+
 module.exports = {
     Notification_key,
+    COMMENT_NOTICE_ITEMS,
+    DOC_NOTICE_SECTION,
+    docNoticeSection,
+    GOAL_NOTICE_SECTION,
+    goalNoticeSection,
     TemplateType,
     ChangeTypes
 };

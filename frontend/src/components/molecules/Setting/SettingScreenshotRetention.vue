@@ -21,6 +21,7 @@
             <label class="screenshot-retention-switch" :class="{ disabled: isBusy }">
                 <input
                     type="checkbox"
+                    :aria-label="$t('ScreenshotRetention.toggle_label')"
                     :checked="policy.enabled"
                     :disabled="isBusy"
                     @change="onToggle($event.target.checked)"
@@ -36,12 +37,13 @@
             </div>
             <select
                 class="screenshot-retention-select"
+                :aria-label="$t('ScreenshotRetention.window_label')"
                 :value="policy.maxAgeMonths"
                 :disabled="!policy.enabled || isBusy"
                 @change="onWindowChange(Number($event.target.value))"
             >
                 <option v-for="n in validMaxAgeMonths" :key="n" :value="n">
-                    {{ $t('ScreenshotRetention.months_option', { n }) }}
+                    {{ $t('ScreenshotRetention.months_option', { n }, n) }}
                 </option>
             </select>
         </div>
@@ -65,9 +67,10 @@ import { ref, computed, watch, inject } from 'vue';
 import { useStore } from 'vuex';
 import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toast-notification';
-import Swal from 'sweetalert2';
+import Swal from '@/utils/lazySwal';
 
 import { apiRequest } from '@/services';
+import { isOwnerOrAdmin } from "@/utils/roles";
 
 const { t } = useI18n();
 const $toast = useToast();
@@ -80,7 +83,7 @@ const userId = inject('$userId');
 // renders nothing for non-owners (the <template v-if="isOwner"> above).
 const companyUser = computed(() => getters['settings/companyUserDetail'] || {});
 // Owner (1) or Admin (2) — both can manage this company setting.
-const isOwner = computed(() => [1, 2].includes(Number(companyUser.value && companyUser.value.roleType)));
+const isOwner = computed(() => isOwnerOrAdmin(Number(companyUser.value && companyUser.value.roleType)));
 
 const policy = ref({
     enabled: false,
@@ -168,7 +171,7 @@ async function onToggle(nextEnabled) {
         showCancelButton: true,
         confirmButtonText: t('ScreenshotRetention.confirm_yes'),
         cancelButtonText: t('Projects.cancel'),
-        confirmButtonColor: '#dc2626'
+        customClass: { confirm: 'swal2-deny' }
     });
     if (!result.isConfirmed) {
         // User backed out; the checkbox briefly flipped — reload from state
@@ -191,9 +194,9 @@ function formatRelative(dateLike) {
     const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
     if (days <= 0) return t('ScreenshotRetention.today');
     if (days === 1) return t('ScreenshotRetention.yesterday');
-    if (days < 30) return t('ScreenshotRetention.days_ago', { n: days });
+    if (days < 30) return t('ScreenshotRetention.days_ago', { n: days }, days);
     const months = Math.floor(days / 30);
-    return t('ScreenshotRetention.months_ago', { n: months });
+    return t('ScreenshotRetention.months_ago', { n: months }, months);
 }
 
 // Watch isOwner rather than firing once on mount: the Vuex store may
@@ -221,13 +224,14 @@ watch(
 .screenshot-retention-card {
     margin-top: 24px;
     padding: 20px;
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--border);
     border-radius: 10px;
 }
 .screenshot-retention-subtitle {
     margin: 4px 0 16px 0;
-    color: #6b7280;
+    color: var(--ink-2);
     font-size: 13px;
     line-height: 1.5;
 }
@@ -236,7 +240,7 @@ watch(
     justify-content: space-between;
     align-items: center;
     padding: 12px 0;
-    border-top: 1px solid #f3f4f6;
+    border-top: 1px solid var(--hairline);
 }
 .screenshot-retention-row-label {
     display: flex;
@@ -245,16 +249,16 @@ watch(
     max-width: 70%;
 }
 .screenshot-retention-row-hint {
-    color: #6b7280;
+    color: var(--ink-2);
     font-size: 12px;
 }
 .screenshot-retention-select {
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 6px 10px;
     font-size: 13px;
-    background: #fff;
-    color: #111827;
+    background: var(--surface);
+    color: var(--ink);
     cursor: pointer;
 }
 .screenshot-retention-select:disabled {
@@ -264,10 +268,10 @@ watch(
 .screenshot-retention-stats {
     margin-top: 12px;
     padding: 10px 12px;
-    background: #f9fafb;
+    background: var(--surface-2);
     border-radius: 8px;
     font-size: 12px;
-    color: #4b5563;
+    color: var(--ink-2);
 }
 
 /* Toggle switch */
@@ -290,7 +294,7 @@ watch(
 .screenshot-retention-slider {
     position: absolute;
     inset: 0;
-    background: #d1d5db;
+    background: var(--border);
     border-radius: 24px;
     transition: background 0.15s ease;
 }
@@ -301,14 +305,23 @@ watch(
     height: 18px;
     left: 3px;
     bottom: 3px;
-    background: #fff;
+    background: var(--knob);
     border-radius: 50%;
     transition: transform 0.15s ease;
 }
 .screenshot-retention-switch input:checked + .screenshot-retention-slider {
-    background: #4f46e5;
+    background: var(--brand);
 }
 .screenshot-retention-switch input:checked + .screenshot-retention-slider::before {
     transform: translateX(20px);
 }
+:root[data-theme="dark"] .screenshot-retention-card { border-color: var(--hairline); }
+:root[data-theme="dark"] :is(.screenshot-retention-subtitle, .screenshot-retention-row-hint, .screenshot-retention-stats) { color: var(--ink-2); }
+:root[data-theme="dark"] .screenshot-retention-row { border-top-color: var(--hairline); }
+:root[data-theme="dark"] .screenshot-retention-select { background: var(--surface-2); border-color: var(--ink-3); color: var(--ink); }
+:root[data-theme="dark"] .screenshot-retention-stats { background: var(--fill); }
+:root[data-theme="dark"] .screenshot-retention-slider { background: var(--ink-3); }
+:root[data-theme="dark"] .screenshot-retention-slider::before { background: var(--knob); }
+:root[data-theme="dark"] .screenshot-retention-switch input:checked + .screenshot-retention-slider { background: var(--brand); }
+:root[data-theme="dark"] .screenshot-retention-switch input:checked + .screenshot-retention-slider::before { background: var(--on-brand); }
 </style>

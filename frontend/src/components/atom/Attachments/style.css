@@ -17,8 +17,8 @@ span.custom-popover:hover .popover-content {
     left: -8px !important;
 }
 span.custom-popover .popover-content {
-    background: none repeat scroll 0 0 #fff;
-    color: #2f3990;
+    background: none repeat scroll 0 0 var(--surface);
+    color: var(--brand);
     font-family: 'Helvetica';
     font-size: 0.9em;
     font-weight: normal;

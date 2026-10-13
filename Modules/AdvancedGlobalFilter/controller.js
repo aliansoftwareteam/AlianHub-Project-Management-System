@@ -4,6 +4,41 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const { replaceObjectKey } = require("../Auth/helper");
 const { escapeRegex } = require("../../utils/escapeRegex");
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { sprintIdentities, visibleSprintClause, hiddenSprintIds } = require('../Sprints/helpers/sprintVisibility');
+const { idForms } = require('../../utils/mongo-handler/objectIdKeys');
+const savedFilters = require("./helpers/savedFilters");
+const { keepVisibleProjectIds } = require('../../Config/projectAccess');
+const { visibleProjectIds } = require('../Agents/scope');
+const { keepTaskListProjectIds } = require('../Tasks/helpers/taskListProjects');
+const { keptFromCaller } = require('../Comments/helpers/conversationRows');
+const { withoutConversationsOfOthers } = require('../Comments/helpers/conversationReaders');
+
+/* The files and links searches name their projects in the saved filter when there is one, so those ids
+ * are kept to the projects the caller can open and may list tasks in, as the route does for `pids`. */
+const visibleObjectIds = async (req, ids) => {
+    const companyId = String(req.headers['companyid'] || '');
+    const visible = await keepVisibleProjectIds(companyId, req.uid, ids);
+    return (await keepTaskListProjectIds(companyId, req.uid, visible)).map((id) => new mongoose.Types.ObjectId(id));
+};
+
+/* The files and links searches join a project's tasks and comments, so each join starts by leaving out
+ * the private sprints the caller is not on. Owners and admins read past sprint privacy. */
+const visibleSprintStages = async (req, projectIds) => {
+    const companyId = String(req.headers['companyid'] || '');
+    if (isPrivileged(await getRoleType(companyId, req.uid))) return [];
+    const hidden = await hiddenSprintIds(companyId, req.uid, projectIds.map(String));
+    return hidden.length ? [{ $match: { sprintId: { $nin: idForms(hidden.map(String)) } } }] : [];
+};
+
+/* The same joins of comments leave out the rows of a conversation the caller does not read. */
+const chatKeptStages = async (req) => {
+    const kept = await keptFromCaller(String(req.headers['companyid'] || ''), req.uid);
+    return Object.keys(kept).length ? [{ $match: kept }] : [];
+};
+
+/* And the joins of tasks leave out the conversation itself, which is stored as a task. */
+const ownConversationsStage = (req) => ({ $match: withoutConversationsOfOthers(req.uid) });
 
 /**
  * Helper functions
@@ -50,154 +85,10 @@ const extractCommentData = () => ({
     mediaURL: { $arrayElemAt: ["$commentData.mediaURL", "$$index"] },
 })
 
-/**
- * This is the endopint which is return all the fatch all the saved global advance filters.
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.getFilter = async (req, res) => {
-    try {
-        const { userId, filterType } = req.params;
-
-        let params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: [
-                {
-                    userId: userId,
-                    filter: 'advancedFilter',
-                    typeFilter: filterType
-                }
-            ]
-        }
-
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'find');
-
-        if (response) {
-            return res.status(200).json({
-                status: true,
-                data: response
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while get the task global filter",
-            error: error 
-        });
-    }
-}
-
-/**
- * This endpoint is used to save task advance filter
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.saveFilter = async (req, res) => {
-    try {
-        const companyId = req.body.companyId;
-
-        const params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: { ...req.body }
-        };
-
-        const response = await MongoDbCrudOpration(companyId, params, "save");
-
-        if(response) {
-            return res.status(200).json({
-                status: true,
-                data: response
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while saving the task global filter",
-            error: error 
-        });
-    }
-}
-
-/**
- * This endpoint is used to update global advance filter
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.updateFilter = async (req, res) => {
-    try {
-        const params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: req.body
-        }
-
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'findOneAndUpdate');
-
-        if(response) {
-            return res.status(200).json({
-                status: true,
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while update the project global filter",
-            error: error 
-        });
-    }
-}
-
-/**
- * This endpoint is used to delete task advance filter
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
-exports.deleteFilter = async (req, res) => {
-    try {
-        const { id, cid } = req.params;
-        const params = {
-            type: SCHEMA_TYPE.GLOBALFILTER,
-            data: [
-                {
-                    _id: new mongoose.Types.ObjectId(id)
-                }
-            ]
-        }
-
-        const response = await MongoDbCrudOpration(cid, params, "deleteOne")
-
-        if (response) {
-            return res.status(200).json({
-                status: true,
-            });
-        } else {
-            return res.status(404).json({
-                status: false,
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while delete the project global filter",
-            error: error 
-        });
-    }
-}
+exports.getFilter = savedFilters.listFilters((req) => ({ filter: 'advancedFilter', typeFilter: String(req.params.filterType || '') }));
+exports.saveFilter = savedFilters.saveFilter;
+exports.updateFilter = savedFilters.updateFilter;
+exports.deleteFilter = savedFilters.deleteFilter;
 
 /**
  * This endpoint is used to filter tasks in global advance filter
@@ -214,8 +105,6 @@ exports.searchTasks = async (req, res) => {
             skip = 0,
             batchSize = 20,
             sortBy = 'createdAt',
-            userId,
-            roleType,
         } = req.body;
 
         // Parse inputs and prepare default values
@@ -229,8 +118,6 @@ exports.searchTasks = async (req, res) => {
 
         additionalFilter = replaceObjectKey(additionalFilter, ["objId", "dbDate"]);
 
-        // Current user ID as string (because AssigneeUserId is stored as string) 
-        const currentUserId = userId ? userId.toString() : null;
 
         // Aggregation stages
         const searchResultMatch = {
@@ -239,6 +126,7 @@ exports.searchTasks = async (req, res) => {
                     { ...additionalFilter },
                     { ProjectID: { $in: convertedProjectIds } },
                     { deletedStatusKey: { $in: [undefined, 0] } },
+                    withoutConversationsOfOthers(req.uid),
                     ...(searchStr ? [{ TaskName: { $regex: escapeRegex(searchStr), $options: "i" } }] : []),
                 ],
             },
@@ -265,20 +153,14 @@ exports.searchTasks = async (req, res) => {
 
         const sprintUnwind = { $unwind: '$sprintArray' };
 
+        /* The caller is read from the session, never from the body: the body's own userId and
+         * roleType would let a client name someone else and inherit their private sprints. */
+        const companyId = req.headers['companyid'] || '';
+        const roleType = await getRoleType(companyId, req.uid);
         let sprintPrivacyFilter = null;
-        if (roleType !== 1 && roleType !== 2) {
-            sprintPrivacyFilter = currentUserId
-                ? {
-                    $match: {
-                        $or: [
-                            { 'sprintArray.private': { $ne: true } },
-                            { 'sprintArray.AssigneeUserId': currentUserId },
-                        ],
-                    },
-                }
-                : {
-                    $match: { 'sprintArray.private': { $ne: true } },
-                };
+        if (!isPrivileged(roleType)) {
+            const identities = req.uid ? await sprintIdentities(companyId, req.uid) : [];
+            sprintPrivacyFilter = { $match: visibleSprintClause(identities, 'sprintArray.') };
         }
 
         const folderLookup = {
@@ -327,7 +209,7 @@ exports.searchTasks = async (req, res) => {
             data: [aggregationPipeline],
         };
 
-        const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'aggregate');
+        const response = await MongoDbCrudOpration(companyId, params, 'aggregate');
 
         return res.status(200).json({
             status: true,
@@ -366,6 +248,8 @@ exports.searchProjects = async (req, res) => {
         const searchStr = searchText.toString();
         const parsedFilterQuery = typeof filterQuery === 'string' ? JSON.parse(filterQuery) : filterQuery;
         const additionalFilter = parsedFilterQuery && Object.keys(parsedFilterQuery).length ? { ...parsedFilterQuery } : {};
+        // The public and private matches come from the request, so they can only narrow what the caller can open.
+        const visibleProjects = (await visibleProjectIds(req.headers['companyid'], req.uid)).map((id) => new mongoose.Types.ObjectId(id));
 
         const searchResultMatch = {
             $match: {
@@ -378,7 +262,8 @@ exports.searchProjects = async (req, res) => {
                         : []),
                     {
                         $or: [publicQuery, privateQuery]
-                    }
+                    },
+                    { _id: { $in: visibleProjects } }
                 ]
             }
         }
@@ -440,16 +325,16 @@ exports.searchFiles = async (req, res) => {
 
         let additionalFilter = [];
         if(Object.keys(parsedFilterQuery).length) {
-            const extractIds = parsedFilterQuery["$and"][0]["_id"]["objId"]["$in"];
-            additionalFilter = extractIds.map(id => new mongoose.Types.ObjectId(id));
+            additionalFilter = await visibleObjectIds(req, parsedFilterQuery["$and"][0]["_id"]["objId"]["$in"]);
         }
 
         // Construct additional filter
         const defaultFilterParams = Object.keys(parsedFilterQuery).length
             ? { $and: [{ _id: { $in: additionalFilter } }] }
             : { $and: [{ _id: { $in: convertedProjectIds } }] };
+        const visibleSprints = await visibleSprintStages(req, defaultFilterParams.$and[0]._id.$in);
+        const chatKept = await chatKeptStages(req);
 
-        // Aggregation pipeline
         const query = [
             { $match: defaultFilterParams },
             {
@@ -458,7 +343,7 @@ exports.searchFiles = async (req, res) => {
                     localField: "_id",
                     foreignField: "ProjectID",
                     as: "taskData",
-                    pipeline: [{ $match: { $expr: { $ne: ["$attachments", []] } } }],
+                    pipeline: [...visibleSprints, ownConversationsStage(req), { $match: { $expr: { $ne: ["$attachments", []] } } }],
                 },
             },
             {
@@ -467,7 +352,7 @@ exports.searchFiles = async (req, res) => {
                     localField: "_id",
                     foreignField: "projectId",
                     as: "commentData",
-                    pipeline: [{ $match: { type: { $nin: ["text", "link"] } } }],
+                    pipeline: [...visibleSprints, ...chatKept, { $match: { type: { $nin: ["text", "link"] } } }],
                 },
             },
             {
@@ -566,16 +451,16 @@ exports.searchLinks = async (req, res) => {
 
         let additionalFilter = [];
         if (Object.keys(parsedFilterQuery).length) {
-            const extractIds = parsedFilterQuery["$and"][0]["_id"]["objId"]["$in"];
-            additionalFilter = extractIds.map(id => new mongoose.Types.ObjectId(id));
+            additionalFilter = await visibleObjectIds(req, parsedFilterQuery["$and"][0]["_id"]["objId"]["$in"]);
         }
 
         // Construct additional filter
         const defaultFilterParams = Object.keys(parsedFilterQuery).length
             ? { $and: [{ _id: { $in: additionalFilter } }] }
             : { $and: [{ _id: { $in: convertedProjectIds } }] };
+        const visibleSprints = await visibleSprintStages(req, defaultFilterParams.$and[0]._id.$in);
+        const chatKept = await chatKeptStages(req);
 
-        // Aggregation pipeline
         const query = [
             {
                 $match: { ...defaultFilterParams }
@@ -586,6 +471,8 @@ exports.searchLinks = async (req, res) => {
                     localField: "_id",
                     foreignField: "ProjectID",
                     pipeline: [
+                        ...visibleSprints,
+                        ownConversationsStage(req),
                         {
                             $match: {
                                 rawDescription: { $exists: true, $ne: null }
@@ -610,6 +497,8 @@ exports.searchLinks = async (req, res) => {
                     localField: "_id",
                     foreignField: "projectId",
                     pipeline: [
+                        ...visibleSprints,
+                        ...chatKept,
                         {
                             $match: {
                                 type: "link"

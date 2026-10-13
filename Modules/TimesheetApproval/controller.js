@@ -1,9 +1,12 @@
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
+const { sessionTenantOf, TenantError } = require('../../Config/tenant');
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const socketEmitter = require('../../event/socketEventEmitter');
 const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
+const { dbCollections } = require('../../Config/collections');
 const {
     canReview, parsePeriod, validateSubmitInput, resolveTransition, validateReason, isObjectIdString,
 } = require('./helpers/approvalRules');
@@ -14,12 +17,9 @@ const {
 // reject (with a reason) or reopen it. The raw `timesheets` entries are never
 // touched — totals are snapshotted at submit time for the reviewer's context.
 
-const actorId = (req) => String(
-    req.uid || (req.body && req.body.userData && (req.body.userData.id || req.body.userData._id)) || ''
-);
-const companyOf = (req) => String(
-    req.headers['companyid'] || (req.body && req.body.companyId) || (req.query && req.query.companyId) || ''
-);
+// The reviewer's role is looked up by this id, so it comes from the verified session only:
+// a body-supplied userData.id let a member claim an owner's id and approve their own sheet.
+const actorId = (req) => String(req.uid || '');
 
 /* Sum logged minutes + entry count for a user over the period, by work time
  * (LogStartTime), covering whole days inclusive. */
@@ -41,20 +41,39 @@ const computePeriodTotals = async (companyId, userId, periodStart, periodEnd) =>
     return { totalMinutes, entryCount: list.length };
 };
 
+const reviewerNameOf = async (uid) => {
+    if (!isObjectIdString(uid)) return '';
+    const user = await MongoDbCrudOpration(dbCollections.GLOBAL, {
+        type: SCHEMA_TYPE.USERS,
+        data: [{ _id: new mongoose.Types.ObjectId(uid) }, { Employee_Name: 1, Employee_FName: 1, Employee_LName: 1 }],
+    }, 'findOne').catch(() => null);
+    if (!user) return '';
+    return user.Employee_Name || [user.Employee_FName, user.Employee_LName].filter(Boolean).join(' ');
+};
+
 /* Resolve whether the caller can review (owner/admin). { ok, roleType }. */
 const callerCanReview = async (req) => {
-    const roleType = await getRoleType(companyOf(req), actorId(req));
+    const roleType = await getRoleType(sessionTenantOf(req), actorId(req));
     return { ok: canReview({ roleType }) || isPrivileged(roleType), roleType };
 };
 
+/* Only a timesheet reviewer may read another user's approvals; anyone else reads their own, whatever the query names. */
+const readTargetOf = async (req) => {
+    const uid = actorId(req);
+    const named = req.query && req.query.userId ? String(req.query.userId) : '';
+    if (!named || named === uid) return uid;
+    const { ok } = await callerCanReview(req);
+    return ok ? named : uid;
+};
+
 /* POST /api/v2/timesheet-approval/submit
- * body: { periodStart, periodEnd, periodType?, note?, userId?, userData } */
+ * body: { periodStart, periodEnd, periodType?, note?, userId? } */
 exports.submitTimesheet = async (req, res) => {
     try {
-        const companyId = companyOf(req);
+        const companyId = sessionTenantOf(req);
         const uid = actorId(req);
-        if (!companyId || !uid) {
-            return res.send({ status: false, statusText: 'companyId and an authenticated user are required.' });
+        if (!uid) {
+            return res.send({ status: false, statusText: 'An authenticated user is required.' });
         }
         const { periodStart, periodEnd, periodType, note } = req.body || {};
         // A member submits their own timesheet; only owner/admin may submit for someone else.
@@ -62,6 +81,9 @@ exports.submitTimesheet = async (req, res) => {
         if (targetUserId !== uid) {
             const { ok } = await callerCanReview(req);
             if (!ok) return res.send({ status: false, statusText: 'You can only submit your own timesheet.' });
+            if ((await nonMembersOf(companyId, [targetUserId])).length) {
+                return res.status(400).send({ status: false, statusText: NOT_A_MEMBER });
+            }
         }
         const check = validateSubmitInput({ userId: targetUserId, periodStart, periodEnd, note });
         if (!check.valid) return res.send({ status: false, statusText: check.reason });
@@ -90,6 +112,7 @@ exports.submitTimesheet = async (req, res) => {
             reviewedAt: null,
             reviewedBy: '',
             reviewerName: '',
+            selfApproved: false,
             rejectionReason: '',
             deletedStatusKey: 0,
         };
@@ -104,6 +127,7 @@ exports.submitTimesheet = async (req, res) => {
         socketEmitter.emit('update', { type: 'update', data: saved, module: 'timesheetApproval' });
         return res.send({ status: true, statusText: 'Timesheet submitted for approval.', data: saved });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in submit timesheet: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -112,9 +136,8 @@ exports.submitTimesheet = async (req, res) => {
 /* GET /api/v2/timesheet-approval/status?userId=&periodStart=&periodEnd= */
 exports.getStatus = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        const userId = req.query && req.query.userId ? String(req.query.userId) : actorId(req);
+        const companyId = sessionTenantOf(req);
+        const userId = await readTargetOf(req);
         const period = parsePeriod({ periodStart: req.query && req.query.periodStart, periodEnd: req.query && req.query.periodEnd });
         if (!period.valid) return res.send({ status: false, statusText: period.reason });
         const doc = await MongoDbCrudOpration(companyId, {
@@ -123,6 +146,7 @@ exports.getStatus = async (req, res) => {
         }, 'findOne');
         return res.send({ status: true, statusText: 'OK', data: doc || null });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in timesheet status: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -131,15 +155,15 @@ exports.getStatus = async (req, res) => {
 /* GET /api/v2/timesheet-approval/mine?userId= — a user's submission history. */
 exports.listMine = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
-        const userId = req.query && req.query.userId ? String(req.query.userId) : actorId(req);
+        const companyId = sessionTenantOf(req);
+        const userId = await readTargetOf(req);
         const docs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
             data: [{ userId, deletedStatusKey: 0 }, null, { sort: { periodStart: -1 } }],
         }, 'find');
         return res.send({ status: true, statusText: 'OK', data: docs || [] });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in timesheet mine: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
@@ -148,8 +172,7 @@ exports.listMine = async (req, res) => {
 /* GET /api/v2/timesheet-approval/pending — owner/admin queue of submitted periods. */
 exports.listPending = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        if (!companyId) return res.send({ status: false, statusText: 'companyId is required.' });
+        const companyId = sessionTenantOf(req);
         const { ok } = await callerCanReview(req);
         if (!ok) return res.send({ status: false, statusText: 'Only an owner or admin can review timesheets.' });
         const docs = await MongoDbCrudOpration(companyId, {
@@ -158,61 +181,182 @@ exports.listPending = async (req, res) => {
         }, 'find');
         return res.send({ status: true, statusText: 'OK', data: docs || [] });
     } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
         logger.error(`ERROR in timesheet pending: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };
 
-/* POST /api/v2/timesheet-approval/:id/review  body: { action, reason?, userData } */
+const refused = (code, statusText) => ({ ok: false, code, statusText });
+
+/* The one review path: the single route and the bulk route both go through it, so a rule added here holds for both. */
+const reviewOne = async (req, { id, action, reason, reviewerName = reviewerNameOf }) => {
+    const companyId = sessionTenantOf(req);
+    const uid = actorId(req);
+    if (!isObjectIdString(id)) return refused('invalid_id', 'A valid id is required.');
+    const { ok } = await callerCanReview(req);
+    if (!ok) return refused('not_allowed', 'Only an owner or admin can review timesheets.');
+
+    const _id = new mongoose.Types.ObjectId(id);
+    const doc = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
+        data: [{ _id, deletedStatusKey: 0 }],
+    }, 'findOne');
+    if (!doc) return refused('not_found', 'Timesheet submission not found.');
+
+    const transition = resolveTransition({ from: doc.status, action });
+    if (!transition.valid) return refused('wrong_state', transition.reason);
+    if (action === 'reject') {
+        const reasonCheck = validateReason(reason);
+        if (!reasonCheck.valid) return refused('invalid_reason', reasonCheck.reason);
+    }
+
+    const reviewed = action !== 'reopen';
+    const actorName = await reviewerName(uid);
+    const at = new Date();
+    // An owner or admin may approve their own week; the approval says so, and so does its history entry.
+    const selfApproved = action === 'approve' && String(doc.userId) === uid;
+    const update = {
+        status: transition.to,
+        rejectionReason: action === 'reject' ? String(reason).trim() : '',
+        reviewedAt: reviewed ? at : null,
+        reviewedBy: reviewed ? uid : '',
+        reviewerName: reviewed ? actorName : '',
+        selfApproved,
+    };
+    const entry = { action, from: doc.status, to: transition.to, by: uid, byName: actorName, at };
+    // A reopening clears the review it undoes, so the week's history keeps both: who reopened it and whose review that was.
+    const history = {
+        approve: { ...entry, selfApproved },
+        reopen: { ...entry, reviewedBy: doc.reviewedBy || '', reviewerName: doc.reviewerName || '', reviewedAt: doc.reviewedAt || null },
+    }[action];
+    const write = history ? { $set: update, $push: { history } } : { $set: update };
+    // Matching on the status that was read keeps a second reviewer from overwriting a review that landed in between.
+    const updated = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
+        data: [{ _id, status: doc.status, deletedStatusKey: 0 }, write, { returnDocument: 'after' }],
+    }, 'findOneAndUpdate');
+    if (!updated) return refused('wrong_state', 'This timesheet was reviewed by someone else just now.');
+    socketEmitter.emit('update', { type: 'update', data: updated, module: 'timesheetApproval' });
+    return { ok: true, data: updated };
+};
+
+/* POST /api/v2/timesheet-approval/:id/review  body: { action, reason? } */
 exports.reviewTimesheet = async (req, res) => {
     try {
-        const companyId = companyOf(req);
-        const uid = actorId(req);
-        const { id } = req.params;
-        if (!companyId || !isObjectIdString(id)) {
-            return res.send({ status: false, statusText: 'companyId and a valid id are required.' });
-        }
-        const { ok } = await callerCanReview(req);
-        if (!ok) return res.send({ status: false, statusText: 'Only an owner or admin can review timesheets.' });
+        const { action, reason } = req.body || {};
+        const outcome = await reviewOne(req, { id: req.params.id, action, reason });
+        if (!outcome.ok) return res.send({ status: false, statusText: outcome.statusText });
+        return res.send({ status: true, statusText: `Timesheet ${outcome.data.status}.`, data: outcome.data });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in review timesheet: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
 
-        const { action, reason, userData } = req.body || {};
-        const doc = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
-            data: [{ _id: new mongoose.Types.ObjectId(id), deletedStatusKey: 0 }],
-        }, 'findOne');
-        if (!doc) return res.send({ status: false, statusText: 'Timesheet submission not found.' });
+const BULK_REVIEW_MAX = 100;
+const BULK_OUTCOMES = { approve: 'approved', reject: 'sent_back' };
+const BULK_SKIP_REASONS = { invalid_id: 'not_found', not_found: 'not_found', not_allowed: 'not_allowed', wrong_state: 'already_reviewed' };
 
-        const transition = resolveTransition({ from: doc.status, action });
-        if (!transition.valid) return res.send({ status: false, statusText: transition.reason });
-
-        const reviewerName = userData && userData.name ? String(userData.name) : '';
-        const update = { status: transition.to };
+/* POST /api/v2/timesheet-approval/bulk-review  body: { ids, action: approve|reject, reason? }
+ * Answers per id; an id that cannot be reviewed is skipped with a reason and the rest still go through. */
+exports.reviewTimesheetsBulk = async (req, res) => {
+    try {
+        sessionTenantOf(req);
+        const { ids, action, reason } = req.body || {};
+        const refuse = (statusText) => res.status(400).send({ status: false, statusText });
+        if (!Array.isArray(ids) || !ids.length) return refuse('ids must be a non-empty list.');
+        if (ids.length > BULK_REVIEW_MAX) return refuse(`At most ${BULK_REVIEW_MAX} timesheets can be reviewed at once.`);
+        if (!Object.keys(BULK_OUTCOMES).includes(action)) return refuse('action must be approve or reject.');
         if (action === 'reject') {
             const reasonCheck = validateReason(reason);
-            if (!reasonCheck.valid) return res.send({ status: false, statusText: reasonCheck.reason });
-            update.rejectionReason = String(reason).trim();
-            update.reviewedAt = new Date();
-            update.reviewedBy = uid;
-            update.reviewerName = reviewerName;
-        } else if (action === 'approve') {
-            update.rejectionReason = '';
-            update.reviewedAt = new Date();
-            update.reviewedBy = uid;
-            update.reviewerName = reviewerName;
-        } else { // reopen — clear the review trail so it can be resubmitted/re-reviewed
-            update.rejectionReason = '';
-            update.reviewedAt = null;
-            update.reviewedBy = '';
-            update.reviewerName = '';
+            if (!reasonCheck.valid) return refuse(reasonCheck.reason);
         }
-        const updated = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
-            data: [{ _id: new mongoose.Types.ObjectId(id) }, { $set: update }, { returnDocument: 'after' }],
-        }, 'findOneAndUpdate');
-        socketEmitter.emit('update', { type: 'update', data: updated, module: 'timesheetApproval' });
-        return res.send({ status: true, statusText: `Timesheet ${transition.to}.`, data: updated });
+
+        let name;
+        const reviewerName = (uid) => { name = name || reviewerNameOf(uid); return name; };
+        const results = [];
+        for (const id of [...new Set(ids.map(String))]) {
+            const outcome = await reviewOne(req, { id, action, reason, reviewerName }).catch((error) => {
+                logger.error(`ERROR in bulk review timesheet ${id}: ${error.message}`);
+                return refused('failed', error.message);
+            });
+            results.push(outcome.ok
+                ? { id, outcome: BULK_OUTCOMES[action] }
+                : { id, outcome: 'skipped', reason: BULK_SKIP_REASONS[outcome.code] || 'failed' });
+        }
+        const counts = { approved: 0, sent_back: 0, skipped: 0 };
+        results.forEach((r) => { counts[r.outcome] += 1; });
+        return res.send({ status: true, statusText: 'OK', data: { results, counts } });
     } catch (error) {
-        logger.error(`ERROR in review timesheet: ${error.message}`);
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in bulk review timesheets: ${error.message}`);
+        return res.send({ status: false, statusText: error.message });
+    }
+};
+
+const { summarize: billableSplit } = require('../TimeSheet/helpers/billableRules');
+const pto = require('../Pto/helpers/ptoRules');
+const { companyWeekendDays } = require('../Company/helpers/companyWeek');
+
+/* GET /api/v2/timesheet-approval/queue?hoursPerDay= — the review queue with the
+ * context a manager needs on one card: who, the period, billable/internal split
+ * and how far over capacity (working hours − approved PTO) the week landed. */
+exports.listQueue = async (req, res) => {
+    try {
+        const companyId = sessionTenantOf(req);
+        const { ok } = await callerCanReview(req);
+        if (!ok) return res.send({ status: false, statusText: 'Only an owner or admin can review timesheets.' });
+        const hoursPerDay = Number(req.query && req.query.hoursPerDay) > 0 ? Number(req.query.hoursPerDay) : 8;
+        const docs = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.TIMESHEET_APPROVAL,
+            data: [{ status: 'submitted', deletedStatusKey: 0 }, null, { sort: { submittedAt: 1 } }],
+        }, 'find') || [];
+        const userIds = [...new Set(docs.map((d) => String(d.userId)))];
+        const users = userIds.length ? await MongoDbCrudOpration(dbCollections.GLOBAL, {
+            type: SCHEMA_TYPE.USERS,
+            data: [{ _id: { $in: userIds.filter(isObjectIdString).map((id) => new mongoose.Types.ObjectId(id)) } }, { Employee_Name: 1, Employee_Email: 1, Employee_profileImageURL: 1 }],
+        }, 'find').catch(() => []) : [];
+        const userById = {};
+        (users || []).forEach((u) => { userById[String(u._id)] = u; });
+        const weekendDays = await companyWeekendDays(companyId);
+
+        const data = await Promise.all(docs.map(async (doc) => {
+            const start = new Date(doc.periodStart); start.setHours(0, 0, 0, 0);
+            const end = new Date(doc.periodEnd); end.setHours(23, 59, 59, 999);
+            const [entries, ptoRows] = await Promise.all([
+                MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.TIMESHEET,
+                    data: [{ Loggeduser: String(doc.userId), LogStartTime: { $gte: Math.floor(start.getTime() / 1000), $lte: Math.floor(end.getTime() / 1000) } }, { billable: 1, LogTimeDuration: 1 }],
+                }, 'find').catch(() => []),
+                MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.PTO_ENTRIES,
+                    data: [{ userId: String(doc.userId), status: 'approved', deletedStatusKey: { $ne: 1 }, startDate: { $lte: end }, endDate: { $gte: start } }],
+                }, 'find').catch(() => []),
+            ]);
+            const split = billableSplit(entries || []);
+            const cap = pto.computeAvailableCapacity({ rangeStart: start, rangeEnd: end, ptoEntries: ptoRows || [], workingHoursPerDay: hoursPerDay, weekendDays });
+            const capacityMinutes = Math.round(cap.availableHours * 60);
+            const u = userById[String(doc.userId)];
+            const o = typeof doc.toObject === 'function' ? doc.toObject() : doc;
+            return {
+                ...o,
+                // The stored totals are the week as first submitted; a reopened week keeps taking time, so the card totals what its split is made of.
+                totalMinutes: split.totalMinutes,
+                entryCount: (entries || []).length,
+                userName: u ? u.Employee_Name || u.Employee_Email || '' : '',
+                userAvatar: u ? u.Employee_profileImageURL || '' : '',
+                billableMinutes: split.billableMinutes,
+                nonBillableMinutes: split.nonBillableMinutes,
+                capacityMinutes,
+                overMinutes: Math.max(0, split.totalMinutes - capacityMinutes),
+            };
+        }));
+        return res.send({ status: true, statusText: 'OK', data });
+    } catch (error) {
+        if (error instanceof TenantError) return res.status(error.statusCode).json({ status: false, statusText: error.message });
+        logger.error(`ERROR in timesheet queue: ${error.message}`);
         return res.send({ status: false, statusText: error.message });
     }
 };

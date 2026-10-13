@@ -10,7 +10,7 @@
         <div class="createCompanyform">
             <div class="d-flex justify-content-center">
             <!-- cropper -->
-            <div class="bordergray-dashed border-radius-8-px d-flex align-items-center justify-content-center" v-if="!showCropper">
+            <div class="cropping-tool-bordergray-dashed border-radius-8-px d-flex align-items-center justify-content-center" v-if="!showCropper">
                 <img :src="cropCloud" alt="cropCloud" style="width: 80px; height: 80px;" @click="fileSelect.click()"/>
             </div>
             <cropperComponent
@@ -170,3 +170,9 @@
     <style>
     @import './style.css'
     </style>
+
+<style scoped>
+.cropping-tool-bordergray-dashed {
+    border: 1px dashed var(--border);
+}
+</style>

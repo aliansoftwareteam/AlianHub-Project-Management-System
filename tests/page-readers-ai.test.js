@@ -1,0 +1,76 @@
+const fakeMongo = require('./fixtures/fakeMongo');
+const world = require('./fixtures/pageReachWorld');
+
+let mockDb;
+jest.mock('../utils/mongo-handler/mongoQueries', () => ({ MongoDbCrudOpration: (...args) => mockDb.crud(...args) }));
+jest.mock('../Config/loggerConfig', () => ({ error: jest.fn(), info: jest.fn(), warn: jest.fn() }));
+jest.mock('../Modules/Tasks/helpers/taskListProjects', () => require('./fixtures/taskListRules').taskListHeldEverywhere());
+jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
+jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn() }));
+jest.mock('../Modules/AICore/llmProvider', () => ({ getProvider: jest.fn(), isAnyProviderConfigured: () => false }));
+
+const { myCache } = require('../Config/config');
+const { gather, openProjects } = require('../Modules/AI/ask');
+const { openSources } = require('../Modules/AI/askThreads');
+const { pinnedSources, MAX_PINNED } = require('../Modules/AI/askContext');
+const { taskContext } = require('../Modules/AI/taskContext');
+
+const { C, PAGES, PROJECTS, TASK } = world;
+
+const EVERY_DOC = {
+    owner: ['shared', 'company', 'closed', 'namedEdit'],
+    admin: ['shared', 'company', 'closed', 'namedEdit'],
+    inside: ['insidePrivate', 'shared', 'company', 'closed', 'namedView', 'namedEdit'],
+    outside: ['outsidePrivate', 'shared', 'company'],
+    guest: ['shared', 'company'],
+    viewer: ['shared', 'company', 'namedView'],
+    editor: ['shared', 'company', 'namedEdit'],
+};
+
+const ONE_PROJECT = {
+    owner: ['shared'], admin: ['shared'], inside: ['insidePrivate', 'shared'], outside: ['outsidePrivate', 'shared'], guest: ['shared'], viewer: ['shared'], editor: ['shared'],
+};
+
+const pagesOf = (sources) => sources.filter((source) => source.kind === 'page');
+
+beforeEach(() => {
+    myCache.flushAll();
+    mockDb = fakeMongo.create();
+    world.seed(mockDb);
+});
+
+describe('the page readers agree on who reaches a page: Ask', () => {
+    it('gathers the docs a question may cite', async () => {
+        const cited = await world.askEveryone(async (uid) => pagesOf((await gather(C, uid, { question: 'atlas', limit: 20 })).sources));
+        expect(cited).toEqual(EVERY_DOC);
+    });
+
+    it('stays inside a project the question is scoped to, and inside the projects a token is kept to', async () => {
+        const gathered = (options) => world.askEveryone(async (uid) => pagesOf((await gather(C, uid, { question: 'atlas', limit: 20, ...options })).sources));
+        expect(await gathered({ projectId: PROJECTS.open })).toEqual(ONE_PROJECT);
+        expect(await gathered({ tokenProjectIds: [PROJECTS.open] })).toEqual(ONE_PROJECT);
+    });
+
+    it('re-opens the docs a saved answer cited', async () => {
+        const cites = Object.values(PAGES).map((sourceId) => ({ kind: 'page', sourceId }));
+        const open = await world.askEveryone(async (uid) => [...(await openSources(C, uid, cites)).keys()].map((key) => key.split(':')[1]));
+        expect(open).toEqual(EVERY_DOC);
+    });
+
+    it('reads the docs a person attached to a question', async () => {
+        const ids = Object.values(PAGES);
+        const attachments = [ids.slice(0, MAX_PINNED), ids.slice(MAX_PINNED)].map((batch) => batch.map((id) => ({ kind: 'page', id })));
+        const pinned = await world.askEveryone(async (uid) => {
+            const projects = await openProjects(C, uid);
+            const read = [];
+            for (const context of attachments) read.push(...pagesOf(await pinnedSources(C, uid, { context, projects })));
+            return read;
+        });
+        expect(pinned).toEqual(EVERY_DOC);
+    });
+
+    it('reads the docs linked to a task', async () => {
+        const linked = await world.askEveryone(async (uid) => (await taskContext({ companyId: C, uid, taskId: TASK })).docs);
+        expect(linked).toEqual(EVERY_DOC);
+    });
+});

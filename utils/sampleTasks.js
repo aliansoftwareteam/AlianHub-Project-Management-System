@@ -3,6 +3,8 @@ const { SCHEMA_TYPE } = require('../Config/schemaType');
 const { MongoDbCrudOpration } = require('./mongo-handler/mongoQueries');
 const { removeCache } = require('./commonFunctions');
 const logger = require('../Config/loggerConfig');
+const { sprintPlacementOf } = require('../Modules/Tasks/helpers/sprintPlacement');
+const { createSampleFields, sampleFieldValues, seedSampleExtras } = require('./sampleExtras');
 
 // Sample tasks are inserted directly rather than through Modules/Tasks/helpers/taskMongo/create.js.
 // That helper writes history and fires notifications, and at project-creation time there is no
@@ -102,6 +104,7 @@ const TASK_DEFAULTS = {
     DueDate: null,
     dueDateDeadLine: [],
     ParentTaskId: '',
+    ancestors: [],
     isParentTask: true,
     Task_Priority: 'MEDIUM',
     deletedStatusKey: 0,
@@ -132,8 +135,9 @@ function resolveStatus(taskStatusData, want) {
     if (want === 'in_progress') hit = byName('in progress') || actives[0];
     else if (want === 'in_review') hit = byName('in review') || actives[1] || actives[0];
     else if (want === 'backlog') hit = byName('backlog') || actives[actives.length - 1];
-    else if (want === 'done') hit = byType('done') || byName('done') || actives[actives.length - 1];
-    else if (want === 'complete') hit = byType('close') || byName('complete');
+    // The seeded templates' "Done" is an ACTIVE status, so finished work landing there stays open
+    // and, dated in the past, shows as overdue on a brand-new workspace.
+    else if (want === 'done' || want === 'complete') hit = byType('close');
     hit = hit || byType('default_active') || list[0];
 
     return hit ? { text: hit.name, key: hit.key, type: hit.type } : null;
@@ -145,10 +149,10 @@ const dayMs = 24 * 60 * 60 * 1000;
 // and so come out looking exactly as they did before; only the welcome set uses them, to make the
 // demo project look like a project someone has actually been working in — statuses spread across
 // the board, real owners, dates on the calendar, mixed priorities and one task with subtasks.
-// `sprints` is either one sprint document or an array of them; a row's plan picks by index.
-function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
-    const sprintList = Array.isArray(sprints) ? sprints : [sprints];
-    const sprintAt = (i) => sprintList[Math.min(Number(i) || 0, sprintList.length - 1)] || sprintList[0];
+// `placements` is one sprintPlacementOf(...).set or an array of them; a row's plan picks by index.
+function buildTaskDocs(project, placements, rows, startingNumber, ownerId, madeFields = null) {
+    const placementList = Array.isArray(placements) ? placements : [placements];
+    const placementAt = (i) => placementList[Math.min(Number(i) || 0, placementList.length - 1)] || placementList[0];
     const projectId = String(project._id);
     const companyId = String(project.CompanyId);
     const code = project.ProjectCode || 'TASK';
@@ -167,18 +171,15 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
         },
     });
 
-    const base = (TaskName, text, n, sprint) => ({
+    const base = (TaskName, text, n, placement) => ({
         ...TASK_DEFAULTS,
         TaskName,
         ...describe(text),
         TaskKey: `${code}-${n}`,
         ProjectID: projectId,
         CompanyId: companyId,
-        sprintId: String(sprint._id),
-        // Real tasks carry the whole sprint document here, not an array, and Task_Leader is a
-        // user id string. status is an object too — every existing task in the wild has all
-        // three in exactly this shape.
-        sprintArray: sprint,
+        ...placement,
+        // Task_Leader is a user id string and status an object, as on every task in the wild.
         Task_Leader: ownerId,
         status: fallback,
         statusType: fallback.type,
@@ -199,8 +200,8 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
 
         // Ids are generated up front so a subtask can name its parent in the same insert.
         const _id = new mongoose.Types.ObjectId();
-        const sprint = sprintAt(opts.sprint);
-        const doc = { ...base(TaskName, text, n, sprint), _id, groupByStatusIndex: i };
+        const placement = placementAt(opts.sprint);
+        const doc = { ...base(TaskName, text, n, placement), _id, groupByStatusIndex: i };
 
         const status = opts.status ? resolveStatus(statuses, opts.status) : null;
         if (status) {
@@ -210,37 +211,47 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
         }
         if (opts.assign) doc.AssigneeUserId = [ownerId];
         if (opts.priority) doc.Task_Priority = opts.priority;
-        if (opts.dueInDays !== undefined) doc.DueDate = new Date(today.getTime() + (opts.dueInDays * dayMs));
+        if (opts.fields) doc.customField = sampleFieldValues(madeFields, opts.fields);
+        if (opts.dueInDays !== undefined) {
+            // A project with no close status leaves even finished rows open, and open work dated
+            // in the past is overdue before the owner has done anything.
+            const days = doc.statusType === 'close' ? opts.dueInDays : Math.max(0, opts.dueInDays);
+            doc.DueDate = new Date(today.getTime() + (days * dayMs));
+        }
 
-        const kids = Array.isArray(opts.subtasks) ? opts.subtasks : [];
-        doc.subTasks = kids.length;
-        docs.push(doc);
-
-        kids.forEach((kidName, k) => {
-            n += 1;
-            docs.push({
-                // A subtask always lives in the same sprint as its parent.
-                ...base(kidName, `An example subtask of "${TaskName}".`, n, sprint),
-                _id: new mongoose.Types.ObjectId(),
-                isParentTask: false,
-                ParentTaskId: String(_id),
-                subTasks: 0,
-                groupByStatusIndex: k,
-                ...(k === 0 ? { status: resolveStatus(statuses, 'complete') || fallback } : {}),
+        const addSubtasks = (parent, kids, depth) => {
+            parent.subTasks = kids.length;
+            kids.forEach((kid, k) => {
+                const { name, subtasks = [] } = typeof kid === 'string' ? { name: kid } : kid;
+                n += 1;
+                const child = {
+                    // A subtask always lives in the same sprint as its parent.
+                    ...base(name, `An example subtask of "${parent.TaskName}".`, n, placement),
+                    _id: new mongoose.Types.ObjectId(),
+                    isParentTask: false,
+                    ParentTaskId: String(parent._id),
+                    ancestors: [...parent.ancestors, String(parent._id)],
+                    subTasks: 0,
+                    groupByStatusIndex: k,
+                    ...(depth === 1 && k === 0 ? { status: resolveStatus(statuses, 'complete') || fallback } : {}),
+                };
+                if (depth === 1 && k === 0) {
+                    child.statusType = child.status.type;
+                    child.statusKey = child.status.key;
+                }
+                docs.push(child);
+                addSubtasks(child, subtasks, depth + 1);
             });
-            if (k === 0) {
-                const last = docs[docs.length - 1];
-                last.statusType = last.status.type;
-                last.statusKey = last.status.key;
-            }
-        });
+        };
+        docs.push(doc);
+        addSubtasks(doc, Array.isArray(opts.subtasks) ? opts.subtasks : [], 1);
 
         if (opts.comment) {
             comments.push({
                 project: false,
                 projectId,
                 taskId: String(_id),
-                sprintId: String(sprint._id),
+                sprintId: String(placement.sprintId),
                 userId: ownerId,
                 type: 'text',
                 message: opts.comment,
@@ -259,7 +270,7 @@ function buildTaskDocs(project, sprints, rows, startingNumber, ownerId) {
 // Nothing anywhere looks a sprint up by the name "List", so renaming it is safe.
 //
 // Never throws: if a sprint cannot be made, the tasks all fall back to the one that exists.
-async function ensureDemoSprints(project, firstSprint) {
+async function ensureDemoSprints(project, firstSprint, ownerId) {
     const companyId = String(project.CompanyId);
     const sprints = [firstSprint];
     try {
@@ -272,6 +283,10 @@ async function ensureDemoSprints(project, firstSprint) {
         // Required late: Modules/Sprints pulls in a large part of the app.
         // eslint-disable-next-line global-require
         const { addSprintFun } = require('../Modules/Sprints/controller');
+        // eslint-disable-next-line global-require
+        const { loadUserData } = require('../Modules/createProject/sampleProject');
+        // addSprintFun writes a history row, and history requires the user it is attributed to.
+        const userData = await loadUserData(ownerId, companyId);
         for (const name of DEMO_SPRINTS.slice(1)) {
             // eslint-disable-next-line no-await-in-loop
             const res = await addSprintFun({
@@ -279,7 +294,7 @@ async function ensureDemoSprints(project, firstSprint) {
                     companyId,
                     projectId: project._id,
                     sprintName: name,
-                    userData: {},
+                    userData,
                     projectName: project.ProjectName,
                 },
             });
@@ -309,9 +324,16 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
         // Only the demo project is split across sprints. A template project keeps the single
         // sprint it was created with, which is what every hand-made project gets.
         const wantsSprints = rows.some((r) => r[2] && r[2].sprint !== undefined);
-        const sprints = wantsSprints ? await ensureDemoSprints(project, sprint) : [sprint];
+        const sprints = wantsSprints ? await ensureDemoSprints(project, sprint, leader) : [sprint];
 
-        const { docs, comments } = buildTaskDocs(project, sprints, rows, startingNumber, leader);
+        const placements = await Promise.all(sprints.map(async (s) => (await sprintPlacementOf(companyId, s)).set));
+        const madeFields = wantsSprints
+            ? await createSampleFields({ companyId, projectId: String(project._id), ownerId: leader }).catch((error) => {
+                logger.error(`seedSampleTasks: sample fields skipped — ${error.message}`);
+                return null;
+            })
+            : null;
+        const { docs, comments } = buildTaskDocs(project, placements, rows, startingNumber, leader, madeFields);
 
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -343,7 +365,7 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
         const perSprint = {};
         for (const d of docs) {
             if (d.isParentTask === false) continue;
-            perSprint[d.sprintId] = (perSprint[d.sprintId] || 0) + 1;
+            perSprint[String(d.sprintId)] = (perSprint[String(d.sprintId)] || 0) + 1;
         }
         for (const [sprintId, count] of Object.entries(perSprint)) {
             // eslint-disable-next-line no-await-in-loop
@@ -351,6 +373,13 @@ async function seedSampleTasks(project, sprint, rows, ownerId) {
                 type: SCHEMA_TYPE.SPRINTS,
                 data: [{ _id: sprintId }, { $inc: { tasks: count } }],
             }, 'findOneAndUpdate');
+        }
+
+        if (wantsSprints) {
+            // eslint-disable-next-line global-require
+            const { loadUserData } = require('../Modules/createProject/sampleProject');
+            await seedSampleExtras({ project, sprints, tasks: docs, ownerId: leader, userData: await loadUserData(leader, companyId) })
+                .catch((error) => logger.error(`seedSampleTasks: extras skipped — ${error.message}`));
         }
 
         removeCache(`project:${String(project._id)}`);
@@ -371,13 +400,6 @@ function sampleTasksForTemplate(templateName) {
     return SAMPLE_TASKS[String(templateName || '').trim()] || null;
 }
 
-// How the demo project is populated. Applied BY POSITION over whatever list the demo ends up
-// with, not attached to particular rows — picking "Marketing" during setup swaps most of the
-// rows out, and attaching the variety to specific rows meant that choice produced a flat,
-// all-To-Do project with no subtasks and no comment.
-//
-// Statuses are names of intent, resolved against the project's own status list, so a company
-// that renames or reorders its statuses still gets a sensible spread.
 // The demo project is split like a real one: work that is finished, work in flight, and work
 // not started. The project arrives with a single sprint called "List" — that one is renamed to
 // the first of these and the other two are created alongside it.
@@ -393,17 +415,17 @@ const DEMO_SPRINTS = ['Getting started', 'This week', 'Up next'];
 // DEMO_SPRINTS, and each sprint holds work at a stage that suits its name.
 const DEMO_LIFE = [
     // Getting started — the intro, mostly behind us
-    { sprint: 0, status: 'in_progress', assign: true, dueInDays: 0, priority: 'HIGH' },
-    { sprint: 0, status: 'complete', assign: true, dueInDays: -2 },
+    { sprint: 0, status: 'in_progress', assign: true, dueInDays: 0, priority: 'HIGH', fields: { hours: 2, area: 'Design' } },
+    { sprint: 0, status: 'complete', assign: true, dueInDays: -2, fields: { hours: 3, area: 'Design' } },
     { sprint: 0, status: 'done', assign: true, dueInDays: -1 },
     // This week — work actually in flight
-    { sprint: 1, dueInDays: 1, priority: 'URGENT' },
-    { sprint: 1, status: 'in_progress', assign: true, dueInDays: 2, comment: 'This is what a comment looks like. The conversation stays on the task, so the reasoning is still here months from now.' },
+    { sprint: 1, dueInDays: 1, priority: 'URGENT', fields: { hours: 4, area: 'Build' } },
+    { sprint: 1, status: 'in_progress', assign: true, dueInDays: 2, fields: { hours: 6, area: 'Build' }, comment: 'This is what a comment looks like. The conversation stays on the task, so the reasoning is still here months from now.' },
     { sprint: 1, dueInDays: 3, priority: 'LOW' },
     { sprint: 1, status: 'in_review', assign: true, dueInDays: 4 },
     // Position 7 on purpose: in the welcome set that row is "Break a big task into subtasks", so
     // the task that teaches subtasks is the one that has them. Same reason the comment sits at 4.
-    { sprint: 1, status: 'in_progress', assign: true, dueInDays: 5, priority: 'HIGH', subtasks: ['Write the first draft', 'Review it with someone', 'Publish the final version'] },
+    { sprint: 1, status: 'in_progress', assign: true, dueInDays: 5, priority: 'HIGH', fields: { hours: 5, area: 'Review' }, subtasks: ['Write the first draft', { name: 'Review it with someone', subtasks: ['Pick a reviewer'] }, 'Publish the final version'] },
     // Up next — nothing started yet
     { sprint: 2, status: 'backlog', dueInDays: 9, priority: 'LOW' },
     { sprint: 2, dueInDays: 12 },

@@ -14,15 +14,13 @@ const APPROVAL_STATUSES = Object.freeze(['submitted', 'approved', 'rejected']);
 // Manager review actions.
 const REVIEW_ACTIONS = Object.freeze(['approve', 'reject', 'reopen']);
 
-// Owner / Admin are the default timesheet approvers (mirrors permissionGuard).
-const ROLE_OWNER = 1;
-const ROLE_ADMIN = 2;
+const { ROLE_OWNER, ROLE_ADMIN, isPrivileged } = require('../../../Config/roleTypes');
 
 const isObjectIdString = (id) => OBJECT_ID_PATTERN.test(String(id || ''));
 const isApprovalStatus = (s) => APPROVAL_STATUSES.includes(String(s || ''));
 
 /* Only owner/admin may review (approve/reject/reopen) timesheets. */
-const canReview = ({ roleType } = {}) => roleType === ROLE_OWNER || roleType === ROLE_ADMIN;
+const canReview = ({ roleType } = {}) => isPrivileged(roleType);
 
 /* Parse + validate a submission period. Both bounds required; start <= end.
  * Both bounds are normalised to the START of their day so a given calendar

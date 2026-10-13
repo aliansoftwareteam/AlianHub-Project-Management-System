@@ -27,7 +27,7 @@
                         :inputId="`milestonename`+fixMilestoneIndex"
                         @keyup="checkErrors({'field':formData.fixMilestone,'name':'name','validations':formData.fixMilestone.rules,'type':formData.fixMilestone.type,'event':$event.event})"
                     ></InputText>
-                    <small class="red" v-if="formData.fixMilestone.error">{{formData.fixMilestone.error}}</small>
+                    <small class="fix-milestone-tr-red" v-if="formData.fixMilestone.error">{{formData.fixMilestone.error}}</small>
                 </div>
             </td>
             <td>
@@ -56,8 +56,8 @@
                             class="amountCurr"
                         ></InputText>
                     </div>
-                    <small class="red" v-if="formData.amount.error">{{formData.amount.error}}</small>
-                    <small class="red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
+                    <small class="fix-milestone-tr-red" v-if="formData.amount.error">{{formData.amount.error}}</small>
+                    <small class="fix-milestone-tr-red" v-if="err">{{$t(`Milestone.${err.replaceAll(' ',"_")}`)}}</small>
                 </div>
             </td>
             <td></td>
@@ -367,3 +367,9 @@
         removeKeyUpListener();
     });
 </script>
+
+<style scoped>
+.fix-milestone-tr-red {
+    color: var(--danger-ink);
+}
+</style>

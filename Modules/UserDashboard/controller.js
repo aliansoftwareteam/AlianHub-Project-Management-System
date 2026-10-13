@@ -1,6 +1,7 @@
 const { myCache } = require("../../Config/config");
 const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
+const { idForms } = require("../../utils/mongo-handler/objectIdKeys");
 const axios = require("axios");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
@@ -17,6 +18,15 @@ const {
     applyTaskMatch,
     projectScopeClause,
 } = require("./helpers/resourceHelpers");
+const { ROLE_GUEST, isPrivileged } = require('../../Config/roleTypes');
+const { ACTIVE_SEAT } = require('../../Config/seatStatus');
+const { arrangeRules, rolePermission, PRIVATE_PROJECTS, seesEveryPrivateProject } = require('../../Config/rulePermissions');
+const { ownOrNotPersonal, othersPersonalListIds } = require('../PersonalList/ownership');
+const { companyWideMatch, toObjectIds } = require('../Tasks/helpers/taskQueryGuard');
+const { taskListProjectIds } = require('../Tasks/helpers/taskListProjects');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
+const { forgetCards } = require('../AI/askCardStore');
+const { nonMembersOf, NOT_A_MEMBER } = require('../../Config/companyMembers');
 
 // Parse a client-built advanced-filter match from the request body.
 function bodyTaskMatch(body) {
@@ -37,43 +47,82 @@ function projectStatusMeta(p) {
 // getEmployeeWorkloadReport: roleType 1/2 → all users (null = no
 // restriction); everyone else → only themselves.
 function resolveVisibleUserIds(payload = {}) {
-    const roleType = Number(payload.callerRoleType || 3);
-    if (roleType === 1 || roleType === 2) return null;
+    const roleType = Number(payload.callerRoleType ?? ROLE_GUEST);
+    if (isPrivileged(roleType)) return null;
     const self = String(payload.callerUserId || "");
     return self ? [self] : [];
+}
+
+async function activeSeatRoleType(companyId, uid) {
+    const row = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.COMPANY_USERS,
+        data: [{ userId: String(uid), ...ACTIVE_SEAT }, { roleType: 1 }],
+    }, "findOne");
+    if (!row) return null;
+    const rt = Number(row.roleType);
+    return Number.isInteger(rt) && rt >= ROLE_GUEST ? rt : ROLE_GUEST;
 }
 
 // SECURITY: resolve the caller's real role for this company from the DB, never
 // from the request body. These routes are JWT-protected (req.uid is the
 // verified user; the companyid header is checked against the token audience),
 // but roleType isn't in the token — so look it up in company_users. Fails
-// closed to the most-restricted role (3) when absent, so a forged
-// callerRoleType in the body can never widen the visibility scope.
+// closed to the guest role, the most restricted, without an active seat, so a
+// forged callerRoleType in the body can never widen the visibility scope.
 async function resolveCallerRoleType(companyId, uid) {
-    if (!uid) return 3;
+    if (!uid) return ROLE_GUEST;
     try {
-        const row = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.COMPANY_USERS,
-            data: [{ userId: String(uid), isDelete: { $ne: true } }, { roleType: 1 }],
-        }, "findOne");
-        const rt = Number(row && row.roleType);
-        return Number.isFinite(rt) && rt > 0 ? rt : 3;
+        return (await activeSeatRoleType(companyId, uid)) ?? ROLE_GUEST;
     } catch (e) {
         logger.error(`resolveCallerRoleType error (company=${companyId}, uid=${uid}): ${e.message || e}`);
-        return 3;
+        return ROLE_GUEST;
     }
 }
+exports.resolveCallerRoleType = resolveCallerRoleType;
 
-// SECURITY: project-level visibility for the company-wide project cards. Mirrors
-// the project-list scoping (Modules/Project/controller/getProjectFilterData.js):
-// owner/admin (roleType 1|2) see everything (returns null → no filter); a member
-// sees private projects they belong to (AssigneeUserId includes their id or a
-// team id) plus public projects — public are also membership-gated unless the
-// caller holds the `public_projects` permission. Returns a Mongo sub-filter to
-// merge into a PROJECTS query, or null for no restriction. Fails closed (member
-// scope) on any lookup error.
-async function resolveVisibleProjectFilter(companyId, uid) {
-    if (!uid) return { _id: { $in: [] } }; // no identity → see nothing
+/* A member's cards read their own work in the projects whose tasks they may list. It sits under
+ * $and so a card's own ProjectID filter cannot replace it. */
+const ownWorkProjects = async (companyId, uid) => ({
+    $and: [{ ProjectID: { $in: toObjectIds(await taskListProjectIds(companyId, uid)) } }],
+});
+
+/* What a company-wide card leaves out for an owner or admin: someone else's personal list, and a chat
+ * they are not in. Everyone else's cards read their own work where they may list tasks. `time` sits
+ * under $and so a card's own ProjectId filter cannot replace it. */
+const companyWideCardScope = async (companyId, uid, isManagement) => {
+    const personalLists = isManagement ? await othersPersonalListIds(companyId, uid) : [];
+    return {
+        tasks: isManagement ? companyWideMatch(uid, personalLists) : await ownWorkProjects(companyId, uid),
+        time: personalLists.length ? { $and: [{ ProjectId: { $nin: idForms(personalLists) } }] } : {},
+    };
+};
+
+/* The same for a card that reads the caller's own tasks whatever their role: an owner or admin is held back by no rule. */
+const ownWorkScope = async (companyId, uid) => (isPrivileged(await resolveCallerRoleType(companyId, uid)) ? {} : ownWorkProjects(companyId, uid));
+
+/* The tasks a card counts: company-wide for an owner or admin; for everyone else, the tasks assigned to them. */
+const cardTaskScope = async (companyId, uid, isManagement) => (isManagement
+    ? (await companyWideCardScope(companyId, uid, true)).tasks
+    : { AssigneeUserId: uid, ...(await ownWorkProjects(companyId, uid)) });
+
+/* The projects a card names in its request, kept to the ones the caller can open and may list
+ * tasks in: the ids come from the client, so the card's own settings prove nothing. */
+const listableProjectIds = async (companyId, uid, projectIds) => {
+    const named = (Array.isArray(projectIds) ? projectIds : []).map(String);
+    const open = new Set(await taskListProjectIds(companyId, uid));
+    return toObjectIds(named.filter((id) => open.has(id)));
+};
+
+const noProject = () => ({ filter: { _id: { $in: [] } }, companyWide: false });
+
+// Project-level visibility for the company-wide project cards, by the same rule as
+// decideProjectAccess in Config/projectAccess.js: a personal list is its owner's alone;
+// owners and admins see every other project (companyWide); everyone else sees public
+// projects, and a private one when they or a team of theirs is assigned or their role
+// lists every private project. `filter` merges into a PROJECTS query. Without an active
+// seat, or on any lookup error, it matches no project.
+async function resolveProjectVisibility(companyId, uid) {
+    if (!uid) return noProject();
     try {
         const [teams, rules, roleType] = await Promise.all([
             MongoDbCrudOpration(companyId, {
@@ -81,25 +130,29 @@ async function resolveVisibleProjectFilter(companyId, uid) {
                 data: [{ assigneeUsersArray: { $in: [String(uid)] } }, { _id: 1 }],
             }, "find").catch(() => []),
             fetchRules(companyId).catch(() => []),
-            resolveCallerRoleType(companyId, uid),
+            activeSeatRoleType(companyId, uid),
         ]);
-        if (roleType === 1 || roleType === 2) return null; // admin/owner → all projects
-        const teamIds = (teams || []).map((t) => "tId_" + t._id);
-        const member = { $in: [String(uid), ...teamIds] };
-        const rule = Array.isArray(rules) ? rules.find((x) => x && x.key === "public_projects") : null;
-        const showAllProjects = !!(rule && rule.roles && rule.roles.find((r) => r.key === roleType && r.permission === true));
+        if (roleType === null) return noProject();
+        if (isPrivileged(roleType)) return { filter: ownOrNotPersonal(uid), companyWide: true };
+        const assigned = { AssigneeUserId: { $in: [String(uid), ...(teams || []).map((t) => "tId_" + t._id)] } };
+        const everyPrivateProject = seesEveryPrivateProject(rolePermission(arrangeRules(rules), roleType, PRIVATE_PROJECTS));
         return {
-            $or: [
-                { isPrivateSpace: true, AssigneeUserId: member },
-                { isPrivateSpace: false, ...(showAllProjects ? {} : { AssigneeUserId: member }) },
-            ],
+            filter: {
+                $and: [
+                    ownOrNotPersonal(uid),
+                    { $or: [{ isPrivateSpace: false }, { isPrivateSpace: true, ...(everyPrivateProject ? {} : assigned) }] },
+                ],
+            },
+            companyWide: false,
         };
     } catch (e) {
-        logger.error(`resolveVisibleProjectFilter error (company=${companyId}, uid=${uid}): ${e.message || e}`);
-        // Fail closed to member-only-nothing rather than leaking company-wide.
-        return { _id: { $in: [] } };
+        logger.error(`resolveProjectVisibility error (company=${companyId}, uid=${uid}): ${e.message || e}`);
+        return noProject();
     }
 }
+
+const resolveVisibleProjectFilter = async (companyId, uid) => (await resolveProjectVisibility(companyId, uid)).filter;
+exports.resolveVisibleProjectFilter = resolveVisibleProjectFilter;
 
 /**
  * This endpoint is used to get user user dashboard template
@@ -114,6 +167,9 @@ exports.getDashboard = async (req, res) => {
         if (!id) {
             return res.status(400).json({ status: false, message: "'id' parameter is required." });
         }
+        if (String(id) !== String(req.uid || "")) {
+            return res.status(403).json({ status: false, message: "You can only open your own home dashboard." });
+        }
 
         const cacheKey = `dashboard_${id}`;
         const cachedDashboard = myCache.get(cacheKey);
@@ -126,7 +182,7 @@ exports.getDashboard = async (req, res) => {
             return res.status(200).json(cachedDashboard);
         }
 
-        const params = { type: SCHEMA_TYPE.USERDASHBOARD, data: [{ userId: id }] };
+        const params = { type: SCHEMA_TYPE.USERDASHBOARD, data: [homeDashboardMatch(id)] };
         const response = await MongoDbCrudOpration(req.headers['companyid'], params, 'find');
 
         if (response?.length) {
@@ -140,7 +196,7 @@ exports.getDashboard = async (req, res) => {
             // "management" template, everyone else the "member" template. Falls
             // back to the isDefault template when no audience match exists.
             const ownerRoleType = await resolveCallerRoleType(req.headers['companyid'], id);
-            const wantedAudience = (ownerRoleType === 1 || ownerRoleType === 2) ? 'management' : 'member';
+            const wantedAudience = isPrivileged(ownerRoleType) ? 'management' : 'member';
             const defaultDashboard =
                 lanData.find(e => !e.isDeleted && e.audience === wantedAudience)
                 || lanData.find(e => e.isDefault && !e.isDeleted);
@@ -202,54 +258,80 @@ exports.getCardComponent = async (req, res) => {
 };
 
 
+const LEGACY_DASHBOARD_OPS = ["addCard", "updateCard", "removeCard", "setCards"];
+
+// Hub dashboards share this collection and carry the creator's userId, so without the
+// templateId and isDeleted guards a user's first hub dashboard (even a deleted one)
+// would be served as their home and no home dashboard would ever be created.
+const homeDashboardMatch = (uid) => ({ userId: uid, templateId: { $exists: true, $ne: "" }, isDeleted: { $ne: true } });
+
+const isPlainObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+function applyLegacyDashboardOp(cards, body) {
+    const refuse = (code, message) => ({ code, message });
+    const cardUid = String(body.cardUid || "");
+    switch (body.op) {
+    case "setCards":
+        if (!Array.isArray(body.cards)) return refuse(400, "'cards' must be an array.");
+        return { cards: sanitizeDashboardCards(body.cards) };
+    case "addCard": {
+        const [card] = sanitizeDashboardCards([body.card]);
+        if (!card) return refuse(400, "A card needs a componentId and a uid.");
+        if (cards.some((c) => String(c && c.uid) === card.uid)) return refuse(400, "A card with that uid is already on the dashboard.");
+        if (cards.length >= MAX_DASHBOARD_CARDS) return refuse(400, `A dashboard holds at most ${MAX_DASHBOARD_CARDS} cards.`);
+        return { cards: [...cards, card] };
+    }
+    case "updateCard": {
+        const index = cardUid ? cards.findIndex((c) => String(c && c.uid) === cardUid) : -1;
+        if (index < 0) return refuse(404, "Card not found on this dashboard.");
+        if (!isPlainObject(body.cardData)) return refuse(400, "'cardData' must be an object.");
+        if (body.filterData !== undefined && !Array.isArray(body.filterData)) return refuse(400, "'filterData' must be an array.");
+        const current = cards[index];
+        const config = { ...(current.config || {}), cardData: body.cardData };
+        if (body.filterData !== undefined) config.filterData = body.filterData;
+        return { cards: cards.map((c, i) => (i === index ? { ...current, config } : c)) };
+    }
+    case "removeCard":
+        if (!cardUid) return refuse(400, "'cardUid' is required.");
+        return { cards: cards.filter((c) => String(c && c.uid) !== cardUid) };
+    default:
+        return refuse(400, `'op' must be one of: ${LEGACY_DASHBOARD_OPS.join(", ")}.`);
+    }
+}
+
 exports.updateDashboard = async (req, res) => {
     try {
-        const { queryObject, method, userId } = req.body;
-
-        if (!queryObject || !method) {
-            return res.status(400).json({
-                status: false, 
-                message: "'queryObject' and 'method' parameters are required." 
-            });
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const body = req.body || {};
+        if (!companyId || !uid) {
+            return res.status(400).json({ status: false, message: "companyId header and an authenticated user are required." });
         }
+        if (!LEGACY_DASHBOARD_OPS.includes(body.op)) {
+            return res.status(400).json({ status: false, message: `'op' must be one of: ${LEGACY_DASHBOARD_OPS.join(", ")}.` });
+        }
+        const match = homeDashboardMatch(uid);
+        if (typeof body.templateId === "string" && body.templateId) match.templateId = body.templateId;
+        const doc = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.USERDASHBOARD, data: [match] }, "findOne");
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
 
-        let updateQuery = {
+        const change = applyLegacyDashboardOp(Array.isArray(doc.cards) ? doc.cards : [], body);
+        if (!change.cards) return res.status(change.code).json({ status: false, message: change.message });
+
+        const updated = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.USERDASHBOARD,
-            data: queryObject
-        };
-
-        MongoDbCrudOpration(req.headers['companyid'], updateQuery, method)
-            .then((result) => {
-                if (result) {
-                    if(userId) {
-                        const cacheKey = `dashboard_${userId}`;
-                        myCache.del(cacheKey);
-                    }
-                    return res.status(200).json({
-                        status: true,
-                        message: "Dashboard updated successfully.", 
-                        data: result 
-                    });
-                } else {
-                    return res.status(404).json({ status: false, message: "Dashboard not found." });
-                }
-            })
-            .catch((error) => {
-                logger.error(`Error while updating the user dashboard: ${error}`);
-                return res.status(400).json({ 
-                    status: false, 
-                    message: "Error while updating dashboard.", 
-                    error: error 
-                });
-            });
-
-    } catch (error) {
-        logger.error(`Error while updating the user dashboard: ${error}`);
-        return res.status(400).json({
-            status: false,
-            message: "An error occurred while updating the user dashboard.",
-            error
+            data: [{ _id: doc._id }, { $set: { cards: change.cards, updatedBy: uid, updatedAt: new Date() } }, { new: true, useFindAndModify: false }],
+        }, "findOneAndUpdate");
+        dropDashboardCaches(uid);
+        return res.status(200).json({
+            status: true,
+            statusText: "Dashboard updated.",
+            message: "Dashboard updated successfully.",
+            data: updated || { ...doc, cards: change.cards },
         });
+    } catch (error) {
+        logger.error(`updateDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while updating the user dashboard." });
     }
 };
 
@@ -336,7 +418,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             overloadCapacityMinutesPerDay: Number(payload.overloadCapacityMinutesPerDay) || null,
             // No per-employee task limit — return all relevant tasks.
             callerUserId: String(payload.callerUserId || ""),
-            callerRoleType: Number(payload.callerRoleType || 3),
+            callerRoleType: Number(payload.callerRoleType ?? ROLE_GUEST),
         };
 
         // ─── Role-based visibility — narrow the employee pool first ──
@@ -346,8 +428,9 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         // see every company employee the filter selects. Only genuine
         // non-admins (roleType not in [1, 2]) are restricted to
         // themselves. null = no restriction.
+        const cardScope = await companyWideCardScope(companyId, cfg.callerUserId, isPrivileged(cfg.callerRoleType));
         let visibleUserIds = null;
-        if (cfg.callerRoleType === 1 || cfg.callerRoleType === 2) {
+        if (isPrivileged(cfg.callerRoleType)) {
             // Admin / Owner / Manager tier — no user-level restriction.
             visibleUserIds = null;
         } else {
@@ -408,7 +491,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         // 1. Planned hours in range (per user, per task) from estimated_time.
         const plannedByUserTask = {};  // `${uid}|${tid}` → planned minutes in range
         {
-            const estFilter = { UserId: { $in: employeeIdStrs } };
+            const estFilter = { UserId: { $in: employeeIdStrs }, ...cardScope.time };
             if (cfg.dateFrom || cfg.dateTo) {
                 estFilter.Date = {};
                 if (cfg.dateFrom) estFilter.Date.$gte = cfg.dateFrom;
@@ -428,7 +511,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
         const loggedByUserTask = {};   // `${uid}|${tid}` → logged minutes in range
         const lastLogByUserTask = {};  // `${uid}|${tid}` → { desc, start } latest work comment
         {
-            const tsFilter = { Loggeduser: { $in: employeeIdStrs } };
+            const tsFilter = { Loggeduser: { $in: employeeIdStrs }, ...cardScope.time };
             if (dateFromSec != null || dateToSec != null) {
                 tsFilter.LogStartTime = {};
                 if (dateFromSec != null) tsFilter.LogStartTime.$gte = dateFromSec;
@@ -483,6 +566,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             const activeFilter = {
                 Loggeduser: { $in: employeeIdStrs },
                 startTimeTracker: { $gte: nowSec - RUNNING_WINDOW_SEC },
+                ...cardScope.time,
             };
             const activeLogs = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
@@ -526,7 +610,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
             const validIds = Array.from(unionTaskIds)
                 .filter((id) => mongoose.Types.ObjectId.isValid(id))
                 .map((id) => new mongoose.Types.ObjectId(id));
-            const taskFilter = { _id: { $in: validIds }, deletedStatusKey: 0 };
+            const taskFilter = { _id: { $in: validIds }, deletedStatusKey: 0, ...cardScope.tasks };
             const empProjClause = projectScopeClause(cfg.projectMode, cfg.projectIds);
             if (empProjClause) {
                 taskFilter.ProjectID = empProjClause;
@@ -543,19 +627,7 @@ exports.getEmployeeWorkloadReport = async (req, res) => {
                     { aiTaskCategoryManual: { $exists: false }, aiTaskCategory: cfg.taskType },
                 ];
             }
-            // Merge the advanced filter match. Fold into $and so it can't
-            // clobber the taskType $or above (buildFilterQuery may also emit $or).
-            if (cfg.taskMatch) {
-                const extra = cfg.taskMatch;
-                const andParts = [];
-                if (taskFilter.$or) { andParts.push({ $or: taskFilter.$or }); delete taskFilter.$or; }
-                if (Array.isArray(extra.$and)) andParts.push(...extra.$and);
-                if (Array.isArray(extra.$or)) andParts.push({ $or: extra.$or });
-                Object.keys(extra).forEach((k) => {
-                    if (k !== "$and" && k !== "$or") taskFilter[k] = extra[k];
-                });
-                if (andParts.length) taskFilter.$and = (taskFilter.$and || []).concat(andParts);
-            }
+            applyTaskMatch(taskFilter, cfg.taskMatch);
             const tasks = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
@@ -790,14 +862,13 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         // needs the per-project rows behind each number, not just totals.
         const includeProjects = req.body && req.body.includeProjects === true;
 
-        // SECURITY: scope to the caller's visible projects. Owner/admin → null
-        // (all projects); a member → only projects they belong to / public ones.
-        const projFilter = await resolveVisibleProjectFilter(companyId, req.uid);
+        const { filter: projFilter, companyWide } = await resolveProjectVisibility(companyId, req.uid);
+        const cardScope = await companyWideCardScope(companyId, String(req.uid || ''), companyWide);
 
         // Project scoping from the card selector: all / include ($in) / exclude ($nin).
         const projectMode = req.body?.projectMode || 'all';
         const projClause = projectScopeClause(projectMode, req.body?.projectId);
-        const tsProjClause = projectScopeClause(projectMode, req.body?.projectId, { string: true });
+        const tsProjClause = projectScopeClause(projectMode, req.body?.projectId, { bothForms: true });
 
         // 1 + 3 — active projects and their ProjectType mix. Drill-down also
         // needs each project's status + its per-project status palette
@@ -805,7 +876,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         const activeProjects = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECTS,
             data: [
-                { statusType: { $nin: ["close"] }, deletedStatusKey: 0, ...(projFilter || {}), ...(projClause ? { _id: projClause } : {}) },
+                { statusType: { $nin: ["close"] }, deletedStatusKey: 0, ...(projClause ? { _id: projClause } : {}), $and: [projFilter] },
                 includeProjects
                     ? { ProjectType: 1, ProjectName: 1, status: 1, statusType: 1, projectStatusData: 1 }
                     : { ProjectType: 1, ProjectName: 1 },
@@ -832,7 +903,7 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         const timelogs = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TIMESHEET,
             data: [
-                { LogStartTime: { $gte: fromSec, $lte: toSec }, ...(tsProjClause ? { ProjectId: tsProjClause } : {}) },
+                { LogStartTime: { $gte: fromSec, $lte: toSec }, ...(tsProjClause ? { ProjectId: tsProjClause } : {}), ...cardScope.time },
                 { ProjectId: 1 },
             ],
         }, "find").catch(() => []);
@@ -841,10 +912,9 @@ exports.getProjectUtilizationSummary = async (req, res) => {
         (timelogs || []).forEach((ts) => {
             if (ts.ProjectId) workingProjectIds.add(String(ts.ProjectId));
         });
-        // For a scoped (member) caller, count only projects they can see; admins
-        // (projFilter === null) keep the company-wide count unchanged.
+        // A scoped caller counts only projects they can see; owners and admins keep the company-wide count.
         let workingProjects = workingProjectIds.size;
-        if (projFilter) {
+        if (!companyWide) {
             const accessibleIds = new Set((activeProjects || []).map((p) => String(p._id)));
             workingProjects = [...workingProjectIds].filter((id) => accessibleIds.has(id)).length;
         }
@@ -921,7 +991,7 @@ exports.getMilestoneSummary = async (req, res) => {
         // Owner/Admin only — resolve the caller's real role from the DB
         // (never from the body). Non-management callers get an empty payload.
         const callerRoleType = await resolveCallerRoleType(companyId, req.uid);
-        if (!(callerRoleType === 1 || callerRoleType === 2)) {
+        if (!isPrivileged(callerRoleType)) {
             return res.status(200).json({ status: true, data: { ...emptyData, restricted: true } });
         }
 
@@ -1158,6 +1228,7 @@ exports.getTeamTaskTypeBreakdown = async (req, res) => {
         if (Array.isArray(visibleUserIds) && !visibleUserIds.length) {
             return res.status(200).json({ status: true, data: { dimension, teams: [] } });
         }
+        const cardScope = await companyWideCardScope(companyId, payload.callerUserId, isPrivileged(payload.callerRoleType));
         const projectIds = Array.isArray(payload.projectIds) ? payload.projectIds
             : Array.isArray(payload.projectId) ? payload.projectId : [];
         const statusKeys = Array.isArray(payload.statusKeys) ? payload.statusKeys
@@ -1185,9 +1256,9 @@ exports.getTeamTaskTypeBreakdown = async (req, res) => {
             // Timesheet-level split (billable lives on the timesheet, not the
             // task). Applies project + user filters; status/advanced filters
             // don't apply here (no task join).
-            const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec } };
+            const tsFilter = { LogStartTime: { $gte: fromSec, $lte: toSec }, ...cardScope.time };
             if (Array.isArray(visibleUserIds)) tsFilter.Loggeduser = { $in: visibleUserIds.map(String) };
-            if (projectIds.length) tsFilter.ProjectId = { $in: projectIds.map(String) };
+            if (projectIds.length) tsFilter.ProjectId = { $in: idForms(projectIds.map(String)) };
             const tlogs = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TIMESHEET,
                 data: [tsFilter, { Loggeduser: 1, LogTimeDuration: 1, billable: 1 }],
@@ -1199,7 +1270,7 @@ exports.getTeamTaskTypeBreakdown = async (req, res) => {
             });
         } else {
             const { loggedByUserTask, taskMap } = await getLoggedAndTasksInRange(companyId, {
-                fromSec, toSec, projectIds, projectMode: payload.projectMode || 'all', statusKeys, visibleUserIds, taskMatch,
+                fromSec, toSec, projectIds, projectMode: payload.projectMode || 'all', statusKeys, visibleUserIds, taskMatch, cardScope,
             });
 
             let sprintTypeMap = {};
@@ -1302,6 +1373,7 @@ exports.getTeamLoggedVsEta = async (req, res) => {
         if (Array.isArray(visibleUserIds) && !visibleUserIds.length) {
             return res.status(200).json({ status: true, data: { teams: [] } });
         }
+        const cardScope = await companyWideCardScope(companyId, payload.callerUserId, isPrivileged(payload.callerRoleType));
 
         const { loggedByUserTask, taskMap, userIds } = await getLoggedAndTasksInRange(companyId, {
             fromSec, toSec,
@@ -1312,6 +1384,7 @@ exports.getTeamLoggedVsEta = async (req, res) => {
                 : Array.isArray(payload.statusKey) ? payload.statusKey : [],
             visibleUserIds,
             taskMatch: (payload.taskMatch && typeof payload.taskMatch === "object") ? payload.taskMatch : null,
+            cardScope,
         });
 
         const [{ map: userTeamMap }, nameMap] = await Promise.all([
@@ -1446,9 +1519,10 @@ exports.getProjectProgressMetric = async (req, res) => {
 
         // Role-based visibility — non-admins are scoped to their own logs.
         const callerUserId = String(payload.callerUserId || "");
-        const callerRoleType = Number(payload.callerRoleType || 3);
-        const restrictToSelf = !(callerRoleType === 1 || callerRoleType === 2);
-        const userScope = () => (restrictToSelf && callerUserId ? { Loggeduser: callerUserId } : {});
+        const callerRoleType = Number(payload.callerRoleType ?? ROLE_GUEST);
+        const restrictToSelf = !isPrivileged(callerRoleType);
+        const cardScope = await companyWideCardScope(companyId, callerUserId, !restrictToSelf);
+        const userScope = () => ({ ...(restrictToSelf && callerUserId ? { Loggeduser: callerUserId } : {}), ...cardScope.time });
         const objIds = (arr) => [...new Set((arr || []).filter(Boolean).map(String))]
             .filter((id) => mongoose.Types.ObjectId.isValid(id))
             .map((id) => new mongoose.Types.ObjectId(id));
@@ -1464,9 +1538,7 @@ exports.getProjectProgressMetric = async (req, res) => {
         };
 
         // Active project criteria — matches the app's "active" definition:
-        // not closed, not deleted. SECURITY: scoped to the caller's visible
-        // projects (owner/admin → all; member → own/public), so the active-project
-        // count and by-type breakdown no longer leak company-wide project data.
+        // not closed, not deleted, and scoped to the projects the caller can open.
         const needsProjectScope = metric === "active_projects" || metric === "projects_by_type";
         const projFilter = needsProjectScope ? await resolveVisibleProjectFilter(companyId, req.uid) : null;
         const activeProjectFilter = {
@@ -1537,7 +1609,7 @@ exports.getProjectProgressMetric = async (req, res) => {
             let running = [];
             if (taskIds.length) {
                 const tasks = await MongoDbCrudOpration(companyId, {
-                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0 }, { ProjectID: 1 }],
+                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0, ...cardScope.tasks }, { ProjectID: 1 }],
                 }, "find").catch(() => []);
                 const pids = objIds((tasks || []).map((t) => t.ProjectID));
                 if (pids.length) {
@@ -1595,6 +1667,7 @@ exports.getProjectProgressMetric = async (req, res) => {
                         {
                             Loggeduser: { $in: [...new Set(pairs.map((p) => p.userId))] },
                             LogStartTime: { $gte: Math.floor(dayStart.getTime() / 1000), $lte: nowSec },
+                            ...cardScope.time,
                         },
                         { Loggeduser: 1, TicketID: 1, LogTimeDuration: 1 },
                     ],
@@ -1615,7 +1688,7 @@ exports.getProjectProgressMetric = async (req, res) => {
             const taskIds = objIds(pairs.map((p) => p.taskId));
             if (taskIds.length) {
                 const tasks = await MongoDbCrudOpration(companyId, {
-                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0 }, { TaskName: 1, TaskKey: 1, ProjectID: 1, sprintArray: 1 }],
+                    type: SCHEMA_TYPE.TASKS, data: [{ _id: { $in: taskIds }, deletedStatusKey: 0, ...cardScope.tasks }, { TaskName: 1, TaskKey: 1, ProjectID: 1, sprintArray: 1 }],
                 }, "find").catch(() => []);
                 (tasks || []).forEach((t) => { taskMap[String(t._id)] = t; });
                 const pids = objIds(Object.values(taskMap).map((t) => t.ProjectID));
@@ -1711,7 +1784,7 @@ exports.getProjectProgressMetric = async (req, res) => {
             const taskMap = {};
             const tIds = objIds([...taskIdSet]);
             if (tIds.length) {
-                const taskFilter = { _id: { $in: tIds }, deletedStatusKey: 0 };
+                const taskFilter = { _id: { $in: tIds }, deletedStatusKey: 0, ...cardScope.tasks };
                 const pmClause = projectScopeClause(projectMode, projectIds);
                 if (pmClause) taskFilter.ProjectID = pmClause;
                 if (includeSubtasks === false) taskFilter.isParentTask = true;
@@ -1825,9 +1898,7 @@ exports.getOnLeaveBoard = async (req, res) => {
         // callerUserId/callerRoleType in the body can no longer widen scope.
         payload.callerUserId = String(req.uid || "");
         payload.callerRoleType = await resolveCallerRoleType(companyId, req.uid);
-        const projectIds = (Array.isArray(payload.projectIds) ? payload.projectIds : [])
-            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
-            .map((id) => new mongoose.Types.ObjectId(String(id)));
+        const projectIds = await listableProjectIds(companyId, payload.callerUserId, payload.projectIds);
         if (!projectIds.length) {
             return res.status(200).json({
                 status: true,
@@ -1845,6 +1916,8 @@ exports.getOnLeaveBoard = async (req, res) => {
         const taskFilter = {
             ProjectID: { $in: projectIds },
             deletedStatusKey: 0,
+            mainChat: { $ne: true },
+            ...(await hiddenSprintFilter(companyId, payload.callerUserId, projectIds)),
             $or: [
                 { startDate: { $gte: dateFrom, $lte: dateTo } },
                 { DueDate: { $gte: dateFrom, $lte: dateTo } },
@@ -1967,6 +2040,7 @@ exports.getMyNextTasks = async (req, res) => {
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
             ...(projClause ? { ProjectID: projClause } : {}),
+            ...(await ownWorkScope(companyId, uid)),
         }, bodyTaskMatch(req.body));
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -2064,6 +2138,7 @@ exports.getMyAchievements = async (req, res) => {
             AssigneeUserId: uid,
             updatedAt: { $gte: dateFrom, $lte: dateTo },
             ...(projClause ? { ProjectID: projClause } : {}),
+            ...(await ownWorkScope(companyId, uid)),
         }, bodyTaskMatch(req.body));
         const tasks = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.TASKS,
@@ -2224,11 +2299,11 @@ exports.getMyLeave = async (req, res) => {
             return res.status(400).json({ status: false, message: "companyId header required" });
         }
         const uid = String(req.uid || "");
-        const projectIds = (Array.isArray(req.body && req.body.projectIds) ? req.body.projectIds : [])
-            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
-            .map((id) => new mongoose.Types.ObjectId(String(id)));
+        const named = (Array.isArray(req.body && req.body.projectIds) ? req.body.projectIds : [])
+            .filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+        const projectIds = uid ? await listableProjectIds(companyId, uid, named) : [];
         if (!uid || !projectIds.length) {
-            return res.status(200).json({ status: true, data: { configured: projectIds.length > 0, rows: [] } });
+            return res.status(200).json({ status: true, data: { configured: named.length > 0, rows: [] } });
         }
 
         const leaveFilter = applyTaskMatch({
@@ -2295,8 +2370,12 @@ exports.getMyDueSoon = async (req, res) => {
             mainChat: { $ne: true }, // exclude chat threads (stored as tasks)
             statusType: { $ne: "close" },
             $or: [{ AssigneeUserId: uid }, { Task_Leader: uid }],
-            DueDate: { $gte: start, $lte: end },
+            // Overdue work is off by default so the existing card is unchanged; the
+            // redesigned My work card asks for it, because "what is late" is the first
+            // thing that card answers.
+            DueDate: req.body && req.body.includeOverdue === true ? { $lte: end } : { $gte: start, $lte: end },
             ...(projClause ? { ProjectID: projClause } : {}),
+            ...(await ownWorkScope(companyId, uid)),
         }, bodyTaskMatch(req.body));
 
         const tasks = await MongoDbCrudOpration(companyId, {
@@ -2440,7 +2519,7 @@ exports.getTasksByStatus = async (req, res) => {
         }
         const uid = String(req.uid || "");
         const emptyPayload = (scope) => ({
-            statuses: [], total: 0, users: [], usersCapped: false,
+            statuses: [], projects: [], total: 0, users: [], usersCapped: false,
             rows: [], rowsHasMore: false, rowsNextSkip: 0,
             scope, period: null,
         });
@@ -2451,7 +2530,7 @@ exports.getTasksByStatus = async (req, res) => {
         const { dateFrom, dateTo, fromSec, toSec } = getDayOrRangeBounds(body);
 
         const callerRoleType = await resolveCallerRoleType(companyId, uid);
-        const isManagement = callerRoleType === 1 || callerRoleType === 2;
+        const isManagement = isPrivileged(callerRoleType);
 
         // Which statuses the card is showing. Empty means every status, so a freshly
         // added card is useful before anyone opens its settings.
@@ -2502,6 +2581,7 @@ exports.getTasksByStatus = async (req, res) => {
         }));
 
         const scope = isManagement ? "company" : "self";
+        const callerTasks = await cardTaskScope(companyId, uid, isManagement);
         if (!windowTaskIds.length) {
             return res.status(200).json({
                 status: true,
@@ -2519,7 +2599,7 @@ exports.getTasksByStatus = async (req, res) => {
             ...(projClause ? { ProjectID: projClause } : {}),
             // A member sees their own work only: assigned to them, not merely led or
             // created by them - the same line getMyAchievements draws.
-            ...(isManagement ? {} : { AssigneeUserId: uid }),
+            ...callerTasks,
         }, bodyTaskMatch(body));
 
         const baseFilter = taskScope(true);
@@ -2544,6 +2624,49 @@ exports.getTasksByStatus = async (req, res) => {
             .filter((g) => g && g._id !== null && g._id !== undefined)
             .map((g) => ({ statusKey: Number(g._id), count: Number(g.n) || 0 }));
         const total = statuses.reduce((a, s) => a + s.count, 0);
+
+        // Stacked bars per project (redesign 20d). One extra grouping over the same
+        // scope, only when the card asks for it — the matrix below is per person and
+        // cannot answer "which project is the blocked work in?".
+        let projects = [];
+        if (body.byProject === true) {
+            const perProject = await MongoDbCrudOpration(companyId, {
+                type: SCHEMA_TYPE.TASKS,
+                data: [[
+                    { $match: baseFilter },
+                    { $group: { _id: { p: "$ProjectID", s: "$statusKey" }, n: { $sum: 1 } } },
+                ]],
+            }, "aggregate").catch((e) => {
+                logger.error(`getTasksByStatus per-project failed: ${e && e.message ? e.message : e}`);
+                return [];
+            });
+            const byProject = new Map();
+            (perProject || []).forEach((g) => {
+                const pid = String((g && g._id && g._id.p) || "");
+                const sKey = Number(g && g._id && g._id.s);
+                if (!pid || !Number.isFinite(sKey)) return;
+                if (!byProject.has(pid)) byProject.set(pid, { projectId: pid, name: "", total: 0, counts: {} });
+                const rec = byProject.get(pid);
+                const n = Number(g.n) || 0;
+                rec.counts[sKey] = (rec.counts[sKey] || 0) + n;
+                rec.total += n;
+            });
+            const pids = Array.from(byProject.keys()).filter((id) => mongoose.Types.ObjectId.isValid(id));
+            if (pids.length) {
+                const projectRows = await MongoDbCrudOpration(companyId, {
+                    type: SCHEMA_TYPE.PROJECTS,
+                    data: [{ _id: { $in: pids.map((id) => new mongoose.Types.ObjectId(id)) } }, { ProjectName: 1 }],
+                }, "find").catch(() => []);
+                (projectRows || []).forEach((p) => {
+                    const rec = byProject.get(String(p._id));
+                    if (rec) rec.name = p.ProjectName || "";
+                });
+            }
+            projects = Array.from(byProject.values())
+                .filter((p) => p.name)
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 8);
+        }
 
         // The per-person matrix: one row per assignee, one number per status.
         //
@@ -2874,6 +2997,7 @@ exports.getTasksByStatus = async (req, res) => {
             status: true,
             data: {
                 statuses,
+                projects,
                 total,
                 users,
                 usersCapped: allUsers.length > USER_LIMIT,
@@ -2893,3 +3017,343 @@ exports.getTasksByStatus = async (req, res) => {
         });
     }
 };
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Shared dashboards (redesign 12d).
+ *
+ * The same `userDashboard` collection, with an owner and a visibility. A
+ * document written before this existed has neither, so it is read as
+ * { ownerId: userId, visibility: 'private' } — the pre-existing personal
+ * dashboard keeps working and shows up in the hub as its owner's own.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+const DASHBOARD_VISIBILITY = ["private", "workspace", "project"];
+const MAX_DASHBOARD_CARDS = 60;
+
+const dashboardOwner = (doc) => String((doc && (doc.ownerId || doc.userId)) || "");
+const dashboardVisibility = (doc) => {
+    const v = String((doc && doc.visibility) || "");
+    return DASHBOARD_VISIBILITY.includes(v) ? v : "private";
+};
+
+function sanitizeDashboardCards(cards) {
+    if (!Array.isArray(cards)) return [];
+    return cards.slice(0, MAX_DASHBOARD_CARDS).map((c) => {
+        const pos = (c && c.config && c.config.position) || {};
+        const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+        return {
+            componentId: String((c && c.componentId) || ""),
+            cardId: String((c && c.cardId) || ""),
+            uid: String((c && c.uid) || ""),
+            config: {
+                cardData: (c && c.config && typeof c.config.cardData === "object" && c.config.cardData) || {},
+                filterData: Array.isArray(c && c.config && c.config.filterData) ? c.config.filterData : [],
+                position: {
+                    x: num(pos.x, 0), y: num(pos.y, 0),
+                    w: num(pos.w, 3), h: num(pos.h, 5),
+                    minW: num(pos.minW, 3), maxW: num(pos.maxW, 12),
+                    minH: num(pos.minH, 4), maxH: num(pos.maxH, 22),
+                },
+            },
+        };
+    }).filter((c) => c.componentId && c.uid);
+}
+
+// Project ids the caller may see, for the 'project' visibility: the set the project list gives them.
+async function visibleProjectIds(companyId, uid) {
+    const filter = await resolveVisibleProjectFilter(companyId, uid);
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PROJECTS,
+        data: [{ isDelete: { $ne: true }, ...filter }, { _id: 1 }],
+    }, "find").catch(() => []);
+    return (rows || []).map((p) => String(p._id));
+}
+
+/* A project dashboard is listed to everyone who opens the project, so its owner has to be one of them. */
+async function openProjectOf(companyId, uid, projectId) {
+    const id = typeof projectId === "string" ? projectId : "";
+    if (!mongoose.Types.ObjectId.isValid(id)) return "";
+    return (await visibleProjectIds(companyId, uid)).includes(id) ? id : "";
+}
+
+const PROJECT_NOT_FOUND = { status: false, message: "Project not found." };
+
+function canViewDashboard(doc, uid, projectIds) {
+    if (!doc || doc.isDeleted === true) return false;
+    if (dashboardOwner(doc) === uid) return true;
+    const vis = dashboardVisibility(doc);
+    if (vis === "workspace") return true;
+    if (vis === "project") return projectIds.includes(String(doc.projectId || ""));
+    return (Array.isArray(doc.sharedWith) ? doc.sharedWith.map(String) : []).includes(uid);
+}
+
+const canEditDashboard = (doc, uid) => dashboardOwner(doc) === uid;
+
+async function findDashboardById(companyId, id) {
+    if (!mongoose.Types.ObjectId.isValid(String(id || ""))) return null;
+    return MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.USERDASHBOARD,
+        data: [{ _id: new mongoose.Types.ObjectId(String(id)) }],
+    }, "findOne").catch(() => null);
+}
+
+function dashboardSummary(doc, uid, nameMap) {
+    const owner = dashboardOwner(doc);
+    return {
+        _id: String(doc._id),
+        title: doc.title || "Untitled dashboard",
+        description: doc.description || "",
+        ownerId: owner,
+        ownerName: (nameMap && nameMap[owner]) || "",
+        isMine: owner === uid,
+        visibility: dashboardVisibility(doc),
+        projectId: String(doc.projectId || ""),
+        cardCount: Array.isArray(doc.cards) ? doc.cards.length : 0,
+        // Enough to draw the hub's layout thumbnail, without the card configs.
+        preview: (Array.isArray(doc.cards) ? doc.cards : []).slice(0, 12).map((c) => ({
+            componentId: c.componentId,
+            ...((c.config && c.config.position) || {}),
+        })),
+        canEdit: canEditDashboard(doc, uid),
+        updatedAt: doc.updatedAt || doc.createdAt || null,
+    };
+}
+
+const dropDashboardCaches = (userId) => {
+    if (userId) myCache.del(`dashboard_${userId}`);
+};
+
+// A failed clean-up leaves rows nobody can reach, so it never fails the save it follows.
+const forgetCardAnswers = (companyId, dashboardId, keptUids) => forgetCards(companyId, dashboardId, keptUids)
+    .catch((error) => logger.error(`dashboard card answers clean-up: ${error && error.message ? error.message : error}`));
+
+exports.listDashboards = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        if (!companyId || !uid) {
+            return res.status(400).json({ status: false, message: "companyId header and an authenticated user are required." });
+        }
+        const projectIds = await visibleProjectIds(companyId, uid);
+        const docs = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: [{
+                isDeleted: { $ne: true },
+                $or: [
+                    { ownerId: uid },
+                    { userId: uid },
+                    { visibility: "workspace" },
+                    { sharedWith: uid },
+                    ...(projectIds.length ? [{ visibility: "project", projectId: { $in: idForms(projectIds) } }] : []),
+                ],
+            }],
+        }, "find").catch(() => []);
+
+        const visible = (docs || []).filter((d) => canViewDashboard(d, uid, projectIds));
+        const nameMap = await getUserNameMap(visible.map(dashboardOwner)).catch(() => ({}));
+        const data = visible
+            .map((d) => dashboardSummary(d, uid, nameMap))
+            .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+        return res.status(200).json({ status: true, statusText: "Dashboards fetched.", data });
+    } catch (error) {
+        logger.error(`listDashboards error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while listing dashboards." });
+    }
+};
+
+exports.getSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        const projectIds = await visibleProjectIds(companyId, uid);
+        if (!canViewDashboard(doc, uid, projectIds)) {
+            return res.status(403).json({ status: false, message: "You do not have access to this dashboard." });
+        }
+        const nameMap = await getUserNameMap([dashboardOwner(doc)]).catch(() => ({}));
+        return res.status(200).json({
+            status: true,
+            statusText: "Dashboard fetched.",
+            data: { ...dashboardSummary(doc, uid, nameMap), cards: Array.isArray(doc.cards) ? doc.cards : [] },
+        });
+    } catch (error) {
+        logger.error(`getSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while fetching the dashboard." });
+    }
+};
+
+exports.createSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        if (!companyId || !uid) {
+            return res.status(400).json({ status: false, message: "companyId header and an authenticated user are required." });
+        }
+        const body = req.body || {};
+        const title = String(body.title || "").trim().slice(0, 120);
+        if (!title) return res.status(400).json({ status: false, message: "A dashboard needs a name." });
+        const visibility = DASHBOARD_VISIBILITY.includes(String(body.visibility)) ? String(body.visibility) : "private";
+        if (visibility === "project" && !body.projectId) {
+            return res.status(400).json({ status: false, message: "A project dashboard needs a project." });
+        }
+        const projectId = visibility === "project" ? await openProjectOf(companyId, uid, body.projectId) : "";
+        if (visibility === "project" && !projectId) return res.status(404).json(PROJECT_NOT_FOUND);
+        const saved = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: {
+                userId: uid,
+                ownerId: uid,
+                updatedBy: uid,
+                visibility,
+                projectId,
+                sharedWith: [],
+                title,
+                description: String(body.description || "").slice(0, 240),
+                cards: sanitizeDashboardCards(body.cards),
+                isDeleted: false,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+        }, "save");
+        dropDashboardCaches(uid);
+        return res.status(200).json({ status: true, statusText: "Dashboard created.", data: dashboardSummary(saved, uid, {}) });
+    } catch (error) {
+        logger.error(`createSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while creating the dashboard." });
+    }
+};
+
+exports.updateSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        if (!canEditDashboard(doc, uid)) {
+            return res.status(403).json({ status: false, message: "Only the owner can change this dashboard." });
+        }
+        const body = req.body || {};
+        const set = { updatedBy: uid, updatedAt: new Date() };
+        if (body.title !== undefined) {
+            const title = String(body.title).trim().slice(0, 120);
+            if (!title) return res.status(400).json({ status: false, message: "A dashboard needs a name." });
+            set.title = title;
+        }
+        if (body.visibility !== undefined) {
+            if (!DASHBOARD_VISIBILITY.includes(String(body.visibility))) {
+                return res.status(400).json({ status: false, message: "Unknown visibility." });
+            }
+            set.visibility = String(body.visibility);
+            const named = set.visibility === "project" ? (body.projectId || String(doc.projectId || "")) : "";
+            if (set.visibility === "project" && !named) {
+                return res.status(400).json({ status: false, message: "A project dashboard needs a project." });
+            }
+            set.projectId = named ? await openProjectOf(companyId, uid, named) : "";
+            if (named && !set.projectId) return res.status(404).json(PROJECT_NOT_FOUND);
+        }
+        if (Array.isArray(body.sharedWith)) {
+            set.sharedWith = body.sharedWith.map(String).filter((v) => mongoose.Types.ObjectId.isValid(v)).slice(0, 200);
+            const held = new Set((doc.sharedWith || []).map(String));
+            if ((await nonMembersOf(companyId, set.sharedWith.filter((id) => !held.has(id)))).length) {
+                return res.status(400).json({ status: false, message: NOT_A_MEMBER });
+            }
+        }
+        const updated = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: [{ _id: doc._id }, { $set: set }, { new: true, useFindAndModify: false }],
+        }, "findOneAndUpdate");
+        dropDashboardCaches(dashboardOwner(doc));
+        return res.status(200).json({ status: true, statusText: "Dashboard updated.", data: dashboardSummary(updated || doc, uid, {}) });
+    } catch (error) {
+        logger.error(`updateSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while updating the dashboard." });
+    }
+};
+
+exports.updateSharedDashboardCards = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        if (!canEditDashboard(doc, uid)) {
+            return res.status(403).json({ status: false, message: "Only the owner can change this dashboard." });
+        }
+        const cards = sanitizeDashboardCards((req.body || {}).cards);
+        const updated = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: [{ _id: doc._id }, { $set: { cards, updatedBy: uid, updatedAt: new Date() } }, { new: true, useFindAndModify: false }],
+        }, "findOneAndUpdate");
+        dropDashboardCaches(dashboardOwner(doc));
+        await forgetCardAnswers(companyId, doc._id, cards.map((c) => c.uid));
+        return res.status(200).json({ status: true, statusText: "Dashboard saved.", data: { cards: (updated && updated.cards) || cards } });
+    } catch (error) {
+        logger.error(`updateSharedDashboardCards error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while saving the dashboard." });
+    }
+};
+
+exports.duplicateSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        const projectIds = await visibleProjectIds(companyId, uid);
+        if (!canViewDashboard(doc, uid, projectIds)) {
+            return res.status(403).json({ status: false, message: "You do not have access to this dashboard." });
+        }
+        // A copy is always the copier's own and always private: sharing is a
+        // decision about the new dashboard, not something inherited silently.
+        const saved = await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: {
+                userId: uid,
+                ownerId: uid,
+                updatedBy: uid,
+                visibility: "private",
+                projectId: "",
+                sharedWith: [],
+                title: `${doc.title || "Dashboard"} (copy)`.slice(0, 120),
+                description: doc.description || "",
+                cards: sanitizeDashboardCards(doc.cards).map((c) => ({
+                    ...c,
+                    uid: String(Math.floor(100000000 + Math.random() * 900000000)),
+                })),
+                isDeleted: false,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            },
+        }, "save");
+        dropDashboardCaches(uid);
+        return res.status(200).json({ status: true, statusText: "Dashboard duplicated.", data: dashboardSummary(saved, uid, {}) });
+    } catch (error) {
+        logger.error(`duplicateSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while duplicating the dashboard." });
+    }
+};
+
+exports.deleteSharedDashboard = async (req, res) => {
+    try {
+        const companyId = req.headers["companyid"];
+        const uid = String(req.uid || "");
+        const doc = await findDashboardById(companyId, req.params.id);
+        if (!doc) return res.status(404).json({ status: false, message: "Dashboard not found." });
+        if (!canEditDashboard(doc, uid)) {
+            return res.status(403).json({ status: false, message: "Only the owner can delete this dashboard." });
+        }
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.USERDASHBOARD,
+            data: [{ _id: doc._id }, { $set: { isDeleted: true, updatedBy: uid, updatedAt: new Date() } }, { new: true, useFindAndModify: false }],
+        }, "findOneAndUpdate");
+        dropDashboardCaches(dashboardOwner(doc));
+        await forgetCardAnswers(companyId, doc._id);
+        return res.status(200).json({ status: true, statusText: "Dashboard deleted.", data: { _id: String(doc._id) } });
+    } catch (error) {
+        logger.error(`deleteSharedDashboard error: ${error && error.message ? error.message : error}`);
+        return res.status(400).json({ status: false, message: "An error occurred while deleting the dashboard." });
+    }
+};
+
+Object.assign(exports, { findDashboardById, canViewDashboard, visibleProjectIds });

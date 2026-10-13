@@ -5,15 +5,15 @@
         <div class="mySettingSection priorityWrapper">
             <div v-if="!milestoneCheck && props.editPermission" :class="[{'Company-pointer-event-none':isSpinner}]">
                 <div class="vs-component vs-con-input-label vs-input inputx vs-input-primary">
-                    <DropDown>
+                    <DropDown mode="listbox">
                         <template #button>
                             <div class=" vs-inputx vs-input--input normal" :ref="milestonefromate">
                                 {{ milestoneformat }}
                             </div>
                         </template>
                         <template #options>
-                            <DropDownOption v-for="(date, index) in dateArray" :key="index">
-                                <div class="w-100"  @click="handleSelect(date),$refs[milestonefromate].click()">{{date}}</div>
+                            <DropDownOption v-for="(date, index) in dateArray" :key="index" :selected="date === milestoneformat" @click="handleSelect(date),$refs[milestonefromate].click()">
+                                <div class="w-100">{{date}}</div>
                             </DropDownOption>
                         </template>
                     </DropDown>
@@ -142,7 +142,7 @@ const handleSelect = (value) => {
     margin-bottom: 20px !important;
 }
 .font_family_status_date {
-    font-family: 'Roboto';
+    font-family: var(--font-ui);
     font-size: 16px;
     font-weight: 400;
     line-height: 19px;

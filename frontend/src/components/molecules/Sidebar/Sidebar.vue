@@ -8,12 +8,18 @@
         >
             <div class="back-drop" v-if="!disableBackdrop" @click="closeOnBackDrop ? $emit('update:visible', !visible) : ''"></div>
             <div
+                ref="panelRef"
+                role="dialog"
+                :aria-modal="disableBackdrop ? null : 'true'"
+                :aria-label="title"
+                tabindex="-1"
+                @keydown.esc.stop="$emit('update:visible', false)"
                 :style="`${width ? `width: ${width}` : ''}; top: ${top}; height: calc(100% - ${top});`"
-                :class="{'hide-side-left':!showSide && left, 'hide-side-right':!showSide && !left,}"
-                class="position-fi bg-white d-flex flex-column sidebar-content z-index-7"
+                :class="[themed ? 'sb-tokens' : 'bg-white', {'hide-side-left':!showSide && left, 'hide-side-right':!showSide && !left}]"
+                class="position-fi d-flex flex-column sidebar-content z-index-7"
                 :id="tourId"
             >
-                <div v-if="!hideHeader" :class="headClass" class="sidebar-head bg-white d-flex align-items-center justify-content-between px-1 blue border-bottom cursor-default">
+                <div v-if="!hideHeader" :class="[headClass, {'bg-white sidebar-blue': !themed}]" class="sidebar-head d-flex align-items-center justify-content-between px-1 border-bottom cursor-default">
                     <slot name="head">
                         <div class="assignee-headtitle d-block text-ellipsis text-nowrap">
                             <slot name="head-left">
@@ -26,20 +32,23 @@
                         </div>
                         <div class="cursor-pointer d-flex align-items-center text-nowrap">
                             <slot name="head-right">
-                                <button v-if="multiSelect && showClear" class="clear-all outline-primary bg-light-gray black mr-1" :class="{'opacity-5 cursor-default': !value.length, 'opacity-10 cursor-pointer': value.length}" @click="$emit('clear')">{{$t('Filters.clearall')}}</button>
-                                <img :src="closeBlueImage" alt="closeButton" class="cursor-pointer" @click="$emit('update:visible', !visible)"/>
+                                <button v-if="multiSelect && showClear" type="button" class="mr-1" :class="[themed ? 'ah-btn ah-btn--secondary ah-btn--sm' : 'clear-all outline-primary sidebar-bg-light-gray sidebar-black', {'opacity-5 cursor-default': !value.length, 'opacity-10 cursor-pointer': value.length}]" @click="$emit('clear')">{{$t('Filters.clearall')}}</button>
+                                <button type="button" class="sidebar-close" :aria-label="$t('Projects.close')" @click="$emit('update:visible', !visible)">
+                                    <ShellIcon v-if="themed" name="x" :size="15" />
+                                    <img v-else :src="closeBlueImage" alt="" class="cursor-pointer"/>
+                                </button>
                             </slot>
                         </div>
                     </slot>
                 </div>
-                <div class="black sidebar-body bg-white style-scroll" :id="uniqueId" :style="{
+                <div class="sidebar-body sidebar-style-scroll" :class="{'sidebar-black bg-white': !themed}" :id="uniqueId" :style="{
                     'height': (hideHeader ? '100%' : '')
                 }">
-                    <div v-if="enableSearch" class="bg-white mobile-list-inputsearch-wrapper border-bottom p-15px">
-                        <input ref="sidebar_search" type="text" v-model="search" :placeHolder="$t('PlaceHolder.search')" class="form-control listsidebar-search font-size-16" @input="$emit('searchChange', search)">
+                    <div v-if="enableSearch" class="mobile-list-inputsearch-wrapper border-bottom p-15px" :class="{'bg-white': !themed}">
+                        <input ref="sidebar_search" type="text" v-model="search" :placeHolder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" class="form-control listsidebar-search sidebar-font-size-16" @input="$emit('searchChange', search)">
                     </div>
                     <slot name="body">
-                        <div v-if="defaultLayout" class="overflow-y-auto sidebar-options overflow-x-hidden" :style="`height: ${!enableSearch ? 'calc(100% - 0px);' : 'calc(100% - 62px);'}`">
+                        <div v-if="defaultLayout" class="overflow-y-auto sidebar-options overflow-x-hidden" :role="filteredOptions?.length ? 'listbox' : null" :aria-label="filteredOptions?.length ? title : null" :aria-multiselectable="multiSelect ? 'true' : null" :style="`height: ${!enableSearch ? 'calc(100% - 0px);' : 'calc(100% - 62px);'}`">
                             <template v-if="!grouped">
                                 <template v-if="filteredOptions?.length">
                                     <SidebarItems
@@ -54,17 +63,18 @@
                                         @remove="(item) => updateItem('remove', item)"
                                         :isDefault="isDefault"
                                         :imageDisplayForPriority="imageDisplayForPriority"
+                                        :themed="themed"
                                     />
                                 </template>
                                 <template v-else>
                                     <div class="text-center mt-10px">
-                                        <span class="red" >{{$t('ProjectSlider.no_result_found')}}</span>
+                                        <span class="sidebar-red" >{{$t('ProjectSlider.no_result_found')}}</span>
                                     </div>
                                 </template>
                             </template>
                             <template v-else>
                                 <template v-for="(group, index) in filteredOptions">
-                                    <div v-if="group.options.length" :key="index">
+                                    <div v-if="group.options.length" :key="index" role="group" :aria-label="group.label">
                                         <div class="group-title p-1">
                                             {{group.label}}
                                         </div>
@@ -80,6 +90,7 @@
                                             @select="(item) => updateItem('add', item)"
                                             @remove="(item) => updateItem('remove', item)"
                                             :imageDisplayForPriority="imageDisplayForPriority"
+                                            :themed="themed"
                                         />
                                     </div>
                                     <div v-else :key="'no_result'+index">
@@ -87,7 +98,7 @@
                                             {{group.label}}
                                         </div>
                                         <div class="text-center mt-10px">
-                                            <span class="red">{{$t('ProjectSlider.no_result_found')}}</span>
+                                            <span class="sidebar-red">{{$t('ProjectSlider.no_result_found')}}</span>
                                         </div>
                                     </div>
                                 </template>
@@ -102,13 +113,17 @@
 
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, defineEmits, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
+import { computed, defineComponent, defineProps, defineEmits, inject, ref, watch, nextTick, onMounted, onUnmounted } from "vue";
+import { routeLocationKey } from "vue-router";
 
 // COMPONENTS
 import SidebarItems from "../SidebarItems/SidebarItems.vue";
+import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
 
 // COMPOSABLES
 import { useCustomComposable } from "@/composable";
+import { useFocusTrap } from "@/composable/useFocusTrap";
+import { useEscapeLayer } from "@/composable/useEscapeLayer";
 
 // USE COMPOSABLES
 const { debounce } = useCustomComposable();
@@ -135,7 +150,7 @@ const props = defineProps({
     },
     top: {
         type: String,
-        default: "46px"
+        default: "var(--legacy-header-h)"
     },
     visible: {
         type: Boolean,
@@ -234,13 +249,21 @@ const props = defineProps({
     listenKeys: {
         type: Boolean,
         default:false
-    }
+    },
+    themed: { type: Boolean, default: true }
 })
 const showSide = ref(false);
 const search = ref("");
 const sidebar_search = ref(null);
 // eslint-disable-next-line
 const visible = ref(false);
+useEscapeLayer(() => props.visible, () => emit('update:visible', false));
+
+// Injected, not useRoute(), so a sheet mounted without a router still renders.
+const route = inject(routeLocationKey, null);
+watch([() => route?.path, () => route?.query?.task], () => {
+    if (props.visible) emit('update:visible', false);
+});
 // FILTER OPTIONS
 const filteredOptions = ref();
 
@@ -258,6 +281,7 @@ function stopListener() {
     document.removeEventListener("keydown", keyListener)
 }
 function keyListener(event) {
+    if (event.target?.closest?.('[role="option"]')) return;
     const currentGroup = filteredOptions.value[groupIndex.value];
     const options = currentGroup?.options || [];
     if(event.keyCode === 13) { // Enter
@@ -415,8 +439,42 @@ function searchOptions(val) {
 watch(() => props.options, () => {
     searchOptions(search.value);
 })
+
+const panelRef = ref(null);
+useFocusTrap(panelRef, computed(() => props.visible && !props.disableBackdrop));
 </script>
 
 <style>
 @import "./style.css";
+</style>
+
+<style scoped>
+.sidebar-black {
+    color: var(--ink);
+}
+.sidebar-blue {
+    color: var(--brand) !important;
+}
+.sidebar-red {
+    color: var(--danger-ink);
+}
+.sidebar-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.sidebar-font-size-16 {
+    font-size: 16px;
+}
+.sidebar-style-scroll::-webkit-scrollbar-track {
+    background-color: var(--canvas);
+}
+.sidebar-style-scroll::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+    background-color: var(--canvas);
+    border-radius: 8px;
+}
+.sidebar-style-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--ink-3);
+    border-radius: 8px;
+}
 </style>

@@ -1,0 +1,241 @@
+import { computed, ref } from "vue";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
+import { i18n } from "@/locales/main";
+
+// The server clamps autonomy to L3; a fourth rung would promise a level no agent can reach.
+const AUTONOMY = [
+    { level: 0, key: "L0", label: "Assist" },
+    { level: 1, key: "L1", label: "Suggest" },
+    { level: 2, key: "L2", label: "Act in bounds" },
+    { level: 3, key: "L3", label: "Scheduled" }
+];
+
+const INBOX_VIEWS = Object.freeze({
+    pending: { query: "?status=pending", statuses: ["pending"] },
+    done: { query: "?status=all&limit=200", statuses: ["approved", "edited"] },
+    declined: { query: "?status=declined", statuses: ["declined"] }
+});
+
+const agents = ref([]);
+const proposals = ref([]);
+const counts = ref({});
+const runSummary = ref({});
+const spend = ref({});
+const registryManifest = ref({ actions: [], never: [] });
+const skillManifest = ref([]);
+const loading = ref(false);
+const lastError = ref("");
+const activeRuns = ref({});
+
+const ok = (res) => res?.data?.status === true;
+const rows = (res) => (ok(res) ? res.data.data : []);
+
+/* The service layer rejects on any non-2xx, so the API's own refusal ("Agent is
+ * paused", "Spend cap reached") lives on error.response — never on res.data. */
+export const reasonOf = (error, fallbackKey) => error?.response?.data?.statusText
+    || error?.response?.data?.message
+    || (error?.message && !/^Request failed with status code/.test(error.message) ? error.message : "")
+    || i18n.global.t(fallbackKey);
+
+const request = async (type, endpoint, body, fallbackKey) => {
+    let res;
+    try {
+        res = await apiRequest(type, endpoint, body);
+    } catch (error) {
+        const errors = error?.response?.data?.data?.errors;
+        throw Object.assign(new Error(reasonOf(error, fallbackKey)), Array.isArray(errors) ? { errors } : {});
+    }
+    if (!ok(res)) throw new Error(res?.data?.statusText || res?.data?.message || i18n.global.t(fallbackKey));
+    return res.data;
+};
+
+export const refusalCount = (run) => (Array.isArray(run?.refusals) ? run.refusals.length : Number(run?.refusals || 0));
+
+export const NEW_AGENT_DEFAULTS = Object.freeze({
+    autonomy: 1,
+    spendCapUsd: 30,
+    // No project until someone picks one: an unscoped agent reads, but every write is refused.
+    projectIds: Object.freeze([]),
+    allowedActions: Object.freeze(["task.comment", "tasks.search", "task.get"])
+});
+
+const OPEN_RUN = ["queued", "running"];
+
+/* GET /runs/:id answers { run, audit }; older callers hand in the bare run. */
+export const runOf = (payload) => {
+    if (!payload) return null;
+    if (payload.run && typeof payload.run === "object") return { ...payload.run, audit: payload.audit || [], revision: payload.revision || null, ...(payload.trace ? { trace: payload.trace } : {}), ...(payload.replayId ? { replayId: payload.replayId } : {}) };
+    return payload;
+};
+
+/* Runs from before revisions carry no number: the server reads them as revision 0. */
+export const pinnedRevisionOf = (run) => {
+    const n = Number(run?.revision?.n ?? run?.agentRevision);
+    return Number.isInteger(n) && n > 0 ? n : 0;
+};
+
+export const undoDeadlineOf = (run) => (run && (run.undoUntil || run.windowEndsAt)) || null;
+
+/* What the revert control should do: "hidden" when the caller cannot see the
+ * project or may not revert, "closed" when only the undo window stands in the
+ * way, "open" otherwise. The server's verdict (undoable / undoReason) wins; a
+ * payload without one falls back to the owner-admin-or-starter rule. */
+export const revertControlState = (run, { userId, privileged, now = Date.now() } = {}) => {
+    if (!run || run.revertedAt || OPEN_RUN.includes(run.status)) return "hidden";
+    const until = undoDeadlineOf(run);
+    const windowOpen = !until || new Date(until).getTime() > now;
+    if (typeof run.undoable === "boolean") {
+        if (run.undoable) return windowOpen ? "open" : "closed";
+        return run.undoReason === "undo_window_passed" ? "closed" : "hidden";
+    }
+    const permitted = Boolean(privileged) || (Boolean(userId) && String(run.startedBy || "") === String(userId));
+    if (!permitted) return "hidden";
+    return windowOpen ? "open" : "closed";
+};
+
+export const canRevertRun = (run, options) => revertControlState(run, options) === "open";
+
+export function autonomyOf(level) {
+    return AUTONOMY.find((a) => a.level === Number(level)) || AUTONOMY[0];
+}
+
+export function useAgents() {
+    const waiting = computed(() => Number(counts.value.waiting || 0));
+
+    const loadAgents = async () => {
+        const res = await apiRequest("get", env.AGENTS);
+        agents.value = rows(res);
+    };
+
+    const loadProposals = async (view = "pending") => {
+        const spec = INBOX_VIEWS[view] || INBOX_VIEWS.pending;
+        const res = await apiRequest("get", `${env.AGENT_PROPOSALS}${spec.query}`);
+        if (!ok(res)) return;
+        proposals.value = (res.data.data || []).filter((p) => spec.statuses.includes(p.status));
+        counts.value = res.data.counts || {};
+    };
+
+    const loadSummary = async () => {
+        const res = await apiRequest("get", `${env.AGENT_RUNS}/summary`);
+        if (!ok(res)) return;
+        runSummary.value = res.data.data || {};
+    };
+
+    const loadSpend = async () => {
+        const res = await apiRequest("get", env.AGENT_SPEND);
+        if (ok(res)) spend.value = res.data.data || {};
+    };
+
+    const loadRegistry = async () => {
+        const res = await apiRequest("get", env.AGENT_REGISTRY);
+        if (ok(res)) registryManifest.value = res.data.data || { actions: [], never: [] };
+    };
+
+    const loadSkills = async ({ includeRetired = false } = {}) => {
+        const res = await apiRequest("get", `${env.AGENT_SKILLS}${includeRetired ? "?retired=true" : ""}`);
+        if (ok(res)) skillManifest.value = res.data.data || [];
+        return skillManifest.value;
+    };
+
+    const loadCatalogues = async () => (await request("get", env.AGENT_SKILL_CATALOGUES, undefined, "Ai.load_failed")).data;
+
+    const loadSkill = async (key) => (await request("get", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}`, undefined, "Ai.load_failed")).data;
+
+    const createSkill = async (body) => (await request("post", env.AGENT_SKILLS, body, "Ai.skill_save_failed")).data;
+
+    const updateSkill = async (key, body) => (await request("put", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}`, body, "Ai.skill_save_failed")).data;
+
+    const retireSkill = async (key) => (await request("delete", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}`, {}, "Ai.skill_retire_failed")).data;
+
+    const dryRunSkill = async (key, body) => (await request("post", `${env.AGENT_SKILLS}/${encodeURIComponent(key)}/dry-run`, body, "Ai.skill_dry_run_failed")).data;
+
+    const loadAll = async () => {
+        loading.value = true;
+        lastError.value = "";
+        try {
+            await Promise.all([loadAgents(), loadProposals(), loadSummary(), loadSpend(), loadRegistry()]);
+        } catch (error) {
+            lastError.value = reasonOf(error, "Ai.load_failed");
+        } finally {
+            loading.value = false;
+        }
+    };
+
+    const decide = async (id, verb, body = {}) => (await request("post", `${env.AGENT_PROPOSALS}/${id}/${verb}`, body, "Ai.decision_failed")).data;
+
+    const setPaused = async (agentId, paused) => {
+        await request("post", `${env.AGENTS}/${agentId}/${paused ? "pause" : "resume"}`, {}, paused ? "Ai.pause_failed" : "Ai.resume_failed");
+        await loadAgents();
+    };
+
+    const pauseAll = async () => {
+        await request("post", env.AGENT_PAUSE_ALL, {}, "Ai.pause_failed");
+        await Promise.all([loadAgents(), loadSummary()]);
+    };
+
+    const loadActiveRuns = async () => {
+        try {
+            const res = await apiRequest("get", `${env.AGENT_RUNS}?status=open&limit=50`);
+            const map = {};
+            rows(res).forEach((r) => { (map[r.agentId] = map[r.agentId] || []).push({ _id: r._id, startedBy: r.startedBy || "" }); });
+            activeRuns.value = map;
+        } catch (e) { activeRuns.value = {}; }
+    };
+
+    const stopActive = async (agentId, mayStop = () => true) => {
+        const ids = (activeRuns.value[agentId] || []).filter(mayStop).map((r) => r._id);
+        for (const id of ids) {
+            // eslint-disable-next-line no-await-in-loop
+            await request("post", `${env.AGENT_RUNS}/${id}/stop`, {}, "Ai.stop_failed");
+        }
+        await loadActiveRuns();
+        await loadSummary();
+    };
+
+    const runNow = async (agentId, taskId, extra = {}) => {
+        const out = await request("post", env.AGENT_RUNS, { agentId, taskId, trigger: "manual", ...extra }, "Ai.run_failed");
+        await loadSummary();
+        await loadActiveRuns();
+        return out.data;
+    };
+
+    const saveAgent = async (agent) => {
+        const out = agent._id
+            ? await request("put", `${env.AGENTS}/${agent._id}`, agent, "Ai.save_failed")
+            : await request("post", env.AGENTS, agent, "Ai.save_failed");
+        await loadAgents();
+        return out.data;
+    };
+
+    const draftAgent = async (description) => (await request("post", env.AGENT_DRAFT, { description }, "AgentCatalogue.draft_failed")).data;
+
+    const deleteAgent = async (agentId) => {
+        await request("delete", `${env.AGENTS}/${agentId}`, undefined, "Ai.delete_failed");
+        await loadAgents();
+    };
+
+    const loadRun = async (runId) => runOf((await request("get", `${env.AGENT_RUNS}/${runId}`, undefined, "Ai.run_load_failed")).data);
+
+    const revertRun = async (runId) => (await request("post", `${env.AGENT_RUNS}/${runId}/revert`, {}, "Ai.revert_failed")).data;
+
+    const loadRunReplay = async (runId) => {
+        const records = (await request("get", `${env.AGENT_RUNS}/${runId}/replay`, undefined, "Ai.replay_load_failed")).data;
+        return Array.isArray(records) ? records : [];
+    };
+
+    const loadRevisions = async (agentId) => (await request("get", `${env.AGENTS}/${agentId}/revisions`, undefined, "Ai.revisions_load_failed")).data || [];
+
+    const promoteRevision = async (agentId, n) => (await request("post", `${env.AGENTS}/${agentId}/revisions/${n}/promote`, {}, "Ai.revision_promote_failed")).data;
+
+    const rollbackRevision = async (agentId, n) => (await request("post", `${env.AGENTS}/${agentId}/revisions/${n}/rollback`, {}, "Ai.revision_rollback_failed")).data;
+
+    return {
+        agents, proposals, counts, runSummary, spend, registryManifest, skillManifest, loading, lastError,
+        waiting, AUTONOMY,
+        loadAll, loadAgents, loadProposals, loadSummary, loadSpend, loadRegistry,
+        loadSkills, loadCatalogues, loadSkill, createSkill, updateSkill, retireSkill, dryRunSkill,
+        decide, setPaused, pauseAll, runNow, saveAgent, draftAgent, deleteAgent, activeRuns, loadActiveRuns, stopActive,
+        loadRun, revertRun, loadRunReplay, loadRevisions, promoteRevision, rollbackRevision
+    };
+}

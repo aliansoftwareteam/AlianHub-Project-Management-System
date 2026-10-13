@@ -6,7 +6,14 @@ import { useToast } from "vue-toast-notification"
 const $toast = useToast();
 const { makeUniqueId } = useCustomComposable();
 import { i18n } from "@/locales/main";
+import { isAgentComment } from "@/utils/commentSide";
+import { AI_MENTION_NOTICES } from "@/utils/aiMention";
 const t = i18n.global.t;
+
+const noticeAiMention = (ai) => {
+    const key = ai && AI_MENTION_NOTICES[ai.code];
+    if (key) $toast.info(t(key), { position: 'top-right' });
+};
 
 
 
@@ -243,7 +250,10 @@ export const sendMessage = async ({messageData, edited}) => {
                     apiRequest('post', `${env.API_COMMENTS}`, params).then((response) => {
                         if(response.data.status) {
                             const data = response.data.data
+                            noticeAiMention(response.data.ai);
                             resolve({...messageData, _id: data._id, id: data._id});
+                        } else {
+                            reject(new Error(response.data.message || response.data.statusText || "Comment not saved"));
                         }
                     })
                     .catch((error) => {
@@ -263,6 +273,8 @@ export const sendMessage = async ({messageData, edited}) => {
                     apiRequest('put', `${env.API_COMMENTS}`, params).then((response) => {
                         if(response.data.status) {
                             resolve(messageData);
+                        } else {
+                            reject(new Error(response.data.message || response.data.statusText || "Comment not saved"));
                         }
                     })
                     .catch((error) => {
@@ -324,18 +336,11 @@ export const deleteFromWasabi = (path, companyId) => {
     })
 }
 
-export function sendMailFromMessage(to, subject, message) {
-    try {
-        const axiosData = {
-            subject, html: message, toMail: to, isHtml: false
-        }
-        apiRequestWithoutCompnay("post", env.SEND_MAIL, axiosData)
+export function sendSupportMail(message, productName) {
+    apiRequestWithoutCompnay("post", env.SUPPORT_MAIL, { message, productName })
         .catch((error) => {
-            console.error("ERROR in send mail comment: ", error);
+            console.error("ERROR in send support mail: ", error);
         })
-    } catch (error) {
-        console.error("ERROR in send mail comment: ", error);
-    }
 }
 
 // --------------- Conditions to Show/Hide user Info ---------------
@@ -343,7 +348,7 @@ function sameTime(data, data2){
     return data && new Date(data.createdAt).setSeconds(0, 0) && new Date(data.createdAt).setSeconds(0, 0) === new Date(data2.createdAt).setSeconds(0, 0);
 }
 function sameUser(data, data2){
-    return data && data.userId && data.userId === data2.userId;
+    return data && data.userId && data.userId === data2.userId && isAgentComment(data) === isAgentComment(data2);
 }
 export const showUserInfo = (data, data2 = null) => {
     let show = true

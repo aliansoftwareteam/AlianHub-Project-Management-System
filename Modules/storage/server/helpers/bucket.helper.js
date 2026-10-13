@@ -7,6 +7,7 @@ const { default: mongoose } = require("mongoose");
 const { SCHEMA_TYPE } = require('../../../../Config/schemaType');
 const thumbnailArray = require('../../../../thumbnail.json');
 const { guardFile, guardBuffer } = require('../../../../utils/imageGuard.js');
+const { logUploadFailures } = require('../../uploadFailures');
 
 exports.iconsThumbnailGenerator = (fpath,companyId,file,bufferString,fileNameWithRan,thumbnailKey) => {
     return new Promise((resolve, reject) => {
@@ -177,43 +178,17 @@ exports.formatBucketSize = (size, unit) => {
     }
 }
 
-// BUG-017 / #71: this helper used `await fs.cp(source, destination, callback)`,
-// but `fs.cp` is callback-style and returns `undefined` — `await undefined`
-// resolves immediately, so the function returned before the copy was done.
-// That made the surrounding `Promise.allSettled(imageArray.map(...))` fix
-// in `uploadIamgesInStorage` toothless on its own. Promisify the callback
-// here so the awaits up the chain actually wait.
-function copyFile(source, destination) {
-    return new Promise((resolve) => {
-        fs.cp(source, destination, (err) => {
-            if (err) {
-                loggerConfig.error('Error copying file:', err);
-            } else {
-                loggerConfig.info('File copied successfully');
-            }
-            resolve();
-        });
-    });
-}
-exports.uploadIamgesInStorage = (imageArray,companyId) => {
-    return new Promise(async (resolve, reject) => {
-        try {
-            // BUG-017 / #71 fix: the previous `imageArray.forEach(async ...)`
-            // didn't wait for the copyFile awaits, so `resolve()` fired
-            // before any file had finished copying. Use `Promise.allSettled`
-            // so independent copies run in parallel and a single failure
-            // doesn't abort the batch.
-            await Promise.allSettled(imageArray.map(async (x) => {
-                const destPath = path.join(__dirname, '../../../../storage', companyId, x.path);
-                const srcPath = path.join(__dirname, '/../../../../wasabiUploadsLocal', x.filePath);
-                await copyFile(srcPath, destPath);
-            }));
-            resolve();
-        } catch (error) {
-            reject(error);
-        }
-    })
-}
+const copyFile = (source, destination) => new Promise((resolve, reject) => {
+    fs.cp(source, destination, (err) => (err ? reject(err) : resolve()));
+});
+
+exports.uploadIamgesInStorage = async (imageArray, companyId) => {
+    const results = await Promise.allSettled(imageArray.map((x) => copyFile(
+        path.join(__dirname, '/../../../../wasabiUploadsLocal', x.filePath),
+        path.join(__dirname, '../../../../storage', companyId, x.path),
+    )));
+    logUploadFailures(loggerConfig, imageArray, results);
+};
 
 exports.uploadTaskTypeImage = (companyId) => {
     return new Promise(async (resolve, reject) => {
@@ -356,20 +331,14 @@ exports.getBucketSizeCompanyWiseStorage = (bucketId,unit,isUpdate=false) => {
                             ]
                         }
                         await updateCompanyFun(SCHEMA_TYPE.GOLBAL,mongoObj,"findOneAndUpdate",bucketId)
-                        then(()=>{
-                            resolve({
-                                size: size,
-                                unit: unit
-                            })
-                        }).catch((error) => {
+                        .catch((error) => {
                             loggerConfig.error(`Error updating company : ${error}`);
                         })
-                    } else {
-                        resolve({
-                            size: size,
-                            unit: unit
-                        })
                     }
+                    resolve({
+                        size: size,
+                        unit: unit
+                    })
                 } else {
                     resolve({
                         size: 0,
@@ -403,6 +372,7 @@ exports.getBucketSizeStorage = () => {
                     return;
                 })
             })
+            .catch(reject)
         } catch (error) {
             reject(error);
             loggerConfig.error(`Error while getting bucket size: ${error})`)
@@ -410,16 +380,19 @@ exports.getBucketSizeStorage = () => {
     })
 }
 
-// FILE
-const multer = require('multer');
+const multer = require('../../../../utils/contextMulter');
 const jwt = require('jsonwebtoken');
 const sharp = require('sharp');
 const { updateCompanyFun, getCompanyDataFun } = require('../../../Company/controller/updateCompany');
-const { DEFAULT_LIMITS, safeFileFilter, safeRelativePath } = require('../../../../utils/uploadConfig');
+const { DEFAULT_LIMITS, safeRelativePath } = require('../../../../utils/uploadConfig');
+const { USER_PROFILES_BUCKET, refuseBeforeWrite, refuseUpload, uploadRefusal } = require('../../bucketAccess');
+const { uploadScopeRefusal } = require('../../changeScope');
+const { isRowTrackshotKey } = require('../../../../common-storage/taskFileKeys');
 
 const storage = multer.diskStorage({
     destination: function (req, _, cb) {
-        const { path: filepath, companyId: bucketId } = req.body;
+        const filepath = req.body.path;
+        const bucketId = req.storageBucket;
         const safePath = safeRelativePath(filepath);
         const safeBucket = safeRelativePath(bucketId);
         if (!safePath || !safeBucket) {
@@ -445,45 +418,23 @@ const storage = multer.diskStorage({
     }
 });
 exports.storageRef = storage;
+
+const serverUploadRefusal = async (req) => {
+    const bucketId = req.body && req.body.companyId; // tenant-scoping: the bucket an upload claims, checked against the caller's seat right here before anything is written
+    const found = await uploadRefusal(req, bucketId, req.body && req.body.path);
+    if (found || bucketId === USER_PROFILES_BUCKET) return found;
+    const bucket = await exports.checkBucketInDB(bucketId);
+    if (!(bucket && Object.keys(bucket).length)) return { code: 400, statusText: 'Invalid bucketId' };
+    return uploadScopeRefusal(req, 'server');
+};
+
 exports.upload = multer({
     storage,
     limits: DEFAULT_LIMITS,
-    fileFilter: safeFileFilter,
+    fileFilter: refuseBeforeWrite(serverUploadRefusal),
 });
 
-exports.validatePath = async(req, res, next) => {
-    const { path: filepath, companyId: bucketId } = req.body;
-    if (!req.aud.split(",").includes(req.body.companyId)) {
-        res.send({
-            status: false,
-            statusText: `You don't have access to requested bucket`
-        });
-        return;
-    }
-    
-    if (!filepath || filepath.includes('..') || filepath.includes('./') || filepath.includes('//') || filepath.startsWith('/')) {
-
-        const dir = path.join(__dirname, '../../../../storage', bucketId ,filepath);
-        if (fs.existsSync(dir)) {
-            fs.unlinkSync(dir);
-        }
-        return res.status(400).send({status: false, statusText: 'Invalid path'});
-    }
-
-    if(bucketId !== "USER_PROFILES") {
-        const bucketValid = await this.checkBucketInDB(bucketId);
-
-        if (bucketValid && Object.keys(bucketValid).length == 0) {
-            const dir = path.join(__dirname, '../../../../storage', bucketId);
-            if (fs.existsSync(dir)) {
-                fs.rmdirSync(dir,{ recursive: true, force: true });
-            }
-            return res.status(400).send({status: false, statusText: 'Invalid bucketId'});
-        }
-    }
-
-    next();
-}
+exports.validatePath = refuseUpload(serverUploadRefusal);
 
 exports.generateSignedUrl = (bucketId, filepath,domainUrl) => {
     const token = jwt.sign({ bucketId, filepath }, process.env.JWT_SECRET, { algorithm: process.env.JWT_ALGORITHM,
@@ -595,6 +546,10 @@ exports.cleanUpTrackShotCompanyWise = async(companyId) => {
                 let updatedShots = [];
                 
                 for (const shot of ts.trackShots) {
+                    if (!isRowTrackshotKey(ts._id, shot.image)) {
+                        updatedShots.push({ ...shot, deleted: false });
+                        continue;
+                    }
                     try {
                         const filePath = path.join(__dirname, '../../../storage', companyId, shot.image);
                         fs.unlinkSync(filePath);

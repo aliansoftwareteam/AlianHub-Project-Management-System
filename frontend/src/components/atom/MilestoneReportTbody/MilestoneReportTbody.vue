@@ -1,16 +1,17 @@
 <template>
-    <tr class="bg-white" :class="[{'background_color_currency':currencyIndex === props.index}]">
-        <td class="fixed bg-white" :class="[{'background_color_currency':currencyIndex === props.index,'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
+    <tr :class="{ 'mr-row--open': currencyIndex === props.index }">
+        <td class="fixed" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
             <div class="d-flex justify-content-between">
                 <div class="thtitle padding_wrapper_arrow">
-                    <img v-if='currencyIndex === props.index' :src="arrowToogle" alt="arrowToogle" @click="handleToogleCurrency(props.index)" class="rotate_arrow cursor-pointer">
-                    <img v-else :src="arrowToogle" alt="arrowToogle" @click="handleToogleCurrency(props.index)" class="cursor-pointer">
-                    <span class="thtitle_currency_family black padding_wrapper_left_arrow">{{props.index}}</span>
+                    <button type="button" class="mr-toggle" :class="{ 'is-open': currencyIndex === props.index }" :aria-expanded="currencyIndex === props.index" :aria-label="$t('Milestone.toggle_rows', { name: props.index })" @click="handleToogleCurrency(props.index)">
+                        <span class="ah-mask-icon" :style="maskOf(arrowToogle)" aria-hidden="true"></span>
+                    </button>
+                    <span class="thtitle_currency_family padding_wrapper_left_arrow">{{props.index}}</span>
                 </div>
                 <div class="thtitle"></div>
                 <div class="thtitle"></div>
                 <div class="thtitle">
-                    <span class="thtitle_currency_family black text-ellipsis d-block" :title="`${props.objectProjectCurrencyBody.currencySymbol} ${props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(calculateTotalAmount()) : getCommaSeperatedNumber(calculateTotalAmountDate())}`">
+                    <span class="thtitle_currency_family text-ellipsis d-block" :title="`${props.objectProjectCurrencyBody.currencySymbol} ${props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(calculateTotalAmount()) : getCommaSeperatedNumber(calculateTotalAmountDate())}`">
                         {{props.objectProjectCurrencyBody.currencySymbol}} {{props.daysOrMonth && props.daysOrMonth.length === 0 ? getCommaSeperatedNumber(calculateTotalAmount()) : getCommaSeperatedNumber(calculateTotalAmountDate())}}
                     </span>
                 </div>
@@ -22,7 +23,7 @@
                 'border-color-highlight-left':props.daysOrMonth.length === 0 ? new Date().getMonth() === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex + 1,
                 'border-color-highlight-left-next':props.daysOrMonth.length === 0 ? new Date().getMonth() + 1 === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex
             }]" 
-            class="border_currency totalAmountCurrencyFamily black text-center font-weight-700 text-ellipsis" :title="`${totalProjectCurrency(monthDate,monthIndex) === 0 ? '' : `${props.objectProjectCurrencyBody.currencySymbol} ${getCommaSeperatedNumber(totalProjectCurrency(monthDate,monthIndex))}`}`">{{totalProjectCurrency(monthDate,monthIndex) === 0 ? '' : `${props.objectProjectCurrencyBody.currencySymbol} ${getCommaSeperatedNumber(totalProjectCurrency(monthDate,monthIndex))}`}}</td>
+            class="border_currency totalAmountCurrencyFamily text-center text-ellipsis" :title="`${totalProjectCurrency(monthDate,monthIndex) === 0 ? '' : `${props.objectProjectCurrencyBody.currencySymbol} ${getCommaSeperatedNumber(totalProjectCurrency(monthDate,monthIndex))}`}`">{{totalProjectCurrency(monthDate,monthIndex) === 0 ? '' : `${props.objectProjectCurrencyBody.currencySymbol} ${getCommaSeperatedNumber(totalProjectCurrency(monthDate,monthIndex))}`}}</td>
         </template>
     </tr>
     <template v-if="currencyIndex === props.index">
@@ -50,6 +51,7 @@
     import { ref,watch,defineProps } from 'vue';
     import MilestoneReportTbodyProject from '@/components/atom/MilestoneReportTbodyProject/MilestoneReportTbodyProject.vue'
     import MilestoneTotal from '@/components/atom/MilestoneTotal/MilestoneTotal.vue'
+    import { maskOf } from '@/utils/iconMask';
     import {milestoneData} from '@/components/organisms/FixMilestone/helper.js';
     const { getCommaSeperatedNumber } = milestoneData();
     // Variable

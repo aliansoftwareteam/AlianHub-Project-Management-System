@@ -1,23 +1,23 @@
-import { ref, inject } from 'vue';
+import { ref } from 'vue';
 import { useStore } from 'vuex';
 import { useToast } from 'vue-toast-notification';
 import { useI18n } from 'vue-i18n';
-import { useCustomComposable, useGetterFunctions, useHistoryNotification } from '@/composable';
-import { useProjects } from '@/composable/projects';
+import { useFavourites } from '@/composable/favourites';
 import * as env from '@/config/env';
 import { apiRequest } from '@/services';
+import { keyFor, ACTIVE, ARCHIVED, TRASHED } from '@/utils/lifecycle';
+
+/* `archive` is the pending mode: 0 close · 1 archive · 2 delete. */
+const MODE_CLOSE = 0;
+const MODE_ARCHIVE = 1;
+const MODE_DELETE = 2;
 
 export function useProjectLifecycle(projectData) {
     const { commit } = useStore();
     const $toast = useToast();
     const { t } = useI18n();
-    const { sanitizeInput } = useCustomComposable();
-    const { getUser } = useGetterFunctions();
-    const { addHistory, addNotification } = useHistoryNotification();
-    const { markFavourite } = useProjects();
+    const { toggleFavourite } = useFavourites();
 
-    const userId = inject('$userId');
-    const companyId = inject('$companyId');
 
     const archive = ref(0);
     const showSidebar = ref(false);
@@ -25,19 +25,17 @@ export function useProjectLifecycle(projectData) {
 
     function updateChildTasks(restore = false, ProjectId = '') {
         try {
-            const dsk = archive.value;
+            const mode = archive.value;
+            // Tasks inherit 8 from a closed project and 7 from an archived one; a deleted project trashes them.
+            const inherited = mode === MODE_CLOSE ? 8 : 7;
             let taskDeleteStatusKey = 0;
             let deletedStatusKey;
             if (restore) {
-                deletedStatusKey = dsk ? 8 : 7;
-                taskDeleteStatusKey = 0;
+                deletedStatusKey = mode ? 8 : 7;
+                taskDeleteStatusKey = keyFor('task', ACTIVE);
             } else {
-                deletedStatusKey = 0;
-                if (dsk === 1 || dsk === 0) {
-                    taskDeleteStatusKey = (dsk === 0 ? 8 : 7);
-                } else if (dsk === 2) {
-                    taskDeleteStatusKey = 1;
-                }
+                deletedStatusKey = keyFor('task', ACTIVE);
+                taskDeleteStatusKey = mode === MODE_DELETE ? keyFor('task', TRASHED) : inherited;
             }
             try {
                 const object = {
@@ -65,8 +63,8 @@ export function useProjectLifecycle(projectData) {
     async function updateProject(value = null) {
         showSpinner.value = true;
         const updateObject = {};
-        if (value !== null || archive.value !== 0) {
-            updateObject.deletedStatusKey = value !== null ? value : archive.value === 1 ? 2 : 1;
+        if (value !== null || archive.value !== MODE_CLOSE) {
+            updateObject.deletedStatusKey = value !== null ? value : keyFor('project', archive.value === MODE_ARCHIVE ? ARCHIVED : TRASHED);
         } else {
             const status = projectData.value.projectStatusData.find((x) => x.type === 'close');
             updateObject.status = status.value;
@@ -78,41 +76,8 @@ export function useProjectLifecycle(projectData) {
             showSpinner.value = false;
             const ProjectId = JSON.parse(JSON.stringify(projectData.value._id));
             updateChildTasks(value !== null, ProjectId);
-            const user = getUser(userId.value);
-            const userData = {
-                id: user.id,
-                Employee_Name: user.Employee_Name,
-                companyOwnerId: user.companyOwnerId,
-            };
-
-            const type = `${value !== null ? 'restored' : archive.value === 0 ? 'closed' : archive.value === 1 ? 'archived' : 'deleted'}`;
-
+            const type = value !== null ? 'restored' : archive.value === MODE_CLOSE ? 'closed' : archive.value === MODE_ARCHIVE ? 'archived' : 'deleted';
             $toast.success(t(`Toast.Project ${type} successfully`), { position: 'top-right' });
-
-            const notificationObject = {
-                message: `<p><strong>${userData.Employee_Name}</strong> has ${type} the <strong>${sanitizeInput(projectData.value.ProjectName)}</strong> Project</p>`,
-                key: 'project_close',
-                projectId: projectData.value._id,
-            };
-            const historyObj = {
-                message: `<b>${userData.Employee_Name}</b> has ${type} the <b>${sanitizeInput(projectData.value.ProjectName)}</b> Project`,
-                key: 'Project_Name',
-            };
-            addHistory({
-                type: 'project',
-                companyId: companyId.value,
-                projectId: projectData.value._id,
-                taskId: null,
-                object: historyObj,
-                userData,
-            });
-            addNotification({
-                type: 'project',
-                companyId: companyId.value,
-                projectId: projectData.value._id,
-                object: notificationObject,
-                userData,
-            });
             commit('projectData/projectLocalUpdate', { itemData: { ...projectData.value, ...updateObject }, projectId: projectData.value._id, key: value === null ? 'RemoveProject' : 'AddProject', subKey: '', userId: '' });
         } catch (error) {
             showSidebar.value = false;
@@ -123,30 +88,8 @@ export function useProjectLifecycle(projectData) {
     }
 
     function markProjectFavourite() {
-        if (!projectData.value.favouriteTasks || !projectData.value.favouriteTasks.find((x) => x.userId === userId.value)) {
-            markFavourite({
-                cid: companyId.value,
-                projectId: projectData.value._id,
-                userId: userId.value,
-            }).then((msg) => {
-                commit('projectData/projectLocalUpdate', { itemData: { ...projectData.value }, projectId: projectData.value._id, key: 'MarkAsFavourite', subKey: 'add', userId: userId.value });
-                $toast.success(msg, { position: 'top-right' });
-            }).catch((error) => {
-                console.error('ERROR in mark project fav: ', error);
-            });
-        } else {
-            markFavourite({
-                cid: companyId.value,
-                projectId: projectData.value._id,
-                userId: userId.value,
-                data: projectData.value.favouriteTasks.find((x) => x.userId === userId.value),
-            }).then((msg) => {
-                commit('projectData/projectLocalUpdate', { itemData: { ...projectData.value }, projectId: projectData.value._id, key: 'MarkAsFavourite', subKey: 'remove', userId: userId.value });
-                $toast.success(msg, { position: 'top-right' });
-            }).catch((error) => {
-                console.error('ERROR in mark project fav: ', error);
-            });
-        }
+        const project = projectData.value || {};
+        toggleFavourite({ type: 'project', id: String(project._id || ''), name: project.ProjectName || '' });
     }
 
     return {

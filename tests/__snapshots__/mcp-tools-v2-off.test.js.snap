@@ -1,0 +1,376 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers docs.read in today's shape 1`] = `
+{
+  "pageId": "6f00000000000000000000e1",
+  "text": "The spec",
+  "title": "Spec",
+  "updatedAt": 2026-09-02T00:00:00.000Z,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers subtask.create in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "subtask.create",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.comment in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "task.comment",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.create in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "task.create",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.get in today's shape 1`] = `
+{
+  "acceptanceCriteria": [],
+  "checklist": [],
+  "commentCount": 0,
+  "description": "Goal: ship it",
+  "dueDate": null,
+  "estimateHours": 2,
+  "goal": "ship it",
+  "key": "AP-1",
+  "linkedDocs": [],
+  "links": [],
+  "priority": "HIGH",
+  "project": {
+    "id": "6f00000000000000000000a1",
+    "name": "Apollo",
+  },
+  "relations": [],
+  "sprint": {
+    "id": "6f00000000000000000000b1",
+    "name": "Sprint 1",
+  },
+  "status": "To do",
+  "statusType": "default_active",
+  "taskId": "6f00000000000000000000d1",
+  "thread": [],
+  "title": "Ship it",
+  "youMayNot": [
+    "Set this task to Done — a person closes it",
+    "Merge, deploy to production, or delete anything",
+  ],
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.link in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "task.link",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers task.status.set in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "task.status.set",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers tasks.next in today's shape 1`] = `
+{
+  "tasks": [
+    {
+      "dueDate": null,
+      "estimateHours": 2,
+      "key": "AP-1",
+      "priority": "HIGH",
+      "projectId": "6f00000000000000000000a1",
+      "sprintId": "6f00000000000000000000b1",
+      "status": "To do",
+      "statusType": "default_active",
+      "taskId": "6f00000000000000000000d1",
+      "title": "Ship it",
+    },
+  ],
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers tasks.search in today's shape 1`] = `
+{
+  "tasks": [
+    {
+      "dueDate": null,
+      "estimateHours": 2,
+      "key": "AP-1",
+      "priority": "HIGH",
+      "projectId": "6f00000000000000000000a1",
+      "sprintId": "6f00000000000000000000b1",
+      "status": "To do",
+      "statusType": "default_active",
+      "taskId": "6f00000000000000000000d1",
+      "title": "Ship it",
+    },
+  ],
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers timelog.start in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "timelog.start",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes answers timelog.stop in today's shape 1`] = `
+{
+  "auditId": "audit-1",
+  "ok": true,
+  "result": {
+    "action": "timelog.stop",
+  },
+  "undoable": true,
+}
+`;
+
+exports[`MCP_TOOLS_V2 off keeps today's tools and result shapes lists the same tools with the same schemas and no annotations 1`] = `
+[
+  {
+    "description": "Shows the next task assigned to the person: the most urgent first, then the soonest due. Changes nothing.",
+    "inputSchema": {
+      "properties": {
+        "projectId": {
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "tasks.next",
+  },
+  {
+    "description": "Finds tasks the person can open, by text, status or project. Changes nothing.",
+    "inputSchema": {
+      "properties": {
+        "limit": {
+          "type": "integer",
+        },
+        "projectId": {
+          "type": "string",
+        },
+        "query": {
+          "type": "string",
+        },
+        "status": {
+          "type": "string",
+        },
+      },
+      "type": "object",
+    },
+    "name": "tasks.search",
+  },
+  {
+    "description": "Shows one task in full: its goal, what counts as done, linked tasks and docs, and what the comments settled. Read it before you work on the task. Changes nothing.",
+    "inputSchema": {
+      "properties": {
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+      ],
+      "type": "object",
+    },
+    "name": "task.get",
+  },
+  {
+    "description": "Adds a comment to a task at once, and the person can undo it. Use it to report what you found, ask a question or share a link. To mention a member so they are notified, write @[Their Name](their member id) with the id from members.list, or @Their Name exactly as members.list shows it; @[All](everyone) reaches everyone who can open the task. Only people who can open the task are notified, and never the person you act for: the answer lists who was told in mentioned, a named person who was not, and why, in notNotified, and a name that matched no one in notFound.",
+    "inputSchema": {
+      "properties": {
+        "body": {
+          "type": "string",
+        },
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+        "body",
+      ],
+      "type": "object",
+    },
+    "name": "task.comment",
+  },
+  {
+    "description": "Sets a task to In progress or In review at once. You cannot close a task: a person does that.",
+    "inputSchema": {
+      "properties": {
+        "status": {
+          "type": "string",
+        },
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+        "status",
+      ],
+      "type": "object",
+    },
+    "name": "task.status.set",
+  },
+  {
+    "description": "Attaches a link to a task, such as a pull request, a branch or a doc, at once. The person can undo it.",
+    "inputSchema": {
+      "properties": {
+        "kind": {
+          "type": "string",
+        },
+        "label": {
+          "type": "string",
+        },
+        "taskId": {
+          "type": "string",
+        },
+        "url": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+        "url",
+      ],
+      "type": "object",
+    },
+    "name": "task.link",
+  },
+  {
+    "description": "Adds a new task to a project, unassigned and in its first status, at once. Use it for work that is not on the board yet, and put the goal and what counts as done in the description.",
+    "inputSchema": {
+      "properties": {
+        "description": {
+          "type": "string",
+        },
+        "priority": {
+          "enum": [
+            "URGENT",
+            "HIGH",
+            "MEDIUM",
+            "LOW",
+          ],
+          "type": "string",
+        },
+        "projectId": {
+          "type": "string",
+        },
+        "sprintId": {
+          "type": "string",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "projectId",
+        "title",
+      ],
+      "type": "object",
+    },
+    "name": "task.create",
+  },
+  {
+    "description": "Adds one subtask to a task at once. Call it once for each subtask.",
+    "inputSchema": {
+      "properties": {
+        "taskId": {
+          "type": "string",
+        },
+        "title": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+        "title",
+      ],
+      "type": "object",
+    },
+    "name": "subtask.create",
+  },
+  {
+    "description": "Starts a timer on a task at once, so the time is logged for the person.",
+    "inputSchema": {
+      "properties": {
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+      ],
+      "type": "object",
+    },
+    "name": "timelog.start",
+  },
+  {
+    "description": "Stops the running timer at once and saves the time as a time entry.",
+    "inputSchema": {
+      "properties": {
+        "note": {
+          "type": "string",
+        },
+        "taskId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "taskId",
+      ],
+      "type": "object",
+    },
+    "name": "timelog.stop",
+  },
+  {
+    "description": "Shows a doc linked from a task, given its id. Changes nothing.",
+    "inputSchema": {
+      "properties": {
+        "pageId": {
+          "type": "string",
+        },
+      },
+      "required": [
+        "pageId",
+      ],
+      "type": "object",
+    },
+    "name": "docs.read",
+  },
+]
+`;

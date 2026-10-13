@@ -1,0 +1,25 @@
+{
+  "keys": {
+    "Members.close_all_done": [
+      "sprint"
+    ],
+    "Members.close_decide": [
+      "sprint"
+    ],
+    "Members.close_reversible": [
+      "sprint"
+    ],
+    "Members.close_sprint": [
+      "sprint"
+    ],
+    "Members.dest_next_new": [
+      "sprint"
+    ],
+    "Members.dest_pick": [
+      "sprint"
+    ],
+    "Members.start_sprint": [
+      "sprint"
+    ]
+  }
+}

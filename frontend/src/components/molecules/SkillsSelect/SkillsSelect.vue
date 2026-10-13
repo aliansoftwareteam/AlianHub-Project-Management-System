@@ -11,6 +11,8 @@
     <div class="skills-select">
         <DropDown
             v-if="editable"
+            mode="listbox"
+            multiselectable
             :maxHeight="'240px'"
             :bodyClass="{'skills-select__menu': true}"
             :bodyClassHeader="{'w-100': true}"
@@ -27,14 +29,19 @@
                     <span v-if="!selected.length" class="skills-select__placeholder">{{ $t('PlaceHolder.Select_Skills') }}</span>
                 </div>
             </template>
-            <template #options>
+            <template #search>
                 <input v-if="options.length" v-model="search" type="text" class="skills-select__search font-size-13"
                     :placeholder="$t('Projects.search')" @click.stop/>
+            </template>
+            <template #options>
                 <div v-for="skill in filtered" :key="skill.slug"
+                    role="option"
+                    :aria-selected="String(isSelected(skill.slug))"
+                    :aria-disabled="!isSelected(skill.slug) && atLimit ? 'true' : undefined"
                     class="skills-select__option d-flex align-items-center cursor-pointer"
                     :class="{'skills-select__option--disabled': !isSelected(skill.slug) && atLimit}"
                     @click.stop="toggle(skill.slug)">
-                    <input type="checkbox" class="cursor-pointer" :checked="isSelected(skill.slug)"
+                    <input type="checkbox" class="cursor-pointer" tabindex="-1" aria-hidden="true" :checked="isSelected(skill.slug)"
                         :disabled="!isSelected(skill.slug) && atLimit"/>
                     <span class="skills-select__option-name text-ellipsis" :title="skill.slug">{{ skill.name }}</span>
                 </div>
@@ -170,8 +177,8 @@ const toggle = (slug) => {
     max-width: 100%;
 }
 .skills-select__chip {
-    background: #EEF0FB;
-    color: #2F3990;
+    background: var(--brand-tint);
+    color: var(--brand);
     border-radius: 4px;
     padding: 2px 8px;
     font-size: 12px;
@@ -185,16 +192,16 @@ const toggle = (slug) => {
 }
 /* Matches the sibling .form-control inputs in the create-project form. */
 .skills-select__chips--field {
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-radius: 6px;
     height: 30px;
     padding: 0 10px;
     box-sizing: border-box;
-    background: #ffffff;
+    background: var(--surface);
     cursor: pointer;
 }
 .skills-select__chips--field:hover {
-    border-color: #B3B9C4;
+    border-color: var(--ink-2);
 }
 /* Must come after --field so height: auto beats its fixed height. */
 .skills-select__chips--wrap {
@@ -211,25 +218,22 @@ const toggle = (slug) => {
     max-width: 100%;
 }
 .skills-select__placeholder {
-    color: #818181;
+    color: var(--ink-2);
     font-size: 13px;
 }
-/* Sticky so it survives scrolling the list inside the dropdown's max-height. */
 .skills-select__search {
-    position: sticky;
-    top: 0;
-    z-index: 1;
     width: 100%;
     box-sizing: border-box;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 4px 8px;
     margin-bottom: 4px;
-    background: #ffffff;
+    background: var(--surface);
+    color: var(--ink);
     outline: none;
 }
 .skills-select__search:focus {
-    border-color: #2F3990;
+    border-color: var(--brand);
 }
 .skills-select__option {
     gap: 8px;
@@ -244,7 +248,7 @@ const toggle = (slug) => {
     max-width: 220px;
 }
 .skills-select__empty {
-    color: #818181;
+    color: var(--ink-2);
     padding: 6px 4px;
 }
 </style>

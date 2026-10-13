@@ -1,11 +1,11 @@
 <template>
-    <div class="d-flex flex-row justify-content-between w-100 p-10px align-items-center bg-light-gray">
+    <div class="d-flex flex-row justify-content-between w-100 p-10px align-items-center ignored-field-bg-light-gray">
         <div class="w-618px">
-            <table class="w-100 text-left bg-white">
+            <table class="w-100 text-left ignored-field-bg-white">
                 <thead>
-                    <tr class="bg-colorlightgray">
+                    <tr class="ignored-field-bg-colorlightgray">
                         <th
-                            class="w-250px bg-colorlightgray p8px-12px font-size-14 text-left dark-gray opacity-5">
+                            class="w-250px ignored-field-bg-colorlightgray p8px-12px ignored-field-font-size-14 text-left ignored-field-dark-gray opacity-5">
                             {{ header }}
                         </th>
                     </tr>
@@ -42,3 +42,21 @@ const emitEditIgnoredField = () => {
     emit('editIgnoredField')
 }
 </script>
+
+<style scoped>
+.ignored-field-bg-light-gray {
+    background-color: var(--surface-2);
+}
+.ignored-field-bg-white {
+    background-color: var(--surface);
+}
+.ignored-field-bg-colorlightgray {
+    background-color: var(--fill);
+}
+.ignored-field-font-size-14 {
+    font-size: 14px;
+}
+.ignored-field-dark-gray {
+    color: var(--ink);
+}
+</style>

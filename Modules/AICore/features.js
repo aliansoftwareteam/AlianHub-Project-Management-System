@@ -1,0 +1,45 @@
+/* Closed list of the product features that spend tokens. Every model call
+ * carries one so the budget can be read per feature; a call with none is a
+ * test failure and a runtime warning booked as `unknown`. */
+const FEATURES = Object.freeze({
+    AGENT_RUN: 'agent_run',
+    PROJECT_PLAN: 'project_plan',
+    PROJECT_TASKS: 'project_tasks',
+    CLARIFIER: 'clarifier',
+    MEETING_NOTES: 'meeting_notes',
+    TASK_SUMMARY: 'task_summary',
+    GOAL_SUMMARY: 'goal_summary',
+    DESCRIPTION: 'description',
+    TASK_CATEGORY: 'task_category',
+    TASK_ESTIMATE: 'task_estimate',
+    WORKLOAD_SUMMARY: 'workload_summary',
+    ASK: 'ask',
+    ASSIST: 'assist',
+    PROJECT_TEMPLATE: 'project_template',
+    PORTFOLIO_SUMMARY: 'portfolio_summary',
+    PAGE_COMPOSE: 'page_compose',
+    GUIDE: 'guide',
+    MCP_BRIEF: 'mcp_brief',
+    KNOWLEDGE_EMBED: 'knowledge_embed',
+    ACTION_ITEMS: 'action_items',
+    TASK_ASSIST: 'task_assist',
+    WRITING_ASSIST: 'writing_assist',
+    ASSIGNMENT_RULES: 'assignment_rules',
+    AUTOMATION_DRAFT: 'automation_draft',
+    AI_FIELD: 'ai_field',
+    AGENT_BUILDER: 'agent_builder',
+    PROJECT_TRIAGE: 'project_triage',
+});
+
+/* Priced by the audio minute, so outside the token features and the task classes that route them. */
+const AUDIO_FEATURES = Object.freeze({ TRANSCRIPTION: 'transcription' });
+
+const UNKNOWN_FEATURE = 'unknown';
+
+const FEATURE_LIST = Object.freeze(Object.values(FEATURES));
+
+const isFeature = (value) => FEATURE_LIST.includes(value);
+
+const isAudioFeature = (value) => Object.values(AUDIO_FEATURES).includes(value);
+
+module.exports = { FEATURES, FEATURE_LIST, AUDIO_FEATURES, UNKNOWN_FEATURE, isFeature, isAudioFeature };

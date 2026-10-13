@@ -62,7 +62,7 @@
                         :showDay="data.showDifference"
                         :showUser="showUserInfo(data, messages[index - 1])"
                         :showMessageTime="showMessageTime(data, messages[index - 1])"
-                        :showUnread="unreadMessages !== 0 && index === (messages.length - (unreadMessages)) ? unreadMessages : 0"
+                        :showUnread="unreadDivider !== 0 && index === (messages.length - (unreadDivider)) ? unreadDivider : 0"
                         :class="{'mb-1': (index === messages.length - 1)}"
 
                         :mainChat="mainChat"
@@ -78,7 +78,11 @@
                         @reply="replyMessage(data)"
                         @pin="pinMessage(data)"
                         @markUnread="updateCount(true, messages.length - index), resetUnread = false"
-                    />
+                    >
+                        <template v-if="threadsOn && data._id && !data.isDeleted && !data.isSending" #thread>
+                            <CommentThread :message="data" :people="users" />
+                        </template>
+                    </Comment>
                 </div>
             </template>
         </div>
@@ -88,8 +92,8 @@
         <div>
             <div id="comment_footer"  class="border-top position-fi flex-column border-bottom d-flex align-items-end justify-content-between bg-white p-12px comment__footer">
                 <!-- SCROLL BOTTOM -->
-                <button v-if="showScrollBotton" class="scroll-bottom-btn position-ab bg-light-blue cursor-pointer" @click="scrollBottom()">
-                    <img :src="downArrow" alt="downArrow" class="vertical-middle">
+                <button v-if="showScrollBotton" type="button" class="scroll-bottom-btn position-ab cursor-pointer" :aria-label="$t('MainChat.jump_latest')" :title="$t('MainChat.jump_latest')" @click="scrollBottom()">
+                    <span class="ah-mask-icon" :style="maskOf(downArrow)"></span>
                 </button>
 
                 <MediaConfirmation
@@ -113,7 +117,9 @@
                                 @cancel-reply="message.reply = {}"
                                 :showAll="mainChat && !projectData?.default"
                                 :userIds="users.map((x) => x.id)"
-                                @enter="mediaFiles.length ? sendMedia() : sendMessageFun(message)"
+                                :agents="mentionAgents"
+                                :aiMention="threadsOn"
+                                @enter="sendFromComposer()"
                                 :sendMessageAllowed="messageAllowed"
                                 @pasteFile="checkMedia"
                                 :isHeight="props.isHeight"
@@ -122,8 +128,8 @@
                         </template>
                         <template v-else>
                             <span class="mr-10px">{{recordTime}}</span>
-                            <div class="bg-green border-radius-10-px record__progress" :style="{width: `${recordingProgress}%`}"></div>
-                            <div class="bg-light-gray border-radius-10-px record__progress" :style="{width: `${100 - recordingProgress}%`}"></div>
+                            <div class="border-radius-10-px record__progress record__progress--done" :style="{width: `${recordingProgress}%`}"></div>
+                            <div class="border-radius-10-px record__progress record__progress--left" :style="{width: `${100 - recordingProgress}%`}"></div>
                         </template>
                     </div>
 
@@ -136,7 +142,7 @@
                         <template v-if="!recording">
                             <img :src="attachIcon" alt="attachIcon" class="mx-1 cursor-pointer" :class="{'cursor-not-allowed' : disabled=!messageAllowed }"  @click="messageAllowed ? $refs.file_input.click() : null">
                             <input type="file" class="d-none" ref="file_input" @change="(e) => {checkMedia(Array.from(e.target.files)); e.target.value = null;}" id="filechat" multiple :disabled="!messageAllowed">
-                            <button class="btn-primary ml-1 send__media-btn border-radius-8-px" :class="{'disable__send-button' : disabled=!messageAllowed }" @click="messageAllowed ? (mediaFiles.length ? sendMedia() : sendMessageFun(message)) : null"><img :src="sendIcon" alt="sendIcon" class="cursor-pointer" :class="{'disable__send-button' : disabled=!messageAllowed }"></button>
+                            <button type="button" class="btn-primary ml-1 send__media-btn border-radius-8-px" :aria-label="$t('TaskPanel.send')" :class="{'disable__send-button' : disabled=!messageAllowed }" :disabled="sendingDraft" @click="messageAllowed ? sendFromComposer() : null"><img :src="sendIcon" alt="" class="cursor-pointer" :class="{'disable__send-button' : disabled=!messageAllowed }"></button>
                         </template>
                     </div>
                 </div>
@@ -150,7 +156,7 @@
                         <InputText
                             class="input__taskname-value"
                             v-model="formData.taskName.value"
-                            placeholder="Enter task name"
+                            :placeholder="$t('Comment.enter_task_name')"
                             :maxLength="250"
                             :minLength="3"
                             :isOutline="false"
@@ -214,11 +220,12 @@
 </template>
 
 <script setup>
+import { defaultStatus } from "@/components/organisms/QuickCreateTask/quickCreateTask";
 // PACKAGES
 import { defineComponent, nextTick, onMounted, ref, defineProps, inject, watch, computed, onBeforeUnmount } from "vue";
 import { dbCollections } from "@/utils/Collections";
 import { useConvertDate, useCustomComposable, useGetterFunctions } from "@/composable";
-import { checkFile, renderFiles, showUserInfo, showMessageTime, sendMessage, bakeMessage, uploadToWasabi, deleteFromWasabi, sendMailFromMessage } from "./helper";
+import { checkFile, renderFiles, showUserInfo, showMessageTime, sendMessage, bakeMessage, uploadToWasabi, deleteFromWasabi, sendSupportMail } from "./helper";
 import { useToast } from "vue-toast-notification";
 import { useValidation } from "@/composable/Validation";
 import { useStore } from "vuex";
@@ -243,6 +250,14 @@ import { useI18n } from "vue-i18n";
 import {generateFileName} from '@/utils/storageQueryBuild.js';
 import ImagesPreviewer from "@/components/organisms/ImagePreviewer/ImagesPreviewer.vue";
 import { storageHelper } from "@/composable/commonFunction";
+import { ROLE_ADMIN } from "@/utils/roles";
+import { isOnViewerSide } from "@/utils/commentSide";
+import CommentThread from "@/components/molecules/CommentThread/CommentThread.vue";
+import { applyCommentEvent, isTaskThread } from "@/composable/commentThreads";
+import { placeOfIncoming } from "./incomingComment";
+import { readsOnOpen, dividerAfterCount } from "./unreadOnOpen";
+import { fetchOwnAi, fetchRunnableAgents } from "@/views/Ai/useRunnableAgents";
+import { maskOf } from "@/utils/iconMask";
 
 const { t } = useI18n();
 
@@ -353,6 +368,10 @@ const props = defineProps({
         type: Boolean,
         default : false
     },
+    focusComposer: {
+        type: Boolean,
+        default: true
+    },
     commentType: {
         type: String,
         default : 'tasks'
@@ -366,6 +385,8 @@ const props = defineProps({
         default : () => {}
     }
 })
+
+const threadsOn = computed(() => !props.mainChat && isTaskThread(props.taskId));
 
 const fileExtentions = computed(() => {
     return getters['settings/fileExtentions'];
@@ -424,11 +445,11 @@ const createEmptyMessage = () => ({
 const COMMENT_DRAFT_PREFIX = "alianhub:comment-draft";
 
 const message = ref(createEmptyMessage());
+const sendingDraft = ref(false);
 const mediaFiles = ref([]);
 const messages = ref([]);
 const showScrollBotton = ref(false);
 const currentTime = ref();
-const customerDetails = ref();
 const documentPath = ref("");
 const projectPath = ref("");
 const commentPath = ref("");
@@ -439,18 +460,26 @@ const messageLimit = ref(25);
 const snapshotListener = ref(null);
 const initalUser = ref(null);
 const users = ref([]);
+const mentionAgents = ref([]);
+/* Only a task's own thread gives an agent something to work on; chat and project threads do not. */
+watch(() => [props.taskId, props.mainChat, props.newChat], async ([taskId]) => {
+    const onTask = !props.mainChat && !props.newChat && /^[0-9a-fA-F]{24}$/.test(String(taskId || ""));
+    const agents = onTask ? (await Promise.all([fetchRunnableAgents(taskId), fetchOwnAi(taskId)])).flat() : [];
+    if (taskId === props.taskId) mentionAgents.value = agents;
+}, { immediate: true });
 const unreadMessages = ref(0);
+const unreadDivider = ref(0);
 let debounceTimeout;
-const countGetter = computed(() => {
-    return getters["users/myCounts"]?.data?.[`${props.taskId ? "task" : "project"}_${projectData.value._id}${props.taskId ? `_${props.sprintId}_${props.taskId}` : ``}_comments`] || 0
-})
-watch(countGetter, (val) => {
+const countKey = computed(() => `${props.taskId ? "task" : "project"}_${projectData.value._id}${props.taskId ? `_${props.sprintId}_${props.taskId}` : ``}_comments`)
+const countGetter = computed(() => getters["users/myCounts"]?.data?.[countKey.value] || 0)
+watch([countKey, countGetter], ([key, val], [oldKey] = []) => {
     unreadMessages.value = val;
+    unreadDivider.value = dividerAfterCount({ divider: unreadDivider.value, count: val, threadChanged: key !== oldKey });
 }, {immediate: true})
 const userCommentCount = computed(() => {
     return  getters["users/myCounts"]?.data || {}
 })
-const adminUsers = computed(() => getters["settings/companyUsers"].filter((x) => x.roleType === 2)?.map((x) => x.userId) )
+const adminUsers = computed(() => getters["settings/companyUsers"].filter((x) => x.roleType === ROLE_ADMIN)?.map((x) => x.userId) )
 const companyUser = ref(getters['settings/companyUserDetail']);
 const messageAllowed = computed(() => {
     if(props.mainChat && !projectData.value?.default && !props.sendMessageAllowed) {
@@ -562,10 +591,13 @@ async function initialize() {
     }
 
 
-    // AUTO FOCUS TEXTBOX
-    nextTick(() => {
-        document.getElementById("message-box")?.focus();
-    })
+    // Keyboard-ready without moving the page: a plain focus() scrolls the task
+    // overlay down to the composer, past the title and description.
+    if (props.focusComposer) {
+        nextTick(() => {
+            document.getElementById("message-box")?.focus({ preventScroll: true });
+        })
+    }
 
     // ASSIGN PATHS
     if(props.taskId && props.taskId.length) {
@@ -653,9 +685,9 @@ function tabSyncDataGet () {
                 response.data.data.forEach((docData)=> {
                     let index = messages.value.findIndex((x) => x._id === docData._id);
                     if(index > -1) {
-                        messages.value[index] = {...docData, sent: docData.userId === userId.value};
+                        messages.value[index] = {...docData, sent: isOnViewerSide(docData, userId.value)};
                     } else {
-                        let obj = {...docData, sent: docData.userId === userId.value};
+                        let obj = {...docData, sent: isOnViewerSide(docData, userId.value)};
                         if(messages.value.length > 1 && obj.createdAt !== undefined && new Date(obj.createdAt).setHours(0,0,0,0) !== new Date(messages.value[messages.value.length-1].createdAt).setHours(0,0,0,0)) {
                             obj.showDifference= true;
                         }
@@ -689,6 +721,15 @@ watch([loadingChat, clientWidth], ([loading]) => {
         })
     }
 })
+
+watch([loadingChat, countKey], ([loading]) => {
+    if(loading) return;
+    setTimeout(() => {
+        if(readsOnOpen({ taskId: props.taskId, mainChat: props.mainChat, newChat: props.newChat, unread: unreadMessages.value })) {
+            updateCount(true, 0);
+        }
+    })
+}, {immediate: true})
 
 watch(() => props.userIds, () => {
     setUsers();
@@ -785,6 +826,7 @@ function watchScroll(e) {
 }
 
 function watchClick(e) {
+    if(!unreadMessages.value) unreadDivider.value = 0;
     if(unreadMessages.value && document.hasFocus()) {
         e.preventDefault();
 
@@ -884,6 +926,24 @@ function resetMessage() {
     const draftKey = getCommentDraftKey();
     message.value = createEmptyMessage();
     clearMessageDraft(draftKey);
+}
+
+// The composer clears as soon as Send is pressed, so a failed send has to put the text back,
+// ahead of anything typed while the request was in flight.
+function keepFailedDraft(draft) {
+    const current = getDraftPayload();
+    message.value = hasDraftPayload(current)
+        ? {...current, message: [draft.message, current.message].filter(Boolean).join("\n")}
+        : {...createEmptyMessage(), ...draft};
+    $toast.error(t("Comments.send_failed"), {position: "top-right"});
+}
+
+function returnMediaToTray(media) {
+    const pendingIndex = messages.value.findIndex((row) => row.isSending === media.isSending);
+    if(pendingIndex > -1) {
+        messages.value.splice(pendingIndex, 1);
+    }
+    mediaFiles.value.push(media);
 }
 
 function pinMessage(message) {
@@ -986,7 +1046,7 @@ function addToCheckList(msg) {
         }
         let localUpdateArray = [...new Set([...JSON.parse(JSON.stringify(props.checklistArray)) || [], ...updateObj])];
 
-        taskClass.updateChecklistsv2({localUpdateArray:localUpdateArray,data:updateObj, projectId:projectData.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: {folderObjId:props.folderId,sprintId:props.sprintId}}).then(()=>{
+        taskClass.updateChecklistsv2({localUpdateArray:localUpdateArray,data:updateObj, projectId:projectData.value._id, taskId:props.taskId,historyObj,sprintId:props.sprintId,companyId:companyId.value,ops:'checklistadd',taskData: {folderObjId:props.folderId,sprintId:props.sprintId,checklistArray:props.checklistArray}}).then(()=>{
             $toast.success(t('Toast.Item_added_to_checklist'), {position: 'top-right'})
         }).catch((error) => {
             console.error("ERROR in delete: ", error.message);
@@ -1002,32 +1062,12 @@ function addToCheckList(msg) {
                     const axiosParams = {
                         id: projectData.value._id,
                         checklistItem: x,
-                        operation: 'push'
+                        operation: 'push',
+                        origin: 'comment'
                     }
 
                     apiRequest("post", `${env.PROJECTS_CHECKLIST}`, axiosParams).then(() => {
                         resolve();
-                        if(x.parentId){
-                            const user = getUser(userId.value)
-    
-                            const userData = {
-                                id: user.id,
-                                Employee_Name: user.Employee_Name,
-                                companyOwnerId: companyOwner.value.userId,
-                            }
-                            let historyObj = {
-                                key : props.taskId ? "Task_Comment" : "Project_Comment",
-                                message : `<b>${userData.Employee_Name}</b> has added <b>${x.name}</b> checklist from <b>(${projectData.value.ProjectName} ${props.folderName ? '/' + props.folderName : ''}${props.sprintName ? '/' + props.sprintName : ''}${props.taskId ? '/' + props.title : ''})</b> ${props.taskId ? 'task' : 'project'}.`
-                            }
-                            apiRequest("post", env.HANDLE_HISTORY, {
-                                "type": props.taskId ? 'task':'project',
-                                "companyId": companyId.value,
-                                "projectId": projectData.value._id,
-                                "taskId": props.taskId ? props.taskId : null,
-                                "object": historyObj,
-                                "userData": userData
-                            })
-                        }
                     })
                     .catch((error) => {
                         reject(error)
@@ -1123,7 +1163,7 @@ function saveTask() {
                                 sprintObj.folderName = formData.value.selectedSprint.value.folderName;
                             }
         
-                            let status = projectData.value.taskStatusData.find((x) => x.type === "default_active");
+                            let status = defaultStatus(projectData.value);
         
                             const obj = {
                                 'TaskName': name,
@@ -1268,21 +1308,8 @@ function getMessages() {
     handleSocketData();
 }
 
-function getMessageId(data = {}) {
-    return data?._id ? String(data._id) : (data?.id ? String(data.id) : "");
-}
-
-function findMessageIndexById(data = {}) {
-    const messageId = getMessageId(data);
-    if(!messageId) return -1;
-
-    return messages.value.findIndex((message) => {
-        return getMessageId(message) === messageId || (message._id && String(message._id) === messageId);
-    });
-}
-
 function decorateIncomingMessage(docData) {
-    const obj = {...docData, sent: docData.userId === userId.value};
+    const obj = {...docData, sent: isOnViewerSide(docData, userId.value)};
     const messageText = obj.message || "";
     obj.overflow = (obj.type === 'text' || obj.type === 'link')
         ? messageText.length > 465
@@ -1300,24 +1327,14 @@ function upsertIncomingComment(docData, {replaceSending = false, incrementTotal 
     if(!docData) return false;
 
     const obj = decorateIncomingMessage(docData);
-    const existingIndex = findMessageIndexById(obj);
-    if(existingIndex > -1) {
-        messages.value[existingIndex] = {...messages.value[existingIndex], ...obj};
+    const place = placeOfIncoming(messages.value, obj, {replaceSending});
+    if(place.kind === "existing") {
+        messages.value[place.index] = {...messages.value[place.index], ...obj};
         return false;
     }
-
-    if(replaceSending) {
-        let type = "";
-        let name = "";
-        if(docData.mediaURL && docData.mediaURL.length) {
-            type = docData.type;
-            name = docData.mediaName;
-        }
-        const sendingIndex = messages.value.findIndex((x) => (x.isSending && x.type === type && x.mediaName === name));
-        if(sendingIndex > -1){
-            messages.value[sendingIndex] = obj;
-            return false;
-        }
+    if(place.kind === "pending") {
+        messages.value[place.index] = obj;
+        return false;
     }
 
     if(shouldShowDateDivider(obj)) {
@@ -1343,12 +1360,14 @@ function handleSocketData() {
 
     socket.value.on("commentInsert",(data)=> {
         let docData = data.fullDocument;
+        if (applyCommentEvent(docData, { inserted: true })) return;
         upsertIncomingComment(docData, {replaceSending: true, incrementTotal: true});
     })
 
 
     socket.value.on("commentUpdate",(data)=> {
         let docData = data.fullDocument;
+        if (applyCommentEvent(docData)) return;
         upsertIncomingComment(docData);
     })
 
@@ -1466,7 +1485,7 @@ function getPaginatedMessages(...args) {
 
                         messages.value.unshift({
                             ...docData,
-                            sent: docData.userId === userId.value,
+                            sent: isOnViewerSide(docData, userId.value),
                             createdAt: docData.createdAt,
                             updatedAt: docData.updatedAt
                         });
@@ -1565,6 +1584,9 @@ function uploadToStorage(file) {
 
             uploadToWasabi(file.data, path, companyId.value)
             .then((URL) => {
+                if(!URL) {
+                    throw new Error("Upload failed");
+                }
                 let msg = {...message.value};
                 msg.mediaURL= URL;
                 msg.mediaName= file.name;
@@ -1572,19 +1594,16 @@ function uploadToStorage(file) {
                 msg.mediaSize= file.data.size;
                 msg.type = file.fileType;
                 msg.createdAt = file.createdAt;
-                sendMessageFun({
+                return sendMessageFun({
                     ...msg
-                },false)
-                .then(() => {
-                    resolve();
-                })
-                .catch((error) => {
-                    reject(error);
-                    console.error("ERROR in send file: ", error);
-                })
+                },false);
+            })
+            .then(() => {
+                resolve();
             })
             .catch((error) => {
-                console.error("ERROR: ", error);
+                console.error("ERROR in send file: ", error);
+                reject(error);
             })
         } catch (error) {
             reject(error);
@@ -1660,6 +1679,7 @@ async function sendMedia() {
                                 resolve2()
                             })
                             .catch((error) => {
+                                returnMediaToTray(media);
                                 reject2(error);
                             })
                         } catch (error) {
@@ -1669,10 +1689,14 @@ async function sendMedia() {
                 )
             });
 
+            const caption = JSON.parse(JSON.stringify(tmpMessage));
             tmpMessage.createdAt = tempDate
-            sendMessageFun(tmpMessage, false);
+            sendMessageFun(tmpMessage, false).catch(() => keepFailedDraft(caption));
             Promise.allSettled(promises)
-                .then(() => {
+                .then((results) => {
+                    if(results.some((result) => result.status === "rejected")) {
+                        $toast.error(t("Comments.attachment_send_failed"), {position: "top-right"});
+                    }
                     resolve(true);
                 })
             .catch((error) => {
@@ -1697,7 +1721,7 @@ function checkMentions(message){
             let id = data.split("(")[1].replace(")", "");
             let msgName = data.split("(")[0].replace("[", "").replace("]", "");
             const user = id === "everyone" ? {id, name: "All"} : users.value.filter((x) => x.id === id)[0];
-            if(`@${user.name}` === msgName) {
+            if(user && `@${user.name}` === msgName) {
                 mentions.push(user.id)
                 msg = msg.replace(data, `@[${user.name}](${user.id})`);
             }
@@ -1707,7 +1731,7 @@ function checkMentions(message){
     return {mentions, msg};
 }
 
-function updateCount(reset = false, count = 0, otherUsers = []) {
+function updateCount(reset = false, count = 0) {
     let taskId = props.taskId;
     if(props.newChat) {
         taskId = newMainChat.value;
@@ -1764,41 +1788,6 @@ function updateCount(reset = false, count = 0, otherUsers = []) {
         .catch((error) => {
             console.error(error,"ERROR");
         })
-    } else {
-        let userArr = Array.from(new Set([...(props?.watchers || []), ...otherUsers]));
-
-        userArr = filterUsers(userArr);
-        userArr = [...new Set(userArr)].filter(x => x && x !== userId.value);
-
-        if(!taskId.length) {
-            let axiosData = {
-                companyId : companyId.value,
-                key : 1,
-                projectId: projectData.value._id,
-                userIds: userArr
-            }
-            apiRequest("post", env.UPDATE_UNREADREAD_COMMENTS_COUNT, axiosData).catch((error) => {
-                console.error(error,"ERROR");
-            })
-        } else {
-            let axiosData = {
-                companyId : companyId.value,
-                key : 2,
-                projectId: projectData.value._id,
-                userIds: userArr,
-                taskId: taskId,
-                sprintId: props.sprintId,
-                prevCount: prevCount 
-            }
-
-            if(props.parentTaskId) {
-                axiosData.parentTaskId = props.parentTaskId;
-            }
-
-            apiRequest("post", env.UPDATE_UNREADREAD_COMMENTS_COUNT, axiosData).catch((error) => {
-                console.error(error,"ERROR");
-            })
-        }
     }
 }
 
@@ -1896,107 +1885,29 @@ function createTaskForMainChat() {
     })
 }
 
-function filterUsers(users = null) {
-    if(!users) return [];
-
-    let projectWatchersFilter = [];
-
-    Object.keys(projectData.value?.watchers || {}).forEach((key) => {
-        if(projectData.value?.watchers?.[key] === "all_activity") {
-            projectWatchersFilter.push(key)
-        }
-    })
-
-    users.forEach((uid) => {
-        const ignore = projectData.value?.watchers?.[uid] === "ignore";
-        if(!ignore) {
-            projectWatchersFilter.push(uid);
-        }
-    })
-
-    return projectWatchersFilter;
-}
-
 function sendNotification(messageData, otherUsers = []) {
-    let receivers = Array.from(new Set([...otherUsers]));
+    if(!props?.mainChat || otherUsers?.length || !props?.watchers?.length || !messageData?.userId) return;
 
-    receivers = receivers?.filter((x) => x !== userId.value) || [];
-
-    // UPDATE COUNTS OF MENTIONS
-    let mentionCounts = {
-        companyId : companyId.value,
-        key : 4,
-        userIds: receivers,
-        readAll: false
-    }
-    apiRequest("post", env.UPDATE_UNREADREAD_COMMENTS_COUNT, mentionCounts).catch((error) => {
-        console.error(error,"ERROR");
-    })
+    const userIds = props.watchers.filter((id) => id !== messageData.userId);
+    if(!userIds.length) return;
 
     const user = getUser(userId.value);
-    // const user = getUser(props.creator?.uid);
-    const currentUser = {
-        id: user._id,
-        Employee_Name: user.Employee_Name,
-        companyOwnerId: user.companyOwnerId,
-    }
-    const finalNotification = {
-        key: props?.mainChat ? otherUsers?.length ?  "comments_I'm_@mentioned_in" : "message_create" : "comments_I'm_@mentioned_in",
-        message: messageData.message
-    }
-    if(props.commentType === 'project'){
-        apiRequest("post", env.HANDLE_NOTIFICATION, {
-            type: 'project',
-            companyId: companyId.value,
-            projectId: projectData.value._id,
-            object: finalNotification,
-            userData: currentUser,
-            mentionUserId:messageData?.mentionIds || [],
-            comments_id: messageData._id
-        })
-        .catch((error) => {
-            console.error("ERROR in update notification", error);
-        })
-    } else if(props?.mainChat && !otherUsers?.length) {
-        if(props?.watchers && props?.watchers?.length && messageData?.userId){
-            const userIds = props.watchers;
-            const index = userIds.indexOf(messageData.userId);
-            if (index > -1) {
-                userIds.splice(index, 1);
-            }
-    
-            if(userIds && userIds.length){
-                apiRequest("post", env.SEND_FCM, {
-                    message: messageData.message,
-                    companyId: companyId.value,
-                    userIdArray:userIds,
-                    key: 'message_create',
-                    type:'chat',
-                    senderUserDetail:currentUser,
-                    actionUrl:`${companyId.value}/chat/${messageData.objId.projectId}/${messageData?.objId?.taskId ? messageData.objId.taskId : messageData.objId.sprintId}`
-                })
-                .catch((error) => {
-                    console.error("ERROR in send notification: ", error);
-                })
-            }
-        }
-    } else {
-        apiRequest("post", env.HANDLE_NOTIFICATION, {
-            type: props?.mainChat ? "chat" : "tasks",
-            companyId: companyId.value || '',
-            projectId: projectData?.value?._id || '',
-            taskId: props?.taskId || '',
-            folderId: props?.folderId ? props.folderId : '',
-            sprintId: props?.sprintId || '',
-            userData: currentUser,
-            object: finalNotification,
-            comments_id: messageData?._id,
-            isGroupChat:props?.selectedChat?.TaskName ? false : true
-        })
-        .catch((error) => {
-            console.error("ERROR in send notification: ", error);
-        })
-    }
+    apiRequest("post", env.SEND_FCM, {
+        message: messageData.message,
+        companyId: companyId.value,
+        userIdArray: userIds,
+        key: 'message_create',
+        type: 'chat',
+        senderUserDetail: {
+            id: user._id,
+            Employee_Name: user.Employee_Name,
+            companyOwnerId: user.companyOwnerId,
+        },
+        actionUrl: `${companyId.value}/chat/${messageData.objId.projectId}/${messageData?.objId?.taskId ? messageData.objId.taskId : messageData.objId.sprintId}`
+    })
+    .catch((error) => {
+        console.error("ERROR in send notification: ", error);
+    })
 }
 
 function updateLastMessageTime(msgObj = {}) {
@@ -2008,10 +1919,25 @@ function updateLastMessageTime(msgObj = {}) {
     });
 }
 
+function sendFromComposer() {
+    if(mediaFiles.value.length) {
+        return sendMedia().catch(() => {});
+    }
+    if(sendingDraft.value) return;
+
+    sendingDraft.value = true;
+    return sendMessageFun(message.value)
+        .catch(() => {})
+        .finally(() => {
+            sendingDraft.value = false;
+        });
+}
+
 async function sendMessageFun(messageData,isReset = true) {
     if (!messageAllowed.value) {
         return;
     }
+    const draft = isReset ? JSON.parse(JSON.stringify(messageData)) : null;
     if(isReset){
         resetMessage();
     }
@@ -2062,13 +1988,6 @@ async function sendMessageFun(messageData,isReset = true) {
                     let {mentions, msg} = checkMentions(messageObj.message);
 
                     if(mentions.length) {
-                        if(mentions.includes("everyone")) {
-                            messageObj.mentionIds = users.value
-                                ?.filter((user) => !user.ghostUser && user.id !== messageData.userId)
-                                .map((x) => x.id); 
-                        } else {
-                            messageObj.mentionIds = mentions;
-                        }
                         messageObj.message = msg;
                     }
                 }
@@ -2117,16 +2036,8 @@ async function sendMessageFun(messageData,isReset = true) {
                 .then((msg) => {
                     resolve("Message Sent", msg);
 
-                    if(props.forSupport) {
-                        if(companyUser?.value?.userEmail !== process.env.VUE_APP_USEREMAIL) {
-                            let subject = "Support from AlianHub"
-                            const mailMessage = changeText(msg.message  || '', '', '');
-                            sendMailFromMessage(customerDetails.value.userEmail, subject, mailMessage);
-                        } else {
-                            let subject = `Support to ${customerDetails.value?.userName || ""}`
-                            const mailMessage = `Email: ${customerDetails.value?.userEmail}\nProduct: ${props.productData?.productName}\n\nMessage:\n${changeText(msg.message  || '', '', '')}`;
-                            sendMailFromMessage(process.env.VUE_APP_SUPPORT_MAIL, subject, mailMessage);
-                        }
+                    if(props.forSupport && companyUser?.value?.userEmail === process.env.VUE_APP_USEREMAIL) {
+                        sendSupportMail(changeText(msg.message || '', '', ''), props.productData?.productName);
                     }
 
                     // INITIALIZE SNAPHOT => IF NOT INITIALIZED
@@ -2134,8 +2045,8 @@ async function sendMessageFun(messageData,isReset = true) {
                         getMessages();
                     }
 
-                    // SET COUNT TO ZERO
                     resetUnread.value = true;
+                    unreadDivider.value = 0;
                     updateCount(true, 0);
 
                     if (edited) {
@@ -2150,42 +2061,6 @@ async function sendMessageFun(messageData,isReset = true) {
                         });
                     } else {
                         debounce(updateLastMessageTime({ ...messageObj }), 500)
-                    }
-
-                    if(!edited) {
-                        updateCount(false, 1, (msg?.mentionIds || []));
-                    }
-
-                    if(!edited && msg.mentionIds.length) {
-                        let mentionsRefObj = {
-                            mentionIds: msg.mentionIds,
-                            type: !props.taskId.length ? "project" : "task",
-                            projectId: projectData.value._id,
-                            userId: userId.value,
-                            notSeen: msg.mentionIds,
-                            taskId: props.taskId,
-                            sprintId: props.sprintId,
-                            folderId: props.folderId ? props.folderId : "",
-                            mainChat: props?.mainChat ? true : false
-                        }
-
-                        let keys = ["id", "type", "mediaSize", "mediaURL", "mediaName", "mediaOriginalName", "message", 'reply_id', 'reply_mediaName', 'reply_mediaOriginalName', 'reply_mediaURL', 'reply_mediaSize', 'reply_message', 'reply_type', 'reply_userId'];
-                        Object.keys(msg).forEach((key) => {
-                            if(keys.includes(key)) {
-                                mentionsRefObj[`comment_${key}`] = msg[key];
-                            }
-                        })
-
-                        const params = {
-                            data: {
-                                ...mentionsRefObj, 
-                                createdAt: new Date(),
-                                updatedAt: new Date()
-                            }
-                        }
-                        apiRequest("post", `${env.APP_NOTIFICATION}/comment`, params).catch((error) => {
-                            console.error(`Error in while send message comment on sendMessageFun hook => ${error}`);
-                        })
                     }
 
                     if(!edited) {
@@ -2211,6 +2086,12 @@ async function sendMessageFun(messageData,isReset = true) {
             console.error("ERROR in send message: ", error);
             reject(error);
         }
+    })
+    .catch((error) => {
+        if(draft) {
+            keepFailedDraft(draft);
+        }
+        throw error;
     })
 }
 function getSprintData(id) {

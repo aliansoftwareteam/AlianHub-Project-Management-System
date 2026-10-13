@@ -1,5 +1,10 @@
 const ctrl = require('./controller');
 const sessionCtr = require('./session');
+const { limitAccountMailRequests } = require('./helpers/accountMail');
+const { agentsRefused } = require('../Agents/guard');
+
+/* How a person signs in is theirs alone to change. */
+const securedByThePerson = agentsRefused('account.security');
 
 exports.init = (app) => {
 
@@ -25,23 +30,6 @@ exports.init = (app) => {
      *           required: true
      *           description: The password of user.
      */
-    /**
-     * @swagger
-     *  /api/v2/auth/register:
-     *    post: 
-     *      description: This API is used for register auth.
-     *      tags: [Auth APIs]
-     *      requestBody:
-     *        required: true
-     *        content:
-     *          application/json:
-     *            schema:
-     *              $ref: '#/components/schemas/registerAuth'
-     *      responses:
-     *          "200":
-     *              description: status:true, message:message
-     */
-    app.post("/api/v2/auth/register", ctrl.registerAuth);
 
 
     /**
@@ -81,6 +69,7 @@ exports.init = (app) => {
      */
     app.post("/api/v2/auth/login", ctrl.loginAuth, ctrl.manageAttempt)
     app.post("/api/v1/auth/loginAuthTracker", ctrl.loginAuthTracker)
+    app.post("/api/v2/auth/tracker-code", ctrl.issueTrackerCode)
 
     // Two-factor auth (TOTP) — Phase 1, password login only.
     // setup/verify/disable require a logged-in session (gated by
@@ -88,10 +77,14 @@ exports.init = (app) => {
     // and exchanges a tempToken + code for a real session, rate-limited like
     // login via manageAttempt.
     app.get("/api/v2/auth/2fa/status", ctrl.twoFaStatus)
-    app.post("/api/v2/auth/2fa/setup", ctrl.twoFaSetup)
-    app.post("/api/v2/auth/2fa/verify", ctrl.twoFaVerify)
-    app.post("/api/v2/auth/2fa/disable", ctrl.twoFaDisable)
+    app.post("/api/v2/auth/2fa/setup", securedByThePerson, ctrl.twoFaSetup)
+    app.post("/api/v2/auth/2fa/verify", securedByThePerson, ctrl.twoFaVerify)
+    app.post("/api/v2/auth/2fa/disable", securedByThePerson, ctrl.twoFaDisable)
     app.post("/api/v2/auth/2fa/validate", ctrl.twoFaValidate, ctrl.manageAttempt)
+
+    // Passwordless login link (public, pre-auth). Enable/disable with MAGIC_LINK_ENABLED.
+    app.post("/api/v2/auth/magic-link", ctrl.requestMagicLink)
+    app.get("/api/v2/auth/magic-link/verify", ctrl.verifyMagicLink)
 
 
     /**
@@ -136,7 +129,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true, message:message
      */
-    app.patch("/api/v2/auth/:id/change-password", ctrl.changePassword);
+    app.patch("/api/v2/auth/:id/change-password", securedByThePerson, ctrl.changePassword);
 
 
     /**
@@ -169,7 +162,7 @@ exports.init = (app) => {
      *          "200":
      *              description: status:true, message:message
      */
-    app.post('/api/v2/auth/forgot-password', ctrl.forgotPassword, ctrl.manageAttempt);
+    app.post('/api/v2/auth/forgot-password', limitAccountMailRequests, ctrl.forgotPassword);
 
 
     /**
@@ -262,23 +255,6 @@ exports.init = (app) => {
      *           required: true
      *           description: The User Id.
      */
-    /**
-     * @swagger
-     *  /api/v2/session/register:
-     *    post: 
-     *      description: This API is used for register a session.
-     *      tags: [Session APIs]
-     *      requestBody:
-     *        required: true
-     *        content:
-     *          application/json:
-     *            schema:
-     *              $ref: '#/components/schemas/registerSession'
-     *      responses:
-     *          "200":
-     *              description: status:true, message:message
-     */
-    app.post('/api/v2/session/register', sessionCtr.registerSesstion);
 
 
     /**
@@ -355,4 +331,304 @@ exports.init = (app) => {
     app.post("/api/v2/generateToken", ctrl.generateTokenV2);
     app.post("/api/v2/logout", ctrl.logout);
     app.post("/api/v2/test", ctrl.testV2);
+    initSignup(app);
 };
+
+const createUserCtrl = require("./controller/createUser");
+const sendVerifcationCtrl = require("./controller/sendVerificationMail");
+const verifyEmailCtrl = require("./controller/verifyEmail");
+const sendForgotPasswordCtrl = require("./controller/sendForgotPasswordMail");
+const sendInvitationCtrl = require("./controller/sendInvitation");
+const { guardInvitation, guardUserImport } = require("../settings/Members/membershipGuard");
+const verifyInvitationCtrl = require("./controller/verifyInvitation");
+const { removeCacheHandler } = require('./controller/removeCache');
+const { mongoOperation } = require('./controller/mongoOperation');
+const { invitationPreview } = require('./controller/invitationPreview');
+const { verifyJWTTokenV2 } = require('../../Config/jwt');
+const { handleEvents } = require('../Company/eventController');
+function initSignup(app) {
+    app.post("/api/v2/createUser", createUserCtrl.createUserV2);
+    /**
+     * @swagger
+    *  components:
+    *    schemas:
+    *      sendVerificationEmail:
+    *        type: object
+    *        required:
+    *          - uid
+    *          - email
+    *        properties:
+    *         uid:
+    *           type: string
+    *           required: true
+    *           description: The uid of user.
+    *         email:
+    *           type: string
+    *           required: true
+    *           description: The email of user.
+     */
+    /**
+     * @swagger
+     *  /api/v2/sendVerificationEmail:
+     *    post: 
+     *      description: This API is used for send email verication link.
+     *      tags: [Mongodb Auth APIs]
+     *      requestBody:
+     *        required: true
+     *        content:
+     *          application/json:
+     *            schema:
+     *              $ref: '#/components/schemas/sendVerificationEmail'
+     *      responses:
+     *          "200":
+     *              description: status:true/false,statusText:message
+     */
+
+    /**
+     * Send Verification Mail API
+     */
+    app.post("/api/v2/sendVerificationEmail", limitAccountMailRequests, sendVerifcationCtrl.sendVerificationEmail);
+
+    /**
+     * @swagger
+    *  components:
+    *    schemas:
+    *      verifyEmail:
+    *        type: object
+    *        required:
+    *          - uid
+    *          - token
+    *        properties:
+    *         uid:
+    *           type: string
+    *           required: true
+    *           description: The uid of user.
+    *         token:  
+    *           type: string
+    *           required: true
+    *           description: The verification token.
+     */           
+    /**
+     * @swagger
+     *  /api/v2/verifyEmail:
+     *    post: 
+     *      description: This API is used for verify email.
+     *      tags: [Mongodb Auth APIs]
+     *      requestBody:
+     *        required: true
+     *        content:
+     *          application/json:
+     *            schema:
+     *              $ref: '#/components/schemas/verifyEmail'
+     *      responses:
+     *          "200":
+     *              description: status:true/false,statusText:message
+     */
+
+    /**
+     *  Verify Mail API
+     */
+    app.post('/api/v2/verifyEmail', verifyEmailCtrl.verifyEmail);
+
+
+     /**
+     * @swagger
+    *  components:
+    *    schemas:
+    *      sendForgotPasswordEmail:
+    *        type: object
+    *        required:
+    *          - email
+    *          - token
+    *          - tokenId
+    *        properties:
+    *         email:
+    *           type: string
+    *           required: true
+    *           description: The email of user.
+    *         token:
+    *           type: string
+    *           required: true
+    *           description: The token.
+    *         tokenId:
+    *           type: string
+    *           required: true
+    *           description: The tokenId.
+    */
+    /**
+     * @swagger
+     *  /api/v2/sendForgotPasswordEmail:
+     *    post: 
+     *      description: This API is used for resend email verication link if token expire.
+     *      tags: [Mongodb Auth APIs]
+     *      requestBody:
+     *        required: true
+     *        content:
+     *          application/json:
+     *            schema:
+     *              $ref: '#/components/schemas/sendForgotPasswordEmail'
+     *      responses:
+     *          "200":
+     *              description: status:true/false,statusText:message
+     */
+
+    /**
+     *  Verify Mail API
+     */
+    app.post('/api/v2/sendForgotPasswordEmail', limitAccountMailRequests, sendForgotPasswordCtrl.sendForgotPasswordEmail);
+
+
+    /**
+     * @swagger
+    *  components:
+    *    schemas:
+    *      sendInvitationEmail:
+    *        type: object
+    *        required:
+    *          - email
+    *          - companyId
+    *          - companyName
+    *          - role
+    *          - designation
+    *        properties:
+    *         email:
+    *           type: string
+    *           required: true
+    *           description: The email of user.
+    *         companyId:
+    *           type: string
+    *           required: true
+    *           description: The inviting companyId.
+    *         companyName:
+    *           type: string
+    *           required: true
+    *           description: The inviting companyName.
+    *         role:
+    *           type: string
+    *           required: true
+    *           description: The provided role id.
+    *         designation:
+    *           type: string
+    *           required: true
+    *           description: This is the inviting user designation.
+     */
+    /**
+     * @swagger
+     *  /api/v2/sendInvitationEmail:
+     *    post: 
+     *      description: This API is used for send email invitation link.
+     *      tags: [Mongodb Auth APIs]
+     *      requestBody:
+     *        required: true
+     *        content:
+     *          application/json:
+     *            schema:
+     *              $ref: '#/components/schemas/sendInvitationEmail'
+     *      responses:
+     *          "200":
+     *              description: status:true/false,statusText:message
+     */
+
+    /**
+     * Send Invitation Mail API
+     */
+    app.post('/api/v2/sendInvitationEmail', guardInvitation, sendInvitationCtrl.sendInvitationEmail);
+    app.post('/api/v1/checkSendInviatation', sendInvitationCtrl.checkSendInviatation);
+    app.post('/api/v1/admin/checkSendInviatation', sendInvitationCtrl.checkSendInviatation);
+    app.post('/api/v1/importUser', guardUserImport, sendInvitationCtrl.importUser);
+    app.get('/importUser/events/:id', (req, res) => {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        handleEvents(req, res)
+    });
+
+    /**
+     * @swagger
+     *  components:
+     *    schemas:
+     *      checkPermission:
+     *            type: object
+     *            required: 
+     *              -key
+     *            properties:
+     *              key:
+     *               type: string
+     *               required: true
+     *               description: decrypted.
+     */
+     /**
+     * @swagger 
+     *  /api/v2/checkPermission:
+     *    post: 
+     *      description: This API is check user invitation link is valid or not
+     *      tags: [Auth APIs]
+     *      requestBody:
+     *        required: true
+     *        content:
+     *          application/json:
+     *            schema:
+     *              $ref: '#/components/schemas/checkPermission'
+     *      responses:
+     *          "200":
+     *              description: status:true/false,statusText:message,key
+     */
+     app.post('/api/v2/checkPermission', verifyInvitationCtrl.checkPermission);
+    app.post('/api/v2/auth/invitation-preview', invitationPreview);
+    // Not in setMiddleware's lists: their company check refuses a caller who is not a member yet.
+    app.post('/api/v2/auth/invitation-accept', verifyJWTTokenV2, verifyInvitationCtrl.acceptSignedIn);
+
+
+    
+    /**
+     * @swagger
+    *  components:
+    *    schemas:
+    *      mongoOpration:
+    *        type: object
+    *        required:
+    *          - dataObj
+    *          - dbName
+    *          - methodName
+    *        properties:
+    *         dataObj:
+    *           type: object
+    *           required: true
+    *           description: The data object which contain type and data keys for mongodb curd opretion.
+    *         dbName:
+    *           type: string
+    *           required: true
+    *           description: The name of database.
+    *         methodName:
+    *           type: string
+    *           required: true
+    *           description: The name of method of mongodb.
+     */
+    /**
+     * @swagger
+     *  /api/v1/mongoOpration:
+     *    post: 
+     *      description: This API is used for send email invitation link.
+     *      tags: [Mongodb Auth APIs]
+     *      requestBody:
+     *        required: true
+     *        content:
+     *          application/json:
+     *            schema:
+     *              $ref: '#/components/schemas/mongoOpration'
+     *      responses:
+     *          "200":
+     *              description: status:true/false,statusText:message
+     */
+
+    app.post("/api/v1/mongoOpration", mongoOperation);
+
+    app.post('/api/v1/verifyToken', createUserCtrl.verifyToken);
+
+    app.post('/api/v1/removeCache', removeCacheHandler);
+
+    app.post("/api/v2/google-signup", createUserCtrl.googleSignup);
+    app.post("/api/v2/github-signup", createUserCtrl.githubSignup);
+    app.post("/api/v2/gitlab-signup", createUserCtrl.gitlabSignup);
+}

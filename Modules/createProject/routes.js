@@ -1,5 +1,7 @@
 const ctrl = require('./controller');
 const { requirePermission } = require('../../Config/permissionGuard');
+const { newProjectNamesOnlyMembers } = require('../Project/helpers/projectPeople');
+const { agentsRefused } = require('../Agents/guard');
 
 exports.init = (app) => {
     /**
@@ -13,12 +15,15 @@ exports.init = (app) => {
     *         - ProjectCategory
     *         - ProjectName
     *         - ProjectCode
-    *         - CompanyId
     *        properties:
     *         CompanyId: 
     *           type: string
-    *           required: true
-    *           description: CompanyId.
+    *           required: false
+    *           description: Ignored; the company comes from the companyid header. A different company is refused.
+    *         projectCreatedBy:
+    *           type: string
+    *           required: false
+    *           description: Ignored; the project is created by the signed-in user.
     *         ProjectCategory: 
     *           type: string
     *           required: true
@@ -57,6 +62,6 @@ exports.init = (app) => {
     /**
      * create Project API
     */
-    app.post('/api/v1/createproject', requirePermission('project.project_create'), ctrl.createProjectFun);
+    app.post('/api/v1/createproject', agentsRefused('project.create'), requirePermission('project.project_create'), newProjectNamesOnlyMembers, ctrl.createProjectFun);
     app.post('/api/v1/getGlobalTemplate', ctrl.getGlobalTemplate);
 }

@@ -18,7 +18,7 @@
     width: 14px;
     height: 14px;
     cursor: pointer;
-    accent-color: #8591F9;
+    accent-color: var(--brand);
     margin: 0;
 }
 .list_view {
@@ -70,5 +70,5 @@ img.draggable_icon {
 span.span_wrapper.task_right.cursor-pointer.custom_sticky {
     position: sticky;
     right: 0;
-    background: #f4f5f7;
+    background: var(--surface-2);
 }

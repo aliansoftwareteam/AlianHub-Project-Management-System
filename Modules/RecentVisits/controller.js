@@ -2,35 +2,45 @@ const { SCHEMA_TYPE } = require("../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries");
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
+const { visibleProjectIds } = require("../Agents/scope");
+const { hiddenSprintFilter } = require("../Sprints/helpers/sprintVisibility");
+const { resolveVisits, parseListQuery, VISIT_TYPES } = require("./helpers/resolveVisits");
 
-// Per-user "recently visited" tracking. One document per user+entity,
-// upserted on every visit — the list endpoint returns the newest first,
-// enriched with task summaries so the dropdown renders without extra calls.
+// One document per user+entity, upserted on every visit.
 
 const OBJECT_ID_PATTERN = /^[0-9a-fA-F]{24}$/;
-const LIST_LIMIT = 15;
+
+/* Visits belong to the signed-in user. A user id in the request is tolerated only when it is theirs. */
+const ownerOf = (req, claimed) => {
+    const uid = String(req.uid || '');
+    if (!uid) return { refused: 401, statusText: 'Sign in to use recent visits.' };
+    if (claimed && String(claimed) !== uid) return { refused: 403, statusText: 'You can only use your own recent visits.' };
+    return { uid };
+};
 
 /**
  * POST /api/v2/recent-visits
- * body: { entityType: 'task', entityId, userData }
+ * body: { entityType: 'task' | 'project' | 'sprint' | 'doc', entityId }
  */
 exports.recordVisit = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
         const { entityType, entityId, userData } = req.body || {};
-        const userId = userData && (userData.id || userData._id) ? String(userData.id || userData._id) : '';
-
-        if (!companyId || !userId) {
-            return res.send({ status: false, statusText: 'companyId and userId are required.' });
+        const owner = ownerOf(req, userData && (userData.id || userData._id));
+        if (owner.refused) {
+            return res.status(owner.refused).send({ status: false, statusText: owner.statusText });
         }
-        if (entityType !== 'task' || !OBJECT_ID_PATTERN.test(String(entityId || ''))) {
-            return res.send({ status: false, statusText: 'A valid task entity is required.' });
+        if (!companyId) {
+            return res.send({ status: false, statusText: 'companyId is required.' });
+        }
+        if (!VISIT_TYPES.includes(entityType) || !OBJECT_ID_PATTERN.test(String(entityId || ''))) {
+            return res.send({ status: false, statusText: 'A valid task, project, list or doc is required.' });
         }
 
         await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.RECENTVISITS,
             data: [
-                { userId, entityType, entityId: new mongoose.Types.ObjectId(entityId) },
+                { userId: owner.uid, entityType, entityId: new mongoose.Types.ObjectId(entityId) },
                 { $set: { visitedAt: new Date() } },
                 { upsert: true },
             ],
@@ -44,41 +54,35 @@ exports.recordVisit = async (req, res) => {
 };
 
 /**
- * GET /api/v2/recent-visits?uid=<userId>
- * Returns the user's most recent task visits with task summaries; visits
- * whose task was deleted in the meantime are filtered out.
+ * GET /api/v2/recent-visits?types=task,project,sprint,doc|all&limit=15
+ * The caller's newest visits, tasks only unless `types` asks for more. Anything deleted,
+ * in a project the caller can no longer open, in a private sprint they are not on, or a
+ * private doc of someone else's, drops out.
  */
 exports.listVisits = async (req, res) => {
     try {
         const companyId = req.headers['companyid'] || '';
-        const userId = String(req.query?.uid || '');
-        if (!companyId || !userId) {
-            return res.send({ status: false, statusText: 'companyId and uid are required.' });
+        const owner = ownerOf(req, req.query && req.query.uid);
+        if (owner.refused) {
+            return res.status(owner.refused).send({ status: false, statusText: owner.statusText });
         }
+        if (!companyId) {
+            return res.send({ status: false, statusText: 'companyId is required.' });
+        }
+        const { types, limit } = parseListQuery(req.query);
 
         const visits = await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.RECENTVISITS,
-            data: [{ userId, entityType: 'task' }, null, { sort: { visitedAt: -1 }, limit: LIST_LIMIT * 2 }],
+            data: [{ userId: owner.uid, entityType: { $in: types } }, null, { sort: { visitedAt: -1 }, limit: limit * 3 }],
         }, 'find');
 
         if (!visits || !visits.length) {
             return res.send({ status: true, statusText: 'No recent visits.', data: [] });
         }
 
-        const taskIds = visits.map((visit) => visit.entityId);
-        const tasks = await MongoDbCrudOpration(companyId, {
-            type: SCHEMA_TYPE.TASKS,
-            data: [
-                { _id: { $in: taskIds }, deletedStatusKey: { $ne: 1 } },
-                'TaskName TaskKey status statusType ProjectID sprintId folderObjId deletedStatusKey',
-            ],
-        }, 'find');
-        const taskById = new Map((tasks || []).map((task) => [String(task._id), task]));
-
-        const data = visits
-            .map((visit) => ({ visitedAt: visit.visitedAt, task: taskById.get(String(visit.entityId)) || null }))
-            .filter((item) => item.task)
-            .slice(0, LIST_LIMIT);
+        const visible = await visibleProjectIds(companyId, owner.uid);
+        const sprintClause = await hiddenSprintFilter(companyId, owner.uid, visible);
+        const data = (await resolveVisits(companyId, owner.uid, visits, { visible, sprintClause })).slice(0, limit);
 
         return res.send({ status: true, statusText: 'Recent visits fetched.', data });
     } catch (error) {

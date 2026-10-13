@@ -1,8 +1,5 @@
 <template>
     <div class="project__detail-component"  v-if="clientWidth > 767 || isvisible === true">
-        <a href="#" @click.prevent="scrollToBottom" class="btn-scroll-to-bottom" v-if="clientWidth < 767">
-            {{$t('general.scroll_to_bottom')}}
-        </a>
         <div v-if="!currentCompany?.planFeature?.projectDetailsView">
             <UpgradePlan
                 :buttonText="$t('Upgrades.upgrade_your_plan')"
@@ -22,7 +19,47 @@
                 :projectData="projectData"
                 :from="'project'"
             />
-            <CheckListComponent 
+            <ProjectMemoryCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id"
+                :projectId="String(projectData._id)"
+            />
+            <ProjectDefaultTemplateCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) === true && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
+            <ProjectGithubCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
+            <ProjectAgentPolicyCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
+            <ProjectAgentLimitsCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
+            <ProjectStandingApprovalsCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
+            <ProjectManagerCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+            />
+            <ProjectDispatcherCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+                :canEdit="checkPermission('project.project_details',projectData.isGlobalPermission) === true"
+                :choices="dispatcherChoices"
+            />
+            <AssignmentRulesCard
+                v-if="checkPermission('project.project_details',projectData.isGlobalPermission) !== null && projectData?._id && !projectData.isPersonal"
+                :projectId="String(projectData._id)"
+                :candidates="assignmentCandidates"
+                :canEdit="checkPermission('project.project_details',projectData.isGlobalPermission) === true"
+            />
+            <CheckListComponent
                 v-if="checkPermission('project.project_checklist',projectData.isGlobalPermission) !== null"
                 :data="checkList"
                 :permission="checkPermission('project.project_checklist',projectData?.isGlobalPermission) === true"
@@ -85,6 +122,16 @@
     import { useStore } from 'vuex';
     import { useToast } from 'vue-toast-notification';
     import Description  from '@/components/atom/Description/Description.vue';
+    import ProjectMemoryCard from './ProjectMemoryCard.vue';
+    import ProjectDefaultTemplateCard from './ProjectDefaultTemplateCard.vue';
+    import ProjectGithubCard from './ProjectGithubCard.vue';
+    import ProjectAgentPolicyCard from './ProjectAgentPolicyCard.vue';
+    import ProjectAgentLimitsCard from './ProjectAgentLimitsCard.vue';
+    import ProjectStandingApprovalsCard from './ProjectStandingApprovalsCard.vue';
+    import ProjectManagerCard from './ProjectManagerCard.vue';
+    import AssignmentRulesCard from './AssignmentRulesCard.vue';
+    import ProjectDispatcherCard from './ProjectDispatcherCard.vue';
+    import { priorityChoices } from '@/utils/dispatcher';
     import Attachments from '@/components/atom/Attachments/Attachments.vue';
     import FixMilestone from '@/components/organisms/FixMilestone/FixMilestone.vue';
     import HourlyMilestone from '@/components/organisms/HourlyMilestone/HourlyMilestone.vue';
@@ -93,14 +140,13 @@
     import AppTeaserBlock from '@/components/molecules/AppTeaserBlock/AppTeaserBlock.vue';
     import * as env from '@/config/env';
     import { apiRequest, apiRequestWithoutCompnay } from '../../../services'
-    import Swal from 'sweetalert2';
+    import Swal from '@/utils/lazySwal';
     import { useCustomComposable, useGetterFunctions } from '@/composable';
     import {storageQueryBuilder,generateFileName} from '@/utils/storageQueryBuild.js';
     import { buildCloudAttachment, isCloudAttachment, cloudTypeOf, CLOUD_PROVIDERS } from '@/utils/cloudAttachment';
     import { importCloudFile } from '@/composable/cloudPicker';
     import { useI18n } from 'vue-i18n';
     import ProjectDetailRightSide from '@/components/organisms/ProjectDetailRightSide/ProjectDetailRightSide.vue';
-    import { projectAttachmentAdd , projectAttachmentChange } from '@/utils/NotificationTemplate';
 
     const companyId = inject('$companyId');
     const $toast = useToast();
@@ -115,22 +161,34 @@
         isvisible:{type:Boolean,default:() => true}
     });
     const projectData = inject('selectedProject');
-    const { checkPermission, makeUniqueId, checkApps, getAppState, checkBucketStorage, sanitizeInput } = useCustomComposable();
+    const { checkPermission, makeUniqueId, checkApps, getAppState, checkBucketStorage } = useCustomComposable();
     const { getters,commit } = useStore();
     const checkList = computed(() => projectData.value.checklistArray)
+    const { getUser } = useGetterFunctions();
+    const assignmentCandidates = computed(() => {
+        const members = (getters["settings/companyUsers"] || []).filter((member) => member.isDelete !== true).map((member) => String(member.userId));
+        const ids = projectData.value?.isPrivateSpace
+            ? (projectData.value.AssigneeUserId || []).map(String).filter((id) => members.includes(id))
+            : members;
+        return [...new Set(ids)]
+            .map((id) => ({ id, name: getUser(id)?.Employee_Name || '' }))
+            .filter((person) => person.name)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    });
+    const choicesOf = (list, value, label) => (Array.isArray(list) ? list : []).filter(Boolean)
+        .map((item) => ({ value: item[value], label: item[label] || '' })).filter((item) => item.value !== undefined && item.value !== null && item.label);
+    const dispatcherChoices = computed(() => ({
+        type: choicesOf(projectData.value?.taskTypeCounts, 'key', 'name'),
+        tag: choicesOf(projectData.value?.tagsArray, 'uid', 'name'),
+        status: choicesOf(projectData.value?.taskStatusData, 'key', 'name'),
+        priority: priorityChoices(getters["settings/companyPriority"]),
+    }));
     const currentCompany = computed(() => getters["settings/selectedCompany"])
     const clientWidth = inject("$clientWidth");
     const emit = defineEmits(["openSeeAllProject","rightSideBarEmit","description"])
     const billingPeriodPro = ref('');
     const startDateProject = ref({});
     const isAttachmentSpinner = ref(false);
-    const {getUser} = useGetterFunctions();
-    const user = getUser(userId.value);
-    const userData = {
-        id: user.id,
-        Employee_Name: user.Employee_Name,
-        companyOwnerId: user.companyOwnerId
-    }
     watch(() => props.billingPeriod, (newval) => {
         billingPeriodPro.value = newval;
     });
@@ -147,16 +205,6 @@
     const fileExtentions = computed(() => {
         return getters['settings/fileExtentions'];
     });
-
-    const scrollToBottom = () => {
-        const targetDiv = document.querySelector('.project__detail-component');
-        if (targetDiv) {
-            targetDiv.scrollTo({
-                top: targetDiv.scrollHeight,
-                behavior: 'smooth'
-            });
-        }
-    }
 
     /**
      * AHE-3838 — attach files picked from a cloud drive to the project.
@@ -222,24 +270,6 @@
                 projectData.value.attachments.push(record);
                 commit('projectData/projectLocalUpdate', { op: "modified", itemData: { ...projectData.value } });
                 attached += 1;
-
-                // History is best-effort — a failure here must not make a
-                // successful attach look failed.
-                try {
-                    await apiRequest("post", env.HANDLE_HISTORY, {
-                        "type": 'project',
-                        "companyId": companyId.value,
-                        "projectId": projectdata._id,
-                        "taskId": null,
-                        "object": {
-                            key: "Project_Attachment",
-                            message: `<b>${userData.Employee_Name}</b> has attached <b>${record.filename}</b> on <b>${sanitizeInput(projectdata.ProjectName)}</b>.`,
-                        },
-                        "userData": userData,
-                    });
-                } catch (error) {
-                    console.error("ERROR in cloud attachment history", error);
-                }
             } catch (error) {
                 console.error("Error attaching cloud file to project: ", error);
             }
@@ -329,51 +359,16 @@
                                     key: '$push'
                                 }
 
-                                apiRequest("put", `${env.PROJECT}/${projectdata._id}`, params).then(() => {                                    
+                                apiRequest("put", `${env.PROJECT}/${projectdata._id}`, params).then(() => {
                                     projectData.value.attachments.push(imagObj)
                                     commit('projectData/projectLocalUpdate', { op: "modified", itemData: { ...projectData.value } });
-
-                                    let historyObj = {
-                                        key : "Project_Attachment",
-                                        message : `<b>${userData.Employee_Name}</b> has attached <b>${file.name}</b> on <b>${sanitizeInput(projectdata.ProjectName)}</b>.`
-                                    }
-                                    apiRequest("post", env.HANDLE_HISTORY, {
-                                        "type": 'project',
-                                        "companyId": companyId.value,
-                                        "projectId": projectdata._id,
-                                        "taskId": null,
-                                        "object": historyObj,
-                                        "userData": userData
-                                    }).then(() => {
-                                        count.value++;
-                                        countFun(fileList[count.value]);
-                                    })
+                                    count.value++;
+                                    countFun(fileList[count.value]);
                                 })
                                 .catch((err) => {
                                     count.value++;
                                     countFun(fileList[count.value]);
                                     console.error(err, "Error in upload project attachment");
-                                })
-                                let notifyObj = {
-                                    url: file.name,
-                                    ProjectName : projectdata.ProjectName
-                                }
-                                let notificationObject = {
-                                    message: projectAttachmentAdd(notifyObj),
-                                    key: "attachments",
-                                };
-                                
-                                apiRequest("post", env.HANDLE_NOTIFICATION, {
-                                    type: 'project',
-                                    companyId: companyId.value,
-                                    projectId: projectdata._id,
-                                    object: notificationObject,
-                                    userData: userData,
-                                    changeType:'name',
-                                    changeData: notifyObj
-                                })
-                                .catch((error) => {
-                                    console.error("ERROR in update notification", error);
                                 })
                                 isUpload = true;
                             } catch (error) {
@@ -437,39 +432,6 @@
                             projectData.value.attachments.splice(indx, 1)
                         }
                         commit('projectData/projectLocalUpdate', { op: "modified", itemData: { ...projectData.value } });
-                        let historyObj = {
-                            key : "Project_Attachment",
-                            message : `<b>${userData.Employee_Name}</b> has deleted <b>${attachment.filename}</b> on <b>${sanitizeInput(projectData.value.ProjectName)}</b>.`
-                        }
-                        apiRequest("post", env.HANDLE_HISTORY, {
-                            "type": 'project',
-                            "companyId": companyId.value,
-                            "projectId": projectData.value._id,
-                            "taskId": null,
-                            "object": historyObj,
-                            "userData": userData
-                        })
-                        let notifyObj = {
-                                removeFileName: attachment.filename,
-                                ProjectName : projectData.ProjectName
-                            }
-                            let notificationObject = {
-                                message: projectAttachmentChange(notifyObj),
-                                key: "attachments",
-                            };
-                            
-                            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                                type: 'project',
-                                companyId: companyId.value,
-                                projectId: projectData._id,
-                                object: notificationObject,
-                                userData: userData,
-                                changeType:'name',
-                                changeData: notifyObj
-                            })
-                            .catch((error) => {
-                                console.error("ERROR in update notification", error);
-                            })
                         $toast.success(t('Toast.Attchments_deleted_successfully'),{position: 'top-right'});
                     })
                 };
@@ -524,3 +486,4 @@
     padding: 20px 18.5px;
 }
 </style>
+<style src="./theme.css"></style>

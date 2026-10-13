@@ -34,7 +34,7 @@ function normaliseSettings(raw) {
     const ids = Array.isArray(s.userIds) ? s.userIds : [];
     return {
         enabled: s.enabled === true,
-        userIds: [...new Set(ids.map((id) => String(id)).filter(Boolean))],
+        userIds: [...new Set(ids.filter((id) => id != null).map((id) => String(id)).filter(Boolean))],
         enabledAt: s.enabledAt || null,
         enabledBy: s.enabledBy || null,
     };
@@ -63,7 +63,7 @@ async function updateCompanySettings(companyId, patch, opts = {}) {
     }
     if (patch.userIds !== undefined) {
         const ids = Array.isArray(patch.userIds) ? patch.userIds : [];
-        setObj['timeReminderSettings.userIds'] = [...new Set(ids.map((id) => String(id)).filter(Boolean))];
+        setObj['timeReminderSettings.userIds'] = [...new Set(ids.filter((id) => id != null).map((id) => String(id)).filter(Boolean))];
     }
     if (opts.markEnabled && opts.userId) {
         setObj['timeReminderSettings.enabledAt'] = new Date();

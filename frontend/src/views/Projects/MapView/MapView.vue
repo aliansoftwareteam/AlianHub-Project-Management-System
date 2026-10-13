@@ -1,19 +1,19 @@
 <template>
-  <div class="map-view">
+  <div class="map-view ah-page">
     <div class="map-view__bar">
       <span class="map-view__count">
-        {{ placedTasks.length }} placed<template v-if="unplaced.length"> · {{ unplaced.length }} to place</template>
+        {{ $t('Views.map_placed', { n: placedTasks.length }) }}<template v-if="unplaced.length"> · {{ $t('Views.map_to_place', { n: unplaced.length }) }}</template>
       </span>
       <span v-if="placingTask" class="map-view__hint">
-        Click anywhere on the map to place <b>{{ placingTask.TaskName || placingTask.TaskKey }}</b>
-        <button type="button" class="map-view__hint-x" @click="placingId = ''">cancel</button>
+        <i18n-t keypath="Views.map_click_to_place"><template #task><b>{{ placingTask.TaskName || placingTask.TaskKey }}</b></template></i18n-t>
+        <button type="button" class="map-view__hint-x" @click="placingId = ''">{{ $t('Views.map_cancel') }}</button>
       </span>
       <button
         v-if="placedTasks.length"
         type="button"
         class="map-view__clear"
         @click="clearAll"
-      >Clear all</button>
+      >{{ $t('Views.map_clear_all') }}</button>
     </div>
 
     <div class="map-view__main">
@@ -27,13 +27,13 @@
         >
           <defs>
             <linearGradient id="mvOcean" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#eef4fb" />
-              <stop offset="100%" stop-color="#dde9f6" />
+              <stop offset="0%" class="map-view__ocean-top" />
+              <stop offset="100%" class="map-view__ocean-bottom" />
             </linearGradient>
           </defs>
 
           <!-- ocean -->
-          <rect x="0" y="0" :width="W" :height="H" fill="url(#mvOcean)" stroke="#c7d6e8" />
+          <rect class="map-view__ocean" x="0" y="0" :width="W" :height="H" fill="url(#mvOcean)" />
 
           <!-- graticule -->
           <g class="map-view__grid">
@@ -68,16 +68,16 @@
           >
             <path
               class="map-view__pin-body"
-              :fill="p.color"
+              :style="{ fill: p.color }"
               d="M0,0 C-9,-14 -7,-26 0,-26 C7,-26 9,-14 0,0 Z"
             />
-            <circle class="map-view__pin-dot" cx="0" cy="-18" r="4.5" fill="#fff" />
+            <circle class="map-view__pin-dot" cx="0" cy="-18" r="4.5" />
             <title>{{ p.TaskName || p.TaskKey }} — {{ fmtLatLng(p.lat, p.lng) }}</title>
           </g>
         </svg>
 
         <div v-if="!activeTasks.length" class="map-view__empty">
-          No tasks in this sprint yet.
+          {{ $t('Views.map_empty') }}
         </div>
       </div>
 
@@ -92,10 +92,10 @@
             <span v-if="selectedTask.TaskKey" class="map-view__key">{{ selectedTask.TaskKey }}</span>
             <span class="map-view__coord">{{ fmtLatLng(placements[selectedId].lat, placements[selectedId].lng) }}</span>
           </div>
-          <button type="button" class="map-view__remove" @click="removePlacement(selectedId)">Remove from map</button>
+          <button type="button" class="map-view__remove" @click="removePlacement(selectedId)">{{ $t('Views.map_remove') }}</button>
         </div>
 
-        <h4 class="map-view__side-title">To place ({{ unplaced.length }})</h4>
+        <h4 class="map-view__side-title">{{ $t('Views.map_to_place_title', { n: unplaced.length }) }}</h4>
         <ul class="map-view__list">
           <li
             v-for="t in unplaced"
@@ -106,10 +106,10 @@
             <span class="map-view__dot" :style="{ background: statusColor(t) }"></span>
             <span class="map-view__item-name" :title="t.TaskName">{{ t.TaskName || t.TaskKey }}</span>
             <button type="button" class="map-view__place" @click="startPlacing(t._id)">
-              {{ placingId === String(t._id) ? 'Placing…' : 'Place' }}
+              {{ placingId === String(t._id) ? $t('Views.map_placing') : $t('Views.map_place') }}
             </button>
           </li>
-          <li v-if="!unplaced.length" class="map-view__all-placed">All tasks placed.</li>
+          <li v-if="!unplaced.length" class="map-view__all-placed">{{ $t('Views.map_all_placed') }}</li>
         </ul>
       </aside>
     </div>
@@ -171,9 +171,9 @@ function unproject(x, y) {
 /* ----------------------------------- status ------------------------------------ */
 function statusColor(task) {
     const type = task?.status?.type || task?.statusType;
-    if (type === 'close') return '#27ae60';
-    if (type === 'inprogress') return '#f1a33a';
-    return '#9aa3b2';
+    if (type === 'close') return 'var(--ok)';
+    if (type === 'inprogress') return 'var(--warn)';
+    return 'var(--ink-3)';
 }
 
 /* ------------------------------- placed / unplaced ------------------------------ */
@@ -285,49 +285,53 @@ watch(() => props.sprints, () => ensureTasksLoaded(), { deep: true });
 </script>
 
 <style scoped>
-.map-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: #fff; }
-.map-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 12px; border-bottom: 1px solid #eee; flex: 0 0 auto; }
-.map-view__count { font-size: 12px; color: #888; }
-.map-view__hint { font-size: 12px; color: #2F3990; background: #eef0ff; border: 1px solid #cdd2f5; border-radius: 4px; padding: 2px 8px; display: inline-flex; align-items: center; gap: 8px; }
-.map-view__hint-x { border: none; background: transparent; color: #2F3990; text-decoration: underline; cursor: pointer; font-size: 12px; padding: 0; }
-.map-view__clear { margin-left: auto; border: 1px solid #d8d8e0; background: #fff; color: #666; border-radius: 5px; font-size: 12px; padding: 3px 10px; cursor: pointer; }
-.map-view__clear:hover { border-color: #c0392b; color: #c0392b; }
+.map-view { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--surface); color: var(--ink); }
+.map-view__bar { display: flex; align-items: center; gap: 14px; padding: 8px 12px; border-bottom: 1px solid var(--hairline); flex: 0 0 auto; }
+.map-view__count { font-size: 12px; color: var(--ink-2); }
+.map-view__hint { font-size: 12px; color: var(--brand); background: var(--brand-tint); border: 1px solid var(--brand-border); border-radius: var(--r-chip); padding: 2px 8px; display: inline-flex; align-items: center; gap: 8px; }
+.map-view__hint-x { border: none; background: transparent; color: var(--brand); text-decoration: underline; cursor: pointer; font-size: 12px; padding: 0; }
+.map-view__clear { margin-left: auto; border: 1px solid var(--border); background: var(--surface); color: var(--ink-2); border-radius: var(--r-chip); font-size: 12px; padding: 3px 10px; cursor: pointer; }
+.map-view__clear:hover { border-color: var(--danger); color: var(--danger); }
 
 .map-view__main { position: relative; flex: 1 1 auto; display: flex; min-height: 380px; }
 .map-view__canvas { position: relative; flex: 1 1 auto; min-width: 0; padding: 12px; overflow: auto; }
 .map-view__canvas.is-placing { cursor: crosshair; }
-.map-view__svg { display: block; width: 100%; height: auto; max-height: 100%; border-radius: 6px; }
+.map-view__svg { display: block; width: 100%; height: auto; max-height: 100%; border-radius: var(--r-chip); }
 
-.map-view__grid line { stroke: #c2d2e6; stroke-width: 1; }
+.map-view__ocean-top { stop-color: var(--surface-2); }
+.map-view__ocean-bottom { stop-color: var(--fill); }
+.map-view__ocean { stroke: var(--border); }
+.map-view__grid line { stroke: var(--border); stroke-width: 1; }
 .map-view__grid line.is-prime,
-.map-view__grid line.is-equator { stroke: #9bb4d4; stroke-width: 1.4; }
-.map-view__labels text { fill: #8190a6; font-size: 11px; }
+.map-view__grid line.is-equator { stroke: var(--ink-3); stroke-width: 1.4; }
+.map-view__labels text { fill: var(--ink-2); font-size: 11px; }
 
 .map-view__pin { cursor: pointer; }
-.map-view__pin-body { stroke: #fff; stroke-width: 1.5; transition: transform .1s ease; }
-.map-view__pin.is-selected .map-view__pin-body { stroke: #2F3990; stroke-width: 2.5; }
+.map-view__pin-body { stroke: var(--surface); stroke-width: 1.5; transition: transform .1s ease; }
+.map-view__pin-dot { fill: var(--surface); }
+.map-view__pin.is-selected .map-view__pin-body { stroke: var(--brand); stroke-width: 2.5; }
 .map-view__pin:hover .map-view__pin-body { transform: scale(1.12); }
 
-.map-view__empty { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); text-align: center; color: #999; font-size: 14px; pointer-events: none; }
+.map-view__empty { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); text-align: center; color: var(--ink-2); font-size: 14px; pointer-events: none; }
 
-.map-view__side { width: 230px; flex: 0 0 auto; border-left: 1px solid #eee; padding: 10px; overflow: auto; background: #fafafe; }
-.map-view__card { border: 1px solid #cdd2f5; background: #fff; border-radius: 6px; padding: 8px; margin-bottom: 12px; }
+.map-view__side { width: 230px; flex: 0 0 auto; border-left: 1px solid var(--hairline); padding: 10px; overflow: auto; background: var(--surface-2); }
+.map-view__card { border: 1px solid var(--brand-border); background: var(--surface); border-radius: var(--r-input); padding: 8px; margin-bottom: 12px; }
 .map-view__card-head { display: flex; align-items: center; gap: 6px; }
-.map-view__card-name { flex: 1 1 auto; font-size: 13px; font-weight: 600; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.map-view__card-x { border: none; background: transparent; color: #999; font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
+.map-view__card-name { flex: 1 1 auto; font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-view__card-x { border: none; background: transparent; color: var(--ink-2); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
 .map-view__card-meta { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
-.map-view__key { font-size: 11px; color: #2F3990; background: #eef0ff; border-radius: 3px; padding: 1px 6px; }
-.map-view__coord { font-size: 11px; color: #777; }
-.map-view__remove { width: 100%; border: 1px solid #e3b4ae; background: #fff; color: #c0392b; border-radius: 5px; font-size: 12px; padding: 4px; cursor: pointer; }
-.map-view__remove:hover { background: #c0392b; color: #fff; }
+.map-view__key { font-size: 11px; color: var(--brand); background: var(--brand-tint); border-radius: var(--r-chip); padding: 1px 6px; }
+.map-view__coord { font-size: 11px; color: var(--ink-2); }
+.map-view__remove { width: 100%; border: 1px solid var(--border); background: var(--surface); color: var(--danger); border-radius: var(--r-chip); font-size: 12px; padding: 4px; cursor: pointer; }
+.map-view__remove:hover { background: var(--danger); color: var(--surface); }
 
-.map-view__side-title { font-size: 12px; text-transform: uppercase; color: #999; margin: 0 0 8px; letter-spacing: .04em; }
+.map-view__side-title { font-size: 12px; text-transform: uppercase; color: var(--ink-label); margin: 0 0 8px; letter-spacing: .04em; }
 .map-view__list { list-style: none; margin: 0; padding: 0; }
-.map-view__item { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee; }
-.map-view__item.is-active { background: #f3f5ff; }
+.map-view__item { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px dashed var(--hairline); }
+.map-view__item.is-active { background: var(--brand-tint); }
 .map-view__dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
-.map-view__item-name { flex: 1 1 auto; font-size: 13px; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.map-view__place { border: 1px solid #2F3990; color: #2F3990; background: #fff; border-radius: 5px; font-size: 12px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
-.map-view__place:hover { background: #2F3990; color: #fff; }
-.map-view__all-placed { font-size: 12px; color: #aaa; padding: 8px 0; }
+.map-view__item-name { flex: 1 1 auto; font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-view__place { border: 1px solid var(--brand); color: var(--brand); background: var(--surface); border-radius: var(--r-chip); font-size: 12px; padding: 3px 8px; cursor: pointer; white-space: nowrap; }
+.map-view__place:hover { background: var(--brand); color: var(--on-brand); }
+.map-view__all-placed { font-size: 12px; color: var(--ink-2); padding: 8px 0; }
 </style>

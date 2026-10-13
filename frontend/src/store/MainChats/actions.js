@@ -53,10 +53,10 @@ export const setChats = ({ commit, rootState }, payload) => {
                     commit('mutateChats', [{ snap: {}, op: "modified", data: { ...data.fullDocument } }]);
                 })
                 socketInstance.on('chatTaskDelete', (data) => {
-                    commit('mutateChats', [{ snap: {}, op: "modified", data: { ...data } }]);
+                    commit('mutateChats', [{ snap: {}, op: "removed", data: { ...data } }]);
                 })
                 socketInstance.on('chatTaskReplace', (data) => {
-                    commit('mutateChats', [{ snap: {}, op: "removed", data: { ...data.fullDocument } }]);
+                    commit('mutateChats', [{ snap: {}, op: "modified", data: { ...data.fullDocument } }]);
                 })
             }
         } catch (e) {

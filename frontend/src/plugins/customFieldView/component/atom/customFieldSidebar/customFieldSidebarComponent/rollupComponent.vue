@@ -1,5 +1,5 @@
 <template>
-    <div v-show="tabIndexCheck === 1">
+    <div v-show="tabIndexCheck === 1" data-field-tab="1">
         <CustomFieldInputComponent
             :label="$t('PlaceHolder.field_label')"
             :type="'text'"
@@ -14,31 +14,31 @@
             :label="$t('Description.description')"
             :type="'textarea'"
             :placeholder="$t('PlaceHolder.Enter_Description')"
-            :validations="'required:trim|length:10'"
+            :validations="''"
             :bindValue="props.customFieldObject?.fieldDescription ? props.customFieldObject.fieldDescription : fieldDescription"
             :validationVisibility="'blur'"
-            :className="'custom__field-required'"
             :name="'fieldDescription'"
         />
-        <!-- Rollup function -->
         <div class="formkit__form-wrapper">
             <label class="formkit-label">{{ $t('CustomField.rollup_function') }}</label>
+            <p class="ah-field__hint">{{ $t('Fields.rollup_help') }}</p>
         </div>
-        <DropDown :zIndex="10" :id="rollupFunctionUniqueId" :keepSameWidth="true">
+        <DropDown themed mode="listbox" :zIndex="10" :id="rollupFunctionUniqueId" :keepSameWidth="true">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="rollupFunctionUniqueId">
+                    <span class="ah-sr-only">{{ $t('CustomField.rollup_function') }}</span>
                     <div class="d-flex border-gray border-radius-5-px align-items-center p-4px justify-content-between">
                         <div class="d-flex align-items-center">
                             <span class="ml-8px font-size-13 font-weight-400 gray81 d-block text-capitalize">{{ rollupFunction }}</span>
                         </div>
                         <div class="mr-8px">
-                            <img class="rotate-z-90" :src="dropDownArrow" alt="triangleBlack">
+                            <img class="rotate-z-90" :src="dropDownArrow" alt="">
                         </div>
                     </div>
                 </div>
             </template>
             <template #options>
-                <DropDownOption v-for="(fn, index) in rollupFunctions" :key="index" @click="$refs[rollupFunctionUniqueId].click(),handleFunction(fn)">
+                <DropDownOption v-for="(fn, index) in rollupFunctions" :key="index" :selected="fn === rollupFunction" @click="$refs[rollupFunctionUniqueId].click(),handleFunction(fn)">
                     <span class="text-capitalize">{{ fn }}</span>
                 </DropDownOption>
             </template>
@@ -48,22 +48,23 @@
             <div class="formkit__form-wrapper">
                 <label class="formkit-label">{{ $t('CustomField.rollup_source_field') }}</label>
             </div>
-            <DropDown :zIndex="10" :id="rollupSourceUniqueId" :keepSameWidth="true">
+            <DropDown themed mode="listbox" :zIndex="10" :id="rollupSourceUniqueId" :keepSameWidth="true">
                 <template #button>
                     <div class="formkit__form-wrapper" :ref="rollupSourceUniqueId">
+                        <span class="ah-sr-only">{{ $t('CustomField.rollup_source_field') }}</span>
                         <div class="d-flex border-gray border-radius-5-px align-items-center p-4px justify-content-between">
                             <div class="d-flex align-items-center">
                                 <span class="ml-8px font-size-13 font-weight-400 gray81 d-block">{{ rollupSourceLabel }}</span>
                             </div>
                             <div class="mr-8px">
-                                <img class="rotate-z-90" :src="dropDownArrow" alt="triangleBlack">
+                                <img class="rotate-z-90" :src="dropDownArrow" alt="">
                             </div>
                         </div>
                     </div>
                 </template>
                 <template #options>
                     <div v-if="sourceFields.length">
-                        <DropDownOption v-for="field in sourceFields" :key="field._id" @click="$refs[rollupSourceUniqueId].click(),handleSource(field)">
+                        <DropDownOption v-for="field in sourceFields" :key="field._id" :selected="String(field._id) === String(rollupSourceFieldId)" @click="$refs[rollupSourceUniqueId].click(),handleSource(field)">
                             <span>{{ field.fieldTitle }}</span>
                         </DropDownOption>
                     </div>
@@ -73,18 +74,18 @@
                 </template>
             </DropDown>
         </div>
-        <DropDown :zIndex="10" v-if="isType">
+        <DropDown themed mode="listbox" :zIndex="10" v-if="isType">
             <template #button>
                 <div class="formkit__form-wrapper" :ref="customFieldTypeUniqueId">
                     <div class="custom__field-required">
                         <div class="formkit-wrapper">
-                            <label class="formkit-label" for="text">{{$t('Billing.type')}}</label>
+                            <span class="formkit-label">{{$t('Billing.type')}}</span>
                             <div class="d-flex border-gray border-radius-5-px align-items-center justify-content-between">
                                 <div class="d-flex align-items-center">
                                     <span class="formkit-input text-capitalize">{{type?.toLowerCase()}}</span>
                                 </div>
                                 <div class="mr-8px">
-                                    <img class="rotate-z-90" :src="dropDownArrow" alt="triangleBlack">
+                                    <img class="rotate-z-90" :src="dropDownArrow" alt="">
                                 </div>
                             </div>
                         </div>
@@ -92,10 +93,10 @@
                 </div>
             </template>
             <template #options>
-                <DropDownOption @click="$refs[customFieldTypeUniqueId].click(),handleType('project')">
+                <DropDownOption :selected="type === 'project'" @click="$refs[customFieldTypeUniqueId].click(),handleType('project')">
                     {{$t('Projects.Project')}}
                 </DropDownOption>
-                <DropDownOption @click="$refs[customFieldTypeUniqueId].click(),handleType('task')">
+                <DropDownOption :selected="type === 'task'" @click="$refs[customFieldTypeUniqueId].click(),handleType('task')">
                     {{$t('subProjectRulesNames.Task')}}
                 </DropDownOption>
             </template>
@@ -173,7 +174,7 @@
 
     // Redirect to the tab where the validation error message is displayed.
     const handleTabComp = (node) => {
-        if(!(node._value.fieldDescription && node._value.fieldTitle)){
+        if(!node._value.fieldTitle){
             tabIndexCheck.value = 1;
             emit('tabIndexUpdate',tabIndexCheck.value)
         }
@@ -186,7 +187,7 @@
         object.rollupFunction = rollupFunction.value;
         object.rollupSourceFieldId = rollupFunction.value === 'count' ? '' : (rollupSourceFieldId.value || '');
         object.fieldTitle = object.fieldTitle.trim();
-        object.fieldDescription = object.fieldDescription.trim();
+        object.fieldDescription = (object.fieldDescription || '').trim();
         if(props.isType === true){
             object.type = type.value;
         }

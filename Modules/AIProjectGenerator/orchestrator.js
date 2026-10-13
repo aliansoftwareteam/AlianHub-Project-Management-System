@@ -17,7 +17,8 @@
  *     "force-rename to 'To Do'". Domain-specific names survive intact.
  *
  *  5. Plan-limit gate matches the manual flow: `checkProjectPlan` runs
- *     before any work, with `removeProjectCount` rollback on failure.
+ *     before any work and stops the run when it does not pass, with
+ *     `removeProjectCount` rollback on failure.
  *
  *  6. `ProjectCode` is generated server-side from the project name using
  *     the same first-letter regex the manual wizard uses, with a
@@ -44,11 +45,20 @@ const { removeCache } = require('../../utils/commonFunctions');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { addSprintFun } = require('../Sprints/controller');
 const { HandleHistory } = require('../Tasks/helpers/helper');
+const { cleanDescription, cleanHtml } = require('../Tasks/helpers/cleanRichText');
 const { HandleBothNotification } = require('../Tasks/helpers/handleNotification');
 const { checkProjectPlan, removeProjectCount } = require('../createProject/controller');
 const { estimateAndPersist: estimateTaskTimeWithAI } = require('../EstimatedTime/aiTaskEstimator');
+const { storableFieldValues } = require('../CustomField/helpers/fieldValueWrite');
+const { defaultCurrencyOf } = require('../Company/helpers/companyCurrency');
+const { keptOnProject } = require('../../Config/projectPeople');
+const { hiddenSprintFilter } = require('../Sprints/helpers/sprintVisibility');
 const planRules = require('./planRules');
+const planAutomations = require('./planAutomations');
 const sseEmitter = require('./sseEmitter');
+const executeAgents = require('./executeAgents');
+const planViews = require('./planViews');
+const { taskCreatedHistoryMessage, projectCreatedHistoryMessage, projectCreatedNoticeMessage } = require('./historyMessages');
 
 // Concurrency cap for fire-and-forget AI estimates after bulk task insert —
 // keeps us well under the LLM provider's per-key rate limits when a single
@@ -265,14 +275,16 @@ function safeIsoDate(value) {
 // ─── Company context loading ───────────────────────────────────────────
 
 async function loadCompanyContext(companyId) {
-    const [projectStatusDoc, taskStatusDoc, taskTypeDoc, apps, tabComponents] = await Promise.all([
+    const [projectStatusDoc, taskStatusDoc, taskTypeDoc, apps, tabComponents, currency] = await Promise.all([
         MongoDbCrudOpration(companyId, { type: dbCollections.SETTINGS, data: [{ name: settingsCollectionDocs.PROJECT_STATUS }] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.SETTINGS, data: [{ name: settingsCollectionDocs.TASK_STATUS }] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.SETTINGS, data: [{ name: settingsCollectionDocs.TASK_TYPE }] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.APPS, data: [{}] }, 'find'),
         MongoDbCrudOpration(companyId, { type: dbCollections.PROJECT_TAB_COMPONENTS, data: [{}] }, 'find'),
+        defaultCurrencyOf(companyId),
     ]);
     return {
+        currency,
         projectStatusSettings: (projectStatusDoc && projectStatusDoc[0]) || { settings: [], totalStatus: 0 },
         taskStatusSettings: (taskStatusDoc && taskStatusDoc[0]) || { settings: [], totalStatus: 0 },
         taskTypeSettings: (taskTypeDoc && taskTypeDoc[0]) || { settings: [], totalStatus: 0 },
@@ -374,14 +386,14 @@ function shapeTaskType(entry, idx) {
 
 // ─── Required views — match company defaults ───────────────────────────
 
-function pickRequiredComponents(tabComponents) {
+function pickRequiredComponents(tabComponents, plannedKeys = new Set()) {
     if (!Array.isArray(tabComponents) || !tabComponents.length) return [];
     let defaultPicked = false;
     const shaped = tabComponents
         .filter((v) => {
             const lowerName = String(v.name || '').trim().toLowerCase();
             const lowerKey = String(v.keyName || '').trim().toLowerCase();
-            if (lowerKey) return AI_PROJECT_VIEW_KEYS.has(lowerKey);
+            if (lowerKey) return AI_PROJECT_VIEW_KEYS.has(lowerKey) || plannedKeys.has(lowerKey);
             return AI_PROJECT_VIEW_NAMES.has(lowerName);
         })
         .map((v) => {
@@ -537,7 +549,7 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
 
     const defaultProjectStatus = projectStatusMerge.merged.find((s) => s.type === 'default_active') || projectStatusMerge.merged[0];
     const apps = pickAppKeys(context.apps);
-    const projectRequired = pickRequiredComponents(context.tabComponents);
+    const projectRequired = pickRequiredComponents(context.tabComponents, planViews.tabKeysFor(plan.views));
     const defaultComponent = projectRequired.find((c) => c.setAsDefault) || projectRequired[0] || {};
     const defaultRequired = defaultComponent.keyName || defaultComponent.name || '';
 
@@ -551,14 +563,14 @@ function buildProjectDoc({ plan, context, companyId, uid, projectIdHint, project
         CompanyId: companyId,
         ProjectName: proj.ProjectName,
         ProjectCode: String(projectCode || '').toUpperCase(),
-        ProjectCurrency: { code: 'USD', symbol: '$' },
+        ProjectCurrency: context.currency || {},
         ProjectType: 'Fix',
         ProjectRequiredComponent: projectRequired,
         ProjectRequiredDefaultComponent: defaultRequired,
         LeadUserId: leadIds,
         AssigneeUserId: assignees,
         DueDate: '',
-        description: proj.description || '',
+        description: cleanHtml(String(proj.description || ''), 'strict'),
         // Set by the controller from the user's input, never by the LLM.
         proposalId: proj.proposalId || '',
         proposalIdNumeric: proj.proposalIdNumeric || '',
@@ -631,6 +643,26 @@ async function pushNewStatusesToSettings({ companyId, statusUpdates }) {
         }, 'updateOne'));
     }
     await Promise.allSettled(ops);
+}
+
+/* A tab outside the allowlist was added only so a planned view could start from it; with no view of its kind made it goes again. */
+async function dropUnusedTabs({ companyId, projectDoc, plannedKeys, made }) {
+    const used = new Set((made || []).map((view) => planViews.tabKeyOf(view.kind)));
+    const unused = [...plannedKeys].filter((key) => !AI_PROJECT_VIEW_KEYS.has(key) && !used.has(key));
+    const tabs = Array.isArray(projectDoc.ProjectRequiredComponent) ? projectDoc.ProjectRequiredComponent : [];
+    const ids = tabs.filter((tab) => unused.includes(String(tab.keyName || '').toLowerCase())).map((tab) => tab._id);
+    if (!ids.length) return;
+    try {
+        await MongoDbCrudOpration(companyId, {
+            type: SCHEMA_TYPE.PROJECTS,
+            data: [{ _id: projectDoc._id }, { $pull: { ProjectRequiredComponent: { _id: { $in: ids } } } }],
+        }, 'updateOne');
+        projectDoc.ProjectRequiredComponent = tabs.filter((tab) => !ids.includes(tab._id));
+        const stored = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{ _id: projectDoc._id }] }, 'findOne');
+        socketEmitter.emit('update', { type: 'update', companyId: String(companyId), data: stored || projectDoc, updatedFields: { ProjectRequiredComponent: 'pull' }, module: 'project' });
+    } catch (e) {
+        logger.warn(`[AIPG] unused tabs left on ${projectDoc._id}: ${e && e.message ? e.message : e}`);
+    }
 }
 
 async function saveProject(companyId, projectDoc) {
@@ -706,8 +738,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
     const watchers = Array.from(new Set([...assignees, String(creatorUid || '')].filter(Boolean)));
 
     const blocks = Array.isArray(task.descriptionBlocks) ? task.descriptionBlocks : [];
-    const descriptionBlock = wrapDescriptionBlock(blocks);
-    const rawDescription = blocksToText(blocks);
+    const { descriptionBlock, rawDescription } = cleanDescription({ descriptionBlock: wrapDescriptionBlock(blocks), rawDescription: blocksToText(blocks) });
 
     return {
         _id: id,
@@ -721,6 +752,7 @@ function buildTaskDoc({ task, projectDoc, sprintDoc, statusByName, taskTypeByKey
         TaskType: taskType ? (taskType.value || taskType.name || 'task') : 'task',
         TaskTypeKey: taskType ? taskType.key : 0,
         ParentTaskId: parentTaskId ? String(parentTaskId) : '',
+        ancestors: parentTaskId ? [String(parentTaskId)] : [],
         // Taken straight from the plan and capped, so a task that was split
         // shows its slice immediately rather than waiting on the background
         // estimator — which never runs for sub-tasks at all.
@@ -789,8 +821,13 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     // follow-up $inc.
     const parentDocs = [];
     const subtaskDocs = [];
-    for (const t of tasks) {
-        const subs = Array.isArray(t.subtasks) ? t.subtasks : [];
+    // A plan names people from the company's roster. The project is stored by now, so each task keeps the ones who
+    // can open it: on a private project, the people and teams it is shared with, the owners and the admins.
+    const keepPeople = keptOnProject(companyId, String(projectDoc._id));
+    const withPeopleOnProject = async (planned) => ({ ...planned, AssigneeUserId: await keepPeople(planned.AssigneeUserId || []) });
+    for (const planned of tasks) {
+        const t = await withPeopleOnProject(planned);
+        const subs = await Promise.all((Array.isArray(t.subtasks) ? t.subtasks : []).map(withPeopleOnProject));
         const parentDoc = buildTaskDoc({
             task: t, projectDoc, sprintDoc, statusByName, taskTypeByKey, creatorUid,
             subTaskCount: subs.length,
@@ -813,6 +850,11 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
         }
     }
     const docs = [...parentDocs, ...subtaskDocs];
+
+    const fieldDefinitions = new Map();
+    for (const doc of docs) {
+        doc.customField = (await storableFieldValues({ companyId, task: doc, definitions: fieldDefinitions })).customField;
+    }
 
     const typeIncrements = {};
     for (const d of docs) {
@@ -849,7 +891,7 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     }, 'updateOne').catch(() => {});
 
     for (const d of docs) {
-        try { socketEmitter.emit('insert', { type: 'insert', data: d, module: 'task' }); } catch (_e) { /* ignore */ }
+        try { socketEmitter.emit('insert', { type: 'insert', data: d, module: 'task', companyId }); } catch (_e) { /* ignore */ }
     }
 
     // Activity-log entry per created task — mirrors the manual task-create
@@ -861,9 +903,8 @@ async function createTasksForSprint({ companyId, projectDoc, sprintDoc, tasks, s
     // failures are logged and never block task creation.
     const historyActor = userData || { id: String(creatorUid || ''), Employee_Name: 'AlianHub AI' };
     for (const d of docs) {
-        const taskTypeLabel = String(d.TaskType || 'task').replace(/_/g, '-');
         const historyObj = {
-            message: `<b>${historyActor.Employee_Name || 'AlianHub AI'}</b> has created new <b>${d.TaskName}</b> ${taskTypeLabel}.`,
+            message: taskCreatedHistoryMessage(historyActor, d),
             key: 'Task_Created',
             sprintId: String(sprintDoc._id),
         };
@@ -935,7 +976,7 @@ async function rollback({ companyId, tracker }) {
 
 async function fireProjectCreateNotification({ companyId, projectDoc, userData }) {
     const notificationObject = {
-        message: `<p>Created a new project named <strong>${projectDoc.ProjectName}</strong>.</p>`,
+        message: projectCreatedNoticeMessage(projectDoc),
         key: 'project_create',
         projectId: String(projectDoc._id),
     };
@@ -963,7 +1004,12 @@ function withTimeout(promise, ms, label) {
     ]);
 }
 
-async function executePlan({ plan, companyId, uid, userData, jobId }) {
+const planCheckReason = (outcome) => {
+    const reason = outcome && (outcome.statusText || outcome.message);
+    return typeof reason === 'string' && reason ? reason : 'Project plan check did not pass.';
+};
+
+async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrief, assumptions, guide, withGuideAgent = true }) {
     const tracker = {
         project: null,
         sprints: [],
@@ -972,47 +1018,36 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
         countIncremented: false,
     };
     const emit = (payload) => sseEmitter.emit(jobId, payload);
+    const withGuide = Boolean((approvedBrief && String(approvedBrief).trim()) || guide);
+    let agents = [];
+    const taskPairs = [];
 
     try {
-        // 1. Plan-limit gate — INTENTIONALLY BYPASSED.
-        //
-        // We still call `checkProjectPlan` because internally it $inc's the
-        // company's `projectCount.{projectCount,publicCount,privateCount}`
-        // counters BEFORE checking the limit ceiling. Keeping that call
-        // means AI-created projects stay accurately counted in the
-        // companies doc — matching how the manual createProject flow
-        // tracks them. We just swallow the rejection that comes back
-        // when the ceiling is tripped, so creation proceeds anyway.
-        //
-        // checkProjectPlan rejects in two distinct cases:
-        //   (a) `countRollBack === false` — the $inc itself failed (e.g.
-        //       Mongo write error). Count was NOT mutated, so we leave
-        //       tracker.countIncremented = false. Nothing for the
-        //       downstream rollback path to undo.
-        //   (b) Otherwise — the $inc succeeded and only the ceiling
-        //       check failed. Count WAS mutated, so we mark
-        //       countIncremented = true and the existing rollback() in
-        //       the outer catch will correctly decrement on later
-        //       failure, exactly like the limit-not-tripped path.
-        emit({ event: 'progress', step: 'project', status: 'started' });
-        logger.info(`[AIPG][${jobId}] step 1: checkProjectPlan start (company=${companyId})`);
+        // The split is recomputed here rather than read off the client's plan:
+        // zod strips it on re-validation, and the labels must be current.
         try {
-            await withTimeout(
+            const leads = Array.isArray(plan.project.LeadUserId) ? plan.project.LeadUserId : [];
+            const prepared = await executeAgents.prepare({ plan, companyId, assumptions, fallbackAssignee: leads[0] || uid });
+            plan = prepared.plan;
+            agents = prepared.agents;
+        } catch (e) {
+            logger.warn(`[AIPG][${jobId}] split not attached (${e && e.message ? e.message : e}); every task is treated as a person's`);
+        }
+
+        // The same plan check the manual create runs; a rejection after the count's $inc still owes a rollback.
+        emit({ event: 'progress', step: 'project', status: 'started' });
+        let planCheck;
+        try {
+            planCheck = await withTimeout(
                 checkProjectPlan({ body: { CompanyId: companyId, isPrivateSpace: tracker.isPrivateSpace } }),
                 45000, 'checkProjectPlan'
             );
-            tracker.countIncremented = true;
         } catch (err) {
-            const incrementFailed = err && err.countRollBack === false;
-            if (!incrementFailed) {
-                tracker.countIncremented = true;
-            }
-            const reason = (err && err.statusText)
-                || (err && err.message)
-                || 'unknown';
-            logger.warn(`[AIPG][${jobId}] checkProjectPlan rejected — bypassed (reason: ${reason}, incrementApplied: ${!incrementFailed})`);
+            tracker.countIncremented = !(err && err.countRollBack === false);
+            throw new Error(planCheckReason(err));
         }
-        logger.info(`[AIPG][${jobId}] step 1: checkProjectPlan done (limit gate bypassed)`);
+        tracker.countIncremented = true;
+        if (!planCheck || !planCheck.status) throw new Error(planCheckReason(planCheck));
 
         // 2. Load company context.
         logger.info(`[AIPG][${jobId}] step 2: loadCompanyContext start`);
@@ -1029,6 +1064,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
 
         // 4. Build project doc.
         const { projectDoc, statusUpdates } = buildProjectDoc({ plan, context, companyId, uid, projectCode });
+        Object.assign(projectDoc, executeAgents.projectFields({ approvedBrief, assumptions, guide }));
         tracker.projectName = projectDoc.ProjectName;
         logger.info(`[AIPG][${jobId}] step 4: buildProjectDoc done`);
 
@@ -1036,7 +1072,7 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
         logger.info(`[AIPG][${jobId}] step 5: saveProject start`);
         const savedProject = await withTimeout(saveProject(companyId, projectDoc), 45000, 'saveProject');
         tracker.project = projectDoc._id.toString();
-        try { socketEmitter.emit('insert', { type: 'insert', data: savedProject || projectDoc, module: 'projects' }); } catch (_e) { /* ignore */ }
+        try { socketEmitter.emit('insert', { type: 'insert', companyId: String(companyId), data: savedProject || projectDoc, module: 'project' }); } catch (_e) { /* ignore */ }
         emit({ event: 'progress', step: 'project', status: 'done', projectId: tracker.project });
         logger.info(`[AIPG][${jobId}] step 5: saveProject done (projectId=${tracker.project})`);
 
@@ -1090,13 +1126,17 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
                 userData,
             });
             for (const t of created) tracker.tasks.push(t._id.toString());
+            taskPairs.push(...executeAgents.pairDocs(sprint.tasks || [], created));
             completed += created.length;
             emit({ event: 'progress', step: 'tasks', status: 'progress', completed, total: totalTasks });
         }
 
+        const views = await planViews.makeViews({ companyId, uid, projectId: tracker.project, views: plan.views });
+        await dropUnusedTabs({ companyId, projectDoc, plannedKeys: planViews.tabKeysFor(plan.views), made: views.made });
+
         // 9. History row (best-effort, single entry).
         const historyObject = {
-            message: `<b>${userData.Employee_Name || 'AI'}</b> created project <b>${projectDoc.ProjectName}</b> with <b>${tracker.sprints.length}</b> sprints and <b>${tracker.tasks.length}</b> tasks via AI.`,
+            message: projectCreatedHistoryMessage(userData, projectDoc, tracker),
             key: 'Project_Created_AI',
         };
         HandleHistory('project', companyId, projectDoc._id.toString(), null, historyObject, userData).catch((e) => {
@@ -1112,14 +1152,27 @@ async function executePlan({ plan, companyId, uid, userData, jobId }) {
         // 11. Cache busts (mirror createProject).
         try { removeCache('UserProjectData:', true); } catch (_e) { /* ignore */ }
 
-        emit({
-            event: 'complete',
-            projectId: tracker.project,
-            projectName: projectDoc.ProjectName,
-            totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length },
+        // 12. Guide agent and the runs for agent-labelled tasks (task 015).
+        const agentWork = await executeAgents.start({
+            companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide, withGuideAgent, approvedBrief, assumptions,
         });
 
-        return { ok: true, projectId: tracker.project, totals: { sprints: tracker.sprints.length, tasks: tracker.tasks.length } };
+        // Last, so nothing after it can roll the project back and leave a rule behind.
+        const rules = await planAutomations.makeRules({ companyId, uid, projectId: tracker.project, plan });
+
+        const totals = { sprints: tracker.sprints.length, tasks: tracker.tasks.length };
+        emit({
+            event: 'complete',
+            rules,
+            projectId: tracker.project,
+            projectName: projectDoc.ProjectName,
+            totals,
+            splitSummary: plan.splitSummary || null,
+            views,
+            ...agentWork,
+        });
+
+        return { ok: true, projectId: tracker.project, totals, views, ...agentWork };
     } catch (error) {
         logger.error(`[AIPG][${jobId}] orchestrator catch: ${error && error.message ? error.message : error}${error && error.stack ? '\n' + error.stack : ''}`);
         await rollback({ companyId, tracker });
@@ -1167,17 +1220,34 @@ async function loadProjectForTasks(companyId, projectId) {
     return (Array.isArray(rows) && rows[0]) || null;
 }
 
+// The project's sprint names, for the planning prompt. Read from the SPRINTS
+// collection for the same reason as loadSprintForTasks below: the project doc's
+// sprintsObj is a legacy copy that no sprint write maintains.
+async function loadSprintNamesForProject(companyId, projectId, uid) {
+    let oid;
+    try { oid = new mongoose.Types.ObjectId(String(projectId)); } catch (_e) { return []; }
+    const hidden = ((await hiddenSprintFilter(companyId, uid, [String(projectId)])).sprintId || { $nin: [] }).$nin.map(String);
+    const rows = await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.SPRINTS,
+        data: [{ projectId: oid, deletedStatusKey: { $ne: 1 } }],
+    }, 'find').catch(() => []);
+    return (Array.isArray(rows) ? rows : []).filter((s) => s && !hidden.includes(String(s._id))).map((s) => s.name).filter(Boolean);
+}
+
 // Load a single sprint by id (company-scoped, non-deleted) from the SPRINTS
 // collection — the source of truth — rather than the project doc's
 // denormalized `sprintsObj`, which a freshly-loaded project doc may not carry.
-async function loadSprintForTasks(companyId, sprintId) {
+async function loadSprintForTasks(companyId, sprintId, uid) {
     let oid;
     try { oid = new mongoose.Types.ObjectId(String(sprintId)); } catch (_e) { return null; }
     const rows = await MongoDbCrudOpration(companyId, {
         type: SCHEMA_TYPE.SPRINTS,
         data: [{ _id: oid, deletedStatusKey: { $ne: 1 } }],
     }, 'find').catch(() => []);
-    return (Array.isArray(rows) && rows[0]) || null;
+    const sprint = (Array.isArray(rows) && rows[0]) || null;
+    if (!sprint) return null;
+    const hidden = ((await hiddenSprintFilter(companyId, uid, [String(sprint.projectId || '')])).sprintId || { $nin: [] }).$nin.map(String);
+    return hidden.includes(String(sprint._id)) ? null : sprint;
 }
 
 async function rollbackTasks({ companyId, tracker }) {
@@ -1417,12 +1487,12 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
             // Resolve the target sprint from the SPRINTS collection (source of
             // truth). The project doc's denormalized `sprintsObj` can be empty on
             // a freshly-loaded doc, which is why the earlier id lookup missed.
-            const sprintRow = await withTimeout(loadSprintForTasks(companyId, targetSprintId), 45000, 'loadSprintForTasks');
-            if (!sprintRow) throw new Error('Target sprint not found in this project');
+            const sprintRow = await withTimeout(loadSprintForTasks(companyId, targetSprintId, uid), 45000, 'loadSprintForTasks');
+            if (!sprintRow) throw new Error('Target list not found in this project');
             // Defensive: keep the tasks in the project they were requested for.
             const sprintProjectId = String(sprintRow.projectId || sprintRow.ProjectID || sprintRow.projectID || '');
             if (sprintProjectId && sprintProjectId !== String(projectDoc._id)) {
-                throw new Error('Target sprint is not in this project');
+                throw new Error('Target list is not in this project');
             }
             const sprintDoc = { _id: sprintRow._id, name: sprintRow.name || sprintRow.sprintName || 'Sprint' };
             const tasks = Array.isArray(tasksPlan.tasks) ? tasksPlan.tasks : [];
@@ -1521,10 +1591,15 @@ async function executeTasksIntoProject({ tasksPlan, projectId, companyId, uid, u
 module.exports = {
     executePlan,
     executeTasksIntoProject,
+    loadSprintForTasks,
     loadProjectForTasks,
+    loadSprintNamesForProject,
     normalizePlanColors,
     // Exported for tests / debugging.
+    loadCompanyContext,
     buildProjectDoc,
+    pickRequiredComponents,
+    dropUnusedTabs,
     mergeStatusList,
     rollback,
     bgFromText,

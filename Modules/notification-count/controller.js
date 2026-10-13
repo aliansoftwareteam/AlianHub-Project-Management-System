@@ -3,6 +3,8 @@ const logger = require("../../Config/loggerConfig");
 const { dbCollections } = require('../../Config/collections');
 const socketEmitter = require('../../event/socketEventEmitter');
 const { escapeRegex } = require('../../utils/escapeRegex');
+const { pinSessionTenant } = require('../../Config/tenant');
+const { parentCountFields } = require('./unreadParents');
 
 // Key 1 is Project Comments
 // Key 2 is update sprint count and task count
@@ -11,104 +13,46 @@ const { escapeRegex } = require('../../utils/escapeRegex');
 // Key 5 is update notification count
 
 
-/**
- * Update Sprint And Task Count
- * @param {Object} Data - Object Which is get Frin Db
- * @param {String} CompanyId - Company Id In which Count is need to update
- * @param {String} TaskFieldName - Name of the field which is being updated
- * @param {String} SprintFieldName - Name of the field which is being updated
- * @returns {function} - Function which is return with object which contain status true or false
-*                          If status is false then error is returned
- */
-exports.updateSprintCount = (companyId,data, taskFieldName, sprintFieldName, parentTaskField = null, prevCount = 0, cb) => {
-    try {
-        let count = 0;
-        const countFun = (row) => {
-            if (count >= data.length) {
-                cb({
-                    status: true
-                });
-                return;
-            }
-            if (!row[taskFieldName]) {
-                count += 1;
-                countFun(data[count]);
-                return;
-            }
-            let obj = {
-                type: dbCollections.USERID,
-                data: [{
-                    _id: row._id
-                }, {
-                    $inc: {
-                        // [sprintFieldName]: -Math.abs(prevCount),
-                        // ...(parentTaskField ? {[parentTaskField]: -Math.abs(prevCount)} : {})
-                        // [sprintFieldName]: prevCount,
-                        ...(parentTaskField ? {[parentTaskField]: prevCount} : {})
-                    }
-                },{returnDocument: 'after'}]
-            }
-            mongoCm.MongoDbCrudOpration(companyId,obj,"findOneAndUpdate").then((response)=>{
-                socketEmitter.emit('update', { type: "update", data: response , module: 'userIdNotification' });
-                // UNSET SPRINT FIELD
-                let obj = {
-                    type: dbCollections.USERID,
-                    data: [{
-                        _id: row._id,
-                        [sprintFieldName]: {
-                            $lte: 0
-                        }
-                    }, {
-                        $unset: {
-                            [sprintFieldName]: ""
-                        }
-                    },{returnDocument: 'after'}]
-                }
-                mongoCm.MongoDbCrudOpration(companyId,obj,"findOneAndUpdate").then((sdata)=>{
-                    socketEmitter.emit('update', { type: "update", data: sdata , module: 'userIdNotification' });
-                    count += 1;
-                    countFun(data[count]);
-                }).catch((err) => {
-                    count += 1;
-                    countFun(data[count]);
-                });
+/* A null document would blank the client's whole count store, so only a real one is broadcast. */
+const emitCounts = (companyId, doc) => {
+    if (doc) socketEmitter.emit('update', { type: "update", data: doc , module: 'userIdNotification', companyId });
+};
 
-                if(parentTaskField) {
-                    // UNSET PARENT TASK FIELD
-                    obj = {
-                        type: dbCollections.USERID,
-                        data: [{
-                            _id: row._id,
-                            [parentTaskField]: {
-                                $lte: 0
-                            }
-                        }, {
-                            $unset: {
-                                [parentTaskField]: ""
-                            }
-                        }]
-                    }
-                    mongoCm.MongoDbCrudOpration(companyId,obj,"findOneAndUpdate").then((ele)=>{
-                        socketEmitter.emit('update', { type: "update", data: ele , module: 'userIdNotification' });
-                        count += 1;
-                        countFun(data[count]);
-                    }).catch((err) => {
-                        count += 1;
-                        countFun(data[count]);
-                    });
-                }
-            }).catch(() => {
-                count += 1;
-                countFun(data[count]);
-            })
+const unsetSpentCount = async (companyId, filter, field) => {
+    emitCounts(companyId, await mongoCm.MongoDbCrudOpration(companyId, {
+        type: dbCollections.USERID,
+        data: [{ ...filter, [field]: { $lte: 0 } }, { $unset: { [field]: "" } }, { returnDocument: 'after' }]
+    }, "findOneAndUpdate"));
+};
+
+/* Changes the count each task above a row holds for it, in every counter document that holds a
+ * count for the row itself, and drops a count that reached zero. */
+const changeParentCounts = async (companyId, rows, taskFieldName, sprintFieldName, parentFields, amountOf) => {
+    if (!parentFields.length) return;
+    for (const row of rows) {
+        if (!row[taskFieldName]) continue;
+        try {
+            const by = amountOf(row);
+            // eslint-disable-next-line no-await-in-loop
+            emitCounts(companyId, await mongoCm.MongoDbCrudOpration(companyId, {
+                type: dbCollections.USERID,
+                data: [{ _id: row._id }, { $inc: Object.fromEntries(parentFields.map((field) => [field, by])) }, { returnDocument: 'after' }]
+            }, "findOneAndUpdate"));
+            for (const field of [sprintFieldName, ...parentFields]) {
+                // eslint-disable-next-line no-await-in-loop
+                await unsetSpentCount(companyId, { _id: row._id }, field);
+            }
+        } catch (error) {
+            logger.error(`${error} ERROR IN PARENT COUNT UPDATE`);
         }
-        countFun(data[count]);
-    } catch (error) {
-        cb({
-            status: false,
-            err: error
-        });
     }
+};
+
+/* `parentTaskField` is one count field or several: one for each task above the row. */
+exports.updateSprintCount = (companyId,data, taskFieldName, sprintFieldName, parentTaskField = null, prevCount = 0, cb) => {
+    changeParentCounts(companyId, data || [], taskFieldName, sprintFieldName, [].concat(parentTaskField || []).filter(Boolean), () => prevCount)
+        .then(() => cb({ status: true }))
+        .catch((error) => cb({ status: false, err: error }));
 }
 
 
@@ -128,7 +72,7 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
             if (count >= userIds.length) {
                 cb({
                     status: true,
-                    data: 'Count update succesfully'
+                    data: 'Count update successfully'
                 });
             } else {
                 const obj = {
@@ -141,7 +85,7 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
                         // first counts for them, and this collection is empty for a
                         // company that has never had one written. Without it every
                         // count write matched nothing, changed nothing, and STILL
-                        // reported "Count update succesfully" — so unread badges
+                        // reported "Count update successfully" — so unread badges
                         // (incoming messages, mark-as-unread, mentions) silently
                         // did nothing at all for that user.
                         {returnDocument: 'after', upsert: true, setDefaultsOnInsert: true}
@@ -151,7 +95,7 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
                     // A null document would blank the client's whole count store, so
                     // only broadcast a real one.
                     if (data) {
-                        socketEmitter.emit('update', { type: "update", data: data , module: 'userIdNotification' });
+                        socketEmitter.emit('update', { type: "update", data: data , module: 'userIdNotification', companyId });
                     }
                     count++;
                     countFunction(userIds[count]);
@@ -171,34 +115,104 @@ exports.updateCount = (companyId,userIds, manageQuery, cb) => {
     }
 }
 
-/**
- * 
- * @param {*} req 
- * @param {*} res 
- * @returns 
- */
+// The people a new comment reaches have their counts raised by the server when it is saved, so a client
+// only ever changes its own.
+const changesOwnCount = (body) => Boolean(body.read || body.set || body.readAll);
 
-exports.updateUnReadCommentsCount = (req, res) => {
-    exports.updateUnReadCommentsCountFun(req).then((cData) => {
-        res.send(cData);
-    })
-    .catch((error) => {
-        // Every rejection below is a { status:false, statusText } object with no
-        // `message`, so this answered `200` with an EMPTY BODY — a rejected write
-        // was indistinguishable from a successful one, and the caller carried on as
-        // though the count had been stored. Report the actual reason, with a status
-        // code the caller can act on.
+/* Chat and notification counts are raised only by the server. */
+const CLIENT_BUMP_KEYS = [1, 2, 4];
+
+const countTargets = (req, res) => {
+    const body = req.body || {};
+    const claimed = Array.isArray(body.userIds) ? body.userIds.filter(Boolean).map(String) : [];
+    if (claimed.some((id) => id !== String(req.uid))) {
+        res.status(403).send({ status: false, statusText: 'You can only change your own unread counts.' });
+        return null;
+    }
+    if (changesOwnCount(body)) return [String(req.uid)];
+    if (!CLIENT_BUMP_KEYS.includes(body.key)) {
+        res.status(403).send({ status: false, statusText: 'Only comment and mention counts can be raised here.' });
+        return null;
+    }
+    return claimed;
+};
+
+exports.updateUnReadCommentsCount = async (req, res) => {
+    try {
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
+        const userIds = countTargets(req, res);
+        if (!userIds) return;
+        if (!userIds.length) {
+            res.send({ status: true, data: 'No recipients in this company' });
+            return;
+        }
+        const step = changesOwnCount(req.body) ? {} : { messageCount: 1 };
+        res.send(await applyUnreadCount(companyId, { ...req.body, userIds, ...step }));
+    } catch (error) {
+        // Rejections are { status: false, statusText } objects without a message; answering them 200 with an
+        // empty body made a refused write look like a stored one.
         const rejected = error && error.status === false;
         res.status(rejected ? 400 : 500).json({
             status: false,
             statusText: (error && (error.statusText || error.message)) || 'Failed to update unread count',
         });
-    });
+    }
 };
-exports.updateUnReadCommentsCountFun = (req) => {
+
+const countsOf = (companyId, filter, projection) => mongoCm.MongoDbCrudOpration(companyId, {
+    type: dbCollections.USERID,
+    data: projection ? [filter, projection] : [filter]
+}, "find");
+
+/* A task's unread count, kept with a count on every task above it: its parent, and the root. */
+const applyTaskCount = async (companyId, body, messageCount, prevCount) => {
+    const sprintFieldName = `sprint_${body.projectId}_${body.sprintId}_comments`;
+    const taskFieldName = `task_${body.projectId}_${body.sprintId}_${body.taskId}_comments`;
+    const parentFields = await parentCountFields(companyId, body);
+    const onEachParent = (by) => Object.fromEntries(parentFields.map((field) => [field, by]));
+    const update = (manageQuery) => new Promise((resolve) => { exports.updateCount(companyId, body.userIds, manageQuery, resolve); });
+
+    if (body.read) {
+        const rows = await countsOf(companyId, { userId: { $in: body.userIds } }, { [taskFieldName]: true })
+            .catch((err) => Promise.reject({ status: false, err }));
+        if (!(rows && rows.length)) return Promise.reject({ status: false, statusText: "User data not found" });
+        /* By what is stored, not by the count the reader sends: the tasks above must lose exactly what this row gave them. */
+        await changeParentCounts(companyId, rows, taskFieldName, sprintFieldName, parentFields, (row) => -Number(row[taskFieldName]));
+        return update({ $unset: { [taskFieldName]: "" } });
+    }
+
+    if (body.set) {
+        const newCount = messageCount - prevCount;
+        /* The sprint count is not raised here: nothing lowers it and nothing shows it. */
+        const result = await update({
+            $set: { [taskFieldName]: messageCount },
+            ...(parentFields.length ? { $inc: onEachParent(newCount) } : {})
+        });
+        if (newCount < 0) {
+            for (const field of [sprintFieldName, ...parentFields]) {
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    const spent = await countsOf(companyId, { [field]: { $lte: 0 } });
+                    for (const row of spent || []) {
+                        // eslint-disable-next-line no-await-in-loop
+                        await unsetSpentCount(companyId, { _id: row._id }, field);
+                    }
+                } catch (error) {
+                    logger.error(`${error} ERROR IN MONGO QUERY`);
+                }
+            }
+        }
+        return result;
+    }
+
+    return update({ $inc: { [taskFieldName]: messageCount, ...onEachParent(messageCount) } });
+};
+
+const applyUnreadCount = (companyId, body) => {
     try {
         return new Promise((resolve, reject) => {
-            if (!(req.body && req.body.companyId)) {
+            if (!companyId) {
                 reject({
                     status: false,
                     statusText: "companyId is required"
@@ -206,17 +220,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 return;
             }
 
-            // SEC (AHE-3834) — the tenant is the authenticated company (header), not a
-            // client-chosen body value. Blocks mutating another company's unread counts.
-            if (req.headers && req.headers['companyid'] && String(req.body.companyId) !== String(req.headers['companyid'])) {
-                reject({
-                    status: false,
-                    statusText: "companyId mismatch"
-                });
-                return;
-            }
-
-            if (!(req.body && req.body.key)) {
+            if (!body.key) {
                 reject({
                     status: false,
                     statusText: "key is required"  
@@ -224,8 +228,8 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 return;
             }
 
-            if (req.body.key === 1 || req.body.key === 2) {
-                if (!(req.body && req.body.projectId)) {
+            if (body.key === 1 || body.key === 2) {
+                if (!body.projectId) {
                     reject({
                         status: false,
                         statusText: "Project id is required"
@@ -233,7 +237,7 @@ exports.updateUnReadCommentsCountFun = (req) => {
                     return;
                 }
 
-                if (!(req.body && req.body.userIds && req.body.userIds.length)) {
+                if (!(body.userIds && body.userIds.length)) {
                     reject({
                         status: false,
                         statusText: "User ids are required"
@@ -242,15 +246,15 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 }
             }
 
-            if (req.body.key === 2) {
-                if (!(req.body && req.body.sprintId)) {
+            if (body.key === 2) {
+                if (!body.sprintId) {
                     reject({
                         status: false,
-                        statusText: "Sprint id is required"
+                        statusText: "List id is required"
                     });
                     return;
                 }
-                if (!(req.body && req.body.taskId)) {
+                if (!body.taskId) {
                     reject({
                         status: false,
                         statusText: "Task id is required"
@@ -259,8 +263,8 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 }
             }
 
-            if (req.body.key === 3) {
-                if (!(req.body && req.body.messageId)) {
+            if (body.key === 3) {
+                if (!body.messageId) {
                     reject({
                         status: false,
                         statusText: "Message id is required"
@@ -269,8 +273,8 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 }
             }
 
-            if (req.body.key === 4) {
-                if (req.body.readAll === undefined) {
+            if (body.key === 4) {
+                if (body.readAll === undefined) {
                     reject({
                         status: false,
                         statusText: "readAll id is required"
@@ -279,19 +283,19 @@ exports.updateUnReadCommentsCountFun = (req) => {
                 }
             }
 
-            let messageCount = req.body.messageCount !== undefined ? req.body.messageCount : 1;
-            let prevCount = req.body.prevCount || 0;
+            let messageCount = body.messageCount !== undefined ? body.messageCount : 1;
+            let prevCount = body.prevCount || 0;
 
-            if (req.body.key === 1) {
-                const fieldName = `project_${req.body.projectId}_comments`;
+            if (body.key === 1) {
+                const fieldName = `project_${body.projectId}_comments`;
                 let manageQuery = {};
-                if (req.body.read) {
+                if (body.read) {
                     manageQuery = {
                         $unset: {
                             [fieldName]: ""
                         }
                     }
-                } else if (req.body.set) {
+                } else if (body.set) {
                     manageQuery = {
                         $set: {
                             [fieldName]: messageCount
@@ -304,229 +308,22 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         },
                     }
                 }
-                exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
+                exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
                     resolve(tData);
                 });
             } 
-            else if (req.body.key === 2) {
-                const sprintFieldName = `sprint_${req.body.projectId}_${req.body.sprintId}_comments`;
-                const taskFieldName = `task_${req.body.projectId}_${req.body.sprintId}_${req.body.taskId}_comments`;
-                let parentTaskField = ``;
-                if(req.body.parentTaskId) {
-                    parentTaskField = `parentTask_${req.body.projectId}_${req.body.sprintId}_${req.body.parentTaskId}_comments`
-                }
+            else if (body.key === 2) {
+                applyTaskCount(companyId, body, messageCount, prevCount).then(resolve).catch(reject);
+            } else if (body.key === 3) {
+                const fieldName = `message_${body.messageId}_counts`;
                 let manageQuery = {};
-                if (req.body.read) {
-                    manageQuery = {
-                        $unset: {
-                            [taskFieldName]: ""
-                        }
-                    }
-                    // Get Task Count
-                    let obj = {
-                        type: dbCollections.USERID,
-                        data: [{
-                            userId: {
-                                $in: req.body.userIds
-                            }
-                        }, {
-                            [taskFieldName]: true
-                        }]
-                    }
-                    mongoCm.MongoDbCrudOpration(req.body.companyId,obj,"find").then((data)=>{
-                        if (!(data && data.length)) {
-                            reject({
-                                status: false,
-                                statusText: "User data not found"
-                            });
-                            return;
-                        }
-                        exports.updateSprintCount(req.body.companyId,data, taskFieldName, sprintFieldName, parentTaskField, -prevCount, (cData) => {
-                            if (!cData.status) {
-                                resolve(cData);
-                                return;
-                            }
-                            exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
-                                resolve(tData);
-                            });
-                        });
-                    }).catch((err) => {
-                        reject({
-                            status: false,
-                            err: err
-                        });
-                    })
-                } else if (req.body.set) {
-                    const newCount = messageCount - prevCount
-                    manageQuery = {
-                        $set: {
-                            [taskFieldName]:messageCount,
-                        }
-                    }
-
-                    // The sprint rollup is deliberately NOT incremented here.
-                    //
-                    // The other two paths stopped maintaining it: the increment for a
-                    // new message is commented out further down, and so is the
-                    // decrement on read (see updateSprintCount). That left THIS the
-                    // only live writer of a field nothing reduces and nothing
-                    // renders, so it grew by messageCount on every "mark as unread"
-                    // and never came back down — e.g. two marks of 4 left
-                    // `sprint_<projectId>_<sprintId>_comments: 8` behind with no
-                    // task count to match it.
-                    //
-                    // Only added when there is something to increment: an empty $inc
-                    // is a MongoDB error.
-                    if (req.body.parentTaskId) {
-                        manageQuery["$inc"] = {
-                            [parentTaskField]: newCount
-                        }
-                    }
-
-                    exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
-                        resolve(tData);
-                        if(newCount < 0){
-                            try {
-                                // Get Task Count
-                                let obj = {
-                                    type: dbCollections.USERID,
-                                    data: [{
-                                        [sprintFieldName]: {
-                                            $lte: 0
-                                        }
-                                    }]
-                                }
-                        
-                                mongoCm.MongoDbCrudOpration(companyId, obj, "find").then((data) => {
-                                    if (!(data && data.length)) {
-                                        return;
-                                    }
-                        
-                                    let count = 0;
-                        
-                                    const updateFunction = (row) => {
-                                        if (count >= data.length) {
-                                            return;
-                                        }
-                        
-                                        let updateObj = {
-                                            type: dbCollections.USERID,
-                                            data: [
-                                                { _id: row._id },
-                                                { 
-                                                    $unset: { 
-                                                        [sprintFieldName]: "" 
-                                                    } 
-                                                },
-                                                { returnDocument: 'after' }
-                                            ]
-                                        }
-                        
-                                        mongoCm.MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate")
-                                        .then((updatedDoc) => {
-                                            socketEmitter.emit('update', { 
-                                                type: "update", 
-                                                data: updatedDoc, 
-                                                module: 'userIdNotification' 
-                                            });
-                                            count += 1;
-                                            updateFunction(data[count]);
-                                        })
-                                        .catch((error) => {
-                                            logger.error(`${error} ERROR IN MONGO QUERY`);
-                                            count += 1;
-                                            updateFunction(data[count]);
-                                        });
-                                    }
-                                    updateFunction(data[count]);
-                                }).catch((error) => {
-                                    logger.error(`${error} ERROR IN MONGO QUERY`);
-                                });
-                                if(req.body.parentTaskId) {
-                                    // UNSET PARENT TASK FIELD
-                                    let obj = {
-                                        type: dbCollections.USERID,
-                                        data: [{
-                                            [parentTaskField]: {
-                                                $lte: 0
-                                            }
-                                        }]
-                                    }
-                            
-                                    mongoCm.MongoDbCrudOpration(companyId, obj, "find").then((data) => {
-                                        if (!(data && data.length)) {
-                                            return;
-                                        }
-                            
-                                        let count = 0;
-                            
-                                        const updateFunction = (row) => {
-                                            if (count >= data.length) {
-                                                return;
-                                            }
-                            
-                                            let updateObj = {
-                                                type: dbCollections.USERID,
-                                                data: [
-                                                    { _id: row._id },
-                                                    { 
-                                                        $unset: { 
-                                                            [parentTaskField]: "" 
-                                                        } 
-                                                    },
-                                                    { returnDocument: 'after' }
-                                                ]
-                                            }
-                            
-                                            mongoCm.MongoDbCrudOpration(companyId, updateObj, "findOneAndUpdate")
-                                            .then((updatedDoc) => {
-                                                socketEmitter.emit('update', { 
-                                                    type: "update", 
-                                                    data: updatedDoc, 
-                                                    module: 'userIdNotification' 
-                                                });
-                                                count += 1;
-                                                updateFunction(data[count]);
-                                            })
-                                            .catch((err) => {
-                                                logger.error(`${err} ERROR IN MONGO QUERY`);
-                                                count += 1;
-                                                updateFunction(data[count]);
-                                            });
-                                        }
-                                        updateFunction(data[count]);
-                                    }).catch((err) => {
-                                        logger.error(`${err} ERROR IN MONGO QUERY`);
-                                    });
-                                }
-                            } catch (error) {
-                                logger.error(`Error updating ${error}`)
-                            }
-                        }
-                    });
-                } else {
-                    manageQuery = {
-                        $inc: {
-                            // [sprintFieldName]: messageCount,
-                            [taskFieldName]: messageCount,
-                            ...(req.body.parentTaskId ? {[parentTaskField]: messageCount} : {})
-                        }
-                    }
-
-                    exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
-                        resolve(tData);
-                    });
-                }
-            } else if (req.body.key === 3) {
-                const fieldName = `message_${req.body.messageId}_counts`;
-                let manageQuery = {};
-                if (req.body.read) {
+                if (body.read) {
                     manageQuery = {
                         $unset: {
                             [fieldName]: ""
                         }
                     }
-                }  else if (req.body.set) {
+                }  else if (body.set) {
                     manageQuery = {
                         $set: {
                             [fieldName]: messageCount
@@ -539,20 +336,20 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         }
                     }
                 }
-                exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
+                exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
                     resolve(tData);
                 });
-            } else if (req.body.key === 4) {
+            } else if (body.key === 4) {
                 const fieldName = `mention_counts`;
                 let manageQuery = {};
-                if (req.body.readAll) {
+                if (body.readAll) {
                     manageQuery = {
                         $unset: {
                             [fieldName]: ""
                         }
                     }
                 } else {
-                    if (req.body.read) {
+                    if (body.read) {
                         manageQuery = {
                             $inc: {
                                 [fieldName]: -1
@@ -566,26 +363,26 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         }
                     }
                 }
-                exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
-                    if (req.body.readAll === false && req.body.read === true) {
-                        exports.updateMentionCount(req.body.companyId,req.body.userIds,fieldName, (cdata) => {
+                exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
+                    if (body.readAll === false && body.read === true) {
+                        exports.updateMentionCount(companyId,body.userIds,fieldName, (cdata) => {
                             resolve(cdata);
                         })
                     } else {
                         resolve(tData);
                     }
                 });
-            } else if (req.body.key === 5) {
+            } else if (body.key === 5) {
                 const fieldName = `notification_counts`;
                 let manageQuery = {};
-                if (req.body.readAll) {
+                if (body.readAll) {
                     manageQuery = {
                         $unset: {
                             [fieldName]: ""
                         }
                     }
                 } else {
-                    if (req.body.read) {
+                    if (body.read) {
                         manageQuery = {
                             $inc: {
                                 [fieldName]: -1
@@ -599,9 +396,9 @@ exports.updateUnReadCommentsCountFun = (req) => {
                         }
                     }
                 }
-                exports.updateCount(req.body.companyId,req.body.userIds, manageQuery, (tData) => {
-                    if (req.body.readAll === false && req.body.read === true) {
-                        exports.updateMentionCount(req.body.companyId,req.body.userIds,fieldName, (cdata) => {
+                exports.updateCount(companyId,body.userIds, manageQuery, (tData) => {
+                    if (body.readAll === false && body.read === true) {
+                        exports.updateMentionCount(companyId,body.userIds,fieldName, (cdata) => {
                             resolve(cdata);
                         })
                     } else {
@@ -616,12 +413,15 @@ exports.updateUnReadCommentsCountFun = (req) => {
             }
         })
     } catch (error) {
-        reject({
+        return Promise.reject({
             status: false,
             err: error
         })
     }
 };
+
+// For server-side callers, which build the body themselves from ids they have already resolved.
+exports.updateUnReadCommentsCountFun = ({ body = {} } = {}) => applyUnreadCount(body.companyId, body);
 
 
 /**
@@ -916,7 +716,8 @@ exports.unsetFieldForMultipleDocuments = (companyId, sprintFieldName, cb) => {
                     socketEmitter.emit('update', { 
                         type: "update", 
                         data: updatedDoc, 
-                        module: 'userIdNotification' 
+                        module: 'userIdNotification',
+                        companyId
                     });
 
                     updatedDocuments.push(updatedDoc);

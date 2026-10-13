@@ -4,7 +4,7 @@ const { myCache } = require('../../Config/config');
 
 exports.getApps = async (req, res) => {
     const companyId = req.headers['companyid'];
-    const fetchAllApps = req.body.fetchAllApps || false;
+    const fetchAllApps = (req.body && req.body.fetchAllApps) || false;
 
     try {
         const appCacheKey = `apps:${companyId}`;
@@ -12,26 +12,23 @@ exports.getApps = async (req, res) => {
         let isFromcache = true;
         if (!apps) {
             isFromcache = false;
-            const appsObj = {
+            apps = await MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.APPS,
                 data: fetchAllApps ? [{}] : []
-            };
-
-            apps = await MongoDbCrudOpration(companyId, appsObj, 'find');
-
+            }, 'find');
             myCache.set(appCacheKey, apps, 604800);
         }
-        
-        const data = apps.filter(app => app.key !== 'IncompleteWarning')
-        
+
+        const data = (apps || []).filter(app => app.key !== 'IncompleteWarning');
+
         if (isFromcache) {
             res.set({
                 'FromCache': 'true',
                 'cacheExpireTime': myCache.getTtl(appCacheKey)
             });
         }
-        res.status(200).json(data);
+        return res.status(200).json({ status: true, statusText: 'Apps fetched.', data });
     } catch (error) {
-        res.status(404).json({ message: "An error occurred while fetching the apps", error: error.message });
+        return res.status(500).json({ status: false, statusText: 'An error occurred while fetching the apps', message: error.message });
     }
 };

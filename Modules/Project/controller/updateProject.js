@@ -3,8 +3,38 @@ const { MongoDbCrudOpration,validateObjectId } = require("../../../utils/mongo-h
 const {removeCache} = require('../../../utils/commonFunctions');
 const { resolveProjectSkills } = require('../../settings/ProjectSkills/helper');
 const { PROJECT_SOURCES, normaliseSource, sourceOrDefault, cleanProposalId, numericProposalId, validateProposalId } = require('../helpers/projectSourceRules');
+const { TRASHED, quotaStatus, syncProjectQuota, privacyChange, syncProjectType } = require('../helpers/projectQuota');
+const logger = require('../../../Config/loggerConfig');
+const knowledgeEvents = require('../../Knowledge/ingest/events');
+const { recordProjectChanges } = require('../helpers/projectHistory');
+const { checkWorkingDays } = require('../../Company/helpers/workingDays');
+const socketEmitter = require('../../../event/socketEventEmitter');
+const { holdProjectDescription, ProjectDescriptionRefused } = require('../helpers/projectDescription');
+const { RichTextLimitError } = require('../../Tasks/helpers/cleanRichText');
 
 exports.updateProjectInternal = async (companyId, projectId, updateObject, key, arrayFilters) => {
+    holdProjectDescription(updateObject, key);
+    // Trashing and restoring a project are the only writes that change what a company
+    // owns, and every client reaches them through here. A counter failure must not block
+    // the delete: a stuck count is recoverable, a project nobody can remove is not.
+    const nextStatus = quotaStatus(updateObject, key);
+    if (nextStatus !== null && companyId && validateObjectId(projectId)) {
+        const crossed = await syncProjectQuota(companyId, projectId, nextStatus).catch((error) => {
+            logger.error(`syncProjectQuota ${projectId}: ${error && error.message ? error.message : error}`);
+            return null;
+        });
+        if (crossed) {
+            if (nextStatus === TRASHED) knowledgeEvents.publishProjectTrashed(companyId, projectId);
+            else knowledgeEvents.publishProjectRestored(companyId, projectId);
+        }
+    }
+    const nextPrivacy = privacyChange(updateObject, key);
+    if (nextPrivacy !== null && companyId && validateObjectId(projectId)) {
+        await syncProjectType(companyId, projectId, nextPrivacy).catch((error) => {
+            logger.error(`syncProjectType ${projectId}: ${error && error.message ? error.message : error}`);
+        });
+    }
+
     return new Promise((resolve, reject) => {
         if (!(updateObject && Object.keys(updateObject).length)) {
             reject("Update Object is Required");
@@ -29,8 +59,8 @@ exports.updateProjectInternal = async (companyId, projectId, updateObject, key, 
                             [fieldName]: {
                                 $cond: {
                                     if: { $isArray: `$${fieldName}` },
-                                    then: { $concatArrays: [`$${fieldName}`, [fieldValue]] },
-                                    else: [fieldValue]
+                                    then: { $concatArrays: [`$${fieldName}`, [{ $literal: fieldValue }]] },
+                                    else: [{ $literal: fieldValue }]
                                 }
                             }
                         }
@@ -74,7 +104,8 @@ exports.updateProjectInternal = async (companyId, projectId, updateObject, key, 
             data: data
         }
         const project = MongoDbCrudOpration(companyId, mongoObj, 'findOneAndUpdate');
-    
+        if (knowledgeEvents.guideTouched(updateObject)) Promise.resolve(project).then(() => knowledgeEvents.publishGuideSaved(companyId, projectId), () => null);
+
         if (!project) {
             reject("Project not updated");
         }
@@ -120,6 +151,28 @@ const guardSourceUpdate = async (companyId, projectId, updateObject, touchesSour
     return check.valid ? {} : { error: "A proposal id is required for Upwork projects" };
 };
 
+/* The override is written whole: a list replaces it and null hands the project back to the company's week. */
+const guardWorkingDays = (updateObject, key) => {
+    const paths = Object.keys(updateObject).filter((path) => path.split('.')[0] === 'workingDays');
+    if (!paths.length) return {};
+    if (paths.some((path) => path !== 'workingDays') || (key && key !== '$set')) {
+        return { error: 'Working days must be sent as a full list, or left empty to use the company\'s.' };
+    }
+    if (updateObject.workingDays === null) return { touched: true };
+    const week = checkWorkingDays(updateObject.workingDays);
+    if (!week.ok) return { error: week.error };
+    updateObject.workingDays = week.days;
+    return { touched: true };
+};
+
+const plain = (document) => (document && typeof document.toObject === 'function' ? document.toObject() : document);
+
+/* The write answers the project as it was. A plain set says what it holds now; any other operator names the fields it touched. */
+const savedChange = (project, updateObject, key) => {
+    if (!key || key === '$set') return { data: { ...plain(project), ...updateObject }, updatedFields: updateObject };
+    return { data: plain(project), updatedFields: Object.fromEntries(Object.keys(updateObject).map((field) => [field, key])) };
+};
+
 exports.updateProject = async (req, res) => {
     try {
         const { id: projectId } = req.params;
@@ -149,9 +202,17 @@ exports.updateProject = async (req, res) => {
             }
             updateObject.skills = await resolveProjectSkills(companyId, updateObject.skills);
         }
+        const week = guardWorkingDays(updateObject, key);
+        if (week.error) return res.status(400).json({ status: false, statusText: week.error, message: week.error });
         exports.updateProjectInternal(companyId, projectId, updateObject, key, arrayFilters).then((project) => {
+            if (project) socketEmitter.emit('update', { type: 'update', companyId: String(companyId), ...savedChange(project, updateObject, key), module: 'project' });
+            recordProjectChanges({ companyId, projectId, actorId: req.uid, previous: project, updateObject, key, arrayFilters, timeZone: req.body.timeZone })
+                .catch((error) => logger.error(`project history after update failed: ${(error && error.message) || error}`));
             return res.status(200).json(project);
         }).catch((error) => {
+            if (error instanceof ProjectDescriptionRefused || error instanceof RichTextLimitError) {
+                return res.status(error.statusCode).json({ status: false, statusText: error.message, message: error.message });
+            }
             return res.status(500).json({ message: "An error occurred while fetching the project",error:error });
         })
     } catch (error) {

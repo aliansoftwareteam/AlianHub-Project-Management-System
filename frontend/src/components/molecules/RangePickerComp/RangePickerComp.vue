@@ -73,7 +73,7 @@ defineComponent({
     width: 8px;
 }
 .timesheet__wrapper .range-picker.rangeComp {
-    min-width: 225px !important;
+    min-width: 265px !important;
     width: fit-content !important;
 }
 </style>

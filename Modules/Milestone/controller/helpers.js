@@ -205,7 +205,7 @@ exports.deleteMilestoneNotification = async (companyId, projectId,userDetail,mil
             }catch(err){
                 logger.error(`handle deleteMilestoneNotification setting : ${err}`);
             }
-        };
+        }
     } catch (err) {
         logger.error(`handle deleteMilestoneNotification : ${err}`);
     }

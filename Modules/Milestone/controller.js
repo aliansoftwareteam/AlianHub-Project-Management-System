@@ -7,4 +7,6 @@ module.exports = {
     ...require('./controller/crud'),
     ...require('./controller/status'),
     ...require('./controller/query'),
+    ...require('./controller/billing'),
+    ...require('./controller/clientView'),
 };

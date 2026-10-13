@@ -1,11 +1,30 @@
 import registerRouter from "../../plugins/register/router";
 export default [
     {
+        path: '/setup',
+        name: 'Setup',
+        component: () => import(/* webpackChunkName: "setup" */ '@/views/Setup/SetupWizard.vue'),
+        meta: {
+            title: "Set up",
+            requiresAuth: false,
+            hideHeader: true,
+        },
+    },
+    {
         path: '/login',
         name: 'Log-in',
         component: () => import(/* webpackChunkName: "login" */ '@/views/Authentication/Login/Login.vue'),
 		meta: {
             title: "Login",
+            requiresAuth: false,
+        },
+    },
+    {
+        path: '/sso',
+        name: 'Sso_Login',
+        component: () => import(/* webpackChunkName: "login" */ '@/views/Authentication/Sso/SsoLogin.vue'),
+        meta: {
+            title: "Sign in with SSO",
             requiresAuth: false,
         },
     },
@@ -24,7 +43,8 @@ export default [
         component: () => import(/* webpackChunkName: "Reset_Password" */ '@/views/Authentication/ResetPassword/ResetPassword.vue'),
         meta: {
             title: 'Reset Password',
-            requiresAuth: false
+            requiresAuth: false,
+            withoutWorkspace: true
         }
     },
     {
@@ -33,7 +53,8 @@ export default [
         component: () => import(/* webpackChunkName: "Set_New_Password */ '@/views/Authentication/ResetPassword/SetNewPassword.vue'),
         meta: {
             title: 'Set New Password',
-            requiresAuth: false
+            requiresAuth: false,
+            withoutWorkspace: true
         }
     },
     ...registerRouter,
@@ -43,13 +64,25 @@ export default [
         component: () => import(/* webpackChunkName: "Verify_Email" */ '../../views/Authentication/VerifyEmail/VerifyEmail.vue'),
         meta: {
             title: 'Verify Email',
-            requiresAuth: false
+            requiresAuth: false,
+            withoutWorkspace: true
         }
     },
     {
         path: '/oauth2',
         name: 'Tracker_Login',
         component: () => import(/* webpackChunkName: "Create_Company" */ '../../views/Authentication/TrackerLogin/TrackerLogin.vue'),
+        meta: {
+            title: 'Authorize_application',
+            requiresAuth: true,
+            hideHeader: true,
+            preventAdvanceSearch: true
+        }
+    },
+    {
+        path: '/oauth/consent',
+        name: 'OAuth_Consent',
+        component: () => import(/* webpackChunkName: "OAuth_Consent" */ '../../views/OAuth/Consent.vue'),
         meta: {
             title: 'Authorize_application',
             requiresAuth: true,
@@ -74,7 +107,8 @@ export default [
         component: () => import(/* webpackChunkName: "Verify_Email" */ '@/views/Authentication/VerifyInvitation/VerifyInvitation.vue'),
         meta: {
             title: 'Verify Invitation',
-            hideHeader: true
+            hideHeader: true,
+            withoutWorkspace: true
         }
     },
     {
@@ -84,7 +118,7 @@ export default [
         meta: {
             title: 'Invitation',
             hideHeader: true,
-            requiresAuth: false
+            withoutWorkspace: true
         }
     }
 ]

@@ -1,0 +1,103 @@
+import { useStore } from "vuex";
+import { apiRequest } from "@/services";
+import * as env from "@/config/env";
+import { useUpdateTasks } from "@/views/Projects/helper.js";
+import { tabUpdateMarker } from "@/utils/taskUpdateMarker";
+import { plainGroupValue } from "@/views/Projects/composables/taskGroupIndex";
+import { isAddedRow } from "@/views/Projects/composables/taskHomeMark";
+
+const GAP = 65536;
+
+/* Reordering and cross-group drops for the redesigned list rows. Same contract
+ * as the legacy ItemList: the group field is written through updateTaskByGroup
+ * and the sort index through /api/v1/taskIndex, so a row dragged in either view
+ * lands in the same place. */
+export function useListDragDrop() {
+    const { commit } = useStore();
+    const { updateTaskByGroup } = useUpdateTasks();
+
+    function groupPayload(item, groupType, stamp) {
+        const marker = tabUpdateMarker(stamp);
+        if (groupType === 0) {
+            return {
+                status: { text: item.name, key: item.key, type: item.type },
+                statusType: item.type,
+                statusKey: item.key,
+                updateToken: marker,
+                islocalSnapStop: true
+            };
+        }
+        if (groupType === 1) {
+            return {
+                AssigneeUserId: item.value ? item.value.split("_") : [],
+                updateToken: marker,
+                islocalSnapStop: true
+            };
+        }
+        if (groupType === 2) {
+            return { Task_Priority: item.value, updateToken: marker, islocalSnapStop: true, Updated_At: new Date() };
+        }
+        return {
+            DueDate: item.searchValue ? new Date(item.searchValue * 1000) : null,
+            updateToken: marker,
+            islocalSnapStop: true,
+            Updated_At: new Date()
+        };
+    }
+
+    function nextIndex(rows, index, indexName) {
+        if (rows.length <= 1) return 0;
+        if (index === 0) return rows[1][indexName] - GAP;
+        if (index + 1 === rows.length) return rows[rows.length - 2][indexName] + GAP;
+        return (rows[index - 1][indexName] + rows[index + 1][indexName]) / 2;
+    }
+
+    /* A task has one place in a group, kept on the task and so by the list it lives in. A row shown
+     * in a list it was added to takes the group it is dropped on, which edits the task, and keeps
+     * its place: a reorder there is refused, and `false` tells the caller so. */
+    function applyDrag({ event, item, groupType, rows, project, listId = "" }) {
+        const move = event?.added || event?.moved;
+        if (!move?.element?._id) return;
+        if (item.value === "NO_DUE_DATE" || item.value === "NEXT") return;
+
+        const element = move.element;
+        const index = move.newIndex;
+        const task = rows.find((row) => row._id === element._id) || element;
+        const stamp = new Date().getTime();
+        const updateData = groupPayload(item, groupType, stamp);
+
+        if (event.added) {
+            updateTaskByGroup(element, item, groupType).catch((error) => console.error("ERROR in list drop: ", error));
+        }
+        if (isAddedRow(task, listId)) return event.added ? undefined : false;
+        if (item.customFieldId) return;
+
+        const tempIndex = nextIndex(rows, index, item.indexName);
+        const relevantIndex = rows.length > 1 ? rows[index === 0 ? 1 : index - 1][item.indexName] : 0;
+
+        apiRequest("post", env.UPDATA_TASK_INDEX, {
+            relevantIndex,
+            projectId: task.ProjectID,
+            companyId: task.CompanyId,
+            taskId: task._id,
+            isFirst: index === 0,
+            isFirstWithRecord: index === 0 && rows.length > 1,
+            indexName: item.indexName,
+            sprintId: task.sprintId,
+            relevantKey: plainGroupValue(item.searchValue),
+            searchKey: item.searchKey,
+            taskKey: task.TaskKey,
+            updateData
+        })
+        .then(() => {
+            commit("projectData/mutateTaskForDragAndDrop", {
+                pid: project._id,
+                sprintId: task.sprintId,
+                task: { ...task, ...updateData, [item.indexName]: tempIndex, updateTimeStamp: stamp }
+            });
+        })
+        .catch((error) => console.error("ERROR in list task index: ", error));
+    }
+
+    return { applyDrag };
+}

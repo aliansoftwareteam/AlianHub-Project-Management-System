@@ -8,17 +8,17 @@ const { updateCommentSprint } = require("../Comments/controller");
 const fp = `${__dirname}/`;
 const mongoose = require("mongoose");
 const socketEmitter = require('../../event/socketEventEmitter');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 
 exports.changeTaskType = async (req, res) => {
     try {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: "CompanyId is required"
-            })
+        if (!req.body) {
+            res.send({ status: false, statusText: "Request body is required" });
             return;
         }
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         if (!(req.body && req.body.projectId)) {
             res.send({
                 status: false,
@@ -44,7 +44,7 @@ exports.changeTaskType = async (req, res) => {
         let tasks = [];
         let promisesArr = [];
     
-        await MongoDbCrudOpration(req.body.companyId, {type: dbCollections.TASKS,data: [{'ProjectID': req.body.projectId,'TaskTypeKey': { $in: req.body.taskTypeKey }}]}, "find")
+        await MongoDbCrudOpration(companyId, {type: dbCollections.TASKS,data: [{'ProjectID': req.body.projectId,'TaskTypeKey': { $in: req.body.taskTypeKey }}]}, "find")
         .then(async(result) => {
             result.map((x) => {
                 tasks.push(x)
@@ -54,9 +54,6 @@ exports.changeTaskType = async (req, res) => {
             promisesArr.push(
                 new Promise((resolve1, reject1) => {
                     try {
-                        // BUG-017 / #71 fix: body has no `await` (it uses
-                        // .then/.catch on MongoDbCrudOpration), so the
-                        // `async` keyword was misleading. Plain forEach.
                         req.body.taskTypeKey.forEach((key) => {
                             if(key === task.TaskTypeKey){
                                 let newStatus = req.body.oldTaskType.filter((y) => y.key === key)[0]?.convertType;
@@ -80,8 +77,8 @@ exports.changeTaskType = async (req, res) => {
                                             }
                                         ]
                                     }
-                                    MongoDbCrudOpration(req.body.companyId,updateObj,"findOneAndUpdate").then((result) => {
-                                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task'});
+                                    MongoDbCrudOpration(companyId,updateObj,"findOneAndUpdate").then((result) => {
+                                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task', companyId});
                                         resolve1()
                                     })
                                     .catch((error) => {
@@ -101,7 +98,7 @@ exports.changeTaskType = async (req, res) => {
         Promise.allSettled(promisesArr).then(() => {
             res.send({
                 status: true,
-                statusText: "TASK UPDATE SUCCESFULLY"
+                statusText: "TASK UPDATE SUCCESSFULLY"
             })
         }).catch((error) => {
             logger.error(`TASK type Error: ${error}`);
@@ -117,13 +114,12 @@ exports.changeTaskType = async (req, res) => {
 
 exports.changeTaskStatus = async (req, res) => {
     try {
-        if (!(req.body && req.body.companyId)) {
-            res.send({
-                status: false,
-                statusText: "CompanyId is required"
-            })
+        if (!req.body) {
+            res.send({ status: false, statusText: "Request body is required" });
             return;
         }
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         if (!(req.body && req.body.projectId)) {
             res.send({
                 status: false,
@@ -149,20 +145,15 @@ exports.changeTaskStatus = async (req, res) => {
         let tasks = [];
         let promisesArr = [];
     
-        await MongoDbCrudOpration(req.body.companyId, {type: dbCollections.TASKS,data: [{ProjectID: req.body.projectId,'statusKey': { $in:  req.body.taskStatusKey }}]}, "find").then((result) => {
+        await MongoDbCrudOpration(companyId, {type: dbCollections.TASKS,data: [{ProjectID: req.body.projectId,'statusKey': { $in:  req.body.taskStatusKey }}]}, "find").then((result) => {
             result.map((x) => {
                 tasks.push(x)
             })
         })
-        // BUG-017 / #71 fix: this outer forEach only pushes synchronously
-        // constructed Promise objects, no `await` — drop the `async`.
         tasks.forEach((task) => {
             promisesArr.push(
                 new Promise((resolve, reject) => {
                     try {
-                        // BUG-017 / #71 fix: same shape as the changeTaskType
-                        // version above — inner body uses .then/.catch, no
-                        // `await`, so `async` is misleading.
                         req.body.taskStatusKey.forEach((key) => {
                             if(key === task.statusKey){
                                 let newStatus = req.body.oldTaskStatus.filter((y) => y.key === key)[0]?.convertStatus;
@@ -190,8 +181,8 @@ exports.changeTaskStatus = async (req, res) => {
                                             }
                                         ]
                                     }
-                                    MongoDbCrudOpration(req.body.companyId,updateObj,"findOneAndUpdate").then((result) => {
-                                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task'});
+                                    MongoDbCrudOpration(companyId,updateObj,"findOneAndUpdate").then((result) => {
+                                        socketEmitter.emit('update', { type: "update", data: result , updatedFields: obj , module: 'task', companyId});
                                         resolve();
                                     })
                                     .catch((error) => {
@@ -211,7 +202,7 @@ exports.changeTaskStatus = async (req, res) => {
         Promise.allSettled(promisesArr).then(() => {
             res.send({
                 status: true,
-                statusText: "TASK UPDATE SUCCESFULLY"
+                statusText: "TASK UPDATE SUCCESSFULLY"
             })
         }).catch((error) => {
             logger.error(`TASK status Error: ${error}`);
@@ -306,8 +297,10 @@ async function batchUpdate(updateArray, cid) {
 
 exports.migrateSprintsFun = async (req, res) => {
     try {
-        let projects = await MongoDbCrudOpration(req.body.companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{}] }, "find");
-        let mainChat = await MongoDbCrudOpration(req.body.companyId, { type: SCHEMA_TYPE.MAIN_CHATS, data: [{}] }, "find");
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
+        let projects = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.PROJECTS, data: [{}] }, "find");
+        let mainChat = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.MAIN_CHATS, data: [{}] }, "find");
         projects = projects.concat(mainChat);
         logger.info(`projects length: ${projects.length}`);
 
@@ -320,7 +313,7 @@ exports.migrateSprintsFun = async (req, res) => {
                     resolveMigration();
                     return;
                 }
-                exports.migrateProject(project, req.body.companyId)
+                exports.migrateProject(project, companyId)
                     .then(() => {
                         count++;
                         countFunction(projects[count]);
@@ -353,7 +346,7 @@ exports.migrateProject = (project,companyId) => {
             let folderPromise = [];
             let sprintPromise = [];
             const extractSprints = (sprints) => Object.values(sprints || {}).map(x => ({ ...x, projectId: project._id }));
-            let sprints = [...extractSprints(sprintsObj || {}), ...(Object.keys(sprintsfolders).length > 0 ? extractSprints(Object.assign(...Object.values(sprintsfolders || {})?.map(x => x.sprintsObj || {}))) : [])];
+            let sprints = [...extractSprints(sprintsObj || {}), ...(Object.keys(sprintsfolders).length > 0 ? extractSprints(Object.assign({}, ...Object.values(sprintsfolders || {}).map(x => x.sprintsObj || {}))) : [])];
             let folders = Object.values(sprintsfolders || {}).map((x) => ({...x,projectId : project._id}));
             folders = folders.map(folder => {
                 const folderObj = {
@@ -406,100 +399,56 @@ exports.migrateProject = (project,companyId) => {
     })
 };
 
-exports.updateTaksSprints = (projectId,companyId) => {
-    return new Promise((resolve, reject) => {
-        try {
-            let findObj = {
-                type: dbCollections.SPRINTS,
-                data: [{ projectId: new mongoose.Types.ObjectId(projectId)}],
+/* A filter on tasks.sprintArray is not cast, and a task not yet rewritten by migration 044 holds .id and .folderId as text. */
+const idForms = (id) => [String(id), new mongoose.Types.ObjectId(String(id))];
+
+exports.updateTaksSprints = async (projectId, companyId) => {
+    try {
+        const sprints = await MongoDbCrudOpration(companyId, {
+            type: dbCollections.SPRINTS,
+            data: [{ projectId: new mongoose.Types.ObjectId(projectId) }],
+        }, "find");
+        await Promise.allSettled((sprints || []).map((sprint) => {
+            const legacyId = sprint.legacyId || '';
+            const sprintId = String(sprint._id);
+            const updateObj = {
+                type: SCHEMA_TYPE.TASKS,
+                data: [
+                    { "sprintArray.id": { $in: legacyId ? [legacyId, ...idForms(sprintId)] : idForms(sprintId) }, ProjectID: new mongoose.Types.ObjectId(projectId) },
+                    { sprintId: new mongoose.Types.ObjectId(sprintId) }
+                ]
             };
-            let updatePromises = [];
-            MongoDbCrudOpration(companyId, findObj, "find").then(async(resp) => {
-                resp.forEach((sprint) => {
-                    let legacyId = sprint.legacyId ? sprint.legacyId : '';
-                    let sprintId = JSON.parse(JSON.stringify(sprint._id));
-                    if(legacyId){
-                        const updateObj = {
-                            type: SCHEMA_TYPE.TASKS,
-                            data: [
-                                { "sprintArray.id": {$in : [legacyId,sprintId]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
-                                { sprintId:  new mongoose.Types.ObjectId(sprintId)}
-                            ]
-                        }
-                        const promise =  MongoDbCrudOpration(companyId,updateObj,"updateMany").then(() => {
-                            logger.info("IF DONE updateTaksSprints");
-                        }).catch((err) => {
-                            logger.error(`ERROR IN IF UPDATE MANY: ${err}`);
-                        })
-                        updatePromises.push(promise);
-                    }else{
-                        const uObj = {
-                            type: SCHEMA_TYPE.TASKS,
-                            data: [
-                                { "sprintArray.id": sprintId , ProjectID: new mongoose.Types.ObjectId(projectId)},
-                                { "sprintId":  new mongoose.Types.ObjectId(sprintId)}
-                            ]
-                        }
-                        const promise =  MongoDbCrudOpration(companyId,uObj,"updateMany").then(() => {
-                            logger.info("ELSE DONE updateTaksSprints");
-                        }).catch((err) => {
-                            logger.error(`ERROR IN ELSE UPDATE MANY: ${err}`);
-                        })
-                        updatePromises.push(promise);
-                    }
-                })
-            })
-            Promise.allSettled(updatePromises).then(() => {
-                resolve();
-            }).catch((error) => {
-                logger.error(`ERROR IN ALL SETTLED: ${error}`);
-                reject();
+            return MongoDbCrudOpration(companyId, updateObj, "updateMany").catch((err) => {
+                logger.error(`ERROR IN UPDATE MANY updateTaksSprints: ${err}`);
             });
-        } catch (error) {
-            logger.error(`ERROR IN UPDATE SPRINTS: ${error}`);
-            reject();
-        }
-    })
+        }));
+    } catch (error) {
+        logger.error(`ERROR IN UPDATE SPRINTS: ${error}`);
+        throw error;
+    }
 }
 
-exports.updateTaksFolders = (projectId,companyId) => {
-    return new Promise((resolve, reject) => {
-        try {
-            let findObj = {
-                type: dbCollections.FOLDERS,
-                data: [{ projectId: new mongoose.Types.ObjectId(projectId)}],
+exports.updateTaksFolders = async (projectId, companyId) => {
+    try {
+        const folders = await MongoDbCrudOpration(companyId, {
+            type: dbCollections.FOLDERS,
+            data: [{ projectId: new mongoose.Types.ObjectId(projectId) }],
+        }, "find");
+        await Promise.allSettled((folders || []).filter((folder) => folder.legacyId).map((folder) => {
+            const folderId = String(folder._id);
+            const updateObj = {
+                type: SCHEMA_TYPE.TASKS,
+                data: [
+                    { "sprintArray.folderId": { $in: [folder.legacyId, ...idForms(folderId)] }, ProjectID: new mongoose.Types.ObjectId(projectId) },
+                    { folderObjId: new mongoose.Types.ObjectId(folderId) }
+                ]
             };
-            let updatePromises = [];
-            MongoDbCrudOpration(companyId, findObj, "find").then(async(resp) => {
-                resp.forEach((folder) => {
-                    let legacyId = folder.legacyId ? folder.legacyId : '';
-                    let folderId = JSON.parse(JSON.stringify(folder._id));
-                    if(legacyId){
-                        const updateObj = {
-                            type: SCHEMA_TYPE.TASKS,
-                            data: [
-                                {"sprintArray.folderId" :{ $exists: true},"sprintArray.folderId": {$in : [legacyId,folderId]} , ProjectID: new mongoose.Types.ObjectId(projectId)},
-                                { folderObjId : new mongoose.Types.ObjectId(folderId)}
-                            ]
-                        }
-                        const promise =  MongoDbCrudOpration(companyId,updateObj,"updateMany").then(() => {
-                            logger.info("IF DONE updateTaksFolders");
-                        }).catch((err) => {
-                            logger.error(`ERROR IN IF UPDATE MANY: ${err}`);
-                        })
-                        updatePromises.push(promise);
-                    }
-                })
-            })
-            Promise.allSettled(updatePromises).then(() => {
-                resolve();
-            }).catch((error) => {
-                logger.error(`ERROR IN ALL SETTLED: ${error}`);
-                reject();
+            return MongoDbCrudOpration(companyId, updateObj, "updateMany").catch((err) => {
+                logger.error(`ERROR IN UPDATE MANY updateTaksFolders: ${err}`);
             });
-        } catch (error) {
-            reject();
-            logger.error(`ERROR IN UPDATE FOLDERS: ${error}`);
-        }
-    })
+        }));
+    } catch (error) {
+        logger.error(`ERROR IN UPDATE FOLDERS: ${error}`);
+        throw error;
+    }
 }

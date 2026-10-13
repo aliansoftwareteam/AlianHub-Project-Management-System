@@ -3,16 +3,17 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const { myCache } = require("../../Config/config");
 const logger = require("../../Config/loggerConfig");
 const { extractIdentity } = require("./helpers/ssoRules");
-const { jitProvisionUser } = require("./provisioning");
+const { ssoSignInUser, SSO_NOT_ALLOWED } = require("./provisioning");
 const { finalizeSsoSession } = require("./ssoSession");
+const { isKnownCompany } = require("../../Config/knownCompany");
 
 // `openid-client` is lazy-required so app load never breaks before `npm install`.
 const apiBase = () => String(process.env.APIURL || '').replace(/\/$/, '');
 const REDIRECT_URI = () => `${apiBase()}/api/v2/sso/oidc/callback`;
 
-const loadConfig = async (companyId) => MongoDbCrudOpration(companyId, {
+const loadConfig = async (companyId) => ((await isKnownCompany(companyId)) ? MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.SSO_CONFIGS, data: [{ deletedStatusKey: 0, isEnabled: true }],
-}, 'findOne');
+}, 'findOne') : null);
 
 const buildClient = async (cfg) => {
     const { Issuer } = require('openid-client');
@@ -37,7 +38,7 @@ const buildClient = async (cfg) => {
 /* GET /api/v2/sso/oidc/initiate?companyId= — redirect the user to the IdP. */
 exports.oidcInitiate = async (req, res) => {
     try {
-        const companyId = req.query.companyId || req.headers['companyid'];
+        const companyId = req.query.companyId || req.headers['companyid']; // tenant-scoping: sign-in starts before any session; the company only picks the IdP, and the one-time state binds the callback to it
         if (!companyId) return res.status(400).send('companyId is required');
         const cfg = await loadConfig(companyId);
         if (!cfg || cfg.provider !== 'oidc') return res.status(404).send('OIDC SSO is not configured for this company');
@@ -77,17 +78,10 @@ exports.oidcCallback = async (req, res) => {
         const tokenSet = await client.callback(REDIRECT_URI(), params, { state: params.state, nonce, code_verifier: codeVerifier });
         const id = extractIdentity(tokenSet.claims(), (cfg.oidc && cfg.oidc.claimMap) || {});
         if (!id.valid) return res.redirect('/login?ssoError=identity');
-        const uid = await jitProvisionUser({
-            companyId,
-            email: id.email,
-            firstName: id.firstName,
-            lastName: id.lastName,
-            externalId: id.externalId,
-            defaultRoleType: cfg.defaultRoleType,
-            autoProvision: cfg.autoProvisionUsers !== false,
-        });
+        const uid = await ssoSignInUser({ companyId, cfg, identity: id });
         return finalizeSsoSession(req, res, uid, `/${companyId}`);
     } catch (error) {
+        if (error && error.code === SSO_NOT_ALLOWED) return res.redirect('/login?ssoError=not_allowed');
         logger.error(`oidcCallback: ${error.message || error}`);
         return res.redirect('/login?ssoError=callback');
     }

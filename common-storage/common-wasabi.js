@@ -66,10 +66,10 @@ exports.handleCreateCompanyDataStorageFun = async(cObj,companyId) => {
             .catch((err) => {
                 reject(err);
                 loggerConfig.error('Error handleCreateCompanyDataStorageFun' + err.message)
-            });;
+            });
         } catch (error) {
-            reject(err);
-            loggerConfig.error('Error handleCreateCompanyDataStorageFun' + err.message)
+            reject(error);
+            loggerConfig.error('Error handleCreateCompanyDataStorageFun' + error.message)
         }
     })
 }
@@ -148,9 +148,7 @@ exports.handleChargeebeCreditNotUpload = (companyId,localFilePath,filedata,id) =
     })
 }
 
-exports.handleBucketSizeUpdateCron = () => {
-    getBucketSize();
-}
+exports.handleBucketSizeUpdateCron = () => getBucketSize();
 exports.cleanUpTrackshot = async () => {
     cleanUpTrackshotStorage();
 }
@@ -209,3 +207,8 @@ exports.handleTaskTypeImageGet = (req,res) => {
 exports.handleTaskAttachmentsDuplicateFunctionality = async(bucketId, previousPath, destinationPath) => {
     await copyWasabiImage(bucketId, previousPath, destinationPath)
 }
+
+exports.handleStoredFileCopy = (bucketId, previousPath, destinationPath) => copyWasabiImage(bucketId, previousPath, destinationPath);
+
+/* An upload to the object store is given a new timestamped name, so it never lands on a stored object. */
+exports.storedFileExists = async () => false;

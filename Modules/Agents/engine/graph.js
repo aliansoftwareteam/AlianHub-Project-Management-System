@@ -1,0 +1,415 @@
+const { StateGraph, Annotation, START, END, interrupt, Command, isGraphBubbleUp } = require('@langchain/langgraph');
+const logger = require('../../../Config/loggerConfig');
+const persistence = require('../../AICore/persistence');
+const orchestrator = require('./orchestrator');
+const findingMemory = require('./findingMemory');
+const memory = require('../memory');
+const aiProfile = require('../../AI/aiProfile');
+const skillIndex = require('../skills');
+const policy = require('../policy');
+const projectPolicy = require('../projectPolicy');
+const { rating: ratingOf } = require('../actions');
+const runs = require('../runs');
+const spendGuard = require('../spendGuard');
+const revisions = require('../revisions');
+const taint = require('../taint');
+const proposalText = require('../proposalText');
+const { FEATURES } = require('../../AICore/features');
+const { failureOf } = require('../../AICore/providerError');
+const providerContext = require('../../AICore/providerContext');
+const telemetry = require('../../../Config/telemetry');
+
+// The run engine as a LangGraph thread, one per run (thread_id = run id):
+//
+//   gather → analyse → review → act → propose → hold → remember
+//
+// A proposal is an interrupt at `hold`; approve/decline resume the thread with
+// the decision and `remember` finishes the run. `propose` and `hold` are two
+// nodes because a resumed node re-runs from its first line — filing the
+// proposal next to the interrupt would file it twice.
+//
+// Terminal writes are conditioned on the run still being `running` (or
+// `waiting_approval` once resumed), so a stop or pause-all that won the race is
+// never overwritten: the node that notices marks the state abandoned and the
+// graph ends without writing more.
+//
+// A finished thread is deleted from the checkpointer by the caller, never by a
+// node: the checkpointer writes a node's own checkpoint after it returns.
+
+const { STATUS } = runs;
+const ABANDONED = Object.freeze({ status: 'abandoned', outcome: 'stopped before it finished' });
+const MODEL_BUDGET = Object.freeze({ maxTokens: 4000 });
+const LOG_PREFIX = '[agent-run]';
+
+const field = (initial) => Annotation({ reducer: (_, next) => next, default: initial });
+const State = Annotation.Root({
+    run: field(() => null),
+    agent: field(() => null),
+    task: field(() => null),
+    context: field(() => null),
+    result: field(() => null),
+    spend: field(() => null),
+    changes: field(() => []),
+    alreadyTracked: field(() => 0),
+    decisions: field(() => []),
+    toAct: field(() => []),
+    toPropose: field(() => []),
+    applied: field(() => 0),
+    refusals: field(() => 0),
+    proposalId: field(() => null),
+    decision: field(() => null),
+    outcome: field(() => null),
+    finalStatus: field(() => null),
+    episode: field(() => null),
+    abandoned: field(() => false),
+    failure: field(() => null),
+});
+
+const plain = (doc) => (doc && typeof doc.toObject === 'function' ? doc.toObject() : doc);
+const slugOf = (run) => run.skill || 'qa-review';
+const titleOf = (task) => task.TaskKey || task.TaskName || 'a task';
+const wantsMemory = (slug) => { const skill = skillIndex.getSkill(slug); return !(skill && skill.usesMemory === false); };
+
+/* Memory is an optimisation: losing it costs context, failing the run over it costs the run. */
+const quietly = async (runId, what, fn) => {
+    try { return await fn(); } catch (e) { logger.error(`${LOG_PREFIX} ${runId}: ${what}: ${e.message}`); return null; }
+};
+
+/* Renews the queue lock between nodes when the run executes inside a job, so a
+ * run that is slow in every phase still holds its lock (see engine/timeouts). */
+const renewLock = (state, config) => {
+    const keepAlive = config.context.deps && config.context.deps.keepAlive;
+    if (typeof keepAlive !== 'function') return Promise.resolve();
+    return quietly(state.run._id, 'job lock not renewed', keepAlive);
+};
+
+async function gather(state, config) {
+    const { companyId, deps } = config.context;
+    const { run, task, agent } = state;
+    const block = wantsMemory(slugOf(run))
+        ? (await quietly(run._id, 'memory unavailable', () => memory.contextFor({ companyId, projectId: task.ProjectID, userId: run.startedBy, agentId: run.agentId }))) || ''
+        : '';
+    const { out: gathered, found } = await taint.collect(() => orchestrator.gather({ skillSlug: slugOf(run), task, companyId, memory: block, startedBy: run.startedBy, runId: String(run._id), actor: deps && deps.actor, allowedActions: agent && agent.allowedActions }));
+    if (gathered.status === 'skipped') return { result: gathered };
+    const marked = await taint.mark(companyId, run, [
+        ...taint.fromTask({ origin: await taint.originOf(companyId, task) }),
+        ...taint.fromContext(gathered.context, { skill: skillIndex.getSkill(slugOf(run)) }),
+        ...found,
+    ]);
+    return { run: marked, context: { ...gathered.context, memory: block } };
+}
+
+const statusAfter = (result) => {
+    if (result.status === 'skipped') return STATUS.SKIPPED;
+    if (result.status === 'refused') return STATUS.STOPPED;
+    return STATUS.FAILED;
+};
+
+/* The guard prices the call before it is made; recordSpend books what it
+ * actually cost afterwards, so the cap check below still catches an under-estimate. */
+async function analyse(state, config) {
+    await renewLock(state, config);
+    const { companyId, deps } = config.context;
+    const { task, agent } = state;
+    let { run } = state;
+    const guard = spendGuard.forRun({ companyId, run, actor: deps && deps.actor });
+    const spendContext = { feature: FEATURES.AGENT_RUN, companyId, runId: String(run._id), userId: run.startedBy || null, account: run.viaAccount || 'workspace', agentId: String(run.agentId), agentRevision: run.agentRevision, skillRevision: run.skillRevision, ...(taint.record(run) || {}) };
+    // The skill reports a fetch before its model call, so the marker lands on
+    // the spend context that call's replay row is written from.
+    const onExternal = async (found) => {
+        run = await taint.mark(companyId, run, [found]);
+        Object.assign(spendContext, taint.record(run) || {});
+    };
+    const about = state.result ? '' : (await quietly(run._id, 'starter profile unavailable', () => aiProfile.aboutRunStarter(companyId, run))) || '';
+    const { out: result, found } = state.result
+        ? { out: state.result, found: [] }
+        : await taint.collect(() => orchestrator.analyse({ skillSlug: slugOf(run), task, context: state.context, budget: { ...MODEL_BUDGET, guard }, spend: spendContext, companyId, agent, onExternal, about }));
+    run = await taint.mark(companyId, run, found);
+    const spend = await runs.recordSpend(companyId, run, result.usage, result.model);
+    if (result.status !== 'success') {
+        const { error, ...kept } = result;
+        return { run, result: kept, spend, outcome: result.reason || null, finalStatus: statusAfter(result), failure: failureOf(error) };
+    }
+    const cap = Number(run.spendCapUsd) > 0 ? Number(run.spendCapUsd) : 0;
+    if (cap && spend.usd >= cap) return { run, result, spend, outcome: `Run spend cap reached ($${spend.usd.toFixed(2)} of $${cap})`, finalStatus: STATUS.STOPPED };
+    return { run, result, spend };
+}
+
+const namedTaskOf = (change) => (change.params && change.params.taskId ? String(change.params.taskId) : '');
+
+/* The project of every other task the changes name, so a tainted run's write
+ * outside its own project is seen as such. */
+const targetProjectsOf = async (companyId, run, changes) => {
+    const targets = new Map();
+    for (const change of changes) {
+        const taskId = namedTaskOf(change);
+        if (!taskId || taskId === String(run.taskId) || targets.has(taskId)) continue;
+        // eslint-disable-next-line no-await-in-loop
+        targets.set(taskId, (await taint.targetProjectOf(companyId, taskId)) || '');
+    }
+    return targets;
+};
+
+/* Below the review level every change is proposed and no decision is recorded,
+ * as before; from it, the policy reviews each change and a refusal still goes
+ * through perform() so it leaves the same audit row as a registry refusal. At
+ * every level the project's own rule is asked last and can only hold a change back. */
+async function review(state, config) {
+    await renewLock(state, config);
+    const { companyId, deps } = config.context;
+    const { run, agent, task, result } = state;
+    const { changes: found, alreadyTracked } = await runs.changesFor(companyId, task, result);
+    if (!found.length) return { alreadyTracked, outcome: `nothing new to file — ${alreadyTracked} finding(s) already tracked`, finalStatus: STATUS.DONE };
+    const changes = found.map((c) => ({ ...c, rating: ratingOf(c.action) }));
+    const reviewing = Number(agent.autonomy) >= policy.REVIEW_LEVEL;
+    const heldByProject = (change, verdict) => projectPolicy.review({ companyId, actor: deps && deps.actor, action: change.action, params: { taskId: String(task._id), ...change.params }, verdict });
+
+    const decisions = [];
+    const toAct = [];
+    const toPropose = [];
+    const targets = reviewing && taint.routes(run) ? await targetProjectsOf(companyId, run, changes) : new Map();
+    for (const change of changes) {
+        const decided = reviewing
+            ? policy.decide({ agent, action: change.action, params: change.params, rating: change.rating, run, task, targetProjectId: targets.has(namedTaskOf(change)) ? targets.get(namedTaskOf(change)) : null })
+            : { decision: policy.DECISION.PROPOSE, reason: '', rating: change.rating };
+        // eslint-disable-next-line no-await-in-loop
+        const verdict = await heldByProject(change, decided);
+        if (reviewing || verdict !== decided) decisions.push({ action: change.action, decision: verdict.decision, reason: verdict.reason, rating: verdict.rating, at: new Date() });
+        if (verdict.decision === policy.DECISION.PROPOSE) toPropose.push(change); else toAct.push({ change, verdict });
+    }
+    if (!reviewing && !decisions.length) return { changes, alreadyTracked, toPropose: changes };
+    await runs.patch(companyId, run._id, {}, { $push: { decisions: { $each: decisions } } });
+    return { changes, alreadyTracked, decisions, toAct, toPropose };
+}
+
+async function act(state, config) {
+    await renewLock(state, config);
+    const { companyId, deps } = config.context;
+    const { run, agent } = state;
+    const marker = taint.record(run);
+    let applied = 0;
+    let refusals = 0;
+    for (const { change, verdict } of state.toAct) {
+        // eslint-disable-next-line no-await-in-loop
+        if (!(await runs.isRunning(companyId, run._id))) return { applied, refusals, abandoned: true };
+        try {
+            // eslint-disable-next-line no-await-in-loop
+            const out = await deps.actions.perform({ companyId, actor: deps.actor, action: change.action, params: change.params, reason: `${run.skill} finding`, allowedActions: agent.allowedActions, decision: verdict, depth: runs.originDepth(run), ...(marker ? { taint: marker } : {}) });
+            // eslint-disable-next-line no-await-in-loop
+            await runs.patch(companyId, run._id, {}, { $push: { actions: { action: change.action, auditId: out.auditId, ok: true, at: new Date() } } });
+            applied += 1;
+            // eslint-disable-next-line no-await-in-loop
+            if (change.remember) await findingMemory.record(companyId, { ...change.remember, subtaskId: out.result && out.result.subtaskId });
+        } catch (e) {
+            if (e.name !== 'RefusedError') {
+                // eslint-disable-next-line no-await-in-loop
+                await runs.patch(companyId, run._id, {}, { $push: { actions: { action: change.action, auditId: e.auditId || null, ok: false, error: e.message, at: new Date() } } });
+                throw e;
+            }
+            refusals += 1;
+            // eslint-disable-next-line no-await-in-loop
+            await runs.patch(companyId, run._id, {}, { $inc: { refusals: 1 }, $push: { actions: { action: change.action, auditId: e.auditId || null, ok: false, refused: e.message, at: new Date() } } });
+        }
+    }
+    const held = state.toPropose.length;
+    const outcome = [`${applied} change(s) applied`, held ? `${held} proposed` : '', refusals ? `${refusals} refused` : '', state.alreadyTracked ? `${state.alreadyTracked} already tracked` : ''].filter(Boolean).join(', ');
+    return { applied, refusals, outcome, ...(held ? {} : { finalStatus: applied ? STATUS.DONE : STATUS.FAILED }) };
+}
+
+async function propose(state, config) {
+    await renewLock(state, config);
+    const { companyId, deps } = config.context;
+    const { run, agent, task, result, spend, toPropose } = state;
+    if (!(await runs.isRunning(companyId, run._id))) return { abandoned: true };
+    const what = Number(agent.autonomy) < policy.REVIEW_LEVEL && !Array.isArray(result.changes)
+        ? `File ${result.findings.length - state.alreadyTracked} QA finding(s) on ${titleOf(task)}`
+        : proposalText.joined([run.skill, `${toPropose.length} change(s) on ${titleOf(task)}`]);
+    // What the grounding check removed is part of the record a person reviews.
+    const dropped = Array.isArray(result.dropped) && result.dropped.length
+        ? `Dropped as unsupported by the data: ${result.dropped.map((d) => `"${String(d.text || d.title).slice(0, 80)}" (${d.reason})`).join('; ')}` : '';
+    const proposal = await deps.proposals.create(companyId, {
+        agent, runId: String(run._id), taskId: String(task._id), projectId: String(task.ProjectID),
+        what,
+        why: [result.summary, dropped].filter(Boolean).join('\n\n'),
+        changes: toPropose,
+        cost: { tokens: result.usage && result.usage.totalTokens, model: result.model, usd: spend && spend.usd },
+        ...(taint.isTainted(run) ? { taint: taint.forProposal(run) } : {}),
+    });
+    const waiting = await runs.patch(companyId, run._id, { status: STATUS.WAITING, ...(state.outcome ? { outcome: state.outcome } : {}) }, { $push: { proposals: String(proposal._id) } }, { onlyIf: STATUS.RUNNING });
+    return waiting ? { proposalId: String(proposal._id) } : { abandoned: true };
+}
+
+function hold(state) {
+    return { decision: interrupt({ proposalId: state.proposalId, changes: state.toPropose }) };
+}
+
+const decidedOutcome = ({ decision, applied }) => {
+    if (decision === 'declined') return 'declined by a person';
+    const list = Array.isArray(applied) ? applied : [];
+    return `${decision} by a person — ${list.filter((a) => a.ok).length} of ${list.length} change(s) applied`;
+};
+
+const episodeOf = (state) => {
+    const { run, task, decision, spend } = state;
+    const declined = Boolean(decision && decision.decision === 'declined');
+    const applied = decision && Array.isArray(decision.applied) ? decision.applied : [];
+    return {
+        skill: run.skill || null, taskId: String(task._id), taskTitle: task.TaskName || null,
+        proposed: state.toPropose.length, acted: state.applied,
+        approved: declined ? 0 : applied.filter((a) => a.ok).length,
+        declined: declined ? state.toPropose.length : 0,
+        declinedReason: (decision && decision.reason) || null,
+        reverted: false, spendUsd: Number((spend && spend.usd) || 0), at: new Date(),
+    };
+};
+
+/* The run row is the record; the memory store is told afterwards, so a run
+ * that was stopped meanwhile leaves no episode behind. */
+async function remember(state, config) {
+    const { companyId } = config.context;
+    const { run, task, decision } = state;
+    const episode = episodeOf(state);
+    const saved = decision
+        ? await runs.finish(companyId, run._id, { status: STATUS.DONE, outcome: decidedOutcome(decision), episode, onlyIf: STATUS.WAITING })
+        : await runs.finish(companyId, run._id, { status: state.finalStatus, outcome: state.outcome, failure: state.failure, episode, onlyIf: STATUS.RUNNING });
+    if (!saved) return { abandoned: true };
+    await quietly(run._id, 'episode not remembered', () => memory.recordEpisode({ companyId, projectId: String(run.projectId || task.ProjectID || ''), runId: String(run._id), patch: episode }));
+    return { episode, outcome: saved.outcome || null, refusals: Number(saved.refusals || 0), finalStatus: saved.status };
+}
+
+const STEP = Object.freeze({ OK: 'ok', ERROR: 'error', INTERRUPTED: 'interrupted' });
+
+const stepSpend = (node, update) => {
+    const spend = node === 'analyse' && update ? update.spend : null;
+    return { tokens: Number((spend && spend.tokens) || 0), costUsd: Number((spend && spend.usd) || 0) };
+};
+
+/* An interrupt is how `hold` parks the thread, not a failure: its step is
+ * recorded as interrupted and it is rethrown outside the span so the span stays ok. */
+const traced = (node, fn) => async (state, config) => {
+    const { companyId } = config.context;
+    const runId = String(state.run._id);
+    let parked = null;
+    const attributes = { 'agent.run.id': runId, 'agent.id': state.run.agentId ? String(state.run.agentId) : null, 'agent.step.node': node, 'tenant.id': String(companyId) };
+    const update = await telemetry.withSpan(`agent.step ${node}`, attributes, async (span) => {
+        const startedAt = new Date();
+        let status = STEP.OK;
+        let out;
+        try {
+            out = await fn(state, config);
+            return out;
+        } catch (e) {
+            if (!isGraphBubbleUp(e)) { status = STEP.ERROR; throw e; }
+            status = STEP.INTERRUPTED;
+            parked = e;
+            return undefined;
+        } finally {
+            const endedAt = new Date();
+            const spend = stepSpend(node, out);
+            span.setAttributes({ 'agent.step.status': status, 'agent.step.tokens': spend.tokens, 'agent.step.cost_usd': spend.costUsd });
+            await runs.recordStep(companyId, runId, { node, startedAt, endedAt, durationMs: endedAt.getTime() - startedAt.getTime(), spanId: span.spanId, traceId: span.traceId, status, ...spend });
+        }
+    });
+    if (parked) throw parked;
+    return update;
+};
+
+const afterAnalyse = (s) => (s.finalStatus ? 'remember' : 'review');
+const afterReview = (s) => { if (s.finalStatus) return 'remember'; return s.toAct.length ? 'act' : 'propose'; };
+const afterAct = (s) => { if (s.abandoned) return END; return s.toPropose.length ? 'propose' : 'remember'; };
+const afterPropose = (s) => (s.abandoned ? END : 'hold');
+
+const builder = new StateGraph(State)
+    .addNode('gather', traced('gather', gather))
+    .addNode('analyse', traced('analyse', analyse))
+    .addNode('review', traced('review', review))
+    .addNode('act', traced('act', act))
+    .addNode('propose', traced('propose', propose))
+    .addNode('hold', traced('hold', hold))
+    .addNode('remember', traced('remember', remember))
+    .addEdge(START, 'gather')
+    .addEdge('gather', 'analyse')
+    .addConditionalEdges('analyse', afterAnalyse, ['review', 'remember'])
+    .addConditionalEdges('review', afterReview, ['act', 'propose', 'remember'])
+    .addConditionalEdges('act', afterAct, ['propose', 'remember', END])
+    .addConditionalEdges('propose', afterPropose, ['hold', END])
+    .addEdge('hold', 'remember')
+    .addEdge('remember', END);
+
+/* Compiled per company because the checkpointer and store are; recompiled when
+ * persistence hands out new instances (tests reset, connections closed). */
+const compiled = new Map();
+const graphFor = (companyId) => {
+    const key = String(companyId);
+    const saver = persistence.saverFor(companyId);
+    const store = persistence.storeFor(companyId);
+    const hit = compiled.get(key);
+    if (hit && hit.saver === saver && hit.store === store) return hit.graph;
+    const graph = builder.compile({ checkpointer: saver, store });
+    compiled.set(key, { saver, store, graph });
+    return graph;
+};
+
+const configFor = (companyId, runId, context) => ({ configurable: { thread_id: String(runId) }, context: { companyId, ...context }, durability: 'sync' });
+
+const interrupted = (out) => Array.isArray(out.__interrupt__) && out.__interrupt__.length > 0;
+
+const forget = (companyId, runId) => quietly(runId, 'thread not deleted', () => persistence.saverFor(companyId).deleteThread(String(runId)));
+
+/* What the row can still tell memory when the graph itself threw. */
+const episodeFromRow = (run, task, error) => ({
+    skill: run.skill || null, taskId: String(task._id), taskTitle: task.TaskName || null,
+    proposed: 0, acted: (Array.isArray(run.actions) ? run.actions : []).filter((a) => a.ok).length,
+    approved: 0, declined: 0, declinedReason: null, reverted: false,
+    spendUsd: Number((run.spend && run.spend.usd) || 0), outcome: error, at: new Date(),
+});
+
+const executeGraph = async ({ companyId, run, agent, task, deps }) => {
+    try {
+        await persistence.ready(companyId);
+        const graph = graphFor(companyId);
+        await runs.patch(companyId, run._id, { threadId: String(run._id), traceId: run.traceId });
+        const pinnedAgent = revisions.applyRevision(agent, await revisions.forRun(companyId, run));
+        const out = await graph.invoke({ run: plain(run), agent: pinnedAgent, task: plain(task) }, configFor(companyId, run._id, { deps }));
+        if (interrupted(out)) {
+            return { status: STATUS.WAITING, proposalId: out.proposalId, refusals: out.refusals, ...(out.outcome ? { outcome: out.outcome } : {}) };
+        }
+        await forget(companyId, run._id);
+        if (out.abandoned) return ABANDONED;
+        return { status: out.finalStatus, outcome: out.outcome, refusals: out.refusals };
+    } catch (e) {
+        logger.error(`${LOG_PREFIX} ${run._id}: ${e.message}`);
+        const row = (await quietly(run._id, 'run row unavailable', () => runs.get(companyId, run._id))) || plain(run);
+        const episode = episodeFromRow(row, task, e.message);
+        const saved = await runs.finish(companyId, run._id, { status: STATUS.FAILED, error: e.message, failure: failureOf(e), episode, onlyIf: STATUS.RUNNING });
+        if (!saved) return ABANDONED;
+        await quietly(run._id, 'episode not remembered', () => memory.recordEpisode({ companyId, projectId: String(row.projectId || task.ProjectID || ''), runId: String(run._id), patch: episode }));
+        return { status: STATUS.FAILED, error: e.message };
+    }
+};
+
+/* Rows from before tracing get their trace id here, so every step of the run shares one. */
+const runGraph = ({ companyId, run, agent, task, deps }) => providerContext.run({ companyId }, () => {
+    const traceId = run.traceId || telemetry.traceIdNow() || telemetry.newTraceId();
+    return telemetry.withTrace(traceId, () => executeGraph({ companyId, run: { ...plain(run), traceId }, agent, task, deps }));
+});
+
+/* Resolves { resumed: false } when the thread holds no interrupt — a run from
+ * before the graph, or one that already finished — so the caller can close the
+ * run the old way. A thread parked after the interrupt (remember threw last
+ * time) is driven on without a new decision. */
+const resumeGraph = async ({ companyId, runId, resume }) => {
+    await persistence.ready(companyId);
+    const graph = graphFor(companyId);
+    const config = configFor(companyId, runId, {});
+    const snapshot = await graph.getState(config);
+    const waiting = (snapshot.tasks || []).some((t) => Array.isArray(t.interrupts) && t.interrupts.length);
+    const parked = !waiting && Array.isArray(snapshot.next) && snapshot.next.length > 0;
+    if (!waiting && !parked) return { resumed: false };
+    const traceId = snapshot.values && snapshot.values.run ? snapshot.values.run.traceId : null;
+    const out = await telemetry.withTrace(traceId, () => graph.invoke(waiting ? new Command({ resume }) : null, config));
+    if (!interrupted(out)) await forget(companyId, runId);
+    return { resumed: true, status: out.finalStatus, outcome: out.outcome, episode: out.episode, ...(out.abandoned ? { abandoned: true } : {}) };
+};
+
+module.exports = { State, ABANDONED, builder, graphFor, runGraph, resumeGraph };

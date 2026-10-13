@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "alianhub-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "nodemon"],
+      "port": 4000
+    }
+  ]
+}

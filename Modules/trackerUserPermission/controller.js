@@ -4,6 +4,8 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const { updateCompanyFun } = require("../Company/controller/updateCompany");
 const { updateMemberFunction } = require('../settings/Members/controller.js');
+const { getRoleType, isPrivileged } = require('../../Config/permissionGuard');
+const { pinSessionTenant } = require('../../Config/tenant');
 
 exports.handleTrackerUserPermission = (req,res) => {
     try {
@@ -11,16 +13,20 @@ exports.handleTrackerUserPermission = (req,res) => {
             res.send({status: false, message: 'req body is requried'});
             return;
         }
-        if(!req.body.CompanyId){
-            res.send({status: false, message: 'Company Id is requried'});    
-            return;
-        }
+        const companyId = pinSessionTenant(req, res);
+        if (!companyId) return;
         if(!req.body.DataObj){
             res.send({status: false, message: 'DataObj is requried'});
             return;
         }
-        exports.updateTrackerUsersAndUser(req.body.DataObj,req.body.CompanyId).then((res1)=>{
-            res.send(res1);
+        getRoleType(companyId, req.uid).then((roleType) => {
+            if (!isPrivileged(roleType)) {
+                res.status(403).send({status: false, message: 'Only an owner or admin can change tracker access'});
+                return undefined;
+            }
+            return exports.updateTrackerUsersAndUser(req.body.DataObj, companyId).then((res1)=>{
+                res.send(res1);
+            });
         })
         .catch((err)=>{
             logger.error(`ERROR in update handleTrackerUserPermission: ${err.message}`)
@@ -37,6 +43,10 @@ exports.updateTrackerUsersAndUser = async (dataObj, companyId) => {
         try {
             const incValue = 1;
             const decValue = -1;
+            const handleError = (err) => {
+                logger.error(`ERROR in update updateTrackerUsersAndUser: ${err.message}`)
+                reject({ status: false, message: 'Something went wrong.' });
+            };
             const updateCompanyQuery = {
                 type: SCHEMA_TYPE.COMPANIES,
                 data: [
@@ -63,7 +73,7 @@ exports.updateTrackerUsersAndUser = async (dataObj, companyId) => {
                 }
             }).catch(handleError);
 
-            function rollbackTrackerCount (fromError=false) {
+            const rollbackTrackerCount = (fromError=false) => {
                 const rollbackCompanyQuery = {
                     type: SCHEMA_TYPE.COMPANIES,
                     data: [
@@ -80,12 +90,8 @@ exports.updateTrackerUsersAndUser = async (dataObj, companyId) => {
                         resolve({ status: false, message: 'Something went wronge' })
                     }
                 }).catch(handleError);
-            }
+            };
 
-            function handleError(err) {
-                logger.error(`ERROR in update updateTrackerUsersAndUser: ${err.message}`)
-                reject({ status: false, message: 'Something went wrong.' });
-            }
         } catch (error) {
             logger.error(`ERROR in update updateTrackerUsersAndUser: ${error.message}`)
             reject({ status: false, message: 'Something went wrong.' });

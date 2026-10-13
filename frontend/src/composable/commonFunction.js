@@ -1,36 +1,12 @@
 import { WASABI_RETRIVE_OBJECT, WASABI_RETRIVE_USER_PROFILE } from "@/config/env";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
-import { getMessaging, getToken } from "firebase/messaging";
 import Store from '@/store/index'
+import { enabledProviders } from '@/config/publicConfig'
 import { computed } from "vue";
 import * as env from '@/config/env';
 import moment from 'moment';
 import { storageQueryBuilder } from '@/utils/storageQueryBuild';
-
-export const fcmToken = () => {
-    return new Promise((resolve, reject) => {
-        try {
-            const messaging = getMessaging();
-            if (Notification.permission === 'granted') {
-                getToken(messaging).then((currentToken) => {
-                    if (currentToken) {
-                        resolve({ status: true, token: currentToken, message: 'granted' });
-                    } else {
-                        console.info('No registration token available. Request permission to generate one.');
-                    }
-                }).catch((err) => {
-                    reject({ status: true, token: '', message: err });
-                    console.error('An error occurred while retrieving token. ', err);
-                });
-            } else {
-                reject({ status: true, token: '', message: 'denied' });
-            }
-        } catch (error) {
-            reject(error);
-        }
-    })
-}
-
+import { customFilterCondition } from '@/views/Projects/composables/customFieldQuery';
 
 export const getConvertedTimeString = (n, type) => {
     try {
@@ -282,6 +258,9 @@ export const projectAppsIcons = (key) => {
     return result[0];
 }
 
+/* Older seeds stored a cloud path the bucket never had; those render from the bundled PNGs. */
+export const isBundledPriorityImage = (image) => !image || String(image).startsWith('taskPriorities/');
+
 export const companyPrioritiesIcons = (key) => {
 
     let data = [
@@ -302,6 +281,9 @@ export const companyPrioritiesIcons = (key) => {
     const result = data.filter(x => x.value === key);
     return result[0];
 }
+
+/* '' for a picture the company uploaded, which storage holds, and for a priority the app has no icon for. */
+export const bundledPriorityIcon = (option) => (isBundledPriorityImage(option?.statusImage) ? companyPrioritiesIcons(option?.value)?.statusImage || '' : '');
 
 export const getImageUrl = (item) => {
     const { name, appStatus } = item;
@@ -787,7 +769,10 @@ export const buildFilterQuery = (queries, userID) => {
         if (filterBy[condition] === undefined) {
             filterBy[condition] = [];
         }
-        if (query.name.type === "arrayOfObject") {
+        if (query.name.type === "custom") {
+            const customCondition = customFilterCondition(query, Store.getters['settings/finalCustomFields']);
+            if (customCondition) filterBy[condition].push(customCondition);
+        } else if (query.name.type === "arrayOfObject") {
             filterBy[condition].push({ [queryField]: { $elemMatch: { [filterOn]: { $in: query.values } } } })
         } else if (query.name.type === "object") {
             const filteField = `${queryField}.${filterOn}`;
@@ -947,8 +932,5 @@ export const escapeCSVValue = (value) => {
 }
 
 export const isAuthDeviderShow = () => {
-    const isAuthWithGoogle = process.env.VUE_APP_IS_GOOGLE_LOGIN || null;
-    const isAuthWithGithub = process.env.VUE_APP_IS_GITHUB_LOGIN || null;
-    const isAuthWithGitlab = process.env.VUE_APP_IS_GITLAB_LOGIN || null;
-    return (isAuthWithGoogle && isAuthWithGoogle === 'true') || (isAuthWithGithub && isAuthWithGithub === 'true') || (isAuthWithGitlab && isAuthWithGitlab === 'true')
+    return enabledProviders().length > 0;
 }

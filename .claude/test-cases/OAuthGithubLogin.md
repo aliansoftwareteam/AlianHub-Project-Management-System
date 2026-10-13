@@ -23,7 +23,6 @@ Copy the **Client ID** and generate a **Client secret**, then set:
 | root `.env` | `GITHUB_CLIENT_ID` | the client id |
 | root `.env` | `GITHUB_CLIENT_SECRET` | the client secret |
 | root `.env` | `GITHUB_BASE_OAUTH_URL` | `https://github.com/login/oauth` |
-| root `.env` | `GITHUB_OAUTH_REQUIRED` | `true` (requires server-side verify via GitHub `/user`) |
 | `frontend/.env` | `VUE_APP_GITHUB_CLIENT_ID` | the **same** client id |
 | `frontend/.env` | `VUE_APP_GITHUB_BASE_OAUTH_URL` | `https://github.com/login/oauth` |
 | `frontend/.env` | `VUE_APP_IS_GITHUB_LOGIN` | `true` |
@@ -52,7 +51,7 @@ Copy the **Client ID** and generate a **Client secret**, then set:
 
 | ID     | Title                                          | Precondition                                  | Steps                                                            | Expected Result                                                        | Actual Result | Status |
 |--------|------------------------------------------------|-----------------------------------------------|------------------------------------------------------------------|------------------------------------------------------------------------|---------------|--------|
-| GHL_006 | accessToken verification enforced             | `GITHUB_OAUTH_REQUIRED='true'`                | 1. Attempt login without a valid GitHub access token            | Rejected ("accessToken is required" / verification failed); no session |               | ⏳     |
+| GHL_006 | accessToken verification enforced             | Always on                | 1. Attempt login without a valid GitHub access token            | Rejected ("accessToken is required" / verification failed); no session |               | ⏳     |
 | GHL_007 | Blocked email cannot log in                   | Auth record `isBlocked = true`                | 1. Click GitHub and authorize that account                      | Rejected with the "email has been blocked" message                     |               | ⏳     |
 
 ## Coexistence

@@ -183,6 +183,13 @@ const TaskSchema = z.object({
     }
 });
 
+const PlanRuleNoteSchema = z.object({
+    name: z.string().max(200).optional().default(''),
+    reason: z.string().max(2000).optional().default(''),
+    code: z.string().max(40).optional().default('other'),
+    max: z.number().int().optional(),
+});
+
 const SprintSchema = z.object({
     sprintName: z.string().min(1).max(80),
     // Safety cap only: 100 tasks per sprint is an absurd ceiling no honest
@@ -251,10 +258,24 @@ const ProjectSchema = z.object({
     dupesIn(proj.taskTypeCounts, 'taskTypeCounts');
 });
 
+// Loose on purpose: a view the shared plan check refuses is dropped with a
+// reason at /plan (./planViews.js) rather than sending the whole plan back
+// for repair. The cap here only bounds a runaway response.
+const PlanViewSchema = z.object({
+    name: z.string().max(200).optional().default(''),
+    kind: z.string().max(40).optional().default('list'),
+    look: z.record(z.string(), z.unknown()).optional(),
+});
+
 const PlanSchema = z.object({
+    // Any shape on purpose: ./planAutomations.js keeps only catalogue rules and
+    // drops the rest with a reason, so a bad rule never sends the plan back for repair.
+    rules: z.array(z.unknown()).max(20).optional(),
+    rulesDropped: z.array(PlanRuleNoteSchema).max(20).optional(),
     project: ProjectSchema,
     // Safety cap only: 200 sprints is far beyond any honest plan.
     sprints: z.array(SprintSchema).min(1).max(200),
+    views: z.array(PlanViewSchema).max(20).optional(),
 }).superRefine((plan, ctx) => {
     const issue = (msg, path) => ctx.addIssue({ code: z.ZodIssueCode.custom, message: msg, path: path || [] });
 
@@ -424,9 +445,36 @@ const QuestionOptionSchema = z.object({
     description: z.string().max(200).optional(),
 });
 
+// The five points a brief must cover before it is planned (task 015). Keys
+// are stable ids shared with the frontend; order is the order the brief's
+// sections are rendered in.
+const COVERAGE_POINTS = ['what_for_whom', 'done_when', 'existing', 'constraints', 'team'];
+const CoveragePointEnum = z.enum(COVERAGE_POINTS);
+const CoverageStateEnum = z.enum(['met', 'missing']);
+
+const CoverageMapSchema = z.object({
+    what_for_whom: CoverageStateEnum,
+    done_when: CoverageStateEnum,
+    existing: CoverageStateEnum,
+    constraints: CoverageStateEnum,
+    team: CoverageStateEnum,
+});
+
+const CoverageSchema = z.object({
+    coverage: CoverageMapSchema,
+    notes: z.object({
+        what_for_whom: z.string().max(300).optional().default(''),
+        done_when: z.string().max(300).optional().default(''),
+        existing: z.string().max(300).optional().default(''),
+        constraints: z.string().max(300).optional().default(''),
+        team: z.string().max(300).optional().default(''),
+    }).optional().default({}),
+});
+
 const ClarifyQuestionSchema = z.object({
     id: z.string().regex(/^[a-z][a-z0-9-]{0,40}$/, 'id must be kebab-case, 1–41 chars'),
-    category: QuestionCategoryEnum,
+    point: CoveragePointEnum,
+    category: QuestionCategoryEnum.optional().default('features'),
     question: z.string().min(5).max(240),
     rationale: z.string().max(280).optional().default(''),
     required: z.boolean().default(false),
@@ -517,6 +565,23 @@ const ClarifyQuestionsSchema = z.object({
     });
 });
 
+const BriefAssumptionSchema = z.object({
+    point: z.enum([...COVERAGE_POINTS, 'other']),
+    text: z.string().min(1).max(500),
+    questionId: z.string().max(60).optional(),
+});
+
+const BriefDraftSchema = z.object({
+    sections: z.object({
+        what_for_whom: z.string().min(1).max(3000),
+        done_when: z.string().min(1).max(3000),
+        existing: z.string().min(1).max(3000),
+        constraints: z.string().min(1).max(3000),
+        team: z.string().min(1).max(3000),
+    }),
+    assumptions: z.array(BriefAssumptionSchema).max(30).default([]),
+});
+
 /**
  * Strip ids that aren't in the allowed member list. Returns a cleaned plan
  * plus a list of removed ids for logging.
@@ -542,6 +607,11 @@ function sanitizeMemberIds(plan, allowedIds) {
     for (const sprint of plan.sprints) {
         for (const task of sprint.tasks) {
             task.AssigneeUserId = filterIds(task.AssigneeUserId, `task:${task.TaskName}`);
+        }
+    }
+    for (const view of (Array.isArray(plan.views) ? plan.views : [])) {
+        if (view && view.look && Array.isArray(view.look.assigneeIds)) {
+            view.look.assigneeIds = filterIds(view.look.assigneeIds, `view:${view.name}`);
         }
     }
     return { plan, removed };
@@ -603,6 +673,9 @@ function tryParseJson(raw) {
 }
 
 module.exports = {
+    COVERAGE_POINTS,
+    CoverageSchema,
+    BriefDraftSchema,
     PlanSchema,
     ClarifyResponseSchema,
     ClarifyQuestionsSchema,

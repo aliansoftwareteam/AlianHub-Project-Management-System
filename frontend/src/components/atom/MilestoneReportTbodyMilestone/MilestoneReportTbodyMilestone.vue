@@ -1,5 +1,5 @@
 <template>
-    <tr class="bg-white project_name_wrapper">
+    <tr class="project_name_wrapper">
         <td class="project_name_mil_td" :class="[{'td_class_border':props.daysOrMonth && props.daysOrMonth.length ? new Date().getMonth() === 0 && new Date().getDate() === 1 : new Date().getMonth() === 0}]">
             <div class="d-flex justify-content-between align-items-center">
                 <div class="thtitle">
@@ -7,10 +7,8 @@
                         <span class="thtitle_currency_family_mil short_name_mil" :class="[{'cursor-pointer':props.projectDetail.statusType !== 'close'}]" @click="redirectProjectDetail(props.projectDetail)" :title="props.milestoneObj.milestoneName">{{props.milestoneObj.milestoneName}}</span>
                         <span
                             v-if="props.milestoneObj.statusId"
-                            class="thtitle_currency_family_status short_mil_status white border-radius-4-px ml-10px"
-                            :style="[{
-                                'background-color':settingStatus && settingStatus.length ? settingStatus.find((ele) => {return ele.value === props.milestoneObj.statusId})?.backgroundColor:'',
-                            }]"
+                            class="thtitle_currency_family_status short_mil_status mr-status-chip ah-status-ink"
+                            :style="chipStyle(settingStatus.find((ele) => {return ele.value === props.milestoneObj.statusId}))"
                             :title="settingStatus.find((ele) => {return ele.value === props.milestoneObj.statusId})?.name"
                         >
                             {{settingStatus.find((ele) => {return ele.value === props.milestoneObj.statusId})?.name}}
@@ -34,7 +32,7 @@
                         'border-color-highlight-left':props.daysOrMonth.length === 0 ? new Date().getMonth() === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex + 1,
                         'border-color-highlight-left-next':props.daysOrMonth.length === 0 ? new Date().getMonth() + 1 === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex
                     }]"
-                    class="border_currency totalMilestoneCurrencyFamily lightGrey text-center"
+                    class="border_currency totalMilestoneCurrencyFamily text-center"
                     v-if="new Date(props.milestoneObj.statusDate).getDate() === monthIndex + 1 && new Date(monthDate.date).getMonth() === new Date(props.milestoneObj.statusDate).getMonth() && `${new Date(props.milestoneObj.statusDate).getFullYear()}` === props.yearSelected"
                 >
                     {{props.currencySymbol}} {{getCommaSeperatedNumber(props.milestoneObj.amount)}}
@@ -52,7 +50,7 @@
                         'border-color-highlight-left':props.daysOrMonth.length === 0 ? new Date().getMonth() === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex + 1,
                         'border-color-highlight-left-next':props.daysOrMonth.length === 0 ? new Date().getMonth() + 1 === monthIndex : new Date().getMonth() === new Date(monthDate.date).getMonth() && new Date().getDate() === monthIndex
                     }]"
-                    class="border_currency totalMilestoneCurrencyFamily lightGrey text-center" 
+                    class="border_currency totalMilestoneCurrencyFamily text-center"
                     v-if="new Date(props.milestoneObj.statusDate).getMonth() === monthIndex && `${new Date(props.milestoneObj.statusDate).getFullYear()}` === props.yearSelected"
                 >
                     {{props.currencySymbol}} {{getCommaSeperatedNumber(props.milestoneObj.amount)}}
@@ -75,6 +73,8 @@
     import { useConvertDate } from "@/composable";
     import { useRouter } from 'vue-router';
     import {milestoneData} from '@/components/organisms/FixMilestone/helper.js';
+    import { statusChipStyle } from '@/utils/statusChipColors';
+    const chipStyle = (status) => statusChipStyle({ textColor: status?.textColor, bgColor: status?.backgroundColor });
     const { getCommaSeperatedNumber } = milestoneData();
     const router = useRouter();
     const { getters } = useStore();

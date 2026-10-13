@@ -5,6 +5,9 @@
 // "Remind me" flow). These reminders are standalone: they carry their own title,
 // description, notify lead-time, attachments and recipient.
 
+const { escapeHtml } = require('../../utils/escapeHtml');
+const { textHtml, subjectText } = require('../Template/emailText');
+
 // notifyBefore sentinel: the user chose "Don't notify" — the reminder still
 // lives on their list, it just never raises a notification.
 const DONT_NOTIFY = -1;
@@ -115,22 +118,8 @@ function buildReminderNotification(reminder, now) {
     };
 }
 
-// --- email ---------------------------------------------------------------
-// Plain string builders, mirroring Modules/TimeSheet/helpers/reminderRules.js
-// and Modules/ScheduledReports/helpers/scheduleRules.js. Kept pure so they can
-// be unit-tested without a transport.
-
-function escapeHtml(value) {
-    return String(value == null ? '' : value)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
 function reminderEmailSubject(reminder) {
-    return `Reminder: ${reminderMessage(reminder)}`;
+    return subjectText(`Reminder: ${reminderMessage(reminder)}`);
 }
 
 // Formats the due moment for the email body. Kept simple and locale-free so the
@@ -143,8 +132,8 @@ function formatRemindAt(value) {
 }
 
 function reminderEmailHtml(reminder, userName) {
-    const title = escapeHtml(reminderMessage(reminder));
-    const greeting = userName ? `Hi ${escapeHtml(userName)},` : 'Hi,';
+    const title = textHtml(reminderMessage(reminder));
+    const greeting = userName ? `Hi ${textHtml(userName)},` : 'Hi,';
     const description = reminder && reminder.description ? String(reminder.description).trim() : '';
     const when = formatRemindAt(reminder && reminder.remindAt);
     const files = Array.isArray(reminder && reminder.attachments) ? reminder.attachments : [];
@@ -156,7 +145,7 @@ function reminderEmailHtml(reminder, userName) {
         + '<div style="padding:14px 16px;background:#F7F8FC;border-left:3px solid #2F3990;border-radius:0 6px 6px 0;">'
         + `<div style="font-size:16px;font-weight:600;color:#191A2B;">${title}</div>`;
     if (description) {
-        body += `<div style="margin-top:6px;color:#4B4D60;">${escapeHtml(description)}</div>`;
+        body += `<div style="margin-top:6px;color:#4B4D60;">${textHtml(description)}</div>`;
     }
     if (when) {
         body += `<div style="margin-top:10px;font-size:12px;color:#84869B;">Due: ${escapeHtml(when)}</div>`;
@@ -166,7 +155,7 @@ function reminderEmailHtml(reminder, userName) {
     if (files.length) {
         body += '<p style="margin:16px 0 6px;font-weight:600;">Attachments</p><ul style="margin:0;padding-left:18px;color:#4B4D60;">';
         files.forEach((f) => {
-            const name = escapeHtml((f && f.name) || 'file');
+            const name = textHtml((f && f.name) || 'file');
             const url = f && f.url ? String(f.url) : '';
             body += url
                 ? `<li><a href="${escapeHtml(url)}" style="color:#2F3990;">${name}</a></li>`

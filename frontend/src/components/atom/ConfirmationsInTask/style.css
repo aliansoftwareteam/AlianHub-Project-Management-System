@@ -9,7 +9,7 @@
     border-top: 0 !important;
 }
 .old__newstatustitle-wrapper {
-    border-bottom: 1px solid #DFE1E6;
+    border-bottom: 1px solid var(--border);
     top: 0;
 }
 .task__type-wrapper .task__type-width {

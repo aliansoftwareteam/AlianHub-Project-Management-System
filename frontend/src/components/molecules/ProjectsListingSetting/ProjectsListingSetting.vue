@@ -1,39 +1,41 @@
 <template>
-    <div class="projectInfoDiv bg-white" :class="[{'opacity-5 pointer-event-none' : item?.isRestrict === true}]">
-        <div class="projectInfoTopLine d-flex align-items-center justify-content-between font-roboto-sans">
+    <div class="ah-card projectInfoDiv" :class="[{'opacity-5 pointer-event-none' : item?.isRestrict === true}]">
+        <div class="projectInfoTopLine d-flex align-items-center justify-content-between font-ui">
             <div class="d-flex align-items-center project__inToplinetextimg-wrapper">
-                <img :class="[{'cursor-pointer' : activeTab === 0}]" :src="item?.favouriteTasks?.filter((x) => x.userId === userId)?.length ? projectStar : blankStar" @click="!item.isRestrict ? updateFavourite(item) : ''" title="favorite"/>
-                <span class="ProjectFirstLatter light-purple d-flex align-items-center justify-content-center font-weight-400 font-roboto-sans white font-size-13 text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
+                <button type="button" class="pls__star-btn" :class="{ 'is-on': isStarred('project', item?._id), 'pls__star-btn--locked': activeTab !== 0 }" :title="$t('Projects.favourite')" :aria-label="$t('Projects.favourite')" :aria-pressed="isStarred('project', item?._id)" @click="!item.isRestrict ? updateFavourite(item) : ''">
+                    <span class="ah-mask-icon pls__star" :style="maskOf(isStarred('project', item?._id) ? projectStar : blankStar)" aria-hidden="true"></span>
+                </button>
+                <span class="ProjectFirstLatter d-flex align-items-center justify-content-center text-uppercase" v-if="item.projectIcon.type === 'color'" :style="[{'background-color': item.projectIcon.type === 'color' ? item.projectIcon.data : ''}]">{{item.ProjectName ? item.ProjectName.charAt(0) : ''}}</span>
                 <WasabiImage
                     v-else
                     :style="[{'height': '20px','width': '20px','border-radius': '20px','margin-left': '5px'}]"
                     :data="{url: item.projectIcon.data}"
                 />
-                <p class="font-weight-500 dark-gray d-block font-size-14 text-ellipsis"><span>{{item.ProjectCode}}</span> | <span :title="item.ProjectName">{{item.ProjectName}}</span></p>
-                <a v-if="activeTab === 0" class="d-flex font-weight-400 font-size-13 text-decoration-none font-roboto-sans cursor-pointer" href.prevent="#" @click="!item.isRestrict ? redirectProjectList(item) : ''"><img :src="projectGoToLink">{{ $t('Projects.go_to_project') }}</a>
+                <p class="pls__name d-block text-ellipsis"><span>{{item.ProjectCode}}</span> | <span :title="item.ProjectName">{{item.ProjectName}}</span></p>
+                <a v-if="activeTab === 0" class="pls__go d-flex text-decoration-none cursor-pointer" href.prevent="#" @click="!item.isRestrict ? redirectProjectList(item) : ''"><span class="ah-mask-icon pls__go-icon" :style="maskOf(projectGoToLink)" aria-hidden="true"></span>{{ $t('Projects.go_to_project') }}</a>
             </div>
-            <DropDown v-if="checkPermission('settings.settings_project_list') == true && checkPermission('project.project_details') == true && checkPermission('project.project_close') == true" :bodyClass="{'setting__project-dropdown' : true}">
+            <DropDown v-if="checkPermission('settings.settings_project_list') == true && checkPermission('project.project_details') == true && checkPermission('project.project_close') == true" mode="menu" :bodyClass="{'setting__project-dropdown' : true}">
                 <template #button>
-                    <img ref="setting" :src="dots" alt="dots" class="position-re ml-20px setting__dots">
+                    <span class="ah-mask-icon setting__dots" :style="maskOf(dots)" role="img" :aria-label="$t('Projects.project_actions', { name: item.ProjectName })"></span>
                 </template>
                 <template #options>
-                    <DropDownOption v-if="item.deletedStatusKey === 2">
-                        <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project" @click="$refs.setting.click(), !item.isRestrict ? unarchiveProject(item) : ''">
+                    <DropDownOption v-if="item.deletedStatusKey === 2" @click="!item.isRestrict ? unarchiveProject(item) : ''">
+                        <div class="d-flex align-items-center setting__close-project">
                             {{$t('Projects.restore_project')}}
                         </div>
                     </DropDownOption>
-                    <DropDownOption v-if="item.deletedStatusKey === 2">
-                        <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project" @click="$refs.setting.click(), showSidebar=true">
+                    <DropDownOption v-if="item.deletedStatusKey === 2" @click="showSidebar=true">
+                        <div class="d-flex align-items-center setting__close-project">
                             {{$t('Projects.delete_project')}}
                         </div>
                     </DropDownOption>
-                    <DropDownOption v-if="item.statusType !== 'close' && item.deletedStatusKey !== 2" @click="$refs.setting.click(), showSidebar=true">
-                        <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project">
+                    <DropDownOption v-if="item.statusType !== 'close' && item.deletedStatusKey !== 2" @click="showSidebar=true">
+                        <div class="d-flex align-items-center setting__close-project">
                             {{ $t('Projects.close_project') }}
                         </div>
                     </DropDownOption>
-                    <DropDownOption @click="$refs.setting.click(), !item.isRestrict ? colseProject(item,'reopen') : ''" v-if="item.statusType === 'close'">
-                        <div class="d-flex align-items-center font-size-14 GunPowder setting__close-project">
+                    <DropDownOption @click="!item.isRestrict ? colseProject(item,'reopen') : ''" v-if="item.statusType === 'close'">
+                        <div class="d-flex align-items-center setting__close-project">
                             {{ $t('Projects.reopen_project') }}
                         </div>
                     </DropDownOption>
@@ -43,7 +45,7 @@
         <div class="project_status_info_area d-flex">
             <div class="p_owner">
                 <div class="p__owner-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Watcher.owner')}}</span>
+                    <span class="sub-title-span pls__label d-block">{{$t('Watcher.owner')}}</span>
                     <Assignee class="Assignee-component"
                         :users="item.LeadUserId"
                         :options="users.map((x) => x._id)"
@@ -59,20 +61,20 @@
             </div>
             <div class="p_sharewith" :class="[{'pointer-event-none' : isSpinner === true}]">
                 <div class="p__sharewith-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Projects.share_with')}}</span>
+                    <span class="sub-title-span pls__label d-block">{{$t('Projects.share_with')}}</span>
                     <div class="share-with-wrapperdata d-flex align-items-center justify-content-start">
-                        <button class="border-radius-8-px font-size-13 d-flex align-items-center justify-content-center mr-010 font-roboto-sans"  @click="!item.isRestrict ? updateProjectSpace(item,'public') : ''" :class="[{'outline-primary share__everyone' : item.isPrivateSpace === false,'outline-secondary share__private':item.isPrivateSpace !== false,'cursor-pointer': activeTab === 0}]">{{$t('Projects.everyone')}}</button>                    
-                        <button class="border-radius-8-px font-size-13 d-flex align-items-center justify-content-center font-roboto-sans"  @click="!item.isRestrict ? updateProjectSpace(item,'private') : ''" :class="[{'outline-primary share__everyone' : item.isPrivateSpace === true,'outline-secondary share__private':item.isPrivateSpace !== true,'cursor-pointer': activeTab === 0}]">{{$t('Projects.private')}}</button>
+                        <button type="button" class="ah-btn ah-btn--sm pls__share" @click="!item.isRestrict ? updateProjectSpace(item,'public') : ''" :class="{ 'ah-btn--outline': item.isPrivateSpace === false, 'ah-btn--secondary': item.isPrivateSpace !== false, 'pls__share--locked': activeTab !== 0 }">{{$t('Projects.everyone')}}</button>                    
+                        <button type="button" class="ah-btn ah-btn--sm pls__share" @click="!item.isRestrict ? updateProjectSpace(item,'private') : ''" :class="{ 'ah-btn--outline': item.isPrivateSpace === true, 'ah-btn--secondary': item.isPrivateSpace !== true, 'pls__share--locked': activeTab !== 0 }">{{$t('Projects.private')}}</button>
                     </div>
                 </div>
             </div>
             <div class="p_status" v-if="checkPermission('project.project_status_change') != null">
                 <div class="p_status-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Templates.project_status')}}</span>
+                    <span class="sub-title-span pls__label d-block">{{$t('Templates.project_status')}}</span>
                     <ul class="pro_block d-flex align-items-center justify-content-start flex-wrap" @click="!item.isRestrict ? openEditSidebar(item,'projectStatus') : ''">
                         <li class="projectDataColorli" v-for="(statusObj,statusKey) in item.projectStatusData"
                         :key="statusKey">
-                            <span class="font-roboto-sans font-weight-400 font-size-13 white" :class="[{'cursor-pointer' : activeTab === 0}]" :style="[{'color': statusObj.textColor+'!important','background-color': statusObj.backgroundColor}]">
+                            <span class="pls__status ah-status-ink" :class="[{'cursor-pointer' : activeTab === 0}]" :style="statusChipStyle({ textColor: statusObj.textColor, bgColor: statusObj.backgroundColor })">
                                 {{statusObj.name}}
                             </span>
                         </li>
@@ -81,12 +83,12 @@
             </div>
             <div class="task_type_status">
                 <div class="task__type-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Projects.task_type')}}</span>
+                    <span class="sub-title-span pls__label d-block">{{$t('Projects.task_type')}}</span>
                     <ul class="d-flex task_type_statusul" @click="!item.isRestrict ? openEditSidebar(item,'taskType') : ''">
                         <li class="projectDataColorli" v-for="(taskType,taskTypeKey) in item.taskTypeCounts" :key="taskTypeKey">
-                            <div class="task_type d-flex align-items-center border-radius-6-px bg-lightgray" :class="[{'cursor-pointer' : activeTab === 0}]">
+                            <div class="task_type d-flex align-items-center" :class="[{'cursor-pointer' : activeTab === 0}]">
                                 <TaskTypeIcon :taskType="taskType" :style="[{'height':'13.85px','width':'13.85px'}]" />
-                                <span class="font-size-13 font-roboto-sans font-weight-400 GunPowder ml-8px" :class="[{'cursor-pointer' : activeTab === 0}]">{{taskType.name}}</span>
+                                <span class="ml-8px" :class="[{'cursor-pointer' : activeTab === 0}]">{{taskType.name}}</span>
                             </div>
                         </li>
                     </ul>
@@ -94,10 +96,10 @@
             </div>
             <div class="task_type_status_todo" v-if="checkPermission('task.task_status') != null">
                 <div class="task__typestatustodo-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Templates.task_status')}}</span>
+                    <span class="sub-title-span pls__label d-block">{{$t('Templates.task_status')}}</span>
                     <ul class="d-flex task_type_statusul" @click="!item.isRestrict ? openEditSidebar(item,'taskStatus') : ''">
                         <li class="cursor_pointer projectDataColorli" v-for="(statusObj,statusKey) in item.taskStatusData" :key="statusKey">
-                            <span class="font-roboto-sans font-weight-400 font-size-13 bg-black white" :style="[{'background-color': statusObj.bgColor, 'color': statusObj.textColor+'!important'}]" :class="[{'cursor-pointer' : activeTab === 0}]">
+                            <span class="pls__status ah-status-ink" :style="statusChipStyle(statusObj)" :class="[{'cursor-pointer' : activeTab === 0}]">
                                 {{statusObj.name}}
                             </span>
                         </li>
@@ -106,47 +108,35 @@
             </div>
             <div class="p_erpApp">
                 <div class="p__erpApp-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Templates.apps')}}</span>
-                    <ul 
-                        class="pro_block d-flex align-items-center justify-content-start flex-wrap" 
+                    <span class="sub-title-span pls__label d-block">{{$t('Templates.apps')}}</span>
+                    <ProjectAppsList
                         v-if="appref.length > 0"
-                    >
-                        <li 
-                            class="image_apps cursor_pointer projectDataColorli black" 
-                            :class="{ 'cursor-pointer': activeTab === 0 }" 
-                            v-for="(appObj, appKey) in appref" 
-                            :key="appKey"
-                        >
-                            <div class="icon-wrapper">
-                                <img 
-                                    :src="processedApps?.includes(appObj.key) ? appIcons[appObj.key]?.afterIcon : appIcons[appObj.key]?.beforeIcon" 
-                                    @click="!item.isRestrict ? updateApp(item, { key: appObj.key }) : ''" 
-                                    :title="appObj.name || 'N/A'" 
-                                    class="erp_app mr-4px"
-                                />
-                            </div>
-                        </li>
-                    </ul>
+                        class="pls__apps"
+                        :apps="appref"
+                        :modelValue="processedApps"
+                        :disabled="!!item.isRestrict || activeTab === 1 || settingPermission !== true || projectDetailPremission !== true"
+                        @toggle="(key) => updateApp(item, { key })"
+                    />
                     <ul class="d-flex" v-else>
-                        <li class="projectDataColorli black font-size-13">
-                            N/A
+                        <li class="projectDataColorli pls__none">
+                            {{ $t('Apps.none') }}
                         </li>
                     </ul>
                 </div>
             </div>
             <div class="p_requiredViews">
                 <div class="p__requiredViews-wrapper">
-                    <span class="sub-title-span d-block font-roboto-sans font-weight-400 gray81 font-size-13">{{$t('Projects.required_view')}}</span>
+                    <span class="sub-title-span pls__label d-block">{{$t('Projects.required_view')}}</span>
                     <ul class="d-flex flex-wrap" v-if="requireComp && requireComp.length > 0" >
                         <li class="pro_block cursor_pointer projectDataColorli" :class="[{'cursor-pointer' : activeTab === 0}]" v-for="(requireObj,requireKey) in requireComp" :key="requireKey">
-                            <img v-if="item.ProjectRequiredComponent?.filter((x) => x.keyName === requireObj.keyName).length > 0" :src="projectComponentsIcons(requireObj.keyName).activeIcon"
-                            @click="!item.isRestrict ? (item.ProjectRequiredComponent.length > 1 ? updateTabs(item,requireObj,'unRead'):null) : ''" :title="requireObj.name ? requireObj.name :'N/A'" class="erp_app def_req mr-10px">
-                            <img v-else :src="projectComponentsIcons(requireObj.keyName).icon" @click="!item.isRestrict ? updateTabs(item,requireObj,'read') : ''" :title="'45'+requireObj.name ? requireObj.name :'N/A'" class="erp_app tab_req mr-10px">
+                            <span v-if="item.ProjectRequiredComponent?.filter((x) => x.keyName === requireObj.keyName).length > 0" class="ah-mask-icon erp_app def_req is-on mr-10px" :style="maskOf(projectComponentsIcons(requireObj.keyName).activeIcon)" role="img"
+                            @click="!item.isRestrict ? (item.ProjectRequiredComponent.length > 1 ? updateTabs(item,requireObj,'unRead'):null) : ''" :title="requireObj.name || $t('Projects.not_available')" :aria-label="requireObj.name || $t('Projects.not_available')"></span>
+                            <span v-else class="ah-mask-icon erp_app tab_req mr-10px" :style="maskOf(projectComponentsIcons(requireObj.keyName).icon)" role="img" @click="!item.isRestrict ? updateTabs(item,requireObj,'read') : ''" :title="requireObj.name || $t('Projects.not_available')" :aria-label="requireObj.name || $t('Projects.not_available')"></span>
                         </li>
                     </ul>
                     <ul class="d-flex" v-else>
-                        <li class="projectDataColorli font-size-13">
-                            N/A
+                        <li class="projectDataColorli pls__none">
+                            {{ $t('Projects.not_available') }}
                         </li>
                     </ul>
                 </div>
@@ -169,6 +159,7 @@
 import { defineProps, inject, computed, ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useProjects } from '@/composable/projects';
+import { useFavourites } from '@/composable/favourites';
 import Assignee from "@/components/molecules/Assignee/Assignee.vue";
 import ProjectSettingSidebar from '@/components/atom/ProjectSettingSidebar/ProjectSettingSidebar.vue'
 import { useStore } from 'vuex';
@@ -176,16 +167,17 @@ import { useToast } from 'vue-toast-notification';
 import DropDown from '@/components/molecules/DropDown/DropDown.vue'
 import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption.vue'
 const companyId = inject('$companyId');
-const userId = inject("$userId");
-import { useCustomComposable, useGetterFunctions } from "@/composable";
+import { useCustomComposable } from "@/composable";
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
 import TaskTypeIcon from "@/components/atom/TaskTypeIcon/TaskTypeIcon.vue";
-import { projectComponentsIcons, projectAppsIcons } from '@/composable/commonFunction';
+import { projectComponentsIcons } from '@/composable/commonFunction';
+import { statusChipStyle } from '@/utils/statusChipColors';
+import { maskOf } from '@/utils/iconMask';
+import ProjectAppsList from "@/components/molecules/ProjectAppsList/ProjectAppsList.vue";
 import { apiRequest } from "@/services";
 import * as env from '@/config/env';
 import ConfirmationSidebar from "@/components/molecules/ConfirmationSidebar/ConfirmationSidebar.vue"
 import { useI18n } from "vue-i18n";
-import { closeProject } from "@/utils/NotificationTemplate";
 const { t } = useI18n();
 
 const props = defineProps({
@@ -197,10 +189,9 @@ const props = defineProps({
         type: Number
     }
 });
-const {markFavourite} = useProjects();
+const { isFavourite: isStarred, toggleFavourite } = useFavourites();
 const {getters,commit} = useStore();
-const {checkPermission,sanitizeInput} = useCustomComposable();
-const {getUser} = useGetterFunctions();
+const {checkPermission} = useCustomComposable();
 const router = useRouter();
 const $toast = useToast();
 const projectGoToLink = require("@/assets/images/svg/projectGoToLink.svg");
@@ -213,12 +204,6 @@ const isSpinner = ref(false);
 const showSidebar = ref(false);
 
 const users = computed(() => getters["users/users"]);
-const user = getUser(userId.value);
-const userData = {
-    id: user.id,
-    Employee_Name: user.Employee_Name,
-    companyOwnerId: user.companyOwnerId
-}
 const requireComp = computed(() => {
     let arr = getters['settings/projectTabComponents'];
     const removeArr = ["gantt", "timeline","embed"];
@@ -250,22 +235,7 @@ function updateFavourite(projectData) {
     if(props.activeTab === 1){
         return;
     }
-    if(!projectData.favouriteTasks || !projectData.favouriteTasks.find((x) => x.userId === userId.value)) {
-        markFavourite({
-            cid: companyId.value,
-            projectId: projectData._id,
-            userId: userId.value
-        })
-        commit('projectData/projectLocalUpdate', {itemData:projectData,key:'MarkAsFavourite',subKey:"add",userId: userId.value});
-    } else {
-        markFavourite({
-            cid: companyId.value,
-            projectId: projectData._id,
-            userId: userId.value,
-            data: projectData.favouriteTasks.find((x) => x.userId === userId.value)
-        })
-        commit('projectData/projectLocalUpdate', {itemData:projectData,key:'MarkAsFavourite',subKey:"remove",userId: userId.value});
-    }
+    toggleFavourite({ type: 'project', id: String(projectData._id), name: projectData.ProjectName || '' });
 }
 const changeAssignee = async (type, user,projectData) => {
     try {
@@ -369,29 +339,14 @@ async function updateApp (item,appObj) {
 }
 
 const appref = ref([]);
-const appIcons = ref({});
 const data = async () => {
     const response = await apiRequest("get", env.PROJECTS_APPS);
-    appref.value = response.data;
-
-    const icons = {};
-    for (const app of appref.value) {
-        icons[app.key] = await getAppIcon(app.key);
-    }
-    appIcons.value = icons;
+    appref.value = response.data?.data || [];
 };
 
 onMounted(()=>{
     data();
 })
-const getAppIcon = async(appKey) => {
-    const icons = projectAppsIcons(appKey) || {};
-    
-    return {
-        beforeIcon: icons.beforeIcon || "default-icon.png", 
-        afterIcon: icons.afterIcon || "default-icon.png"
-    };
-};
 
 const getAppKeys = (apps) => {
     if (!Array.isArray(apps)) return [];
@@ -484,41 +439,8 @@ async function colseProject (project,type) {
         commit('projectData/projectLocalUpdate', {itemData:  {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
         if(type === 'reopen') {
             restoreChildTasks(project._id);
-            let historyObj = {
-                key : "Project_EndDate",
-                message : `<b>${userData.Employee_Name}</b> has reopened <b>${sanitizeInput(project.ProjectName)}</b> Project</b>.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": project._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
         } else {
             restoreChildTasks(project._id, 8);
-        }
-        if(type === 'close'){
-            let notifyObj = {
-                'ProjectName' : project?.ProjectName ||' ',
-                'userName' : userData?.Employee_Name || ''
-            }
-            let notificationObject = {
-                message: closeProject(notifyObj),
-                key: "project_close",
-            };
-            
-            apiRequest("post", env.HANDLE_NOTIFICATION, {
-                type: 'project',
-                companyId: companyId.value,
-                projectId: project?._id,
-                object: notificationObject,
-                userData: userData
-            })
-            .catch((error) => {
-                console.error("ERROR in update notification", error);
-            })
         }
         $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
         showSidebar.value = false;
@@ -538,19 +460,6 @@ async function deleteProject(project, deletedStatusKey) {
         commit('projectData/projectLocalUpdate', {itemData:  {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
         deleteChildTasks(project);
         commit('projectData/mutateProjects', [{ op: "modified", data: { ...project, ...updateObject } }]);
-        let historyObj = {
-            key: "Project_EndDate",
-            message: `<b>${userData.Employee_Name}</b> has deleted <b>${sanitizeInput(project.ProjectName)}</b> project</b>.`
-        }
-        apiRequest("post", env.HANDLE_HISTORY, {
-            "type": 'project',
-            "companyId": companyId.value,
-            "projectId": project._id,
-            "taskId": null,
-            "object": historyObj,
-            "userData": userData
-        })
-
         $toast.success(t('Toast.Deleted_successfully'), { position: 'top-right' });
     } catch (error) {
         console.error(error);
@@ -575,18 +484,6 @@ async function unarchiveProject(project) {
         await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${project._id}`,{updateObject: updateObject});
         commit('projectData/projectLocalUpdate', {itemData:  {...project,...updateObject},projectId:project._id,key:'RemoveProject',subKey: '',userId: ''});
         restoreChildTasks(project._id, 7);
-        let historyObj = {
-            key : "Project_EndDate",
-            message : `<b>${userData.Employee_Name}</b> has unarchived <b>${sanitizeInput(project.ProjectName)}</b> project</b>.`
-        }
-        apiRequest("post", env.HANDLE_HISTORY, {
-            "type": 'project',
-            "companyId": companyId.value,
-            "projectId": project._id,
-            "taskId": null,
-            "object": historyObj,
-            "userData": userData
-        })
         $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
     } catch (error) {
         console.error("ERROR in unarchive project: ", error);
@@ -609,45 +506,15 @@ async function restoreChildTasks(projectId, restoreKey = 8) {
 
 async function updateProjectType (projectObj,isPrivate) {
     try {
-        let queryObj;
-        if(isPrivate === true){
-            queryObj = {'projectCount.privateCount':1, 'projectCount.publicCount':-1};
-        }else{
-            queryObj = {'projectCount.publicCount':1, 'projectCount.privateCount':-1};
-        }
-        await apiRequest("put",`${env.COMPANYACTIONS}`,{updateObject: queryObj,key: '$inc'});
         let type = isPrivate === true ? 'private' : 'public';
         if(checkSpecificTypeCount(type) === true){
-            let queryObj = {
-                isPrivateSpace: isPrivate
-            };
-            await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${projectObj._id}`,{updateObject: queryObj})
+            await apiRequest("put",`/api/v1/${env.PROJECTACTIONS}/${projectObj._id}`,{updateObject: {isPrivateSpace: isPrivate}})
             $toast.success(t('Toast.Updated_successfully'),{position: 'top-right'});
-            let historyObj = {
-                key : "Project_EndDate",
-                message : `<b>${userData.Employee_Name}</b> has changed <b>Share with option</b> as <b>${type}</b></b>.`
-            }
-            apiRequest("post", env.HANDLE_HISTORY, {
-                "type": 'project',
-                "companyId": companyId.value,
-                "projectId": projectObj._id,
-                "taskId": null,
-                "object": historyObj,
-                "userData": userData
-            })
             commit('projectData/projectLocalUpdate', {itemData:{...projectObj,isPrivateSpace: isPrivate},projectId:projectObj._id,key:'ProjectTypeChange',subKey:"",userId: ''});
         }
-        //If you don't have plans to update private or public projects, that time count is decresed
         else{
             isSpinner.value = false;
             $toast.error(t('Toast.Upgrade_Your_Plan'),{position: 'top-right'})
-            let queryObj;
-            if(isPrivate === true){
-                queryObj = {'projectCount.privateCount':-1, 'projectCount.publicCount':1};
-            }else{
-                queryObj = {'projectCount.publicCount':-1, 'projectCount.privateCount':1};
-            }
-            await apiRequest("put",`${env.COMPANYACTIONS}`,{updateObject: queryObj,key: '$inc'});
             commit('projectData/projectLocalUpdate', {itemData:{...projectObj,isPrivateSpace: isPrivate},projectId:projectObj._id,key:'ProjectTypeChange',subKey:"",userId: ''});
         }
     } catch (error) {

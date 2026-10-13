@@ -45,6 +45,7 @@ import * as env from '@/config/env';
 import { teamIdToUserId, buildFilterQuery } from '@/composable/commonFunction';
 import { resolveCardRange, bucketForStatus } from '@/composable/useResourceWorkload';
 import CardSkeleton from '@/components/atom/CardSkeleton/CardSkeleton.vue';
+import { ROLE_GUEST } from "@/utils/roles";
 
 // Resource Utilization card #11 — "Table of worked tasks, date-range wise".
 // Reuses employee-workload for the selected range; splits each user×project's
@@ -91,7 +92,7 @@ const load = async () => {
             dateTo,
             currentOnly: false,
             callerUserId: userId && userId.value ? String(userId.value) : '',
-            callerRoleType: props.companyUserDetail?.roleType || 3,
+            callerRoleType: props.companyUserDetail?.roleType ?? ROLE_GUEST,
             // Advanced "Add filter" builder → task-field match (buildFilterQuery).
             taskMatch: (() => {
                 const fd = Array.isArray(props.filterData) ? props.filterData : Object.values(props.filterData || {});
@@ -142,12 +143,12 @@ onMounted(load);
 
 <style scoped>
 .wtt { height: 100%; width: 100%; padding: 8px 10px; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
-.wtt-msg { color: #9aa0b4; font-size: 12px; padding: 10px 0; }
+.wtt-msg { color: var(--ink-2); font-size: 12px; padding: 10px 0; }
 .wtt-table-wrap { overflow: auto; }
 .wtt-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
-.wtt-table th { text-align: left; color: #6b7280; font-weight: 600; padding: 4px 6px; border-bottom: 1px solid #eef0f6; position: sticky; top: 0; background: #fff; }
+.wtt-table th { text-align: left; color: var(--ink-2); font-weight: 600; padding: 4px 6px; border-bottom: 1px solid var(--hairline); position: sticky; top: 0; background: var(--surface); }
 .wtt-table th.wtt-num { text-align: right; }
-.wtt-table td { padding: 5px 6px; border-bottom: 1px solid #f4f5f9; color: #3a3f52; }
+.wtt-table td { padding: 5px 6px; border-bottom: 1px solid var(--hairline); color: var(--ink-label); }
 .wtt-num { text-align: right; }
 .wtt-user { font-weight: 600; }
 .wtt-proj { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }

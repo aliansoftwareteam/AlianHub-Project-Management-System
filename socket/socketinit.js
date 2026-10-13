@@ -6,11 +6,25 @@ const {companiesSocketHandler} = require('./controller/companiesSocket');
 const {userNotificationCountHandler} = require('./controller/userNotificationCount');
 const {generalReminderSocketHandler} = require('./controller/generalReminderSocket');
 const {callSocketHandler} = require('./controller/callSocket');
+require('./controller/agentSessionSocket').registerWhenOn();
+require('./controller/viewTemplateSocket');
+require('./controller/goalSocket');
+require('./controller/dispatcherSocket');
+require('./controller/pageShareSocket');
+require('./controller/whiteboardSocket');
+require('./controller/projectTemplateSocket');
+require('./controller/agentSocket');
+require('./controller/listSocket');
+require('./controller/projectSocket');
+require('./controller/customFieldSocket');
 const { instrument } = require('@socket.io/admin-ui');
 const jwt = require('jsonwebtoken');
+const { handshakeToken } = require('../Config/cookies');
+const { resolveAccessSession } = require('../Config/jwt');
 const logger = require('../Config/loggerConfig');
 const { corsOriginDelegate } = require('../utils/cors.js');
 const { removeRoom, removeBySocket } = require('./helper');
+const { identityOf } = require('./roomAccess');
 exports.changeStreams = [];
 const EventEmitter = require('events');
 exports.emitter = new EventEmitter();
@@ -49,6 +63,29 @@ exports.getAdminUiConfig = (env = process.env) => {
     };
 };
 
+/**
+ * The session behind a socket's access token.
+ *
+ * A socket used to be judged on the token signature alone, so a tab that had logged out —
+ * or whose token had since expired — kept receiving every event it was subscribed to. The
+ * session is resolved through the same `resolveAccessSession` the HTTP middleware uses, so
+ * a logout that deletes the session row and drops its cache entry ends the socket too.
+ *
+ * Cost: a cache hit for the life of the cached session (10 minutes, the HTTP TTL), one
+ * Mongo read after that — not a read per event. Logging out deletes the cache entry, so
+ * the very next event from that socket reaches Mongo, finds nothing and closes it.
+ */
+const sessionOf = async (payload) => {
+    if (!payload) return { ok: false };
+    if (Number.isFinite(payload.exp) && payload.exp * 1000 <= Date.now()) return { ok: false };
+    try {
+        return await resolveAccessSession(payload);
+    } catch (error) {
+        logger.error(`Socket session lookup error ${error.message || error}`);
+        return { ok: false };
+    }
+};
+
 exports.initSocket = (server) => {
 
     let io = new Server(server, {
@@ -63,18 +100,28 @@ exports.initSocket = (server) => {
         },
     });
     const userNamespace = io.of(/^\/userid_\w+$/);
-    userNamespace.use((socket, next) => {
-        const token = socket.handshake.auth.token;
+    userNamespace.use(async (socket, next) => {
+        const token = handshakeToken(socket.handshake);
         if (!token) {
             return next(new Error('Authentication error: Token not provided'));
         }
-        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-            if (err) {
-                return next(new Error('Authentication error: Invalid token'));
-            }
-            socket.user = decoded;
-            next();
-        });
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (error) {
+            return next(new Error('Authentication error: Invalid token'));
+        }
+        const session = await sessionOf(decoded);
+        if (!session.ok) {
+            return next(new Error('Authentication error: Session has ended'));
+        }
+        const identity = identityOf(socket.nsp.name, decoded);
+        if (!identity) {
+            return next(new Error('Authentication error: Namespace does not match the token'));
+        }
+        socket.user = decoded;
+        socket.identity = identity;
+        next();
     });
     const adminUiConfig = exports.getAdminUiConfig();
     if (adminUiConfig) {
@@ -89,6 +136,19 @@ exports.initSocket = (server) => {
         socket.customData = {userRole};
         const namespace = socket.nsp;
 
+        // A handshake only proves the session was live when the socket opened. Every event
+        // re-checks it, so a socket whose session has since ended is closed on its next one.
+        socket.use((_event, next) => {
+            sessionOf(socket.user).then((session) => {
+                if (session.ok) {
+                    next();
+                    return;
+                }
+                next(new Error('Session has ended'));
+                socket.disconnect(true);
+            });
+        });
+
         // SOCKET-PERFORMANCE-PLAN #4 (Phase 1) + #1 (Phase 2): auto-purge
         // every entry for this socket from the room index when the socket
         // disconnects. `removeBySocket` uses the bySocket reverse index
@@ -98,30 +158,18 @@ exports.initSocket = (server) => {
             removeBySocket(socket);
         });
 
-        // SOCKET-PERFORMANCE-PLAN #1 (Phase 2): explicit client-driven
-        // namespace disconnect. Behaviourally identical to the original
-        // recursive `countFunction` — for every room in this adapter whose
-        // name encodes the target socket id, remove the index entry. Then
-        // forcibly close the target socket. The recursion in the previous
-        // version was synchronous busy-work; a plain forEach over
-        // `adapter.rooms` is equivalent and easier to follow.
         socket.on('disconnectNameSpace', (id) => {
-            socket.adapter.rooms.forEach((_, roomName) => {
-                if (roomName.includes(id)) {
-                    removeRoom(roomName);
-                }
-            });
-            namespace.sockets.get(id)?.disconnect(true);
+            if (id !== socket.id) return;
+            socket.rooms.forEach((roomName) => removeRoom(roomName));
+            socket.disconnect(true);
         });
 
         socket.on('getRoomList', (socketId, callback) => {
-            let roomsArray = [];
-            socket.adapter.rooms.forEach((_, roomName) => {
-                if (roomName.includes("**") && roomName.includes(socketId)) {
-                    roomsArray.push(roomName)
-                }
-            })
-            callback(roomsArray);
+            if (typeof callback !== 'function') return;
+            const rooms = socketId === socket.id
+                ? [...socket.rooms].filter((roomName) => roomName.includes('**'))
+                : [];
+            callback(rooms);
         });
         taskSocketHandler({socket, namespace});
         chatSocketHandler({socket, namespace});

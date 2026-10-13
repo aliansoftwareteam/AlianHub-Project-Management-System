@@ -2,117 +2,137 @@ const { default: mongoose } = require("mongoose");
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
 const { replaceObjectKey, relapceUndefinedvals } = require("../../Auth/helper");
+const { tenantOf, TenantError } = require("../../../Config/tenant");
+const { removeCache } = require("../../../utils/commonFunctions.js");
+const socketEmitter = require("../../../event/socketEventEmitter");
+const logger = require("../../../Config/loggerConfig");
+const { QueryRefused, validatePipeline, visibilityStage, withExtraListRows, withScopedJoins } = require("./taskQueryGuard");
+const { WriteRefused, parseCascade, assertCanCascade, cascadeFilter } = require("./taskWriteGuard");
+const { canReadTask } = require("./taskReadAccess");
+const { extraListsOf, listsForViewer, opensList } = require("./taskExtraLists");
+const { withLinkConditions } = require("../../CustomField/helpers/fieldLinks");
 
-exports.getTaskByQyery = async(req,res) => {
+const refuse = (res, statusCode, statusText, message, extra = {}) => res.status(statusCode).json({ status: false, statusText, message, ...extra });
+
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+
+exports.getTaskByQyery = async (req, res) => {
     try {
-        const companyId = req.headers["companyid"];
-        const { findQuery, replaceUndefined=false } = req.body;
-
+        const companyId = tenantOf(req);
+        const { findQuery, replaceUndefined = false, inList } = req.body || {};
         if (!findQuery) {
-            return res.status(400).json({
-                message: "An error occurred while getting the task.",
-                error: "Query is required."
-            });
+            return refuse(res, 400, "Query is required.", "An error occurred while getting the task.");
         }
-        let query;
-        if(replaceUndefined) {
-            let modeQuery =  relapceUndefinedvals(findQuery);
-            query = replaceObjectKey(modeQuery, ["objId","dbDate"]);
-        } else {
-            query = replaceObjectKey(findQuery, ["objId","dbDate"]);
-        }
-        const taskQuery = [query];
-        const taskObj = {
-            type: SCHEMA_TYPE.TASKS,
-            data: [taskQuery]
-        };
-        const response = await MongoDbCrudOpration(companyId, taskObj, 'aggregate');
+        if (inList !== undefined && !(typeof inList === "string" && OBJECT_ID.test(inList))) throw new QueryRefused("inList", "it must be a list id");
 
+        const stages = validatePipeline(findQuery);
+        const converted = await withLinkConditions(companyId, req.uid, replaceObjectKey(replaceUndefined ? relapceUndefinedvals(stages) : stages, ["objId", "dbDate"]));
+        const rows = inList && await opensList(companyId, req.uid, inList) ? withExtraListRows(converted, inList) : converted;
+        const scope = await visibilityStage(companyId, req.uid);
+        const joined = await withScopedJoins(companyId, req.uid, rows);
+        const pipeline = scope ? [scope, ...joined] : joined;
+
+        const response = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [pipeline] }, "aggregate");
         return res.status(200).json(response);
     } catch (error) {
-        return res.status(500).json({
-            message: "An error occurred while getting the task.",
-            error: error.message || error
-        });
+        if (error instanceof QueryRefused) {
+            return refuse(res, 400, "Query refused", error.message, { stage: error.stage });
+        }
+        if (error instanceof TenantError) {
+            return refuse(res, error.statusCode, "Forbidden", error.message);
+        }
+        logger.error(`getTaskByQyery error: ${error.message || error}`);
+        return refuse(res, 500, "An error occurred while getting the task.", error.message || String(error));
     }
-}
+};
 
-exports.getTask = async(req,res) => {
+// A task the caller may not see answers exactly like one that does not exist, so the
+// response never confirms that a task id is real.
+const taskNotFound = (res) => refuse(res, 404, "Task not found.", "Task not found.");
+
+const readableTask = async (companyId, uid, id) => {
+    const task = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ _id: new mongoose.Types.ObjectId(id) }] }, "findOne");
+    return task && await canReadTask(companyId, uid, task) ? task : null;
+};
+
+exports.getTask = async (req, res) => {
     try {
-        const companyId = req.headers["companyid"];
-        const { id } = req.params;
-        if (!companyId || !id) {
-            return res.status(400).json({
-                message: "An error occurred while getting the task.",
-                error: "Company ID and Task ID is required."
-            });
+        const companyId = String(req.headers["companyid"] || "");
+        const id = String(req.params.id || "");
+        if (!companyId || !OBJECT_ID.test(id)) {
+            return refuse(res, 400, "A valid task id is required.", "An error occurred while getting the task.");
         }
 
-        const query = {
-            type: SCHEMA_TYPE.TASKS,
-            data: [
-                {
-                    _id: new mongoose.Types.ObjectId(id)
-                }
-            ]
-        };
-
-        const response = await MongoDbCrudOpration(companyId, query, "findOne");
-        return res.status(200).json(response);
+        const task = await readableTask(companyId, req.uid, id);
+        if (!task) return taskNotFound(res);
+        if (!extraListsOf(task).length) return res.status(200).json(task);
+        const stored = typeof task.toJSON === "function" ? task.toJSON() : task;
+        return res.status(200).json({ ...stored, extraLists: await listsForViewer(companyId, req.uid, task) });
     } catch (error) {
-        console.error("Error getting task:", error);
-        return res.status(500).json({
-            message: "An error occurred while getting the task.",
-            error: error.message || error
-        });
+        logger.error(`getTask error: ${error.message || error}`);
+        return refuse(res, 500, "An error occurred while getting the task.", "An error occurred while getting the task.");
     }
-}
+};
+
+exports.getTaskLists = async (req, res) => {
+    try {
+        const companyId = tenantOf(req);
+        const id = String(req.params.id || "");
+        if (!OBJECT_ID.test(id)) {
+            return refuse(res, 400, "A valid task id is required.", "An error occurred while getting the task.");
+        }
+        const task = await readableTask(companyId, req.uid, id);
+        if (!task) return taskNotFound(res);
+        return res.status(200).json({ status: true, statusText: "Task lists.", data: { taskId: id.toLowerCase(), extraLists: await listsForViewer(companyId, req.uid, task) } });
+    } catch (error) {
+        if (error instanceof TenantError) {
+            return refuse(res, error.statusCode, "Forbidden", error.message);
+        }
+        logger.error(`getTaskLists error: ${error.message || error}`);
+        return refuse(res, 500, "An error occurred while getting the task.", "An error occurred while getting the task.");
+    }
+};
+
+const ALLOWED_BODY_KEYS = ["firstParameter", "secondParameter", "key", "isConvertFirstParameter", "isConvertSecondParameter", "refreshToken"];
+const SOCKET_FIELDS = { _id: 1, ProjectID: 1, sprintId: 1, ParentTaskId: 1, AssigneeUserId: 1 };
 
 exports.updateTask = async (req, res) => {
     try {
-        const companyId = req.headers["companyid"];
-        const { firstParameter, secondParameter, key, isConvertFirstParameter, isConvertSecondParameter } = req.body;
+        const companyId = tenantOf(req);
+        const body = req.body || {};
 
-        if (!companyId) {
-            return res.status(400).json({
-                message: "An error occurred while updating the task.",
-                error: "Company ID is required."
-            });
-        }
-
-        const requiredFields = { firstParameter,secondParameter,key };
-        const missingField = Object.keys(requiredFields).find(key => !requiredFields[key]);
+        const missingField = ["firstParameter", "secondParameter", "key"].find((field) => !body[field]);
         if (missingField) {
-            return res.status(400).json({ message: `${missingField} is required.` });
+            return refuse(res, 400, `${missingField} is required.`, "An error occurred while updating the task.");
         }
-
-        const allowedKeys = ["firstParameter","secondParameter","key","isConvertFirstParameter","isConvertSecondParameter","refreshToken"];
-        const invalidKeys = Object.keys(req.body).filter(key => !allowedKeys.includes(key));
+        const invalidKeys = Object.keys(body).filter((key) => !ALLOWED_BODY_KEYS.includes(key));
         if (invalidKeys.length > 0) {
-            return res.status(400).json({
-                message: "Invalid keys provided in the request.",
-                error: `Invalid keys: ${invalidKeys.join(", ")}. Allowed keys: ${allowedKeys.join(", ")}.`
-            });
+            return refuse(res, 400, "Invalid keys provided in the request.", `Invalid keys: ${invalidKeys.join(", ")}.`);
         }
 
-        const convertParameter = (param, shouldConvert) => shouldConvert ? replaceObjectKey(param, "objId") : param;
-        const convertedFirstParameter = convertParameter(firstParameter, isConvertFirstParameter);
-        const convertedSecondParameter = convertParameter(secondParameter, isConvertSecondParameter);
+        const cascade = parseCascade(body);
+        await assertCanCascade(companyId, req.uid, cascade);
 
-        // Query Data
-        const query = {
-            type: SCHEMA_TYPE.TASKS,
-            data: [convertedFirstParameter, convertedSecondParameter]
-        };
+        const filter = cascadeFilter(cascade);
+        const tasks = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [filter, SOCKET_FIELDS] }, "find");
+        const ids = (tasks || []).map((task) => task._id);
+        const result = ids.length
+            ? await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [{ ...filter, _id: { $in: ids } }, { $set: { deletedStatusKey: cascade.to } }] }, "updateMany")
+            : { acknowledged: true, matchedCount: 0, modifiedCount: 0 };
 
-        const response = await MongoDbCrudOpration(companyId, query, key);
-
-        return res.status(200).json(response);
-    } catch (error) {
-        console.error("Error updating task:", error);
-        return res.status(500).json({
-            message: "An error occurred while updating the task.",
-            error: error.message || error
+        const updatedFields = { deletedStatusKey: cascade.to };
+        (tasks || []).forEach((task) => {
+            const plain = typeof task.toObject === "function" ? task.toObject() : task;
+            socketEmitter.emit("update", { type: "update", data: { ...plain, ...updatedFields }, updatedFields, module: "task", companyId });
         });
+        removeCache("UserProjectData:", true);
+
+        return res.status(200).json({ status: true, statusText: "Tasks updated successfully.", data: result });
+    } catch (error) {
+        if (error instanceof WriteRefused || error instanceof TenantError) {
+            return refuse(res, error.statusCode, "Forbidden", error.message);
+        }
+        logger.error(`updateTask error: ${error.message || error}`);
+        return refuse(res, 500, "An error occurred while updating the task.", error.message || String(error));
     }
 };

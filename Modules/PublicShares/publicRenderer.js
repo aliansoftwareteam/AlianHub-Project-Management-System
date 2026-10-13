@@ -3,8 +3,10 @@ const { MongoDbCrudOpration } = require("../../utils/mongo-handler/mongoQueries"
 const mongoose = require("mongoose");
 const logger = require("../../Config/loggerConfig");
 const { isShareToken, validateIntakeSubmission, escapeHtml, sanitizeDocHtml } = require('./helpers/shareRules');
+const { shareIsLive } = require('./helpers/shareAccess');
 const reportRules = require('../CustomReports/helpers/reportRules'); // REP-09 — share saved reports
-const bcrypt = require('bcrypt');
+const customReports = require('../CustomReports/controller');
+const { hashPassword, isCurrentPasswordHash, verifyPassword } = require('../Auth/helpers/passwordHash');
 const crypto = require('crypto');
 
 // Unauthenticated public pages, server-rendered as plain HTML so the public
@@ -15,20 +17,20 @@ const PAGE_STYLE = `
     body{font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f6fa;color:#222;margin:0;padding:24px}
     .wrap{max-width:880px;margin:0 auto}
     h1{font-size:22px;margin:0 0 4px}
-    .muted{color:#777;font-size:13px;margin-bottom:20px}
+    .muted{color:#666;font-size:13px;margin-bottom:20px}
     .group{background:#fff;border:1px solid #e6e6e6;border-radius:10px;margin-bottom:14px;overflow:hidden}
     .group h2{font-size:14px;margin:0;padding:10px 14px;background:#fafafa;border-bottom:1px solid #eee}
     .task{display:flex;justify-content:space-between;gap:12px;padding:9px 14px;border-bottom:1px solid #f2f2f2;font-size:14px}
     .task:last-child{border-bottom:none}
-    .key{color:#7b68ee;font-weight:600;white-space:nowrap}
+    .key{color:#5b4ccc;font-weight:600;white-space:nowrap}
     .name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .pill{background:#f0f0f0;border-radius:10px;padding:1px 9px;font-size:12px;color:#666;white-space:nowrap}
     form{background:#fff;border:1px solid #e6e6e6;border-radius:10px;padding:16px;margin-top:22px}
     form h2{font-size:15px;margin:0 0 10px}
     label{display:block;font-size:12px;color:#666;margin:10px 0 3px}
     input,textarea{width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:14px;font-family:inherit}
-    button{margin-top:14px;background:#7b68ee;border:none;color:#fff;border-radius:6px;padding:9px 18px;font-size:14px;cursor:pointer}
-    .footer{margin-top:26px;text-align:center;color:#aaa;font-size:12px}
+    button{margin-top:14px;background:#5b4ccc;border:none;color:#fff;border-radius:6px;padding:9px 18px;font-size:14px;cursor:pointer}
+    .footer{margin-top:26px;text-align:center;color:#5f6573;font-size:12px}
     /* ── Docs share ────────────────────────────────────────────────────────
        Full-bleed: a breadcrumb bar across the top, the page tree down the left,
        the document on a white sheet to the right. */
@@ -49,7 +51,8 @@ const PAGE_STYLE = `
     .pg-live{display:flex;flex-direction:column;flex:1;min-height:0}
     .pg-live.is-loading{opacity:.55}
     .dk__bar{display:flex;align-items:center;gap:6px;flex:0 0 46px;height:46px;padding:0 16px;border-bottom:1px solid #eef0f3;font-size:13px;background:#fff;overflow:hidden;white-space:nowrap}
-    .crumb{display:inline-flex;align-items:center;gap:5px;color:#6b7280;text-decoration:none;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+    .crumb{display:inline-block;color:#6b7280;text-decoration:none;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .crumb .ic{margin-right:5px}
     a.crumb:hover{color:#111}
     .crumb.is-last{color:#111;font-weight:600}
     .crumb-sep{color:#c9ccd6}
@@ -58,7 +61,7 @@ const PAGE_STYLE = `
        flex child refuses to shrink past its content and the window scrolls instead. */
     .dk{display:flex;align-items:stretch;flex:1;min-height:0;background:#fff}
     .dk__side{flex:0 0 320px;min-height:0;overflow-y:auto;background:#fff;border-right:1px solid #eef0f3;padding:14px 8px 20px}
-    .dk__side-label{font-size:12px;color:#8b90a0;padding:2px 10px 8px}
+    .dk__side-label{font-size:12px;color:#646a78;padding:2px 10px 8px}
     .dk__tree{display:flex;flex-direction:column}
     /* The row is the highlight and the hit area; the link fills what is left of
        it so the caret beside it stays independently clickable. */
@@ -81,7 +84,7 @@ const PAGE_STYLE = `
        both stack their own min-height plus padding made a short doc scroll. */
     .dk__doc-col{width:100%;max-width:760px;padding:40px 0 64px}
     .dk__title{font-size:34px;font-weight:700;letter-spacing:-.4px;margin:0 0 12px;line-height:1.2}
-    .dk__meta{display:flex;align-items:center;gap:8px;font-size:13px;color:#9aa0b0;margin-bottom:26px}
+    .dk__meta{display:flex;align-items:center;gap:8px;font-size:13px;color:#646a78;margin-bottom:26px}
     .dk__author{color:#4b5162}
     .dk__dot{color:#c9ccd6}
     .dk__avatar{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#7b68ee;color:#fff;font-size:10px;font-weight:700;flex:0 0 20px}
@@ -89,7 +92,7 @@ const PAGE_STYLE = `
     .dk__doc-col .doc{border:none;border-radius:0;padding:0;background:transparent;font-size:15px;line-height:1.75}
     .dk__subs{margin-top:40px}
     .dk__subs table{width:100%;border-collapse:collapse}
-    .dk__subs th{text-align:left;font-size:12.5px;font-weight:500;color:#9aa0b0;padding:0 0 8px;border-bottom:1px solid #eef0f3}
+    .dk__subs th{text-align:left;font-size:12.5px;font-weight:500;color:#646a78;padding:0 0 8px;border-bottom:1px solid #eef0f3}
     .dk__subs td{padding:12px 0;border-bottom:1px solid #f2f3f6;font-size:14px}
     .dk__owner-col{width:90px;text-align:left}
     .dk__sub-link{display:inline-flex;align-items:center;gap:10px;color:#111;font-weight:600;text-decoration:none}
@@ -131,7 +134,7 @@ const PAGE_STYLE = `
     .doc iframe.ql-video.ql-align-center{margin-left:auto;margin-right:auto}
     .doc iframe.ql-video.ql-align-right{margin-left:auto}
     .doc a{color:#5b4ccc}
-    .doc table{border-collapse:collapse}
+    .doc table{border-collapse:collapse;display:block;max-width:100%;overflow-x:auto}
     .doc td,.doc th{border:1px solid #e6e6e6;padding:6px 10px}
     /* The editor stores alignment and indent as classes, so the public page has to
        understand them too or every centred heading silently goes left. */
@@ -289,19 +292,36 @@ async function resolveShare(token) {
         type: SCHEMA_TYPE.PUBLIC_SHARES,
         data: [{ _id: index.shareId }],
     }, 'findOne');
-    if (!share || share.enabled === false) return null;
-    if (share.expiresAt && new Date(share.expiresAt).getTime() < Date.now()) return null;
+    if (!(await shareIsLive(index.companyId, share))) return null;
     return { companyId: index.companyId, share };
 }
+
+/* Matched on the hash it replaces, so a password changed or removed meanwhile is not overwritten. */
+const storeSharePasswordInCurrentFormat = async (companyId, share, supplied) => {
+    await MongoDbCrudOpration(companyId, {
+        type: SCHEMA_TYPE.PUBLIC_SHARES,
+        data: [{ _id: share._id, passwordHash: share.passwordHash }, { $set: await hashPassword(supplied) }],
+    }, 'updateOne');
+};
+
+const sharePasswordMatches = async (companyId, share, supplied) => {
+    if (!supplied || !(await verifyPassword(supplied, share))) return false;
+    if (!isCurrentPasswordHash(share)) {
+        storeSharePasswordInCurrentFormat(companyId, share, supplied)
+            .catch((error) => logger.error(`Share password hash upgrade: ${error.message || error}`));
+    }
+    return true;
+};
 
 // --- REP-09: report shares — a read-only public view of a saved report (REP-02). ---
 const DIM_LABELS = { status: 'Status', project: 'Project', sprint: 'Sprint' };
 const METRIC_LABELS = { count: 'Task count', points: 'Story points' };
 
-async function runReportRows(companyId, cfg) {
-    const pipeline = reportRules.buildPipeline(cfg);
-    const raw = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TASKS, data: [pipeline] }, 'aggregate');
-    return (raw || []).map((r) => ({ label: (r._id === null || r._id === undefined || r._id === '') ? '(none)' : String(r._id), value: r.value || 0 }));
+/* The public page shows what the person who published it could see, no more: the rows are
+ * built by the reports module under the share author's own project and sprint scope. */
+async function runReportRows(companyId, cfg, viewer) {
+    const out = await customReports.runConfig(companyId, cfg, viewer);
+    return (out.rows || []).map((r) => ({ label: r.label, value: r.value }));
 }
 
 async function renderReport(companyId, share) {
@@ -313,7 +333,7 @@ async function renderReport(companyId, share) {
     }
     // Resolve through the same whitelist engine — never raw fields.
     const check = reportRules.validateConfig(report);
-    const rows = check.valid ? await runReportRows(companyId, check.value) : [];
+    const rows = check.valid ? await runReportRows(companyId, check.value, share.createdBy) : [];
     const total = rows.reduce((a, r) => a + (r.value || 0), 0);
     const dimLabel = DIM_LABELS[check.value && check.value.dimension] || 'Group';
     const metricLabel = METRIC_LABELS[check.value && check.value.metric] || 'Value';
@@ -325,6 +345,67 @@ async function renderReport(companyId, share) {
     body += `<div class="task"><span class="name"><b>Total</b></span><span class="pill"><b>${escapeHtml(total)}</b></span></div>`;
     body += '</div>';
     return { title: report.name, body };
+}
+
+/* ── Client view (handoff 19d) ─────────────────────────────────────────────
+ *
+ * A login-free page for the client: milestone progress, what needs their
+ * sign-off, dated updates and invoices. Nothing else — the payload comes from
+ * Modules/Milestone's client projection, the same allow-list the in-app Guest
+ * view uses, so this page cannot show a field the projection does not build.
+ * It renders what it is given and looks nothing up on its own. */
+const CLIENT_STATE_LABEL = { done: 'Complete', in_progress: 'In progress', upcoming: 'Upcoming' };
+
+const clientMoney = (amount, currency) => {
+    const n = Number(amount) || 0;
+    const body = n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${escapeHtml(currency || '')} ${body}`.trim();
+};
+
+async function renderClientView(companyId, share) {
+    const { buildClientPayload } = require('../Milestone/controller/clientView');
+    const view = await buildClientPayload(companyId, String(share.entityId));
+    if (!view) return { title: 'Project', body: '<h1>This project is no longer available.</h1>' };
+
+    let body = `<h1>${escapeHtml(view.project.name)}</h1>`;
+    body += `<div class="muted">Shared by ${escapeHtml(view.project.sharedBy || 'the project team')} · client view</div>`;
+
+    body += `<div class="group"><h2>Progress · ${escapeHtml(view.progress.complete)} of ${escapeHtml(view.progress.total)} milestones complete</h2>`;
+    if (!view.progress.milestones.length) body += '<div class="task"><span class="name">No milestones yet.</span></div>';
+    view.progress.milestones.forEach((m) => {
+        const meta = m.state === 'done'
+            ? `Done ${escapeHtml(m.completedDate || '')}`
+            : `${escapeHtml(m.percent)}% · due ${escapeHtml(m.dueDate || 'TBC')}`;
+        body += `<div class="task"><span class="name">${escapeHtml(m.name)}</span><span class="pill">${escapeHtml(CLIENT_STATE_LABEL[m.state])} — ${meta}</span></div>`;
+    });
+    body += '</div>';
+
+    if (view.waitingOnYou.length) {
+        body += `<div class="group"><h2>Waiting on you (${escapeHtml(view.waitingOnYou.length)})</h2>`;
+        view.waitingOnYou.forEach((s) => {
+            const when = s.dueDate ? `needed by ${escapeHtml(s.dueDate)}` : 'no date set';
+            body += `<div class="task"><span class="name">${escapeHtml(s.title)}</span><span class="pill">${when}</span></div>`;
+        });
+        body += '</div>';
+    }
+
+    if (view.updates.length) {
+        body += '<div class="group"><h2>Recent updates</h2>';
+        view.updates.forEach((u) => {
+            body += `<div class="task"><span class="key">${escapeHtml(u.date)}</span><span class="name">${escapeHtml(u.text)}</span></div>`;
+        });
+        body += '</div>';
+    }
+
+    body += '<div class="group"><h2>Invoices</h2>';
+    if (!view.invoices.length) body += '<div class="task"><span class="name">No invoices issued yet.</span></div>';
+    view.invoices.forEach((inv) => {
+        const state = inv.status === 'paid' ? `paid` : `due ${escapeHtml(inv.dueDate || '')}`;
+        body += `<div class="task"><span class="key">${escapeHtml(inv.number)}</span><span class="name">${escapeHtml(inv.label)}</span><span class="pill">${clientMoney(inv.amount, inv.currency)} · ${state}</span></div>`;
+    });
+    body += '</div>';
+
+    return { title: view.project.name || 'Project', body };
 }
 
 /**
@@ -622,10 +703,15 @@ exports.renderShare = async (req, res) => {
         // Optional password gate (stateless — re-entered per visit).
         if (share.passwordHash) {
             const supplied = (req.body && req.body.password) ? String(req.body.password) : '';
-            const ok = supplied && await bcrypt.compare(supplied, share.passwordHash);
-            if (!ok) {
+            if (!(await sharePasswordMatches(companyId, share, supplied))) {
                 return sendPage(res, 200, 'Protected', passwordForm(req.params.token, req.method === 'POST'));
             }
+        }
+
+        // A client view renders the guest-safe project summary (handoff 19d).
+        if (share.entityType === 'client_view') {
+            const rendered = await renderClientView(companyId, share);
+            return sendPage(res, 200, rendered.title, rendered.body);
         }
 
         // REP-09 — report shares render a read-only table instead of a task board.
@@ -662,7 +748,7 @@ exports.renderShare = async (req, res) => {
             MongoDbCrudOpration(companyId, {
                 type: SCHEMA_TYPE.TASKS,
                 data: [
-                    { sprintId: share.entityId, deletedStatusKey: 0, isParentTask: true },
+                    { sprintId: share.entityId, deletedStatusKey: 0, isParentTask: true, mainChat: { $ne: true } },
                     'TaskKey TaskName status Task_Priority',
                     { sort: { updatedAt: -1 }, limit: 300 },
                 ],
@@ -696,6 +782,7 @@ exports.renderShare = async (req, res) => {
                 <label>Details</label><textarea name="description" rows="4" maxlength="5000"></textarea>
                 <label>Your name</label><input name="name" maxlength="120">
                 <label>Email</label><input name="email" type="email" maxlength="120">
+                ${share.passwordHash ? '<label>Password *</label><input name="password" type="password" required>' : ''}
                 <button type="submit">Send</button>
             </form>`;
         }
@@ -711,7 +798,18 @@ exports.renderShare = async (req, res) => {
 exports.submitIntake = async (req, res) => {
     try {
         const resolved = await resolveShare(req.params.token);
-        if (!resolved || !resolved.share.allowIntake) {
+        if (!resolved) {
+            return sendPage(res, 404, 'Not found', '<h1>This link is not available.</h1>');
+        }
+        // Asked before intake is looked at, so without the password nothing says whether the form is on.
+        if (resolved.share.passwordHash) {
+            const supplied = (req.body && req.body.password) ? String(req.body.password) : '';
+            const ok = supplied && await verifyPassword(supplied, resolved.share);
+            if (!ok) {
+                return sendPage(res, 200, 'Protected', passwordForm(req.params.token, true));
+            }
+        }
+        if (!resolved.share.allowIntake) {
             return sendPage(res, 404, 'Not found', '<h1>This link is not available.</h1>');
         }
         const { title, description, name, email } = req.body || {};

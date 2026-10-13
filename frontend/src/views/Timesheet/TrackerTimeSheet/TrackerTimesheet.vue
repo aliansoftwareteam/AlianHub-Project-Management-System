@@ -9,30 +9,33 @@
         />
     </div>
     <div v-else>
-        <div class="timesheet_view Usertimesheet_view timesheet_view_latest bg-light-gray time_tracker__timesheet" v-if="error404">
+        <div class="ah-page timesheet_view Usertimesheet_view timesheet_view_latest time_tracker__timesheet" v-if="error404">
             <div class="row">
                 <div class="col-md-12">
                     <div class="page_title_row d-flex">
                         <div class="page-title d-flex">
                             <ul class="breadcrumb title_strip">
-                                <li @click="goHome()">
-                                    <img class="cursor-pointer" src="@/assets/images/home_icon.png" alt="home_icon"/>
+                                <li>
+                                    <button type="button" class="ts-home" :aria-label="$t('Milestone.home_link')" @click="goHome()">
+                                        <span class="ah-mask-icon" :style="maskOf(homeIcon)" aria-hidden="true"></span>
+                                    </button>
                                 </li>
                                 <li class="pro_route_link">
-                                    <router-link :to="`/${companyId}/project`" class="text-decoration-underline font-size-18 font-weight-700">{{$t('UserTimesheet.back_projects')}}</router-link>
+                                    <router-link :to="`/${companyId}/project`" class="ts-crumb">{{$t('UserTimesheet.back_projects')}}</router-link>
                                 </li>
                                 <li>
-                                    <span class="workload_title font-size-18 font-weight-700">{{$t('UserTimesheet.tracker_timesheet')}}</span>
+                                    <span class="workload_title ts-crumb">{{$t('UserTimesheet.tracker_timesheet')}}</span>
                                 </li>
                             </ul>
+                        <TimesheetTabs active="tracker" class="ts-legacy-tabs" />
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="timesheet__wrapper page-content bg-light-gray h-100">
+            <div class="timesheet__wrapper page-content h-100">
                 <div class="page_top_data  d-flex align-items-center justify-content-between flex-wrap">
                     <div class="d-flex" :class="[{'flex-wrap' : clientWidth <=767}]" :style="[{width : clientWidth > 768 ? 'calc(100% - 233px)' : '100%'}]"> 
-                    <span class="cursor-pointer"><img class="position-re left__arrow-img" src="@/assets/images/rectangle_leftArrow.png" @click="dateChange('left')"></span>
+                    <button type="button" class="ts-day-nav ts-day-nav--prev" :aria-label="$t('Projects.previous')" @click="dateChange('left')"><span class="ah-mask-icon" :style="maskOf(chevronIcon)" aria-hidden="true"></span></button>
                         <span class="tracker-timesheet-calender-wrapper">
                             <CalenderCompo
                                 class="tracker-timesheet-calender"
@@ -41,35 +44,35 @@
                                 @update:model-value="($event) => {dateUpdate($event)}"
                             />
                         </span>
-                        <span class="cursor-pointer"><img class="position-re right__arrow-img" src="@/assets/images/rectangle_rightArrow.png" @click="dateChange('right')" ></span>
+                        <button type="button" class="ts-day-nav" :aria-label="$t('Home.Next')" @click="dateChange('right')"><span class="ah-mask-icon" :style="maskOf(chevronIcon)" aria-hidden="true"></span></button>
                         <div class="wf_filter cursor-pointer" @click.stop="$refs.filter_tt_click.click()"  :style="[{marginTop : clientWidth <= 767 ? '15px' : '0px', marginLeft : clientWidth <=767 ? '0' : '17px' }]">
-                            <span class="timesheet_user_filter bg-white">
-                                <DropDown id="" class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
-                                    <template #button>
-                                        <button ref="filter_tt_click" class="btn-white border dot-btn">
-                                            <a href="#" class="link_disable_css">{{$t('Filters.filter_by')}}</a>
+                            <span class="timesheet_user_filter">
+                                <DropDown mode="listbox" id="" themed class="status_change_dropdown" :bodyClass="{'timesheetDropdown_wrapper' : true}">
+                                    <template #button="{ triggerAttrs }">
+                                        <button type="button" ref="filter_tt_click" class="dot-btn" v-bind="triggerAttrs">
+                                            <span class="link_disable_css">{{$t('Filters.filter_by')}}</span>
                                         </button>
                                     </template>
                                     <template #options>
-                                    <DropDownOption v-show="filterType=='' && isEveryOne" @click="handleFilterType('select','Users')">
+                                    <DropDownOption v-if="filterType=='' && isEveryOne" @click="handleFilterType('select','Users')">
                                         {{$t('UserTimesheet.Users')}}
                                     </DropDownOption>
-                                    <DropDownOption v-show="filterType=='' && isEveryOne" @click="handleFilterType('select','Teams')">
+                                    <DropDownOption v-if="filterType=='' && isEveryOne" @click="handleFilterType('select','Teams')">
                                         {{$t('UserTimesheet.Teams')}}
                                     </DropDownOption>
-                                    <DropDownOption v-show="filterType==''" @click="handleFilterType('select','Projects')">
+                                    <DropDownOption v-if="filterType==''" @click="handleFilterType('select','Projects')">
                                         {{$t('UserTimesheet.Projects')}}
                                     </DropDownOption>
                                     <div v-if="filterType!=''">
                                         <div class="wf_header">
                                             <a @click="handleFilterType('back','')">
-                                                <img src="@/assets/images/svg/filter_back_icon.svg"/>&nbsp;
+                                                <span class="ah-mask-icon ts-back" :style="maskOf(backIcon)" aria-hidden="true"></span>&nbsp;
                                                 {{$t('UserTimesheet.back')}}
                                             </a>
                                             <span>{{$t(`UserTimesheet.${filterType}`)}}</span>
                                         </div>
                                         <span class="filter_search_block">
-                                            <input type="search" class="form-control" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
+                                            <input type="search" class="ah-input" ref="filter_dd_search" :placeHolder="$t('PlaceHolder.search')" v-model="filterSearch"/>
                                         </span>
                                         <div class="wf_body filter_body_scroll checklist-main" :class="{'filter_body_scroll': optionFilter.length >= 5}">
                                             <span
@@ -78,8 +81,8 @@
                                             :key="index"
                                             v-show="filterType.toLowerCase()=='users' && isEveryOne">
                                                 <a class="vs-dropdown-users d-flex align-items-center">
-                                                    <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
-                                                    <UserProfile
+                                                    <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent',true)" :value="item.id" v-model="checkedFilter">&nbsp;
+                                                    <UserProfile decorative
                                                         v-if="filterType.toLowerCase() == 'users'"
                                                         :showDot="false"
                                                         class="timesheet_user_profile mr-10px"
@@ -108,7 +111,7 @@
                                             :key="index"
                                             v-show="filterType.toLowerCase()=='projects'">
                                                 <a class="vs-dropdown-users d-flex align-items-center">
-                                                    <input type="checkbox" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
+                                                    <input type="checkbox" class="ah-check" v-show="filterType.toLowerCase() == 'users'" @click="handleFilterItem(item,'checkEvent')" :value="item.id" v-model="checkedFilter">&nbsp;
                                                     <span v-if="item?.projectIcon && item?.projectIcon.type === 'color'" class="d-flex align-items-center justify-content-center inital-box" :style="[{'background-color': item?.projectIcon.data}]">{{ item?.name.charAt(0).toUpperCase()}}</span>
                                                     <img v-if="item?.projectIcon && item?.projectIcon.type === 'image' && validateURL(item?.projectIcon.data)" class="profile-sm-square inital-box" :src="item?.projectIcon.data" alt=""/>
                                                     <WasabiImage 
@@ -130,11 +133,10 @@
                                     <span class="user_name" :title="chip.name" >
                                             {{  `${$t(`general.${chip.type.slice(0,-1)}`)} : ${chip.name}` }}
                                         </span>
-                                        <button @click="handleFilterItem(chip,'remove')" type="button" class="btn-close vs-chip--close cursor-pointer">
-                                            <img src="@/assets/images/svg/close_timesheet.svg" alt="cancel"/>
-                                        </button>
+                                        <button @click="handleFilterItem(chip,'remove')" type="button" class="ts-chip-x" :aria-label="$t('Reports.remove_filter')">×</button>
                                 </span>
                             </div>
+                            <span class="ah-mask-icon wf_filter__icon" :style="maskOf(filterIcon)" aria-hidden="true"></span>
                         </div>
                     </div>
                 </div>
@@ -143,9 +145,9 @@
                         <TimebarComponent :logRangeValue="logRange" :selectedSlot="selectedSlot" @toggle="selectedSlot = $event"/>
                     </div>
                     <div class="mt-12px">
-                        <div class="screenShotTime red mt-50px text-center" v-if="subSpinner">
-                            <div class="screenShotTime-skelaton bg-white" v-for="(sKey) in skelatonArray" :key="sKey">
-                                <div class="screenShotTime-skelaton--time font-size-18 black">
+                        <div class="screenShotTime mt-50px text-center" v-if="subSpinner">
+                            <div class="screenShotTime-skelaton" v-for="(sKey) in skelatonArray" :key="sKey">
+                                <div class="screenShotTime-skelaton--time">
                                     <Skelaton class="" style="height: 22px; width: 170px;"/>
                                 </div>
                             </div>
@@ -153,7 +155,7 @@
                         <div class="screenShotTime style-scroll" v-if="finalRange?.length && !subSpinner">
                             <ScreenshotTime v-for="log in finalRange" :key="log.time" :logRangeData="log" :active="selectedSlot === log.time" :trackShots="log.trackShot" @update:getScreenShotDetail="getScreenShotDetailFunction" @toggle="selectedSlot = $event" :id="log.time" />
                         </div>
-                        <div class="screenShotTime red mt-50px text-center" v-if="!finalRange?.length && !subSpinner">
+                        <div class="screenShotTime ts-empty mt-50px text-center" v-if="!finalRange?.length && !subSpinner">
                             {{$t('UserTimesheet.no_records_found')}}
                         </div>
                     </div>
@@ -162,12 +164,14 @@
             </div>
         </div>
         <div v-else class="h-100">
-            <NotFound />
+            <AppState kind="denied" />
         </div>
     </div>
 </template>
 
 <script setup>
+    import TimesheetTabs from '@/views/Timesheet/TimesheetTabs.vue';
+    import '@/views/Timesheet/timeV2.css';
     import { useCustomComposable ,useGetterFunctions } from '@/composable';
     import TimebarComponent from '@/components/atom/TimesheetView/TrackerTimeSheetView/TimebarComponent.vue'
     import { defineComponent , onMounted ,ref , computed , inject ,watch } from "vue";
@@ -179,13 +183,20 @@
     import SpinnerComp from '@/components/atom/SpinnerComp/SpinnerComp.vue';
     import * as helper from '@/views/Timesheet/helper';
     import ScreenshotTime from '@/components/atom/TimesheetView/TrackerTimeSheetView/ScreenshotTime'
-    import NotFound from '@/views/NotFound.vue'
+    import AppState from '@/components/molecules/AppState/AppState.vue'
     import UserProfile from "@/components/atom/UserProfile/UserProfile.vue";
     import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
     import Skelaton from '@/components/atom/Skelaton/Skelaton.vue';
     import UpgradePlan from '@/components/atom/UpgradYourPlanComponent/UpgradYourPlanComponent.vue';
     import { apiRequest } from '../../../services';
     import * as env from '@/config/env';
+    import { isOwnerOrAdmin } from "@/utils/roles";
+    import { maskOf } from '@/utils/iconMask';
+    import { dayRange, hourSlots, hoursWithLogs, logsOf, shotsIn } from './trackerDay';
+    const homeIcon = require('@/assets/images/home_icon.png');
+    const backIcon = require('@/assets/images/svg/filter_back_icon.svg');
+    const filterIcon = require('@/assets/images/svg/filter_icon.svg');
+    const chevronIcon = require('@/assets/images/table_arrow.png');
     const {getUser} = useGetterFunctions();
     defineComponent({
         name: "UserTimesheet",
@@ -278,7 +289,7 @@
                     let publicQuery = {
                         isPrivateSpace:false
                     }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
+                    if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle.showAllProjects) {
                         publicQuery.AssigneeUserId = {
                             $in:[uid]
                         }
@@ -289,7 +300,7 @@
                     let privateQuery = {
                         isPrivateSpace:true
                     }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+                    if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                         privateQuery.AssigneeUserId = {
                             $in:[uid]
                         }
@@ -348,12 +359,7 @@
     }
     const getTimeSlot = () => {
         resetLogRange();
-        timeSlots.value = [];
-        for (let i = 0; i < 24; i++) {
-            let startTime = new Date(dateValue.value).setHours(i,0,0)
-            let endTime = new Date(dateValue.value).setHours(i+1,0,0)
-            timeSlots.value.push({time:i , inRange: false , start: startTime, end: endTime , trackShot: []});
-        }
+        timeSlots.value = hourSlots(dateValue.value);
     }
     function debouncer(timeout = 1000) {
         return new Promise((resolve) => {
@@ -410,134 +416,50 @@
             console.error(error);
         }
     }
-    const getTrackerTimesheetData = () => {
+    const dayLogs = ref([]);
+    let dayReads = 0;
+    /* One request for the whole day (./trackerDay.js). A later date or filter asks again, and the earlier answer is dropped. */
+    const getTrackerTimesheetData = async () => {
         subSpinner.value = true;
-        let batchObject = {first: [], second: [], third: []};
-        for (let i = 0; i < timeSlots.value.length; i++) {
-            if (i < 8) {
-                batchObject.first.push(timeSlots.value[i])
-            } else if (i >= 8 && i < 16) {
-                batchObject.second.push(timeSlots.value[i])
-            } else {
-                batchObject.third.push(timeSlots.value[i])
-            }
+        dayReads += 1;
+        const read = dayReads;
+        let logs = [];
+        try {
+            const userArray = await queryFunction();
+            const result = await apiRequest("post", `${env.TIMESHEET}/tracker`, {
+                selectedFilter: selectedFilters.value,
+                userArray,
+                ...dayRange(dateValue.value),
+                isEveryOne: isEveryOne.value
+            });
+            logs = logsOf(result?.data, projects.value);
+        } catch (error) {
+            console.error(error);
         }
-        
-        let count = 0;
-        let countFunction = (row) => {
-            if (count >= Object.keys(batchObject).length) {
-                finalRange.value.sort((a,b)=> a.time - b.time);
-                
-                let first = logRange.value.find((ele)=> ele.inRange)
-                if (first) {
-                    selectedSlot.value = first.time
-                    getDBData().catch((e) => {
-                        subSpinner.value = false;
-                        console.error(e)
-                    })
-                } else {
-                    subSpinner.value = false;
-                }
-                return;
-            } else {
-                let promise = []
-                row.forEach((ele) => {
-                    promise.push(executeQuery(ele));
-                })
-                Promise.allSettled(promise).then(()=>{
-                    count++;
-                    countFunction(batchObject[Object.keys(batchObject)[count]]);
-                }).catch((error)=>{
-                    console.error(error);
-                    count++;
-                    countFunction(batchObject[Object.keys(batchObject)[count]]);
-                })
-            }
+        if (read !== dayReads) return;
+        dayLogs.value = logs;
+        hoursWithLogs(logs, timeSlots.value).forEach((hour) => {
+            const ind = logRange.value.findIndex((x) => x.time === hour);
+            logRange.value[ind] = {time: hour, inRange: true};
+            finalRange.value.push({...logRange.value[ind], isSelected: false});
+        });
+        const first = logRange.value.find((ele) => ele.inRange);
+        if (!first) {
+            subSpinner.value = false;
+            return;
         }
-        countFunction(batchObject[Object.keys(batchObject)[count]]);
+        selectedSlot.value = first.time;
+        getDBData().catch((e) => {
+            subSpinner.value = false;
+            console.error(e);
+        });
     }
-    const getTrackShotData = (element) => {
-        return new Promise((resolve, reject) => {
-            try {
-                if (timeSlots.value[element].trackShot.length === 0) {
-                    let start = Math.floor(timeSlots.value[element].start / 1000);
-                    let end = Math.floor(timeSlots.value[element].end / 1000);
-                    queryFunction().then((userArr) => {
-                        const axiosObj = {
-                            selectedFilter : selectedFilters.value,
-                            userArray: userArr,
-                            start: start,
-                            end: end,
-                            isEveryOne: isEveryOne.value
-                        }
-                        apiRequest("post", `${env.TIMESHEET}/tracker`,axiosObj)
-                        .then((result) => {
-                            const timesheet = result.data; 
-                            let arrayData = [];
-                            let finalresult = timesheet.filter( (x)=>{
-                                 x.data =  x.data.filter( (y)=>{
-                                    let isProject =  projects.value.find((z)=> z._id == y.ProjectId)
-                                    if (isProject) {
-                                        return true;
-                                    }
-                                })
-                                if (x.data.length) {
-                                    return true
-                                }
-                            })
-                            finalresult.map((vals) => {
-                                let docTemp = vals;
-                                arrayData.push({ ...docTemp, 'logAddType': docTemp.logAddType ? docTemp.logAddType : 0 });
-                            })
-
-                            // Use reduce to concatenate 'data' arrays
-                            const finalData = arrayData.reduce((accumulator, currentValue) => {
-                                return accumulator.concat(currentValue.data);
-                            }, []);
-
-                            let array = [];
-                            finalData.forEach((row) => {
-                                if (row.trackShots && row.trackShots.length) {
-                                    row.trackShots.forEach((track) => {
-                                        let screenShotTime = track.screenShotTime ? Number(track.screenShotTime) : new Date().getTime()
-                                        if (screenShotTime >= start * 1000 && screenShotTime <= end * 1000) {
-                                            let proInd = projects.value.findIndex((x) => x._id === row.ProjectId)
-                                            let obj = {
-                                                time: screenShotTime,
-                                                image: track.image,
-                                                trackShots: track,
-                                                userId: row.Loggeduser,
-                                                memoName: row.LogDescription,
-                                                projectName: proInd !== -1 ? projects.value[proInd].ProjectName : '',
-                                                projectKey: proInd !== -1 ? projects.value[proInd].ProjectCode : '',
-                                                userProfile: getUser(row.Loggeduser)?.Employee_profileImageURL,
-                                                userName: getUser(row.Loggeduser)?.Employee_Name,
-                                                taskId: row.TicketID,
-                                                companyId: companyId.value,
-                                                projectId: row.ProjectId
-                                            }
-                                            array.push(obj);
-                                        }
-                                    })
-                                }
-                            })
-
-                            timeSlots.value[element].trackShot = array;
-                            timeSlotObj.value = timeSlots.value[element];
-                            resolve(timeSlots.value[element].trackShot);
-                        })
-                    }).catch((error)=>{
-                        reject(error);
-                        console.error(error);
-                    })
-                }
-                else {
-                    resolve([])
-                }            
-            } catch (error) {
-                reject(error);
-            }
-        })
+    const getTrackShotData = async (element) => {
+        const slot = timeSlots.value[element];
+        if (slot.trackShot.length) return [];
+        slot.trackShot = shotsIn(dayLogs.value, slot, { projects: projects.value, userOf: getUser, companyId: companyId.value });
+        timeSlotObj.value = slot;
+        return slot.trackShot;
     }
     function handleFilterItem(selectedItem, type, isUser=false){
         debouncerWithPromise(400).then(()=>{
@@ -583,58 +505,6 @@
                 }
 
                 resolve(userArray);
-            } catch (error) {
-                reject(error);
-            }
-        })
-    }
-    const executeQuery = (ele) => {
-        return new Promise((resolve, reject) => {
-            try {
-                let start = Math.floor(ele.start / 1000);
-                let end = Math.floor(ele.end / 1000);
-                queryFunction().then((userArr) => {
-                    const axiosObj = {
-                        selectedFilter : selectedFilters.value,
-                        userArray: userArr,
-                        start: start,
-                        end: end,
-                        isEveryOne: isEveryOne.value
-                    }
-                    apiRequest("post", `${env.TIMESHEET}/tracker`,axiosObj)
-                    .then((result) => {
-                        const timesheet = result.data;
-                        if (timesheet.length) {
-                            let finalresult = timesheet.filter( (x)=>{
-                                 x.data =  x.data.filter( (y)=>{
-                                    let isProject =  projects.value.find((z)=> z._id == y.ProjectId)
-                                    if (isProject) {
-                                        return true;
-                                    }
-                                })
-                                if (x.data.length) {
-                                    return true
-                                }
-                            })
-                            if (finalresult.length) {
-                                let ind = logRange.value.findIndex((x) => x.time === ele.time);
-                                logRange.value[ind] = {time: ele.time, inRange: true}
-                                finalRange.value.push({...logRange.value[ind], isSelected: false})
-                                resolve();
-                            } else {
-                                resolve();
-                            }
-                        } else {
-                            resolve();
-                        }
-                    }).catch((error) => {
-                        console.error(error);
-                        reject();
-                    })
-                }).catch((error)=>{
-                    console.error(error);
-                    reject(error)
-                })
             } catch (error) {
                 reject(error);
             }
@@ -759,25 +629,57 @@
     align-items: center;
 }
 .screenShotTime-skelaton {
-    border: 1px solid #e8e8e8;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: 12px;
     margin-bottom: 20px;
 }
-.left__arrow-img{
-    right:-2px;
-    min-width: 32px;
+.ts-day-nav{
+    display: inline-grid;
+    place-content: center;
+    flex: none;
+    width: 32px;
     height: 30px;
+    margin-left: -1px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 0 var(--r-chip) var(--r-chip) 0;
+    background: var(--surface);
+    color: var(--ink-2);
+    cursor: pointer;
 }
-.right__arrow-img{
-    left:-2px;
-    min-width: 32px;
-    height: 30px;
+.ts-day-nav:hover{
+    background: var(--surface-hover);
+    color: var(--ink);
+}
+.ts-day-nav .ah-mask-icon{
+    width: 9px;
+    height: 9px;
+}
+.ts-day-nav--prev{
+    margin: 0 -1px 0 0;
+    border-radius: var(--r-chip) 0 0 var(--r-chip);
+}
+.ts-day-nav--prev .ah-mask-icon{
+    transform: rotate(180deg);
 }
 .page-content {
     padding: 15px;
 }
+/* The legacy title strip carries the shared timesheet tabs, so it follows the theme. */
 .page-title {
     width: 100%;
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--hairline);
+    color: var(--ink);
+}
+.pro_route_link a { color: var(--ink); }
+.ts-legacy-tabs { align-self: stretch; margin: 0 16px 0 0; }
+.ts-legacy-tabs :deep(.tv-tab) { display: flex; align-items: center; }
+@media (max-width: 767px) {
+    .page-title { flex-wrap: wrap; }
+    .ts-legacy-tabs { margin: 0; padding: 0 8px; }
+    .ts-legacy-tabs :deep(.tv-tab) { min-height: 40px; }
 }
 ul.breadcrumb.title_strip {
     margin: 0;
@@ -785,8 +687,7 @@ ul.breadcrumb.title_strip {
     display: flex;
     align-items: center;
     height: 61px;
-    background-color: #FCFCFC;
-    border-bottom: 1px solid #DAE1E7;
+    background-color: transparent;
     width: 100%;
     padding-left: 15px;
 }
@@ -797,8 +698,8 @@ ul.breadcrumb.title_strip li:first-child {
 ul.breadcrumb.title_strip li {
     list-style: none;
     padding: 0px 20px;
-    border-left: 1px solid #b7b7b7;
-    font-family: 'Roboto', sans-serif;
+    border-left: 1px solid var(--border);
+    font-family: var(--font-ui);
     font-weight:700;
 }
 .dp__main.dp__theme_light {
@@ -808,7 +709,7 @@ ul.breadcrumb.title_strip li {
 }
 span.chipusername_wrapper {
     display: flex;
-    background-color: #f1efef;
+    background-color: var(--fill);
     border-radius: 10px;
     margin-right: 10px;
     padding: 1px 4px 0.77px 8px;
@@ -816,8 +717,8 @@ span.chipusername_wrapper {
     align-items: center;
     min-width: fit-content;
 }
-a.link_disable_css {
-    color: #000;
+.link_disable_css {
+    color: var(--ink);
     text-decoration: none;
     font-size: 16px;
 }
@@ -830,6 +731,9 @@ span.chipusername_wrapper button {
     width: 17px;
     height: 17px;
     background: transparent !important;
+    color: var(--ink-2);
+    font: 400 var(--fs-lg, 16px)/1 var(--font-ui);
+    cursor: pointer;
 }
 .timesheet__wrapper .wf_filter {
     height: 30px;
@@ -859,13 +763,13 @@ span.chipusername_wrapper button {
 }
 .wf_filter::-webkit-scrollbar-thumb {
     border-radius: 10px;
-    -webkit-box-shadow: inset 0 0 6px rgba(0,0,0,.3);
-    background-color: #C1C1C1;
+    -webkit-box-shadow: inset 0 0 6px var(--shadow-ink);
+    background-color: var(--border);
 }
 .wf_filter::-webkit-scrollbar {
     width: 5px;
     height: 5px;
-    background-color: #F5F5F5;
+    background-color: var(--fill);
 }
 .wf_filter{
     overflow-x: auto !important;
@@ -877,20 +781,20 @@ span.chipusername_wrapper button {
 span.chipusername_wrapper span.user_name {
     font-size: 13px;
     font-weight: 500;
-    color: #505050;
+    color: var(--ink-2);
     line-height: 19.24px;
     min-width: max-content;
 }
 .circlegreen {
   width: 10px;
   height: 10px;
-  background-color: #1CB303;
+  background-color: var(--ok);
   border-radius: 50%;
 }
 .circlePurple {
   width: 10px;
   height: 10px;
-  background-color: #7367F0;
+  background-color: var(--agent);
   border-radius: 50%;
 }
 .timesheet_user_filter button.dot-btn {
@@ -898,17 +802,17 @@ span.chipusername_wrapper span.user_name {
   height: 28px;
 }
 .tracker-timesheet-calender-wrapper{
-    border:1px solid #DFE1E6;
+    border:1px solid var(--border);
     height: 30px;
-    background-color: #FFFFFF;
+    background-color: var(--surface);
     width: 143px;
     min-width: 143px;
 }
 .tracker-timesheet-calender {
     margin: 2px 10px 0;
 }
-.tracker-timesheet-calender .date_format_cal.calendar-comp::placeholder{font-size: 16px !important;color: #000 !important;}
-.tracker-timesheet-calender .date_format_cal.calendar-comp{font-size: 16px !important;color: #000 !important;}
+.tracker-timesheet-calender .date_format_cal.calendar-comp::placeholder{font-size: 16px !important;color: var(--ink) !important;}
+.tracker-timesheet-calender .date_format_cal.calendar-comp{font-size: 16px !important;color: var(--ink) !important;}
 
 .timebarWrapper{
     margin-top: 16px;
@@ -922,15 +826,15 @@ span.chipusername_wrapper span.user_name {
 .screenShotTime::-webkit-scrollbar {
     width: 6px;
     height: 6px;
-    background: #D9D9D9 !important;
+    background: var(--fill) !important;
     border-radius: 6px;
 }
 .screenShotTime.style-scroll::-webkit-scrollbar-thumb {
-    background: #2f3990;
+    background: var(--brand);
     border-radius: 6px;
 }
 .screenShotTime.style-scroll::-webkit-scrollbar-track{
-    background-color: #D9D9D9 !important;
+    background-color: var(--fill) !important;
     border-radius: 6px;
 }
 .timesheetDropdown_wrapper {
@@ -940,7 +844,7 @@ span.chipusername_wrapper span.user_name {
   border: 0 !important;
   margin-top: 9px;
   margin-left: -11px;
-  filter: drop-shadow(0px 2px 12px rgba(0, 0, 0, 0.15)) !important;
+  filter: drop-shadow(0px 2px 12px var(--shadow-ink)) !important;
 }
 .timesheet__wrapper .range-picker.rangeComp{
     min-width: 251px !important;
@@ -957,7 +861,7 @@ span.chipusername_wrapper span.user_name {
     max-height: calc(100vh - 335px);
     overflow: auto;
 }
-.timesheetDropdown_wrapper span.filter_search_block .form-control {padding: 15.5px 10px !important;}
+.timesheetDropdown_wrapper span.filter_search_block .ah-input {padding: 15.5px 10px !important;}
 .timesheetDropdown_wrapper .wf_header span{font-size: 18px;}
 .timesheetDropdown_wrapper span.filter_search_block{padding: 20px 0 20px;}
 .timesheetDropdown_wrapper span.filter_list_item{font-size: 16px !important; line-height: 21px;}

@@ -165,7 +165,7 @@ const handleClick = (event) => {
     position: relative;
 }
 .attachment-display ul li img {
-    background-color: #F4F5F7;
+    background-color: var(--fill);
     height: 22px;
     border-radius: 2px;
     object-fit: contain;
@@ -192,8 +192,8 @@ img.attachment__image-height {
     gap: 4px;
     max-width: calc(100% - 16px);
     padding: 2px 6px;
-    background: rgba(255, 255, 255, 0.94);
-    border: 1px solid #E6E7EF;
+    background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 999px;
     box-shadow: 0 1px 3px rgba(23, 24, 36, 0.12);
     pointer-events: none;
@@ -207,7 +207,7 @@ img.attachment__image-height {
     font-size: 9.5px;
     font-weight: 600;
     line-height: 1.4;
-    color: #4A4B63;
+    color: var(--ink-2);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

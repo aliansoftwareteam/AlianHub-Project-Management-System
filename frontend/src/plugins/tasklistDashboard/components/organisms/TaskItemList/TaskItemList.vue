@@ -14,7 +14,7 @@
                                     :addUser="false"
                                     class="mr-5px"
                                 />
-                                <h5 v-if="containerWidth > 767" class="text-ellipse item-title font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
+                                <h5 v-if="containerWidth > 767" class="text-ellipse item-title task-item-list-font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
                                     <span v-for="(user, userIndex) in item.users" :key="userIndex">
                                         {{userIndex !== 0 ? ", " : "" }}{{user.Employee_Name}}
                                     </span>
@@ -25,16 +25,16 @@
                                 <h5 class="text-ellipse item-title" :style="`color: ${item.textColor ? item.textColor : '#818181'}; background-color: ${item.backColor ? item.backColor : 'transparent'}; margin-left: 5px;`">{{$t('general.unassigned')}}</h5>
                             </div>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
+                            <span class="task-item-list-font-size-14 ml-6px task-item-list-dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
                         </template>
                         <template v-else>
                             <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
-                            <span class="text-ellipse status-sprint font-weight-500" :style="`color: ${item.textColor ? item.textColor : ''}; background-color: ${item.bgColor ? item.bgColor : 'transparent'}`">
+                            <span class="text-ellipse status-sprint task-item-list-font-weight-500 ah-status-ink" :style="item.bgColor ? statusChipStyle(item) : { color: item.textColor || '' }">
                                 <WasabiImage v-if="item.image" :data="{url: item.image, title: item.name}" class="mr-5px"/>
                                 {{item.name}}
                             </span>
                             <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                            <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
+                            <span class="task-item-list-dark-gray task-item-list-font-size-13 task-item-list-font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Projects.tasks')}}</span>
                         </template>
                     </div>
                 </div>
@@ -43,7 +43,7 @@
                         <div v-for="(head,i) in headers.filter((x) => cardData.includes(x.id))" :key="i" class="span_wrapper">
                             <span
                                 :title="head.label"
-                                class="task_right dark-gray font-weight-500 font-size-12 text-ellipse"
+                                class="task_right task-item-list-dark-gray task-item-list-font-weight-500 task-item-list-font-size-12 text-ellipse"
                                 :class="{
                                     'item-head-draggable-div' : false,
                                     'custom__field_list_view':head.key !== 'AssigneeUserId' && head.key !== 'commentCounts' && head.key !== 'DueDate' && head.key !== 'Task_Priority' && head.key !== 'TaskKey' && head.key !== 'created_date' && head.key !== 'created_by'
@@ -110,7 +110,7 @@
                                 :addUser="false"
                                 class="mr-5px"
                             />
-                            <h5 v-if="containerWidth > 767" class="text-ellipse item-title font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
+                            <h5 v-if="containerWidth > 767" class="text-ellipse item-title task-item-list-font-size-14" :style="`color: ${item.textColor ? item.textColor : '#3a3a3a'}; background-color: ${item.backColor ? item.backColor : 'transparent'};`">
                                 <span v-for="(user, userIndex) in item.users" :key="userIndex">
                                     {{userIndex !== 0 ? ", " : "" }}{{user.Employee_Name}}
                                 </span>
@@ -121,16 +121,16 @@
                             <h5 class="text-ellipse item-title" :style="`color: ${item.textColor ? item.textColor : '#818181'}; background-color: ${item.backColor ? item.backColor : 'transparent'}; margin-left: 5px;`">{{$t('general.unassigned')}}</h5>
                         </div>
                         <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                        <span class="font-size-14 ml-6px dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
+                        <span class="task-item-list-font-size-14 ml-6px task-item-list-dark-gray">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
                     </template>
                     <template v-else>
                         <img src="@/assets/images/svg/triangleBlack.svg" alt="traingle" class="mr-5px" :style="`transform: rotateZ(${item.isExpanded ? 90 : 0}deg); width: 6px;`">
-                        <span class="text-ellipse status-sprint font-weight-500" :style="`color: ${item.textColor ? item.textColor : ''}; background-color: ${item.bgColor ? item.bgColor : 'transparent'}`">
+                        <span class="text-ellipse status-sprint task-item-list-font-weight-500 ah-status-ink" :style="item.bgColor ? statusChipStyle(item) : { color: item.textColor || '' }">
                             <WasabiImage v-if="item.image" :data="{url: item.image, title: item.name}" class="mr-5px"/>
                             {{item.name}}
                         </span>
                         <!-- <span>{{getTaskCount(item)}} Tasks</span> -->
-                        <span class="dark-gray font-size-13 font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
+                        <span class="task-item-list-dark-gray task-item-list-font-size-13 task-item-list-font-weight-400 ml-6px tasks__title">{{searchedTask ? filteredTasksGetter.length : tasksFound}} {{$t('Notification.tasks')}}</span>
                     </template>
                 </div>
             </div>
@@ -139,7 +139,7 @@
                     <div v-for="(head,i) in headers.filter((x) => cardData.includes(x.id))" :key="i" class="span_wrapper">
                         <span
                             :title="head.label"
-                            class="task_right dark-gray font-weight-500 font-size-12 text-ellipse"
+                            class="task_right task-item-list-dark-gray task-item-list-font-weight-500 task-item-list-font-size-12 text-ellipse"
                             :class="{
                                 'item-head-draggable-div' : false,
                                 'custom__field_list_view':head.key !== 'AssigneeUserId' && head.key !== 'commentCounts' && head.key !== 'DueDate' && head.key !== 'Task_Priority' && head.key !== 'TaskKey' && head.key !== 'created_date' && head.key !== 'created_by'
@@ -150,24 +150,26 @@
                         </span>
                     </div>
                     <span class="span_wrapper task_right cursor-pointer" v-if="!projectData?.deletedStatusKey && checkPermission('task.list_view_column',project?.isGlobalPermission) == true">
-                        <DropDown>
+                        <DropDown v-if="props.statusIndex === 0" mode="listbox">
                             <template #button>
-                                <img :src="addCustomField" :alt="addCustomField" v-if="props.statusIndex === 0" />
+                                <img :src="addCustomField" :alt="$t('Projects.show_hide_columns')" />
                             </template>
                             <template #options>
-                                <DropDownOption>
-                                    <input type="text" class="customfield__form-control" placeholder="search" v-model="search" @input="handleInput">
-                                </DropDownOption>
-                                <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')">
-                                    <span class="font-weight-500 line-height-19 font-roboto-sans blue" @click="isCustomField = true">+ {{$t('CustomField.custom_field')}}</span>
+                                <div class="d-flex align-items-center task-item-list-hover-bg-lighter-gray-dropdown task-item-list-hover-purple cursor-pointer text-nowrap drop-down-item task-item-list-gray81 p-7px border-radius-4-px">
+                                    <input type="text" class="customfield__form-control" :placeholder="$t('PlaceHolder.search')" :aria-label="$t('PlaceHolder.search')" v-model="search" @input="handleInput">
+                                </div>
+                                <DropDownOption v-if="checkPermission('task.task_custom_field',project?.isGlobalPermission) !== null && checkApps('CustomFields')" @click="isCustomField = true">
+                                    <span class="task-item-list-font-weight-500 task-item-list-line-height-19 font-ui task-item-list-blue">+ {{$t('CustomField.custom_field')}}</span>
                                 </DropDownOption>
                                 <template v-if="headerHideShow && headerHideShow.length">
                                     <DropDownOption
                                         v-for="(obj, index) in headerHideShow.filter((head)=> (head.funcPermission ? checkPermission(head.funcPermission,projectData.isGlobalPermission) !== null : true ) && (head.appPermission ? checkApps(head.appPermission) : true ))"
                                         :key="index"
+                                        :selected="Boolean(obj.show)"
+                                        @click="obj.show = !obj.show; toggleButton(obj.show,obj.key,obj)"
                                     >
                                         <div class="d-flex align-items-center justify-content-between w-100">
-                                            <span class="font-weight-400 line-height-19 font-roboto-sans">
+                                            <span class="task-item-list-font-weight-400 task-item-list-line-height-19 font-ui">
                                                 {{obj.label}}
                                             </span>
                                             <span>
@@ -202,6 +204,7 @@ import { computed, ref, watch, defineProps, unref, onMounted, inject, defineEmit
 import { useStore } from 'vuex';
 import { useCustomComposable } from '@/composable';
 import { taskListHelper } from '@/views/Projects/helper';
+import { statusChipStyle } from '@/utils/statusChipColors';
 
 // COMPONENTS
 import Task from '../Task/Task.vue';
@@ -215,6 +218,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 
 const {isCustomFields} = customField();
 import * as env from '@/config/env';
+import { indexRepairBody, indexRepairRows } from "@/views/Projects/composables/taskGroupIndex";
 import { useI18n } from "vue-i18n";
 import { apiRequest } from "../../../../../services/index";
 import Skelaton from "@/components/atom/Skelaton/AiSkelaton.vue"
@@ -663,51 +667,27 @@ const setHeader = (customFieldArray) => {
 }
 
 
-function prepareIndexData () {    
-    // setTimeout(() => {
-    let taskWithoutFilter = []
-    let taskArray = [];
-    let withoutIndexTask = items.value?.filter((data) => {
-        return (data[props.item.indexName] === undefined || data[props.item.indexName] === null) && data.TaskKey !== '--'
-    })
-    if (withoutIndexTask?.length > 0) {
-        withoutIndexTask.map((x) => taskWithoutFilter.push({data: x._id, item: props.item, taskKey: x.TaskKey}))
-        withoutIndexTask.map((x) => taskArray.push(x));
-    }    
-    if (!(taskWithoutFilter.length === 0 && taskArray.length === 0)) {
-        var newObj = {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: taskArray, indexName: items.value[0].indexName};
-        commit("projectData/mutateTaskIndex",newObj)
-        let count = 0;
-        if (taskArray.length !== 1) {
-            isLoading.value = true;
-        }
-        let countFunction = (row) => {
-            if (count >= taskWithoutFilter.length) {
-                isLoading.value = false;
-                return;
-            } else {
-                if (row.taskKey != '--') {
-                    apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, {
-                        taskUpdate : row,
-                        companyId: companyId.value,
-                    }).then(()=>{
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                    .catch((error) => {
-                        console.error("ERROR in update project history: ", error);
-                        count++;
-                        countFunction(taskWithoutFilter[count])
-                    })
-                } else {
-                    count++;
-                    countFunction(taskWithoutFilter[count]);
-                }
-            }
-        }
-        countFunction(taskWithoutFilter[count])
+function prepareIndexData () {
+    const rows = indexRepairRows(items.value, props.item, checkPermission('task.task_list', projectData.value?.isGlobalPermission));
+    if (!rows.length) return;
+
+    commit("projectData/mutateTaskIndex", {pid: projectData.value._id, sprintId: items.value[0].sprintId, tasksArray: rows.map((row) => ({ _id: row.data })), indexName: props.item.indexName});
+    if (rows.length !== 1) {
+        isLoading.value = true;
     }
-    // }, 2000);
+    const next = (index) => {
+        if (index >= rows.length) {
+            isLoading.value = false;
+            return;
+        }
+        apiRequest("post", env.ONLOAD_UPDATE_TASK_INDEX, indexRepairBody(rows[index], companyId.value))
+            .then(() => next(index + 1))
+            .catch((error) => {
+                console.error("ERROR in update task index: ", error);
+                next(index + 1);
+            });
+    };
+    next(0);
 }
 </script>
 
@@ -741,5 +721,41 @@ function prepareIndexData () {
     container-type: inline-size; /* Enables container queries */
     container-name: tasksList; /* This name is referenced in @container */
     box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.08);
+}
+</style>
+
+<style scoped>
+.task-item-list-blue {
+    color: var(--brand) !important;
+}
+.task-item-list-dark-gray {
+    color: var(--ink);
+}
+.task-item-list-gray81 {
+    color: var(--ink-2);
+}
+.task-item-list-hover-purple:hover {
+    color: var(--brand) !important;
+}
+.task-item-list-hover-bg-lighter-gray-dropdown:hover {
+    background-color: var(--surface-hover) !important;
+}
+.task-item-list-font-weight-400 {
+    font-weight: 400 !important;
+}
+.task-item-list-font-weight-500 {
+    font-weight: 500 !important;
+}
+.task-item-list-font-size-12 {
+    font-size: 12px;
+}
+.task-item-list-font-size-13 {
+    font-size: 13px;
+}
+.task-item-list-font-size-14 {
+    font-size: 14px;
+}
+.task-item-list-line-height-19 {
+    line-height: 19px;
 }
 </style>

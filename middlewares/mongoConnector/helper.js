@@ -37,7 +37,7 @@ exports.createConnection = (db) => {
         try {
             let retries = 0;
 
-            function handleMongoConnection() {
+            const handleMongoConnection = () => {
                 connect(db)
                 .then((connection) => {
                     retries=0;
@@ -77,7 +77,6 @@ exports.closeConnection = (db) => {
     if (index !== -1) {
         exports.connections[index].connection.close();
         exports.connections.splice(index, 1);
-        console.log("NEW CONNECTION", exports.connections.map((x) => ({ db: x.db, last: x.lastRequest })));
     }
 }
 

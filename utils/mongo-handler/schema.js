@@ -1,6 +1,18 @@
 const mongoose = require('mongoose');
+const { objectIdIfHex } = require('./objectIdKeys');
+const { listPlacement } = require('./listPlacement');
+
+/* A Mixed path's required check lets '' through, where the String path it replaced refused it. */
+const notEmpty = { validator: (value) => value !== '', message: 'Path `{PATH}` is required.' };
+
 const schema = {
     tasks: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
+        // Written by the importers alone (Modules/Importers): the import job that created the task, and the id its
+        // source gave it. No client body sets either, and a copy of the task carries neither.
+        importJobId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        importSourceId: { type: String, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -44,6 +56,31 @@ const schema = {
             type: String,
             required: false,
         },
+        // The chain of parents above the task, root first; empty or missing on a top-level task.
+        // Derived from ParentTaskId by Modules/Tasks/helpers/taskTree.js, never taken from a client.
+        'ancestors': {
+            type: [String],
+            required: false,
+        },
+        // The task whose archive or delete carried this row with it; a restore of that task brings
+        // back the rows that name it. Written only by the cascade in Modules/Tasks/helpers/taskTree.js.
+        'cascadedBy': {
+            type: String,
+            required: false,
+        },
+        // The other lists the task also shows in; its home stays ProjectID and sprintId, and the home alone
+        // decides who reads it. Written only by Modules/Tasks/helpers/taskExtraLists.js, never taken from a client.
+        'extraLists': {
+            type: [{
+                _id: false,
+                projectId: { type: mongoose.Schema.Types.ObjectId, required: true },
+                sprintId: { type: mongoose.Schema.Types.ObjectId, required: true },
+                addedBy: { type: String, required: false },
+                addedAt: { type: Date, required: false },
+            }],
+            default: undefined,
+            required: false,
+        },
         'ProjectID': {
             type: mongoose.Schema.Types.ObjectId,
             required: true,
@@ -67,6 +104,7 @@ const schema = {
         'sprintArray': {
             type: Object,
             required: true,
+            set: listPlacement,
         },
         'Task_Priority': {
             type: String,
@@ -140,6 +178,10 @@ const schema = {
             type: Number,
             required: false,
         },
+        // The due date task.due_date_passed last fired for (Modules/Automations/engine/dueDateTrigger).
+        dueDatePassedFor: { type: Date, required: false },
+        // True while task.subtasks_all_done has fired and no subtask has been open since (Modules/Automations/engine/subtaskTrigger).
+        subtasksAllDone: { type: Boolean, required: false },
         'rawDescription': {
             type: String,
             required: false,
@@ -172,11 +214,33 @@ const schema = {
             type: mongoose.Schema.Types.ObjectId,
             required: false,
         },
+        // Provenance of Done — written only by Modules/Tasks/helpers/completion.js:
+        // { workBy: [{ actorId, actorType, agentId?, viaAccount, hours }],
+        //   checkedBy: { actorId, actorType:'human', at } | null,
+        //   closedBy:  { actorId, actorType:'human', at, viaAgent? } | null,
+        //   badge: 'HUMAN'|'AGENT'|'MIXED'|'UNCHECKED'|null, reopenCount }
+        'completion': {
+            type: Object,
+            required: false,
+        },
+        // External links (PR, branch, doc, url) attached through task.link:
+        // [{ url, kind, label, addedBy, actorType, agentId?, addedAt }]
+        'links': {
+            type: Array,
+            default: [],
+            required: false,
+        },
         descriptionBlock: {
             type : Object,
             required: false
         },
         customField: {
+            type: Object,
+            required: false
+        },
+        // Per AI custom field: when and by whom it was last filled by AI, and the hash of the task parts it read;
+        // `failed: { at, reason, trigger }` when a later answer did not fit and was not stored.
+        aiFieldFills: {
             type: Object,
             required: false
         },
@@ -203,6 +267,9 @@ const schema = {
             type: Boolean,
             required: false
         },
+        // A mainChat conversation with an agent (Modules/Agents/chatAgents); its one assignee is the person.
+        agentId: { type: String, required: false },
+        agentName: { type: String, required: false },
         totalEstimatedTime:{
             type: Number,
             required: false
@@ -223,7 +290,9 @@ const schema = {
             type: Number,
             default: null,
             required: false
-        }
+        },
+        // { kind: email | form | webhook, ref } — set by the inbound path that created the task; an agent run on it is tainted
+        origin: { type: Object, required: false },
     },
     timesheet: {
         LogDescription: {
@@ -247,8 +316,9 @@ const schema = {
             required: true,
         },
         ProjectId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
+            set: objectIdIfHex,
         },
         TicketID: {
             type: String,
@@ -272,6 +342,22 @@ const schema = {
             default: true,
             required: false,
         },
+        actorType: {
+            type: String,
+            required: false,
+        },
+        agentId: {
+            type: String,
+            required: false,
+        },
+        viaAccount: {
+            type: String,
+            required: false,
+        },
+        runId: {
+            type: String,
+            required: false,
+        },
     },
     history: {
         Key: {
@@ -283,8 +369,10 @@ const schema = {
             required: true,
         },
         ProjectId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
+            validate: notEmpty,
+            set: objectIdIfHex,
         },
         TaskId: {
             type: String,
@@ -298,6 +386,11 @@ const schema = {
             type: String,
             required: true,
         },
+        // Only on a change an agent made (Modules/Agents/actingAgent): UserId stays the person, so every
+        // reader that filters by person still finds the row. A person's own change has none of the three.
+        actorType: { type: String, required: false },
+        agentName: { type: String, required: false },
+        actedFor: { type: String, required: false },
         // BUG-046 / #100: createdAt/updatedAt are populated by Mongoose
         // (`timestamps: true` on historySchema). Keep the field
         // declarations so older code paths that still reference the
@@ -348,10 +441,28 @@ const schema = {
         active: { type: Boolean, default: true, required: false },
         expiresAt: { type: Date, required: false },
         lastUsedAt: { type: Date, required: false },
+        // 'user' (a script acting as the person) or 'agent' (a CLI/coding agent —
+        // the action registry applies). Absent means 'user'.
+        kind: { type: String, required: false },
+        agentId: { type: String, required: false },
+        // { mode: 'workspace'|'personal'|'local', provider, linkedAt, label }
+        agentAccount: { type: Object, required: false },
+        // Contractor narrowing: when set, tasks.next / tasks.search stay inside these projects.
+        projectIds: { type: Array, default: [], required: false },
+        // What the token was created to do beyond its scopes (Modules/Mcp/manageFlag.js); never changed afterwards.
+        grants: { type: Array, default: [], required: false },
+        // When the secret in use was issued by a renewal; the lifetime is counted from here.
+        renewedAt: { type: Date, required: false },
+        // Set when the owner was told the token is about to end, so they are told once; a renewal clears it.
+        expiryNoticeAt: { type: Date, required: false },
     },
     // Per-call audit of token-authenticated API requests
     apiActivityLogs: {
-        tokenId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        // An MCP call made with an OAuth access token has no personal token: it names the client and grant instead.
+        tokenId: { type: mongoose.Schema.Types.ObjectId, required() { return !this.clientId; } },
+        clientId: { type: String, required: false },
+        grantId: { type: String, required: false },
+        userId: { type: String, required: false },
         method: { type: String, required: true },
         path: { type: String, required: true },
         statusCode: { type: Number, required: false },
@@ -384,6 +495,24 @@ const schema = {
         errorList: { type: Array, default: [], required: false },
         mapping: { type: Object, required: false },
         fileName: { type: String, required: false },
+        updated: { type: Number, required: false },
+        undoneAt: { type: Date, required: false },
+        undoneBy: { type: String, required: false },
+    },
+    aiFieldJobs: {
+        userId: { type: String, required: true },
+        fieldId: { type: String, required: true },
+        taskIds: { type: Array, default: [], required: false },
+        proposalIds: { type: Array, default: [], required: false },
+        status: { type: String, required: true },
+        total: { type: Number, default: 0, required: false },
+        processed: { type: Number, default: 0, required: false },
+        filled: { type: Number, default: 0, required: false },
+        skipped: { type: Number, default: 0, required: false },
+        failed: { type: Number, default: 0, required: false },
+        stopReason: { type: String, default: '', required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
     },
     // Epics: a grouping layer above tasks with progress roll-up
     epics: {
@@ -413,7 +542,10 @@ const schema = {
         monthday: { type: Number, required: false },
         runHour: { type: Number, default: 9 },
         skipIfOpen: { type: Boolean, default: false },
+        missedPolicy: { type: String, required: false },
         until: { type: Date, required: false },
+        maxRuns: { type: Number, required: false },
+        sourceTaskId: { type: String, required: false },
         nextRunAt: { type: Date, required: false },
         lastRunAt: { type: Date, required: false },
         lastInstanceTaskId: { type: String, required: false },
@@ -424,6 +556,150 @@ const schema = {
         sprintArray: { type: Object, required: false },
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0 },
+    },
+    // Task templates (Modules/TaskTemplates). Dates are day offsets from the day a template is applied;
+    // checklist is [{ key, name, parentKey }] and subtasks [{ title, startOffsetDays, dueOffsetDays, assigneeIds }].
+    task_templates: {
+        name: { type: String, required: true },
+        // 'project' | 'workspace'; a workspace template has no ProjectID.
+        scope: { type: String, default: 'project', required: true },
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, default: null, required: false },
+        defaultForProjects: { type: Array, default: [], required: false },
+        sourceTaskId: { type: String, default: '', required: false },
+        titlePattern: { type: String, default: '', required: false },
+        rawDescription: { type: String, default: '', required: false },
+        descriptionBlock: { type: Object, default: {}, required: false },
+        TaskType: { type: String, default: '', required: false },
+        TaskTypeKey: { type: Number, default: null, required: false },
+        Task_Priority: { type: String, default: '', required: false },
+        tagsArray: { type: Array, default: [], required: false },
+        totalEstimatedTime: { type: Number, default: null, required: false },
+        points: { type: Number, default: null, required: false },
+        customField: { type: Object, default: {}, required: false },
+        startOffsetDays: { type: Number, default: null, required: false },
+        dueOffsetDays: { type: Number, default: null, required: false },
+        checklist: { type: Array, default: [], required: false },
+        subtasks: { type: Array, default: [], required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // View templates (Modules/ViewTemplates). viewType is the view's keyName; settings is what cleanViewSettings returns.
+    view_templates: {
+        name: { type: String, required: true },
+        viewType: { type: String, required: true },
+        settings: { type: Object, default: {}, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Project templates saved from a project (Modules/ProjectSnapshots). A `template` row is the template: `snapshot` holds the rows a
+    // duplicate would write, under ids of their own, with dates as milliseconds from the project's start. Its tasks sit in `tasks` rows
+    // of a few each that name it by templateId, so no one document grows with the project.
+    project_snapshots: {
+        kind: { type: String, required: true },
+        name: { type: String, required: false },
+        description: { type: String, default: '', required: false },
+        everyone: { type: Boolean, default: false, required: false },
+        sourcePrivate: { type: Boolean, default: false, required: false },
+        include: { type: Object, default: {}, required: false },
+        counts: { type: Object, default: {}, required: false },
+        statuses: { type: Array, default: undefined, required: false },
+        snapshot: { type: Object, required: false },
+        templateId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        part: { type: Number, required: false },
+        tasks: { type: Array, default: undefined, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // A person's saved views of the Everything page (Modules/Tasks/controller/everythingViews.js). userId is the
+    // one person who can read or change the row; settings is what parseViewSettings returns.
+    everything_views: {
+        userId: { type: String, required: true },
+        name: { type: String, required: true },
+        settings: { type: Object, default: {}, required: false },
+        isDefault: { type: Boolean, default: false, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Goals (Modules/Goals). Who may read a row is decided by visibility, ownerUserId and sharedWith
+    // (helpers/goalAccess.js); revision is the guard every write names so two writers cannot overwrite each other.
+    goals: {
+        name: { type: String, required: true },
+        description: { type: String, default: '', required: false },
+        ownerUserId: { type: String, required: true },
+        periodStart: { type: String, default: '', required: false },
+        periodEnd: { type: String, default: '', required: false },
+        visibility: { type: String, required: true },
+        sharedWith: { type: [String], default: [], required: false },
+        color: { type: String, default: '', required: false },
+        progressPct: { type: Number, default: 0, required: false },
+        reachedAt: { type: Date, default: null, required: false },
+        notifiedAt: { type: Date, required: false },
+        aiSummary: {
+            text: { type: String, required: false },
+            basis: { type: String, required: false },
+            madeAt: { type: Date, required: false },
+        },
+        targets: {
+            type: [{
+                _id: false,
+                id: { type: String, required: true },
+                name: { type: String, required: true },
+                kind: { type: String, required: true },
+                weight: { type: Number, default: 1, required: false },
+                progressPct: { type: Number, default: 0, required: false },
+                reachedAt: { type: Date, default: null, required: false },
+                notifiedAt: { type: Date, required: false },
+                start: { type: Number, required: false },
+                target: { type: Number, required: false },
+                current: { type: Number, required: false },
+                unit: { type: String, required: false },
+                currencyCode: { type: String, required: false },
+                done: { type: Boolean, required: false },
+                updatedBy: { type: String, required: false },
+                updatedAt: { type: Date, required: false },
+                sources: {
+                    sprintIds: { type: [String], default: undefined, required: false },
+                    taskIds: { type: [String], default: undefined, required: false },
+                },
+                counted: {
+                    done: { type: Number, required: false },
+                    total: { type: Number, required: false },
+                    at: { type: Date, required: false },
+                    failedAt: { type: Date, required: false },
+                    failedCode: { type: String, required: false },
+                    skipped: {
+                        sprintIds: { type: [String], default: undefined, required: false },
+                        taskIds: { type: [String], default: undefined, required: false },
+                    },
+                },
+                dirty: { type: Boolean, required: false },
+            }],
+            default: [],
+            required: false,
+        },
+        revision: { type: Number, default: 0, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        // Written by the welcome project's seeder alone, with that project's id: removing the sample takes this goal and no goal a person made.
+        sample: { type: Boolean, required: false },
+        sampleProjectId: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // A list's whiteboard (Modules/Whiteboards). elements is what applyPatch returns: cards that name a task by id
+    // and never carry its title. history holds the states earlier saves replaced, capped by MAX_SNAPSHOTS.
+    whiteboards: {
+        projectId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        sprintId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        elements: { type: Array, default: [], required: false },
+        revision: { type: Number, default: 0, required: false },
+        history: { type: Array, default: [], required: false },
+        historyKeptAt: { type: Date, required: false },
+        savedAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Personal reminders (COLLAB-03) — one-shot, per-user. A node-schedule cron
     // (every minute) fires any reminder whose reminderAt has passed and that
@@ -529,7 +805,27 @@ const schema = {
         reviewedAt: { type: Date, required: false },
         reviewedBy: { type: String, required: false },
         reviewerName: { type: String, required: false },
+        // The standing approval was given by the person whose week it is
+        selfApproved: { type: Boolean, default: false, required: false },
         rejectionReason: { type: String, required: false },
+        // One entry per approval (who, when, and whether it was their own week) and per reopening (who, when, and the review that undid).
+        history: {
+            type: [{
+                _id: false,
+                action: { type: String, required: true },
+                from: { type: String, required: false },
+                to: { type: String, required: false },
+                by: { type: String, required: true },
+                byName: { type: String, required: false },
+                at: { type: Date, required: true },
+                selfApproved: { type: Boolean, required: false },
+                reviewedBy: { type: String, required: false },
+                reviewerName: { type: String, required: false },
+                reviewedAt: { type: Date, required: false },
+            }],
+            default: undefined,
+            required: false,
+        },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
     // Billing rates — per user / project / default hourly rate — managed by Modules/TimeSheet (TIME-07)
@@ -545,6 +841,28 @@ const schema = {
     ssoConfigs: {
         provider: { type: String, default: 'oidc', required: false },
         isEnabled: { type: Boolean, default: false, required: false },
+        displayName: { type: String, default: '', required: false },
+        domains: { type: [String], default: [], required: false },
+        // Published as the TXT record _alianhub-sso.<domain> to prove the company controls a domain.
+        domainVerificationToken: { type: String, required: false },
+        verifiedDomains: {
+            type: [{
+                _id: false,
+                domain: { type: String, required: true },
+                verifiedAt: { type: Date, required: true },
+                // Set by the daily re-check (Modules/SSO/domainRecheck.js); consecutive checks that found no record.
+                lastCheckedAt: { type: Date, required: false },
+                failedChecks: { type: Number, required: false },
+            }],
+            default: [],
+            required: false,
+        },
+        lapsedDomains: {
+            type: [{ _id: false, domain: { type: String, required: true }, lapsedAt: { type: Date, required: true } }],
+            default: [],
+            required: false,
+        },
+        enforcement: { type: String, default: 'optional', required: false },
         autoProvisionUsers: { type: Boolean, default: true, required: false },
         defaultRoleType: { type: Number, default: 3, required: false },
         oidc: { type: Object, required: false },
@@ -564,6 +882,91 @@ const schema = {
         entityName: { type: String, required: false },
         meta: { type: Object, required: false },
         ip: { type: String, required: false },
+        // Only on rows written while AUDIT_CHAIN is on (Modules/Audit/chain.js). The hash is taken before save,
+        // so no auditLogs field may have a default: a value Mongoose adds on save would fail verification.
+        chain: {
+            seq: { type: Number, required: false },
+            prevHash: { type: String, required: false },
+            hash: { type: String, required: false },
+        },
+    },
+    // One document per chain head: _id "head" in a company database, the company id in the global mirror.
+    auditChainHeads: {
+        _id: { type: String, required: true },
+        seq: { type: Number, required: true },
+        hash: { type: String, required: true },
+        rowId: { type: String, required: false },
+        mac: { type: String, required: true },
+        at: { type: Date, required: false },
+    },
+    // Per-company secrets by handle (Config/secrets.js): AES-256-GCM ciphertext under the key whose
+    // fingerprint is keyId. Revocation blanks the ciphertext and keeps the row as a record.
+    secrets: {
+        handle: { type: String, required: true },
+        name: { type: String, required: true },
+        kind: { type: String, required: true },
+        keyId: { type: String, required: true },
+        ciphertext: { type: String, required: false },
+        iv: { type: String, required: false },
+        tag: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        rotatedAt: { type: Date, required: false },
+        revokedAt: { type: Date, required: false },
+        lastResolvedAt: { type: Date, required: false },
+        // No document points at the handle any more, and no key was set to revoke it with (Config/secrets.js retire).
+        orphanedAt: { type: Date, required: false },
+        // A skill_read secret is sent only to these hosts, in this request header (authorization when unset).
+        hosts: { type: [String], required: false, default: undefined },
+        header: { type: String, required: false },
+    },
+    // The last chained row a retention sweep deleted; verification starts after the newest one.
+    auditChainAnchors: {
+        seq: { type: Number, required: true },
+        hash: { type: String, required: true },
+        rowId: { type: String, required: false },
+        cutoff: { type: Date, required: false },
+        mac: { type: String, required: true },
+    },
+    // Where resumed verification has got to, shared by every server (Modules/Audit/chain.js): _id "progress".
+    auditChainProgress: {
+        _id: { type: String, required: true },
+        anchorSeq: { type: Number, required: false },
+        seq: { type: Number, required: false },
+        hash: { type: String, required: false },
+        rewalkSeq: { type: Number, required: false },
+        rewalkHash: { type: String, required: false },
+        brokenAt: { type: Number, required: false },
+        gen: { type: Number, required: false },
+        mac: { type: String, required: false },
+        at: { type: Date, required: false },
+        owner: { type: String, required: false },
+        leaseId: { type: String, required: false },
+        leaseUntil: { type: Date, required: false },
+        leaseMac: { type: String, required: false },
+    },
+    // Where an erasure's audit redaction has got to (Modules/Audit/redact.js), keyed by the person's pseudonym.
+    auditRedactions: {
+        _id: { type: String, required: true },
+        after: { type: String, required: false },
+        rows: { type: Number, required: false },
+        fields: { type: Number, required: false },
+        by: { type: String, required: false },
+        reason: { type: String, required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
+        recordedRowId: { type: String, required: false },
+        runId: { type: String, required: false },
+        owner: { type: String, required: false },
+        leaseUntil: { type: Date, required: false },
+        pending: { type: Object, required: false },
+    },
+    // One document, _id "key", in the global database: the fingerprint of the AUDIT_CHAIN_KEY the chain was
+    // started with (Modules/Audit/keyGuard.js). Never the key itself.
+    auditChainKey: {
+        _id: { type: String, required: true },
+        fingerprint: { type: String, required: true },
+        at: { type: Date, required: false },
     },
     // Per-company SCIM 2.0 provisioning config — managed by Modules/Scim (SEC-05).
     // The IdP-held bearer token is stored only as a bcrypt hash; the company is
@@ -622,6 +1025,8 @@ const schema = {
         savedReportId: { type: String, required: true },
         cadence: { type: String, default: 'weekly', required: false },
         recipients: { type: Array, default: [], required: false },
+        // Who last set the recipients: outside addresses are sent to only while this person is an owner or admin.
+        recipientsBy: { type: String, required: false },
         active: { type: Boolean, default: true, required: false },
         lastRunAt: { type: Date, required: false },
         nextRunAt: { type: Date, required: false },
@@ -653,7 +1058,9 @@ const schema = {
     // Calendar feeds — managed by Modules/Calendar (AUTO-02). Token-keyed in the
     // GLOBAL db; an unauthenticated .ics URL resolves its company + scope.
     calendarFeeds: {
-        token: { type: String, required: true },
+        // Only 012-hash-calendar-feed-tokens reads it; it stays declared so that migration's $unset survives the strict schema.
+        token: { type: String, required: false },
+        tokenHash: { type: String, required: false },
         companyId: { type: String, required: true },
         userId: { type: String, required: false },
         scope: { type: String, default: 'my', required: false },
@@ -667,27 +1074,710 @@ const schema = {
     // (which tasks) + actions (set_priority); applied on demand as a bulk update.
     automationRules: {
         name: { type: String, required: true },
-        trigger: { type: String, default: 'manual', required: false },
+        // v1 stored a bare trigger name ("task_created"); v2 stores
+        // { type, event, cron, tz }. Mixed so both shapes validate — existing
+        // rules keep working untouched, and the matcher reads either
+        // (`rule.trigger.event || rule.trigger`). Narrowing this to Object would
+        // orphan every rule already saved.
+        trigger: { type: mongoose.Schema.Types.Mixed, default: 'manual', required: false },
+        version: { type: Number, default: 1, required: false },
         conditions: { type: Object, default: {}, required: false },
+        // v1 flat action list. Kept because the on-demand bulk `apply` still
+        // reads it; v2 rules use `steps` instead.
         actions: { type: Array, default: [], required: false },
+        steps: { type: Array, default: [], required: false },
+        scope: { type: Object, default: {}, required: false },
+        limits: { type: Object, default: {}, required: false },
+        stats: { type: Object, default: {}, required: false },
+        // Opt-in to reacting to automation-authored events. Off by default: this
+        // is the switch that stops rule A and rule B triggering each other forever.
+        reactToAutomation: { type: Boolean, default: false, required: false },
+        // Round-robin turn per assign step id, advanced atomically by Modules/Automations/engine/assignees.
+        assignCursors: { type: Object, default: {}, required: false },
+        // { [userId]: { hour, count } } — notices the rule's notify steps sent each person in the current hour (Modules/Automations/engine/noticeRecipients).
+        notifyWindows: { type: Object, default: {}, required: false },
+        // [{ reason: 'unknown_status', status, step? }] — a condition naming a status no project in scope has,
+        // flagged by migrations 061 (conditions) and 062 (condition steps) instead of being dropped; cleared when the rule is saved again.
+        needsReview: { type: Array, default: undefined, required: false },
         enabled: { type: Boolean, default: true, required: false },
+        // The v1 on-demand bulk apply only: when it last ran and how many tasks it
+        // changed. A v2 rule is fired by events, never applied, so these stay unset
+        // on one — how often it fired is counted from its automationRuns.
         lastRunAt: { type: Date, required: false },
         lastRunCount: { type: Number, default: 0, required: false },
         createdBy: { type: String, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Canonical domain events, written by event/domainEventBus.js. Phase 0 of the
+    // automation engine records envelopes without acting on them, so we can read a
+    // week of real traffic and find the events we don't yet emit before the matcher
+    // is built against the wrong shape. Capped by TTL — this is a diagnostic log,
+    // never a source of truth.
+    automationEventLog: {
+        eventId: { type: String, required: true },
+        type: { type: String, required: true },
+        occurredAt: { type: Date, required: true },
+        actor: { type: Object, default: {}, required: false },
+        depth: { type: Number, default: 0, required: false },
+        scope: { type: Object, default: {}, required: false },
+        entity: { type: Object, default: {}, required: false },
+        changedFields: { type: Array, default: [], required: false },
+        hasPrevious: { type: Boolean, default: false, required: false },
+    },
+    // One document per rule execution. `cursor` is what makes a container restart
+    // mid-run resumable instead of replaying: the runner writes it after every
+    // step, so a resumed run picks up at the next step rather than re-applying
+    // mutations that already landed.
+    // What an agent has already reported for a task, keyed on the STABLE fact id
+    // rather than the finding's title. The model re-words the same defect on every
+    // run ("Shorten meta description to 160 characters" one run, "…to avoid
+    // truncation" the next), so title-based dedup silently fails and the board
+    // fills with the same six defects again and again.
+    agentFindings: {
+        projectId: { type: mongoose.Schema.Types.Mixed, required: true, set: objectIdIfHex },
+        taskId: { type: String, required: true },
+        factId: { type: String, required: true },
+        skill: { type: String, required: false },
+        subtaskId: { type: String, required: false },
+        title: { type: String, required: false },
+        severity: { type: String, required: false },
+        // open | resolved | wontfix — `wontfix` is set by a human and is never
+        // re-filed, which is how the "ignore this check" list learns itself.
+        status: { type: String, default: 'open', required: false },
+        occurrences: { type: Number, default: 1, required: false },
+        firstSeenAt: { type: Date, required: false },
+        lastSeenAt: { type: Date, required: false },
+    },
+    // What a project's daily look found, by rule and with no model — managed by Modules/Agents/manager.
+    projectFindings: {
+        projectId: { type: mongoose.Schema.Types.Mixed, required: true, set: objectIdIfHex },
+        // rule, subject and cause; one row per project and key, reopened when the cause comes back
+        key: { type: String, required: true },
+        rule: { type: String, required: true },
+        taskId: { type: String, required: false },
+        // every task the finding names or counts: a reader sees it only when they can open them all
+        taskIds: { type: [String], default: [], required: false },
+        userId: { type: String, required: false },
+        facts: { type: Object, default: {}, required: false },
+        // open | handled (its change was approved and the cause lasts) | declined (never offered again) | closed (the cause is gone)
+        status: { type: String, default: 'open', required: true },
+        proposalId: { type: String, required: false },
+        openedAt: { type: Date, required: false },
+        lastSeenAt: { type: Date, required: false },
+        closedAt: { type: Date, required: false },
+        // The connected agent that holds the item in the work queue: { by, userId, name, at, until }. Absent, or past `until`, the item is free.
+        claim: { type: Object, required: false },
+        // { why: 'taken_back' | 'finished' | 'withdrawn', userId, name, at }: not handed to an agent again while the row stays open.
+        leftQueue: { type: Object, required: false },
+    },
+    // What agents leave while they work (Modules/Agents/workMarks.js): one row per scope and key, taken by a conditional write.
+    //   place:<projectId> / <n>   one of the project's places for agents at work; `by` holds it for the queue item `ref`
+    //   hand / <connection>       the one queue item `ref` a connected agent holds
+    //   read:<taskId> / <reader>  the task's change stamp `seen` when that agent last read it
+    //   turn / <taskId>           the agent `by` that is changing the task until `until`
+    //   direct:<projectId> / <connection>  the tasks that connection `changed` there on its own lately, each { id, at }
+    agentWorkMarks: {
+        scope: { type: String, required: true },
+        key: { type: String, required: true },
+        by: { type: String, required: false },
+        ref: { type: String, required: false },
+        at: { type: Date, required: false },
+        until: { type: Date, required: false },
+        seen: { type: Date, required: false },
+        listed: { type: Date, required: false },
+        changed: { type: Array, default: undefined, required: false },
+        rev: { type: Number, default: 0, required: false },
+    },
+    // Agents as teammates — managed by Modules/Agents.
+    agents: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
+        name: { type: String, required: true },
+        slug: { type: String, required: false },
+        description: { type: String, required: false },
+        ownerId: { type: String, required: false },
+        skills: { type: Array, default: [], required: false },
+        // Subset of Modules/Agents/registry.js keys this agent may use. Empty = every registry action.
+        allowedActions: { type: Array, default: [], required: false },
+        // The role it plays ('blueprint/slug' of Modules/Agents/roles), so the dispatcher can give a role's task to the least loaded of its agents.
+        role: { type: String, required: false },
+        // 'team-pack:<blueprint>' on an agent a team pack made, so undoing the pack can find it again.
+        madeBy: { type: String, required: false },
+        projectIds: { type: Array, default: [], required: false },
+        // 0 suggest everything · 1 act on low risk · 2 act on medium, propose the rest · 3 also on a schedule
+        autonomy: { type: Number, default: 0, required: false },
+        spendCapUsd: { type: Number, default: 30, required: false },
+        // { month: 'YYYY-MM', usd, tokens, runs }
+        spendMonth: { type: Object, required: false },
+        paused: { type: Boolean, default: false, required: false },
+        pausedReason: { type: String, required: false },
+        pausedAt: { type: Date, required: false },
+        // 'workspace' | 'personal' | 'local'
+        account: { type: String, default: 'workspace', required: false },
+        model: { type: String, required: false },
+        schedule: { type: Object, required: false },
+        // How the agent is meant to be started ('mention' for a project Guide). Informational; runs.canStart enforces the rest.
+        trigger: { type: String, required: false },
+        rateLimitPerDay: { type: Number, required: false },
+        // Overrides the skill's verifier floor (Modules/Agents/engine/confidence.js); null uses the skill's.
+        confidenceFloor: { type: Number, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    agentRuns: {
+        agentId: { type: String, required: true },
+        agentName: { type: String, required: false },
+        taskId: { type: String, required: false },
+        projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
+        skill: { type: String, required: false },
+        trigger: { type: String, required: false },
+        // Depth of the domain event that started a rule-triggered run; its actions emit at depth + 1
+        triggerDepth: { type: Number, default: 0, required: false },
+        triggerEventId: { type: String, required: false },
+        // queued | running | waiting_approval | done | skipped | failed | stopped
+        status: { type: String, default: 'queued', required: true },
+        // caller-supplied (Idempotency-Key) or derived from agent:task:trigger:ref; unique where present
+        idempotencyKey: { type: String, required: false },
+        viaAccount: { type: String, required: false },
+        startedBy: { type: String, required: false },
+        // What the request that started the run was held to (event/writerLimits.js); the run's skill executes under it
+        startedUnder: {
+            agent: { type: Boolean, required: false },
+            chat: { type: Boolean, required: false },
+            projectIds: { type: [String], default: undefined, required: false },
+        },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
+        // set with the terminal status; the TTL index deletes the run once it passes
+        expiresAt: { type: Date, required: false },
+        elapsedMs: { type: Number, default: 0, required: false },
+        // { tokens, usd, model, billedToWorkspace }
+        spend: { type: Object, required: false },
+        // Estimated cost of the model calls in flight, held against the caps until each settles
+        reservedUsd: { type: Number, default: 0, required: false },
+        actions: { type: Array, default: [], required: false },
+        proposals: { type: Array, default: [], required: false },
+        refusals: { type: Number, default: 0, required: false },
+        // [{ action, decision: act | propose | refuse, reason, rating, at }] — one per change the policy reviewed
+        decisions: { type: Array, default: [], required: false },
+        revertedAt: { type: Date, required: false },
+        revertedBy: { type: String, required: false },
+        // { reverted, failed: [{ action, auditId, reason }] }
+        revert: { type: Object, required: false },
+        spendCapUsd: { type: Number, required: false },
+        notifyMe: { type: Boolean, default: false, required: false },
+        outcome: { type: String, required: false },
+        error: { type: String, required: false },
+        // { type, code, provider, model, status, requestId, groupKey, message } — only when a provider error failed the run
+        failure: { type: Object, required: false },
+        // { skill, taskId, taskTitle, proposed, acted, approved, declined, declinedReason, reverted, spendUsd, at }
+        episode: { type: Object, required: false },
+        // LangGraph thread the run executes on (the run id); resumed by approve/decline
+        threadId: { type: String, required: false },
+        // agent_revisions.n pinned at start; absent on runs from before revisions (read as 0)
+        agentRevision: { type: Number, required: false },
+        // { key, hash, n } — the skill identity pinned at start: a data skill's version as n, a code skill's module hash with n null
+        skillRevision: { type: Object, required: false },
+        // { kind: code | seed | workspace, version } — which implementation of the skill ran; version only on a workspace copy
+        skillSource: { type: Object, required: false },
+        // W3C trace id shared by the run's steps, audit rows, log lines and spans
+        traceId: { type: String, required: false },
+        // [{ node, startedAt, endedAt, durationMs, spanId, traceId, status: ok | error | interrupted, tokens, costUsd }], one per node execution
+        steps: { type: Array, default: [], required: false },
+        // Set once the run took in content from outside the workspace (Modules/Agents/taint.js); absent on a clean run
+        tainted: { type: Boolean, required: false },
+        // [{ kind: fetch | email | form | webhook | file | passage | client | instruction | connector, ref, at }] — where it came from, never the content
+        taintSources: { type: Array, default: undefined, required: false },
+        // [{ action, connector, channelId, state: applied | failed | refused, messages, chars, truncated, reason, error, at }] — one per
+        // connector read the run tried; the per-run caps are counted from it, and it never holds what was read
+        connectorReads: { type: Array, default: undefined, required: false },
+        // 'report' for a scheduled report run (no task); absent on a task run
+        kind: { type: String, required: false },
+        scheduleId: { type: String, required: false },
+        slotAt: { type: Date, required: false },
+        // { key, title, summary, sections, counts, text, delivered: { inbox, email, comment, page }, shared: { comment, page: { projectId, counts } }, notes }
+        report: { type: Object, required: false },
+    },
+    // Modules/Agents/schedules — when an L3 agent runs a report, and as whom
+    agentSchedules: {
+        agentId: { type: String, required: true },
+        // the person whose access the run reads with and who receives the report
+        ownerId: { type: String, required: true },
+        createdBy: { type: String, required: false },
+        // daily_briefing | deadline_watch | mentions_digest | weekly_status
+        report: { type: String, required: true },
+        // daily | weekdays | weekly
+        every: { type: String, required: true },
+        // HH:MM in `timezone`
+        at: { type: String, required: true },
+        // 0 (Sunday) to 6, weekly only
+        weekday: { type: Number, required: false },
+        timezone: { type: String, default: 'UTC', required: false },
+        // { days } for deadline_watch
+        options: { type: Object, required: false },
+        // { email, taskId, pageProjectId }
+        deliver: { type: Object, required: false },
+        enabled: { type: Boolean, default: true, required: false },
+        // slots at or before this never fire, so saving a schedule does not fire the slot just gone
+        since: { type: Date, required: false },
+        lastSlotAt: { type: Date, required: false },
+        // { status: done | failed | skipped | missed, reason, code, slot, runId, at }
+        lastResult: { type: Object, required: false },
+        nextRunAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    agentRevisions: {
+        agentId: { type: String, required: true },
+        n: { type: Number, required: true },
+        // draft | candidate | live | superseded — the only fields that change after creation are state and its timestamps
+        state: { type: String, required: true },
+        // every agent field that affects a run, frozen at creation
+        snapshot: { type: Object, required: true },
+        // skill keys the revision executes
+        serves: { type: Array, default: [], required: false },
+        // [{ key, hash, n }] — the identity of each skill when the revision was written
+        skillRefs: { type: Array, default: [], required: false },
+        // save | create | promote | rollback | migration | bootstrap
+        source: { type: String, required: false },
+        rollbackOf: { type: Number, required: false },
+        note: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        promotedBy: { type: String, required: false },
+        promotedAt: { type: Date, required: false },
+        supersededAt: { type: Date, required: false },
+    },
+    aiUsage: {
+        companyId: { type: String, required: false },
+        feature: { type: String, required: true },
+        model: { type: String, required: false },
+        provider: { type: String, required: false },
+        inputTokens: { type: Number, default: 0, required: false },
+        outputTokens: { type: Number, default: 0, required: false },
+        totalTokens: { type: Number, default: 0, required: false },
+        // null when the model had no price on file; never a silent 0
+        costUsd: { type: Number, required: false },
+        priced: { type: Boolean, default: false, required: false },
+        billedToWorkspace: { type: Boolean, default: true, required: false },
+        // Set on a call priced by something other than tokens: unit 'audio_minute', quantity in that unit,
+        // estimated when the quantity came from the upload's size rather than its length
+        unit: { type: String, required: false },
+        quantity: { type: Number, required: false },
+        estimated: { type: Boolean, required: false },
+        runId: { type: String, required: false },
+        userId: { type: String, required: false },
+        at: { type: Date, required: true },
+    },
+    // One per model call (Modules/AICore/replay.js); system, messages and response are redacted and capped
+    aiReplays: {
+        feature: { type: String, required: true },
+        // 'tool' for a registry read an agent called, 'fetch' for a data skill's declared read; absent on a model call
+        kind: { type: String, required: false },
+        runId: { type: String, required: false },
+        agentId: { type: String, required: false },
+        agentRevision: { type: Number, required: false },
+        // { key, hash, n }
+        skillRevision: { type: Object, required: false },
+        model: { type: String, required: false },
+        provider: { type: String, required: false },
+        params: {
+            temperature: { type: Number, required: false },
+            maxTokens: { type: Number, required: false },
+            jsonMode: { type: Boolean, required: false },
+        },
+        // the routing decision for this call (Modules/AICore/decision.js)
+        decision: { type: Object, required: false },
+        // sha256 of the unredacted { system, messages }, or of the query on a tool row
+        promptHash: { type: String, required: true },
+        system: { type: String, required: false },
+        // [{ role, content }]
+        messages: { type: Array, default: [], required: false },
+        retrievedChunkIds: { type: [String], default: [], required: false },
+        // the run's taint marker at the time of the call (agentRuns.tainted / taintSources); absent on a clean run
+        tainted: { type: Boolean, required: false },
+        taintSources: { type: Array, default: undefined, required: false },
+        // tool rows: { action, args, scope } and the numbers the action returned
+        query: { type: Object, required: false },
+        // fetch rows: { host, path, status, bytes, hops, sha256, body, bodyTruncated }; no headers, no query strings
+        fetch: { type: Object, required: false },
+        result: { type: Object, required: false },
+        response: { type: String, required: false },
+        truncated: { type: Boolean, default: false, required: false },
+        usage: {
+            inputTokens: { type: Number, default: 0, required: false },
+            outputTokens: { type: Number, default: 0, required: false },
+        },
+        costUsd: { type: Number, required: false },
+        durationMs: { type: Number, default: 0, required: false },
+        // ok | error
+        status: { type: String, required: true },
+        errorCode: { type: String, required: false },
+        traceId: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        expiresAt: { type: Date, required: true },
+    },
+    // One in-flight budget hold (Modules/AICore/reservation.js); deleted by the
+    // TTL on expiresAt, which is also what stops a stranded hold blocking a budget
+    aiReservations: {
+        companyId: { type: String, required: false },
+        feature: { type: String, required: true },
+        // held | settled | released
+        state: { type: String, required: true },
+        amountUsd: { type: Number, default: 0, required: true },
+        model: { type: String, required: false },
+        provider: { type: String, required: false },
+        taskClass: { type: String, required: false },
+        estimatedInputTokens: { type: Number, default: 0, required: false },
+        estimatedOutputTokens: { type: Number, default: 0, required: false },
+        actualInputTokens: { type: Number, required: false },
+        actualOutputTokens: { type: Number, required: false },
+        actualUsd: { type: Number, required: false },
+        runId: { type: String, required: false },
+        userId: { type: String, required: false },
+        at: { type: Date, required: true },
+        settledAt: { type: Date, required: false },
+        expiresAt: { type: Date, required: true },
+    },
+    // One rate-alert incident (Modules/Agents/alerts.js); at most one open row per { type, key }
+    aiAlerts: {
+        // agent_error_rate | approval_rate_falling | cost_forecast | queue_age
+        type: { type: String, required: true },
+        // the agentId for agent_error_rate, "company" otherwise
+        key: { type: String, required: true },
+        agentName: { type: String, required: false },
+        // open | resolved
+        status: { type: String, default: 'open', required: true },
+        openedAt: { type: Date, required: true },
+        resolvedAt: { type: Date, required: false },
+        lastValue: { type: Number, required: false },
+        threshold: { type: Number, required: false },
+        window: { type: String, required: false },
+        // condition-specific context, e.g. { baselinePct } or { source, runId }
+        detail: { type: Object, required: false },
+        lastEvaluatedAt: { type: Date, required: false },
+        notifiedUserIds: { type: [String], default: [], required: false },
+        traceId: { type: String, required: false },
+    },
+    // A per-company skill in the closed vocabulary of Modules/Agents/skills/catalogues.js (ADR 003).
+    agentSkills: {
+        key: { type: String, required: true },
+        name: { type: String, required: true },
+        description: { type: String, required: false },
+        version: { type: Number, required: true },
+        enabled: { type: Boolean, default: true, required: false },
+        inputs: { type: Array, default: [], required: false },
+        // [{ reader, as, params }]
+        gather: { type: Array, default: [], required: false },
+        // { partials, instructions, template, output, maxTokens }
+        prompt: { type: Object, required: true },
+        // [{ action, each, max, label, params }]
+        emit: { type: Array, default: [], required: false },
+        // The distinct action keys of `emit`, kept for the manifest and the allowed-actions intersection.
+        emits: { type: Array, default: [], required: false },
+        // Template for the run's summary over answer and emitted; absent means the answer's own summary.
+        summary: { type: String, required: false },
+        // Template rendered from gathered data alone, posted when the model answered nothing.
+        fallback: { type: String, required: false },
+        // { keys, numbers, fields, mustNameKey, allowHours, cites } — the ground-truth gate over the answer.
+        grounded: { type: Object, required: false },
+        risk: { type: String, required: false },
+        // Model pinned to this skill, validated against the priced allowlist at save time
+        model: { type: String, required: false },
+        declaredHosts: { type: [String], default: undefined, required: false },
+        retiredAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+    },
+    agentProposals: {
+        agentId: { type: String, required: true },
+        agentName: { type: String, required: false },
+        runId: { type: String, required: false },
+        taskId: { type: String, required: false },
+        // Every task a batch names. A person who cannot read one of them does not see the proposal (Agents/access.js).
+        taskIds: { type: [String], default: undefined, required: false },
+        projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
+        what: { type: String, required: true },
+        why: { type: String, required: false },
+        // [{ action, params, label, reversible }] — every action a registry key
+        changes: { type: Array, default: [], required: false },
+        // pending | applying | approved | edited | declined | undone | failed
+        status: { type: String, default: 'pending', required: true },
+        gate: { type: String, required: false },
+        priority: { type: String, required: false },
+        decidedBy: { type: String, required: false },
+        decidedAt: { type: Date, required: false },
+        failedAt: { type: Date, required: false },
+        failedReason: { type: String, required: false },
+        undoUntil: { type: Date, required: false },
+        auditIds: { type: Array, default: [], required: false },
+        // [{ action, ok, channelId, channelName, ts, error, at }] — what the provider answered for each connector change
+        delivery: { type: Array, required: false },
+        cost: { type: Object, required: false },
+        // a canned Inbox key (too_many_changes | wrong_tone | needs_person | not_now) or free text, ≤ 200 chars
+        declineReason: { type: String, required: false },
+        // { sources: [{ kind, ref, at }], reason } — set when the run behind it read external content
+        taint: { type: Object, required: false },
+        // 'mcp' when an MCP tool call filed it: requestedBy is the token's person, who the approved change runs as.
+        // 'system' when a project's daily look filed it: the approved change runs on the approver's own rights.
+        source: { type: String, required: false },
+        // { id, rule, facts, projectName } of the finding a 'system' proposal answers
+        finding: { type: Object, required: false },
+        requestedBy: { type: String, required: false },
+        tokenId: { type: String, required: false },
+        // the token's project list when it filed; approval refuses a target outside it
+        tokenProjectIds: { type: Array, required: false },
+        // Set instead of tokenId when an outside client filed it: the grant approval re-checks, and its client
+        oauthClientId: { type: String, required: false },
+        oauthGrantId: { type: String, required: false },
+        allowedActions: { type: Array, required: false },
+        // Set on a change a standing approval applied: it is filed already approved, by the person who made that approval.
+        standingApprovalId: { type: String, required: false },
+        // Set on the parts of a plan an approval left to be made later (Agents/planFollowUp.js): the proposal they came from.
+        splitFrom: { type: String, required: false },
+        // Set where those parts were tried and not made: the person who approved, who alone may try them once more, and why they were not made.
+        retryBy: { type: String, required: false },
+        retryWhy: { type: String, required: false },
+        // [{ part, name, error }] — what an approved change answered that it did not make, kept so the finished proposal says why
+        notMade: { type: Array, default: undefined, required: false },
+    },
+    // "Always do this": one kind of change, by one connection, in one project — managed by Modules/Agents/standingApprovals.js.
+    rolePlaybookOverrides: {
+        key: { type: String, required: true },
+        body: { type: String, required: true },
+        updatedBy: { type: String, required: true },
+    },
+    agentStandingApprovals: {
+        projectId: { type: String, required: true },
+        action: { type: String, required: true },
+        label: { type: String, required: false },
+        // the connection it covers: a personal token, or an outside client's grant
+        tokenId: { type: String, required: false },
+        oauthClientId: { type: String, required: false },
+        oauthGrantId: { type: String, required: false },
+        // the person behind that connection
+        requestedBy: { type: String, required: true },
+        agentId: { type: String, required: false },
+        agentName: { type: String, required: false },
+        madeBy: { type: String, required: true },
+        madeAt: { type: Date, required: true },
+        proposalId: { type: String, required: false },
+        expiresAt: { type: Date, required: true },
+        // active | ended
+        status: { type: String, default: 'active', required: true },
+        endedAt: { type: Date, required: false },
+        endedBy: { type: String, required: false },
+        endedBecause: { type: String, required: false },
+        uses: { type: Number, default: 0, required: false },
+        lastUsedAt: { type: Date, required: false },
+    },
+    automationRuns: {
+        ruleId: { type: String, required: true },
+        ruleName: { type: String, required: false },
+        eventId: { type: String, required: true },
+        eventType: { type: String, required: false },
+        entity: { type: Object, default: {}, required: false },
+        envelope: { type: Object, default: {}, required: false },
+        traceId: { type: String, required: false },
+        status: { type: String, default: 'queued', required: true },
+        cursor: { type: Number, default: 0, required: false },
+        attempts: { type: Number, default: 0, required: false },
+        steps: { type: Array, default: [], required: false },
+        outputs: { type: Object, default: {}, required: false },
+        error: { type: String, required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
+    },
+    /* Task 028 sprint 5 step 1. A workflow run is the durable unit of multi-step
+     * work; an automation rule is a one-node workflow, so `definition.steps` holds
+     * exactly one node of type "automation_rule" and `automationRunId` points at
+     * the automation_runs row the compatibility wrapper executes. */
+    workflowRuns: {
+        workflowId: { type: String, required: true },
+        name: { type: String, required: false },
+        source: { type: String, default: 'automation_rule', required: false },
+        // Unique when present: what makes a redelivered trigger a no-op rather than a second run.
+        dedupeKey: { type: String, required: false },
+        ruleId: { type: String, required: false },
+        ruleName: { type: String, required: false },
+        automationRunId: { type: String, required: false },
+        eventId: { type: String, required: false },
+        eventType: { type: String, required: false },
+        entity: { type: Object, default: {}, required: false },
+        envelope: { type: Object, default: {}, required: false },
+        traceId: { type: String, required: false },
+        startedBy: { type: String, required: false },
+        // The agent, task and project an agent-run workflow works on; what scopes
+        // a run to the projects its reader may open.
+        agentId: { type: String, required: false },
+        taskId: { type: String, required: false },
+        projectId: { type: String, required: false },
+        // queued | running | success | failed | stopped | blocked
+        status: { type: String, default: 'queued', required: true },
+        // { steps: [{ id, type, action, dependsOn, config, maxAttempts }] } — snapshotted at
+        // start, so editing the rule mid-run cannot change the graph underneath it.
+        definition: { type: Object, default: {}, required: false },
+        outputs: { type: Object, default: {}, required: false },
+        error: { type: String, required: false },
+        /* Task 028 sprint 5 step 4. The deadline and the budget the whole chain
+         * spends down, fixed when the run starts, and the re-entry depth it
+         * inherited from whatever started it. Absent means unbounded, which is
+         * every run written before these existed. */
+        deadlineAt: { type: Date, required: false },
+        budgetUsd: { type: Number, required: false },
+        spentUsd: { type: Number, default: 0, required: false },
+        depth: { type: Number, default: 0, required: false },
+        /* Why the run stopped short of what it was asked to do, when that was a
+         * limit rather than an error: the hourly run limit of step 5
+         * ({ reason, stepId, agentId, limit, used, resetsAt, detail, at }) or the
+         * deadline, budget or depth a hop was refused for in step 4
+         * ({ code, reason, stepId, at }). */
+        blocked: { type: Object, required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
+    },
+    /* One row per step of a workflow run, unique on { runId, stepId }. `fencingToken`
+     * is bumped by every claim; a worker whose token is stale has lost its lease and
+     * its write is refused. */
+    workflowStepRuns: {
+        runId: { type: String, required: true },
+        stepId: { type: String, required: true },
+        index: { type: Number, default: 0, required: false },
+        type: { type: String, required: true },
+        action: { type: String, required: false },
+        dependsOn: { type: Array, default: [], required: false },
+        config: { type: Object, default: {}, required: false },
+        // pending | running | success | failed | skipped | stopped
+        status: { type: String, default: 'pending', required: true },
+        attempts: { type: Number, default: 0, required: false },
+        maxAttempts: { type: Number, default: 3, required: false },
+        fencingToken: { type: Number, default: 0, required: false },
+        workerId: { type: String, required: false },
+        claimedAt: { type: Date, required: false },
+        leaseExpiresAt: { type: Date, required: false },
+        nextAttemptAt: { type: Date, required: false },
+        // Action-level key: the audit row it opens is what stops a replay repeating the effect.
+        idempotencyKey: { type: String, required: false },
+        auditId: { type: String, required: false },
+        replayed: { type: Boolean, default: false, required: false },
+        output: { type: Object, required: false },
+        error: { type: String, required: false },
+        // { type, code, deterministic } — `deterministic` is what decides retry versus give up.
+        failure: { type: Object, required: false },
+        // Set when a person skipped the step by hand. A skip nobody asked for blocks
+        // everything behind it; one an operator asked for lets the run carry on.
+        skippedBy: { type: String, required: false },
+        // { action: retry | skip | resume, by, at, reason } — the last operator control applied.
+        control: { type: Object, required: false },
+        // { at, by, reverted, failed } — the result of compensating this step.
+        compensation: { type: Object, required: false },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false },
+        /* Task 028 sprint 5 step 2. A step that is waiting — on a person, on a
+         * clock, on its fan-out children — is pending with a `nextAttemptAt`,
+         * and these say why, so a pending row is readable as blocked rather
+         * than as failed-and-retrying. */
+        waitingSince: { type: Date, required: false },
+        // When a role_handoff step put its task in the role's queue; the step's deadline counts from here.
+        handedAt: { type: Date, required: false },
+        waitUntil: { type: Date, required: false },
+        waitReason: { type: String, required: false },
+        approvalId: { type: String, required: false },
+        agentSessionId: { type: String, required: false },
+        // Fan-out children are written at run time and point back at the step that expanded them.
+        parentStepId: { type: String, required: false },
+        childIndex: { type: Number, required: false },
+        item: { type: Object, required: false },
+        // A loop's bounds: the iteration it is on and the spend its body has taken.
+        iteration: { type: Number, required: false },
+        budgetUsedUsd: { type: Number, required: false },
+        /* Task 028 sprint 5 step 4. What this hop was granted out of what the run
+         * had left, the re-entry depth it ran at, and what it took. */
+        deadlineAt: { type: Date, required: false },
+        budgetUsd: { type: Number, required: false },
+        costUsd: { type: Number, required: false },
+        depth: { type: Number, required: false },
+        // Ids only, never the credential. The previous one stays accepted until the next re-mint.
+        credentialId: { type: String, required: false },
+        previousCredentialId: { type: String, required: false },
+        credentialExpiresAt: { type: Date, required: false },
+    },
+    /* Task 028 sprint 5 step 2. One row per human approval step: who owns the
+     * decision, when it escalates, when it expires and what happened. The step
+     * run waits on this row and resumes when it is decided. */
+    workflowApprovals: {
+        runId: { type: String, required: true },
+        stepId: { type: String, required: true },
+        workflowId: { type: String, required: false },
+        title: { type: String, required: false },
+        prompt: { type: String, required: false },
+        ownerUserId: { type: String, required: false },
+        ownerRole: { type: String, required: false },
+        escalateToUserId: { type: String, required: false },
+        escalateAt: { type: Date, required: false },
+        escalatedAt: { type: Date, required: false },
+        // Owners in order: the original owner first, then whoever an escalation handed it to.
+        owners: { type: Array, default: [], required: false },
+        deadlineAt: { type: Date, required: false },
+        // escalate | approve | reject | fail — what the deadline does when nobody decided.
+        onDeadline: { type: String, default: 'fail', required: false },
+        // pending | approved | rejected | expired
+        status: { type: String, default: 'pending', required: true },
+        decidedBy: { type: String, required: false },
+        decidedAt: { type: Date, required: false },
+        comment: { type: String, required: false },
+        // Who handed the request on, and to whom: one entry per reassignment,
+        // in the order they happened.
+        reassignedBy: { type: String, required: false },
+        reassignedAt: { type: Date, required: false },
+        reassignments: { type: Array, default: [], required: false },
+        context: { type: Object, default: {}, required: false },
+    },
+    /* Task 028 sprint 5. A workflow an author composed and saved, as opposed to
+     * `workflowRuns`, which is one execution of one. A definition is saved
+     * disabled and stays that way until somebody turns it on, the way an
+     * automation rule does: a workflow that starts spending the moment it is
+     * saved gives its author no chance to read it back first. */
+    workflowDefinitions: {
+        name: { type: String, required: true },
+        description: { type: String, required: false },
+        // [{ id, type, action, dependsOn, config, maxAttempts }] — the same shape
+        // `workflowRuns.definition.steps` snapshots when a run starts.
+        steps: { type: Array, default: [], required: false },
+        deadlineMs: { type: Number, required: false },
+        budgetUsd: { type: Number, required: false },
+        enabled: { type: Boolean, default: false, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        enabledBy: { type: String, required: false },
+        enabledAt: { type: Date, required: false },
+        // [{ reason: 'unknown_status', status, step }] — a condition or loop step naming a status no
+        // project has, flagged by migration 062 instead of being dropped.
+        needsReview: { type: Array, default: undefined, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
     // Integration connections — managed by Modules/Integrations (AUTO-04). Generic
-    // registry backing the marketplace, Slack and iframe apps. Secrets live in
-    // config but are redacted before reaching the client.
+    // registry backing the marketplace, Slack and iframe apps. Secret config keys
+    // are AES-256-GCM ciphertext (utils/secretField); secretsVersion 0 marks a row
+    // migration 007 has not sealed yet.
     integrationConnections: {
         type: { type: String, required: true },
         name: { type: String, required: false },
         config: { type: Object, default: {}, required: false },
+        secretsVersion: { type: Number, default: 0, required: false },
+        // { [secret field key]: 'sec_…' } when SECRETS_STORE keeps the value in `secrets`; the field is then absent from config.
+        secretHandles: { type: Object, required: false },
         status: { type: String, default: 'connected', required: false },
         enabled: { type: Boolean, default: true, required: false },
         createdBy: { type: String, required: false },
+        connectedBy: { type: String, required: false },
         connectedAt: { type: Date, required: false },
+        projectIds: { type: [String], default: undefined, required: false },
+        // GitHub: [{ repo: 'owner/name', projectIds: [String], sync: {...} }], each repository with its own cursor and backoff (migration 075).
+        repos: { type: Array, default: undefined, required: false },
+        sync: { type: Object, required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    appConnectionEvents: {
+        key: { type: String, required: true },
+        connectionId: { type: String, required: false },
+        taskId: { type: String, required: false },
     },
     // AHE-3838 — one row per (user, cloud storage provider). Distinct from
     // integrationConnections above, which holds the COMPANY's app registration:
@@ -736,14 +1826,82 @@ const schema = {
         linkedTasks: { type: [mongoose.Schema.Types.ObjectId], required: false, default: [] },
         // 'project' (anyone who can see the project) or 'private' (only its author).
         visibility: { type: String, required: false, default: 'project' },
+        isWiki: { type: Boolean, required: false, default: false },
+        ownerId: { type: String, required: false },
+        reviewDate: { type: Date, required: false },
+        reviewedAt: { type: Date, required: false },
+        reviewedBy: { type: String, required: false },
+        createdByAgent: { type: Boolean, required: false, default: false },
+        agentName: { type: String, required: false },
+        // 'draft' until a person approves an agent-written page.
+        agentStatus: { type: String, required: false },
+        approvedBy: { type: String, required: false },
+        // Same contract as tasks.origin, for a page an inbound path creates; a member's or an agent's page has none
+        origin: { type: Object, required: false },
+        // Who last changed the title or the body, and when. updatedBy moves on a property change too, so it cannot
+        // say who wrote the state a version keeps.
+        editedBy: { type: String, required: false },
+        editedAt: { type: Date, required: false },
+        // Everyone already told that the doc names them. No default: a doc without the list predates it, and a
+        // mongoose array would otherwise read as an empty list and tell everyone it names again.
+        mentionsTold: { type: [String], required: false, default: undefined },
+        // People this one doc is shared with by name, whatever its project or privacy; role is 'viewer' or 'editor'.
+        // Modules/Pages/helpers/pageRules.js holds the limit and what a share gives.
+        sharedWith: {
+            type: [{
+                _id: false,
+                userId: { type: String, required: true },
+                role: { type: String, required: true },
+                by: { type: String, required: false },
+                at: { type: Date, required: false },
+            }],
+            required: false,
+            default: undefined,
+        },
+        // Everyone already told the doc was shared with them, so naming a person again tells them nothing twice.
+        sharesTold: { type: [String], required: false, default: undefined },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // Doc history (Modules/Pages/versions.js). savedBy and savedAt are the writer and the time of the state held, not of
+    // the row. A row with no reason is from the removed history: no savedAt (createdAt stands in) and no visibility.
     pageVersions: {
         pageId: { type: mongoose.Schema.Types.ObjectId, required: true },
         title: { type: String, required: false },
         content: { type: Object, required: false },
         rawText: { type: String, required: false },
         savedBy: { type: String, required: false },
+        savedAt: { type: Date, required: false },
+        name: { type: String, required: false },
+        // 'author' | 'interval' | 'rewrite' | 'restore' | 'manual'
+        reason: { type: String, required: false },
+        // The doc's visibility while this state was live; a 'private' version is its author's alone for good.
+        visibility: { type: String, required: false },
+        hash: { type: String, required: false },
+        size: { type: Number, required: false },
+    },
+    // Comments on a doc (Modules/Pages/comments.js). A reply carries its thread's first comment as parentId and that
+    // comment's blockId; a blockId the doc no longer has is read as a doc-level comment.
+    pageComments: {
+        pageId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        blockId: { type: String, required: false },
+        parentId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        userId: { type: String, required: true },
+        message: { type: String, required: false, default: '' },
+        mentionIds: { type: [String], required: false, default: [] },
+        assigneeId: { type: String, required: false },
+        assignedBy: { type: String, required: false },
+        assignedAt: { type: Date, required: false },
+        resolved: { type: Boolean, required: false },
+        resolvedBy: { type: String, required: false },
+        resolvedAt: { type: Date, required: false },
+        reactions: { type: Array, required: false, default: [] },
+        mediaURL: { type: String, required: false },
+        mediaOriginalName: { type: String, required: false },
+        mediaSize: { type: Number, required: false },
+        editedAt: { type: Date, required: false },
+        isDeleted: { type: Boolean, required: false },
+        deletedBy: { type: String, required: false },
+        deletedAt: { type: Date, required: false },
     },
     // Public share links for sprints/projects (+ optional intake form)
     publicShares: {
@@ -755,6 +1913,8 @@ const schema = {
         createdBy: { type: String, required: false },
         expiresAt: { type: Date, required: false },
         passwordHash: { type: String, required: false },
+        // No default: a missing value is what marks a hash made before this format (Modules/Auth/helpers/passwordHash.js).
+        passwordHashVersion: { type: Number, required: false },
     },
     /* Forms — a form belongs to a project and files every submission as a task in
      * one sprint. That sprint IS the response list: there is no separate response
@@ -814,6 +1974,577 @@ const schema = {
         taskKey: { type: String, default: '', required: false },
         deletedStatusKey: { type: Number, default: 0, required: false },
     },
+    // One billing contract per project — managed by Modules/Milestone (handoff 19a/19b).
+    // The milestones themselves stay in `milestone`; this holds the terms the
+    // money maths needs and that live nowhere else in the product: who the
+    // client is, whether the project is fixed-price or hourly, the tax rate, the
+    // monthly ceiling, and the blended cost rate profitability is measured
+    // against. Rates are stored in MINOR UNITS and tax in BASIS POINTS so no
+    // stored figure is ever a float.
+    projectContracts: {
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        // 'fixed' | 'hourly'
+        billingMode: { type: String, default: 'fixed', required: false },
+        clientName: { type: String, default: '', required: false },
+        vendorName: { type: String, default: '', required: false },
+        // Company users with the client's seat — they are who a sign-off task is
+        // assigned to and who the client view answers for.
+        clientContactIds: { type: Array, default: [], required: false },
+        currency: { type: String, default: 'USD', required: false },
+        currencySymbol: { type: String, default: '$', required: false },
+        taxLabel: { type: String, default: '', required: false },
+        taxRateBp: { type: Number, default: 0, required: false },
+        paymentTermsDays: { type: Number, default: 30, required: false },
+        // Null until somebody sets it. There is no honest default for a blended
+        // cost rate, so profitability stays unavailable rather than wrong.
+        blendedCostRateMinor: { type: Number, default: null, required: false },
+        monthlyCapMinor: { type: Number, default: null, required: false },
+        // Contract-level rule toggles shown on 19a.
+        requireTasksDoneToInvoice: { type: Boolean, default: true, required: false },
+        signOffIsTask: { type: Boolean, default: true, required: false },
+        warnWhenHoursExceedValue: { type: Boolean, default: false, required: false },
+        allowClientMessages: { type: Boolean, default: true, required: false },
+        invoicePrefix: { type: String, default: 'INV', required: false },
+        invoiceSeq: { type: Number, default: 0, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // One row per day, mode, method, route pattern, permission key, role, project scope and reason
+    // (Config/permissionDecisions.js). Never a request body or a query string.
+    permissionDecisions: {
+        day: { type: Date, required: true },
+        mode: { type: String, required: true },
+        method: { type: String, required: true },
+        route: { type: String, required: true },
+        permission: { type: String, required: true },
+        role: { type: Number, default: null, required: false },
+        scope: { type: String, required: true },
+        reason: { type: String, required: true },
+        count: { type: Number, required: false },
+        firstSeen: { type: Date, required: false },
+        lastSeen: { type: Date, required: false },
+        // When a permission.refused audit row was last written for this key, at most once a minute.
+        lastAuditedAt: { type: Date, required: false },
+        userIds: { type: [String], required: false },
+    },
+    // Global only. One row per day, directive, blocked host and document path shape (Modules/CspReport):
+    // a violation report's URLs, referrer and sample are never stored.
+    cspReports: {
+        day: { type: Date, required: true },
+        directive: { type: String, required: true },
+        blockedHost: { type: String, required: true },
+        documentPath: { type: String, required: true },
+        count: { type: Number, required: false },
+        lastSeen: { type: Date, required: false },
+    },
+    // MCP OAuth authorization server (Modules/OAuthServer), global database. Secrets, codes and tokens are
+    // kept only as keyed hashes; a client whose companyId is set was pre-registered by that workspace.
+    oauthClients: {
+        clientId: { type: String, required: true },
+        kind: { type: String, required: true },
+        name: { type: String, required: true },
+        redirectUris: { type: [String], required: true },
+        tokenEndpointAuthMethod: { type: String, required: true },
+        secretHash: { type: String, required: false },
+        scopes: { type: [String], required: false },
+        companyId: { type: String, required: false },
+        createdBy: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        revokedAt: { type: Date, required: false },
+        revokedBy: { type: String, required: false },
+    },
+    oauthGrants: {
+        grantId: { type: String, required: true },
+        clientId: { type: String, required: true },
+        companyId: { type: String, required: true },
+        userId: { type: String, required: true },
+        scopes: { type: [String], required: true },
+        resource: { type: String, required: true },
+        createdAt: { type: Date, required: true },
+        expiresAt: { type: Date, required: true },
+        // The TTL index removes a grant this long after its cap, revoked or not, so the collection stays bounded.
+        purgeAt: { type: Date, required: true },
+        revokedAt: { type: Date, required: false },
+        revokedReason: { type: String, required: false },
+        lastUsedAt: { type: Date, required: false },
+        // Set when the person was told the grant is about to end, so they are told once.
+        expiryNoticeAt: { type: Date, required: false },
+    },
+    // kind is code, access, refresh or consent (an answered consent request). purgeAt drives the TTL index; a code outlives its expiry there so a replay is recognised.
+    oauthTokens: {
+        tokenHash: { type: String, required: true },
+        kind: { type: String, required: true },
+        grantId: { type: String, required: true },
+        clientId: { type: String, required: true },
+        companyId: { type: String, required: true },
+        userId: { type: String, required: true },
+        scopes: { type: [String], required: true },
+        resource: { type: String, required: true },
+        redirectUri: { type: String, required: false },
+        codeChallenge: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        expiresAt: { type: Date, required: true },
+        purgeAt: { type: Date, required: true },
+        spentAt: { type: Date, required: false },
+        revokedAt: { type: Date, required: false },
+    },
+    // One row per client per workspace; status is pending, approved, denied or revoked. scopes is the ceiling a
+    // person may consent to there, and privateSprints the admin opt-in private-sprint delegation needs (S7, S8).
+    oauthClientApprovals: {
+        companyId: { type: String, required: true },
+        clientId: { type: String, required: true },
+        clientName: { type: String, required: false },
+        clientKind: { type: String, required: false },
+        redirectHosts: { type: [String], required: false },
+        status: { type: String, required: true },
+        scopes: { type: [String], required: false },
+        requestedScopes: { type: [String], required: false },
+        privateSprints: { type: Boolean, required: false },
+        requestedBy: { type: String, required: false },
+        requestedAt: { type: Date, required: false },
+        decidedBy: { type: String, required: false },
+        decidedAt: { type: Date, required: false },
+        revokedBy: { type: String, required: false },
+        revokedAt: { type: Date, required: false },
+        updatedAt: { type: Date, required: false },
+    },
+    // One document per workspace (_id "workspace"): the hosts its agents may fetch when
+    // AGENT_EGRESS_ALLOWLIST is on (Modules/Agents/engine/egressAllowlist.js).
+    egressAllowlists: {
+        _id: { type: String, required: true },
+        hosts: { type: [String], required: false },
+        updatedBy: { type: String, required: false },
+        updatedAt: { type: Date, required: false },
+        // Moves on with every save; a save names the version it read, so two console tabs cannot drop each other's hosts.
+        version: { type: Number, required: false },
+    },
+    // One row per workspace and connector, or per person and connector when the connection is a person's own
+    // (Modules/Agents/connectors). Tokens live in `secrets` by handle, never here.
+    connectorConnections: {
+        connector: { type: String, required: true },
+        // The person a personal connection belongs to; absent on a workspace connection.
+        userId: { type: String, required: false },
+        // { bot_token: 'sec_…', signing_secret: 'sec_…' } or { refresh_token: 'sec_…', access_token: 'sec_…' }
+        secretHandles: { type: Object, default: {}, required: false },
+        secretSetAt: { type: Object, default: {}, required: false },
+        team: { type: Object, required: false },
+        // [{ id, name, member }] as the provider listed them when the token was saved or the list refreshed
+        channels: { type: Array, default: [], required: false },
+        channelsFetchedAt: { type: Date, required: false },
+        // [{ id, name, read, post }] the channels an owner or admin chose and what agents may do in each; a row
+        // without the two ticks is from before reading existed and means post only
+        allowedChannels: { type: Array, default: [], required: false },
+        // connected | broken, and for a person's connection also pending | revoked
+        status: { type: String, default: 'connected', required: false },
+        brokenReason: { type: String, required: false },
+        brokenAt: { type: Date, required: false },
+        // What the provider granted, and { email, sub } of the account the person connected
+        scopes: { type: [String], default: undefined, required: false },
+        account: { type: Object, required: false },
+        accessExpiresAt: { type: Date, required: false },
+        connectedAt: { type: Date, required: false },
+        lastUsedAt: { type: Date, required: false },
+        lastRefreshedAt: { type: Date, required: false },
+        // { stateHash, verifier, sessionId, origin } of a connect attempt in progress; cleared when it is used
+        oauth: { type: Object, required: false },
+        disconnectedAt: { type: Date, required: false },
+        // self | admin | member_removed
+        disconnectedBy: { type: String, required: false },
+        lastPostAt: { type: Date, required: false },
+        lastReadAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Instance-wide, in the global database: patterns the owner added to the instruction guard on top of
+    // the built-in list (Modules/AICore/instructionPatterns.js).
+    instructionPatterns: {
+        source: { type: String, required: true },
+        note: { type: String, required: false },
+        addedBy: { type: String, required: false },
+        addedAt: { type: Date, required: false },
+    },
+    // An outside agent delegated a task (Modules/AgentSessions, EXTERNAL_AGENT_SESSIONS). state is offered, active,
+    // completed, failed, revoked or unresponsive; the handle is stored only as a hash and dies with the offer.
+    agentSessions: {
+        taskId: { type: String, required: true },
+        projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
+        sprintId: { type: String, required: false },
+        taskKey: { type: String, required: false },
+        taskName: { type: String, required: false },
+        clientId: { type: String, required: true },
+        clientName: { type: String, required: false },
+        grantId: { type: String, required: true },
+        delegatedBy: { type: String, required: true },
+        assignedDelegator: { type: Boolean, required: false },
+        privateSprint: { type: Boolean, required: false },
+        state: { type: String, required: true },
+        reason: { type: String, required: false },
+        handleHash: { type: String, required: false },
+        handleExpiresAt: { type: Date, required: false },
+        tainted: { type: Boolean, required: false },
+        // Set when a workflow's external_agent step opened the session; the step waits on it.
+        workflowRunId: { type: String, required: false },
+        workflowStepId: { type: String, required: false },
+        createdAt: { type: Date, required: true },
+        deliveredAt: { type: Date, required: false },
+        firstActivityAt: { type: Date, required: false },
+        lastActivityAt: { type: Date, required: false },
+        endedAt: { type: Date, required: false },
+        activityCount: { type: Number, required: false },
+        activities: {
+            type: [{
+                _id: false,
+                type: { type: String, required: true },
+                text: { type: String, required: false },
+                at: { type: Date, required: true },
+            }],
+            required: false,
+        },
+    },
+    // Where a workspace announces delegations to one outside client: an https URL and the HMAC secret that signs each
+    // announcement, by handle when SECRETS_STORE is on and on the row otherwise.
+    agentSessionEndpoints: {
+        clientId: { type: String, required: true },
+        url: { type: String, required: true },
+        secret: { type: String, required: false },
+        secretHandle: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        updatedAt: { type: Date, required: false },
+    },
+    // One person's Ask conversation (Modules/AI/askThreads). Private to ownerId, admins included; a turn keeps only the
+    // ids of what it cited, so reopening a thread re-reads each source under the reader's access of the day.
+    askThreads: {
+        ownerId: { type: String, required: true },
+        title: { type: String, required: false, default: '' },
+        turns: {
+            type: [{
+                _id: false,
+                turnId: { type: String, required: true },
+                question: { type: String, required: true },
+                answer: { type: String, required: false, default: '' },
+                mode: { type: String, required: false, default: 'ask' },
+                model: { type: String, required: false, default: '' },
+                cited: {
+                    type: [{
+                        _id: false,
+                        kind: { type: String, required: true },
+                        sourceId: { type: String, required: true },
+                        ref: { type: String, required: false, default: '' },
+                    }],
+                    required: false,
+                },
+                createdAt: { type: Date, required: true },
+            }],
+            required: false,
+        },
+        turnCount: { type: Number, required: false, default: 0 },
+        lastTurnAt: { type: Date, required: false },
+    },
+    // The answer one viewer got from an Ask card on a dashboard (Modules/AI/askCard). It was built from what userId could
+    // open, so it is only ever read back by userId; cited keeps ids alone and they are re-read under that reader's access.
+    dashboardCardAnswers: {
+        dashboardId: { type: String, required: true },
+        cardUid: { type: String, required: true },
+        userId: { type: String, required: true },
+        question: { type: String, required: true },
+        projectId: { type: String, required: false, default: '' },
+        answer: { type: String, required: false, default: '' },
+        cited: {
+            type: [{
+                _id: false,
+                kind: { type: String, required: true },
+                sourceId: { type: String, required: true },
+                ref: { type: String, required: false, default: '' },
+            }],
+            required: false,
+        },
+        askedAt: { type: Date, required: true },
+        autoAskedAt: { type: Date, required: false },
+    },
+    // The summary or the area an AI column shows for a task (Modules/AI/taskAiValues): one per task and kind, with what
+    // it was made from (basis: the comment count, or a fingerprint of the task text and labels), when, and who asked.
+    // The text is derived from the task and its thread, so it is removed with them and read only through a task read.
+    taskAiValues: {
+        taskId: { type: String, required: true },
+        kind: { type: String, required: true },
+        value: { type: mongoose.Schema.Types.Mixed, required: false },
+        basis: { type: String, required: false, default: '' },
+        madeAt: { type: Date, required: true },
+        madeBy: { type: String, required: false, default: '' },
+    },
+    // One person's thumbs up or down on an AI answer (Modules/AI/feedback). Never the question; the answer and its
+    // cited ids only when the person ticked "include the answer" (shared).
+    aiFeedback: {
+        userId: { type: String, required: true },
+        feature: { type: String, required: true },
+        kind: { type: String, required: true },
+        itemId: { type: String, required: true },
+        threadId: { type: String, required: false, default: '' },
+        runId: { type: String, required: false, default: '' },
+        model: { type: String, required: false, default: '' },
+        rating: { type: String, required: true },
+        reasons: { type: [String], required: false, default: [] },
+        note: { type: String, required: false, default: '' },
+        via: { type: String, required: false, default: 'thumbs' },
+        shared: { type: Boolean, required: false, default: false },
+        answer: { type: String, required: false, default: '' },
+        sources: {
+            type: [{
+                _id: false,
+                kind: { type: String, required: true },
+                sourceId: { type: String, required: true },
+                ref: { type: String, required: false, default: '' },
+            }],
+            required: false,
+            default: [],
+        },
+        createdAt: { type: Date, required: true },
+        updatedAt: { type: Date, required: false },
+    },
+    // A held-out eval run from the AI quality page (Modules/AI/quality): counts and the failing cases only.
+    aiEvalRuns: {
+        suite: { type: String, required: true },
+        passed: { type: Number, required: true },
+        total: { type: Number, required: true },
+        failures: {
+            type: [{
+                _id: false,
+                question: { type: String, required: true },
+                expected: { type: [String], required: false, default: [] },
+                got: { type: [String], required: false, default: [] },
+            }],
+            required: false,
+            default: [],
+        },
+        ranBy: { type: String, required: true },
+        ranAt: { type: Date, required: true },
+    },
+    // Who a project's AI assignment rules name, and when (Modules/AssignmentRules). One row per project.
+    assignmentRules: {
+        projectId: { type: String, required: true },
+        entries: {
+            type: [{
+                _id: false,
+                userId: { type: String, required: true },
+                when: { type: String, required: true },
+            }],
+            default: [],
+            required: false,
+        },
+        fallbackUserId: { type: String, required: false, default: null },
+        onCreate: { type: Boolean, required: false, default: true },
+        onChange: { type: Boolean, required: false, default: false },
+        mode: { type: String, required: false, default: 'suggest' },
+        revision: { type: Number, required: false, default: 1 },
+        updatedBy: { type: String, required: false },
+        updatedAt: { type: Date, required: false },
+        // The dispatcher (Modules/AssignmentRules/dispatcher): { mode: off | suggest | apply, threshold, modelGuess, roles: ['blueprint/slug'],
+        // rules: [{ id?, role, when: { taskTypeKeys, tags, priorities, statusKeys, sprintIds, fields: [{ id, value }] } }], revision, updatedBy, updatedAt }
+        dispatcher: { type: Object, required: false },
+        // What each team pack applied here, so its undo takes back only that (Modules/AssignmentRules/dispatcher/packs.js):
+        // [{ applyId, blueprint, projectIds, roles, rules: [{ id, role, when }], proposalId, fieldProposalId, fieldNames, modeWas, waitingRules: [{ role, tag, proposalId }],
+        //    agents: { made, widened: [{ agentId, projectIds }] }, skills, by, at }]
+        teamPacks: { type: Array, default: undefined, required: false },
+    },
+    // One decision per task revision: what the rules chose, why, and what became of it. `inputHash` covers the task text
+    // and the rule revision, so the same task is never decided twice for the same input.
+    assignmentDecisions: {
+        taskId: { type: String, required: true },
+        projectId: { type: String, required: true },
+        inputHash: { type: String, required: true },
+        trigger: { type: String, required: false, default: 'create' },
+        state: { type: String, required: true },
+        mode: { type: String, required: false, default: 'suggest' },
+        userId: { type: String, required: false, default: null },
+        source: { type: String, required: false, default: null },
+        rejectedUserId: { type: String, required: false, default: null },
+        reason: { type: String, required: false, default: '' },
+        model: { type: String, required: false, default: '' },
+        rulesRevision: { type: Number, required: false, default: 0 },
+        rulesBy: { type: String, required: false, default: '' },
+        resolvedBy: { type: String, required: false, default: '' },
+        resolvedAt: { type: Date, required: false },
+        createdAt: { type: Date, required: false },
+        updatedAt: { type: Date, required: false },
+    },
+    // Which role the dispatcher routed a task to, why, and what a lead made of it (Modules/AssignmentRules/dispatcher).
+    // state: suggested | needs_routing | applied | accepted | dismissed | routed | superseded. `inputHash` covers the task fields the rules read
+    // and the dispatcher revision, so a task is routed once per input.
+    dispatchDecisions: {
+        taskId: { type: String, required: true },
+        projectId: { type: String, required: true },
+        inputHash: { type: String, required: true },
+        trigger: { type: String, required: false, default: 'create' },
+        state: { type: String, required: true },
+        mode: { type: String, required: false, default: 'suggest' },
+        role: { type: String, required: false, default: null },
+        source: { type: String, required: false, default: null },
+        ruleIndex: { type: Number, required: false, default: null },
+        confidence: { type: Number, required: false, default: null },
+        reason: { type: String, required: false, default: null },
+        agentId: { type: String, required: false, default: null },
+        skipped: { type: Array, required: false, default: [] },
+        taskTypeKey: { type: Number, required: false, default: null },
+        chosenRole: { type: String, required: false, default: null },
+        resolvedBy: { type: String, required: false, default: '' },
+        resolvedAt: { type: Date, required: false },
+        createdAt: { type: Date, required: false },
+        updatedAt: { type: Date, required: false },
+    },
+    // One person's AI memory (Modules/AI/aiProfile): private to ownerId, admins included, and read only into
+    // prompts that person starts.
+    aiProfiles: {
+        ownerId: { type: String, required: true },
+        enabled: { type: Boolean, required: false, default: true },
+        nickname: { type: String, required: false, default: '' },
+        role: { type: String, required: false, default: '' },
+        preferences: { type: String, required: false, default: '' },
+        facts: {
+            type: [{
+                _id: false,
+                id: { type: String, required: true },
+                text: { type: String, required: true },
+                source: { type: String, required: false, default: 'manual' },
+                createdAt: { type: Date, required: false },
+            }],
+            required: false,
+        },
+    },
+    // Client invoices raised against a project (handoff 19c). Distinct from the
+    // global `invoices` collection, which is AlianHub's own subscription billing.
+    // Every line keeps the ids it was drafted from so a client question about a
+    // number can be answered by opening the tasks or the time logs behind it.
+    projectInvoices: {
+        ProjectID: { type: mongoose.Schema.Types.ObjectId, required: true },
+        number: { type: String, required: true },
+        clientName: { type: String, default: '', required: false },
+        // 'milestone' | 'month'
+        source: { type: String, default: 'milestone', required: false },
+        periodStart: { type: Date, required: false },
+        periodEnd: { type: Date, required: false },
+        issuedDate: { type: Date, required: false },
+        dueDate: { type: Date, required: false },
+        // [{ id, kind, label, detail, qtyMilli, unitMinor, amountMinor,
+        //    milestoneId, taskIds, timelogIds }]
+        lines: { type: Array, default: [], required: false },
+        currency: { type: String, default: 'USD', required: false },
+        currencySymbol: { type: String, default: '$', required: false },
+        taxLabel: { type: String, default: '', required: false },
+        taxRateBp: { type: Number, default: 0, required: false },
+        subtotalMinor: { type: Number, default: 0, required: false },
+        taxMinor: { type: Number, default: 0, required: false },
+        totalMinor: { type: Number, default: 0, required: false },
+        // 'draft' | 'sent' | 'paid'
+        status: { type: String, default: 'draft', required: false },
+        sentAt: { type: Date, required: false },
+        paidAt: { type: Date, required: false },
+        notes: { type: String, default: '', required: false },
+        createdBy: { type: String, required: false },
+        updatedBy: { type: String, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false },
+    },
+    // Retrieval corpus written by Modules/Knowledge/ingest: one row per chunk of a source document.
+    knowledgeChunks: {
+        companyId: { type: String, required: true },
+        sourceType: { type: String, required: true },
+        sourceId: { type: String, required: true },
+        ordinal: { type: Number, required: true },
+        projectId: { type: mongoose.Schema.Types.ObjectId, required: false, default: null },
+        sprintId: { type: mongoose.Schema.Types.ObjectId, required: false, default: null },
+        taskId: { type: String, required: false, default: '' },
+        participants: { type: [String], required: false, default: [] },
+        visibility: { type: String, required: false, default: 'project' },
+        createdBy: { type: String, required: false, default: '' },
+        // Pages only: the user ids the page is shared with by name.
+        sharedWith: { type: [String], required: false, default: [] },
+        // 'human' | 'agent'
+        authorKind: { type: String, required: false, default: 'human' },
+        // 'member' | 'agent' | 'external', the taint contract of Modules/Agents/taint.js; absent on chunks older than the field reads as not external.
+        origin: { type: String, required: false },
+        title: { type: String, required: false, default: '' },
+        headingPath: { type: [String], required: false, default: [] },
+        text: { type: String, required: false, default: '' },
+        // UTF-8 length of `text`, stored so the console's figures are summed from an index instead of from the text.
+        textBytes: { type: Number, required: false },
+        contentHash: { type: String, required: true },
+        // The vector for `text` under `embeddingModel`; empty until a hybrid company embeds it.
+        embedding: { type: [Number], required: false, default: [] },
+        embeddingModel: { type: String, required: false, default: null },
+        deleted: { type: Boolean, required: false, default: false },
+        deletedAt: { type: Date, required: false, default: null },
+        // 'task' marks a comment left out because its task is deleted, which is how a restore is told apart from a move.
+        tombstoneReason: { type: String, required: false, default: '' },
+        // Files only: the storage key the text was extracted from, how many chunks that text made, and how many extractions have failed.
+        fileKey: { type: String, required: false },
+        pieceCount: { type: Number, required: false },
+        extractAttempts: { type: Number, required: false },
+        // Set while a file is owed an extraction (queued, or a retry due then); cleared once its sync is done.
+        extractDueAt: { type: Date, required: false },
+        // The source row's updatedAt when it was read, so a slower, older read never overwrites a newer one.
+        sourceUpdatedAt: { type: Date, required: false },
+        embedLeaseUntil: { type: Date, required: false },
+        embedLeaseOwner: { type: String, required: false },
+        // Agent memory only (sourceType 'memory'): the scope, the agent whose runs alone read it, and what it was formed from.
+        scope: { type: String, required: false },
+        agentId: { type: String, required: false },
+        projectIds: { type: [String], required: false, default: undefined },
+        runId: { type: String, required: false },
+        startedBy: { type: String, required: false },
+        // Read only by runs of the person in startedBy: the note formed outside any project, or from content outside the workspace.
+        starterOnly: { type: Boolean, required: false },
+        tainted: { type: Boolean, required: false },
+        taintRefs: { type: [String], required: false, default: undefined },
+        derivedFrom: { type: [String], required: false, default: undefined },
+        derivedAuthors: { type: [String], required: false, default: undefined },
+        derivedOnlyPrivateOf: { type: String, required: false },
+    },
+    // What an erasure keeps out of the index for good: one document, one task's comments and files, or one person's private pages and comments.
+    knowledgeExclusions: {
+        companyId: { type: String, required: true },
+        // 'document' | 'task' | 'author'
+        kind: { type: String, required: true },
+        sourceType: { type: String, required: false, default: '' },
+        sourceId: { type: String, required: false, default: '' },
+        userId: { type: String, required: false, default: '' },
+        reason: { type: String, required: false, default: 'erased' },
+        erasedAt: { type: Date, required: false },
+        erasedBy: { type: String, required: false, default: '' },
+        erasedChunks: { type: Number, required: false, default: 0 },
+    },
+    // Backfill progress per source type, one row per tenant database.
+    knowledgeIndexState: {
+        companyId: { type: String, required: true },
+        sourceType: { type: String, required: true },
+        // 'running' | 'catching-up' | 'complete' | 'failed'
+        status: { type: String, required: false, default: 'running' },
+        cursor: { type: String, required: false, default: '' },
+        indexed: { type: Number, required: false, default: 0 },
+        skipped: { type: Number, required: false, default: 0 },
+        startedAt: { type: Date, required: false },
+        finishedAt: { type: Date, required: false, default: null },
+        lastRunAt: { type: Date, required: false },
+        // The service identity the last run was recorded under (STEP_CREDENTIALS), e.g. service:indexer.
+        lastRunBy: { type: String, required: false },
+        error: { type: String, required: false, default: '' },
+        // Written while the indexer is on; a stale one means events may have been dropped while it was off.
+        lastSeenOnAt: { type: Date, required: false },
+        catchUpFrom: { type: Date, required: false, default: null },
+        catchUpPass: { type: Number, required: false, default: 0 },
+        // When the source's chunks were given their origin, so the fill runs once.
+        originFilledAt: { type: Date, required: false },
+        reindexStatus: { type: String, required: false, default: '' },
+        reindexCursor: { type: String, required: false, default: '' },
+        reindexSynced: { type: Number, required: false, default: 0 },
+        reindexRequestedAt: { type: Date, required: false },
+        reindexRequestedBy: { type: String, required: false },
+        reindexFinishedAt: { type: Date, required: false },
+        reindexError: { type: String, required: false, default: '' },
+        reindexFailures: { type: Number, required: false, default: 0 },
+        reindexOwner: { type: String, required: false, default: '' },
+        reindexLeaseUntil: { type: Date, required: false, default: null },
+    },
     // Submissions arriving through a public intake form
     intakeItems: {
         publicShareId: { type: mongoose.Schema.Types.ObjectId, required: true },
@@ -848,10 +2579,20 @@ const schema = {
             default: [],
             required: true,
         },
-        // HMAC secret — generated server-side, returned once on create.
+        // HMAC secret — generated server-side, returned once on create. Absent when
+        // secretHandle names the row in `secrets` that holds it (SECRETS_STORE).
         secret: {
             type: String,
-            required: true,
+            required: false,
+        },
+        secretHandle: {
+            type: String,
+            required: false,
+        },
+        // Set by the dispatcher while the signing secret will not resolve, cleared by the next delivery it can sign.
+        needsAttention: {
+            type: String,
+            required: false,
         },
         active: {
             type: Boolean,
@@ -911,6 +2652,10 @@ const schema = {
         },
     },
     users: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
+        // Set only by scripts/seed-scale.js; its --drop deletes no user without it.
+        scaleSeed: { type: String, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -1007,6 +2752,57 @@ const schema = {
             type: Object,
             required: false
         },
+        // Written only by PUT /api/v2/users/onboarding (Modules/Users/onboarding.js). It was once
+        // $set through /api/v1/user while undeclared, and this strict schema dropped every write.
+        homeChecklist: {
+            dismissed: { type: Boolean, required: false },
+            openedProject: { type: Boolean, required: false },
+            completedTask: { type: Boolean, required: false },
+            loggedTime: { type: Boolean, required: false },
+            reviewedPermissions: { type: Boolean, required: false },
+            chosenApps: { type: Boolean, required: false },
+            viewedBoard: { type: Boolean, required: false },
+            viewedNotifications: { type: Boolean, required: false },
+            importedWork: { type: Boolean, required: false },
+            openedMyWork: { type: Boolean, required: false },
+            viewedShortcuts: { type: Boolean, required: false },
+            connectAiSkipped: { type: Boolean, required: false },
+            toursOffered: { type: [String], required: false, default: undefined }
+        },
+        // mode has no default on purpose: see newAccountNavPreferences in Modules/Users/helpers/navPreferencesRules.js.
+        navPreferences: {
+            pinned: { type: [String], required: false, default: undefined },
+            mode: { type: String, required: false }
+        },
+        accessibilityPreferences: {
+            singleKeyShortcuts: { type: Boolean, required: false }
+        },
+        // Written by Settings > Language (frontend/src/views/Settings/Language/localePrefs.js).
+        localePreferences: {
+            language: { type: String, required: false },
+            numerals: { type: String, required: false },
+            dateFormat: { type: String, required: false },
+            numberFormat: { type: String, required: false },
+            weekStart: { type: String, required: false },
+            currency: { type: String, required: false }
+        },
+        // Stars across companies live on the global user record, so each entry names its company.
+        favourites: {
+            type: [new mongoose.Schema({
+                companyId: { type: String, required: true },
+                type: { type: String, required: true },
+                id: { type: String, required: true },
+                addedAt: { type: Date, required: false }
+            }, { _id: false })],
+            required: false,
+            default: undefined
+        },
+        // Written only by PUT /api/v2/users/home-cards (Modules/Users/homeCards.js).
+        // A saved layout replaces hidden, which only users who never rearranged Home still carry.
+        homeCards: {
+            hidden: { type: [String], required: false, default: undefined },
+            layout: { type: [String], required: false, default: undefined }
+        },
         languageCode: {
             type: String,
             required: false,
@@ -1016,6 +2812,15 @@ const schema = {
             type: String,
             required: false,
             default: ""
+        },
+        workingHours: {
+            type: Object,
+            required: false
+        },
+        // Personal coding-agent link (27b): { mode, provider, linkedAt, label, email }
+        agentAccount: {
+            type: Object,
+            required: false
         }
     },
     adminDetail: {
@@ -1147,8 +2952,86 @@ const schema = {
         }
     },
     companies: {
+        // { by, anchor } — set only by scripts/seed-scale.js, which writes to and drops no company without it.
+        scaleSeed: { type: Object, required: false },
+        // The id of the migration that wrote this row for a workspace opened without one; its down() deletes no row without it.
+        rowRepairedBy: { type: String, required: false },
+        // { allowedModes: ['workspace','personal','local'], requireCheckBeforeDone, connectedPaused, connectedPausedBy, connectedPausedAt }
+        agentPolicy: {
+            type: Object,
+            required: false
+        },
+        agentUndoHours: {
+            type: Number,
+            required: false
+        },
+        agentMonthlyBudgetUsd: {
+            type: Number,
+            required: false
+        },
+        // 0 or unset = no daily limit; the day is the UTC day
+        agentDailyBudgetUsd: {
+            type: Number,
+            required: false
+        },
+        // { day: 'YYYY-MM-DD', '80': Date|null, '100': Date|null }
+        agentDailyBudgetAlerts: {
+            type: Object,
+            required: false
+        },
+        // { month: 'YYYY-MM', '80': Date|null, '100': Date|null }
+        agentBudgetAlerts: {
+            type: Object,
+            required: false
+        },
+        // { enabled, errorRatePct, errorMinRuns, approvalFloorPct, approvalDropPts, costForecastPct, queueAgeMinutes }
+        agentAlerts: {
+            type: Object,
+            required: false
+        },
+        // { classes: { <task class>: { model?, qualityFloor?, latencyTargetMs? } }, updatedAt, updatedBy }
+        // — the routing policy (Modules/AICore/routingPolicy.js); read only while AI_MODEL_ROUTER is on
+        aiRoutingPolicy: {
+            type: Object,
+            required: false
+        },
+        // { <provider>: 'sec_…' } — per-workspace LLM API keys by secrets-store handle
+        // (Modules/AICore/providerKeys.js); read only while TENANT_PROVIDER_KEYS is on
+        aiProviderKeys: {
+            type: Object,
+            required: false
+        },
+        // { enabled: false, updatedAt, updatedBy } — the workspace "AI off" switch (Modules/AICore/aiSwitch.js);
+        // absent or enabled:true is on. An Object for the same reason as knowledgeRetrieval below.
+        aiSwitch: {
+            type: Object,
+            required: false
+        },
+        // { mode: 'on' | 'off' } — read by Modules/Knowledge/flag.js while KNOWLEDGE_RETRIEVAL is
+        // "tenant" or "all"; absent is off under "tenant". An Object, not a nested path: a nested
+        // path makes the company document a getter node-cache cannot clone, and every company read fails.
+        knowledgeRetrieval: {
+            type: Object,
+            required: false
+        },
+        // { mode: 'on' | 'off' } — read by Modules/Knowledge/flag.js while KNOWLEDGE_INDEXER is "tenant" or "all".
+        knowledgeIndexer: {
+            type: Object,
+            required: false
+        },
+        // { mode: 'off' | 'report' | 'enforce' } for browser sessions, read by Config/permissionEnforcement.js;
+        // absent inherits PERMISSION_ENFORCEMENT_MODE. An Object for the same reason as knowledgeRetrieval.
+        permissionEnforcement: {
+            type: Object,
+            required: false
+        },
         "legacyId": {
             type: String,
+            required: false
+        },
+        // Set before a deletion drops the database; every process refuses to open the company from then on.
+        deletingAt: {
+            type: Date,
             required: false
         },
         Cst_City: {
@@ -1192,9 +3075,16 @@ const schema = {
             required: false,
             default: true
         },
+        // Weekday numbers (0 = Sunday) the company works; absent reads as Monday to Friday
+        // (Modules/Company/helpers/workingDays.js). No default, so only a chosen week is stored.
+        workingDays: {
+            type: [Number],
+            required: false,
+            default: undefined
+        },
         Cst_Phone: {
             type: String,
-            required: true
+            required: false
         },
         Cst_State: {
             type: String,
@@ -1525,6 +3415,8 @@ const schema = {
         }
     },
     companyUsers: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -1571,6 +3463,20 @@ const schema = {
             type: String,
             required: false
         },
+        // What the company's SCIM IdP says about this member. The shared users record belongs to every
+        // company the person is in, so an IdP's rename lands here instead.
+        scimExternalId: { type: String, required: false },
+        scimGivenName: { type: String, required: false },
+        scimFamilyName: { type: String, required: false },
+        // Set when SCIM deactivates a live seat; a deactivated row without it may never have been a membership.
+        scimDeactivatedSeatAt: { type: Date, required: false },
+        // The userId of this member's manager in the same company. Empty means no
+        // reporting line is recorded, which is the normal state for most workspaces.
+        managerId: {
+            type: String,
+            required: false,
+            default: ""
+        },
         isTrackerUser: {
             type: Boolean,
             required: false
@@ -1591,6 +3497,11 @@ const schema = {
         },
         ProjectRequiredComponent: {
             type: Array,
+            required: false
+        },
+        // { points: { value, per: 'day' | 'week' }, count: { value, per } }; hours capacity stays on users.workingHours.
+        workloadCapacity: {
+            type: Object,
             required: false
         }
     },
@@ -1658,8 +3569,9 @@ const schema = {
             required: true
         },
         ProjectId: {
-            type: String,
-            required: true
+            type: mongoose.Schema.Types.Mixed,
+            required: true,
+            set: objectIdIfHex,
         },
         TaskId: {
             type: String,
@@ -1721,6 +3633,8 @@ const schema = {
         }
     },
     projects: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         "legacyId": {
             type: String,
             required: false
@@ -1778,6 +3692,52 @@ const schema = {
             type: String,
             required: true
         },
+        // Personal List (Modules/PersonalList). Without these the flag was stripped on
+        // save, the list was never found again and a fresh "Personal" project was
+        // created on every visit — and shown in the team's project list.
+        isPersonal: {
+            type: Boolean,
+            default: false
+        },
+        personalOwner: {
+            type: String,
+            default: ""
+        },
+        // { done: 'never' | 'approval' | 'yes', connected: 'propose_all' | 'single_task', updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectPolicy.js).
+        agentPolicy: {
+            type: Object,
+            required: false
+        },
+        // { atOnce, directTasks, paused, pausedBy, pausedAt, updatedBy, updatedAt }; absent means the defaults (Modules/Agents/projectLimits.js).
+        agentLimits: {
+            type: Object,
+            required: false
+        },
+        // { on, updatedBy, updatedAt }; absent means off (Modules/Agents/manager/settings.js).
+        agentManager: {
+            type: Object,
+            required: false
+        },
+        // The day (YYYY-MM-DD) of the last daily look: the mark a server takes before it looks, so two never look on one day.
+        agentManagerLookedOn: {
+            type: String,
+            required: false
+        },
+        // The day (YYYY-MM-DD) of the last triage: the mark a server takes before it asks the model.
+        agentManagerTriagedOn: {
+            type: String,
+            required: false
+        },
+        // The creation time up to which the manager's model has triaged new tasks (Modules/Agents/managerTriage.js).
+        agentManagerTriagedAt: {
+            type: Date,
+            required: false
+        },
+        // Ids of tasks created at exactly agentManagerTriagedAt that were already triaged.
+        agentManagerTriagedIds: {
+            type: [String],
+            required: false
+        },
         ProjectType: {
             type: String,
             required: true
@@ -1832,11 +3792,6 @@ const schema = {
             default: false
         },
         lastTaskId: {
-            type: Number,
-            required: false,
-            default: 0
-        },
-        milestoneAmount: {
             type: Number,
             required: false,
             default: 0
@@ -1910,6 +3865,12 @@ const schema = {
             required: true,
             default : true
         },
+        // The project's own working week, overriding the company's; absent, null or empty uses the company's.
+        workingDays: {
+            type: [Number],
+            required: false,
+            default: undefined
+        },
         lastProjectActivity: {
             type: Number,
             required: false
@@ -1977,6 +3938,18 @@ const schema = {
         // Slugs from the company's `project_skills` settings list, so renames
         // are display-only and the value joins to a bid's skills downstream.
         skills: {
+            type: Array,
+            required: false,
+            default: []
+        },
+        // Guide instructions generated from the approved brief (task 015):
+        // { stages: [{ name, goal }], essentials, escalations, style, markdown }.
+        aiGuide: {
+            type: Object,
+            required: false
+        },
+        // Assumptions the AI plan was built on: [{ point, text }].
+        aiAssumptions: {
             type: Array,
             required: false,
             default: []
@@ -2143,8 +4116,9 @@ const schema = {
             required: true,
         },
         projectId:{
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: true,
+            set: objectIdIfHex,
         },
         startDate:{
             type: Number,
@@ -2201,6 +4175,22 @@ const schema = {
         billingPeriod:{
             type:String,
             required:false
+        },
+        // Which tasks this milestone covers. Empty means "derive from the
+        // milestone's own date window" — see resolveMilestoneScope.
+        taskIds:{
+            type: Array,
+            default: [],
+            required: false
+        },
+        // Company user who signs the milestone off (the client contact).
+        signOffUserId:{
+            type: String,
+            required: false
+        },
+        signOffAt:{
+            type: Date,
+            required: false
         }
     },
     apps: {
@@ -2238,9 +4228,12 @@ const schema = {
             type: String,
             required: true,
         },
+        // A company-wide doc belongs to no project, so a doc notice may carry none.
         projectId: {
-            type: String,
-            required: true,
+            type: mongoose.Schema.Types.Mixed,
+            required: function projectIdRequired() { return this.type !== 'docs'; },
+            validate: notEmpty,
+            set: objectIdIfHex,
         },
         taskId: {
             type: String,
@@ -2259,8 +4252,9 @@ const schema = {
             required: true,
         },
         folderId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: false,
+            set: objectIdIfHex,
         },
         isSelected: {
             type: Boolean,
@@ -2272,8 +4266,9 @@ const schema = {
             default: []
         },
         sprintId: {
-            type: String,
+            type: mongoose.Schema.Types.Mixed,
             required: false,
+            set: objectIdIfHex,
         },
         companyId: {
             type: String,
@@ -2355,6 +4350,23 @@ const schema = {
         User_Employee_Verify: {
             type: Boolean,
             required:false
+        },
+        // 'watching' when the reader got this only because they watch the item (Inbox "Other").
+        reason: {
+            type: String,
+            required: false
+        },
+        snoozedUntil: {
+            type: Date,
+            required: false
+        },
+        snoozeUntilChange: {
+            type: Boolean,
+            required: false
+        },
+        clearedAt: {
+            type: Date,
+            required: false
         }
     },
     notificationsSettings: {
@@ -2374,9 +4386,36 @@ const schema = {
             type: Object,
             required: true
         },
+        docs: {
+            type: Object,
+            required: false
+        },
+        goals: {
+            type: Object,
+            required: false
+        },
         userId: {
             type: String,
             required: true,
+        },
+        quietHours: {
+            type: Object,
+            required: false
+        },
+        agentActivity: {
+            type: Boolean,
+            required: false,
+            default: true
+        },
+        dailyDigest: {
+            type: Boolean,
+            required: false,
+            default: false
+        },
+        // { agent_error_rate, approval_rate_falling, cost_forecast, queue_age } booleans; an absent type takes the role default (Modules/Agents/alertRules.js)
+        aiAlerts: {
+            type: Object,
+            required: false
         }
     },
     mentions: {
@@ -2384,6 +4423,8 @@ const schema = {
             type: String,
             required: true
         },
+        // The first message of the thread the comment is a reply in, so a mention there opens that thread.
+        comment_parentId: { type: String, required: false },
         comment_mediaOriginalName: {
             type: String,
             required: false
@@ -2441,8 +4482,9 @@ const schema = {
             required: true
         },
         folderId: {
-            type: String,
-            required: false
+            type: mongoose.Schema.Types.Mixed,
+            required: false,
+            set: objectIdIfHex,
         },
         mentionIds: {
             type: Array,
@@ -2453,12 +4495,15 @@ const schema = {
             required: false
         },
         projectId: {
-            type: String,
-            required: true
+            type: mongoose.Schema.Types.Mixed,
+            required: true,
+            validate: notEmpty,
+            set: objectIdIfHex,
         },
         sprintId: {
-            type: String,
-            required: false
+            type: mongoose.Schema.Types.Mixed,
+            required: false,
+            set: objectIdIfHex,
         },
         taskId: {
             type: String,
@@ -2476,7 +4521,22 @@ const schema = {
             type: Boolean,
             required: false,
             default: false
-        }
+        },
+        // One row serves every mentioned reader, so snooze and clear are kept per reader.
+        snoozes: {
+            type: Array,
+            required: false,
+            default: undefined
+        },
+        clearedFor: {
+            type: Array,
+            required: false,
+            default: undefined
+        },
+        purgeAt: {
+            type: Date,
+            required: false
+        },
     },
     comments: {
         "legacyId": {
@@ -2590,7 +4650,42 @@ const schema = {
         folderId:{
             type: mongoose.Schema.Types.ObjectId,
             required: false,
-        }
+        },
+        transcript: { type: String, required: false },
+        isAgent: { type: Boolean, required: false },
+        agentName: { type: String, required: false },
+        // 27c attribution. Without these the fields were stripped on save and every
+        // agent comment read as posted by the person who approved it.
+        actorType: { type: String, default: "" },
+        agentId: { type: String, default: "" },
+        viaAccount: { type: String, default: "" },
+        runId: { type: String, default: "" },
+        automationName: { type: String, required: false },
+        // A threaded reply's first comment; the reply always carries that comment's thread ids.
+        parentId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        assigneeId: { type: String, required: false },
+        assignedBy: { type: String, required: false },
+        assignedAt: { type: Date, required: false },
+        resolved: { type: Boolean, required: false },
+        resolvedBy: { type: String, required: false },
+        resolvedAt: { type: Date, required: false },
+        // @ai: the question's { state, askerId, at, answerId, code }, and on the AI's answer who asked, which comment and what it cites.
+        aiAsk: { type: Object, required: false },
+        aiAskerId: { type: String, required: false },
+        aiQuestionId: { type: String, required: false },
+        aiCitations: { type: Array, required: false },
+        // @agent in chat: the question's { state, askerId, agentIds, at, answerIds, code }; on the agent's reply what it cites and the changes it made or proposed.
+        agentAsk: { type: Object, required: false },
+        agentCitations: { type: Array, required: false },
+        agentChanges: { type: Array, required: false },
+        // A chat message that asked its author's own connected AI (Modules/Agents/manager/chatQuestions.js): { at }. It names nobody.
+        ownAiAsk: { type: Object, required: false },
+        // The tool an importer brought the comment from (Modules/Importers); the author and the time are the file's word.
+        importedFrom: { type: String, required: false },
+        // The import job that saved the comment, and its time and author in the file, by which the same file imported
+        // again knows the comment is already here.
+        importJobId: { type: mongoose.Schema.Types.ObjectId, required: false },
+        importKey: { type: String, required: false }
     },
     mainChat: {
         ProjectCode: {
@@ -2626,10 +4721,6 @@ const schema = {
     subscriptionPlan: {
         addonPriceArray: {
             type: Array,
-            required: false
-        },
-        status: {
-            type: Number,
             required: false
         },
         planName: {
@@ -2715,10 +4806,11 @@ const schema = {
             type:Boolean,
             required : false
         },
-        projectId : {
-            type : String,
-            required : true,
-            default : ''
+        projectId: {
+            type: mongoose.Schema.Types.Mixed,
+            required: true,
+            default: '',
+            set: objectIdIfHex,
         }
     },
     planFeatureDisplay:{
@@ -2820,11 +4912,6 @@ const schema = {
             required: false,
             default: false
         },
-        projectId: {
-            type:Array,
-            required: false,
-            default:''
-        },
         type: {
             type:String,
             required: true,
@@ -2858,7 +4945,7 @@ const schema = {
         isDelete:{
             type:Boolean,
             required: false,
-            default:''
+            default:false
         },
         fieldCountryObject:{
             type:Object,
@@ -2914,9 +5001,60 @@ const schema = {
             type:String,
             required: false,
             default:''
-        }
+        },
+        // Modules/CustomField/aiFields/config.js writes this shape; min to dateRule apply to one output each
+        fieldAi: {
+            enabled: { type: Boolean, required: false },
+            template: { type: String, required: false },
+            // text | option | labels | number | rating | date
+            output: { type: String, required: false },
+            language: { type: String, required: false },
+            prompt: { type: String, required: false },
+            reads: { type: [String], default: undefined, required: false },
+            autoRefill: { type: Boolean, required: false },
+            min: { type: Number, required: false },
+            max: { type: Number, required: false },
+            decimals: { type: Number, required: false },
+            // clamp | reject
+            outOfRange: { type: String, required: false },
+            // '' | after_start | not_past
+            dateRule: { type: String, required: false },
+        },
+        fieldTaskTypes:{
+            type:Array,
+            required: false,
+            default:[]
+        },
+        // people fields: false holds one person
+        fieldMultiple: { type: Boolean, required: false },
+        // rating fields: 3 to 10
+        fieldRatingMax: { type: Number, required: false },
+        // files fields: 1 to 20 files, and any | images | documents
+        fieldFilesMax: { type: Number, required: false },
+        fieldFilesKind: { type: String, required: false },
+        // relationship fields: 1 to 20 linked tasks, from any | project | list
+        fieldLinkMax: { type: Number, required: false },
+        fieldLinkScope: { type: String, required: false },
+        fieldLinkProjectId: { type: String, required: false },
+        fieldLinkSprintId: { type: String, required: false },
+        // voting fields: false keeps the voters to the server
+        fieldVotersShown: { type: Boolean, required: false }
+    },
+    // What a relationship or a voting field holds on one task: task ids, or the ids of the people who voted.
+    customFieldLinks: {
+        // "<taskId>:<fieldId>", so a task holds one document for a field
+        _id: { type: String, required: false },
+        taskId: { type: String, required: true },
+        fieldId: { type: String, required: true },
+        // relationship | voting
+        kind: { type: String, required: true },
+        ids: { type: [String], default: [], required: false },
+        // steps on every vote, so the count a task shows is the one from the latest
+        version: { type: Number, required: false },
     },
     sprints: {
+        // Set only by scripts/demo; demo:unseed deletes nothing without it.
+        demo: { type: Boolean, required: false },
         sendMessage: {
             type: Boolean,
             required: false,
@@ -3038,7 +5176,33 @@ const schema = {
         rolledFrom: {
             type: mongoose.Schema.Types.ObjectId,
             required: false
-        }
+        },
+        purpose: { type: String, required: false },
+        linkedProjectId: { type: String, required: false },
+        visibility: { type: String, required: false },
+        slackMirror: { type: Object, default: {}, required: false }
+    },
+    calls: {
+        callId: { type: String, required: true },
+        chatId: { type: String, required: false },
+        projectId: { type: mongoose.Schema.Types.Mixed, required: false, set: objectIdIfHex },
+        sprintId: { type: String, required: false },
+        media: { type: String, required: false },
+        title: { type: String, required: false },
+        participants: { type: Array, default: [], required: false },
+        startedAt: { type: Date, required: false },
+        endedAt: { type: Date, required: false },
+        durationSec: { type: Number, default: 0, required: false },
+        notetaker: { type: Boolean, default: false, required: false },
+        transcript: { type: String, default: '', required: false },
+        summary: { type: String, default: '', required: false },
+        actionItems: { type: Array, default: [], required: false },
+        status: { type: String, default: 'ready', required: false },
+        recapPostedAt: { type: Date, required: false },
+        createdBy: { type: String, required: false },
+        editedBy: { type: String, required: false },
+        editedAt: { type: Date, required: false },
+        deletedStatusKey: { type: Number, default: 0, required: false }
     },
     folders:{
         name:{
@@ -3056,6 +5220,10 @@ const schema = {
         legacyId : {
             type: String,
             required:false
+        },
+        parentFolderId: {
+            type: mongoose.Schema.Types.ObjectId,
+            required: false
         }
     },
     preCompanies: {
@@ -3155,6 +5323,11 @@ const schema = {
             type: String,
             required: false
         },
+        // No default: a missing value is what marks a hash made before this format (Modules/Auth/helpers/passwordHash.js).
+        passwordHashVersion: {
+            type: Number,
+            required: false
+        },
         isBlocked: {
             type: Boolean,
             default: false
@@ -3232,6 +5405,38 @@ const schema = {
             type: String,
             required: false
         },
+        refreshTokenHash: {
+            type: String,
+            required: false
+        },
+        refreshTokenJti: {
+            type: String,
+            required: false
+        },
+        tokenTail: {
+            type: String,
+            required: false
+        },
+        previousRefreshTokenHash: {
+            type: String,
+            required: false
+        },
+        rotatedAt: {
+            type: Date,
+            required: false
+        },
+        trackerCodeHash: {
+            type: String,
+            required: false
+        },
+        trackerCodeExpiresAt: {
+            type: Date,
+            required: false
+        },
+        trackerCodeChallenge: {
+            type: String,
+            required: false
+        },
         lastActive: {
             type: Date,
             default: new Date()
@@ -3269,6 +5474,29 @@ const schema = {
             type: Date,
             required: true
         }
+    },
+    // One row per migration id, plus the "__lock" row the runner holds while it works.
+    schemaVersions: {
+        _id: { type: String, required: true },
+        appliedAt: { type: Date, required: false },
+        durationMs: { type: Number, required: false },
+        appVersion: { type: String, required: false },
+        ok: { type: Boolean, required: false },
+        error: { type: String, required: false },
+        companies: { type: Object, required: false },
+        owner: { type: String, required: false },
+        expiresAt: { type: Date, required: false },
+    },
+    // A single document (_id "instance") holding what Settings > Instance saves; secrets encrypted.
+    instanceSettings: {
+        _id: { type: String, required: true },
+        values: { type: Object, required: false },
+        updatedAt: { type: Date, required: false },
+        updatedBy: { type: String, required: false },
+        // When API_TOKEN_STRICT was first seen on; the legacy-token grace counts from here and it is never rewritten.
+        apiTokenStrictSince: { type: Date, required: false },
+        // When the maximum API token lifetime first applied; tokens made earlier with a longer expiry count from here.
+        apiTokenMaxLifetimeSince: { type: Date, required: false },
     },
     globalSettings: {
         name: {
@@ -3308,6 +5536,31 @@ const schema = {
         isDeleted: {
             type: Boolean,
             required: true
+        },
+        ownerId: {
+            type: String,
+            required: false
+        },
+        visibility: {
+            type: String,
+            required: false
+        },
+        projectId: {
+            type: mongoose.Schema.Types.Mixed,
+            required: false,
+            set: objectIdIfHex,
+        },
+        sharedWith: {
+            type: Array,
+            required: false
+        },
+        description: {
+            type: String,
+            required: false
+        },
+        updatedBy: {
+            type: String,
+            required: false
         }
     }
 }

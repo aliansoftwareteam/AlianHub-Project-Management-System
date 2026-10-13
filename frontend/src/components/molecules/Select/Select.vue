@@ -1,7 +1,7 @@
 <template>
     <div>
         <span>{{title}}</span>
-        <div class="select-option form-control mt-5px" :id="`${name}_options`" @click="!disabled ? showOption = !showOption : ''" :class="{'cutom-select-disabled': disabled, 'focused': showOption}">
+        <div class="select-option form-control mt-5px" :id="`${name}_options`" @click="!disabled ? showOption = !showOption : ''" :class="{'cutom-select-disabled': disabled, 'focused': showOption, 'sel-tokens': themed}">
             <div class="d-flex align-items-center justify-content-between h-100" :class="{'cursor-default' : disabled, 'cursor-pointer': !disabled}">
                 <div class="select-option__label text-ellipsis">
                     <slot name="header">
@@ -10,8 +10,8 @@
                         </span>
                     </slot>
                 </div>
-                <img v-if="!props.selectImage" :src="clientWidth > 767 ? selectArrow : selectArrowMobile" alt="arrow" :style="`transform: rotateZ(${showOption ? '180' : '0'}deg)`">
-                <img v-else :src="clientWidth > 767 ? otherArrow : selectArrowMobile" alt="arrow" :style="`transform: rotateZ(${showOption ? '180' : '0'}deg)`">
+                <span v-if="themed" class="ah-mask-icon select-option__arrow" :style="[maskOf(arrowImage), { transform: `rotateZ(${showOption ? '180' : '0'}deg)` }]" aria-hidden="true"></span>
+                <img v-else :src="arrowImage" alt="" :style="`transform: rotateZ(${showOption ? '180' : '0'}deg)`">
                 
             </div>
             <div class="select-option-value" v-if="showOption">
@@ -48,8 +48,9 @@
 
 <script setup>
 // PACKAGES
-import { defineComponent, defineProps, defineEmits, ref, nextTick, watch,inject } from 'vue';
+import { computed, defineComponent, defineProps, defineEmits, ref, nextTick, watch,inject } from 'vue';
 import WasabiImage from "@/components/atom/WasabiIamgeCompp/WasabiIamgeCompp.vue";
+import { maskOf } from '@/utils/iconMask';
 
 
 // IMAGES
@@ -103,7 +104,8 @@ const props = defineProps({
         type: Boolean,
         required: false,
         default: false
-    }
+    },
+    themed: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(["change", "input", "update:modelValue", "ShowOpiton"]);
@@ -112,6 +114,7 @@ const showOption = ref(false);
 const search = ref("");
 const searchBox = ref();
 const clientWidth = inject("$clientWidth");
+const arrowImage = computed(() => (clientWidth?.value > 767 ? (props.selectImage ? otherArrow : selectArrow) : selectArrowMobile));
 
 emit("ShowOpiton",showOption.value)
 

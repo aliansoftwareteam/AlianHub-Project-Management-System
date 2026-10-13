@@ -84,7 +84,7 @@ async function fireReminderNotification(companyId, reminder, now) {
 
 // Push the fired state to the owner's open tabs so the list updates live.
 // Never throws — a socket problem must not affect the firing loop.
-function emitFired(reminder, firedAt) {
+function emitFired(companyId, reminder, firedAt) {
     try {
         const plain = reminder && reminder.toObject ? reminder.toObject() : reminder;
         if (!plain || !plain.userId) return;
@@ -93,6 +93,7 @@ function emitFired(reminder, firedAt) {
             data: { ...plain, fired: true, firedAt, isDone: true, completedAt: firedAt },
             updatedFields: { fired: true, isDone: true },
             module: 'generalReminder',
+            companyId,
         });
     } catch (e) {
         logger.error(`${LOG_PREFIX} fired emit failed: ${e.message}`);
@@ -211,7 +212,7 @@ async function processDueForCompany(companyId, now) {
             await updateReminder(companyId, reminder._id, {
                 fired: true, firedAt: ref, isDone: true, completedAt: ref,
             });
-            emitFired(reminder, ref);
+            emitFired(companyId, reminder, ref);
             processedIds.push(String(reminder._id));
             fired++;
         } catch (e) {
@@ -243,7 +244,7 @@ async function fireOne(companyId, reminder) {
     await updateReminder(companyId, reminder._id, {
         fired: true, firedAt: ref, isDone: true, completedAt: ref,
     });
-    emitFired(reminder, ref);
+    emitFired(companyId, reminder, ref);
     await queue.dequeue(reminder._id);
     return { fired: true, alreadyFired: false, emailed };
 }

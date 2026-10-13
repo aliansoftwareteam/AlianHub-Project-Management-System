@@ -13,14 +13,14 @@
             <input ref="fileEl" type="file" accept=".csv,.xlsx" class="font-size-13 jimport__file" @change="parseFile" />
 
             <div v-if="rows.length" class="font-size-13 jimport__preview">
-                {{ $t('Projects.import_rows_found', { count: rows.length }) }}
+                {{ $t('Projects.import_rows_found', { count: rows.length }, rows.length) }}
             </div>
 
             <div class="d-flex align-items-center jimport__controls" v-if="rows.length">
                 <span class="font-size-13 font-weight-500 mr-10px">{{ $t('Projects.select_sprint') }}:</span>
-                <select v-model="selectedSprintId" class="jimport__select font-size-13">
+                <select v-model="selectedSprintId" class="ah-input jimport__select">
                     <option v-for="sprint in sprintOptions" :key="'ji-'+sprint.id" :value="sprint.id">
-                        {{ sprint.folderName ? sprint.folderName + ' / ' : '' }}{{ sprint.name }}
+                        {{ listLabel(sprint) }}
                     </option>
                 </select>
                 <button class="btn-primary font-size-13 ml-10px" :disabled="isImporting || !selectedSprintId" @click="startImport">
@@ -36,7 +36,9 @@
 <script setup>
 // PACKAGES
 import { computed, defineProps, inject, ref, watch } from "vue";
+import { folderPathLabel, listLabel } from "@/utils/folderTree";
 import * as XLSX from "xlsx";
+import { textEncodingOf } from "@/components/organisms/WorkspaceImport/readSheet";
 import { useToast } from "vue-toast-notification";
 import { useI18n } from "vue-i18n";
 
@@ -75,7 +77,7 @@ const sprintOptions = computed(() => {
     });
     Object.values(props.projectData?.sprintsfolders || {}).forEach((folder) => {
         Object.values(folder?.sprintsObj || {}).forEach((sprint) => {
-            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderId: folder.folderId });
+            if (sprint?.id) options.push({ id: sprint.id, name: sprint.name || 'Sprint', folderName: folder.folderName || '', folderPath: folderPathLabel(props.projectData?.sprintsfolders, folder), folderId: folder.folderId });
         });
     });
     return options;
@@ -98,7 +100,7 @@ function parseFile(event) {
     const reader = new FileReader();
     reader.onload = (loadEvent) => {
         try {
-            const workbook = XLSX.read(loadEvent.target.result, { type: 'array' });
+            const workbook = XLSX.read(loadEvent.target.result, { type: 'array', ...textEncodingOf(loadEvent.target.result) });
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             rows.value = XLSX.utils.sheet_to_json(sheet, { defval: '' });
             resultText.value = '';
@@ -170,38 +172,34 @@ function startImport() {
 .jimport__overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: var(--scrim);
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .jimport__card {
-    background: #fff;
+    background: var(--surface);
+    color: var(--ink);
+    color-scheme: var(--scheme);
     border-radius: 10px;
     width: min(520px, 92vw);
     padding: 16px 20px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--shadow-modal);
 }
 .jimport__head { margin-bottom: 8px; }
-.jimport__close { color: #9a9a9a; }
-.jimport__close:hover { color: #e84a4a; }
+.jimport__close { color: var(--ink-2); }
+.jimport__close:hover { color: var(--danger); }
 .jimport__hint { margin-bottom: 12px; }
-.jimport__sample { display: inline-block; margin-bottom: 12px; color: #2f3990; text-decoration: underline; cursor: pointer; }
+.jimport__sample { display: inline-block; margin-bottom: 12px; color: var(--brand); text-decoration: underline; cursor: pointer; }
 .jimport__sample:hover { opacity: 0.8; }
 .jimport__file { margin-bottom: 12px; }
 .jimport__preview { margin-bottom: 10px; }
-.jimport__select {
-    border: 1px solid #e0e0e0;
-    border-radius: 6px;
-    padding: 6px 8px;
-    background: #fff;
-    min-width: 200px;
-}
+.ah-input.jimport__select { width: auto; min-width: 200px; }
 .jimport__result {
     margin-top: 12px;
     padding: 8px 10px;
-    background: #f7f9fc;
+    background: var(--surface-2);
     border-radius: 6px;
 }
 </style>

@@ -9,6 +9,7 @@ const {
 const { SCHEMA_TYPE } = require('../../Config/schemaType');
 const { MongoDbCrudOpration } = require('../../utils/mongo-handler/mongoQueries');
 const logger = require('../../Config/loggerConfig');
+const { nonMembersOf } = require('../../Config/companyMembers');
 
 /**
  * Call signalling for main chat (AHE-3839).
@@ -40,6 +41,11 @@ const logger = require('../../Config/loggerConfig');
 
 const RING_TIMEOUT_MS = 45000;   // unanswered after this = missed
 const MEDIA = new Set(['audio', 'video']);
+const OBJECT_ID = /^[a-f0-9]{24}$/i;
+const REASON_MAX = 40;
+
+/* A decline reason is shown on the caller's screen, so it travels as a few words and nothing else. */
+const reasonText = (reason) => (typeof reason === 'string' && reason.trim() ? reason.trim().slice(0, REASON_MAX) : 'declined');
 
 // callId -> { callId, companyId, chatId, media, from, to, state, startedAt, answeredAt,
 //             timer, callerSocketId, calleeSocketId }
@@ -111,6 +117,8 @@ const resolvePeer = async (companyId, callerUid, chatId) => {
     const peer = parties.find((p) => p !== String(callerUid));
     // A conversation with only one distinct party is a note to self, not a call.
     if (!peer) return null;
+    // A socket and a conversation both outlive a seat: neither end of a call is someone who has left the company.
+    if ((await nonMembersOf(companyId, [String(callerUid), peer])).length) return null;
     return { peer, projectId: String(chat.ProjectID || ''), sprintId: String(chat.sprintId || '') };
 };
 
@@ -192,7 +200,7 @@ exports.callSocketHandler = ({ socket, namespace }) => {
     socket.on('call:invite', async ({ chatId, media } = {}) => {
         try {
             const kind = MEDIA.has(media) ? media : 'audio';
-            if (!chatId) return emitToSocketOwner(socket, 'call:error', { code: 'BAD_REQUEST', message: 'chatId is required.' });
+            if (typeof chatId !== 'string' || !OBJECT_ID.test(chatId)) return emitToSocketOwner(socket, 'call:error', { code: 'BAD_REQUEST', message: 'chatId is required.' });
 
             if (activeByUser.has(userKey(companyId, uid))) {
                 return emitToSocketOwner(socket, 'call:error', { code: 'BUSY_SELF', message: 'You are already on a call.' });
@@ -288,7 +296,7 @@ exports.callSocketHandler = ({ socket, namespace }) => {
             if (entry.socketId === socket.id) return;
             entry.namespace.to(entry.roomName).emit('call:takenElsewhere', { callId });
         });
-        emitToUser(companyId, call.from, 'call:rejected', { callId, reason: reason || 'declined' });
+        emitToUser(companyId, call.from, 'call:rejected', { callId, reason: reasonText(reason) });
         clearCall(call);
     });
 

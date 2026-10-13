@@ -1,10 +1,11 @@
 <template>
     <div v-if="!disabled">
-        <DropDown :id="uid" @isVisible="$event ? '' : statusSearch = ''">
+        <DropDown :id="uid" mode="listbox" @isVisible="$event ? '' : statusSearch = ''">
             <template #button>
                 <div :ref="uid" class="status-main-div d-flex align-items-center">
                     <slot name="head">
                         <TaskTypeIcon :taskType="modelValue" :title="modelValue?.name" :class="['task__type-image vertical-middle cursor-pointer', imgClasses]" />
+                        <span class="ah-sr-only">{{ modelValue?.name }}</span>
                     </slot>
                 </div>
             </template>
@@ -24,7 +25,7 @@
             </template>
 
             <template #options>
-                <DropDownOption v-for="(status, statusIndex) in filteredOptions" :key="statusIndex" @click="$emit('select', status,convertStatus), $emit('update:modelValue', item), $refs[uid].click()">
+                <DropDownOption v-for="(status, statusIndex) in filteredOptions" :key="statusIndex" :selected="modelValue?.key !== undefined && status.key === modelValue.key" @click="$emit('select', status,convertStatus), $emit('update:modelValue', item), $refs[uid].click()">
                     <div class="d-flex align-items-center">
                         <TaskTypeIcon :taskType="status" :title="status?.name" class="task__type-image ml-10px vertical-middle" />
                         <span class="ml-5px"  :style="{color: status.textColor}">{{status.name}}</span>

@@ -5,10 +5,10 @@
                 <li class=" d-flex align-items-center justify-content-between position-re">
                     <span class="taskInnerData"  v-if="!element.isEditable">
                         <div class="d-flex align-items-center  position-re">
-                            <span v-if="props.from === 'task_type'" class="drag-handle" title="Drag to reorder">
+                            <span v-if="props.from === 'task_type'" class="drag-handle" :title="$t('Projects.form_drag_to_reorder')">
                                 <img :src="dragDots" class="drag-handle__img" alt="drag" />
                             </span>
-                            <span v-else class="drag-image-wrapper position-ab" title="Drag to reorder">
+                            <span v-else class="drag-image-wrapper position-ab" :title="$t('Projects.form_drag_to_reorder')">
                                 <img :src="dragIcon" class="dragImage position-re" :style="[{verticalAlign: 'middle'}]" />
                             </span>
                         <template v-if="!element.isEditable && !isChangeColor" >
@@ -26,10 +26,10 @@
                     <img :src="saveData" class="cursor-pointer"  v-if="element.isEditable" @click="$emit('click:updateFieldValue', element,categoryTytpe),$emit('disbaleButton',false)">
                     <img :src="deletered" class="cursor-pointer ml-10px" v-if="element.isEditable" @click="element.isEditable = false, element.name = taskTypeName,$emit('disbaleButton',false),$emit('resetTaskTypeErr')">
                     <span class="taskInnerData task-dropdown" v-if="props.from === 'task_type' && itemData.length > 1">
-                        <DropDown id="" class="status_change_dropdown" :bodyClass="{'taskstatus-dropdown' : true}" v-if="isDeletable && element.default ? false : true">
-                            <template #button>
-                                <button class="btn-white border cursor-pointer dot-btn">
-                                    <img :src="dotcolor">
+                        <DropDown mode="menu" id="" class="status_change_dropdown" :bodyClass="{'taskstatus-dropdown' : true}" v-if="isDeletable && element.default ? false : true">
+                            <template #button="{ triggerAttrs }">
+                                <button type="button" class="btn-white border cursor-pointer dot-btn" v-bind="triggerAttrs">
+                                    <img :src="dotcolor" :alt="$t('Templates.item_actions', { name: element.name })">
                                 </button>
                             </template>
                             <template #options>
@@ -40,10 +40,10 @@
                         </DropDown>
                     </span>
                     <span class="taskInnerData task-dropdown" v-if="!element.isEditable && element.default ? false : true && props.from !== 'task_type'">
-                        <DropDown class="status_change_dropdown" :bodyClass="{'taskstatus-dropdown' : true}" v-if="isDeletable && element.default ? false : true">
-                            <template #button>
-                                <button class="btn-white border cursor-pointer dot-btn">
-                                    <img :src="dotcolor">
+                        <DropDown mode="menu" class="status_change_dropdown" :bodyClass="{'taskstatus-dropdown' : true}" v-if="isDeletable && element.default ? false : true">
+                            <template #button="{ triggerAttrs }">
+                                <button type="button" class="btn-white border cursor-pointer dot-btn" v-bind="triggerAttrs">
+                                    <img :src="dotcolor" :alt="$t('Templates.item_actions', { name: element.name })">
                                 </button>
                             </template>
                             <template #options>
@@ -160,7 +160,7 @@ import DropDownOption from '@/components/molecules/DropDownOption/DropDownOption
 }
 .taskStatusRight ul li{
     list-style: none;
-    border: 1px solid #DFE1E6;
+    border: 1px solid var(--border);
     border-radius: 3px;
     padding: 0px 11px 0px 23px;
     margin-bottom: 10px;
@@ -192,7 +192,7 @@ div#expand_subtask .drop-down-menu {
 }
 input.form-control.edit-input {
     margin: 1px 8px 1px 0px;
-    background-color: #f1f1f1;
+    background-color: var(--fill);
     border: 0;
 }
 .project__setting-ignoredrag{

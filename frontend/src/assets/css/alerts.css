@@ -1,0 +1,33 @@
+/* SweetAlert on the design tokens. The library injects its own stylesheet when it is first imported,
+   so order is not ours to choose; it writes every class inside :where(), and a plain class here
+   outranks that wherever this file lands. A caller's confirmButtonColor is an inline style and
+   still wins over the button rules. */
+.swal2-container { color-scheme: var(--scheme); font-family: var(--font-ui); }
+.swal2-container.swal2-backdrop-show, .swal2-container.swal2-noanimation { background: var(--scrim); }
+.swal2-container .swal2-popup { background: var(--surface); color: var(--ink-2); border: 1px solid var(--hairline); border-radius: var(--r-modal); box-shadow: var(--shadow-modal); }
+.swal2-container .swal2-popup.swal2-toast { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-pop); }
+.swal2-container .swal2-title { color: var(--ink); }
+.swal2-container .swal2-html-container { color: var(--ink-2); }
+.swal2-container .swal2-footer { border-top: 1px solid var(--hairline); color: var(--ink-2); }
+.swal2-container .swal2-close { color: var(--ink-2); }
+.swal2-container .swal2-close:hover { color: var(--danger-ink); }
+.swal2-container .swal2-close:focus-visible { box-shadow: var(--focus); }
+.swal2-container .swal2-timer-progress-bar { background: var(--track); }
+.swal2-container .swal2-loader { border-color: var(--brand) transparent var(--brand) transparent; }
+.swal2-container .swal2-input, .swal2-container .swal2-textarea, .swal2-container .swal2-select { background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: var(--r-input); box-shadow: none; }
+.swal2-container .swal2-input:focus, .swal2-container .swal2-textarea:focus, .swal2-container .swal2-select:focus { border: 1px solid var(--brand); box-shadow: var(--focus); }
+.swal2-container .swal2-input::placeholder, .swal2-container .swal2-textarea::placeholder { color: var(--ink-2); }
+.swal2-container .swal2-input.swal2-inputerror, .swal2-container .swal2-textarea.swal2-inputerror, .swal2-container .swal2-select.swal2-inputerror { border-color: var(--danger) !important; box-shadow: none !important; }
+.swal2-container .swal2-file, .swal2-container .swal2-range, .swal2-container .swal2-radio, .swal2-container .swal2-checkbox { background: var(--surface); color: var(--ink); }
+.swal2-container .swal2-validation-message { background: var(--surface-2); color: var(--ink); }
+.swal2-container .swal2-validation-message::before { background-color: var(--danger); color: var(--on-danger); }
+.swal2-container .swal2-styled { min-height: var(--control-h-lg, 36px); padding: 0 var(--sp-7); border-radius: var(--r-input); font: 600 var(--fs-md, 13px)/1 var(--font-ui); }
+.swal2-container .swal2-styled.swal2-confirm { background-color: var(--brand); color: var(--on-brand); }
+.swal2-container .swal2-styled.swal2-cancel { background-color: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--border); }
+.swal2-container .swal2-styled.swal2-deny { background-color: var(--danger); color: var(--on-danger); }
+.swal2-container .swal2-styled:focus-visible { box-shadow: var(--focus); }
+/* A caller that still passes a button colour gets the library's white text on it. */
+.swal2-container .swal2-styled[style*="background-color"] { color: var(--rail-ink-strong); box-shadow: none; }
+.swal2-container .swal2-progress-steps .swal2-progress-step, .swal2-container .swal2-progress-steps .swal2-progress-step-line { background: var(--brand); color: var(--on-brand); }
+.swal2-container .swal2-progress-steps .swal2-progress-step.swal2-active-progress-step ~ .swal2-progress-step, .swal2-container .swal2-progress-steps .swal2-progress-step.swal2-active-progress-step ~ .swal2-progress-step-line { background: var(--brand-tint); color: var(--brand); }
+body.swal2-no-backdrop .swal2-container .swal2-modal { box-shadow: var(--shadow-modal); }

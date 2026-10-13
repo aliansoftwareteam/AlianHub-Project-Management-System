@@ -41,7 +41,7 @@
                         <tbody>
                             <tr v-for="(item, index) in finalCustomFieldData.sort((a,b) => new Date(b?.createdAt)?.getTime() - new Date(a?.createdAt)?.getTime())" :key="index" :class="[{'disable':!item.isDelete}]">
                                 <td>
-                                    <span class="field__title text-capitalize text-ellipsis field__title__name" :title="item?.fieldTitle">{{item?.fieldTitle}}</span>
+                                    <span class="field__title text-ellipsis field__title__name" :title="item?.fieldTitle">{{item?.fieldTitle}}</span>
                                 </td>
                                 <td>
                                     <span>{{convertDateFormat(item?.createdAt,'',{showDayName: false})}}</span>
@@ -54,15 +54,15 @@
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center created_by">
-                                        <UserProfile :data="{title: getUser(item?.userId)?.Employee_Name, image: (getUser(item?.userId)?.Employee_profileImageURL)}" width="30px" :showDot="false" :thumbnail="'30x30'"/>
-                                        <span class="text-capitalize pl-5px text-ellipsis field__user_name" :title="getUser(item?.userId)?.Employee_Name">{{getUser(item?.userId)?.Employee_Name}}</span>
+                                        <UserProfile decorative :data="{title: getUser(item?.userId)?.Employee_Name, image: (getUser(item?.userId)?.Employee_profileImageURL)}" width="30px" :showDot="false" :thumbnail="'30x30'"/>
+                                        <span class="pl-5px text-ellipsis field__user_name" :title="getUser(item?.userId)?.Employee_Name">{{getUser(item?.userId)?.Employee_Name}}</span>
                                     </div>
                                 </td>
                                 <td :class="[{'pointer-event-none':!item.isDelete}]">
-                                    <DropDown @isVisible="handleOutsideClick" :bodyClass="{'custom__field__dropdown':true}">
-                                        <template #button>
-                                            <div class="project_bg d-flex GunPowder font-size-13" @click="handelSubmit(index)">
-                                                <span v-if="item?.global" class="project_ellipsis">All Projects</span>
+                                    <DropDown mode="listbox" multiselectable @isVisible="handelSubmit(index), handleOutsideClick($event)" :bodyClass="{'custom__field__dropdown':true}">
+                                        <template #button="{ triggerAttrs }">
+                                            <button type="button" class="dropdown-trigger project_bg d-flex GunPowder font-size-13" v-bind="triggerAttrs" :disabled="!item.isDelete">
+                                                <span v-if="item?.global" class="project_ellipsis">{{ $t('CustomField.all_projects') }}</span>
                                                 <span v-else-if="item?.projectId && item?.projectId?.length" class="project_ellipsis">
                                                     <template
                                                         v-for="(id, ind) in item?.projectId"
@@ -72,10 +72,10 @@
                                                     </template>
                                                 </span>
                                                 <span class="project_ellipsis" v-else>N/A</span>
-                                                <img :src="selectArrowMobile" alt="addIconmilestoneSvg" class="cursor-pointer ml_1" />
-                                            </div>
+                                                <img :src="selectArrowMobile" alt="" class="cursor-pointer ml_1" />
+                                            </button>
                                         </template>
-                                        <template #options v-if="item.isDelete">
+                                        <template #search v-if="item.isDelete">
                                             <div class="d-flex align-items-center pb-7px">
                                                 <InputText
                                                     v-model="searchProject"
@@ -86,18 +86,22 @@
                                                 />
                                                 <span class="text-nowrap ml-5-px font-size-12 font-weight-400 blue cursor-pointer" @click="handleChecked(index)" v-if="!searchProject">{{finalCustomFieldDataTest[index].global === true ? $t('Filters.unselect_all') : $t('Filters.select_all')}}</span>
                                             </div>
+                                        </template>
+                                        <template #options v-if="item.isDelete">
                                             <div v-if="projectListSearch && projectListSearch.length">
                                                 <DropDownOption
                                                     v-for="(project, indexs) in projectListSearch"
                                                     :key="'project'+indexs"
+                                                    :selected="finalCustomFieldDataTest[index].global || !!finalCustomFieldDataTest[index].projectId?.includes(project._id)"
                                                     style="padding: 0px !important;"
+                                                    @click="selectSingleCheckbox(index,project._id)"
                                                 >
-                                                    <CheckboxComponent class="p-7px" :customClass="`custom_field_checkbox`" labelClass="text-ellipsis pl-1 cursor-pointer project__name_ellipsis" :id="'project'+indexs" @click.capture="selectSingleCheckbox(index,project._id)" :modelValue="!finalCustomFieldDataTest[index].global ? finalCustomFieldDataTest[index].projectId?.includes(project._id) : true" :customClasses="!finalCustomFieldDataTest[index].global ? finalCustomFieldDataTest[index].projectId?.includes(project._id) ? 'is_checked' : 'remove_checked' : 'is_checked'"  :text="project?.ProjectName" />
+                                                    <CheckboxComponent class="p-7px" :customClass="`custom_field_checkbox`" labelClass="text-ellipsis pl-1 cursor-pointer project__name_ellipsis" :id="'project'+indexs" :modelValue="!finalCustomFieldDataTest[index].global ? finalCustomFieldDataTest[index].projectId?.includes(project._id) : true" :customClasses="!finalCustomFieldDataTest[index].global ? finalCustomFieldDataTest[index].projectId?.includes(project._id) ? 'is_checked' : 'remove_checked' : 'is_checked'"  :text="project?.ProjectName" />
                                                 </DropDownOption>
                                             </div>
                                             <div v-else>
                                                 <DropDownOption>
-                                                    <span>No record found</span>
+                                                    <span>{{ $t('CustomField.no_record_found') }}</span>
                                                 </DropDownOption>
                                             </div>
                                         </template>
@@ -109,18 +113,18 @@
                                     </span>
                                 </td>
                                 <td :class="[{'pointer-event-none':!item.isDelete}]">
-                                    <DropDown>
-                                        <template #button>
-                                            <div class="project_bg project_type d-flex GunPowder font-size-13" :ref="customFieldType">
+                                    <DropDown mode="listbox">
+                                        <template #button="{ triggerAttrs }">
+                                            <button type="button" class="dropdown-trigger project_bg project_type d-flex GunPowder font-size-13" :ref="customFieldType" v-bind="triggerAttrs" :disabled="!item.isDelete">
                                                 <span class="field__title field__title__type text-capitalize">{{ item?.type || 'Na' }}</span>
-                                                <img :src="selectArrowMobile" alt="addIconmilestoneSvg" class="cursor-pointer ml_1">
-                                            </div>
+                                                <img :src="selectArrowMobile" alt="" class="cursor-pointer ml_1">
+                                            </button>
                                         </template>
                                         <template #options v-if="item.isDelete">
-                                            <DropDownOption @click="emit('updateCustomFieldType',item,'project'),$refs[customFieldType][index].click()">
+                                            <DropDownOption :selected="item?.type === 'project'" @click="emit('updateCustomFieldType',item,'project'),$refs[customFieldType][index].click()">
                                                 {{$t('Projects.Project')}}
                                             </DropDownOption>
-                                            <DropDownOption @click="emit('updateCustomFieldType',item,'task'),$refs[customFieldType][index].click()">
+                                            <DropDownOption :selected="item?.type === 'task'" @click="emit('updateCustomFieldType',item,'task'),$refs[customFieldType][index].click()">
                                                 {{$t('subProjectRulesNames.Task')}}
                                             </DropDownOption>
                                         </template>
@@ -177,6 +181,7 @@
     import { useI18n } from "vue-i18n";
     import { useToast } from 'vue-toast-notification';
     import { ref, watch,computed,onMounted } from 'vue';
+    import { isOwnerOrAdmin } from "@/utils/roles";
 
     const { t } = useI18n();
 
@@ -238,7 +243,7 @@
                     let publicQuery = {
                         isPrivateSpace:false
                     }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2 && !getters["settings/rules"].toggle.showAllProjects) {
+                    if(!isOwnerOrAdmin(companyUserDetail.value.roleType) && !getters["settings/rules"].toggle.showAllProjects) {
                         publicQuery.AssigneeUserId = {
                             $in:[uid]
                         }
@@ -249,7 +254,7 @@
                     let privateQuery = {
                         isPrivateSpace:true
                     }
-                    if(companyUserDetail.value.roleType !== 1 && companyUserDetail.value.roleType !== 2) {
+                    if(!isOwnerOrAdmin(companyUserDetail.value.roleType)) {
                         privateQuery.AssigneeUserId = {
                             $in:[uid]
                         }
@@ -358,16 +363,18 @@
     };
     const handleOutsideClick = (value) => {
         if(!value && areArraysEqual(finalCustomFieldData.value[customFieldIndex.value].projectId,finalCustomFieldDataTest.value[customFieldIndex.value].projectId) === false){  
+            const loaded = finalCustomFieldData.value[customFieldIndex.value];
+            const before = { global: loaded.global, projectId: [].concat(loaded.projectId || []) };
             if(finalCustomFieldDataTest.value[customFieldIndex.value].global === true && !finalCustomFieldData.value[customFieldIndex.value].global){
                 if(projectList.value.length !== finalCustomFieldDataTest.value[customFieldIndex.value].projectId.length){
                     finalCustomFieldData.value[customFieldIndex.value].projectId = finalCustomFieldDataTest.value[customFieldIndex.value].projectId;
                     finalCustomFieldData.value[customFieldIndex.value].global = finalCustomFieldDataTest.value[customFieldIndex.value].global;            
-                    emit('updateCustomFieldProject',finalCustomFieldData.value[customFieldIndex.value]);
+                    emit('updateCustomFieldProject',finalCustomFieldData.value[customFieldIndex.value],before);
                 }
             }else if(finalCustomFieldDataTest.value[customFieldIndex.value].global === false){
                 finalCustomFieldData.value[customFieldIndex.value].projectId = finalCustomFieldDataTest.value[customFieldIndex.value].projectId;
                 finalCustomFieldData.value[customFieldIndex.value].global = finalCustomFieldDataTest.value[customFieldIndex.value].global;            
-                emit('updateCustomFieldProject',finalCustomFieldData.value[customFieldIndex.value]);
+                emit('updateCustomFieldProject',finalCustomFieldData.value[customFieldIndex.value],before);
             }
         }
         projectListSearch.value = projectList.value ? JSON.parse(JSON.stringify(projectList.value)) : [];

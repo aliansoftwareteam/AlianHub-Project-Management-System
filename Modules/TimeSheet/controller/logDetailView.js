@@ -1,43 +1,29 @@
-
 const { SCHEMA_TYPE } = require("../../../Config/schemaType");
 const { MongoDbCrudOpration } = require("../../../utils/mongo-handler/mongoQueries");
-
+const { resolveSheetScope, scopedTimeMatch, asList, SHEET_PERMISSION } = require("../helpers/timeScope");
 
 exports.getlogDetailTimeSheet = async(req,res) => {
     try {
-        const { taskId, startDate,endDate,userArray, projectId, } = req.body;
+        const { taskId, startDate, endDate, userArray, projectId } = req.body || {};
+        const companyId = req.headers['companyid'];
+        const scope = await resolveSheetScope(companyId, req.uid, [SHEET_PERMISSION.user, SHEET_PERMISSION.project]);
+        const projectIds = Array.isArray(projectId) ? projectId : [projectId].filter(Boolean);
 
-        let timeQuery = {
+        const timeQuery = {
+            ...scopedTimeMatch(scope, {
+                userIds: asList(userArray).length ? userArray : null,
+                projectIds: projectIds.length ? projectIds : null,
+            }),
             LogStartTime: {
-                $gte: startDate,
-                $lte: endDate,
-            }
-        }
-
-        if (userArray && userArray.length > 0) {
-            timeQuery.Loggeduser = { $in: userArray };
-        }
-
-        if (projectId && projectId !== '') {
-            timeQuery.ProjectId = { $in: Array.isArray(projectId) ? projectId : [projectId] };
-        }
-
-        if (taskId && taskId !== '') {
+                $gte: Number(startDate),
+                $lte: Number(endDate),
+            },
+        };
+        if (typeof taskId === 'string' && taskId) {
             timeQuery.TicketID = taskId;
         }
 
-        const query = [
-            {
-                $match: {
-                    $and: [timeQuery]
-                }
-            },
-        ];
-        const timesheetObj = {
-            type: SCHEMA_TYPE.TIMESHEET,
-            data: [query]
-        };
-        const timesheetData = await MongoDbCrudOpration(req.headers['companyid'], timesheetObj, 'aggregate');
+        const timesheetData = await MongoDbCrudOpration(companyId, { type: SCHEMA_TYPE.TIMESHEET, data: [[{ $match: timeQuery }]] }, 'aggregate');
 
         if (!timesheetData) {
             return res.status(404).json({ message: "TimeSheet Data not found" });
