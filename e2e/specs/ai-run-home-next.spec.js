@@ -31,12 +31,12 @@ test.describe('Home: what next', () => {
         await expect(next.getByRole('button', { name: /^(Add a task|Review)$/ })).toBeVisible();
     });
 
-    test('points at the Inbox when something waits for approval', async ({ page, state, loginAs }) => {
+    test('points at the Inbox when something of the person\'s own waits for approval', async ({ page, state, loginAs }) => {
         const { owner, member, project, task, email, suffix } = await newMember({ state, loginAs });
         const agent = await createAgent(owner.api, { project, name: `[QA what next] ${suffix}` });
         const proposals = await openProposals(state);
         try {
-            await proposals.seed({ agent, project, task, what: `Comment on ${task._id}`, why: `Waiting for ${member.email} ${suffix}` });
+            await proposals.seed({ agent, project, task, what: `Comment on ${task._id}`, why: `Waiting for ${member.email} ${suffix}`, runBy: member.userId });
             await signInThroughForm(page, { email, password: state.password, companyId: state.companyId });
 
             const next = page.getByRole('region', { name: 'What next' });
@@ -44,6 +44,27 @@ test.describe('Home: what next', () => {
             await next.getByRole('button', { name: 'Review' }).click();
             await expect(page).toHaveURL(/\/inbox\?tab=approval/);
             await expect(page.getByRole('region', { name: 'Needs your approval' })).toBeVisible();
+        } finally {
+            await proposals.close();
+            await owner.api.delete(`/api/v2/agents/${agent._id}`);
+        }
+    });
+
+    test('links what waits for the team apart, without asking for the person\'s approval', async ({ page, state, loginAs }) => {
+        const { owner, member, project, task, email, suffix } = await newMember({ state, loginAs });
+        const agent = await createAgent(owner.api, { project, name: `[QA what next team] ${suffix}` });
+        const proposals = await openProposals(state);
+        try {
+            await proposals.seed({ agent, project, task, what: `Comment on ${task._id}`, why: `Waiting for the team ${member.email} ${suffix}`, runBy: owner.uid });
+            await signInThroughForm(page, { email, password: state.password, companyId: state.companyId });
+
+            const next = page.getByRole('region', { name: 'What next' });
+            await expect(next).toContainText('Nothing is due today and nothing is waiting on you.');
+            await expect(next).not.toContainText('your approval');
+            const team = next.getByRole('button', { name: /(One|\d+) waiting for the team/ });
+            await expect(team).toBeVisible();
+            await team.click();
+            await expect(page).toHaveURL(/\/inbox\?tab=approval/);
         } finally {
             await proposals.close();
             await owner.api.delete(`/api/v2/agents/${agent._id}`);

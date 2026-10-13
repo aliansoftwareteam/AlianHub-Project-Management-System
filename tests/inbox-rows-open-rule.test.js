@@ -9,7 +9,7 @@ jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () 
 jest.mock('../Config/loggerConfig', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }));
 jest.mock('../event/socketEventEmitter', () => ({ emit: jest.fn(), on: jest.fn() }));
 jest.mock('../utils/commonFunctions', () => ({ removeCache: jest.fn() }));
-jest.mock('../Modules/Inbox/helpers/approvalQueue', () => ({ readQueue: jest.fn(async () => []), readApplied: jest.fn(async () => []), waitingCount: () => 0 }));
+jest.mock('../Modules/Inbox/helpers/approvalQueue', () => ({ readQueue: jest.fn(async () => []), readApplied: jest.fn(async () => []), waitingCount: () => 0, ownWaitingCount: () => 0 }));
 
 const { SCHEMA_TYPE } = require('../Config/schemaType');
 const world = require('./fixtures/accessWorld');

@@ -5224,6 +5224,7 @@
     "Home.next_start_project_action": "Create a project",
     "Home.next_start_task": "Nothing is assigned to you yet. Add a task of your own for today.",
     "Home.next_start_task_action": "Add a task",
+    "Home.next_team": "One waiting for the team | {n} waiting for the team",
     "Home.next_today": "You have one task for today. | You have {n} tasks for today.",
     "Home.next_today_action": "Show today",
     "Home.next_waiting": "One thing is waiting on you. | {n} things are waiting on you.",

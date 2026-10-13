@@ -51,7 +51,7 @@
                         :showSpinner="onboarding.removingSample.value"
                         @confirm="removeSampleConfirmed"
                     />
-                    <HomeWhatNext v-if="shownNext" :next="shownNext" @act="onNext" />
+                    <HomeWhatNext v-if="shownNext" :next="shownNext" :team="teamWaiting" @act="onNext" />
                     <div class="home__grid">
                         <MyWorkCard
                             ref="myWorkCard"
@@ -213,6 +213,7 @@ const projectsLoaded = computed(() => Array.isArray(getters["projectData/project
 const emptyWorkspace = computed(() => projectsLoaded.value && !ownProjects.value.length && !work.openTasks.value.some((task) => task.ProjectID !== sampleProject.value?._id));
 const waitingShown = computed(() => (homeCards.layout.includes("waiting") ? waitingCount.value : 0));
 const whatsNext = useWhatNext({ work, waiting: waitingShown, empty: emptyWorkspace, canCreateProject, canOpenInbox: computed(() => router.hasRoute("inbox")) });
+const teamWaiting = whatsNext.team;
 const STARTS = [NEXT.START_PROJECT, NEXT.START_TASK];
 /* While the setup card is up it names the one next step, so a second "start here" is not put above it. */
 const shownNext = computed(() => {
@@ -229,7 +230,7 @@ function focusWaiting() {
 }
 
 function onNext(kind) {
-    if (kind === NEXT.APPROVALS) router.push({ name: "inbox", params: { cid: companyId.value }, query: { tab: "approval" } }).catch(() => {});
+    if (kind === NEXT.APPROVALS || kind === NEXT.TEAM) router.push({ name: "inbox", params: { cid: companyId.value }, query: { tab: "approval" } }).catch(() => {});
     else if (kind === NEXT.WAITING) focusWaiting();
     else if (kind === NEXT.OVERDUE || kind === NEXT.TODAY || kind === NEXT.SOON) myWorkCard.value?.showGroup(kind);
     else if (kind === NEXT.START_PROJECT) createProjectOpen.value = true;

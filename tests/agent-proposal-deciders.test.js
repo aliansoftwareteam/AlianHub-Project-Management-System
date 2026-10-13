@@ -98,12 +98,18 @@ const privileged = (uid) => uid === OWNER;
 
 let fx;
 
-const filedOn = async (taskId) => {
-    const reply = await rpc(ctx(OWNER), 'task.comment', { taskId, body: 'Looks ready' });
+const filedOn = async (taskId, by = OWNER) => {
+    const reply = await rpc(ctx(by), 'task.comment', { taskId, body: 'Looks ready' });
     expect(reply).toMatchObject({ pending: true });
     return reply.proposalId;
 };
 const filedComment = () => filedOn(fx.top._id);
+/* Approving always is for the person behind the connection, so a seated person is asked over their own. */
+const filedOverOwn = (person) => {
+    if (person === GUEST) return filedComment();
+    rows(SCHEMA_TYPE.API_TOKENS).find((row) => String(row._id) === TOKEN).userId = person;
+    return filedOn(fx.top._id, person);
+};
 /* An approval as the person made it before, whoever they are, so that undoing it is theirs to ask for. */
 const approvedBy = async (uid) => {
     const id = await filedComment();
@@ -114,7 +120,7 @@ const approvedBy = async (uid) => {
 /* [what is decided, the route, how the proposal is prepared for the person, the body, the status it starts in, the status a decision leaves] */
 const DECISIONS = [
     ['approving', APPROVE, filedComment, {}, 'pending', 'approved'],
-    ['approving for every time', APPROVE, filedComment, { always: true }, 'pending', 'approved'],
+    ['approving for every time', APPROVE, filedOverOwn, { always: true }, 'pending', 'approved'],
     ['declining', DECLINE, filedComment, { reason: 'Not now' }, 'pending', 'declined'],
     ['undoing their own approval', UNDO, approvedBy, {}, 'approved', 'undone'],
 ];

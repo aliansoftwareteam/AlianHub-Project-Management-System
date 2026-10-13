@@ -18,15 +18,17 @@ const SOURCE_MCP = 'mcp';
 
 const plain = (row) => (row && typeof row.toObject === 'function' ? row.toObject() : row);
 
-/* Whether "Always do this" is offered on the row, and the kind of change it would cover. */
-const alwaysOf = (standing, proposal) => {
-    const offered = !standing.locked && standingApprovals.offerable(proposal);
+/* Whether "Always do this" is offered on the row, and the kind of change it would cover. A standing approval over
+ * a connection is made only by the person behind it, or by an owner or admin. */
+const alwaysOf = (standing, proposal, viewer) => {
+    const mayStand = Boolean(viewer) && (viewer.privileged || String(proposal.requestedBy || '') === String(viewer.userId));
+    const offered = mayStand && !standing.locked && standingApprovals.offerable(proposal);
     return offered ? { always: true, alwaysKind: standingApprovals.labelOf(proposal.changes[0].action) } : { always: false };
 };
 
 /* A change is shown through its card, which is built for the viewer. The change as filed goes only with a proposal
  * a person can edit, to a person who may decide it: approving an edit sends the kept changes back. */
-const toRow = (previews, batches = new Map()) => (proposal, standing) => ({
+const toRow = (previews, batches = new Map(), viewer = null, mine = () => false) => (proposal, standing) => ({
     sourceType: 'proposal',
     sourceId: String(proposal._id),
     proposalId: String(proposal._id),
@@ -50,7 +52,8 @@ const toRow = (previews, batches = new Map()) => (proposal, standing) => ({
     locked: standing.locked,
     lockedWhy: standing.lockedWhy,
     mayDecline: standing.mayDecline,
-    ...alwaysOf(standing, proposal),
+    ...alwaysOf(standing, proposal, viewer),
+    mine: mine(proposal),
     // approval.refusalFor refuses an edited approval of a change a connected agent filed.
     editable: proposal.source !== SOURCE_MCP,
     tainted: Boolean(proposal.taint && proposal.taint.reason),
@@ -76,12 +79,15 @@ const readQueue = async (companyId, userId) => {
         logger.error(`[inbox] proposal previews: ${error.message}`);
         return new Map();
     });
-    const [previews, batches, standings] = await Promise.all([cards(intentPreview.forProposals), cards(intentPreview.forBatches), approverRights.standingsOf(companyId, caller, listed, locks)]);
-    const row = toRow(previews, batches);
+    const [previews, batches, standings, mine] = await Promise.all([
+        cards(intentPreview.forProposals), cards(intentPreview.forBatches), approverRights.standingsOf(companyId, caller, listed, locks), access.askedForOf(companyId, userId, listed),
+    ]);
+    const row = toRow(previews, batches, { userId: String(userId), privileged: caller.privileged }, mine);
     return listed.map((proposal, at) => row(proposal, standings[at]));
 };
 
 const waitingCount = (rows) => rows.filter((row) => !row.locked).length;
+const ownWaitingCount = (rows) => rows.filter((row) => !row.locked && row.mine).length;
 
 /* What the person's own standing approvals applied, while each can still be undone from here. */
 const readApplied = async (companyId, userId) => {
@@ -97,4 +103,4 @@ const readApplied = async (companyId, userId) => {
     return listed.map((proposal) => ({ ...toRow(previews)(proposal, approverRights.OPEN), always: false, unread: false, undoUntil: proposal.undoUntil }));
 };
 
-module.exports = { readQueue, readApplied, waitingCount, QUEUE_LIMIT };
+module.exports = { readQueue, readApplied, waitingCount, ownWaitingCount, QUEUE_LIMIT };

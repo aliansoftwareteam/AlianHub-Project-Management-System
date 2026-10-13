@@ -165,6 +165,9 @@ const approveAlways = async (companyId, id, { decider, isPrivileged, ip = '', ch
     const proposals = require('./proposals');
     const p = plain(await proposals.get(companyId, id));
     if (!p) return refused('Proposal not found.', 404);
+    if (!isPrivileged && String(p.requestedBy || '') !== String(decider.userId)) {
+        return refused('Only the person behind this connection, or an owner or admin, can approve it always.', 403);
+    }
     if (p.status === PENDING) {
         const why = proposalRefusal(p) || await reachRefusal(companyId, p.projectId, p.changes[0]);
         if (why) return refused(`This change cannot be approved always: ${why}.`, 409);

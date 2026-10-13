@@ -121,7 +121,7 @@ const approved = async () => {
     return id;
 };
 const standingOne = async () => {
-    const out = await standing.approveAlways(CID, await filedComment(), { decider: { kind: 'human', userId: MEMBER }, isPrivileged: false, ip: '' });
+    const out = await standing.approveAlways(CID, await filedComment(), { decider: { kind: 'human', userId: OWNER }, isPrivileged: true, ip: '' });
     expect(out.error).toBeUndefined();
     return out.standing.id;
 };
