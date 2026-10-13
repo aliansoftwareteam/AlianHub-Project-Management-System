@@ -36,6 +36,15 @@ Built for enterprises, startups, and growing teams — no per-seat pricing, no v
 
 [Live demo](https://demo.alianhub.com) · [Website](https://alianhub.com) · [Documentation](https://help.alianhub.com) · [Self-host with Docker](#option-1--self-hosting-with-docker-recommended) · [FAQ](#faq)
 
+<p align="center">
+  <b>Jump to:</b>
+  <a href="#features">Features</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#connect-your-ai-claude-chatgpt-over-mcp">Connect your AI</a> ·
+  <a href="#faq">FAQ</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
+
 <br/>
 
 <div align="center">
@@ -73,13 +82,16 @@ docker compose up -d
 # AlianHub running at http://localhost:4000
 ```
 
-Update to a newer version later:
+<details>
+<summary><b>Update to a newer version later</b></summary>
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
 > Images are published to GHCR: `ghcr.io/aliansoftwareteam/alianhub:latest`. Multi-arch (amd64 + arm64).
+
+</details>
 
 ### Option 2 — Install from source (for developers)
 
@@ -88,6 +100,9 @@ git clone https://github.com/aliansoftwareteam/AlianHub-Project-Management-Syste
 cd AlianHub-Project-Management-System
 npm run setup
 ```
+
+<details>
+<summary><b>What <code>npm run setup</code> does, first-run setup and AI defaults</b></summary>
 
 That's it. `npm run setup` will:
 
@@ -112,9 +127,14 @@ or switch them under **Settings → Instance → AI**, to turn any of it off. An
 upgraded install keeps them off until an owner turns them on there; see
 [docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md).
 
+</details>
+
 **Prerequisite:** MongoDB running locally on `mongodb://localhost:27017`. If you don't have it: `docker run -d -p 27017:27017 mongo:7` or download from [mongodb.com](https://www.mongodb.com/try/download/community).
 
 ### Available commands
+
+<details>
+<summary><b>Show the npm commands</b></summary>
 
 | Command | What it does |
 |---------|--------------|
@@ -126,6 +146,8 @@ upgraded install keeps them off until an owner turns them on there; see
 | `cd frontend && npm test` | Vitest component specs |
 
 > For active development with hot-reload, run the backend (`npm run nodemon`) and the frontend dev server (`cd frontend && npm run serve`) separately. Developers: [docs/DEVELOPER-GUIDE.md](docs/DEVELOPER-GUIDE.md).
+
+</details>
 
 ---
 
@@ -199,6 +221,68 @@ AlianHub is built using a pragmatic and scalable stack:
 
 ### Key features of AlianHub
 
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      📋 <a href="docs/guide/first-hour/03-lists-folders-tasks.md"><b>Projects & tasks</b></a><br/>
+      Lists, folders, subtasks, checklists and comments.
+    </td>
+    <td width="33%" valign="top">
+      🗂️ <a href="docs/guide/views.md"><b>Six views</b></a><br/>
+      List, Board, Table, Calendar, Gantt and Workload.
+    </td>
+    <td width="33%" valign="top">
+      📊 <a href="docs/guide/views.md#gantt"><b>Gantt chart</b></a><br/>
+      Drag bars to reschedule and link blocking tasks.
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      ⏱️ <a href="docs/guide/time.md"><b>Time tracking</b></a><br/>
+      Timers, weekly timesheets and approval.
+    </td>
+    <td width="33%" valign="top">
+      👥 <a href="docs/guide/people-and-roles.md"><b>Roles & privacy</b></a><br/>
+      Roles, guests, private projects and lists.
+    </td>
+    <td width="33%" valign="top">
+      📝 <a href="docs/guide/docs-and-whiteboards.md"><b>Docs & wiki</b></a><br/>
+      Briefs, notes and versions beside the work.
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      ⚙️ <a href="docs/guide/rules.md"><b>Automations</b></a><br/>
+      Rules that do a small job when something happens.
+    </td>
+    <td width="33%" valign="top">
+      🧩 <a href="docs/guide/custom-fields.md"><b>Custom fields</b></a><br/>
+      Add the details your team tracks to every task.
+    </td>
+    <td width="33%" valign="top">
+      💬 <a href="docs/guide/chat-and-inbox.md"><b>Chat & Inbox</b></a><br/>
+      Channels, direct messages, mentions and alerts.
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      🔌 <a href="docs/CONNECT-YOUR-AI.md"><b>Connect your AI</b></a><br/>
+      Claude, ChatGPT or Claude Code over MCP.
+    </td>
+    <td width="33%" valign="top">
+      📦 <a href="docs/MOVING-FROM-CLICKUP.md"><b>Import from ClickUp</b></a><br/>
+      Bring tasks, comments and custom fields across.
+    </td>
+    <td width="33%" valign="top">
+      🏠 <a href="docs/ADMIN-GUIDE.md"><b>Self-hosted</b></a><br/>
+      Run it on your own servers with Docker.
+    </td>
+  </tr>
+</table>
+
+<details>
+<summary><b>Full feature list</b></summary>
+
 - **📋 Project & task management** — Create projects with custom milestones, sprints, statuses, and custom fields. Track tasks across **List, Board, Table, Calendar, Gantt, and Workload** views with drag-and-drop, sub-tasks, checklists, attachments, comments, due dates, and reminders.
 
 - **👥 Team collaboration with RBAC** — Assign tasks to users, manage role-based permissions per company, and create custom roles with dynamic permission rules. **Multi-tenant by design** — a single instance can host multiple companies, each with isolated data.
@@ -226,6 +310,8 @@ AlianHub is built using a pragmatic and scalable stack:
 - **💻 Web + desktop (Electron)** — Identical experience in the browser and as a native desktop app. **Multi-language UI** via vue-i18n.
 
 - **🏠 Self-hosted, your data** — Run on your own servers with MongoDB and Wasabi/S3 (or local filesystem) storage. **No vendor lock-in, no per-seat pricing, no data leaving your infrastructure.**
+
+</details>
 
 > Features evolve continuously — see [Discussions](https://github.com/aliansoftwareteam/AlianHub-Project-Management-System/discussions) for what's next and [CHANGELOG.md](CHANGELOG.md) for what just shipped.
 
@@ -401,6 +487,18 @@ AlianHub ships an MCP server, so the AI app you already use can work inside your
 - Every change is written in the audit log, and risky changes wait for a person to approve them.
 - It cannot delete tasks, docs, comments or projects, and cannot change who may do what.
 
+```mermaid
+flowchart LR
+    You["🙋 You"] -->|ask in everyday words| AI["🤖 Your own AI<br/>Claude · ChatGPT · Claude Code"]
+    AI -->|MCP, acting as you| Hub["⚙️ AlianHub<br/>your role and permissions"]
+    Hub -->|change to one task| Done["✅ Made at once<br/>with Undo"]
+    Hub -->|"wider change, new field, view,<br/>rule or project, closing a task"| Inbox["📥 AI Inbox<br/>waits for a person"]
+    Inbox -->|Approve| Done
+    Inbox -.->|Decline, with a reason| AI
+    Done --> Work["📋 Tasks · projects · team"]
+    Hub -.->|every change| Audit["🧾 Audit log"]
+```
+
 Step-by-step guide: [docs/CONNECT-YOUR-AI.md](docs/CONNECT-YOUR-AI.md) · every tool: [docs/MCP-AGENT-GUIDE.md](docs/MCP-AGENT-GUIDE.md).
 
 ---
@@ -511,33 +609,54 @@ AlianHub Project-Management-System is a community-driven project, and your contr
 
 ## FAQ
 
-### Is AlianHub free?
+<details>
+<summary><h3>Is AlianHub free?</h3></summary>
 
 Yes. AlianHub is free and open source under the AGPL-3.0 license. You can self-host it with no per-seat pricing. Paid help with hosting, customization and support is available from [Aliansoftware](#deploy--customize-with-aliansoftware) if you want it.
 
-### Can I self-host AlianHub?
+</details>
+
+<details>
+<summary><h3>Can I self-host AlianHub?</h3></summary>
 
 Yes, that is how it is meant to run. Use the [Docker Compose file](#option-1--self-hosting-with-docker-recommended) (images on GHCR for amd64 and arm64) or [install from source](#option-2--install-from-source-for-developers) with Node.js and MongoDB. See [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) and [docs/ENV.md](docs/ENV.md).
 
-### How does AlianHub compare to Jira or ClickUp?
+</details>
+
+<details>
+<summary><h3>How does AlianHub compare to Jira or ClickUp?</h3></summary>
 
 AlianHub covers the everyday project work — tasks, sprints, Board, List, Calendar, Gantt and Workload views, docs, automations and time tracking — but runs on your own servers under an open-source license. See [Why choose AlianHub over Jira or ClickUp](#why-choose-alianhub-over-jira-or-clickup) and the [feature status](#feature-status) table.
 
-### Can I move from ClickUp to AlianHub?
+</details>
+
+<details>
+<summary><h3>Can I move from ClickUp to AlianHub?</h3></summary>
 
 Yes. Export from ClickUp as CSV or Excel and import it under **Settings → Import & export**. Tasks, subtasks, statuses, assignees, dates, tags, checklists, comments and custom fields come across, and the import can be undone. [docs/MOVING-FROM-CLICKUP.md](docs/MOVING-FROM-CLICKUP.md) lists what comes across and what does not.
 
-### What AI features does AlianHub have?
+</details>
+
+<details>
+<summary><h3>What AI features does AlianHub have?</h3></summary>
 
 AI Assist generates tasks, subtasks, checklists, descriptions and sprint plans from plain language, using your own LLM API key. Each person can also connect Claude, ChatGPT or Claude Code over MCP to work in AlianHub for them — see [Connect your AI](#connect-your-ai-claude-chatgpt-over-mcp).
 
-### What license is AlianHub under?
+</details>
+
+<details>
+<summary><h3>What license is AlianHub under?</h3></summary>
 
 The GNU Affero General Public License v3.0 (AGPL-3.0). You can use, modify and self-host it freely; if you run a modified version as a public network service you must publish your changes. See [License](#license).
 
-### Does AlianHub have time tracking?
+</details>
+
+<details>
+<summary><h3>Does AlianHub have time tracking?</h3></summary>
 
 Yes. Start a timer on a task or add time by hand, send in a weekly timesheet for approval, and optionally use the desktop tracker for screenshots and activity. See [docs/guide/time.md](docs/guide/time.md).
+
+</details>
 
 ---
 
