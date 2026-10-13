@@ -248,9 +248,13 @@ const executors = {
         const at = held && held.by === connection ? held.at : now;
         const claim = { by: connection, userId: String(actor.userId), name: await nameOf(actor), at, until: new Date(now.getTime() + CLAIM_MINUTES * MINUTE_MS) };
         const taken = await change(companyId, {
-            ...waiting, _id: item.row._id, $or: [{ claim: null }, { 'claim.until': { $lte: now } }, { 'claim.by': connection }],
+            ...waiting, _id: item.row._id, ...(params.role ? { 'facts.role': params.role } : {}), $or: [{ claim: null }, { 'claim.until': { $lte: now } }, { 'claim.by': connection }],
         }, { $set: { claim } });
-        if (!taken) throw new DeterministicError(REFUSAL.TAKEN);
+        if (!taken) {
+            const [current] = params.role ? await find(companyId, SCHEMA_TYPE.PROJECT_FINDINGS, [{ _id: item.row._id }]) : [];
+            if (current && routedRole(current) !== params.role) throw new DeterministicError(REFUSAL.OTHER_ROLE(routedRole(current)));
+            throw new DeterministicError(REFUSAL.TAKEN);
+        }
         const renews = Boolean(held && held.by === connection);
         const place = renews ? { held: '' } : await places.takeFor({ companyId, projectId: item.projectId, connection, itemId: item.row._id, now, holds: claimStands(companyId, now) });
         if (place.held) {

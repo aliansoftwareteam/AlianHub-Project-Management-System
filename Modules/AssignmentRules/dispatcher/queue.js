@@ -53,11 +53,12 @@ async function put(companyId, task, { role, agentId, by, byPerson = false }) {
     const held = rows.find((row) => row.status === STATUS.OPEN);
     const now = new Date();
     if (held) {
-        await require('../../Agents/manager/workQueue').reRouted(companyId, held, role);
-        await MongoDbCrudOpration(companyId, {
+        // The claim is judged on the row as written: one taken between the read above and this write is caught too.
+        const after = plain(await MongoDbCrudOpration(companyId, {
             type: SCHEMA_TYPE.PROJECT_FINDINGS,
-            data: [{ _id: new mongoose.Types.ObjectId(String(held._id)) }, { $set: { 'facts.role': role, 'facts.agentId': agentId || '' }, $unset: { leftQueue: '' } }],
-        }, 'updateOne');
+            data: [{ _id: new mongoose.Types.ObjectId(String(held._id)) }, { $set: { 'facts.role': role, 'facts.agentId': agentId || '' }, $unset: { leftQueue: '' } }, { returnDocument: 'after' }],
+        }, 'findOneAndUpdate'));
+        if (after) await require('../../Agents/manager/workQueue').reRouted(companyId, after, role);
     } else {
         const closed = rows.find((row) => row.status === STATUS.CLOSED) || null;
         await open(companyId, String(task.ProjectID), { key: `${HANDED_OVER}:${task._id}`, rule: HANDED_OVER, taskId: String(task._id), taskIds: [String(task._id)], facts }, now, closed);

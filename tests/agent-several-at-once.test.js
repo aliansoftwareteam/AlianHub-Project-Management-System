@@ -14,8 +14,16 @@ const mockStamped = (q, method) => {
     const stamped = operators ? { ...update, $set: { ...(update.$set || {}), updatedAt: new Date() } } : { ...update, updatedAt: new Date() };
     return { ...q, data: [filter, stamped, ...q.data.slice(2)] };
 };
+/* `mockBeforeWrite.run(q, method)` runs once before the first write it answers true for, as another caller would. */
+const mockBeforeWrite = { run: null };
 jest.mock('../utils/mongo-handler/mongoQueries', () => ({
-    MongoDbCrudOpration: (companyId, q, method) => mockDb.crud(companyId, mockStamped(q, method), method),
+    MongoDbCrudOpration: (companyId, q, method) => {
+        const hook = mockBeforeWrite.run;
+        const first = hook ? hook(q, method) : null;
+        if (!first) return mockDb.crud(companyId, mockStamped(q, method), method);
+        mockBeforeWrite.run = null;
+        return Promise.resolve(first).then(() => mockDb.crud(companyId, mockStamped(q, method), method));
+    },
     validateObjectId: (id) => /^[a-f0-9]{24}$/i.test(String(id)),
 }));
 jest.mock('../Config/config', () => ({ myCache: { get: () => undefined, set: () => {}, del: () => {}, keys: () => [], getTtl: () => 0, flushAll: () => {} } }));
@@ -137,6 +145,7 @@ beforeAll(() => {
 
 beforeEach(() => {
     jest.clearAllMocks();
+    mockBeforeWrite.run = null;
     n = 0;
     seed();
     process.env.MCP_TOOLS_WORK = 'on';
@@ -282,6 +291,26 @@ describe('several roles over one connection', () => {
         expect(await releaseAs(ROLES[0], first.itemId)).toMatchObject({ isError: true, error: REFUSAL.NOT_HELD_AS(ROLES[0]) });
         expect(await claimAs(ROLES[0], second.itemId)).toMatchObject({ ok: true });
         await releaseAs(ROLES[0], second.itemId);
+        expect(await claimAs(ROLES[1], first.itemId)).toMatchObject({ ok: true });
+    });
+
+    it('a re-route landing between a claim\'s read and its write leaves the old role holding nothing', async () => {
+        const [first] = await routed(ROLES[0]);
+        mockBeforeWrite.run = (q, method) => method === 'findOneAndUpdate' && q.type === SCHEMA_TYPE.PROJECT_FINDINGS && q.data[0].$or
+            && routeTo(first.task, ROLES[1]);
+        expect(await claimAs(ROLES[0], first.itemId)).toMatchObject({ isError: true, error: REFUSAL.OTHER_ROLE(ROLES[1]) });
+        expect(mockBeforeWrite.run).toBeNull();
+        expect(rowOf(first.itemId).claim).toBeUndefined();
+        expect(await claimAs(ROLES[1], first.itemId)).toMatchObject({ ok: true });
+    });
+
+    it('a claim written just before the re-route\'s write is dropped by it', async () => {
+        const [first] = await routed(ROLES[0]);
+        mockBeforeWrite.run = (q, method) => method === 'findOneAndUpdate' && q.type === SCHEMA_TYPE.PROJECT_FINDINGS && q.data[1].$set && 'facts.role' in q.data[1].$set
+            && claimAs(ROLES[0], first.itemId);
+        await routeTo(first.task, ROLES[1]);
+        expect(mockBeforeWrite.run).toBeNull();
+        expect(rowOf(first.itemId).claim).toBeUndefined();
         expect(await claimAs(ROLES[1], first.itemId)).toMatchObject({ ok: true });
     });
 
