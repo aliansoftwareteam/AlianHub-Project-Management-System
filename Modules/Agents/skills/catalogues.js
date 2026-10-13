@@ -112,12 +112,13 @@ const READER_CATALOGUE = Object.freeze({
     }),
     project: Object.freeze({
         label: 'The project',
-        description: 'The project name and its stored guide.',
+        description: 'The project name, its description and its stored guide.',
         params: Object.freeze({
             maxChars: Object.freeze({ type: 'number', min: 200, max: 20000, default: 8000 }),
             requireGuide: Object.freeze({ type: 'boolean', default: false }),
+            asStarter: Object.freeze({ type: 'boolean', default: false }),
         }),
-        fields: Object.freeze(['name', 'guide', 'hasGuide']),
+        fields: Object.freeze(['name', 'guide', 'hasGuide', 'description']),
     }),
     'project.tasks': Object.freeze({
         label: 'Tasks in the project',
@@ -127,6 +128,7 @@ const READER_CATALOGUE = Object.freeze({
             openOnly: Object.freeze({ type: 'boolean', default: false }),
             rowsPerBucket: Object.freeze({ type: 'number', min: 1, max: 50, default: 10 }),
             requireTasks: Object.freeze({ type: 'boolean', default: true }),
+            asStarter: Object.freeze({ type: 'boolean', default: false }),
         }),
         fields: Object.freeze([
             'count', 'open', 'done', 'overdue', 'dueSoon', 'blocked', 'inReview', 'unassigned', 'moved',

@@ -3,16 +3,17 @@
 // into each company so an admin can edit it, and an edited copy shadows this.
 
 const MAX_PROPOSED = 3;
+const NO_GUIDE = '{{^gather.project.hasGuide}}No guide is stored for this project yet, so this comes from its description and plan.\n{{/gather.project.hasGuide}}';
 const NEXT_STEP = '{{#answer.nextStep}}{{answer.nextStep | clip:1200}}{{/answer.nextStep}}{{^answer.nextStep}}{{fallback}}{{/answer.nextStep}}';
 
 module.exports = Object.freeze({
     key: 'project.guide',
     name: 'Project Guide',
-    description: 'Answers "what next" on a task from the project\'s stored guide and its plan, and proposes the next tasks.',
+    description: 'Answers "what next" on a task from the project\'s stored guide, or its description where no guide is stored, and its plan, and proposes the next tasks.',
     inputs: ['project_task'],
     gather: [
-        { reader: 'project', as: 'project', params: { maxChars: 8000, requireGuide: true } },
-        { reader: 'project.tasks', as: 'plan', params: { limit: 200, rowsPerBucket: 25, requireTasks: false } },
+        { reader: 'project', as: 'project', params: { maxChars: 8000, requireGuide: false, asStarter: true } },
+        { reader: 'project.tasks', as: 'plan', params: { limit: 200, rowsPerBucket: 25, requireTasks: false, asStarter: true } },
         { reader: 'memory', as: 'memory', params: { maxChars: 2000 } },
         { reader: 'task', as: 'task', params: { maxChars: 2000 } },
     ],
@@ -21,18 +22,18 @@ module.exports = Object.freeze({
         instructions: [
             'You are the Guide for one project inside a project management tool. Someone mentioned you on a task and wants to know what to do next.',
             '',
-            "You will be given the project's GUIDE (its stages, the essentials to flag, when to escalate, and how to answer), the PLAN as it stands on the board, and the TASK you were mentioned on.",
+            "You will be given the project's GUIDE (its stages, the essentials to flag, when to escalate, and how to answer) or, when no guide is stored, its DESCRIPTION, the PLAN as it stands on the board, and the TASK you were mentioned on.",
+            'With no guide, infer the current stage from the description and the plan, and do not invent stages, essentials or escalation rules.',
             '',
             'HARD RULES:',
-            "- Lead with the single clearest next step, grounded in the plan and the guide's current stage.",
+            "- Lead with the single clearest next step, grounded in the plan and the guide's current stage, or the description where there is no guide.",
             `- Propose at most ${MAX_PROPOSED} follow-up tasks, only when the plan lacks them.`,
             "- If something in the guide's essentials or escalation rules applies, say so in \"flags\".",
         ].join('\n'),
         template: [
             'PROJECT: {{gather.project.name}}',
             '',
-            'GUIDE:',
-            '{{gather.project.guide}}',
+            '{{#gather.project.hasGuide}}GUIDE:\n{{gather.project.guide}}{{/gather.project.hasGuide}}{{^gather.project.hasGuide}}GUIDE: (none stored for this project)\n\nDESCRIPTION:\n{{#gather.project.description}}{{gather.project.description}}{{/gather.project.description}}{{^gather.project.description}}(none){{/gather.project.description}}{{/gather.project.hasGuide}}',
             '',
             '{{#gather.memory.text}}MEMORY:\n{{gather.memory.text}}\n\n{{/gather.memory.text}}PLAN:',
             '{{#gather.plan.plan}}{{gather.plan.plan}}{{/gather.plan.plan}}{{^gather.plan.plan}}(no tasks yet){{/gather.plan.plan}}',
@@ -40,7 +41,7 @@ module.exports = Object.freeze({
             'TASK: {{gather.task.title}}',
             '{{#gather.task.brief}}TASK BRIEF: {{gather.task.brief}}{{/gather.task.brief}}',
         ].join('\n'),
-        output: '{"nextStep":"one or two sentences","why":"one sentence","proposedTasks":[{"title":"...","why":"one sentence","hours":2}],"flags":["..."]}',
+        output: '{"nextStep":"one or two sentences","why":"one sentence","proposedTasks":[{"title":"...","why":"one sentence","hours":2}],"flags":["..."],"notes":"optional"}',
         maxTokens: 1800,
     },
     emit: [
@@ -58,7 +59,7 @@ module.exports = Object.freeze({
             action: 'task.comment',
             label: 'Post the next step',
             params: {
-                body: `Next step: ${NEXT_STEP}\n{{#answer.why}}{{answer.why | clip:400}}\n{{/answer.why}}{{#emitted.subtask.create}}\nProposed {{emitted.subtask.create}} follow-up task(s).\n{{/emitted.subtask.create}}{{#answer.flags | bullets:6}}\nFlags:\n{{answer.flags | bullets:6}}{{/answer.flags}}`,
+                body: `${NO_GUIDE}Next step: ${NEXT_STEP}\n{{#answer.why}}{{answer.why | clip:400}}\n{{/answer.why}}{{#emitted.subtask.create}}\nProposed {{emitted.subtask.create}} follow-up task(s).\n{{/emitted.subtask.create}}{{#answer.flags | bullets:6}}\nFlags:\n{{answer.flags | bullets:6}}{{/answer.flags}}{{#answer.notes}}\n\nNotes: {{answer.notes | clip:400}}{{/answer.notes}}`,
             },
         },
     ],
