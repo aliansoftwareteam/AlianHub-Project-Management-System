@@ -1,14 +1,13 @@
 /* eslint-env browser */
 /* Builds the README screenshots: boots the e2e harness against a disposable MongoDB, fills a demo
  * workspace with made-up data, and captures each screen at 1440x900 @2x in light and dark.
- * Usage: npm run readme:screenshots [-- --only home,board] [-- --out <dir>] */
+ * Usage: npm run readme:screenshots [-- --only home,board] [-- --out <dir>] [-- --mongo-url <url>] [-- --chromium <path>] */
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const sharp = require('sharp');
 const { chromium } = require('@playwright/test');
 
-process.env.E2E_MONGODB_URL = process.env.E2E_MONGODB_URL || 'mongodb://127.0.0.1:27018';
 
 const { resetDatabase, listCompanyIds } = require('../e2e/support/database');
 const { startServer } = require('../e2e/support/server');
@@ -74,6 +73,9 @@ const argValue = (flag) => {
     const at = process.argv.indexOf(flag);
     return at === -1 ? null : process.argv[at + 1];
 };
+
+const MONGO_URL = argValue('--mongo-url') || 'mongodb://127.0.0.1:27018';
+Object.assign(process.env, { E2E_MONGODB_URL: MONGO_URL });
 
 const log = (message) => process.stdout.write(`${message}\n`);
 
@@ -295,11 +297,11 @@ async function compress(source, target) {
 async function main() {
     const out = path.resolve(argValue('--out') || OUT_DEFAULT);
     const only = argValue('--only') ? argValue('--only').split(',') : null;
-    const mongoUrl = process.env.E2E_MONGODB_URL;
+    const mongoUrl = MONGO_URL;
     await resetDatabase(mongoUrl);
     const logFile = path.join(os.tmpdir(), 'readme-screenshots-server.log');
     const server = await startServer({ mongoUrl, logFile });
-    const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
+    const browser = await chromium.launch({ executablePath: argValue('--chromium') || undefined });
     try {
         const world = await seed(server.baseURL);
         world.baseURL = server.baseURL;
