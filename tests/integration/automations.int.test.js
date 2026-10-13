@@ -585,10 +585,10 @@ describe('AI project generator', () => {
     });
 
     it('validates a plan before executing anything', async () => {
-        const { api } = await loginAs('member');
-        expect((await api.post('/api/v1/ai/project/guide', { approvedBrief: 'short' })).status).toBe(400);
-        expect((await api.post('/api/v1/ai/project/execute', {})).body.statusText).toBe('plan required in request body');
-        expect((await api.post('/api/v1/ai/project/execute', { plan: { project: {} } })).status).toBe(400);
+        const { api } = await loginAs('owner');
+        expect((await api.post('/api/v1/ai/project/guide', { approvedBrief: 'short' })).body.code).toBe('PLAN_EXPIRED');
+        expect((await api.post('/api/v1/ai/project/execute', {})).status).toBe(410);
+        expect((await api.post('/api/v1/ai/project/execute', { plan: { project: {} } })).body.code).toBe('PLAN_EXPIRED');
         expect((await api.post('/api/v1/ai/project/not-an-id/tasks/execute', { plan: {} })).status).toBe(400);
         const tasksMode = await api.post(`/api/v1/ai/project/${state.projects.shared._id}/tasks/execute`, { mode: 'tasks', plan: {} });
         expect(tasksMode.body.statusText).toBe('targetSprintId required for tasks mode');
