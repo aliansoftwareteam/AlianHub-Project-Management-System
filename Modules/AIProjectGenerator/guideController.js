@@ -102,14 +102,14 @@ exports.guide = async (req, res) => {
         const companyId = tenantOf(req);
         const body = req.body || {};
         const stored = planStash.storedPlan({ uid: req.uid, companyId, planId: body.planId });
-        const from = stored || body;
-        const approvedBrief = clip(from.approvedBrief, 20000);
+        if (!stored) return res.status(410).send({ status: false, statusText: planStash.PLAN_EXPIRED, message: planStash.PLAN_EXPIRED, code: 'PLAN_EXPIRED' });
+        const approvedBrief = clip(stored.approvedBrief, 20000);
         if (approvedBrief.length < MIN_BRIEF_CHARS) return sendError(res, 400, `approvedBrief must be at least ${MIN_BRIEF_CHARS} characters`);
         if (!isAnyProviderConfigured()) return sendError(res, 503, 'No LLM provider is configured');
         const project = await resolveProjectId({ companyId, uid: req.uid, projectId: body.projectId });
         if (project.hidden) return sendError(res, 404, 'Project not found');
-        const out = await generateGuide({ approvedBrief, assumptions: from.assumptions, plan: from.plan, companyId, userId: String(req.uid), projectId: project.projectId });
-        if (stored) planStash.rememberGuide({ uid: req.uid, companyId, planId: body.planId, guide: out.guide });
+        const out = await generateGuide({ approvedBrief, assumptions: stored.assumptions, plan: stored.plan, companyId, userId: String(req.uid), projectId: project.projectId });
+        planStash.rememberGuide({ uid: req.uid, companyId, planId: body.planId, guide: out.guide });
         return res.send({ status: true, data: { guide: out.guide }, usage: out.usage, model: out.model, provider: out.provider });
     } catch (error) {
         if (error instanceof TenantError) return sendError(res, error.statusCode, error.message);

@@ -194,6 +194,7 @@ export const LINE_KINDS = {
         if (problem) return { label: t('IntentPreview.line_rule'), text: t('IntentPreview.rule_problem', { problem }) };
         return textOf(line.text) ? { label: t('IntentPreview.line_rule'), text: t('IntentPreview.rule_starts_off', { rule: textOf(line.text) }) } : null;
     },
+    planAgent: (t, line) => (textOf(line.project) ? { label: t('IntentPreview.line_agent'), text: t('IntentPreview.agent_guide', { project: textOf(line.project) }) } : null),
     planTask: (t, line, locale) => {
         const name = textOf(line.name);
         if (!name) return null;

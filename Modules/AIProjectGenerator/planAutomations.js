@@ -67,17 +67,6 @@ const trimRules = (given, project) => {
     return { kept, dropped };
 };
 
-const adminRefusal = { code: 'admin', message: rules.REFUSED.filer };
-
-/* As trimRules, and a person who may not manage automations is told now rather than shown rules that would never be made. */
-const trimRulesFor = async ({ companyId, uid, given, project }) => {
-    const trimmed = trimRules(given, project);
-    if (!trimmed.kept.length) return trimmed;
-    const may = await rules.mayManage(companyId, uid).catch(() => false);
-    if (may) return trimmed;
-    return { kept: [], dropped: [...trimmed.kept.map((rule) => note(rule.name, adminRefusal)), ...trimmed.dropped] };
-};
-
 const refusalCode = (error) => {
     const message = String(error || '');
     if (message.includes(OFF)) return 'off';
@@ -112,4 +101,4 @@ const makeRules = async ({ companyId, uid, projectId, plan }) => {
     }
 };
 
-module.exports = { RULES_MAX, STEPS_MAX, trimRules, trimRulesFor, makeRules, refusalCode };
+module.exports = { RULES_MAX, STEPS_MAX, trimRules, makeRules, refusalCode };

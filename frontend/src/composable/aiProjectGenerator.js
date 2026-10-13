@@ -132,7 +132,7 @@ export function useAiProjectGenerator() {
 
     // The server builds the plan it proposed under planId, with the brief and guide it kept; it answers 410 once
     // that copy has expired.
-    async function execute({ planId, edits, userName, isPrivateSpace, proposalId, skills, source }) {
+    async function execute({ planId, edits, userName, isPrivateSpace, proposalId, skills, source, picks }) {
         try {
             const res = await apiRequest('post', env.AI_PROJECT_EXECUTE, {
                 planId,
@@ -142,6 +142,7 @@ export function useAiProjectGenerator() {
                 proposalId: proposalId || '',
                 skills: Array.isArray(skills) ? skills : [],
                 source: source || '',
+                picks: picks || undefined,
             });
             return unwrap(res.data);
         } catch (e) {

@@ -19,6 +19,7 @@ const orchestrator = require('../Modules/AIProjectGenerator/orchestrator');
 const ctrl = require('../Modules/AIProjectGenerator/controller');
 const planViews = require('../Modules/AIProjectGenerator/planViews');
 const planStash = require('../Modules/AIProjectGenerator/planStash');
+const projectCreate = require('../Modules/Agents/projectCreate');
 const { PlanSchema } = require('../Modules/AIProjectGenerator/schemaValidator');
 const { buildSystemPrompt } = require('../Modules/AIProjectGenerator/promptBuilder');
 
@@ -178,10 +179,11 @@ describe('/plan', () => {
         expect(complete.plan.viewsDropped).toEqual([{ name: 'Gantt', reason: expect.stringContaining('needs a kind'), code: 'kind' }]);
     });
 
-    it('trims the views again at /execute', async () => {
+    it('trims the views again at /execute, whatever plan the client sends back', async () => {
+        jest.spyOn(projectCreate, 'refusedFor').mockResolvedValue({ project: '', parts: [] });
         const planId = planStash.rememberPlan({ uid: U, companyId: C, plan: { ...validPlan([1, 2, 3, 4, 5, 6].map(named)), viewsDropped: [] } });
         const r = res();
-        await ctrl.execute(req({ planId, source: 'other' }), r);
+        await ctrl.execute(req({ planId, plan: validPlan([1, 2, 3, 4, 5, 6, 7, 8].map(named)), source: 'other' }), r);
         expect(r.body).toMatchObject({ status: true });
         await sleep(350);
         const { plan } = orchestrator.executePlan.mock.calls[0][0];
@@ -197,10 +199,12 @@ describe('/plan', () => {
         expect(sanitized.plan.views[0].look.assigneeIds).toEqual([MEMBER]);
         expect(sanitized.removed).toEqual([{ label: 'view:Mine', id: STRANGER }]);
 
+        jest.spyOn(projectCreate, 'refusedFor').mockResolvedValue({ project: '', parts: [] });
         const r = res();
         const planId = planStash.rememberPlan({ uid: U, companyId: C, plan: validPlan([{ name: 'Theirs', kind: 'list', look: { assigneeIds: [STRANGER] } }]) });
-        await ctrl.execute(req({ planId, source: 'other' }), r);
+        await ctrl.execute(req({ planId, plan: validPlan([{ name: 'Mine', kind: 'list', look: { assigneeIds: [MEMBER] } }]), source: 'other' }), r);
         await sleep(350);
+        expect(orchestrator.executePlan.mock.calls[0][0].plan.views.map((view) => view.name)).toEqual(['Theirs']);
         expect(orchestrator.executePlan.mock.calls[0][0].plan.views[0].look.assigneeIds).toEqual([]);
     });
 });

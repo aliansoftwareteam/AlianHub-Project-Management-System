@@ -143,6 +143,7 @@ describe('/execute builds the plan /plan proposed', () => {
 
     it('applies the renames and the privacy choice to the stored plan, and leaves the stored copy as it was', async () => {
         const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        orchestrator.executePlan.mockResolvedValueOnce({ ok: false, error: 'rolled back' });
         await execute({
             planId,
             source: 'other',
@@ -177,6 +178,34 @@ describe('/execute builds the plan /plan proposed', () => {
     it('keeps the plan for the generator session', () => {
         expect(planStash.PLAN_TTL_SECONDS).toBeGreaterThanOrEqual(60 * 60);
     });
+
+    it('builds one project from a plan: a second /execute with the same planId answers 410', async () => {
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        const first = await execute({ planId, source: 'other' });
+        expect(first.body.status).toBe(true);
+        const second = await execute({ planId, source: 'other' });
+        expect(second.code).toBe(410);
+        expect(orchestrator.executePlan).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a second /execute while the first is still building, and frees the plan when the build fails', async () => {
+        let finish;
+        orchestrator.executePlan.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() });
+        expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
+        expect((await execute({ planId, source: 'other' })).code).toBe(410);
+        finish({ ok: false, error: 'rolled back' });
+        await sleep(10);
+        expect((await execute({ planId, source: 'other' })).body.status).toBe(true);
+        expect(orchestrator.executePlan).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps the last three plans a person generated', () => {
+        const ids = [1, 2, 3, 4].map(() => planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan() }));
+        expect(ids.map((planId) => Boolean(planStash.storedPlan({ uid: OWNER, companyId: C, planId })))).toEqual([false, true, true, true]);
+        expect(planStash.storedPlan({ uid: MEMBER, companyId: C, planId: planStash.rememberPlan({ uid: MEMBER, companyId: C, plan: storedPlan() }) })).toBeTruthy();
+        expect(planStash.storedPlan({ uid: OWNER, companyId: C, planId: ids[1] })).toBeTruthy();
+    });
 });
 
 describe('the brief and the guide come from the server copy', () => {
@@ -210,5 +239,27 @@ describe('the brief and the guide come from the server copy', () => {
 
         await execute({ planId, source: 'other', guide: { ...GUIDE, stages: [{ name: 'Other' }, { name: 'Steps' }] } });
         expect(built().guide.stages.map((s) => s.name)).toEqual(['Build', 'Launch']);
+        expect(built().guide.markdown).toContain('**Build**');
+    });
+
+    it('keeps the person\'s rewording of the stored guide, cut to 20000 characters', async () => {
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan(), approvedBrief: BRIEF });
+        planStash.rememberGuide({ uid: OWNER, companyId: C, planId, guide: { ...GUIDE, markdown: '## Stages\n1. Build' } });
+        await execute({ planId, source: 'other', edits: { guideMarkdown: `## My stages\n${'x'.repeat(30000)}`, guide: { stages: [] } } });
+        expect(built().guide.stages).toEqual(GUIDE.stages);
+        expect(built().guide.markdown.startsWith('## My stages')).toBe(true);
+        expect(built().guide.markdown).toHaveLength(20000);
+    });
+
+    it('ignores a guide rewording when no guide was drafted for the plan', async () => {
+        const planId = planStash.rememberPlan({ uid: OWNER, companyId: C, plan: storedPlan(), approvedBrief: BRIEF });
+        await execute({ planId, source: 'other', edits: { guideMarkdown: '## Stages\n1. Mine' } });
+        expect(built().guide).toBeNull();
+    });
+
+    it('writes the reworded guide onto the project', () => {
+        const { projectFields } = jest.requireActual('../Modules/AIProjectGenerator/executeAgents');
+        expect(projectFields({ guide: { ...GUIDE, markdown: '## Mine' } }).aiGuide).toMatchObject({ stages: GUIDE.stages, markdown: '## Mine' });
+        expect(projectFields({ guide: GUIDE }).aiGuide.markdown).toContain('**Build**');
     });
 });
