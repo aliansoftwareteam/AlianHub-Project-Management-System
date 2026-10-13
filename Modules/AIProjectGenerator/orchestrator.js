@@ -58,6 +58,7 @@ const planAutomations = require('./planAutomations');
 const sseEmitter = require('./sseEmitter');
 const executeAgents = require('./executeAgents');
 const planViews = require('./planViews');
+const planDashboard = require('./planDashboard');
 const { taskCreatedHistoryMessage, projectCreatedHistoryMessage, projectCreatedNoticeMessage } = require('./historyMessages');
 
 // Concurrency cap for fire-and-forget AI estimates after bulk task insert —
@@ -1157,6 +1158,9 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
             companyId, uid, projectId: tracker.project, projectName: projectDoc.ProjectName, pairs: taskPairs, agents, withGuide, withGuideAgent, approvedBrief, assumptions,
         });
 
+        // A dashboard lives outside the project, so it too comes after everything that could roll the project back.
+        const dashboard = await planDashboard.makeDashboard({ companyId, uid, projectId: tracker.project, dashboard: plan.dashboard });
+
         // Last, so nothing after it can roll the project back and leave a rule behind.
         const rules = await planAutomations.makeRules({ companyId, uid, projectId: tracker.project, plan });
 
@@ -1169,10 +1173,11 @@ async function executePlan({ plan, companyId, uid, userData, jobId, approvedBrie
             totals,
             splitSummary: plan.splitSummary || null,
             views,
+            dashboard,
             ...agentWork,
         });
 
-        return { ok: true, projectId: tracker.project, totals, views, ...agentWork };
+        return { ok: true, projectId: tracker.project, totals, views, dashboard, ...agentWork };
     } catch (error) {
         logger.error(`[AIPG][${jobId}] orchestrator catch: ${error && error.message ? error.message : error}${error && error.stack ? '\n' + error.stack : ''}`);
         await rollback({ companyId, tracker });

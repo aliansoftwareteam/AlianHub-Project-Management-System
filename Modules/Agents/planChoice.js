@@ -9,7 +9,7 @@ const planFiling = require('./planFiling');
 // in the shape it is kept in (./planFiling.js), as its card and its executor read it.
 
 const PLANS = Object.freeze({ 'project.setup': { mayBeEmpty: false }, [projects.ACTION]: { mayBeEmpty: true } });
-const NOUN = Object.freeze({ statuses: 'status', lists: 'list', fields: 'field', views: 'view', rules: 'automation', tasks: 'task' });
+const NOUN = Object.freeze({ statuses: 'status', lists: 'list', fields: 'field', views: 'view', dashboards: 'dashboard', rules: 'automation', tasks: 'task' });
 const REFUSED = Object.freeze({
     shape: 'The chosen parts must name, for each change, the parts of its plan to keep.',
     both: 'Send the chosen parts or edited changes, not both.',

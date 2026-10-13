@@ -225,9 +225,9 @@ const planViewLines = (view, at, projectId, context) => {
     ];
 };
 
-/* The parts of a plan: the statuses and lists by name, each field with its type, and each view followed by what it
- * shows. A line says which part of the stored plan it is (`pick`, `picks` for a line of names), or which part it
- * belongs under, so the person approving can leave that part out (./planChoice.js). */
+/* The parts of a plan: the statuses and lists by name, each field with its type, each view followed by what it
+ * shows, and the dashboard with its cards. A line says which part of the stored plan it is (`pick`, `picks` for a
+ * line of names), or which part it belongs under, so the person approving can leave that part out (./planChoice.js). */
 const planLines = (change, context) => {
     const params = paramsOf(change);
     return [
@@ -235,6 +235,7 @@ const planLines = (change, context) => {
         namesLine('newLists', 'lists', params.lists, plans.LISTS_MAX, planShown.NAME_MAX),
         ...listOf(params.definitions).slice(0, setup.FIELDS_MAX).map((field, at) => picked(fieldLine(field), keyOf('fields', at))),
         ...planViews(change).flatMap((view, at) => planViewLines(view, at, idOf(params.projectId), context)),
+        ...listOf(params.dashboards).slice(0, plans.DASHBOARDS_MAX).map((dashboard, at) => dashboards.planLine(dashboard, keyOf('dashboards', at))),
     ];
 };
 
