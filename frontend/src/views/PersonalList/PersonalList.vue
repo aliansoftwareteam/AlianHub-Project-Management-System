@@ -131,7 +131,8 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, ref } from "vue";
+import { computed, inject, onMounted, ref, watch } from "vue";
+import { useStore } from "vuex";
 import moment from "moment";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
@@ -144,6 +145,7 @@ import { usePersonalList } from "@/components/molecules/Home/usePersonalList";
 import { compareTasks, dueBucket, dueLabel, fmtEstimate, priorityMeta } from "@/components/molecules/Home/homeFormat";
 import "@/components/molecules/Home/style.css";
 import "./style.css";
+import { withDetailChange } from "./followDetail";
 
 defineOptions({ name: "PersonalList" });
 
@@ -167,6 +169,7 @@ const dateInput = ref(null);
 const overStatus = ref(null);
 const dragging = ref(null);
 const createProjectOpen = ref(false);
+const { getters } = useStore();
 const detail = ref({ open: false, taskId: "", projectId: "", sprintId: "" });
 
 const statuses = computed(() => personal.project?.taskStatusData || []);
@@ -262,6 +265,8 @@ function closeTask() {
     detail.value = { open: false, taskId: "", projectId: "", sprintId: "" };
     load();
 }
+
+watch(() => getters["projectData/gettaskDetailData"], (change) => { tasks.value = withDetailChange(tasks.value, change); });
 
 onMounted(() => {
     list.ensure().then(load).catch(() => {});

@@ -55,7 +55,7 @@ const props = defineProps({
 defineEmits(["action", "dismiss"]);
 
 const expanded = ref(true);
-const doneCount = computed(() => props.steps.filter((s) => s.done).length);
+const doneCount = computed(() => props.steps.filter((s) => s.done || s.skipped).length);
 const active = computed(() => props.steps.find((s) => !s.done && !s.skipped) || null);
 const markImported = () => saveOnboarding({ importedWork: true });
 </script>

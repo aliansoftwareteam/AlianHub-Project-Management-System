@@ -18,6 +18,8 @@ const EXTERNAL_STEP = /^external agent step refused: ([a-z_]+)/;
 const APPROVED_PROPOSAL = /^approved proposal [a-f0-9]{24} by (\S+)$/i;
 const STANDING = /^([\s\S]*) \(standing approval [a-f0-9]{24}, made by (\S+)\)$/i;
 const SKILL_FINDING = /^(\S+) finding$/;
+/* Modules/Mcp/taintHold.js; rows filed before it named the client hold the client's metadata address instead. */
+const OUTSIDE_HELD = /\(?\S+ ([^;()]+); it came from an outside client \((.+?)\), so it needs a person's approval\)?$/;
 /* Rows written before the server's sentences were reworded still hold "Agents cannot perform ..." and "the task is
    not one ...", so both wordings are read. A list's sentence names its project too, so the list is asked first. */
 const AGENTS_CANNOT = /^Agents cannot perform ([\s\S]+)$/;
@@ -111,9 +113,25 @@ const CODED_REASONS = Object.freeze({
 
 /* A reason the server wrote as a code, or with one in front, in a sentence. Words a person or an agent typed
    are returned as they are. `personName(id)` names a person the reader can already see. */
+const clientWords = (client) => {
+    try {
+        return /^https?:\/\//.test(client) ? new URL(client).host : client;
+    } catch (error) {
+        return client;
+    }
+};
+
+const outsideHeld = (t, te, text, held, personName) => {
+    const plain = t("AuditReasons.outside_client_held", { risk: held[1].trim(), client: clientWords(held[2]) });
+    const said = text.slice(0, held.index).trim();
+    return said ? `${plainReason(t, te, said, personName)} (${plain})` : plain;
+};
+
 export const plainReason = (t, te, reason, personName = () => "") => {
     const text = String(reason || "").trim();
     if (!text) return "";
+    const held = OUTSIDE_HELD.exec(text);
+    if (held) return outsideHeld(t, te, text, held, personName);
     if (BARE_CODE.test(text)) return te(`AuditReasons.${text}`) ? t(`AuditReasons.${text}`) : text;
     const approved = APPROVED_PROPOSAL.exec(text);
     if (approved) return personName(approved[1]) ? t("AuditReasons.approved_by", { person: personName(approved[1]) }) : t("AuditReasons.approved_by_someone");

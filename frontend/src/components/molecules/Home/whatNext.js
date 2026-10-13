@@ -1,4 +1,5 @@
 import { computed, ref, unref } from "vue";
+import moment from "moment";
 import { apiRequest } from "@/services";
 import * as env from "@/config/env";
 
@@ -7,6 +8,7 @@ export const NEXT = Object.freeze({
     WAITING: "waiting",
     OVERDUE: "overdue",
     TODAY: "today",
+    SOON: "soon",
     START_PROJECT: "start_project",
     START_TASK: "start_task",
     CLEAR: "clear",
@@ -14,14 +16,24 @@ export const NEXT = Object.freeze({
 });
 
 const step = (kind, count = 0) => ({ kind, count });
+const SOON_DAYS = 7;
 
-/* `empty` is a workspace with no project and no task of the person's own, so the sample project's tasks do not count as work to do. */
-export function whatNext({ approvals = 0, waiting = 0, overdue = 0, today = 0, empty = false, canCreateProject = false } = {}) {
+const dueSoon = (tasks) => {
+    const until = moment().startOf("day").add(SOON_DAYS + 1, "day");
+    return (tasks || []).filter((task) => task.DueDate && moment(task.DueDate).isBefore(until)).length;
+};
+
+/* `empty` is a workspace with no project and no task of the person's own, so the sample project's tasks do not count as work to do.
+ * The person's own work due soon comes before approvals, which may be other people's agents asking. */
+export function whatNext({ approvals = 0, waiting = 0, overdue = 0, today = 0, soon = 0, empty = false, canCreateProject = false } = {}) {
+    if (!empty) {
+        if (overdue > 0) return step(NEXT.OVERDUE, overdue);
+        if (today > 0) return step(NEXT.TODAY, today);
+        if (soon > 0) return step(NEXT.SOON, soon);
+    }
     if (approvals > 0) return step(NEXT.APPROVALS, approvals);
     if (waiting > 0) return step(NEXT.WAITING, waiting);
     if (empty) return step(canCreateProject ? NEXT.START_PROJECT : NEXT.START_TASK);
-    if (overdue > 0) return step(NEXT.OVERDUE, overdue);
-    if (today > 0) return step(NEXT.TODAY, today);
     return step(NEXT.CLEAR);
 }
 
@@ -60,6 +72,7 @@ export function useWhatNext({ work, waiting, empty, canCreateProject, canOpenInb
             waiting: Math.max(0, (Number(unref(waiting)) || 0) - team.value),
             overdue: groups.overdue.length,
             today: groups.today.length,
+            soon: dueSoon(groups.next),
             empty: unref(empty),
             canCreateProject: unref(canCreateProject)
         });

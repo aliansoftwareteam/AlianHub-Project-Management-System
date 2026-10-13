@@ -8,6 +8,8 @@
                 </button>
             </Teleport>
 
+            <AdminOnlyNote v-if="!canInvite" what="invite" class="mbv__admin-only" />
+
             <div v-if="mailFailed" class="mbv__notice" role="alert" data-test="invite-mail-failed">
                 <ShellIcon name="alert" :size="15" />
                 <span class="mbv__notice-text">{{ $t('Members.invite_mail_failed') }}</span>
@@ -195,6 +197,7 @@ import { useToast } from "vue-toast-notification";
 import Swal from '@/utils/lazySwal';
 import AppState from "@/components/molecules/AppState/AppState.vue";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import AdminOnlyNote from "@/components/molecules/AdminOnlyNote/AdminOnlyNote.vue";
 import EmptyState from "@/components/atom/EmptyState/EmptyState.vue";
 import { useCustomComposable } from "@/composable";
 import { apiRequest, apiRequestWithoutCompnay } from "@/services";
@@ -576,5 +579,6 @@ onBeforeUnmount(() => document.removeEventListener("click", closeMenus));
 </script>
 
 <style scoped>
+.mbv__admin-only { margin-bottom: var(--sp-6, 12px); }
 @import "./style.css";
 </style>

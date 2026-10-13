@@ -109,7 +109,7 @@
                         </div>
                         <div class="ah-pop__sep"></div>
                         <router-link class="ah-pop__item" :to="{ name: 'My Profile', params: { cid: companyId } }" role="menuitem" @click="closePopovers()">
-                            <ShellIcon name="user" :size="15" /><span>{{ $t('Shell.my_profile') }}</span>
+                            <ShellIcon name="user" :size="15" /><span>{{ $t('Settings.nav_my_settings') }}</span>
                         </router-link>
                         <router-link class="ah-pop__item" :to="{ name: 'Setting', params: { cid: companyId } }" role="menuitem" @click="closePopovers()">
                             <ShellIcon name="settings" :size="15" /><span>{{ $t('settingslider.Settings') }}</span>

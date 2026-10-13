@@ -8,7 +8,7 @@
             :options="assigneeFilterOptions"
             :visible="userSidebar"
             @update:visible="(v) => $emit('update:userSidebar', v)"
-            :title="$t('Projects.list_of_user')"
+            :title="$t('Projects.choose_people')"
             @selected="$emit('manageFilterUsers', $event.value)"
             @itemClicked="$emit('manageFilterUsers', $event.value)"
             @removed="$emit('manageFilterUsers', $event.value)"

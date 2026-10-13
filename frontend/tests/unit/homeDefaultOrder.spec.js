@@ -149,7 +149,7 @@ describe('the order of Home', () => {
 describe('what next on Home', () => {
     it('approvals waiting for the person: the Inbox\'s own count, and the button opens that tab', async () => {
         approvalCount = 2;
-        groups.overdue = [task('t2')];
+        groups.next = [task('t2', { DueDate: new Date(Date.now() + 30 * 86400000).toISOString() })];
         await openHome();
         expect(line().attributes('data-kind')).toBe('approvals');
         expect(line().attributes('data-count')).toBe('2');
@@ -169,6 +169,7 @@ describe('what next on Home', () => {
     });
 
     it('overdue work: the number My work lists, and the button takes the keyboard to those rows', async () => {
+        approvalCount = 2;
         groups.today = [task('t1')];
         groups.overdue = [task('t2'), task('t3')];
         await openHome();

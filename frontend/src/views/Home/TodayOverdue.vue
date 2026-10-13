@@ -19,6 +19,7 @@
                                 <button type="button" class="ah-pop__item" role="menuitem" @click="focusAdd"><ShellIcon name="plus" :size="14" /><span>{{ $t('Home.new_task') }}</span></button>
                                 <button v-if="canCreateProject" type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; createProjectOpen = true"><ShellIcon name="projects" :size="14" /><span>{{ $t('Home.new_project') }}</span></button>
                                 <button type="button" class="ah-pop__item" role="menuitem" @click="newOpen = false; openPanel('reminders')"><ShellIcon name="reminder" :size="14" /><span>{{ $t('Home.new_reminder') }}</span></button>
+                                <AdminOnlyNote v-if="!canCreateProject" what="projects" class="home__admin-only" />
                             </div>
                         </transition>
                     </div>
@@ -121,6 +122,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useToast } from "vue-toast-notification";
 import ShellIcon from "@/components/organisms/Shell/ShellIcon.vue";
+import AdminOnlyNote from "@/components/molecules/AdminOnlyNote/AdminOnlyNote.vue";
 import { openPanel } from "@/components/organisms/Shell/shellState";
 import { onTaskClosed, openTask as openTaskPanel, useTaskSequenceSource } from "@/components/organisms/TaskDetailOverlay/useTaskOverlay";
 import CreateProjectSidebar from "@/components/organisms/CreateProject/CreateProjectSidebar.vue";
@@ -230,7 +232,7 @@ function focusWaiting() {
 function onNext(kind) {
     if (kind === NEXT.APPROVALS || kind === NEXT.TEAM) router.push({ name: "inbox", params: { cid: companyId.value }, query: { tab: "approval" } }).catch(() => {});
     else if (kind === NEXT.WAITING) focusWaiting();
-    else if (kind === NEXT.OVERDUE || kind === NEXT.TODAY) myWorkCard.value?.showGroup(kind);
+    else if (kind === NEXT.OVERDUE || kind === NEXT.TODAY || kind === NEXT.SOON) myWorkCard.value?.showGroup(kind);
     else if (kind === NEXT.START_PROJECT) createProjectOpen.value = true;
     else myWorkCard.value?.focusAdd();
 }
