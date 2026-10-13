@@ -263,6 +263,31 @@ describe('AiProjectCreator guided flow', () => {
         expect(outcome.text()).not.toContain('AiProject.runs_queued');
     });
 
+    it('shows the planned dashboard as a part to leave out, and says on the done screen where it was made', async () => {
+        const planResponse = { ...plan, dashboard: { name: 'Shop at a glance', cards: ['due_soon'], cardKeys: ['DueSoonCard'] } };
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), planResponse });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+
+        expect(picksOn(wrapper)).toContain('dashboards:0');
+        expect(cardLine(wrapper, 'dashboards:0')).toMatchObject({ kind: 'planDashboard', name: 'Shop at a glance', cards: ['DueSoonCard'] });
+
+        await wrapper.find('[data-test="create-everything"]').trigger('click');
+        await flushPromises();
+        FakeEventSource.last.emit({ event: 'complete', projectId: 'proj-1', totals: { sprints: 1, tasks: 4 }, dashboard: { name: 'Shop at a glance', made: true, shared: true } });
+        await flushPromises();
+
+        expect(wrapper.find('[data-test="dashboard-outcome"]').text()).toBe('AiProject.dashboard_made_shared');
+    });
+
+    it('says why a planned dashboard was left out of the plan', async () => {
+        routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), planResponse: { ...plan, dashboardDropped: { name: 'Odd', code: 'no_cards' } } });
+        const wrapper = mountCreator();
+        await reachPreview(wrapper);
+        expect(wrapper.find('[data-test="dashboard-dropped"]').text()).toBe('AiProject.dashboard_dropped_no_cards');
+        expect(picksOn(wrapper)).not.toContain('dashboards:0');
+    });
+
     it('counts the split itself when the server sends labels but no totals', async () => {
         routes({ clarify: () => ({ coverage: allMet, round: 1, maxRounds: 2, questions: [] }), planResponse: { ...plan, splitSummary: undefined } });
         const wrapper = mountCreator();

@@ -98,7 +98,7 @@ export const broughtBack = (preview, leftOut, went) => {
     return leftOut.filter((held) => out.has(held));
 };
 
-const KEPT_WORDS = Object.freeze({ statuses: 'kept_statuses', lists: 'kept_lists', fields: 'kept_fields', views: 'kept_views', rules: 'kept_rules', tasks: 'kept_tasks' });
+const KEPT_WORDS = Object.freeze({ statuses: 'kept_statuses', lists: 'kept_lists', fields: 'kept_fields', views: 'kept_views', dashboards: 'kept_dashboards', rules: 'kept_rules', tasks: 'kept_tasks' });
 
 /* How many parts of each kind are still ticked, for the kinds that have one left out, in the card's order. */
 export const keptCounts = (preview, leftOut) => {

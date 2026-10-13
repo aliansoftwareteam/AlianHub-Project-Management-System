@@ -8,19 +8,21 @@ const permissions = require('./permissions');
 const setup = require('./setupRequests');
 const { storedProject, whoOf } = require('./taskRequests');
 
-// One plan for a project that exists: statuses, lists, fields and views. Each part is made by the route the web app
-// calls for it, as the person behind the agent, and only where the person who approved may make that part by hand
-// too. A part that fails is reported beside the parts that worked. Taking a plan back removes what it made, part
-// by part, and leaves whatever is in use by then. Its automations and first tasks come last and are each an action
-// of their own (./planWork.js), with their own audit row and undo.
+// One plan for a project that exists: statuses, lists, fields, views and a dashboard. Each part is made by the route
+// the web app calls for it, as the person behind the agent, and only where the person who approved may make that
+// part by hand too; the dashboard is made as the approver, since a dashboard is its owner's alone. A part that fails
+// is reported beside the parts that worked. Taking a plan back removes what it made, part by part, and leaves
+// whatever is in use or changed by then. Its automations and first tasks come last and are each an action of their
+// own (./planWork.js), with their own audit row and undo.
 
-const PARTS = Object.freeze(['statuses', 'lists', 'fields', 'views']);
+const PARTS = Object.freeze(['statuses', 'lists', 'fields', 'views', 'dashboards']);
 const WORK_PARTS = Object.freeze(['rules', 'tasks']);
 const ALL_PARTS = Object.freeze([...PARTS, ...WORK_PARTS]);
-const PLAN_KEY = Object.freeze({ statuses: 'statuses', lists: 'lists', fields: 'definitions', views: 'views', rules: 'rules', tasks: 'tasks' });
+const PLAN_KEY = Object.freeze({ statuses: 'statuses', lists: 'lists', fields: 'definitions', views: 'views', dashboards: 'dashboards', rules: 'rules', tasks: 'tasks' });
 const STATUSES_MAX = 10;
 const LISTS_MAX = 10;
 const VIEWS_MAX = 5;
+const DASHBOARDS_MAX = 1;
 const STATUS_NAME_MAX = setup.LOOK_MAX.status;
 const CLOSING_TYPES = Object.freeze(['done', 'close']);
 const NEW_STATUS_COLOURS = Object.freeze(['#6473e8', '#ff9600', '#9b59b6', '#00a3bf', '#e8590c', '#2f9e44']);
@@ -29,6 +31,7 @@ const ADMIN_ONLY = 'This status does not exist in the company yet, and only an o
 const NOT_THIS_PLAN = 'This status is new to the workspace, and it cannot be added through this plan. An owner or admin can add it in Settings, or ask their own AI.';
 
 const work = () => require('./workRequests');
+const boards = () => require('./dashboardRequests');
 const planWork = () => require('./planWork');
 const refuse = (message) => new tools.DeterministicError(message);
 /* A part that was not made because of who asked or who approved, which asking again does not change. */
@@ -51,6 +54,8 @@ const listNameMax = () => work().LIST_NAME_MAX;
 const namesOf = (given, max) => listOf(given).map((name) => setup.lineOf(name, max));
 const fieldsGiven = (plan) => (plan.definitions !== undefined ? plan.definitions : plan.fields);
 const lookGiven = (view) => (view.look && typeof view.look === 'object' ? view.look : view);
+/* A caller names one `dashboard`; a stored plan keeps it under `dashboards`, as every part is a list. */
+const dashboardsGiven = (plan) => (plan.dashboard !== undefined ? [plan.dashboard] : plan.dashboards);
 
 const viewOf = (given) => {
     const view = objectOf(given);
@@ -70,11 +75,13 @@ const planOf = (given) => {
     const lists = namesOf(plan.lists, listNameMax());
     const definitions = setup.draftsOf(fieldsGiven(plan));
     const views = listOf(plan.views).map(viewOf);
+    const dashboards = listOf(dashboardsGiven(plan)).map((dashboard) => boards().planDashboardOf(dashboard));
     return {
         ...(statuses.length ? { statuses } : {}),
         ...(lists.length ? { lists } : {}),
         ...(definitions.length ? { definitions } : {}),
         ...(views.length ? { views } : {}),
+        ...(dashboards.length ? { dashboards } : {}),
     };
 };
 
@@ -119,21 +126,31 @@ const viewsProblemOf = (plan) => {
 
 const viewsProblem = (plan) => viewsProblemOf(plan).message;
 
+const dashboardProblem = (plan) => {
+    const given = dashboardsGiven(plan);
+    if (given === undefined) return '';
+    if (!Array.isArray(given) || given.length !== DASHBOARDS_MAX) return `a plan holds ${DASHBOARDS_MAX} dashboard`;
+    return boards().planDashboardProblem(given[0]);
+};
+
+const ownParts = (plan) => [plan.statuses, plan.lists, fieldsGiven(plan), plan.views, dashboardsGiven(plan)];
+
 /* '' for a plan every part of which can be asked for; otherwise what is wrong with it. */
 const planProblem = (given) => {
     const plan = objectOf(given);
     const fields = fieldsGiven(plan);
-    if ([plan.statuses, plan.lists, fields, plan.views].every((part) => part === undefined)) return `the plan needs at least one of ${PARTS.join(', ')}`;
+    if (ownParts(plan).every((part) => part === undefined)) return `the plan needs at least one of ${PARTS.join(', ')}`;
     return namesProblem('statuses', plan.statuses, STATUSES_MAX, STATUS_NAME_MAX)
         || namesProblem('lists', plan.lists, LISTS_MAX, listNameMax())
         || (fields !== undefined ? setup.draftsProblem(fields) : '')
-        || viewsProblem(plan);
+        || viewsProblem(plan)
+        || dashboardProblem(plan);
 };
 
 /* '' for a plan of a project that exists, every part of which can be asked for; otherwise what is wrong with it. */
 const setupProblem = (given) => {
     const plan = objectOf(given);
-    const own = [plan.statuses, plan.lists, fieldsGiven(plan), plan.views].some((part) => part !== undefined);
+    const own = ownParts(plan).some((part) => part !== undefined);
     if (!own && !planWork().isAsked(plan)) return `the plan needs at least one of ${ALL_PARTS.join(', ')}`;
     return (own ? planProblem(plan) : '') || planWork().problemIn(plan);
 };
@@ -143,11 +160,14 @@ const keysOf = (part, uid) => {
     const { FIELD_PERMISSIONS, permissionsForProjectUpdate } = require('../../Config/projectAccess');
     if (part === 'statuses') return permissionsForProjectUpdate({ taskStatusData: [] }, uid);
     if (part === 'lists') return [LIST_CREATE];
+    if (part === 'dashboards') return [];
     return [FIELD_PERMISSIONS.ProjectRequiredComponent];
 };
 
-/* '' where `uid` may make that part of a plan by hand in the project; otherwise the key that person lacks. */
+/* '' where `uid` may make that part of a plan by hand in the project; otherwise the key that person lacks. Any
+ * member makes a dashboard of their own. */
 const whyNot = async (companyId, uid, projectId, part) => {
+    if (part === 'dashboards') return '';
     if (part === 'fields') {
         const held = await permissions.holderMay(companyId, { kind: 'human', userId: uid }, 'fields.create', { projectId });
         return held.allowed ? '' : `${held.permission} is not granted`;
@@ -273,7 +293,25 @@ const addViews = async ({ companyId, who, projectId, plan, fields }) => {
     return items;
 };
 
-const MAKERS = Object.freeze({ statuses: addStatuses, lists: addLists, fields: addFields, views: addViews });
+const asApprover = (who, approvedBy) => (approvedBy && approvedBy !== who.uid
+    ? { uid: approvedBy, via: who.via, mark: who.mark ? { ...who.mark, userId: approvedBy } : null }
+    : who);
+
+const addDashboards = async ({ companyId, who, approvedBy, projectId, plan }) => {
+    const owner = asApprover(who, idOf(approvedBy));
+    const items = [];
+    for (const dashboard of plan.dashboards) {
+        try {
+            const made = await boards().makeForPlan({ companyId, who: owner, projectId, dashboard });
+            items.push({ name: made.name, made: true, dashboardId: made.dashboardId, shared: made.shared, savedAt: made.savedAt });
+        } catch (error) {
+            items.push(failedItem(dashboard.name, error));
+        }
+    }
+    return items;
+};
+
+const MAKERS = Object.freeze({ statuses: addStatuses, lists: addLists, fields: addFields, views: addViews, dashboards: addDashboards });
 const makerOf = (part) => MAKERS[part] || planWork().MAKERS[part];
 
 /* Every part in turn, each answered on its own: made, kept, or why not. `asked` is how the plan was asked for (the
@@ -314,6 +352,27 @@ const notMadeIn = (parts, plan) => parts.flatMap((entry) => (entry.error
 const liveTaskIn = (companyId, projectId, filter) => MongoDbCrudOpration(companyId, {
     type: SCHEMA_TYPE.TASKS, data: [{ ProjectID: { $in: idForms(projectId) }, deletedStatusKey: { $ne: 1 }, ...filter }, { _id: 1 }],
 }, 'findOne');
+
+const withdrawDashboards = async ({ companyId, who, dashboards }, out) => {
+    for (const made of listOf(dashboards)) {
+        try {
+            const gone = await boards().withdrawForPlan({ companyId, who, made });
+            if (gone.removed) out.removed.dashboards.push(gone.name);
+            else if (gone.reason) out.kept.push({ part: 'dashboards', name: gone.name, reason: gone.reason });
+        } catch (error) {
+            out.kept.push({ part: 'dashboards', name: '', reason: error.message });
+        }
+    }
+};
+
+/* The dashboards a plan made, taken back on their own: a new project's are, after the project. */
+const withdrawDashboardsOf = async ({ companyId, who, dashboards }) => {
+    const out = { removed: { dashboards: [] }, kept: [] };
+    await withdrawDashboards({ companyId, who, dashboards }, out);
+    return out;
+};
+
+const madeDashboards = (parts) => madeIn(parts, 'dashboards').map((item) => ({ dashboardId: item.dashboardId, savedAt: item.savedAt }));
 
 const withdrawViews = async ({ companyId, who, projectId, viewIds }, out) => {
     for (const viewId of listOf(viewIds)) {
@@ -367,7 +426,8 @@ const withdrawStatuses = async ({ companyId, who, projectId, statusKeys }, out) 
 /* Taking a plan back, newest part first, as the person undoing: what it made is removed, and whatever is in use now stays and is named with the reason. */
 const withdraw = async ({ companyId, who, made }) => {
     const projectId = idOf((await storedProject(companyId, made.projectId))._id);
-    const out = { removed: { views: [], fields: [], lists: [], statuses: [] }, kept: [] };
+    const out = { removed: { dashboards: [], views: [], fields: [], lists: [], statuses: [] }, kept: [] };
+    await withdrawDashboards({ companyId, who, dashboards: made.dashboards }, out);
     await withdrawViews({ companyId, who, projectId, viewIds: made.viewIds }, out);
     await withdrawFields({ companyId, who, projectId, fieldIds: made.fieldIds }, out);
     await withdrawLists({ companyId, who, projectId, lists: made.lists }, out);
@@ -394,6 +454,7 @@ const executors = {
                 lists: madeIn(parts, 'lists').map((item) => ({ sprintId: item.sprintId, name: item.name })),
                 fieldIds: madeIn(parts, 'fields').map((item) => item.fieldId),
                 viewIds: madeIn(parts, 'views').map((item) => item.viewId),
+                dashboards: madeDashboards(parts),
             } : null,
             entityType: 'project', entityId: projectId, entityName: project.ProjectName || '',
         };
@@ -407,4 +468,7 @@ const inverses = {
     },
 };
 
-module.exports = { executors, inverses, planOf, planProblem, viewsProblemOf, setupPlanOf, setupProblem, refusedParts, whyNot, newToCompany, newStatusRefusal, mayPassLater, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, ALL_PARTS, PLAN_KEY, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };
+module.exports = {
+    executors, inverses, planOf, planProblem, viewsProblemOf, setupPlanOf, setupProblem, refusedParts, whyNot, newToCompany, newStatusRefusal, mayPassLater, viewOf, partsOf, keysOf, carryOut, notMadeIn,
+    madeDashboards, withdrawDashboardsOf, PARTS, ALL_PARTS, PLAN_KEY, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, DASHBOARDS_MAX, STATUS_NAME_MAX,
+};

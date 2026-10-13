@@ -30,6 +30,8 @@
       { "name": string, "kind": "list" | "board" | "table" | "calendar" | "workload", "look": { } }
     ],
 
+    "dashboard": { "name": string, "cards": string[] },   // optional; one at most, 1-6 cards, see Dashboard
+
     "sprints": [
       {
         "sprintName": string,                             // 1-80 chars

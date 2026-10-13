@@ -11,8 +11,10 @@ const ACTION = 'dashboard.card.add';
 const UNDO_KIND = 'dashboardCard';
 const NAME_MAX = 120;
 const CARDS_MAX = 60;
+const PLAN_CARDS_MAX = 6;
 const PRIVATE = 'private';
 const WORKSPACE = 'workspace';
+const PROJECT = 'project';
 const OBJECT_ID = /^[a-f0-9]{24}$/i;
 
 const slot = (w, h, minW, minH, maxH = 22) => Object.freeze({ w, h, minW, maxW: 12, minH, maxH });
@@ -36,6 +38,7 @@ const NOT_FOUND = 'That dashboard was not found.';
 const NOT_OWNER = 'Only the owner of a dashboard can change it, and this one belongs to someone else.';
 const FULL = `That dashboard already has ${CARDS_MAX} cards, which is the most it can have.`;
 const NOT_THEIRS = 'A dashboard is changed by its owner alone, so only the person this card was asked for can approve it.';
+const CHANGED_SINCE = 'it was changed after the plan made it';
 
 const refuse = (message) => new tools.DeterministicError(message);
 const idOf = (value) => (value === undefined || value === null ? '' : String(value));
@@ -150,6 +153,61 @@ const withdraw = async ({ companyId, who, made }) => {
     return { dashboardId: made.dashboardId, removed: true, dashboardRemoved: whole };
 };
 
+const timeOf = (value) => {
+    const at = value ? new Date(value).getTime() : 0;
+    return Number.isFinite(at) ? at : 0;
+};
+
+/* The dashboard a plan names, kept to what a plan takes: a name, and cards of the picker, each once. */
+const planDashboardOf = (given) => {
+    const asked = objectOf(given);
+    return { name: setup.lineOf(asked.name, NAME_MAX), cards: [...new Set(listOf(asked.cards).map(idOf))] };
+};
+
+/* '' for a dashboard a plan can ask for; otherwise what is wrong with it. */
+const planDashboardProblem = (given) => {
+    const asked = objectOf(given);
+    if (!planDashboardOf(asked).name) return 'dashboard needs a name';
+    const cards = listOf(asked.cards).map(idOf);
+    if (!cards.length || cards.length > PLAN_CARDS_MAX) return `dashboard needs 1 to ${PLAN_CARDS_MAX} cards`;
+    const other = cards.find((card) => !Object.hasOwn(CARDS, card));
+    if (other !== undefined) return `dashboard: "${other}" is not a card; a card is one of ${Object.keys(CARDS).join(', ')}`;
+    return new Set(cards).size < cards.length ? 'dashboard names a card twice' : '';
+};
+
+/* The line a plan's card shows for its dashboard, each card named by the component the editor draws. */
+const planLine = (given, pick) => {
+    const dashboard = planDashboardOf(given);
+    if (!dashboard.name) return null;
+    return { kind: 'planDashboard', name: dashboard.name, cards: dashboard.cards.filter((card) => Object.hasOwn(CARDS, card)).map((card) => CARDS[card].key), pick };
+};
+
+/* A plan's dashboard, made by the editor's route as `who`, who owns it: shown to everyone on the project where they
+ * can open it, which is what the route asks of a project dashboard, and private to them otherwise. */
+const makeForPlan = async ({ companyId, who, projectId, dashboard }) => {
+    const { visibleProjectIds } = require('../UserDashboard/controller');
+    const shared = (await visibleProjectIds(companyId, who.uid)).includes(idOf(projectId));
+    const cards = dashboard.cards.reduce((made, card) => [...made, cardDoc({ card }, made)], []);
+    const body = { title: dashboard.name, visibility: shared ? PROJECT : PRIVATE, ...(shared ? { projectId: idOf(projectId) } : {}), cards };
+    const answer = await setup.answerOf('dashboardCreate', { companyId, who, body });
+    const made = answered(answer);
+    if (!made || !made._id) throw refuse(setup.reasonOf(answer, 'The dashboard was not created.'));
+    return { dashboardId: idOf(made._id), name: made.title || dashboard.name, shared: made.visibility === PROJECT, savedAt: timeOf(made.updatedAt) };
+};
+
+/* Taking a plan's dashboard back, as the person undoing, who must own it. One that is gone already is left at that;
+ * one changed since the plan made it stays, with why. */
+const withdrawForPlan = async ({ companyId, who, made }) => {
+    const held = await editable(companyId, who, made.dashboardId);
+    if (held.error === NOT_FOUND) return { removed: false, name: '' };
+    if (held.error) return { removed: false, name: '', reason: held.error };
+    const name = held.dashboard.title || '';
+    if (timeOf(held.dashboard.updatedAt) !== Number(made.savedAt || 0)) return { removed: false, name, reason: CHANGED_SINCE };
+    const answer = await setup.answerOf('dashboardDelete', { companyId, who, params: { id: made.dashboardId } });
+    if (!answered(answer)) return { removed: false, name, reason: setup.reasonOf(answer, 'the dashboard was not removed') };
+    return { removed: true, name };
+};
+
 const mayWithdraw = async (companyId, uid, dashboardId) => !(await editable(companyId, human(uid), dashboardId)).error;
 
 /* The card's lines, for a viewer who can open the dashboard; a dashboard that is not there yet is the proposal's own text. */
@@ -189,4 +247,7 @@ const inverses = {
     [UNDO_KIND]: (companyId, made, actor) => withdraw({ companyId, who: whoOf(actor), made }),
 };
 
-module.exports = { executors, inverses, draftOf, problemIn, refusalFor, approverRefusal, mayWithdraw, preview, ACTION, UNDO_KIND, CARDS, PERIODS, NAME_MAX, NOT_THEIRS };
+module.exports = {
+    executors, inverses, draftOf, problemIn, refusalFor, approverRefusal, mayWithdraw, preview, planDashboardOf, planDashboardProblem, planLine, makeForPlan, withdrawForPlan,
+    ACTION, UNDO_KIND, CARDS, PERIODS, NAME_MAX, PLAN_CARDS_MAX, NOT_THEIRS, CHANGED_SINCE,
+};

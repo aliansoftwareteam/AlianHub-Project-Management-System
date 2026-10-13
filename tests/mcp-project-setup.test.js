@@ -342,7 +342,7 @@ describe('undo takes back what the plan made', () => {
         const out = await undo(id);
         expect(out.error).toBeUndefined();
         expect(out.results[0]).toMatchObject({ ok: true, result: { projectId: P_OPEN, kept: [] } });
-        expect(out.results[0].result.removed).toEqual({ views: ['Review board'], fields: ['Budget', 'Region'], lists: ['Backlog', 'This week'], statuses: ['In Review'] });
+        expect(out.results[0].result.removed).toEqual({ dashboards: [], views: ['Review board'], fields: ['Budget', 'Region'], lists: ['Backlog', 'This week'], statuses: ['In Review'] });
         expect(statusNames()).toEqual(['To Do', 'In Progress', 'Done']);
         expect(listsNamed('Backlog')).toHaveLength(0);
         expect(listsNamed('This week')).toHaveLength(0);
@@ -361,7 +361,7 @@ describe('undo takes back what the plan made', () => {
         mockDb.seed(SCHEMA_TYPE.TASKS, { TaskName: 'Planned', ProjectID: P_OPEN, sprintId: String(listsNamed('Backlog')[0]._id), CompanyId: CID, statusKey: 1, deletedStatusKey: 0 });
         const out = await undo(id);
         const { removed, kept } = out.results[0].result;
-        expect(removed).toEqual({ views: ['Review board'], fields: ['Region'], lists: ['This week'], statuses: [] });
+        expect(removed).toEqual({ dashboards: [], views: ['Review board'], fields: ['Region'], lists: ['This week'], statuses: [] });
         expect(kept.map((entry) => [entry.part, entry.name])).toEqual([['fields', 'Budget'], ['lists', 'Backlog'], ['statuses', 'In Review']]);
         expect(kept.find((entry) => entry.part === 'statuses').reason).toMatch(/task/);
         expect(statusNames()).toContain('In Review');

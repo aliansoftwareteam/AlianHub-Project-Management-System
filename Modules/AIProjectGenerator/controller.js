@@ -19,6 +19,7 @@ const planAutomations = require('./planAutomations');
 const { usageFromResult, addUsage, summarize } = require('../AICore/usage');
 const planRules = require('./planRules');
 const planViews = require('./planViews');
+const planDashboard = require('./planDashboard');
 const planPicks = require('./planPicks');
 const sseEmitter = require('./sseEmitter');
 const { PLAN_TTL_SECONDS, PLAN_EXPIRED, cacheKey, rememberPlan, storedPlan, storedGuide, claimPlan, releasePlan, forgetPlan } = require('./planStash');
@@ -287,6 +288,10 @@ async function generatePlanForJob({ jobId, uid, companyId, description, addition
         const { kept, dropped } = planViews.trimViews(plan.views);
         plan.views = kept;
         plan.viewsDropped = dropped;
+        const board = planDashboard.trimDashboard(plan.dashboard);
+        if (board.kept) plan.dashboard = board.kept;
+        else delete plan.dashboard;
+        if (board.dropped) plan.dashboardDropped = board.dropped;
         Object.assign(plan, planPicks.marksOf(await planPicks.locksFor({ companyId, uid, plan })));
 
         const planId = rememberPlan({ uid, companyId, plan, approvedBrief, assumptions });
@@ -672,6 +677,9 @@ exports.execute = async (req, res) => {
         }
         plan = normalizePlanColors(reCheck.data);
         plan.views = planViews.trimViews(plan.views).kept;
+        const board = planDashboard.trimDashboard(plan.dashboard).kept;
+        if (board) plan.dashboard = board;
+        else delete plan.dashboard;
 
         const locks = await planPicks.locksFor({ companyId, uid, plan: stored.plan });
         const picked = planPicks.narrow(plan, req.body && req.body.picks, { withGuide, locks });

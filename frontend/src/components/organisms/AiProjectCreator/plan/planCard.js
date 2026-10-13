@@ -16,6 +16,7 @@ export const cardOf = (plan, { withGuide = false } = {}) => {
         sprints.length && { kind: 'newLists', names: sprints.map((sprint) => textOf(sprint?.sprintName)), picks: sprints.map((sprint, at) => `lists:${at}`) },
         ...taskLines,
         ...listOf(plan.views).map((view, at) => ({ kind: 'planView', name: textOf(view?.name), layout: textOf(view?.kind), pick: `views:${at}` })),
+        plan.dashboard && { kind: 'planDashboard', name: textOf(plan.dashboard.name), cards: listOf(plan.dashboard.cardKeys), pick: 'dashboards:0' },
         ...listOf(plan.rules).map((rule, at) => ({ kind: 'planRule', text: textOf(rule?.sentence) || textOf(rule?.name), pick: `rules:${at}` })),
         withGuide && { kind: 'planAgent', project: textOf(plan.project.ProjectName), pick: 'agents:0' },
     ].filter(Boolean);

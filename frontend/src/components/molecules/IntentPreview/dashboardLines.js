@@ -1,4 +1,4 @@
-// The lines of a card an agent asks to add to a dashboard (Modules/Agents/dashboardRequests.js). The server names the
+// The lines of a card an agent asks to add to a dashboard, and of a plan's dashboard (Modules/Agents/dashboardRequests.js). The server names the
 // card by its component and the span of time by its number, as the dashboard stores them; the words are the
 // dashboard editor's own.
 
@@ -20,5 +20,11 @@ export const DASHBOARD_LINE_KINDS = {
         const period = PERIOD_OPTIONS.find((option) => option.id === line.period);
         const card = t(entry.titleKey);
         return { label: t('IntentPreview.line_card'), text: period ? t('IntentPreview.card_over', { card, period: t(period.labelKey) }) : card };
+    },
+    planDashboard: (t, line) => {
+        const name = textOf(line.name);
+        if (!name) return null;
+        const cards = (Array.isArray(line.cards) ? line.cards : []).map(catalogEntry).filter(Boolean).map((entry) => t(entry.titleKey));
+        return { label: t('IntentPreview.line_new_dashboard'), text: cards.length ? t('IntentPreview.dashboard_with_cards', { name, cards: cards.join(', ') }) : name };
     },
 };
