@@ -93,25 +93,31 @@ const namesProblem = (part, given, max, nameMax) => {
     return twice ? `"${twice}" is named twice in ${part}` : '';
 };
 
-const viewsProblem = (plan) => {
-    if (plan.views === undefined) return '';
+const NO_VIEW_PROBLEM = Object.freeze({ code: '', message: '' });
+const viewProblem = (code, message) => ({ code, message });
+
+/* What is wrong with a plan's views, with a `code` a screen can say in the person's language; an empty message when nothing is. */
+const viewsProblemOf = (plan) => {
+    if (plan.views === undefined) return NO_VIEW_PROBLEM;
     const given = listOf(plan.views);
-    if (!given.length || given.length > VIEWS_MAX) return `views needs 1 to ${VIEWS_MAX} views`;
+    if (!given.length || given.length > VIEWS_MAX) return viewProblem('too_many', `views needs 1 to ${VIEWS_MAX} views`);
     const planned = setup.draftsOf(fieldsGiven(plan)).map((draft) => draft.name);
     for (const [at, entry] of given.entries()) {
         const view = viewOf(entry);
         const where = `views[${at}]${view.name ? ` (${view.name})` : ''}`;
-        if (!view.name) return `${where} needs a name`;
-        if (!Object.hasOwn(setup.VIEW_KINDS, view.kind)) return `${where} needs a kind: one of ${Object.keys(setup.VIEW_KINDS).join(', ')}`;
+        if (!view.name) return viewProblem('name_missing', `${where} needs a name`);
+        if (!Object.hasOwn(setup.VIEW_KINDS, view.kind)) return viewProblem('kind', `${where} needs a kind: one of ${Object.keys(setup.VIEW_KINDS).join(', ')}`);
         const wrong = setup.lookProblem(lookGiven(objectOf(entry)));
-        if (wrong) return `${where}: ${wrong}`;
+        if (wrong) return viewProblem('look', `${where}: ${wrong}`);
         const unknown = listOf(view.showFields).find((name) => !planned.some((field) => sameName(field, name)));
-        if (unknown) return `${where} shows "${unknown}", which is not a field of this plan; a field the project already has goes in showFieldIds`;
+        if (unknown) return viewProblem('look', `${where} shows "${unknown}", which is not a field of this plan; a field the project already has goes in showFieldIds`);
     }
     const names = given.map((entry) => viewOf(entry).name);
     const twice = names.find((name, at) => names.findIndex((other) => sameName(other, name)) !== at);
-    return twice ? `"${twice}" is named twice in views` : '';
+    return twice ? viewProblem('name_taken', `"${twice}" is named twice in views`) : NO_VIEW_PROBLEM;
 };
+
+const viewsProblem = (plan) => viewsProblemOf(plan).message;
 
 /* '' for a plan every part of which can be asked for; otherwise what is wrong with it. */
 const planProblem = (given) => {
@@ -261,7 +267,7 @@ const addViews = async ({ companyId, who, projectId, plan, fields }) => {
             const made = await setup.createView({ companyId, who, projectId, name: view.name, kind: view.kind, look: { ...view.look, ...(shown.length ? { showFieldIds: shown } : {}) } });
             items.push({ name: made.name, kind: made.kind, made: true, viewId: made.viewId, leftOut: unique([...made.leftOut, ...(found.length < named.length ? ['columns'] : [])]) });
         } catch (error) {
-            items.push({ ...failedItem(view.name, error), kind: view.kind });
+            items.push({ ...failedItem(view.name, error), kind: view.kind, ...(error.code ? { code: error.code } : {}) });
         }
     }
     return items;
@@ -285,7 +291,7 @@ const carryOut = async ({ companyId, who, approvedBy, projectId, plan, asked = {
     for (const part of partsOf(plan)) {
         const error = barred(part);
         if (error) {
-            parts.push({ part, ok: false, error, refused: true, items: [] });
+            parts.push({ part, ok: false, error, refused: true, code: 'permission', items: [] });
             continue;
         }
         const fields = (parts.find((made) => made.part === 'fields') || { items: [] }).items;
@@ -401,4 +407,4 @@ const inverses = {
     },
 };
 
-module.exports = { executors, inverses, planOf, planProblem, setupPlanOf, setupProblem, refusedParts, whyNot, newToCompany, newStatusRefusal, mayPassLater, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, ALL_PARTS, PLAN_KEY, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };
+module.exports = { executors, inverses, planOf, planProblem, viewsProblemOf, setupPlanOf, setupProblem, refusedParts, whyNot, newToCompany, newStatusRefusal, mayPassLater, viewOf, partsOf, keysOf, carryOut, notMadeIn, PARTS, ALL_PARTS, PLAN_KEY, STATUSES_MAX, LISTS_MAX, VIEWS_MAX, STATUS_NAME_MAX };
